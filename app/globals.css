@@ -9,8 +9,8 @@
 .token{position:relative;z-index:2}
 .token:hover,.token:focus-visible{z-index:35}
 .token-number{display:block;line-height:1}
-.quick-view{position:absolute;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%);width:max-content;min-width:132px;padding:9px 11px;border:1px solid #9eacca;border-radius:7px;background:#fff;color:#152650;box-shadow:0 7px 20px #17325c45;display:grid;gap:6px;z-index:40;pointer-events:none;text-align:left}
-.quick-view:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff}
+.quick-view{position:fixed;transform:translate(-50%,-100%);width:max-content;min-width:142px;padding:10px 12px;border:1px solid #8799bd;border-radius:8px;background:#fff;color:#152650;box-shadow:0 12px 34px #10264f66;display:grid;gap:7px;z-index:2147483000;pointer-events:none;text-align:left;animation:quick-pop .12s ease-out}.quick-view.below{transform:translate(-50%,0)}
+.quick-view:after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:7px solid transparent;border-top-color:#fff}.quick-view.below:after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#fff}@keyframes quick-pop{from{opacity:0}to{opacity:1}}
 .quick-bus,.quick-status{display:flex;align-items:center;gap:7px}
 .quick-bus strong{font-size:12px}
 .quick-status{font-size:9px;font-weight:900;color:#586783}
