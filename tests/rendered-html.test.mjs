@@ -34,6 +34,16 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, />LOCATE</);
   assert.match(html, /> SETTINGS</);
   assert.match(html, /data-bus-id="b0" data-status="service" data-pending="false"/);
+  assert.match(html, /data-bus-id="b20" data-status="out" data-pending="false"/);
+  assert.match(html, /IN SERVICE WITH DEFECTS/);
+  assert.match(html, /WORK IN PROGRESS/);
+  assert.match(html, /DECOMMISSIONED \/ DOWN INDEFINITELY/);
+  assert.doesNotMatch(html, /TOW \/ STAGING/);
+  assert.match(html, /--status-service:#1764d8/);
+  assert.match(html, /--status-defect:#159447/);
+  assert.match(html, /--status-shop:#efa400/);
+  assert.match(html, /--status-out:#c91f27/);
+  assert.match(html, /--status-decommissioned:#343a40/);
   assert.doesNotMatch(html, /TOTAL SPACES:/);
   assert.doesNotMatch(html, /SHOP BAYS \(DIAGONAL - 12 TOTAL\)/);
 
@@ -56,6 +66,11 @@ test("includes full theme, manual color, highlight, and locate controls", async 
     assert.match(page, new RegExp(control));
   }
   assert.match(page, /scrollIntoView\(\{behavior:"smooth"/);
+  assert.match(page, /original==="tow"\?"out"/);
+  assert.match(page, /statusVersion:3/);
+  assert.match(page, /<Icon s=\{bus\.s\}/);
+  assert.match(page, /onChange=\{e=>f\("s",e\.target\.value\)\}/);
+  assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
   assert.match(css, /\.app\.highlight-service/);
   assert.match(css, /\.app\.highlight-pending/);
   assert.match(css, /@keyframes locate-pulse/);
