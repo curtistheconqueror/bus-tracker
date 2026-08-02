@@ -100,6 +100,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .command-bar button:hover,.command-bar button:focus-visible{border-color:var(--command-text);filter:brightness(1.12)}
 .command-highlights{display:flex;gap:5px}
 .command-highlights button.active{background:#0873df;color:#fff;border-color:#69adff;box-shadow:0 0 0 2px #62a8ff44 inset}
+.command-highlights button b{min-width:17px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;padding:2px 5px;border-radius:10px;background:#ffffff26;color:inherit;font-size:8px}
 .locate-command{height:31px;display:flex;border:1px solid color-mix(in srgb,var(--command-text) 35%,transparent);border-radius:5px;overflow:hidden;background:var(--panel-bg)}
 .locate-command input{width:82px;border:0;outline:0;padding:0 8px;background:var(--panel-bg);color:var(--theme-text);font-size:10px;font-weight:900}
 .locate-command button{border:0;border-left:1px solid color-mix(in srgb,var(--command-text) 25%,transparent);border-radius:0;background:#0873df;color:#fff}
@@ -110,7 +111,9 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .refresh-command span{font-size:16px;line-height:1}
 .refresh-command:disabled{opacity:.65;cursor:wait}
 .app.highlight-all .token{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
-.app.highlight-service .token:not([data-status="service"]):not([data-status="defect"]),.app.highlight-pending .token[data-pending="false"],.app.highlight-unscheduled .token[data-unscheduled="false"]{opacity:.18;filter:grayscale(.8)}
+.app.highlight-pending .token[data-pending="false"],.app.highlight-unscheduled .token[data-unscheduled="false"],.app.highlight-ac .token[data-ac="false"],.app.highlight-downsheet .token[data-downsheet="false"]{opacity:.18;filter:grayscale(.8)}
+.app.highlight-ac .token[data-ac="true"]{outline:2px solid #24a9e8;box-shadow:0 0 13px #24a9e8;animation:command-glow 1.05s ease-in-out infinite alternate}
+.app.highlight-downsheet .token[data-downsheet="true"]{outline:2px solid #9d58e8;box-shadow:0 0 13px #9d58e8;animation:command-glow 1.05s ease-in-out infinite alternate}
 .app.highlight-unscheduled .token[data-unscheduled="true"]{outline:2px solid #ff7a18;box-shadow:0 0 13px #ff7a18;animation:command-glow 1.05s ease-in-out infinite alternate}
 .app.highlight-service .token[data-status="service"],.app.highlight-service .token[data-status="defect"]{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
 .app.highlight-pending .token[data-pending="true"]{outline:2px solid #ffc21a;box-shadow:0 0 13px #ffc21a;animation:command-glow 1.05s ease-in-out infinite alternate}
@@ -139,7 +142,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .color-field code{font-size:8px;color:#70809b;text-align:right}
 .settings-actions{background:#f8faff}
 @media(max-width:800px){.command-bar{width:calc(100vw - 12px);gap:5px;justify-content:space-between}.command-bar button{padding:0 7px;font-size:8px}.locate-command input{width:63px}.theme-grid{grid-template-columns:repeat(3,1fr)}.manual-grid{grid-template-columns:1fr}.settings-modal{max-height:94vh}.settings-body{padding:11px}.app{padding-bottom:68px}}
-@media(max-width:560px){.command-highlights button{font-size:0;padding:0 6px}.command-highlights button:after{font-size:10px}.command-highlights button:nth-child(1):after{content:"ALL"}.command-highlights button:nth-child(2):after{content:"SERVICE"}.command-highlights button:nth-child(3):after{content:"PENDING"}.command-highlights button:nth-child(4):after{content:"UNSCHED"}.settings-command,.refresh-command{font-size:0!important;padding:0 7px!important}.settings-command span,.refresh-command span{font-size:17px}.locate-command input{width:55px}}
+@media(max-width:560px){.command-highlights button{font-size:0;padding:0 6px}.command-highlights button:after{font-size:10px}.command-highlights button:nth-child(1):after{content:"AC"}.command-highlights button:nth-child(2):after{content:"MYSTERY"}.command-highlights button:nth-child(3):after{content:"DOWN"}.command-highlights button:nth-child(4):after{content:"PENDING"}.command-highlights button:nth-child(5):after{content:"UNSCHED"}.command-highlights button:nth-child(3) b{font-size:8px}.command-bar{flex-wrap:wrap}.app{padding-bottom:104px}.settings-command,.refresh-command{font-size:0!important;padding:0 7px!important}.settings-command span,.refresh-command span{font-size:17px}.locate-command input{width:55px}}
 /* Nine service bays and official Roadcall treatment */
 :root{--roadcall-color:#f97316}
 .bay-placeholder{visibility:hidden;pointer-events:none}

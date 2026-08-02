@@ -31,8 +31,9 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, /<title>Pace Maintenance Bus Tracking System<\/title>/i);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
-  assert.match(html, />ALL BUSES</);
-  assert.match(html, />IN SERVICE</);
+  assert.match(html, />AC BUSES</);
+  assert.match(html, />MYSTERY BUSES</);
+  assert.match(html, /DOWN SHEET/);
   assert.match(html, />PENDING REPAIR</);
   assert.match(html, />UNSCHEDULED WORK</);
   assert.match(html, />LOCATE</);
@@ -102,6 +103,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.app\.highlight-pending/);
   assert.match(css, /\.app\.highlight-unscheduled/);
   assert.match(page, /data-unscheduled=\{bus\.outReason==="Unscheduled"\}/);
+  assert.match(page, /data-ac=\{Boolean\(bus\.acIssue\)/);
+  assert.match(page, /data-downsheet=\{Boolean\(bus\.onDownSheet\)\}/);
+  assert.match(page, /activeDownIds\.length/);
+  assert.match(page, /entry\.category==="A\/C and HVAC"/);
+  assert.match(css, /\.app\.highlight-ac/);
+  assert.match(css, /\.app\.highlight-downsheet/);
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
@@ -125,7 +132,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(13/);
-  assert.match(page, /validateBusUpdate\(buses,next\)/);
+  assert.match(page, /validateBusUpdate\(buses,cleanNext\)/);
   assert.match(page, /error==="occupied-location"/);
   assert.match(page, /towInProgress:boolean/);
   assert.match(page, /towInProgress:Boolean\(bus\.towInProgress\)/);
