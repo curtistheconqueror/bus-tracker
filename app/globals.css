@@ -46,3 +46,25 @@
 .road .title{height:28px}
 .roadgrid{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(8,1fr);gap:7px;height:235px}
 .road p{margin:5px 0 0}
+
+/* Section bus controls, wider vertical spaces, and touch gestures */
+.token{touch-action:manipulation}
+.title-actions{position:absolute;right:4px;display:flex;align-items:center;gap:5px}
+.title-actions button{width:19px;height:19px;padding:0;border:1px solid #9eabc4;border-radius:4px;background:#fff;color:#24385d;font-size:13px;font-weight:900;line-height:17px;opacity:.78;cursor:pointer}
+.title-actions button:hover,.title-actions button:focus-visible{opacity:1;background:#edf4ff;border-color:#5878ae}
+.title-actions .remove-space{color:#aa1d26}
+.title-actions .more-section{font-size:9px;letter-spacing:-1px}
+.vertical{gap:6px}
+.vertical section{padding:0 5px 9px}
+.vertical .token{transform:translateX(-2px);font-size:8px;padding:3px 2px;gap:2px}
+.vertical .title,.special .title{flex-direction:column;justify-content:center;gap:2px}
+.vertical .title-actions,.special .title-actions{position:static;right:auto}
+.vertical .title-actions button,.special .title-actions button{width:18px;height:17px;line-height:15px;font-size:11px}
+.remove-shade{z-index:2147483001}
+.remove-modal{width:min(520px,100%);background:#f8faff;border-radius:10px;box-shadow:0 18px 70px #0009;overflow:hidden}
+.remove-list{display:grid;gap:8px;padding:16px;max-height:55vh;overflow:auto}
+.remove-list>p{margin:10px;color:#67748d;text-align:center;font-size:12px}
+.remove-list>div{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid #d3dbea;border-radius:6px;background:#fff}
+.remove-list>div>span{display:flex;align-items:center;gap:8px;font-size:11px}
+.remove-list small{color:#687791;font-size:8px;font-weight:900}
+.remove-list>div>button{border:1px solid #dfa3a6;border-radius:4px;background:#fff4f4;color:#ac1d25;padding:6px 9px;font-size:9px;font-weight:900}
