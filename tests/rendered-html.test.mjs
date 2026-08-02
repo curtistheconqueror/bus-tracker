@@ -34,6 +34,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, />ALL BUSES</);
   assert.match(html, />IN SERVICE</);
   assert.match(html, />PENDING REPAIR</);
+  assert.match(html, />UNSCHEDULED WORK</);
   assert.match(html, />LOCATE</);
   assert.match(html, />REFRESH</);
   assert.match(html, /> SETTINGS</);
@@ -99,6 +100,8 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /@keyframes roadcall-dot-pulse/);
   assert.match(css, /\.app\.highlight-service/);
   assert.match(css, /\.app\.highlight-pending/);
+  assert.match(css, /\.app\.highlight-unscheduled/);
+  assert.match(page, /data-unscheduled=\{bus\.outReason==="Unscheduled"\}/);
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
