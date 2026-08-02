@@ -18,3 +18,25 @@
 .overflow{display:flex;align-items:center;justify-content:center;gap:7px;padding:6px;margin-top:5px;border:1px solid #d7a04c;border-radius:5px;background:#fff6df}
 .overflow>b{font-size:8px;color:#8b5700}
 @media(max-width:1100px){.single .token{font-size:9px;padding:3px 5px}.quick-view{min-width:124px}}
+
+/* Operational status, road area, repair snapshot, and color settings */
+.legend{gap:11px;font-size:8px}
+.road{border:1px solid #7ea0d3;border-radius:5px;padding:0 9px;background:linear-gradient(180deg,#f9fbff,#f2f7ff)}
+.road .title{height:38px;color:#164b91;font-size:10px}
+.roadgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,1fr);gap:6px;height:174px}
+.road p{text-align:center;margin:8px 0 0;font-size:7px;font-weight:900;color:#61718e}
+.quick-view{min-width:190px;max-width:250px}
+.quick-sitting,.quick-detail{display:grid;grid-template-columns:auto 1fr;gap:7px;align-items:start;border-top:1px solid #dce2ed;padding-top:6px;font-size:10px;color:#273a60;white-space:normal}
+.quick-sitting b,.quick-detail b{font-size:8px;color:#72809b;white-space:nowrap}
+.roadcall-badge{margin-left:auto;padding:3px 5px;border-radius:4px;background:#b91f28;color:#fff;font-size:7px;letter-spacing:.5px}
+.settings-shade{z-index:2147483001}
+.settings-modal{width:min(470px,100%);background:#f8faff;border-radius:10px;box-shadow:0 18px 70px #0009;overflow:hidden}
+.color-settings{display:grid;gap:8px;padding:18px}
+.color-settings>label{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:7px 10px;border:1px solid #d3dbea;border-radius:6px;background:#fff;font-size:10px;font-weight:900;color:#33486d}
+.color-settings>label>span{display:flex;align-items:center;gap:9px}
+.color-settings input[type=color]{width:42px;height:27px;border:0;border-radius:4px;background:transparent;cursor:pointer}
+.color-settings .theme-setting{margin-top:5px}
+.settings-actions{display:flex;justify-content:space-between;padding:12px 18px;border-top:1px solid #d1d8e6}
+.settings-actions button{border:1px solid #aeb8cc;background:#fff;border-radius:4px;padding:9px 13px;font-size:10px;font-weight:900}
+.settings-actions .save{background:#0867d5;color:#fff;border-color:#0867d5}
+@media(max-width:1100px){.legend{gap:6px;font-size:7px}.roadgrid{gap:4px}}
