@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -119,6 +120,14 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(13/);
+  assert.match(page, /validateBusUpdate\(buses,next\)/);
+  assert.match(page, /error==="occupied-location"/);
+  assert.match(page, /towInProgress:boolean/);
+  assert.match(page, /towInProgress:Boolean\(bus\.towInProgress\)/);
+  assert.match(page, /TOW IN PROGRESS/);
+  assert.match(page, /checked=\{d\.towInProgress\}/);
+  assert.match(css, /\.tow-badge\{/);
+  assert.match(css, /\.form \.tow-check\{/);
 });
 test("installs and caches an offline app shell", async () => {
   const [page, layout, worker, manifestText] = await Promise.all([
@@ -138,4 +147,26 @@ test("installs and caches an offline app shell", async () => {
   assert.match(worker, /html\.matchAll/);
   assert.match(worker, /request\.mode === "navigate"/);
   assert.match(worker, /caches\.match\("\/"\)/);
+});
+
+test("allows ordinary edits to an existing duplicated number while protecting identity and occupancy", () => {
+  const buses = [
+    { id: "a", n: "17571", l: "east-0" },
+    { id: "b", n: "17571", l: "road-0" },
+    { id: "c", n: "18000", l: "road-1" },
+  ];
+
+  assert.equal(hasBusNumberConflict(buses, "a", "17571", "17571"), false);
+  assert.equal(hasBusNumberConflict(buses, "a", "17571", "18000"), true);
+  assert.equal(hasBusNumberConflict(buses, "new", "", "17571"), true);
+  assert.equal(hasBusNumberConflict(buses, "a", "17571", "19000"), false);
+  assert.equal(hasLocationConflict(buses, "a", "east-0"), false);
+  assert.equal(hasLocationConflict(buses, "a", "road-1"), true);
+  assert.equal(validateBusUpdate(buses, { id: "a", n: "17571", l: "east-0" }), null);
+  assert.equal(validateBusUpdate(buses, { id: "a", n: "17571", l: "east-6" }), null);
+  assert.equal(validateBusUpdate(buses, { id: "a", n: "18000", l: "east-0" }), "duplicate-number");
+  assert.equal(validateBusUpdate(buses, { id: "a", n: "17571", l: "road-1" }), "occupied-location");
+  assert.equal(validateBusUpdate(buses, { id: "new", n: "17571", l: "east-6" }), "duplicate-number");
+  assert.equal(validateBusUpdate(buses, { id: "new", n: "", l: "east-6" }), "number-required");
+  assert.equal(validateBusUpdate(buses, { id: "new", n: "17A71", l: "east-6" }), "number-invalid");
 });
