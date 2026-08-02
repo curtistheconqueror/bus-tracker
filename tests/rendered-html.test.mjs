@@ -90,6 +90,20 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.app\.highlight-pending/);
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
+  assert.match(page, /LIVE FLEET:/);
+  assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
+  assert.match(page, /data-empty=\{!b\}/);
+  assert.match(page, /onDoubleClick=/);
+  assert.match(page, /event\.pointerType!=="touch"/);
+  assert.match(page, /Protected fleet identity\. Change only in Settings\./);
+  assert.match(page, /FLEET NUMBER CONTROL/);
+  assert.match(page, /Duplicate numbers are blocked/);
+  assert.match(page, /MOVE TO AREA/);
+  assert.match(page, /disabled=\{!area\.available\}/);
+  assert.match(page, /That destination was just occupied/);
+  assert.match(css, /\.service\{width:calc\(75% - 8px\);justify-self:start/);
+  assert.match(css, /\.road\{position:absolute;top:0/);
+  assert.match(css, /\.app\.highlight-status-out/);
 });
 test("installs and caches an offline app shell", async () => {
   const [page, layout, worker, manifestText] = await Promise.all([
