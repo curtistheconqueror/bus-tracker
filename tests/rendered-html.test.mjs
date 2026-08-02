@@ -27,6 +27,7 @@ test("server-renders the live fleet command dashboard", async () => {
   const html = await response.text();
 
   assert.match(html, /<title>Pace Maintenance Bus Tracking System<\/title>/i);
+  assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
   assert.match(html, />ALL BUSES</);
   assert.match(html, />IN SERVICE</);
@@ -75,4 +76,23 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.app\.highlight-pending/);
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
+});
+test("installs and caches an offline app shell", async () => {
+  const [page, layout, worker, manifestText] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
+  ]);
+  const manifest = JSON.parse(manifestText);
+
+  assert.match(page, /navigator\.serviceWorker\.register\("\/sw\.js"\)/);
+  assert.match(layout, /manifest:"\/manifest\.webmanifest"/);
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.orientation, "landscape");
+  assert.equal(manifest.start_url, "/");
+  assert.match(worker, /cacheAppShell/);
+  assert.match(worker, /html\.matchAll/);
+  assert.match(worker, /request\.mode === "navigate"/);
+  assert.match(worker, /caches\.match\("\/"\)/);
 });
