@@ -61,5 +61,22 @@ button,input,select,textarea{font:inherit}
 .updated{display:flex;flex-direction:column}.updated b{font-size:10px;color:#183c70}.updated small{margin-top:3px;font-size:7px;color:#7d899d}
 .empty-sheet{height:260px!important;text-align:center;color:#687791}.empty-sheet b,.empty-sheet span{display:block}.empty-sheet b{font-size:14px;color:#294566}.empty-sheet span{margin-top:6px;font-size:9px}
 .down-footnote{display:flex;justify-content:space-between;margin:8px 18px 0;color:#687791;font-size:7px;font-weight:900;letter-spacing:.5px}
+.down-shade{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:18px;background:#06152cbb}
+.repair-editor{width:min(760px,97vw);max-height:94vh;display:flex;flex-direction:column;border-radius:10px;background:#f8faff;box-shadow:0 24px 80px #000a;overflow:hidden}
+.repair-editor-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;background:linear-gradient(110deg,#06275c,#0b4f9e);color:#fff}
+.repair-editor-head span{font-size:8px;font-weight:900;letter-spacing:1.4px}.repair-editor-head h2{margin:2px 0 0;font-size:22px}.repair-editor-head button{border:0;background:transparent;color:#fff;font-size:25px;cursor:pointer}
+.repair-form{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:11px 13px;overflow:auto}
+.repair-form label{display:flex;flex-direction:column;gap:4px;color:#455a7b;font-size:8px;font-weight:900;letter-spacing:.3px}
+.repair-form label.wide{grid-column:1/-1}
+.repair-form input,.repair-form select,.repair-form textarea{width:100%;min-height:37px;border:1px solid #b7c2d5;border-radius:5px;background:#fff;color:#1b3157;padding:8px;font-size:10px;font-weight:700;outline:none}
+.repair-form input:focus,.repair-form select:focus,.repair-form textarea:focus{border-color:#1680e8;box-shadow:0 0 0 2px #1680e822}
+.repair-form select:disabled{background:#eef1f5;color:#8792a4}
+.repair-form textarea{min-height:65px;resize:vertical}
+.repair-form small{font-size:7px;font-weight:600;letter-spacing:0;color:#7a879b}
+.repair-category select{border-left:4px solid #0b70d1}.repair-specific select{border-left:4px solid #e49a00}
+.operator-initials input{text-transform:uppercase;border-color:#4d82bd}
+.repair-editor-actions{display:flex;justify-content:flex-end;gap:8px;padding:11px 18px;border-top:1px solid #cbd4e3;background:#f2f5fa}
+.repair-editor-actions button{min-height:36px;border:1px solid #aebbd0;border-radius:5px;background:#fff;color:#294264;padding:0 14px;font-size:9px;font-weight:900;cursor:pointer}
+.repair-editor-actions .save-repair{background:#0873d8;border-color:#0873d8;color:#fff}
 @media(max-width:900px){.down-header{padding:9px 12px}.down-header h1{font-size:20px}.down-summary{grid-template-columns:repeat(3,1fr)}.down-controls{flex-wrap:wrap}.completed-toggle{margin-left:0}.sheet-scroll{max-height:none}.down-app{padding-bottom:16px}}
 @media(max-width:600px){.down-header{align-items:flex-start;flex-direction:column}.down-header nav{width:100%}.down-header nav a{flex:1}.down-summary{grid-template-columns:repeat(2,1fr);margin:8px}.down-controls{margin:0 8px 8px}.shift-filter{width:100%}.shift-filter button{min-width:0;flex:1}.completed-toggle{margin-right:auto}.sheet-wrap{margin:0 8px}.down-footnote{display:none}}

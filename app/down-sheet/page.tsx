@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./down-sheet.css";
+import DownSheetEditor from "./down-sheet-editor";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -95,6 +96,7 @@ export default function DownSheet(){
  const [filter,setFilter]=useState<ShiftFilter>("All");
  const [showCompleted,setShowCompleted]=useState(false);
  const [hydrated,setHydrated]=useState(false);
+ const [editing,setEditing]=useState<DownEntry|null>(null);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
  // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -106,6 +108,8 @@ export default function DownSheet(){
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  const visible=useMemo(()=>entries.filter(entry=>(showCompleted||isActive(entry))&&(filter==="All"||entry.shift===filter)),[entries,filter,showCompleted]);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length};
+ const openNewEntry=()=>{if(entries.length>=MAX_ENTRIES){alert("The down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:shiftFromFleet(bus.shift),workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
+ const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
 
  return <main className="down-app">
   <header className="down-header">
@@ -127,7 +131,7 @@ export default function DownSheet(){
     <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
    </div>
    <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
-   <button className="add-repair" type="button" disabled={entries.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
+   <button className="add-repair" type="button" onClick={openNewEntry} disabled={entries.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
    <button className="down-settings" type="button" aria-label="Open down sheet settings">⚙ SETTINGS</button>
   </section>
 
@@ -139,7 +143,7 @@ export default function DownSheet(){
      <tbody>{visible.length?visible.map((entry,index)=><tr className={entry.workflow==="Completed"?"completed":""} key={entry.id}>
       <td className="line-number">{String(index+1).padStart(2,"0")}</td>
       <td className="fleet-number"><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></td>
-      <td><button className="reason-button" type="button"><b>{entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
+      <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
       <td><b className="shift-tag">{entry.shift}</b></td>
@@ -150,5 +154,6 @@ export default function DownSheet(){
    </div>
   </section>
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
+  {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials="" onClose={()=>setEditing(null)} onSave={saveEntry}/>}
  </main>;
 }
