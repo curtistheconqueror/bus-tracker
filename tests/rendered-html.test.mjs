@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
+import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
+    new Request("http://localhost" + path, { headers: { accept: "text/html" } }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -178,4 +179,54 @@ test("allows ordinary edits to an existing duplicated number while protecting id
   assert.equal(validateBusUpdate(buses, { id: "new", n: "17571", l: "east-6" }), "duplicate-number");
   assert.equal(validateBusUpdate(buses, { id: "new", n: "", l: "east-6" }), "number-required");
   assert.equal(validateBusUpdate(buses, { id: "new", n: "17A71", l: "east-6" }), "number-invalid");
+});
+test("renders the interactive down sheet with All as the default shift view", async () => {
+  const response = await render("/down-sheet");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Interactive Down Sheet/);
+  assert.match(html, /aria-pressed="true">ALL/);
+  assert.match(html, />1ST</);
+  assert.match(html, />2ND</);
+  assert.match(html, />3RD</);
+  assert.match(html, /ACTIVE DOWN/);
+  assert.match(html, /BUS NUMBER/);
+  assert.match(html, /REASON DOWN/);
+  assert.match(html, /MECHANIC \/ VENDOR/);
+  assert.match(html, /SHEET CAPACITY/);
+});
+
+test("down sheet synchronization changes repairs and status without moving the bus", () => {
+  const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
+  const updated = applyDownEntryToFleet(fleet, {
+    busId: "bus-1",
+    category: "Brakes",
+    repair: "ABS warning",
+    customReason: "Intermittent warning light",
+    assignmentType: "Mechanic",
+    assignedTo: "JD",
+    workflow: "In Progress",
+    operationalStatus: "shop",
+  });
+  assert.equal(updated[0].l, "east-4");
+  assert.equal(updated[0].s, "shop");
+  assert.equal(updated[0].down, true);
+  assert.equal(updated[0].mechanic, "JD");
+  assert.match(updated[0].pendingRepair, /Brakes.*ABS warning.*Intermittent warning light/);
+
+  const completed = applyDownEntryToFleet(updated, {
+    busId: "bus-1",
+    category: "Brakes",
+    repair: "ABS warning",
+    customReason: "",
+    assignmentType: "Vendor",
+    assignedTo: "Outside vendor",
+    workflow: "Completed",
+    operationalStatus: "service",
+  });
+  assert.equal(completed[0].l, "east-4");
+  assert.equal(completed[0].s, "service");
+  assert.equal(completed[0].down, false);
+  assert.equal(completed[0].pendingRepair, "");
+  assert.equal(completed[0].mechanic, "JD");
 });
