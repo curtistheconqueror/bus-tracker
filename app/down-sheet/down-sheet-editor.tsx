@@ -50,7 +50,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
  const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
  const repairs=REPAIR_OPTIONS[draft.category]||[];
  const isNew=!entries.some(item=>item.id===entry.id);
- const submit=(event:React.FormEvent)=>{event.preventDefault();const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);if(!bus){alert("Select a bus number.");return}if(!draft.category){alert("Select a repair category.");return}if(!draft.repair){alert("Select the specific repair or service.");return}if(!operator){alert("Enter your initials before saving this update.");return}const now=new Date().toISOString(),action=isNew?"Created down-sheet entry":"Updated repair entry",next={...draft,busNumber:bus.n,updatedAt:now,updatedBy:operator,completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",history:[...draft.history,{at:now,initials:operator,action}]};onSave(next)};
+ const submit=(event:React.FormEvent)=>{event.preventDefault();const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);if(!bus){alert("Select a bus number.");return}if(!draft.category){alert("Select a repair category.");return}if(!draft.repair){alert("Select the specific repair or service.");return}if(!operator){alert("Enter your initials before saving this update.");return}const now=new Date().toISOString(),action=isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow,next={...draft,busNumber:bus.n,updatedAt:now,updatedBy:operator,completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",history:[...draft.history,{at:now,initials:operator,action}]};onSave(next)};
 
  return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
   <form className="repair-editor" onSubmit={submit}>
@@ -69,6 +69,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
     <label className="operator-initials">UPDATED BY — INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required for every saved change.</small></label>
    </div>
+   {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
    <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair">{isNew?"ADD TO DOWN SHEET":"SAVE UPDATE"}</button></div>
   </form>
  </div>;

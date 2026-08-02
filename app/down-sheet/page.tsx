@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
+import DownSheetSettings from "./down-sheet-settings";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -98,19 +99,22 @@ export default function DownSheet(){
  const [showCompleted,setShowCompleted]=useState(false);
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
+ const [settingsOpen,setSettingsOpen]=useState(false);
+ const [defaultInitials,setDefaultInitials]=useState("");
+ const [defaultShift,setDefaultShift]=useState<Shift>("1st");
 
  // Restore the existing device-local fleet and down sheet once after hydration.
  // eslint-disable-next-line react-hooks/set-state-in-effect
- useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;setEntries(Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):entriesFromFleet(nextFleet));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;setEntries(Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):entriesFromFleet(nextFleet));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st")}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  useEffect(()=>{if(hydrated)localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries}))},[entries,hydrated]);
- useEffect(()=>{if(hydrated){const saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...saved,showCompleted}))}},[showCompleted,hydrated]);
+ useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift}))},[showCompleted,defaultInitials,defaultShift,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),nextFleet=(Array.isArray(payload)?payload:payload.buses)||[];setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find((item:FleetBus)=>item.id===entry.busId);if(!bus)return entry;const incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}catch{}}if(event.key===DOWN_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),next=Array.isArray(payload)?payload:payload.entries;if(Array.isArray(next))setEntries(next.map(normalizeEntry))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  const visible=useMemo(()=>entries.filter(entry=>(showCompleted||isActive(entry))&&(filter==="All"||entry.shift===filter)),[entries,filter,showCompleted]);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length};
- const openNewEntry=()=>{if(entries.length>=MAX_ENTRIES){alert("The down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:shiftFromFleet(bus.shift),workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
+ const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);localStorage.setItem(FLEET_KEY,JSON.stringify({version:3,buses:nextFleet}));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
 
  return <main className="down-app">
@@ -125,7 +129,7 @@ export default function DownSheet(){
    <div><strong>{counters.accident}</strong><span>ACCIDENT</span></div>
    <div><strong>{counters.waiting}</strong><span>WAITING PARTS</span></div>
    <div><strong>{counters.completedToday}</strong><span>COMPLETED TODAY</span></div>
-   <div className="capacity"><strong>{entries.length}<small> / {MAX_ENTRIES}</small></strong><span>SHEET CAPACITY</span></div>
+   <div className="capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>SHEET CAPACITY</span></div>
   </section>
 
   <section className="down-controls">
@@ -133,8 +137,8 @@ export default function DownSheet(){
     <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
    </div>
    <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
-   <button className="add-repair" type="button" onClick={openNewEntry} disabled={entries.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
-   <button className="down-settings" type="button" aria-label="Open down sheet settings">⚙ SETTINGS</button>
+   <button className="add-repair" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
+   <button className="down-settings" type="button" onClick={()=>setSettingsOpen(true)} aria-label="Open down sheet settings">⚙ SETTINGS</button>
   </section>
 
   <section className="sheet-wrap">
@@ -156,6 +160,7 @@ export default function DownSheet(){
    </div>
   </section>
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
-  {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials="" onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {settingsOpen&&<DownSheetSettings defaultInitials={defaultInitials} setDefaultInitials={setDefaultInitials} defaultShift={defaultShift} setDefaultShift={setDefaultShift} showCompleted={showCompleted} setShowCompleted={setShowCompleted} onClose={()=>setSettingsOpen(false)}/>}
  </main>;
 }

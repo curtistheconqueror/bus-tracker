@@ -194,6 +194,9 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /REASON DOWN/);
   assert.match(html, /MECHANIC \/ VENDOR/);
   assert.match(html, /SHEET CAPACITY/);
+  assert.match(html, /SHOW COMPLETED/);
+  assert.match(html, /ADD DOWN BUS/);
+  assert.match(html, /SETTINGS/);
 });
 
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
