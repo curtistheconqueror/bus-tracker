@@ -34,6 +34,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, />IN SERVICE</);
   assert.match(html, />PENDING REPAIR</);
   assert.match(html, />LOCATE</);
+  assert.match(html, />REFRESH</);
   assert.match(html, /> SETTINGS</);
   assert.match(html, /data-bus-id="b0" data-status="service" data-pending="false"/);
   assert.match(html, /data-bus-id="b20" data-status="out" data-pending="false"/);
@@ -128,6 +129,14 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.towInProgress\}/);
   assert.match(css, /\.tow-badge\{/);
   assert.match(css, /\.form \.tow-check\{/);
+  assert.match(page, /pace-south-fleet-board-backup/);
+  assert.match(page, /EXPORT \/ SHARE BACKUP/);
+  assert.match(page, /IMPORT BACKUP/);
+  assert.match(page, /registration\?\.update\(\)/);
+  assert.match(page, /window\.location\.reload\(\)/);
+  assert.match(page, /It will replace the board and settings currently stored on this device/);
+  assert.match(css, /\.refresh-command\{/);
+  assert.match(css, /\.board-data/);
 });
 test("installs and caches an offline app shell", async () => {
   const [page, layout, worker, manifestText] = await Promise.all([

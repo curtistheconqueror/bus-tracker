@@ -105,6 +105,9 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .locate-command button{border:0;border-left:1px solid color-mix(in srgb,var(--command-text) 25%,transparent);border-radius:0;background:#0873df;color:#fff}
 .settings-command{display:flex;align-items:center;gap:6px}
 .settings-command span{font-size:15px;line-height:1}
+.refresh-command{display:flex;align-items:center;gap:5px}
+.refresh-command span{font-size:16px;line-height:1}
+.refresh-command:disabled{opacity:.65;cursor:wait}
 .app.highlight-all .token{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
 .app.highlight-service .token:not([data-status="service"]):not([data-status="defect"]),.app.highlight-pending .token[data-pending="false"]{opacity:.18;filter:grayscale(.8)}
 .app.highlight-service .token[data-status="service"],.app.highlight-service .token[data-status="defect"]{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
@@ -117,6 +120,11 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .settings-group{border:1px solid #d1dbea;border-radius:8px;background:#fff;padding:13px}
 .settings-group h3{margin:0 0 4px;font-size:11px;letter-spacing:.8px;color:#173968}
 .settings-group>p{margin:0 0 11px;font-size:10px;color:#687791}
+.board-data>div{display:flex;gap:8px;flex-wrap:wrap}
+.board-data button,.board-data label{min-height:35px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #8aa3c8;border-radius:6px;background:#eef5ff;color:#173968;padding:0 13px;font-size:9px;font-weight:900;cursor:pointer}
+.board-data label{background:#0873df;color:#fff;border-color:#0873df}
+.board-data input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.board-data small{display:block;margin-top:8px;color:#687791;font-size:9px}
 .theme-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .theme-grid button{min-height:57px;border:1px solid #c6d0e2;border-radius:7px;background:#f7f9fd;color:#294066;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:9px;cursor:pointer}
 .theme-grid button i{width:34px;height:17px;border:3px solid;border-radius:4px;box-shadow:inset 0 0 0 2px #ffffff44}
@@ -129,7 +137,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .color-field code{font-size:8px;color:#70809b;text-align:right}
 .settings-actions{background:#f8faff}
 @media(max-width:800px){.command-bar{width:calc(100vw - 12px);gap:5px;justify-content:space-between}.command-bar button{padding:0 7px;font-size:8px}.locate-command input{width:63px}.theme-grid{grid-template-columns:repeat(3,1fr)}.manual-grid{grid-template-columns:1fr}.settings-modal{max-height:94vh}.settings-body{padding:11px}.app{padding-bottom:68px}}
-@media(max-width:560px){.command-highlights button{font-size:0;padding:0 6px}.command-highlights button:after{font-size:10px}.command-highlights button:nth-child(1):after{content:"ALL"}.command-highlights button:nth-child(2):after{content:"SERVICE"}.command-highlights button:nth-child(3):after{content:"PENDING"}.settings-command{font-size:0!important}.settings-command span{font-size:17px}.locate-command input{width:55px}}
+@media(max-width:560px){.command-highlights button{font-size:0;padding:0 6px}.command-highlights button:after{font-size:10px}.command-highlights button:nth-child(1):after{content:"ALL"}.command-highlights button:nth-child(2):after{content:"SERVICE"}.command-highlights button:nth-child(3):after{content:"PENDING"}.settings-command,.refresh-command{font-size:0!important;padding:0 7px!important}.settings-command span,.refresh-command span{font-size:17px}.locate-command input{width:55px}}
 /* Nine service bays and official Roadcall treatment */
 :root{--roadcall-color:#f97316}
 .bay-placeholder{visibility:hidden;pointer-events:none}
