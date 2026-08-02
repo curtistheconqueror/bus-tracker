@@ -56,6 +56,14 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.equal((service.match(/class="spot"/g) ?? []).length, 8);
   const wall = section(html, "SHOP WALL (SINGLE FILE)", "MAIN GARAGE (BAYS 1-12)");
   assert.equal((wall.match(/class="spot"/g) ?? []).length, 8);
+  const pit = section(html, "PIT", "BRAKE TEST");
+  assert.equal((pit.match(/class="spot"/g) ?? []).length, 2);
+  const brake = section(html, "BRAKE TEST", "TOW STAGING");
+  assert.equal((brake.match(/class="spot"/g) ?? []).length, 2);
+  const east = section(html, '<section class="east lot">', '<section class="road">');
+  assert.equal((east.match(/class="spot"/g) ?? []).length, 21);
+  const road = section(html, '<section class="road">', '<section class="wall">');
+  assert.equal((road.match(/class="spot"/g) ?? []).length, 65);
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
@@ -104,6 +112,13 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.service\{width:calc\(75% - 8px\);justify-self:start/);
   assert.match(css, /\.road\{position:absolute;top:0/);
   assert.match(css, /\.app\.highlight-status-out/);
+  assert.match(page, /const ROAD_CAPACITY=65/);
+  assert.match(page, /"PIT":slots\("pit",2\)/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",2\)/);
+  assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
+  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
+  assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
+  assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(13/);
 });
 test("installs and caches an offline app shell", async () => {
   const [page, layout, worker, manifestText] = await Promise.all([
