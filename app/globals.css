@@ -130,3 +130,14 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .settings-actions{background:#f8faff}
 @media(max-width:800px){.command-bar{width:calc(100vw - 12px);gap:5px;justify-content:space-between}.command-bar button{padding:0 7px;font-size:8px}.locate-command input{width:63px}.theme-grid{grid-template-columns:repeat(3,1fr)}.manual-grid{grid-template-columns:1fr}.settings-modal{max-height:94vh}.settings-body{padding:11px}.app{padding-bottom:68px}}
 @media(max-width:560px){.command-highlights button{font-size:0;padding:0 6px}.command-highlights button:after{font-size:10px}.command-highlights button:nth-child(1):after{content:"ALL"}.command-highlights button:nth-child(2):after{content:"SERVICE"}.command-highlights button:nth-child(3):after{content:"PENDING"}.settings-command{font-size:0!important}.settings-command span{font-size:17px}.locate-command input{width:55px}}
+/* Nine service bays and official Roadcall treatment */
+:root{--roadcall-color:#f97316}
+.bay-placeholder{visibility:hidden;pointer-events:none}
+.bays .bay-overflow{min-height:29px;margin:5px 6px 0;padding:4px 7px;gap:5px}
+.bays .bay-overflow .token{padding:2px 4px;font-size:8px}
+.roadcall-dot{position:absolute;top:-5px;right:-5px;width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:var(--roadcall-color);box-shadow:0 0 0 1px #8f3700;z-index:4;animation:roadcall-dot-pulse .85s ease-in-out infinite}
+@keyframes roadcall-dot-pulse{0%,100%{transform:scale(.82);box-shadow:0 0 0 1px #8f3700,0 0 0 0 color-mix(in srgb,var(--roadcall-color) 70%,transparent)}50%{transform:scale(1.2);box-shadow:0 0 0 1px #8f3700,0 0 0 5px color-mix(in srgb,var(--roadcall-color) 15%,transparent)}}
+.roadcall-badge{background:var(--roadcall-color);color:#fff}
+.roadcall-location{border-left:3px solid var(--roadcall-color);padding-left:7px}
+.form .roadcall-check{color:#a54300}
+@media(prefers-reduced-motion:reduce){.roadcall-dot{animation:none}}

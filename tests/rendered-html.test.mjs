@@ -47,6 +47,10 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, /--status-decommissioned:#343a40/);
   assert.doesNotMatch(html, /TOTAL SPACES:/);
   assert.doesNotMatch(html, /SHOP BAYS \(DIAGONAL - 12 TOTAL\)/);
+  const bays = section(html, "SHOP BAYS (DIAGONAL)", "PIT");
+  assert.equal((bays.match(/class="bay"/g) ?? []).length, 9);
+  assert.equal((bays.match(/class="bay-placeholder"/g) ?? []).length, 3);
+  assert.match(bays, /NEEDS REASSIGNMENT/);
 
   const service = section(html, "SERVICE DETAIL AREA (SINGLE FILE)", "PAINT BOOTH");
   assert.equal((service.match(/class="spot"/g) ?? []).length, 8);
@@ -72,6 +76,16 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /<Icon s=\{bus\.s\}/);
   assert.match(page, /onChange=\{e=>f\("s",e\.target\.value\)\}/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
+  assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,null,8,6,4,2,null,9,7,5,3,1\]/);
+  assert.match(page, /"SHOP BAYS \(DIAGONAL\)":slots\("bay",9,1\)/);
+  assert.match(page, /roadcallSolid:boolean;roadcallLocation:string/);
+  assert.match(page, /SOLID ORANGE BUS \(NO FLASHING DOT\)/);
+  assert.match(page, /ROADCALL LOCATION/);
+  assert.match(page, /roadcallLocation:bus\.roadcallLocation\?\?""/);
+  assert.match(page, /bus\.roadcall&&bus\.roadcallSolid\?"var\(--roadcall-color\)"/);
+  assert.match(css, /--roadcall-color:#f97316/);
+  assert.match(css, /\.roadcall-dot\{/);
+  assert.match(css, /@keyframes roadcall-dot-pulse/);
   assert.match(css, /\.app\.highlight-service/);
   assert.match(css, /\.app\.highlight-pending/);
   assert.match(css, /@keyframes locate-pulse/);
