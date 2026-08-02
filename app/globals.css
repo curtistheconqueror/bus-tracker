@@ -40,3 +40,9 @@
 .settings-actions button{border:1px solid #aeb8cc;background:#fff;border-radius:4px;padding:9px 13px;font-size:10px;font-weight:900}
 .settings-actions .save{background:#0867d5;color:#fff;border-color:#0867d5}
 @media(max-width:1100px){.legend{gap:6px;font-size:7px}.roadgrid{gap:4px}}
+
+/* 32-space In Service / On Road capacity */
+.mid{height:352px;grid-template-rows:278px 60px}
+.road .title{height:28px}
+.roadgrid{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(8,1fr);gap:7px;height:235px}
+.road p{margin:5px 0 0}
