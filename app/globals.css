@@ -251,3 +251,39 @@ body.modal-scroll-locked .command-bar{pointer-events:none!important}
 body.modal-scroll-locked .modal{max-height:calc(100dvh - 16px);margin:0 auto}
 body.modal-scroll-locked .modal>.actions{padding-bottom:max(12px,env(safe-area-inset-bottom))}
 body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
+/* Fleet warning flags, ADA quick-find controls, and persistent multi-locate */
+.command-bar{width:min(1180px,calc(100vw - 22px));gap:5px}
+.command-highlights{min-width:0}
+.command-highlights button{padding-left:8px;padding-right:8px}
+.locate-command{flex:none;min-width:218px}
+.locate-command input{width:76px}
+.locate-command button{padding:0 8px;white-space:nowrap}
+.locate-command .multi-locate-trigger{background:#5b3fa3}
+.locate-command .multi-locate-trigger.active{background:#b6232c}
+.app.highlight-check-engine .token[data-check-engine="false"],.app.highlight-bad-ramp .token[data-bad-ramp="false"]{opacity:.18;filter:grayscale(.8)}
+.app.highlight-check-engine .token[data-check-engine="true"]{outline:2px solid #ff8a00;box-shadow:0 0 14px #ff8a00;animation:command-glow 1.05s ease-in-out infinite alternate}
+.app.highlight-bad-ramp .token[data-bad-ramp="true"]{outline:2px solid #08a7d1;box-shadow:0 0 14px #08a7d1;animation:command-glow 1.05s ease-in-out infinite alternate}
+.token.multi-locate{z-index:80;outline:3px solid #a855f7;box-shadow:0 0 0 2px #fff,0 0 18px 7px #a855f7;animation:multi-locate-glow .8s ease-in-out infinite alternate}
+@keyframes multi-locate-glow{from{filter:brightness(1);transform:scale(1)}to{filter:brightness(1.25);transform:scale(1.08)}}
+.operational-flags{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px!important;padding:8px;border:1px solid #d2dbea;border-radius:7px;background:#f5f8fd}
+.operational-flags .check{min-height:30px;padding:5px 7px;border:1px solid #dbe2ed;border-radius:5px;background:#fff;font-size:9px}
+.form .warning-check{color:#a04f00}
+.form .ada-check{color:#087896}
+.ada-check span{font-size:15px;line-height:1}
+.roadcall-options{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:end}
+.alert-detail{border-left:3px solid #ff8a00;padding-left:7px}
+.ada-detail{border-left:3px solid #08a7d1;padding-left:7px}
+.multi-locate-shade{z-index:2147483002}
+.multi-locate-modal{width:min(520px,100%);background:#f8faff;color:#1c3158;border-radius:10px;box-shadow:0 18px 70px #0009;overflow:hidden}
+.multi-locate-body{display:grid;gap:13px;padding:17px}
+.multi-locate-body>p{margin:0;color:#5e6e89;font-size:10px;line-height:1.45}
+.multi-locate-body>form{height:40px;display:grid;grid-template-columns:1fr auto}
+.multi-locate-body>form input{min-width:0;border:1px solid #aebbd0;border-radius:6px 0 0 6px;padding:0 11px;background:#fff;color:#172858;font-weight:900}
+.multi-locate-body>form button{border:1px solid #0873df;border-radius:0 6px 6px 0;background:#0873df;color:#fff;padding:0 15px;font-size:9px;font-weight:900}
+.multi-locate-list{min-height:50px;max-height:220px;overflow:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:7px;padding:9px;border:1px solid #d1dbea;border-radius:7px;background:#fff}
+.multi-locate-list>button{height:31px;display:flex;align-items:center;gap:8px;border:1px solid #9d58e8;border-radius:16px;background:#f4edff;color:#56228d;padding:0 9px 0 12px;font-size:9px;font-weight:900}
+.multi-locate-list>button b{font-size:15px;line-height:1}
+.multi-locate-list>small{margin:auto;color:#7b879b}
+.multi-locate-actions button:disabled{opacity:.45}
+@media(max-width:1100px){.command-bar{flex-wrap:wrap}.app{padding-bottom:102px}.operational-flags{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.command-highlights button:nth-child(1):after{content:"AC"}.command-highlights button:nth-child(2):after{content:"ENGINE"}.command-highlights button:nth-child(3):after{content:"ADA"}.command-highlights button:nth-child(4):after{content:"MYSTERY"}.command-highlights button:nth-child(5):after{content:"DOWN"}.command-highlights button:nth-child(6):after{content:"PENDING"}.command-highlights button:nth-child(7):after{content:"UNSCHED"}.command-highlights button:nth-child(5) b{font-size:8px}.operational-flags{grid-template-columns:1fr}.roadcall-options{grid-template-columns:1fr}.locate-command{min-width:205px}}
