@@ -155,6 +155,10 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.repair-choice-stage\{[^}]*max-height:min\(390px,48dvh\)[^}]*overflow-y:auto/);
   assert.match(css, /\.repair-choice-stage\{[^}]*overscroll-behavior:contain[^}]*touch-action:pan-y/);
   assert.match(css, /\.modal\.defect-expanded\{width:min\(650px,100%\)\}/);
+  assert.match(page, /All repair categories/);
+  assert.match(page, /Object\.keys\(REPAIR_OPTIONS\)\.length\} OPTIONS/);
+  assert.match(css, /\.category-choice-grid\{grid-template-columns:repeat\(4/);
+  assert.match(css, /@media\(max-width:800px\)\{\.repair-choice-stage\{[^}]*\}\.category-choice-grid\{grid-template-columns:repeat\(3/);
   assert.match(page, /modal-scroll-locked/);
   assert.match(page, /position:"fixed"/);
   assert.match(page, /window\.scrollTo\(scrollX,scrollY\)/);
@@ -306,7 +310,7 @@ test("dropping onto an occupied parking space swaps both buses atomically", () =
   assert.ok(swapped.every(bus => bus.parkedAt === "now"));
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.ok(Object.keys(REPAIR_OPTIONS).length >= 15);
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
   assert.ok(Object.values(REPAIR_OPTIONS).every(options => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));

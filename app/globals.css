@@ -223,12 +223,12 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 /* Immediately visible, touch-friendly repair catalog */
 .repair-choice-stage{grid-column:1/-1;display:grid;gap:8px;max-height:min(390px,48dvh);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable;padding:10px;border:1px solid #c5d1e2;border-radius:7px;background:#f8fbff}
 .choice-prompt{font-size:8px;color:#4c607e;letter-spacing:.45px}
-.category-choice-grid,.issue-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.category-choice-grid,.issue-choice-grid{display:grid;gap:7px}.category-choice-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .category-choice-grid button,.issue-choice-grid button,.choice-selected button{min-height:35px;border:1px solid #aebbd0;border-radius:6px;background:#f8faff;color:#18365f;padding:7px;font-size:8px;font-weight:900;line-height:1.2;cursor:pointer;white-space:normal}
 .category-choice-grid button:hover,.category-choice-grid button:focus-visible,.issue-choice-grid button:hover,.issue-choice-grid button:focus-visible,.issue-choice-grid button.active{border-color:#0873df;background:#e6f1ff;color:#0759ad;box-shadow:0 0 0 2px #0873df20}
 .choice-selected{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-left:4px solid #0873df;background:#edf5ff}
 .choice-selected span{display:flex;flex-direction:column;gap:2px}.choice-selected small{font-size:7px;color:#687a94}.choice-selected strong{font-size:11px;color:#173e73}.choice-selected button{min-height:30px;background:#fff}
-@media(max-width:800px){.repair-choice-stage{max-height:min(360px,46dvh)}.category-choice-grid,.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.repair-choice-stage{max-height:min(380px,52dvh)}.category-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.category-choice-grid,.issue-choice-grid{grid-template-columns:1fr}}
 /* Lock the facility map while a full-screen editor is open */
 body.modal-scroll-locked .app{overflow:hidden!important}
