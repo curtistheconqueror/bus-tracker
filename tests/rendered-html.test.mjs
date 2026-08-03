@@ -147,6 +147,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CHOOSE THE SPECIFIC DEFECT/);
   assert.match(page, /CHANGE CATEGORY/);
   assert.match(css, /\.category-choice-grid/);
+  assert.match(page, /modal-scroll-locked/);
+  assert.match(page, /position:"fixed"/);
+  assert.match(page, /window\.scrollTo\(scrollX,scrollY\)/);
+  assert.match(css, /body\.modal-scroll-locked \.app\{overflow:hidden!important/);
+  assert.match(css, /overscroll-behavior:contain;touch-action:pan-y/);
+  assert.match(css, /\.modal>\.actions\{position:sticky;bottom:0/);
   assert.match(page, /pace-south-fleet-board-backup/);
   assert.match(page, /EXPORT \/ SHARE BACKUP/);
   assert.match(page, /IMPORT BACKUP/);
