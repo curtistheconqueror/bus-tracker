@@ -6,6 +6,7 @@ import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
+import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
@@ -176,6 +177,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /data-check-engine=\{bus\.checkEngine\}/);
   assert.match(page, /data-bad-ramp=\{bus\.badRampKneeler\}/);
   assert.match(page, /function MultiLocateModal/);
+  assert.match(page, /Array\(Math\.max\(7-initial\.length,0\)\)\.fill\(\"\"\)/);
+  assert.match(page, /\+ ADD FIELD/);
+  assert.match(page, /MOVE ALL SELECTED BUSES/);
+  assert.match(page, /MOVE ALL TO AREA/);
+  assert.match(page, /NOT ENOUGH SPACE/);
+  assert.match(page, /bulkRelocateBuses\(buses,multiLocateIds,targetSlots\)/);
   assert.match(page, /KEEP \"\+selected\.length\+\" HIGHLIGHTED/);
   assert.match(page, /multiLocateIds\.length\?\"CLEAR \"\+multiLocateIds\.length:\"MULTI\"/);
   assert.match(css, /\.app\.highlight-check-engine/);
@@ -401,6 +408,32 @@ test("smart status returns repaired and defect-carrying buses to the road correc
   assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "out");
   assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
   assert.equal(roadServiceStatus({ defects: minor }), "defect");
+});
+
+test("bulk relocation preserves order, smart status, and all-or-nothing capacity", () => {
+  const minor = [{ id: "d1", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
+  const fleet = [
+    { id: "a", l: "east-1", s: "shop", parkedAt: "old-a", defects: minor, pendingRepair: "" },
+    { id: "b", l: "road-0", s: "service", parkedAt: "old-b", defects: [], pendingRepair: "" },
+    { id: "c", l: "west-0", s: "service", parkedAt: "old-c", defects: [], pendingRepair: "" },
+  ];
+  const target = ["road-0", "road-1", "road-2"];
+  assert.deepEqual(bulkAreaAvailability(fleet, ["b", "a", "c"], target), { open: 2, needed: 2, already: 1, available: true });
+  const moved = bulkRelocateBuses(fleet, ["b", "a", "c"], target, "now");
+  assert.equal(moved.error, null);
+  assert.equal(moved.moved, 2);
+  assert.equal(moved.fleet.find(bus => bus.id === "b").l, "road-0");
+  assert.equal(moved.fleet.find(bus => bus.id === "b").parkedAt, "old-b");
+  assert.equal(moved.fleet.find(bus => bus.id === "a").l, "road-1");
+  assert.equal(moved.fleet.find(bus => bus.id === "a").s, "defect");
+  assert.equal(moved.fleet.find(bus => bus.id === "a").parkedAt, "now");
+  assert.equal(moved.fleet.find(bus => bus.id === "c").l, "road-2");
+
+  const blockedFleet = [...fleet, { id: "block", l: "road-1", s: "service", parkedAt: "old-block", defects: [], pendingRepair: "" }];
+  const blocked = bulkRelocateBuses(blockedFleet, ["a", "c"], target, "now");
+  assert.equal(blocked.error, "insufficient-space");
+  assert.equal(blocked.moved, 0);
+  assert.equal(blocked.fleet, blockedFleet);
 });
 
 test("dropping onto an occupied parking space swaps both buses atomically", () => {

@@ -293,3 +293,23 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .garagegrid>i,.garagegrid>b,.grow>strong{background:var(--garage-frame)}
 .grow .spot.garage-special-slot{background:var(--garage-special);border-color:color-mix(in srgb,var(--garage-frame) 55%,#aeb8cc)}
 .garage-color-settings>p{margin-bottom:10px}
+/* Seven-field multi-locate and capacity-safe bulk area relocation */
+.multi-locate-modal{width:min(760px,100%);max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
+.multi-locate-body{overflow-y:auto;min-height:0}
+.multi-locate-body>.multi-entry-form{height:auto;display:grid;grid-template-columns:1fr;gap:10px}
+.multi-bus-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.multi-bus-fields label{display:grid;gap:4px;color:#506080;font-size:8px;font-weight:900}
+.multi-bus-fields input{width:100%;height:36px;border:1px solid #aebbd0!important;border-radius:5px!important;padding:0 9px!important;background:#fff;color:#172858;font-size:10px;font-weight:900}
+.multi-entry-actions{display:flex;justify-content:space-between;gap:8px}
+.multi-entry-actions button{min-height:34px;border:1px solid #8ea3c4!important;border-radius:5px!important;background:#eef4fc!important;color:#173968!important;padding:0 12px!important;font-size:9px!important;font-weight:900}
+.multi-entry-actions .highlight-selection{margin-left:auto;background:#0873df!important;color:#fff!important;border-color:#0873df!important}
+.multi-entry-actions button:disabled{opacity:.45}
+.bulk-relocation{display:grid;gap:9px;padding:11px;border:1px solid #85a4d2;border-radius:7px;background:#eef5ff}
+.bulk-relocation h3{margin:0;color:#153e76;font-size:10px;letter-spacing:.6px}
+.bulk-relocation p{margin:0;color:#5c6d88;font-size:9px;line-height:1.4}
+.bulk-relocation>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.bulk-relocation select{min-width:0;height:38px;border:1px solid #aebbd0;border-radius:5px;padding:0 9px;background:#fff;color:#172858;font-size:9px;font-weight:800}
+.bulk-relocation button{height:38px;border:1px solid #0873df;border-radius:5px;background:#0873df;color:#fff;padding:0 14px;font-size:9px;font-weight:900}
+.bulk-relocation button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:680px){.multi-bus-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.bulk-relocation>div{grid-template-columns:1fr}.bulk-relocation button{width:100%}}
+@media(max-width:430px){.multi-bus-fields{grid-template-columns:1fr}.multi-entry-actions{flex-direction:column}.multi-entry-actions .highlight-selection{margin-left:0}}
