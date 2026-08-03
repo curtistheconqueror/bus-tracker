@@ -4,7 +4,7 @@ import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
-import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectSummary } from "../app/repair-catalog.ts";
+import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -150,11 +150,14 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CHOOSE THE STATUS OR CODE/);
   assert.match(page, /CHANGE CATEGORY/);
   assert.match(page, /ADD ANOTHER DEFECT/);
+  assert.match(page, /onSubmit=\{submitEditor\}/);
+  assert.match(page, /const pending=adding\?buildDraftDefect\(\):null/);
   assert.match(page, /DEFECT \{index\+1\}/);
   assert.match(css, /\.category-choice-grid/);
   assert.match(css, /\.repair-choice-stage\{[^}]*max-height:min\(390px,48dvh\)[^}]*overflow-y:auto/);
   assert.match(css, /\.repair-choice-stage\{[^}]*overscroll-behavior:contain[^}]*touch-action:pan-y/);
   assert.match(css, /\.modal\.defect-expanded\{width:min\(650px,100%\)\}/);
+  assert.match(css, /\.add-defect-confirm\{[^}]*position:sticky[^}]*bottom:0[^}]*width:100%/);
   assert.match(page, /All repair categories/);
   assert.match(page, /Object\.keys\(REPAIR_OPTIONS\)\.length\} OPTIONS/);
   assert.match(css, /\.category-choice-grid\{grid-template-columns:repeat\(4/);
@@ -308,6 +311,11 @@ test("dropping onto an occupied parking space swaps both buses atomically", () =
   assert.equal(swapped.find(bus => bus.id === "b").s, "shop");
   assert.equal(new Set(swapped.map(bus => bus.l)).size, 2);
   assert.ok(swapped.every(bus => bus.parkedAt === "now"));
+});
+test("manual defect drafts are captured when the main editor is saved", () => {
+  const draft = defectFromDraft({ category: "", issue: "", details: "  Driver reports intermittent rattle  ", operability: "service", state: "open" }, "manual", "manual-test");
+  assert.deepEqual(draft, { id: "manual-test", category: "Miscellaneous", issue: "Manual entry", details: "Driver reports intermittent rattle", operability: "service", state: "open" });
+  assert.match(defectSummary([draft]), /Manual entry.*Driver reports intermittent rattle/);
 });
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);

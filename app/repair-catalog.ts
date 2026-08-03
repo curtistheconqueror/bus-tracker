@@ -40,6 +40,11 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
  },
 };
+export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|"manual",id="defect-"+Date.now()+"-"+Math.random().toString(36).slice(2,7)):StructuredDefect|null{
+ const manual=mode==="manual",details=draft.details.trim(),category=manual?"Miscellaneous":draft.category,issue=manual?"Manual entry":draft.issue;
+ if(!category||!issue||manual&&!details)return null;
+ return {...draft,id,category,issue,details};
+}
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
