@@ -165,6 +165,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /REPAIR_OPTIONS\[newDefect\.category\]\.map\(issue=><option/);
   assert.match(page, /CHOOSE THE AMEREX SYSTEM/);
   assert.match(css, /\.native-repair-picker select\{[^}]*min-height:44px/);
+  assert.match(css, /\.native-repair-picker\{grid-template-columns:repeat\(2/);
+  assert.match(css, /\.native-repair-picker \.amerex-code\{grid-column:1\/-1\}/);
+  assert.match(page, /ref=\{secondaryRepairRef\} className="repair-dropdown"/);
+  assert.match(page, /ref=\{tertiaryRepairRef\} className="repair-dropdown amerex-code"/);
+  assert.match(page, /secondaryRepairRef\.current\?\.scrollIntoView/);
+  assert.match(page, /tertiaryRepairRef\.current\?\.scrollIntoView/);
   assert.doesNotMatch(page, /SCROLL TO VIEW ALL REPAIR OPTIONS/);
   assert.doesNotMatch(page, /className="scroll-cue"/);
   assert.doesNotMatch(css, /\.scroll-cue\{/);

@@ -221,14 +221,14 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .defect-entry .manual-defect{grid-column:1/-1}.defect-entry textarea{min-height:62px}.add-defect-confirm{grid-column:1/-1;position:sticky;bottom:0;z-index:3;align-self:end;width:100%;height:40px;box-shadow:0 -4px 12px #173e7324}
 @media(max-width:800px){.modal.defect-expanded{width:100%}.defect-entry,.defect-controls{grid-template-columns:1fr}.entry-mode,.defect-entry .manual-defect{grid-column:auto}.entry-mode{display:grid;grid-template-columns:1fr 1fr}.defect-heading{position:sticky;top:0;z-index:2}}
 /* Immediately visible, touch-friendly repair catalog */
-.repair-choice-stage{grid-column:1/-1;display:grid;gap:12px;padding:12px;border:1px solid #c5d1e2;border-radius:7px;background:#f8fbff}
-.native-repair-picker .repair-dropdown{display:flex;flex-direction:column;gap:6px;color:#334d70;font-size:9px;font-weight:900}
+.repair-choice-stage{grid-column:1/-1;display:grid;gap:12px;padding:12px;border:1px solid #c5d1e2;border-radius:7px;background:#f8fbff}.native-repair-picker{grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}.native-repair-picker .amerex-code{grid-column:1/-1}
+.native-repair-picker .repair-dropdown{display:flex;flex-direction:column;gap:6px;min-width:0;color:#334d70;font-size:9px;font-weight:900}
 .native-repair-picker select{width:100%;min-height:44px;border:1px solid #8fa6c6;border-radius:6px;background:#fff;color:#17345e;padding:9px 34px 9px 10px;font-size:13px;font-weight:700}
 .native-repair-picker select:focus{border-color:#0873df;box-shadow:0 0 0 3px #0873df22;outline:0}
 .scroll-region{overflow-y:scroll!important;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable;position:relative}
 .scroll-region::-webkit-scrollbar{width:12px}.scroll-region::-webkit-scrollbar-track{background:#dfe8f4;border-radius:8px}.scroll-region::-webkit-scrollbar-thumb{background:#54739f;border:2px solid #dfe8f4;border-radius:8px}
 .scroll-region:focus-visible{outline:3px solid #1780e8;outline-offset:-3px}
-@media(max-width:800px){.defect-list{max-height:clamp(200px,32dvh,300px)}.native-repair-picker select{font-size:16px}}
+@media(max-width:800px){.defect-list{max-height:clamp(200px,32dvh,300px)}.native-repair-picker select{font-size:16px}}@media(max-width:560px){.native-repair-picker{grid-template-columns:1fr}.native-repair-picker .amerex-code{grid-column:auto}}
 /* Lock the facility map while a full-screen editor is open */
 body.modal-scroll-locked .app{overflow:hidden!important}
 body.modal-scroll-locked .shade{overscroll-behavior:none}
