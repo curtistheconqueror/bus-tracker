@@ -152,9 +152,17 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /modal-scroll-locked/);
   assert.match(page, /position:"fixed"/);
   assert.match(page, /window\.scrollTo\(scrollX,scrollY\)/);
+  assert.match(page, /pickerRef\.current\?\.scrollIntoView/);
+  assert.match(page, /ref=\{pickerRef\} className="defect-entry"/);
   assert.match(css, /body\.modal-scroll-locked \.app\{overflow:hidden!important/);
   assert.match(css, /overscroll-behavior:contain;touch-action:pan-y/);
   assert.match(css, /\.modal>\.actions\{position:sticky;bottom:0/);
+  assert.match(css, /body\.modal-scroll-locked \.shade\{z-index:2147483500!important/);
+  assert.match(css, /body\.modal-scroll-locked \.command-bar\{pointer-events:none!important/);
+  assert.match(css, /max-height:calc\(100dvh - 16px\)/);
+  const commandZ = Number(css.match(/\.command-bar\{[^}]*z-index:(\d+)/)?.[1] || 0);
+  const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
+  assert.ok(modalZ > commandZ, `Bus editor layer ${modalZ} must exceed command strip ${commandZ}`);
   assert.match(page, /pace-south-fleet-board-backup/);
   assert.match(page, /EXPORT \/ SHARE BACKUP/);
   assert.match(page, /IMPORT BACKUP/);
@@ -302,6 +310,8 @@ test("repair catalog exposes robust category and issue choices", () => {
   const twoDefects = [
     { id: "one", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" },
     { id: "two", category: "Tech Services", issue: "Farebox", details: "Reader offline", operability: "service", state: "open" },
+    { id: "three", category: "Electrical / Multiplex", issue: "Horn", details: "Intermittent", operability: "service", state: "open" },
   ];
-  assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline/);
+  assert.equal(twoDefects.length, 3);
+  assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
 });

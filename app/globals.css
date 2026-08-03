@@ -236,3 +236,9 @@ body.modal-scroll-locked .shade{overscroll-behavior:none}
 body.modal-scroll-locked .modal{touch-action:manipulation;overscroll-behavior:none}
 body.modal-scroll-locked .modal>.form{overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
 body.modal-scroll-locked .modal>.actions{position:sticky;bottom:0;z-index:4;background:#f8faff;box-shadow:0 -4px 12px #17285818}
+/* Keep every tracker command behind the bus editor and reveal defect choices automatically */
+body.modal-scroll-locked .shade{z-index:2147483500!important;padding:8px;align-items:center;justify-content:center}
+body.modal-scroll-locked .command-bar{pointer-events:none!important}
+body.modal-scroll-locked .modal{max-height:calc(100dvh - 16px);margin:0 auto}
+body.modal-scroll-locked .modal>.actions{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
