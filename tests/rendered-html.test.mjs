@@ -177,7 +177,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.doesNotMatch(page, /className="scroll-cue"/);
   assert.doesNotMatch(css, /\.scroll-cue\{/);
   assert.match(css, /\.modal\.defect-expanded\{width:min\(650px,100%\)\}/);
-  assert.match(css, /\.add-defect-confirm\{[^}]*position:sticky[^}]*bottom:0[^}]*width:100%/);
+  assert.match(css, /\.add-defect-confirm\{[^}]*position:static[^}]*width:100%/);
+  assert.doesNotMatch(css, /\.add-defect-confirm\{[^}]*position:sticky/);
+  assert.match(page, /disabled=\{entryMode==="manual"&&!newDefect\.details\.trim\(\)\}/);
   assert.match(page, /modal-scroll-locked/);
   assert.match(page, /position:"fixed"/);
   assert.match(page, /window\.scrollTo\(scrollX,scrollY\)/);
