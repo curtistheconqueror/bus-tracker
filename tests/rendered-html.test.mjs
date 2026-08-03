@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
+import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
+import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 
@@ -107,7 +109,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /data-unscheduled=\{bus\.outReason==="Unscheduled"\}/);
   assert.match(page, /data-ac=\{Boolean\(bus\.acIssue\)/);
   assert.match(page, /data-downsheet=\{Boolean\(bus\.onDownSheet\)\}/);
-  assert.match(page, /activeDownIds\.length/);
+  assert.match(page, /downSheetBusIds\.length/);
   assert.match(page, /entry\.category==="A\/C and HVAC"/);
   assert.match(css, /\.app\.highlight-ac/);
   assert.match(css, /\.app\.highlight-downsheet/);
@@ -257,11 +259,39 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /SHOW COMPLETED/);
   assert.match(html, /ADD DOWN BUS/);
   assert.match(html, /SETTINGS/);
+  assert.match(html, /QUICK NOTES/);
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   assert.match(source, /knownActive/);
   assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
 });
 
+test("tracker down-sheet highlight uses only explicitly selected buses", () => {
+  const ids = selectedDownSheetBusIds([
+    { id: "bus-a", down: true },
+    { id: "bus-b", down: false },
+    { id: "20501", down: false },
+    { id: "bus-c", down: true },
+  ]);
+  assert.deepEqual(ids, ["bus-a", "bus-c"]);
+  assert.equal(ids.includes("20501"), false);
+});
+
+test("down-sheet button shows a ratio only when tracker and sheet counts differ", () => {
+  assert.equal(downSheetCountLabel(30, 30), "30");
+  assert.equal(downSheetCountLabel(30, 40), "30 / 40");
+});
+
+test("tracker checkbox creates and completes its matching down-sheet row", () => {
+  const bus = { id: "bus-17571", n: "17571", s: "out", down: true, pendingRepair: "A/C compressor", shift: "Evening" };
+  const added = syncTrackerDownSheetSelection(null, bus, "2026-08-02T12:00:00.000Z");
+  assert.equal(added.entries.length, 1);
+  assert.equal(added.entries[0].busId, bus.id);
+  assert.equal(added.entries[0].workflow, "Scheduled");
+  assert.equal(added.entries[0].shift, "2nd");
+  const removed = syncTrackerDownSheetSelection(JSON.stringify(added), { ...bus, down: false }, "2026-08-02T13:00:00.000Z");
+  assert.equal(removed.entries[0].workflow, "Completed");
+  assert.equal(removed.entries[0].completedAt, "2026-08-02T13:00:00.000Z");
+});
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
   const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
   const updated = applyDownEntryToFleet(fleet, {

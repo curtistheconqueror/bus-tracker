@@ -34,7 +34,7 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
   return {
    ...bus,
    s:entry.operationalStatus,
-   down:defects.some(isUnresolved)&&entry.operationalStatus!=="decommissioned",
+   down:!completed&&entry.operationalStatus!=="decommissioned",
    defects,
    pendingRepair:defectSummary(defects),
    mechanic:entry.assignmentType==="Mechanic"&&entry.assignedTo.trim()?entry.assignedTo.trim():bus.mechanic,
