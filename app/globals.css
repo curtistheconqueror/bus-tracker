@@ -208,7 +208,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .defect-heading small{font-size:8px;color:#65758f}
 .defect-heading button,.entry-mode button,.add-defect-confirm{border:1px solid #176ac0;border-radius:5px;background:#0873df;color:#fff;padding:7px 10px;font-size:8px;font-weight:900;cursor:pointer}
 .no-defects{margin:0;padding:12px;color:#6e7e97;font-size:9px;font-weight:700}
-.defect-list{display:grid;gap:8px;padding:10px}
+.defect-list{display:grid;gap:8px;padding:10px;max-height:clamp(190px,30dvh,290px)}
 .defect-card{padding:9px;border:1px solid #c6d1e2;border-left:4px solid #159447;border-radius:6px;background:#fff}
 .defect-card.deferred{border-left-color:#efa400}.defect-card.completed{border-left-color:#687384;opacity:.72}
 .defect-card>div:first-child{display:flex;justify-content:space-between;gap:10px}
@@ -221,14 +221,19 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .defect-entry .manual-defect{grid-column:1/-1}.defect-entry textarea{min-height:62px}.add-defect-confirm{grid-column:1/-1;position:sticky;bottom:0;z-index:3;align-self:end;width:100%;height:40px;box-shadow:0 -4px 12px #173e7324}
 @media(max-width:800px){.modal.defect-expanded{width:100%}.defect-entry,.defect-controls{grid-template-columns:1fr}.entry-mode,.defect-entry .manual-defect{grid-column:auto}.entry-mode{display:grid;grid-template-columns:1fr 1fr}.defect-heading{position:sticky;top:0;z-index:2}}
 /* Immediately visible, touch-friendly repair catalog */
-.repair-choice-stage{grid-column:1/-1;display:grid;gap:8px;max-height:min(390px,48dvh);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable;padding:10px;border:1px solid #c5d1e2;border-radius:7px;background:#f8fbff}
+.repair-choice-stage{grid-column:1/-1;display:grid;gap:8px;height:clamp(270px,50dvh,430px);max-height:none;padding:10px;border:1px solid #c5d1e2;border-radius:7px;background:#f8fbff}
+.scroll-region{overflow-y:scroll!important;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable;position:relative}
+.scroll-region::-webkit-scrollbar{width:12px}.scroll-region::-webkit-scrollbar-track{background:#dfe8f4;border-radius:8px}.scroll-region::-webkit-scrollbar-thumb{background:#54739f;border:2px solid #dfe8f4;border-radius:8px}
+.scroll-region:focus-visible{outline:3px solid #1780e8;outline-offset:-3px}
+.scroll-cue{position:sticky;top:-10px;z-index:4;margin:-10px -10px 2px;padding:6px 10px;background:#173e73;color:#fff;font-size:7px;font-weight:900;letter-spacing:.45px;text-align:center;box-shadow:0 3px 8px #173e7330}
+.defect-list .scroll-cue{top:-10px;grid-column:1/-1}
 .choice-prompt{font-size:8px;color:#4c607e;letter-spacing:.45px}
 .category-choice-grid,.issue-choice-grid{display:grid;gap:7px}.category-choice-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .category-choice-grid button,.issue-choice-grid button,.choice-selected button{min-height:35px;border:1px solid #aebbd0;border-radius:6px;background:#f8faff;color:#18365f;padding:7px;font-size:8px;font-weight:900;line-height:1.2;cursor:pointer;white-space:normal}
 .category-choice-grid button:hover,.category-choice-grid button:focus-visible,.issue-choice-grid button:hover,.issue-choice-grid button:focus-visible,.issue-choice-grid button.active{border-color:#0873df;background:#e6f1ff;color:#0759ad;box-shadow:0 0 0 2px #0873df20}
 .choice-selected{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-left:4px solid #0873df;background:#edf5ff}
 .choice-selected span{display:flex;flex-direction:column;gap:2px}.choice-selected small{font-size:7px;color:#687a94}.choice-selected strong{font-size:11px;color:#173e73}.choice-selected button{min-height:30px;background:#fff}
-@media(max-width:800px){.repair-choice-stage{max-height:min(380px,52dvh)}.category-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.repair-choice-stage{height:clamp(280px,54dvh,410px)}.defect-list{max-height:clamp(200px,32dvh,300px)}.category-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.category-choice-grid,.issue-choice-grid{grid-template-columns:1fr}}
 /* Lock the facility map while a full-screen editor is open */
 body.modal-scroll-locked .app{overflow:hidden!important}
