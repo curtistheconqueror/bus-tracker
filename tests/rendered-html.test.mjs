@@ -120,9 +120,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
-  assert.match(css, /\.east\{position:relative;margin-left:0;width:calc\(66\.6667% \+ 2px\);min-width:0;padding-left:6px;padding-right:6px;justify-self:start\}/);
+  assert.match(css, /\.east\{position:relative;margin-left:0;width:calc\(66\.6667% \+ 2px\);min-width:0;padding-left:6px;padding-right:6px;justify-self:end\}/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);grid-template-rows:repeat\(9,minmax\(0,1fr\)\);width:100%;gap:4px\}/);
-  assert.match(css, /\.east \.title>span:first-child\{flex-direction:column/);
+  assert.match(css, /\.east \.title>span:first-child\{flex-direction:column;gap:0;font-size:11px/);
   assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
   assert.match(page, /data-empty=\{!b\}/);
   assert.match(page, /onDoubleClick=/);

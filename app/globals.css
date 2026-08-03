@@ -188,11 +188,11 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 @media(max-width:800px){.fleet-number-row{grid-template-columns:1fr}.fleet-number-row button{width:100%}}
 
 /* Two-column CNG East, expanded On Road grid, and paired longitudinal service spaces */
-.east{position:relative;margin-left:0;width:calc(66.6667% + 2px);min-width:0;padding-left:6px;padding-right:6px;justify-self:start}
+.east{position:relative;margin-left:0;width:calc(66.6667% + 2px);min-width:0;padding-left:6px;padding-right:6px;justify-self:end}
 .eastgrid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));width:100%;gap:4px}
 .east .title{justify-content:flex-start;padding-left:2px;padding-right:48px;text-align:left}
-.east .title>span:first-child{flex-direction:column;gap:0;font-size:8px;line-height:1}
-.east .section-count{min-width:17px;height:13px;padding:0 4px;font-size:7px}
+.east .title>span:first-child{flex-direction:column;gap:0;font-size:11px;line-height:1}
+.east .section-count{min-width:17px;height:14px;padding:0 4px;font-size:8px}
 .east .title-actions{right:1px;gap:1px}
 .east .title-actions button{width:15px;height:17px;line-height:15px;font-size:10px}
 .roadgrid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(15,minmax(0,1fr));gap:5px}
