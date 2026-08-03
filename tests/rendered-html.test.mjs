@@ -8,6 +8,7 @@ import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-members
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
+import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -59,7 +60,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.doesNotMatch(html, /SHOP BAYS \(DIAGONAL - 12 TOTAL\)/);
   const bays = section(html, "SHOP BAYS (DIAGONAL)", "PIT");
   assert.equal((bays.match(/class="bay"/g) ?? []).length, 9);
-  assert.equal((bays.match(/class="bay-placeholder"/g) ?? []).length, 3);
+  assert.equal((bays.match(/class="bay-placeholder"/g) ?? []).length, 1);
   assert.match(bays, /NEEDS REASSIGNMENT/);
 
   const service = section(html, "SERVICE DETAIL AREA (SINGLE FILE)", "PAINT BOOTH");
@@ -73,7 +74,9 @@ test("server-renders the live fleet command dashboard", async () => {
   const east = section(html, '<section class="east lot">', '<section class="road">');
   assert.equal((east.match(/class="spot"/g) ?? []).length, 21);
   const road = section(html, '<section class="road">', '<section class="wall">');
-  assert.equal((road.match(/class="spot"/g) ?? []).length, 65);
+  assert.equal((road.match(/class="spot"/g) ?? []).length, 75);
+  const west = section(html, '<section class="west lot panel">', '<footer class="command-bar">');
+  assert.equal((west.match(/class="spot"/g) ?? []).length, 32);
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
@@ -94,7 +97,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /<Icon s=\{bus\.s\}/);
   assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
-  assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,null,8,6,4,2,null,9,7,5,3,1\]/);
+  assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,8,6,4,2,9,7,5,3,1\]/);
   assert.match(page, /"SHOP BAYS \(DIAGONAL\)":slots\("bay",9,1\)/);
   assert.match(page, /roadcallSolid:boolean;roadcallLocation:string/);
   assert.match(page, /SOLID ORANGE BUS \(NO FLASHING DOT\)/);
@@ -117,8 +120,8 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
-  assert.match(css, /\.east\{position:relative;margin-left:calc\(25% - 2px\);width:calc\(75% \+ 2px\)\}/);
-  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-rows:repeat\(7,minmax\(0,1fr\)\);width:100%\}/);
+  assert.match(css, /\.east\{position:relative;margin-left:0;width:100%;min-width:0;padding-left:6px;padding-right:6px\}/);
+  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-rows:repeat\(7,minmax\(0,1fr\)\);width:100%;gap:5px\}/);
   assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
   assert.match(page, /data-empty=\{!b\}/);
   assert.match(page, /onDoubleClick=/);
@@ -131,14 +134,20 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /That destination was just occupied/);
   assert.match(css, /\.service\{width:calc\(75% - 8px\);justify-self:start/);
   assert.match(css, /\.road\{position:absolute;top:0/);
+  assert.match(css, /\.mid\{grid-template-columns:145px 310px 191px minmax\(0,1fr\) 25%\}/);
+  assert.match(css, /\.baygrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}/);
   assert.match(css, /\.app\.highlight-status-out/);
-  assert.match(page, /const ROAD_CAPACITY=65/);
+  assert.equal(ROAD_CAPACITY, 75);
+  assert.equal(WEST_CAPACITY, 32);
   assert.match(page, /"PIT":slots\("pit",2\)/);
   assert.match(page, /"BRAKE TEST":slots\("brake",2\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
-  assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(13/);
+  assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(15/);
+  assert.match(css, /\.westgrid\{[^}]*grid-template-rows:repeat\(4/);
+  assert.match(css, /\.west\{align-self:end\}/);
+  assert.match(page, /migrateReducedCapacity\(migrated,"west",WEST_CAPACITY\)/);
   assert.match(page, /validateBusUpdate\(buses,withSummary\)/);
   assert.match(page, /error==="occupied-location"/);
   assert.match(page, /towInProgress:boolean/);
@@ -309,6 +318,15 @@ test("section counters include assigned and overflow buses and update from fleet
   assert.equal(sectionBusCount(fleet.slice(1), slots), 2);
 });
 
+test("CNG West capacity reduction migrates every saved bus without loss", () => {
+  const fleet = Array.from({ length: 31 }, (_, index) => ({ id: `kept-${index}`, l: `west-${index}` }));
+  fleet.push({ id: "removed-row", l: "west-35" }, { id: "previous-overflow", l: "west-overflow-2" });
+  const migrated = migrateReducedCapacity(fleet, "west", WEST_CAPACITY);
+  assert.equal(migrated.length, fleet.length);
+  assert.equal(migrated.find(bus => bus.id === "removed-row").l, "west-31");
+  assert.equal(migrated.find(bus => bus.id === "previous-overflow").l, "west-overflow-1");
+  assert.equal(new Set(migrated.map(bus => bus.l)).size, migrated.length);
+});
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
   const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
   const updated = applyDownEntryToFleet(fleet, {

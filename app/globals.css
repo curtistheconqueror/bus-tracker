@@ -158,6 +158,8 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 @media(prefers-reduced-motion:reduce){.roadcall-dot{animation:none}}
 /* Expanded on-road area and interactive live fleet counters */
 .facility{position:relative}
+.mid{grid-template-columns:145px 310px 191px minmax(0,1fr) 25%}
+.baygrid{grid-template-columns:repeat(5,minmax(0,1fr))}
 .service{width:calc(75% - 8px);justify-self:start;margin-left:8px}
 .road{position:absolute;top:0;right:8px;width:calc(25% - 16px);height:440px;z-index:3;display:flex;flex-direction:column}
 .roadgrid{height:auto;flex:1;min-height:0}
@@ -169,7 +171,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .legend .pending-count>i{width:10px;height:10px;border-radius:50%;background:var(--status-shop);box-shadow:0 0 0 2px color-mix(in srgb,var(--status-shop) 24%,transparent)}
 .app.highlight-status-service .token:not([data-status="service"]),.app.highlight-status-defect .token:not([data-status="defect"]),.app.highlight-status-shop .token:not([data-status="shop"]),.app.highlight-status-out .token:not([data-status="out"]),.app.highlight-status-decommissioned .token:not([data-status="decommissioned"]),.app.highlight-status-unknown .token:not([data-status="unknown"]){opacity:.18;filter:grayscale(.8)}
 .app.highlight-status-service .token[data-status="service"],.app.highlight-status-defect .token[data-status="defect"],.app.highlight-status-shop .token[data-status="shop"],.app.highlight-status-out .token[data-status="out"],.app.highlight-status-decommissioned .token[data-status="decommissioned"],.app.highlight-status-unknown .token[data-status="unknown"]{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
-@media(max-width:1100px){.service{margin-left:8px}.road{right:8px}.legend>button{font-size:6px;padding:2px 3px}.legend>button>span{max-width:80px}.legend>button>b{min-width:18px;height:18px}}
+@media(max-width:1100px){.mid{grid-template-columns:120px 270px 174px minmax(0,1fr) 225px}.service{margin-left:8px}.road{right:8px;width:225px}.legend>button{font-size:6px;padding:2px 3px}.legend>button>span{max-width:80px}.legend>button>b{min-width:18px;height:18px}}
 /* Direct empty-space creation gestures */
 .spot[data-empty="true"]{cursor:copy;touch-action:manipulation}
 .spot[data-empty="true"]:hover{background:color-mix(in srgb,var(--slot-bg) 82%,#dcecff);border-color:#7196c7}
@@ -186,11 +188,13 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 @media(max-width:800px){.fleet-number-row{grid-template-columns:1fr}.fleet-number-row button{width:100%}}
 
 /* Three-column CNG East, matching On Road cells, and paired longitudinal service spaces */
-.east{position:relative;margin-left:calc(25% - 2px);width:calc(75% + 2px)}
-.eastgrid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,minmax(0,1fr));width:100%}
+.east{position:relative;margin-left:0;width:100%;min-width:0;padding-left:6px;padding-right:6px}
+.eastgrid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,minmax(0,1fr));width:100%;gap:5px}
 .east .title{justify-content:flex-start;padding-left:8px;padding-right:64px;text-align:left}
 .east .title-actions{right:2px}
-.roadgrid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(13,minmax(0,1fr));gap:7px}
+.roadgrid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(15,minmax(0,1fr));gap:5px}
+.west{align-self:end}
+.westgrid{grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));height:176px}
 .pit .vspots,.brake .vspots{grid-template-rows:repeat(2,minmax(0,1fr))}
 .east-overflow{position:absolute;left:8px;right:8px;bottom:4px;z-index:5}
 /* Tow-in-progress operational flag */
