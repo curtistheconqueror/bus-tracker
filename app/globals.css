@@ -196,3 +196,27 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .quick-bus .roadcall-badge+.tow-badge{margin-left:2px}
 .tow-detail{border-left:3px solid #6f42c1;padding-left:7px;color:#4d2f83}
 .form .tow-check{color:#5c349f}
+/* Smart multi-defect editor and occupied-space bus swapping */
+.spot.swap-ready{background:#fff0d6;border:2px solid #ee8a00;box-shadow:inset 0 0 0 2px #fff6e5}
+.modal{display:flex;flex-direction:column;max-height:94vh;transition:width .18s ease}
+.modal.defect-expanded{width:min(860px,100%)}
+.modal>.form{overflow-y:auto;min-height:0}
+.modal>.mhead,.modal>.actions{flex:none}
+.defect-workbench{border:1px solid #b7c5dc;border-radius:8px;background:#f1f5fb;overflow:hidden}
+.defect-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#e5edf8;border-bottom:1px solid #c6d1e2}
+.defect-heading>span{display:flex;flex-direction:column;gap:2px;color:#17345e;font-size:10px}
+.defect-heading small{font-size:8px;color:#65758f}
+.defect-heading button,.entry-mode button,.add-defect-confirm{border:1px solid #176ac0;border-radius:5px;background:#0873df;color:#fff;padding:7px 10px;font-size:8px;font-weight:900;cursor:pointer}
+.no-defects{margin:0;padding:12px;color:#6e7e97;font-size:9px;font-weight:700}
+.defect-list{display:grid;gap:8px;padding:10px}
+.defect-card{padding:9px;border:1px solid #c6d1e2;border-left:4px solid #159447;border-radius:6px;background:#fff}
+.defect-card.deferred{border-left-color:#efa400}.defect-card.completed{border-left-color:#687384;opacity:.72}
+.defect-card>div:first-child{display:flex;justify-content:space-between;gap:10px}
+.defect-card>div:first-child>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.defect-card b{font-size:8px;color:#65758f;text-transform:uppercase}.defect-card strong{font-size:11px;color:#17345e}.defect-card small{font-size:9px;color:#4f6079;overflow-wrap:anywhere}
+.defect-card>div:first-child>button{align-self:start;border:0;background:transparent;color:#aa2730;font-size:7px;font-weight:900;cursor:pointer}
+.defect-controls{display:grid;grid-template-columns:1fr 1.5fr;gap:8px;margin-top:8px}.defect-controls label{font-size:7px}.defect-controls select{padding:6px}
+.defect-entry{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-top:1px solid #c6d1e2;background:#fff}
+.entry-mode{grid-column:1/-1;display:flex;gap:6px}.entry-mode button{background:#fff;color:#315071;border-color:#9dafc8}.entry-mode button.active{background:#173e73;color:#fff;border-color:#173e73}
+.defect-entry .manual-defect{grid-column:1/-1}.defect-entry textarea{min-height:62px}.add-defect-confirm{align-self:end;height:36px}
+@media(max-width:800px){.modal.defect-expanded{width:100%}.defect-entry,.defect-controls{grid-template-columns:1fr}.entry-mode,.defect-entry .manual-defect{grid-column:auto}.entry-mode{display:grid;grid-template-columns:1fr 1fr}.defect-heading{position:sticky;top:0;z-index:2}}

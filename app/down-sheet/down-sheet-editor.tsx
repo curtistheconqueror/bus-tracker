@@ -1,6 +1,7 @@
 "use client";
 
 import {useMemo,useState} from "react";
+import {REPAIR_OPTIONS} from "../repair-catalog";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -15,28 +16,6 @@ export type DownSheetRecord={
  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
-};
-
-const REPAIR_OPTIONS:Record<string,string[]>={
- "A/C and HVAC":["No cooling","Compressor","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check-engine diagnosis","Loss of power","Oil leak","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
- "Cooling System":["Overheating","Coolant leak","Radiator","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
- "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
- "Suspension":["Air bag","Shock / strut","Ride-height issue","Suspension leak","Bushing / linkage","Other suspension repair"],
- "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
- "Brakes":["Brake inspection","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Parking brake","Other brake repair"],
- "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
- "Battery, Starting and Charging":["Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Cables / terminals","Other starting or charging repair"],
- "Electrical / Multiplex":["Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
- "No Start":["No crank","Cranks / no start","Intermittent no start","Starting-system diagnosis","Fuel-related no start","Electrical no start","Other no-start diagnosis"],
- "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
- "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Mirrors / fixtures","Other light or fixture"],
- "Bodywork":["Accident damage","Body panel","Bumper","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
- "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
- "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Valve Adjustment and Spark Plug Refresh"],
- "Preventive Maintenance":["Oil and filter service","Lubrication","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
- "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Other repair"],
 };
 
 const SECTIONS:RepairSection[]=["Pending","Accident","Scheduled Repair","Inspection","Vendor Repair","Roadcall","Other"];
@@ -67,7 +46,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>update("workflow",event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
     <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>This changes status only, never the parking location.</small></label>
     <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
-    <label className="operator-initials">UPDATED BY — INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required for every saved change.</small></label>
+    <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required for every saved change.</small></label>
    </div>
    {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
    <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair">{isNew?"ADD TO DOWN SHEET":"SAVE UPDATE"}</button></div>

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
+import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -87,7 +88,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /original==="tow"\?"out"/);
   assert.match(page, /statusVersion:3/);
   assert.match(page, /<Icon s=\{bus\.s\}/);
-  assert.match(page, /onChange=\{e=>f\("s",e\.target\.value\)\}/);
+  assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
   assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,null,8,6,4,2,null,9,7,5,3,1\]/);
   assert.match(page, /"SHOP BAYS \(DIAGONAL\)":slots\("bay",9,1\)/);
@@ -132,7 +133,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(13/);
-  assert.match(page, /validateBusUpdate\(buses,cleanNext\)/);
+  assert.match(page, /validateBusUpdate\(buses,withSummary\)/);
   assert.match(page, /error==="occupied-location"/);
   assert.match(page, /towInProgress:boolean/);
   assert.match(page, /towInProgress:Boolean\(bus\.towInProgress\)/);
@@ -207,6 +208,9 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /SHOW COMPLETED/);
   assert.match(html, /ADD DOWN BUS/);
   assert.match(html, /SETTINGS/);
+  const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  assert.match(source, /knownActive/);
+  assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
 });
 
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
@@ -226,6 +230,9 @@ test("down sheet synchronization changes repairs and status without moving the b
   assert.equal(updated[0].down, true);
   assert.equal(updated[0].mechanic, "JD");
   assert.match(updated[0].pendingRepair, /Brakes.*ABS warning.*Intermittent warning light/);
+  assert.equal(updated[0].defects.length, 1);
+  assert.equal(updated[0].defects[0].category, "Brakes");
+  assert.equal(updated[0].defects[0].state, "open");
 
   const completed = applyDownEntryToFleet(updated, {
     busId: "bus-1",
@@ -241,5 +248,32 @@ test("down sheet synchronization changes repairs and status without moving the b
   assert.equal(completed[0].s, "service");
   assert.equal(completed[0].down, false);
   assert.equal(completed[0].pendingRepair, "");
+  assert.equal(completed[0].defects.length, 1);
+  assert.equal(completed[0].defects[0].state, "completed");
   assert.equal(completed[0].mechanic, "JD");
+});
+test("smart status returns repaired and defect-carrying buses to the road correctly", () => {
+  const minor = [{ id: "d1", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
+  const downing = [{ id: "d2", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" }];
+  const completed = minor.map(defect => ({ ...defect, state: "completed" }));
+  assert.equal(statusForLocation("road-4", "shop", { defects: minor, pendingRepair: "" }), "defect");
+  assert.equal(statusForLocation("road-4", "shop", { defects: downing, pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("road-4", "shop", { defects: completed, pendingRepair: "" }), "service");
+  assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
+  assert.equal(roadServiceStatus({ defects: minor }), "defect");
+});
+
+test("dropping onto an occupied parking space swaps both buses atomically", () => {
+  const fleet = [
+    { id: "a", l: "bay-1", s: "shop", parkedAt: "old-a", defects: [{ id: "d1", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }] },
+    { id: "b", l: "road-2", s: "service", parkedAt: "old-b", defects: [] },
+  ];
+  const swapped = moveOrSwapBuses(fleet, "a", "road-2", "now");
+  assert.equal(swapped.find(bus => bus.id === "a").l, "road-2");
+  assert.equal(swapped.find(bus => bus.id === "a").s, "defect");
+  assert.equal(swapped.find(bus => bus.id === "b").l, "bay-1");
+  assert.equal(swapped.find(bus => bus.id === "b").s, "shop");
+  assert.equal(new Set(swapped.map(bus => bus.l)).size, 2);
+  assert.ok(swapped.every(bus => bus.parkedAt === "now"));
 });

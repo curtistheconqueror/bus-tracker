@@ -5,6 +5,7 @@ import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetSettings from "./down-sheet-settings";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
+import {isUnresolved,type StructuredDefect} from "../repair-catalog";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -15,7 +16,7 @@ type RepairSection="Pending"|"Accident"|"Scheduled Repair"|"Inspection"|"Vendor 
 
 type FleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;foreman?:string;shift?:string;
- down?:boolean;notes?:string;pendingRepair?:string;roadcall?:boolean;parkedAt?:string;
+ down?:boolean;notes?:string;pendingRepair?:string;defects?:StructuredDefect[];roadcall?:boolean;parkedAt?:string;
 };
 
 type RepairHistory={at:string;initials:string;action:string};
@@ -69,9 +70,9 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
   id:"repair-"+bus.id,
   busId:bus.id,
   busNumber:bus.n,
-  category:"Miscellaneous",
-  repair:bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
-  customReason:"",
+  category:bus.defects?.find(isUnresolved)?.category||"Miscellaneous",
+  repair:bus.defects?.find(isUnresolved)?.issue||bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
+  customReason:bus.defects?.find(isUnresolved)?.details||"",
   assignmentType:"Mechanic",
   assignedTo:bus.mechanic||"",
   section:bus.roadcall?"Roadcall":"Pending",
@@ -105,11 +106,11 @@ export default function DownSheet(){
 
  // Restore the existing device-local fleet and down sheet once after hydration.
  // eslint-disable-next-line react-hooks/set-state-in-effect
- useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;setEntries(Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):entriesFromFleet(nextFleet));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st")}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;const restored=Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):[],knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st")}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  useEffect(()=>{if(hydrated)localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries}))},[entries,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift}))},[showCompleted,defaultInitials,defaultShift,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),nextFleet=(Array.isArray(payload)?payload:payload.buses)||[];setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find((item:FleetBus)=>item.id===entry.busId);if(!bus)return entry;const incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}catch{}}if(event.key===DOWN_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),next=Array.isArray(payload)?payload:payload.entries;if(Array.isArray(next))setEntries(next.map(normalizeEntry))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),nextFleet=(Array.isArray(payload)?payload:payload.buses)||[];setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find((item:FleetBus)=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}catch{}}if(event.key===DOWN_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),next=Array.isArray(payload)?payload:payload.entries;if(Array.isArray(next))setEntries(next.map(normalizeEntry))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  const visible=useMemo(()=>entries.filter(entry=>(showCompleted||isActive(entry))&&(filter==="All"||entry.shift===filter)),[entries,filter,showCompleted]);
