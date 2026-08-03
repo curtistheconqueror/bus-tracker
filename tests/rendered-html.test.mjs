@@ -7,6 +7,7 @@ import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
+import { sectionBusCount } from "../app/section-count.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -294,6 +295,18 @@ test("tracker checkbox creates and completes its matching down-sheet row", () =>
   assert.equal(removed.entries[0].workflow, "Completed");
   assert.equal(removed.entries[0].completedAt, "2026-08-02T13:00:00.000Z");
 });
+test("section counters include assigned and overflow buses and update from fleet state", () => {
+  const slots = ["east-0", "east-1", "east-2"];
+  const fleet = [
+    { l: "east-0" },
+    { l: "east-2" },
+    { l: "east-overflow-0" },
+    { l: "west-0" },
+  ];
+  assert.equal(sectionBusCount(fleet, slots), 3);
+  assert.equal(sectionBusCount(fleet.slice(1), slots), 2);
+});
+
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
   const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
   const updated = applyDownEntryToFleet(fleet, {

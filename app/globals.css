@@ -50,6 +50,8 @@
 /* Section bus controls, wider vertical spaces, and touch gestures */
 .token{touch-action:manipulation}
 .title-actions{position:absolute;right:4px;display:flex;align-items:center;gap:5px}
+.title>span:first-child{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.section-count{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:18px;padding:0 6px;border:1px solid #9badd0;border-radius:10px;background:#edf3fc;color:#173e73;font-size:9px;line-height:1}
 .title-actions button{width:19px;height:19px;padding:0;border:1px solid #9eabc4;border-radius:4px;background:#fff;color:#24385d;font-size:13px;font-weight:900;line-height:17px;opacity:.78;cursor:pointer}
 .title-actions button:hover,.title-actions button:focus-visible{opacity:1;background:#edf4ff;border-color:#5878ae}
 .title-actions .remove-space{color:#aa1d26}
