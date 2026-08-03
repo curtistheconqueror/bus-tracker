@@ -186,7 +186,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 @media(max-width:800px){.fleet-number-row{grid-template-columns:1fr}.fleet-number-row button{width:100%}}
 
 /* Three-column CNG East, matching On Road cells, and paired longitudinal service spaces */
-.east{position:relative}
+.east{position:relative;transform:translateX(4px);width:calc(100% - 4px)}
 .eastgrid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,minmax(0,1fr));width:calc(75% - 2px)}
 .east .title{justify-content:flex-start;padding-left:8px;padding-right:64px;text-align:left}
 .east .title-actions{right:2px}

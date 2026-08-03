@@ -117,6 +117,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /@keyframes locate-pulse/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
+  assert.match(css, /\.east\{position:relative;transform:translateX\(4px\);width:calc\(100% - 4px\)\}/);
   assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
   assert.match(page, /data-empty=\{!b\}/);
   assert.match(page, /onDoubleClick=/);
