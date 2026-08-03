@@ -4,7 +4,7 @@ import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
-import { REPAIR_OPTIONS, defectSummary } from "../app/repair-catalog.ts";
+import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectSummary } from "../app/repair-catalog.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -145,6 +145,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CHOOSE A REPAIR CATEGORY/);
   assert.match(page, /category-choice-grid/);
   assert.match(page, /CHOOSE THE SPECIFIC DEFECT/);
+  assert.match(page, /CHOOSE THE AMEREX SYSTEM/);
+  assert.match(page, /CHANGE SYSTEM/);
+  assert.match(page, /CHOOSE THE STATUS OR CODE/);
   assert.match(page, /CHANGE CATEGORY/);
   assert.match(page, /ADD ANOTHER DEFECT/);
   assert.match(page, /DEFECT \{index\+1\}/);
@@ -307,6 +310,11 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"));
   assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "MDT Screen", "Destination Sign", "Other Tech Services"]);
+  assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
   const twoDefects = [
     { id: "one", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" },
     { id: "two", category: "Tech Services", issue: "Farebox", details: "Reader offline", operability: "service", state: "open" },

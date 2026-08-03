@@ -22,6 +22,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Battery, Starting and Charging":["Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["Horn","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Tech Services":["Farebox","Ventra","MDT Screen","Destination Sign","Other Tech Services"],
+ "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "No Start":["No crank","Cranks / no start","Intermittent no start","Starting-system diagnosis","Fuel-related no start","Electrical no start","Other no-start diagnosis"],
  "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
@@ -33,6 +34,12 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
 
+export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
+ "Amerex":{
+  "Fire Suppression":["Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Other Fire Suppression Trouble"],
+  "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
+ },
+};
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
