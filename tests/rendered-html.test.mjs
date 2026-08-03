@@ -152,6 +152,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /ADD ANOTHER DEFECT/);
   assert.match(page, /DEFECT \{index\+1\}/);
   assert.match(css, /\.category-choice-grid/);
+  assert.match(css, /\.repair-choice-stage\{[^}]*max-height:min\(390px,48dvh\)[^}]*overflow-y:auto/);
+  assert.match(css, /\.repair-choice-stage\{[^}]*overscroll-behavior:contain[^}]*touch-action:pan-y/);
+  assert.match(css, /\.modal\.defect-expanded\{width:min\(650px,100%\)\}/);
   assert.match(page, /modal-scroll-locked/);
   assert.match(page, /position:"fixed"/);
   assert.match(page, /window\.scrollTo\(scrollX,scrollY\)/);
