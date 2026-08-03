@@ -91,6 +91,14 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   for (const control of ["Page Background", "Panel Background", "Parking Spaces", "Command Bar", "SECTION BACKGROUNDS", "BUS STATUS COLORS"]) {
     assert.match(page, new RegExp(control));
   }
+  assert.match(page, /garageSpecial:string;garageFrame:string/);
+  assert.match(page, /Bays 11 & 12 Parking Spaces/);
+  assert.match(page, /Garage Border, Top & Row Banners/);
+  assert.match(page, /className=\{c>=10\?"garage-special-slot":undefined\}/);
+  assert.match(page, /"--garage-special",visuals\.garageSpecial/);
+  assert.match(page, /"--garage-frame",visuals\.garageFrame/);
+  assert.match(css, /\.garage\{border-color:var\(--garage-frame\)\}/);
+  assert.match(css, /\.grow \.spot\.garage-special-slot\{background:var\(--garage-special\)/);
   assert.match(page, /scrollIntoView\(\{behavior:"smooth"/);
   assert.match(page, /original==="tow"\?"out"/);
   assert.match(page, /statusVersion:3/);
