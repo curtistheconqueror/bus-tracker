@@ -4,6 +4,7 @@ import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
+import { REPAIR_OPTIONS } from "../app/repair-catalog.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -141,6 +142,11 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.towInProgress\}/);
   assert.match(css, /\.tow-badge\{/);
   assert.match(css, /\.form \.tow-check\{/);
+  assert.match(page, /CHOOSE A REPAIR CATEGORY/);
+  assert.match(page, /category-choice-grid/);
+  assert.match(page, /CHOOSE THE SPECIFIC DEFECT/);
+  assert.match(page, /CHANGE CATEGORY/);
+  assert.match(css, /\.category-choice-grid/);
   assert.match(page, /pace-south-fleet-board-backup/);
   assert.match(page, /EXPORT \/ SHARE BACKUP/);
   assert.match(page, /IMPORT BACKUP/);
@@ -276,4 +282,11 @@ test("dropping onto an occupied parking space swaps both buses atomically", () =
   assert.equal(swapped.find(bus => bus.id === "b").s, "shop");
   assert.equal(new Set(swapped.map(bus => bus.l)).size, 2);
   assert.ok(swapped.every(bus => bus.parkedAt === "now"));
+});
+test("repair catalog exposes robust category and issue choices", () => {
+  assert.ok(Object.keys(REPAIR_OPTIONS).length >= 15);
+  assert.ok(Object.values(REPAIR_OPTIONS).every(options => options.length >= 5));
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
+  assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
+  assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
 });

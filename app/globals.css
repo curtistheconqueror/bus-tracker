@@ -220,3 +220,13 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .entry-mode{grid-column:1/-1;display:flex;gap:6px}.entry-mode button{background:#fff;color:#315071;border-color:#9dafc8}.entry-mode button.active{background:#173e73;color:#fff;border-color:#173e73}
 .defect-entry .manual-defect{grid-column:1/-1}.defect-entry textarea{min-height:62px}.add-defect-confirm{align-self:end;height:36px}
 @media(max-width:800px){.modal.defect-expanded{width:100%}.defect-entry,.defect-controls{grid-template-columns:1fr}.entry-mode,.defect-entry .manual-defect{grid-column:auto}.entry-mode{display:grid;grid-template-columns:1fr 1fr}.defect-heading{position:sticky;top:0;z-index:2}}
+/* Immediately visible, touch-friendly repair catalog */
+.repair-choice-stage{grid-column:1/-1;display:grid;gap:8px}
+.choice-prompt{font-size:8px;color:#4c607e;letter-spacing:.45px}
+.category-choice-grid,.issue-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.category-choice-grid button,.issue-choice-grid button,.choice-selected button{min-height:35px;border:1px solid #aebbd0;border-radius:6px;background:#f8faff;color:#18365f;padding:7px;font-size:8px;font-weight:900;line-height:1.2;cursor:pointer;white-space:normal}
+.category-choice-grid button:hover,.category-choice-grid button:focus-visible,.issue-choice-grid button:hover,.issue-choice-grid button:focus-visible,.issue-choice-grid button.active{border-color:#0873df;background:#e6f1ff;color:#0759ad;box-shadow:0 0 0 2px #0873df20}
+.choice-selected{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-left:4px solid #0873df;background:#edf5ff}
+.choice-selected span{display:flex;flex-direction:column;gap:2px}.choice-selected small{font-size:7px;color:#687a94}.choice-selected strong{font-size:11px;color:#173e73}.choice-selected button{min-height:30px;background:#fff}
+@media(max-width:800px){.category-choice-grid,.issue-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.category-choice-grid,.issue-choice-grid{grid-template-columns:1fr}}
