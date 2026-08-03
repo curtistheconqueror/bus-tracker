@@ -30,7 +30,7 @@ const data:[string,LegacyS,string][]=[["17544","route","service-0"],["17520","sh
 const seed:B[]=data.map((x,i)=>{const status:S=x[1]==="route"?"service":x[1]==="service"?"defect":x[1]==="tow"?"out":x[1];const unavailable=status==="out"||status==="decommissioned";const bay=Number(x[2].replace("bay-",""));return {id:"b"+i,n:x[0],s:status,l:x[2].startsWith("bay-")&&bay>9?"bay-overflow-"+(bay-10):x[2],mechanic:"",foreman:"",shift:"Day",priority:"Normal",safe:!unavailable,down:false,notes:"",pendingRepair:"",defects:[],roadcall:false,roadcallSolid:false,roadcallLocation:"",towInProgress:false,parkedAt:new Date(Date.now()-(i%12)*36e5).toISOString(),outReason:status==="out"?"Unscheduled":""}});
 const SINGLE_FILE_CAPACITY=8;
 const slots=(prefix:string,count:number,start=0)=>Array.from({length:count},(_,index)=>prefix+"-"+(index+start));
-const EAST_SLOTS=Array.from({length:7},(_,row)=>[0,1,2].map(column=>"east-"+(row*4+column))).flat();
+const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();
 const SECTION_SLOTS:Record<string,string[]>={
  "SERVICE DETAIL AREA (SINGLE FILE)":slots("service",8),
  "PAINT BOOTH":slots("paint",1),

@@ -1,5 +1,5 @@
 export const ROAD_CAPACITY=75;
-export const WEST_CAPACITY=32;
+export const WEST_CAPACITY=40;
 
 export function migrateReducedCapacity<T extends {l:string}>(source:T[],prefix:string,capacity:number):T[]{
  const retained=Array.from({length:capacity},(_,index)=>prefix+"-"+index);

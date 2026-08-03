@@ -187,14 +187,14 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .fleet-warning{margin-top:9px;padding:8px 10px;border-left:3px solid #e3a100;background:#fff7dc;color:#735300;font-size:9px;font-weight:800}
 @media(max-width:800px){.fleet-number-row{grid-template-columns:1fr}.fleet-number-row button{width:100%}}
 
-/* Three-column CNG East, matching On Road cells, and paired longitudinal service spaces */
+/* Two-column CNG East, expanded On Road grid, and paired longitudinal service spaces */
 .east{position:relative;margin-left:0;width:100%;min-width:0;padding-left:6px;padding-right:6px}
-.eastgrid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(7,minmax(0,1fr));width:100%;gap:5px}
+.eastgrid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));width:100%;gap:4px}
 .east .title{justify-content:flex-start;padding-left:8px;padding-right:64px;text-align:left}
 .east .title-actions{right:2px}
 .roadgrid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(15,minmax(0,1fr));gap:5px}
 .west{align-self:end}
-.westgrid{grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));height:176px}
+.westgrid{grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));height:222px}
 .pit .vspots,.brake .vspots{grid-template-rows:repeat(2,minmax(0,1fr))}
 .east-overflow{position:absolute;left:8px;right:8px;bottom:4px;z-index:5}
 /* Tow-in-progress operational flag */

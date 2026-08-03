@@ -72,11 +72,11 @@ test("server-renders the live fleet command dashboard", async () => {
   const brake = section(html, "BRAKE TEST", "TOW STAGING");
   assert.equal((brake.match(/class="spot"/g) ?? []).length, 2);
   const east = section(html, '<section class="east lot">', '<section class="road">');
-  assert.equal((east.match(/class="spot"/g) ?? []).length, 21);
+  assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
   assert.equal((road.match(/class="spot"/g) ?? []).length, 75);
   const west = section(html, '<section class="west lot panel">', '<footer class="command-bar">');
-  assert.equal((west.match(/class="spot"/g) ?? []).length, 32);
+  assert.equal((west.match(/class="spot"/g) ?? []).length, 40);
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
@@ -121,7 +121,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
   assert.match(css, /\.east\{position:relative;margin-left:0;width:100%;min-width:0;padding-left:6px;padding-right:6px\}/);
-  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\);grid-template-rows:repeat\(7,minmax\(0,1fr\)\);width:100%;gap:5px\}/);
+  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);grid-template-rows:repeat\(9,minmax\(0,1fr\)\);width:100%;gap:4px\}/);
   assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
   assert.match(page, /data-empty=\{!b\}/);
   assert.match(page, /onDoubleClick=/);
@@ -138,14 +138,15 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.baygrid\{grid-template-columns:repeat\(5,minmax\(0,1fr\)\)\}/);
   assert.match(css, /\.app\.highlight-status-out/);
   assert.equal(ROAD_CAPACITY, 75);
-  assert.equal(WEST_CAPACITY, 32);
+  assert.equal(WEST_CAPACITY, 40);
   assert.match(page, /"PIT":slots\("pit",2\)/);
   assert.match(page, /"BRAKE TEST":slots\("brake",2\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
-  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(3/);
+  assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
+  assert.ok(page.includes('const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(15/);
-  assert.match(css, /\.westgrid\{[^}]*grid-template-rows:repeat\(4/);
+  assert.match(css, /\.westgrid\{[^}]*grid-template-rows:repeat\(5/);
   assert.match(css, /\.west\{align-self:end\}/);
   assert.match(page, /migrateReducedCapacity\(migrated,"west",WEST_CAPACITY\)/);
   assert.match(page, /validateBusUpdate\(buses,withSummary\)/);
@@ -318,13 +319,12 @@ test("section counters include assigned and overflow buses and update from fleet
   assert.equal(sectionBusCount(fleet.slice(1), slots), 2);
 });
 
-test("CNG West capacity reduction migrates every saved bus without loss", () => {
-  const fleet = Array.from({ length: 31 }, (_, index) => ({ id: `kept-${index}`, l: `west-${index}` }));
-  fleet.push({ id: "removed-row", l: "west-35" }, { id: "previous-overflow", l: "west-overflow-2" });
+test("restored CNG West row pulls saved overflow buses back into visible spaces", () => {
+  const fleet = Array.from({ length: 39 }, (_, index) => ({ id: `kept-${index}`, l: `west-${index}` }));
+  fleet.push({ id: "previous-overflow", l: "west-overflow-2" });
   const migrated = migrateReducedCapacity(fleet, "west", WEST_CAPACITY);
   assert.equal(migrated.length, fleet.length);
-  assert.equal(migrated.find(bus => bus.id === "removed-row").l, "west-31");
-  assert.equal(migrated.find(bus => bus.id === "previous-overflow").l, "west-overflow-1");
+  assert.equal(migrated.find(bus => bus.id === "previous-overflow").l, "west-39");
   assert.equal(new Set(migrated.map(bus => bus.l)).size, migrated.length);
 });
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
