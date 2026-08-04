@@ -20,6 +20,7 @@ export function roadServiceStatus(bus:RepairAwareBus):FleetStatus{
 
 export function statusForLocation(location:string,current:FleetStatus,bus:RepairAwareBus):FleetStatus{
  if(location.startsWith("bay-"))return "shop";
+ if((location.startsWith("east-")||location.startsWith("west-"))&&hasUnresolvedDefects(bus))return "out";
  if(location.startsWith("road-")&&(current==="shop"||current==="service"||current==="defect"))return roadServiceStatus(bus);
  return current;
 }

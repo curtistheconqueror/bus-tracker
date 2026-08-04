@@ -8,6 +8,7 @@ import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-members
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
+import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
@@ -135,8 +136,20 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.east \.title>span:first-child\{flex-direction:column;gap:0;font-size:11px/);
   assert.match(page, /buses\.filter\(bus=>bus\.s===status\)\.length/);
   assert.match(page, /data-empty=\{!b\}/);
-  assert.match(page, /onDoubleClick=/);
-  assert.match(page, /event\.pointerType!=="touch"/);
+  assert.doesNotMatch(page, /onDoubleClick=/);
+  assert.doesNotMatch(page, /addBusAt/);
+  assert.match(page, /Move Bus Here/);
+  assert.match(page, /Tap to move an existing bus here/);
+  assert.match(page, /New buses can only be created in Settings/);
+  assert.match(page, /ACTIVE TRACKER FLEET/);
+  assert.match(page, /CREATE NEW BUS/);
+  assert.match(page, /Map spaces only relocate buses that already exist/);
+  assert.match(page, /SWITCH \/ REASSIGN/);
+  assert.match(page, /WHERE SHOULD/);
+  assert.match(page, /reassignBusPair\(buses,withSummary as B,otherId,targetSlots\)/);
+  assert.match(css, /\.move-here-modal\{/);
+  assert.match(css, /\.fleet-creation-control\{/);
+  assert.match(css, /\.switch-reassign\{/);
   assert.match(page, /Protected fleet identity\. Change only in Settings\./);
   assert.match(page, /FLEET NUMBER CONTROL/);
   assert.match(page, /Duplicate numbers are blocked/);
@@ -416,6 +429,9 @@ test("smart status returns repaired and defect-carrying buses to the road correc
   assert.equal(statusForLocation("road-4", "shop", { defects: completed, pendingRepair: "" }), "service");
   assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "out");
   assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
+  assert.equal(statusForLocation("east-1", "defect", { defects: minor, pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("west-4", "service", { defects: minor, pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("east-1", "service", { defects: [], pendingRepair: "" }), "service");
   assert.equal(roadServiceStatus({ defects: minor }), "defect");
 });
 
@@ -475,6 +491,36 @@ test("bulk defect assignment appends safely, skips duplicates, and updates road 
   assert.equal(missing.error, "missing-bus");
   assert.equal(missing.fleet, fleet);
   assert.equal(missing.applied, 0);
+});
+
+test("paired reassignment swaps atomically or sends the displaced bus to an open area", () => {
+  const minor = [{ id: "d1", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
+  const fleet = [
+    { id: "a", n: "100", l: "road-0", s: "defect", parkedAt: "old-a", defects: minor, pendingRepair: "A/C and HVAC" },
+    { id: "b", n: "200", l: "east-1", s: "service", parkedAt: "old-b", defects: [], pendingRepair: "" },
+    { id: "block", n: "300", l: "west-0", s: "service", parkedAt: "old-block", defects: [], pendingRepair: "" },
+  ];
+  const selected = { ...fleet[0], mechanic: "JD" };
+  const swapped = reassignBusPair(fleet, selected, "b", null, "now");
+  assert.equal(swapped.error, null);
+  assert.equal(swapped.fleet.find(bus => bus.id === "a").l, "east-1");
+  assert.equal(swapped.fleet.find(bus => bus.id === "a").s, "out");
+  assert.equal(swapped.fleet.find(bus => bus.id === "a").mechanic, "JD");
+  assert.equal(swapped.fleet.find(bus => bus.id === "b").l, "road-0");
+  assert.equal(swapped.fleet.find(bus => bus.id === "b").s, "service");
+  assert.equal(swapped.fleet.find(bus => bus.id === "a").parkedAt, "now");
+  assert.equal(swapped.fleet.find(bus => bus.id === "b").parkedAt, "now");
+
+  const rerouted = reassignBusPair(fleet, selected, "b", ["west-0", "west-1"], "now");
+  assert.equal(rerouted.error, null);
+  assert.equal(rerouted.displacedLocation, "west-1");
+  assert.equal(rerouted.fleet.find(bus => bus.id === "a").l, "east-1");
+  assert.equal(rerouted.fleet.find(bus => bus.id === "b").l, "west-1");
+  assert.equal(rerouted.fleet.find(bus => bus.id === "block").l, "west-0");
+
+  const blocked = reassignBusPair(fleet, selected, "b", ["east-1"], "now");
+  assert.equal(blocked.error, "insufficient-space");
+  assert.equal(blocked.fleet, fleet);
 });
 
 test("dropping onto an occupied parking space swaps both buses atomically", () => {
