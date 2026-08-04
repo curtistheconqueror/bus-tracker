@@ -13,6 +13,7 @@ import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } 
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
+import { planOperatorCommand } from "../app/operator-engine.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -62,6 +63,41 @@ test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", 
   assert.equal(duplicateExact.matchType, "exact");
 });
 
+test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
+  const fleet = [
+    { id: "a", n: "17525", s: "service", l: "road-0", down: false, pendingRepair: "" },
+    { id: "b", n: "17505", s: "service", l: "road-1", down: false, pendingRepair: "" },
+    { id: "c", n: "18505", s: "out", l: "west-0", down: true, pendingRepair: "Brakes — ABS warning" },
+  ];
+  const areas = [
+    { name: "IN SERVICE / ON ROAD", slots: ["road-0", "road-1", "road-2"] },
+    { name: "CNG EAST LOT", slots: ["east-1", "east-2"] },
+    { name: "CNG WEST LOT", slots: ["west-0", "west-1"] },
+  ];
+  const moved = planOperatorCommand("Move bus 25 to CNG East", fleet, areas);
+  assert.equal(moved.kind, "plan");
+  assert.equal(moved.plan.kind, "move");
+  assert.equal(moved.plan.busNumber, "17525");
+  assert.equal(moved.plan.areaName, "CNG EAST LOT");
+  assert.equal(moved.plan.requiresConfirmation, true);
+  const ambiguousMove = planOperatorCommand("Move bus 05 to CNG East", fleet, areas);
+  assert.equal(ambiguousMove.kind, "message");
+  assert.match(ambiguousMove.message, /17505, 18505/);
+  const ambiguousLocate = planOperatorCommand("Locate bus 05", fleet, areas);
+  assert.equal(ambiguousLocate.kind, "plan");
+  assert.equal(ambiguousLocate.plan.kind, "locate");
+  assert.deepEqual(ambiguousLocate.plan.busNumbers, ["17505", "18505"]);
+  const downSheet = planOperatorCommand("Add bus 25 to the down sheet", fleet, areas);
+  assert.equal(downSheet.kind, "plan");
+  assert.equal(downSheet.plan.kind, "downsheet");
+  assert.equal(downSheet.plan.selected, true);
+  const defect = planOperatorCommand("Add check-engine diagnosis to bus 25", fleet, areas);
+  assert.equal(defect.kind, "plan");
+  assert.equal(defect.plan.kind, "defect");
+  assert.equal(defect.plan.defect.issue, "Check-engine diagnosis");
+  assert.equal(defect.plan.flag, "checkEngine");
+});
+
 test("server-renders the live fleet command dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -79,6 +115,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, />LOCATE</);
   assert.match(html, />REFRESH</);
   assert.match(html, /> SETTINGS</);
+  assert.match(html, /AI OPERATOR/);
   assert.match(html, /data-bus-id="b0" data-status="service" data-pending="false"/);
   assert.match(html, /data-bus-id="b20" data-status="out" data-pending="false"/);
   assert.match(html, /IN SERVICE WITH DEFECTS/);
@@ -393,14 +430,16 @@ test("down-sheet button shows a ratio only when tracker and sheet counts differ"
 
 test("tracker checkbox creates and completes its matching down-sheet row", () => {
   const bus = { id: "bus-17571", n: "17571", s: "out", down: true, pendingRepair: "A/C compressor", shift: "Evening" };
-  const added = syncTrackerDownSheetSelection(null, bus, "2026-08-02T12:00:00.000Z");
+  const added = syncTrackerDownSheetSelection(null, bus, "2026-08-02T12:00:00.000Z", "AI");
   assert.equal(added.entries.length, 1);
   assert.equal(added.entries[0].busId, bus.id);
   assert.equal(added.entries[0].workflow, "Scheduled");
   assert.equal(added.entries[0].shift, "2nd");
-  const removed = syncTrackerDownSheetSelection(JSON.stringify(added), { ...bus, down: false }, "2026-08-02T13:00:00.000Z");
+  assert.equal(added.entries[0].updatedBy, "AI");
+  const removed = syncTrackerDownSheetSelection(JSON.stringify(added), { ...bus, down: false }, "2026-08-02T13:00:00.000Z", "AI");
   assert.equal(removed.entries[0].workflow, "Completed");
   assert.equal(removed.entries[0].completedAt, "2026-08-02T13:00:00.000Z");
+  assert.equal(removed.entries[0].updatedBy, "AI");
 });
 test("section counters include assigned and overflow buses and update from fleet state", () => {
   const slots = ["east-0", "east-1", "east-2"];
