@@ -116,6 +116,12 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, />REFRESH</);
   assert.match(html, /> SETTINGS</);
   assert.match(html, /AI OPERATOR/);
+  const commandBar=html.slice(html.indexOf('<footer class="command-bar">'),html.indexOf('</footer>')+9);
+  assert.ok(commandBar.indexOf('class="locate-command"')<commandBar.indexOf('class="command-highlights"'));
+  assert.ok(commandBar.indexOf('class="settings-command"')<commandBar.indexOf('class="ai-operator-command"'));
+  assert.match(commandBar, /RAMP\/KNEELER[\s\S]*ADA/);
+  assert.doesNotMatch(commandBar, /BAD RAMP\/KNEELER/);
+  assert.doesNotMatch(commandBar, /<small>PACE<\/small>/);
   assert.match(html, /data-bus-id="b0" data-status="service" data-pending="false"/);
   assert.match(html, /data-bus-id="b20" data-status="out" data-pending="false"/);
   assert.match(html, /IN SERVICE WITH DEFECTS/);
@@ -269,7 +275,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.checkEngine\}/);
   assert.match(page, /checked=\{d\.noHorn\}/);
   assert.match(page, /checked=\{d\.badRampKneeler\}/);
-  assert.match(page, /BAD RAMP\/KNEELER \(ADA\)/);
+  assert.match(page, /ramp-kneeler-command/);
+  assert.match(page, /<span>RAMP\/KNEELER<\/span><small>ADA/);
+  assert.match(css, /\.ramp-kneeler-command\{/);
   assert.match(page, /CHECK ENGINES/);
   assert.match(page, /data-check-engine=\{bus\.checkEngine\}/);
   assert.match(page, /data-bad-ramp=\{bus\.badRampKneeler\}/);

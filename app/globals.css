@@ -102,6 +102,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .command-bar button:hover,.command-bar button:focus-visible{border-color:var(--command-text);filter:brightness(1.12)}
 .command-highlights{display:flex;gap:5px}
 .command-highlights button.active{background:#0873df;color:#fff;border-color:#69adff;box-shadow:0 0 0 2px #62a8ff44 inset}
+.ramp-kneeler-command{display:grid!important;align-content:center;justify-items:center;line-height:1!important;padding-top:2px!important;padding-bottom:2px!important}.ramp-kneeler-command>span{font-size:8px}.ramp-kneeler-command>small{font-size:7px;font-weight:900}
 .command-highlights button b{min-width:17px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;padding:2px 5px;border-radius:10px;background:#ffffff26;color:inherit;font-size:8px}
 .locate-command{height:31px;display:flex;border:1px solid color-mix(in srgb,var(--command-text) 35%,transparent);border-radius:5px;overflow:hidden;background:var(--panel-bg)}
 .locate-command input{width:82px;border:0;outline:0;padding:0 8px;background:var(--panel-bg);color:var(--theme-text);font-size:10px;font-weight:900}
