@@ -120,8 +120,9 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .app.highlight-service .token[data-status="service"],.app.highlight-service .token[data-status="defect"]{outline:2px solid #35a0ff;box-shadow:0 0 12px #35a0ff;animation:command-glow 1.05s ease-in-out infinite alternate}
 .app.highlight-pending .token[data-pending="true"]{outline:2px solid #ffc21a;box-shadow:0 0 13px #ffc21a;animation:command-glow 1.05s ease-in-out infinite alternate}
 @keyframes command-glow{from{filter:brightness(1)}to{filter:brightness(1.28)}}
-.locate-pulse{position:relative;z-index:100!important;animation:locate-pulse .8s ease-in-out 6!important}
-@keyframes locate-pulse{0%,100%{background:var(--slot-bg);box-shadow:0 0 0 0 #00d9ff}50%{background:#b9f4ff;box-shadow:0 0 0 5px #00d9ff,0 0 24px 10px #00d9ff}}
+.token.single-locate{position:relative;z-index:100!important;outline:3px solid #00d9ff;animation:single-locate-glow .8s ease-in-out infinite alternate!important}
+@keyframes single-locate-glow{0%{background:var(--slot-bg);box-shadow:0 0 0 2px #fff,0 0 8px 3px #00d9ff}100%{background:#b9f4ff;box-shadow:0 0 0 3px #fff,0 0 24px 10px #00d9ff}}
+@media (prefers-reduced-motion:reduce){.token.single-locate{animation:none!important;background:#b9f4ff;box-shadow:0 0 0 3px #fff,0 0 18px 7px #00d9ff}}
 .settings-modal{width:min(880px,96vw);max-height:90vh;display:flex;flex-direction:column;background:#f8faff;color:#1c3158}
 .settings-body{padding:16px 18px;overflow:auto;display:grid;gap:17px}
 .settings-group{border:1px solid #d1dbea;border-radius:8px;background:#fff;padding:13px}

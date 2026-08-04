@@ -196,7 +196,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /entry\.category==="A\/C and HVAC"/);
   assert.match(css, /\.app\.highlight-ac/);
   assert.match(css, /\.app\.highlight-downsheet/);
-  assert.match(css, /@keyframes locate-pulse/);
+  assert.match(css, /\.token\.single-locate\{/);
+  assert.match(css, /@keyframes single-locate-glow/);
+  assert.match(css, /animation:single-locate-glow [^;]* infinite/);
+  assert.match(page, /pace-locate-ack/);
+  assert.match(page, /setLocatedBusIds\(\[resolution\.bus\.id\]\)/);
+  assert.doesNotMatch(page, /resolved to Bus/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);
   assert.match(page, /LIVE FLEET:/);
   assert.match(css, /\.east\{position:relative;margin-left:0;width:calc\(66\.6667% \+ 2px\);min-width:0;padding-left:6px;padding-right:6px;justify-self:end\}/);
