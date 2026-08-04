@@ -12,6 +12,7 @@ import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
+import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -30,6 +31,36 @@ function section(html, start, end) {
   assert.ok(startIndex >= 0 && endIndex > startIndex, `Expected section ${start}`);
   return html.slice(startIndex, endIndex);
 }
+
+test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", () => {
+  const fleet = [
+    { id: "a", n: "17525" },
+    { id: "b", n: "17505" },
+    { id: "c", n: "18505" },
+    { id: "d", n: "20505" },
+    { id: "e", n: "15504" },
+    { id: "f", n: "17504" },
+  ];
+  const exact = resolveBusNumber(fleet, "17525");
+  assert.equal(exact.kind, "exact");
+  assert.equal(exact.bus.id, "a");
+  const uniqueSuffix = resolveBusNumber(fleet, "25");
+  assert.equal(uniqueSuffix.kind, "suffix");
+  assert.equal(uniqueSuffix.bus.n, "17525");
+  const ambiguous = resolveBusNumber(fleet, "05");
+  assert.equal(ambiguous.kind, "ambiguous");
+  assert.equal(ambiguous.matchType, "suffix");
+  assert.deepEqual(candidateBusNumbers(ambiguous.matches), ["17505", "18505", "20505"]);
+  const leadingZero = resolveBusNumber(fleet, "04");
+  assert.equal(leadingZero.kind, "ambiguous");
+  assert.deepEqual(candidateBusNumbers(leadingZero.matches), ["15504", "17504"]);
+  assert.equal(resolveBusNumber(fleet, "4").kind, "invalid");
+  assert.equal(resolveBusNumber(fleet, "525").kind, "invalid");
+  assert.equal(resolveBusNumber(fleet, "99").kind, "not-found");
+  const duplicateExact = resolveBusNumber([...fleet, { id: "duplicate", n: "17525" }], "17525");
+  assert.equal(duplicateExact.kind, "ambiguous");
+  assert.equal(duplicateExact.matchType, "exact");
+});
 
 test("server-renders the live fleet command dashboard", async () => {
   const response = await render();
@@ -140,6 +171,11 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.doesNotMatch(page, /addBusAt/);
   assert.match(page, /Move Bus Here/);
   assert.match(page, /Tap to move an existing bus here/);
+  assert.match(page, /resolveBusNumber\(buses,number\)/);
+  assert.match(page, /resolveBusNumber\(buses,needle\)/);
+  assert.match(page, /Full # or last 2/);
+  assert.match(page, /All matches are highlighted/);
+  assert.match(page, /All matching buses are highlighted/);
   assert.match(page, /New buses can only be created in Settings/);
   assert.match(page, /ACTIVE TRACKER FLEET/);
   assert.match(page, /CREATE NEW BUS/);
