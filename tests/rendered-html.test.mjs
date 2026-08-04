@@ -146,6 +146,11 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /Map spaces only relocate buses that already exist/);
   assert.match(page, /SWITCH \/ REASSIGN/);
   assert.match(page, /WHERE SHOULD/);
+  assert.match(page, /SWITCH WITH BUS<select value=\{switchBusId\}/);
+  assert.match(page, /Choose an existing bus/);
+  assert.match(page, /Select another bus first/);
+  assert.match(page, /disabled=\{!switchTarget\}/);
+  assert.doesNotMatch(page, /switch-bus-list-/);
   assert.match(page, /reassignBusPair\(buses,withSummary as B,otherId,targetSlots\)/);
   assert.match(css, /\.move-here-modal\{/);
   assert.match(css, /\.fleet-creation-control\{/);
