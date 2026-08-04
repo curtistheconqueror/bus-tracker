@@ -313,3 +313,21 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .bulk-relocation button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:680px){.multi-bus-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.bulk-relocation>div{grid-template-columns:1fr}.bulk-relocation button{width:100%}}
 @media(max-width:430px){.multi-bus-fields{grid-template-columns:1fr}.multi-entry-actions{flex-direction:column}.multi-entry-actions .highlight-selection{margin-left:0}}
+/* Version 44 multi-bus defect assignment and trouble-bay destinations */
+.multi-locate-modal{width:min(920px,100%)}
+.multi-bulk-actions{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:10px;align-items:start}
+.bulk-defect-panel{display:grid;gap:10px;padding:11px;border:1px solid #9b77c7;border-radius:7px;background:#f7f1ff}
+.bulk-defect-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bulk-defect-heading span{display:grid;gap:5px}
+.bulk-defect-heading h3{margin:0;color:#512d7d;font-size:10px;letter-spacing:.6px}
+.bulk-defect-heading p{margin:0;color:#6c5a82;font-size:9px;line-height:1.4}
+.bulk-defect-heading>button,.apply-bulk-defect{min-height:36px;border:1px solid #6f3faa;border-radius:5px;background:#6f3faa;color:#fff;padding:0 13px;font-size:9px;font-weight:900}
+.bulk-defect-entry{display:grid;grid-template-columns:1fr;gap:10px;padding-top:10px;border-top:1px solid #d8c8eb}
+.bulk-defect-entry .entry-mode{grid-column:auto}
+.bulk-defect-entry .repair-choice-stage{grid-column:auto;padding:10px}
+.bulk-defect-entry .manual-defect,.bulk-operability{display:grid;gap:5px;color:#506080;font-size:8px;font-weight:900}
+.bulk-defect-entry textarea{min-height:72px;resize:vertical;border:1px solid #aebbd0;border-radius:5px;padding:9px;background:#fff;color:#172858;font:inherit}
+.bulk-operability select{height:40px;border:1px solid #aebbd0;border-radius:5px;padding:0 9px;background:#fff;color:#172858;font-size:9px;font-weight:800}
+.apply-bulk-defect{width:100%;background:#0873df;border-color:#0873df}
+.apply-bulk-defect:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:760px){.multi-bulk-actions{grid-template-columns:1fr}.bulk-defect-entry .native-repair-picker{grid-template-columns:1fr}.bulk-defect-entry .native-repair-picker .amerex-code{grid-column:auto}}

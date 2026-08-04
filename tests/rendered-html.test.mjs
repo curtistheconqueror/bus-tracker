@@ -7,6 +7,7 @@ import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
+import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
@@ -181,6 +182,14 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /\+ ADD FIELD/);
   assert.match(page, /MOVE ALL SELECTED BUSES/);
   assert.match(page, /MOVE ALL TO AREA/);
+  assert.match(page, /ADD SAME DEFECT TO ALL/);
+  assert.match(page, /APPLY DEFECT TO/);
+  assert.match(page, /applyDefectToBuses\(buses,multiLocateIds,defect\)/);
+  assert.match(page, /\["MAIN GARAGE \(BAYS 1-10\)",GARAGE_STANDARD_SLOTS\]/);
+  assert.match(page, /\["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS\]/);
+  assert.match(page, /\["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS\]/);
+  assert.match(css, /\.multi-bulk-actions\{/);
+  assert.match(css, /\.bulk-defect-panel\{/);
   assert.match(page, /NOT ENOUGH SPACE/);
   assert.match(page, /bulkRelocateBuses\(buses,multiLocateIds,targetSlots\)/);
   assert.match(page, /KEEP \"\+selected\.length\+\" HIGHLIGHTED/);
@@ -434,6 +443,38 @@ test("bulk relocation preserves order, smart status, and all-or-nothing capacity
   assert.equal(blocked.error, "insufficient-space");
   assert.equal(blocked.moved, 0);
   assert.equal(blocked.fleet, blockedFleet);
+});
+
+test("bulk defect assignment appends safely, skips duplicates, and updates road status", () => {
+  const shared = { id: "shared", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" };
+  const existing = { id: "existing", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" };
+  const fleet = [
+    { id: "a", l: "road-0", s: "service", defects: [], pendingRepair: "" },
+    { id: "b", l: "garage-10", s: "shop", defects: [existing], pendingRepair: defectSummary([existing]) },
+    { id: "c", l: "road-1", s: "defect", defects: [{ ...shared, id: "already" }], pendingRepair: defectSummary([shared]) },
+    { id: "d", l: "west-0", s: "service", defects: [], pendingRepair: "" },
+  ];
+  const updated = applyDefectToBuses(fleet, ["a", "b", "c", "d"], shared);
+  assert.equal(updated.error, null);
+  assert.equal(updated.applied, 3);
+  assert.equal(updated.skipped, 1);
+  assert.equal(updated.fleet.find(bus => bus.id === "a").s, "defect");
+  assert.equal(updated.fleet.find(bus => bus.id === "a").defects.length, 1);
+  assert.equal(updated.fleet.find(bus => bus.id === "b").s, "shop");
+  assert.equal(updated.fleet.find(bus => bus.id === "b").defects.length, 2);
+  assert.equal(updated.fleet.find(bus => bus.id === "c").defects.length, 1);
+  assert.equal(updated.fleet.find(bus => bus.id === "d").s, "defect");
+  assert.match(updated.fleet.find(bus => bus.id === "b").pendingRepair, /No cooling.*Horn/);
+  assert.notEqual(updated.fleet.find(bus => bus.id === "a").defects[0].id, updated.fleet.find(bus => bus.id === "b").defects[1].id);
+
+  const downing = { id: "downing", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" };
+  const madeOut = applyDefectToBuses(updated.fleet, ["a"], downing);
+  assert.equal(madeOut.fleet.find(bus => bus.id === "a").s, "out");
+
+  const missing = applyDefectToBuses(fleet, ["a", "missing"], shared);
+  assert.equal(missing.error, "missing-bus");
+  assert.equal(missing.fleet, fleet);
+  assert.equal(missing.applied, 0);
 });
 
 test("dropping onto an occupied parking space swaps both buses atomically", () => {
