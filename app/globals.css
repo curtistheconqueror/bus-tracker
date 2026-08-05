@@ -48,7 +48,7 @@
 .road p{margin:5px 0 0}
 
 /* Section bus controls, wider vertical spaces, and touch gestures */
-.token{touch-action:manipulation}
+.token{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.token *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .title-actions{position:absolute;right:4px;display:flex;align-items:center;gap:5px}
 .title>span:first-child{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
 .section-count{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:18px;padding:0 6px;border:1px solid #9badd0;border-radius:10px;background:#edf3fc;color:#173e73;font-size:9px;line-height:1}
@@ -380,3 +380,6 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 @media(prefers-reduced-motion:reduce){.ai-operator-command:before{animation:none}}
 @media(max-width:1100px){.ai-operator-command{min-width:118px!important}.operator-modal{max-height:calc(100dvh - 16px)}}
 @media(max-width:620px){.operator-head{grid-template-columns:auto 1fr auto}.operator-head>b{display:none}.operator-preview{grid-template-columns:1fr}.operator-preview>div{justify-content:flex-end}.operator-compose{grid-template-columns:1fr}.operator-compose>button{width:100%}.operator-foot{align-items:flex-start;flex-direction:column}.operator-foot button{width:100%}.operator-messages article{max-width:94%}.ai-operator-command{min-width:54px!important;width:54px!important;padding:0 6px!important}.ai-operator-command>strong,.ai-operator-command>b{display:none}.ai-operator-command>span{margin:auto}}
+
+@media(hover:none){.spot[data-empty="true"]:hover{background:var(--slot-bg);border-color:var(--theme-border);outline:none}}
+.touch-control-settings>label{display:flex;align-items:flex-start;gap:10px;padding:11px;border:1px solid #c5d1e5;border-radius:7px;background:#f7faff;color:#20365f}.touch-control-settings>label input{width:18px;height:18px;flex:none}.touch-control-settings>label span{display:grid;gap:4px}.touch-control-settings>label b{font-size:10px}.touch-control-settings>label small{font-size:9px;color:#61708c}
