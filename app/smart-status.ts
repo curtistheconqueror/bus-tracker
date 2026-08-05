@@ -1,5 +1,6 @@
 import type {StructuredDefect} from "./repair-catalog.ts";
 import {isUnresolved} from "./repair-catalog.ts";
+import {stampOperationalChange} from "./operational-time.ts";
 
 export type FleetStatus="shop"|"service"|"defect"|"out"|"decommissioned"|"unknown";
 export type RepairAwareBus={defects?:StructuredDefect[];pendingRepair?:string};
@@ -25,11 +26,12 @@ export function statusForLocation(location:string,current:FleetStatus,bus:Repair
  return current;
 }
 
-export type MovableRepairBus=RepairAwareBus&{id:string;l:string;s:FleetStatus;parkedAt:string};
+export type MovableRepairBus=RepairAwareBus&{id:string;l:string;s:FleetStatus;parkedAt:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string};
 
 export function moveOrSwapBuses<T extends MovableRepairBus>(fleet:T[],id:string,targetLocation:string,now=new Date().toISOString()):T[]{
  const moving=fleet.find(bus=>bus.id===id);
  if(!moving||moving.l===targetLocation)return fleet;
  const destination=fleet.find(bus=>bus.l===targetLocation&&bus.id!==id),origin=moving.l;
- return fleet.map(bus=>bus.id===moving.id?{...bus,l:targetLocation,s:statusForLocation(targetLocation,bus.s,bus),parkedAt:now}:destination&&bus.id===destination.id?{...bus,l:origin,s:statusForLocation(origin,bus.s,bus),parkedAt:now}:bus);
+ const relocate=(bus:T,location:string)=>stampOperationalChange(bus,{...bus,l:location,s:statusForLocation(location,bus.s,bus)} as T,now) as T;
+ return fleet.map(bus=>bus.id===moving.id?relocate(bus,targetLocation):destination&&bus.id===destination.id?relocate(bus,origin):bus);
 }

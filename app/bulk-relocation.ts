@@ -1,10 +1,13 @@
 import {statusForLocation,type FleetStatus,type RepairAwareBus} from "./smart-status.ts";
+import {stampOperationalChange} from "./operational-time.ts";
 
 export type BulkRelocationBus=RepairAwareBus&{
  id:string;
  l:string;
  s:FleetStatus;
  parkedAt:string;
+ lastLocationChangeAt?:string;
+ lastStatusChangeAt?:string;
 };
 
 export type BulkAreaAvailability={
@@ -37,6 +40,8 @@ export function bulkRelocateBuses<T extends BulkRelocationBus>(fleet:T[],selecte
  });
  return {fleet:fleet.map(bus=>{
   const location=assignments.get(bus.id);
-  return location?{...bus,l:location,s:statusForLocation(location,bus.s,bus),parkedAt:now}:bus;
+  if(!location)return bus;
+  const relocated={...bus,l:location,s:statusForLocation(location,bus.s,bus)} as T;
+  return stampOperationalChange(bus,relocated,now) as T;
  }),moved:assignments.size,error:null};
 }

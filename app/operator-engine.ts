@@ -1,19 +1,20 @@
 import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver.ts";
 import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "./repair-catalog.ts";
+import {analyzeFleetQuestion,findOperatorArea,type FleetInsightBus} from "./fleet-intelligence.ts";
 
-export type OperatorBus={
- id:string;n:string;s:string;l:string;down:boolean;pendingRepair?:string;
- checkEngine?:boolean;noHorn?:boolean;badRampKneeler?:boolean;
-};
+export type OperatorBus=FleetInsightBus;
 
 export type OperatorArea={name:string;slots:string[]};
+export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string};
 
 type DefectDraft=Omit<StructuredDefect,"id">;
 
 export type OperatorPlan=
  | {kind:"locate";requiresConfirmation:false;busIds:string[];busNumbers:string[];summary:string}
+ | {kind:"analysis";requiresConfirmation:false;busIds:string[];busNumbers:string[];selectionLabel:string;summary:string;response:string}
  | {kind:"inspect";requiresConfirmation:false;busId:string;busNumber:string;summary:string;response:string}
  | {kind:"move";requiresConfirmation:true;busId:string;busNumber:string;areaName:string;summary:string}
+ | {kind:"bulkMove";requiresConfirmation:true;busIds:string[];busNumbers:string[];areaName:string;selectionLabel:string;summary:string}
  | {kind:"downsheet";requiresConfirmation:true;busId:string;busNumber:string;selected:boolean;summary:string}
  | {kind:"defect";requiresConfirmation:true;busId:string;busNumber:string;defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler";summary:string};
 
@@ -22,24 +23,6 @@ export type OperatorPlanningResult=
  | {kind:"message";message:string};
 
 const STATUS_LABELS:Record<string,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown / Mystery"};
-
-const AREA_ALIASES:[string,string[]][]=[
- ["TROUBLE BAY 11",["trouble bay 11","bay 11"]],
- ["TROUBLE BAY 12",["trouble bay 12","bay 12"]],
- ["IN SERVICE / ON ROAD",["in service on road","on the road","on road","road section","road area"]],
- ["SERVICE DETAIL AREA (SINGLE FILE)",["service detail area","service detail"]],
- ["SHOP BAYS (DIAGONAL)",["shop bays","service bays","service bay"]],
- ["MAIN GARAGE (BAYS 1-10)",["main garage","garage"]],
- ["CNG EAST LOT",["cng east lot","cng east","east lot"]],
- ["CNG WEST LOT",["cng west lot","cng west","west lot"]],
- ["SHOP WALL (SINGLE FILE)",["shop wall"]],
- ["PAINT BOOTH",["paint booth"]],
- ["WASH RACK",["wash rack"]],
- ["BODY SHOP",["body shop"]],
- ["BRAKE TEST",["brake test"]],
- ["TOW STAGING",["tow staging","tow area"]],
- ["PIT",["the pit","pit"]],
-];
 
 function normalized(value:string){return value.toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ")}
 
@@ -61,12 +44,7 @@ function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:
 }
 
 function areaFromCommand(command:string,areas:OperatorArea[]){
- const haystack=normalized(command);
- for(const [canonical,aliases] of AREA_ALIASES){
-  const area=areas.find(item=>item.name===canonical);
-  if(area&&aliases.some(alias=>haystack.includes(normalized(alias))))return area;
- }
- return [...areas].sort((a,b)=>normalized(b.name).length-normalized(a.name).length).find(area=>haystack.includes(normalized(area.name)));
+ return findOperatorArea(command,areas);
 }
 
 const DEFECT_CHOICES=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>issues.map(issue=>({category,issue,key:normalized(issue)}))).sort((a,b)=>b.key.length-a.key.length);
@@ -82,9 +60,25 @@ function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngin
 
 function areaLabel(bus:OperatorBus,areas:OperatorArea[]){return areas.find(area=>area.slots.includes(bus.l))?.name||"an unassigned or overflow location"}
 
-export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:OperatorArea[]):OperatorPlanningResult{
+export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:OperatorArea[],context:OperatorSelectionContext|null=null,now=Date.now()):OperatorPlanningResult{
  const text=normalized(command);
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
+
+ const groupMove=/\b(move|relocate|place|send|put)\b/.test(text)&&(/\b(those|them|these|selected|that group|the group)\b/.test(text)||Boolean(context?.busIds.length&&!busQuery(command)));
+ if(groupMove){
+  if(!context?.busIds.length)return {kind:"message",message:"I do not have a remembered fleet group yet. Ask a question such as “Which buses have been sitting for 8+ hours?” first."};
+  const area=areaFromCommand(command,areas);
+  if(!area)return {kind:"message",message:"I remember "+context.busIds.length+" buses, but I could not identify the destination area. Try On Road, CNG East, CNG West, Shop Wall, or Main Garage."};
+  const selected=context.busIds.map(id=>fleet.find(bus=>bus.id===id)).filter(Boolean) as OperatorBus[];
+  if(selected.length!==context.busIds.length)return {kind:"message",message:"The remembered group changed after the last answer. Ask the fleet question again before relocating it."};
+  const already=selected.filter(bus=>area.slots.includes(bus.l)).length,needed=selected.length-already,open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
+  if(open<needed)return {kind:"message",message:area.name+" has "+open+" open spaces but "+needed+" are needed for the remembered group. Nothing was prepared."};
+  if(!needed)return {kind:"message",message:"All "+selected.length+" remembered buses are already in "+area.name+"."};
+  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:area.name,selectionLabel:context.label,summary:"Move "+needed+" of "+selected.length+" remembered buses ("+context.label+") to the first available spaces in "+area.name+(already?" and leave "+already+" already there":"")}};
+ }
+
+ const insight=analyzeFleetQuestion(command,fleet,areas,now);
+ if(insight)return {kind:"plan",plan:{kind:"analysis",requiresConfirmation:false,summary:"Analyze "+insight.selectionLabel,response:insight.response,busIds:insight.busIds,busNumbers:insight.busNumbers,selectionLabel:insight.selectionLabel}};
 
  const resolved=resolveOne(fleet,command);
  const isLocate=/\b(locate|find|highlight)\b/.test(text);
@@ -127,5 +121,5 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   return {kind:"plan",plan:{kind:"inspect",requiresConfirmation:false,busId:bus.id,busNumber:bus.n,summary:"Inspect Bus "+bus.n,response:"Bus "+bus.n+" is in "+areaLabel(bus,areas)+" with status “"+(STATUS_LABELS[bus.s]||bus.s)+".”"+repair+(bus.down?" It is on the active down sheet.":" It is not marked on the active down sheet.")}};
  }
 
- return {kind:"message",message:"I found Bus "+bus.n+", but I need an action. I can currently locate or inspect it, move it to an area, add a catalog defect, or add/remove it from the down sheet."};
+ return {kind:"message",message:"I found Bus "+bus.n+", but I need an action. I can answer fleet questions, inspect or locate buses, move them to an area, add a catalog defect, or add/remove them from the down sheet."};
 }

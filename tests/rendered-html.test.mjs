@@ -14,6 +14,7 @@ import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
+import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -97,6 +98,55 @@ test("AI operator plans safe tracker and down-sheet actions with number-smart re
   assert.equal(defect.plan.defect.issue, "Check-engine diagnosis");
   assert.equal(defect.plan.flag, "checkEngine");
 });
+test("AI operator answers fleet audits, remembers sitting-time groups, and plans a follow-up bulk move", () => {
+  const now = Date.parse("2026-08-05T12:00:00.000Z");
+  const fleet = [
+    { id: "a", n: "17525", s: "service", l: "west-0", down: false, pendingRepair: "", parkedAt: "2026-08-05T00:00:00.000Z", lastLocationChangeAt: "2026-08-05T00:00:00.000Z", lastStatusChangeAt: "2026-08-04T22:00:00.000Z" },
+    { id: "b", n: "17505", s: "service", l: "road-1", down: false, pendingRepair: "", parkedAt: "2026-08-05T05:00:00.000Z", lastLocationChangeAt: "2026-08-05T05:00:00.000Z", lastStatusChangeAt: "2026-08-05T04:00:00.000Z" },
+    { id: "c", n: "18505", s: "out", l: "east-1", down: true, pendingRepair: "Brakes", parkedAt: "2026-08-05T03:00:00.000Z", lastLocationChangeAt: "2026-08-05T02:00:00.000Z", lastStatusChangeAt: "2026-08-05T03:00:00.000Z" },
+    { id: "d", n: "17525", s: "shop", l: "road-2", down: false, pendingRepair: "", parkedAt: "2026-08-05T11:00:00.000Z", lastLocationChangeAt: "2026-08-05T11:00:00.000Z", lastStatusChangeAt: "2026-08-05T11:00:00.000Z" },
+  ];
+  const areas = [
+    { name: "IN SERVICE / ON ROAD", slots: ["road-0", "road-1", "road-2", "road-3"] },
+    { name: "CNG EAST LOT", slots: ["east-1", "east-2"] },
+    { name: "CNG WEST LOT", slots: ["west-0", "west-1"] },
+  ];
+
+  const duplicates = planOperatorCommand("How many duplicates do we have?", fleet, areas, null, now);
+  assert.equal(duplicates.kind, "plan");
+  assert.equal(duplicates.plan.kind, "analysis");
+  assert.match(duplicates.plan.response, /1 extra duplicate record/);
+  assert.deepEqual(duplicates.plan.busIds, ["a", "d"]);
+
+  const sitting = planOperatorCommand("How many buses have been sitting for 8+ hours?", fleet, areas, null, now);
+  assert.equal(sitting.kind, "plan");
+  assert.equal(sitting.plan.kind, "analysis");
+  assert.deepEqual(sitting.plan.busIds, ["a", "c"]);
+  assert.match(sitting.plan.response, /2 buses/);
+  assert.match(sitting.plan.response, /no location or status change/i);
+
+  const context = { busIds: sitting.plan.busIds, busNumbers: sitting.plan.busNumbers, label: sitting.plan.selectionLabel };
+  const followUp = planOperatorCommand("Relocate to the On Road area", fleet, areas, context, now);
+  assert.equal(followUp.kind, "plan");
+  assert.equal(followUp.plan.kind, "bulkMove");
+  assert.deepEqual(followUp.plan.busIds, ["a", "c"]);
+  assert.equal(followUp.plan.areaName, "IN SERVICE / ON ROAD");
+  assert.equal(followUp.plan.requiresConfirmation, true);
+});
+
+test("operational sitting time resets on either a real location or status change", () => {
+  const previous = { id: "a", l: "east-1", s: "service", parkedAt: "2026-08-05T01:00:00.000Z", lastLocationChangeAt: "2026-08-05T01:00:00.000Z", lastStatusChangeAt: "2026-08-05T02:00:00.000Z" };
+  const statusUpdated = stampOperationalChange(previous, { ...previous, s: "out" }, "2026-08-05T12:00:00.000Z");
+  assert.equal(statusUpdated.lastLocationChangeAt, "2026-08-05T01:00:00.000Z");
+  assert.equal(statusUpdated.lastStatusChangeAt, "2026-08-05T12:00:00.000Z");
+  assert.equal(operationalUpdateAt(statusUpdated), "2026-08-05T12:00:00.000Z");
+
+  const locationUpdated = stampOperationalChange(statusUpdated, { ...statusUpdated, l: "road-0" }, "2026-08-05T13:00:00.000Z");
+  assert.equal(locationUpdated.lastLocationChangeAt, "2026-08-05T13:00:00.000Z");
+  assert.equal(locationUpdated.lastStatusChangeAt, "2026-08-05T12:00:00.000Z");
+  assert.equal(operationalUpdateAt(locationUpdated), "2026-08-05T13:00:00.000Z");
+});
+
 
 test("server-renders the live fleet command dashboard", async () => {
   const response = await render();
