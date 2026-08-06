@@ -1,11 +1,17 @@
 # Pace South Bus Tracker - Full Project Handoff
 
-Updated: 2026-08-03
+Updated: 2026-08-06
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live Sites version: 42
-Live code commit: 0b00fc395b20d6e46d9417e36e941b392fc5dc25
+Live Sites version: 54
+Live code commit: 148520f906fad265ae2fe0dd200da8918f0d988c
+
+## Repository remotes
+
+- `origin`: private GitHub backup at `curtistheconqueror/bus-tracker`.
+- `sites`: existing OpenAI Sites source repository used only for Sites releases.
+- Never copy a Sites credential or token into `origin`, a remote URL, Git configuration, source files, or documentation.
 
 ## Purpose
 
@@ -25,16 +31,27 @@ Never place a Sites write token in a file, Git remote URL, or Git configuration.
 
 ## Current release state
 
-- Version 40: CNG East final alignment and readable title.
-- Version 41: persistent bus warning flags, CHECK ENGINES and ADA quick filters, and multi-bus locate.
-- Version 42: Version 41 plus configurable Main Garage accents.
-- Version 42 is currently published and live.
-- Local repository was clean at live commit 0b00fc3 before this documentation-only handoff.
+- Version 52: board backup/export and import transfer controls plus the latest touch/locate fixes.
+- Version 53: AI Operator fleet intelligence, duplicate and fleet audits, location/status activity timestamps, remembered result groups, and capacity-safe follow-up relocation to IN SERVICE / ON ROAD.
+- Version 54: optional per-device confirmation prompts, published from commit `148520f`.
+- Version 54 is currently published and live.
 - Important recent checkpoints:
-  - 0b00fc3 Add garage accent color controls (Version 42, live)
-  - 4ef2c59 Add fleet warning filters and multi-locate (Version 41)
-  - 92d7530 Align CNG East with on-road section (Version 40)
-  - 11b04fd Preserve CNG East space sizing (Version 39)
+  - `148520f` Add optional confirmation prompt settings (Version 54, live)
+  - `ba85acd` Add AI Operator fleet intelligence and follow-up relocation (Version 53)
+  - `44387c8` Document future operator defect reporting phase
+
+## Version 54 confirmation preferences
+
+Dashboard Settings includes a `CONFIRMATION PROMPTS` section below Board Backup and above Touch Controls:
+
+- `CONFIRM BUS MOVES & SWITCHES` gates confirmation prompts for Move Bus Here, editor Switch/Reassign, and Multi-Locate group moves.
+- `CONFIRM GROUP DEFECT ASSIGNMENT` gates the bulk add-defect confirmation prompt.
+- Both preferences are independent, per device, and default to ON.
+- Missing, unset, or corrupted saved values restore the safe ON behavior.
+- Values persist in `pace-board-settings-v1` as `confirmMoves` and `confirmDefects` and are included in backup export/import.
+- Import Backup always requires confirmation regardless of these preferences.
+- Drag-and-drop and the editor's MOVE TO AREA behavior remain unchanged and do not prompt.
+- Shared helpers live in `app/confirmation-preferences.ts`.
 
 ## Runtime and commands
 
@@ -50,7 +67,7 @@ Commands:
 - npm run lint
 - npm run db:generate
 
-npm test is the required release gate. It performs a production vinext build and runs tests/rendered-html.test.mjs. The current suite contains 15 passing tests.
+npm test is the required release gate. It performs a production vinext build and runs tests/rendered-html.test.mjs. The current suite contains 23 passing tests.
 
 ## Technology
 
