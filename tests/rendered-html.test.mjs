@@ -717,3 +717,40 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(twoDefects.length, 3);
   assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
 });
+test("confirmation prompts are per-device settings that default to on", async () => {
+  const { confirmationPreference, confirmAction } = await import("../app/confirmation-preferences.ts");
+  // Missing, damaged, or legacy saved settings must restore the safer prompting default.
+  assert.equal(confirmationPreference(undefined), true);
+  assert.equal(confirmationPreference(null), true);
+  assert.equal(confirmationPreference("no"), true);
+  assert.equal(confirmationPreference(true), true);
+  assert.equal(confirmationPreference(false), false);
+  // Enabled prompts defer to the operator's answer; disabled prompts apply immediately without asking.
+  let asked = 0;
+  assert.equal(confirmAction(true, "Move?", () => { asked++; return false; }), false);
+  assert.equal(asked, 1);
+  assert.equal(confirmAction(true, "Move?", () => { asked++; return true; }), true);
+  assert.equal(confirmAction(false, "Move?", () => { asked++; return false; }), true);
+  assert.equal(asked, 2);
+
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  // Settings UI exposes independent move and group-defect toggles.
+  assert.match(page, /CONFIRMATION PROMPTS/);
+  assert.match(page, /CONFIRM BUS MOVES &amp; SWITCHES/);
+  assert.match(page, /CONFIRM GROUP DEFECT ASSIGNMENT/);
+  assert.match(css, /\.confirmation-settings>label\{margin-top:8px\}/);
+  // All three move paths and the bulk-defect path honor the preference.
+  assert.match(page, /confirmAction\(confirmMoves,"Move Bus "\+bus\.n\+enteredNote/);
+  assert.match(page, /confirmAction\(confirmMoves,"Move "\+selected\.length/);
+  assert.match(page, /confirmAction\(confirmMoves,"Move Bus "\+d\.n\+" into Bus "/);
+  assert.match(page, /confirmAction\(confirmDefects,"Add "\+defectLabel\(defect\)/);
+  // Preferences persist, restore safely, and travel with backup export/import.
+  assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
+  assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
+  assert.match(page, /singleTapEmptySpaces,confirmMoves,confirmDefects\}\)\)/);
+  assert.match(page, /theme:themeName,singleTapEmptySpaces,confirmMoves,confirmDefects\}/);
+  assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
+  // Replacing the whole board must always ask, regardless of preferences.
+  assert.match(page, /confirm\("Import this backup\?/);
+});

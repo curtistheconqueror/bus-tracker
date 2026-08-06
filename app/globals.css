@@ -385,3 +385,8 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 
 @media(hover:none){.spot[data-empty="true"]:hover{background:var(--slot-bg);border-color:var(--theme-border);outline:none}}
 .touch-control-settings>label{display:flex;align-items:flex-start;gap:10px;padding:11px;border:1px solid #c5d1e5;border-radius:7px;background:#f7faff;color:#20365f}.touch-control-settings>label input{width:18px;height:18px;flex:none}.touch-control-settings>label span{display:grid;gap:4px}.touch-control-settings>label b{font-size:10px}.touch-control-settings>label small{font-size:9px;color:#61708c}
+
+/* Version 53: stacked confirmation toggles need row spacing; the note explains the always-on import prompt. */
+.confirmation-settings>label{margin-top:8px}
+.confirmation-settings>label:first-of-type{margin-top:0}
+.confirmation-settings .confirmation-note{display:block;margin-top:8px;font-size:9px;color:#61708c}
