@@ -104,7 +104,7 @@ test("AI operator answers fleet audits, remembers sitting-time groups, and plans
   const fleet = [
     { id: "a", n: "17525", s: "service", l: "west-0", down: false, pendingRepair: "", parkedAt: "2026-08-05T00:00:00.000Z", lastLocationChangeAt: "2026-08-05T00:00:00.000Z", lastStatusChangeAt: "2026-08-04T22:00:00.000Z" },
     { id: "b", n: "17505", s: "service", l: "road-1", down: false, pendingRepair: "", parkedAt: "2026-08-05T05:00:00.000Z", lastLocationChangeAt: "2026-08-05T05:00:00.000Z", lastStatusChangeAt: "2026-08-05T04:00:00.000Z" },
-    { id: "c", n: "18505", s: "out", l: "east-1", down: true, pendingRepair: "Brakes", parkedAt: "2026-08-05T03:00:00.000Z", lastLocationChangeAt: "2026-08-05T02:00:00.000Z", lastStatusChangeAt: "2026-08-05T03:00:00.000Z" },
+    { id: "c", n: "18505", s: "out", l: "east-1", down: true, pendingRepair: "Brakes", checkTransmission: true, parkedAt: "2026-08-05T03:00:00.000Z", lastLocationChangeAt: "2026-08-05T02:00:00.000Z", lastStatusChangeAt: "2026-08-05T03:00:00.000Z" },
     { id: "d", n: "17525", s: "shop", l: "road-2", down: false, pendingRepair: "", parkedAt: "2026-08-05T11:00:00.000Z", lastLocationChangeAt: "2026-08-05T11:00:00.000Z", lastStatusChangeAt: "2026-08-05T11:00:00.000Z" },
   ];
   const areas = [
@@ -118,6 +118,12 @@ test("AI operator answers fleet audits, remembers sitting-time groups, and plans
   assert.equal(duplicates.plan.kind, "analysis");
   assert.match(duplicates.plan.response, /1 extra duplicate record/);
   assert.deepEqual(duplicates.plan.busIds, ["a", "d"]);
+
+  const checkTransmission = planOperatorCommand("How many buses have a check transmission light?", fleet, areas, null, now);
+  assert.equal(checkTransmission.kind, "plan");
+  assert.equal(checkTransmission.plan.kind, "analysis");
+  assert.deepEqual(checkTransmission.plan.busIds, ["c"]);
+  assert.match(checkTransmission.plan.response, /check-transmission reports/);
 
   const sitting = planOperatorCommand("How many buses have been sitting for 8+ hours?", fleet, areas, null, now);
   assert.equal(sitting.kind, "plan");
@@ -333,9 +339,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.towInProgress\}/);
   assert.match(css, /\.tow-badge\{/);
   assert.match(css, /\.form \.tow-check\{/);
-  assert.match(page, /checkEngine:boolean;noHorn:boolean;badRampKneeler:boolean/);
+  assert.match(page, /checkEngine:boolean;checkTransmission:boolean;noHorn:boolean;badRampKneeler:boolean/);
   assert.match(page, /checkEngine:Boolean\(bus\.checkEngine\)/);
+  assert.match(page, /checkTransmission:Boolean\(bus\.checkTransmission\)/);
   assert.match(page, /checked=\{d\.checkEngine\}/);
+  assert.match(page, /checked=\{d\.checkTransmission\}/);
+  assert.match(page, /CHECK TRANSMISSION LIGHT/);
   assert.match(page, /checked=\{d\.noHorn\}/);
   assert.match(page, /checked=\{d\.badRampKneeler\}/);
   assert.match(page, /ramp-kneeler-command/);

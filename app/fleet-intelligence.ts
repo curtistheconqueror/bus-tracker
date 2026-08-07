@@ -8,6 +8,7 @@ export type FleetInsightBus={
  down:boolean;
  pendingRepair?:string;
  checkEngine?:boolean;
+ checkTransmission?:boolean;
  noHorn?:boolean;
  badRampKneeler?:boolean;
  parkedAt?:string;
@@ -105,6 +106,7 @@ export function analyzeFleetQuestion(command:string,fleet:FleetInsightBus[],area
  let matched:FleetInsightBus[]|null=null,label="";
  if(/\b(?:down sheet|downsheet)\b/.test(text)){matched=fleet.filter(bus=>bus.down);label="buses marked on the down sheet"}
  else if(/\b(?:check engine|check engines)\b/.test(text)){matched=fleet.filter(bus=>bus.checkEngine);label="buses with check-engine reports"}
+ else if(/\b(?:check transmission|transmission light|transmission lights)\b/.test(text)){matched=fleet.filter(bus=>bus.checkTransmission);label="buses with check-transmission reports"}
  else if(/\b(?:no horn|horn issue|horn issues)\b/.test(text)){matched=fleet.filter(bus=>bus.noHorn);label="buses with horn reports"}
  else if(/\b(?:ramp|kneeler|ada)\b/.test(text)){matched=fleet.filter(bus=>bus.badRampKneeler);label="buses with ramp or kneeler reports"}
  else if(/\b(?:ac issue|ac issues|air conditioning|hvac)\b/.test(text)){matched=fleet.filter(hasAcIssue);label="buses with A/C issues"}
