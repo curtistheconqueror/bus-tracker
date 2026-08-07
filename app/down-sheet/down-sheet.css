@@ -10,7 +10,7 @@ button,input,select,textarea{font:inherit}
 .down-header nav{display:flex;gap:7px}
 .down-header nav a{min-width:108px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #81a9dc;border-radius:6px;color:#eaf3ff;text-decoration:none;font-size:10px;font-weight:900}
 .down-header nav a.active{background:#fff;color:var(--down-navy);border-color:#fff}
-.down-summary{margin:12px 14px 8px;display:grid;grid-template-columns:1.25fr repeat(5,1fr);gap:7px}
+.down-summary{margin:12px 14px 8px;display:grid;grid-template-columns:1.25fr repeat(7,1fr);gap:7px}
 .down-summary>div{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #c3cde0;border-radius:7px;background:#fff;box-shadow:0 2px 6px #17376115}
 .down-summary strong{font-size:24px;line-height:1;color:#11396d}
 .down-summary strong small{font-size:11px;color:#7787a2}
@@ -47,9 +47,9 @@ button,input,select,textarea{font:inherit}
 .sheet-title span{font-size:17px;font-weight:900;color:#102e5b}
 .sheet-title p{margin:0;font-size:8px;font-weight:900;color:#657590}
 .sheet-scroll{overflow:auto;max-height:calc(100vh - 285px);min-height:320px}
-.down-table{width:100%;min-width:1040px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.down-table{width:100%;min-width:1160px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
-.down-table th:nth-child(1){width:48px;text-align:center}.down-table th:nth-child(2){width:108px}.down-table th:nth-child(3){width:285px}.down-table th:nth-child(4){width:155px}.down-table th:nth-child(5){width:118px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:125px}.down-table th:nth-child(8){width:105px}
+.down-table th:nth-child(1){width:48px;text-align:center}.down-table th:nth-child(2){width:108px}.down-table th:nth-child(3){width:260px}.down-table th:nth-child(4){width:140px}.down-table th:nth-child(5){width:112px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:118px}.down-table th:nth-child(8){width:95px}.down-table th:nth-child(9){width:105px}
 .down-table td{height:55px;padding:5px 7px;border-right:1px solid #d8dee9;border-bottom:1px solid #c8d0de;background:#fff;font-size:10px;vertical-align:middle}
 .down-table tr:nth-child(even) td{background:#f9fbfe}
 .down-table tr.completed td{opacity:.62;background:#eef7f1}
@@ -67,7 +67,7 @@ button,input,select,textarea{font:inherit}
 .empty-sheet{height:260px!important;text-align:center;color:#687791}.empty-sheet b,.empty-sheet span{display:block}.empty-sheet b{font-size:14px;color:#294566}.empty-sheet span{margin-top:6px;font-size:9px}
 .down-footnote{display:flex;justify-content:space-between;margin:8px 18px 0;color:#687791;font-size:7px;font-weight:900;letter-spacing:.5px}
 .down-shade{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:18px;background:#06152cbb}
-.repair-editor{width:min(760px,97vw);max-height:94vh;display:flex;flex-direction:column;border-radius:10px;background:#f8faff;box-shadow:0 24px 80px #000a;overflow:hidden}
+.repair-editor{width:min(980px,97vw);max-height:94vh;display:flex;flex-direction:column;border-radius:10px;background:#f8faff;box-shadow:0 24px 80px #000a;overflow:hidden}
 .repair-editor-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;background:linear-gradient(110deg,#06275c,#0b4f9e);color:#fff}
 .repair-editor-head span{font-size:8px;font-weight:900;letter-spacing:1.4px}.repair-editor-head h2{margin:2px 0 0;font-size:22px}.repair-editor-head button{border:0;background:transparent;color:#fff;font-size:25px;cursor:pointer}
 .repair-form{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:11px 13px;overflow:auto}
@@ -96,3 +96,32 @@ button,input,select,textarea{font:inherit}
 .down-settings-body>p{margin:0;padding:9px;border-left:3px solid #efaa1b;background:#fff8e3;color:#725919;font-size:8px;line-height:1.4}
 @media(max-width:900px){.down-header{padding:9px 12px}.down-header h1{font-size:20px}.down-summary{grid-template-columns:repeat(3,1fr)}.down-controls{flex-wrap:wrap}.completed-toggle{margin-left:0}.sheet-scroll{max-height:none}.down-app{padding-bottom:16px}}
 @media(max-width:600px){.down-header{align-items:flex-start;flex-direction:column}.down-header nav{width:100%}.down-header nav a{flex:1}.down-summary{grid-template-columns:repeat(2,1fr);margin:8px}.down-controls{margin:0 8px 8px}.shift-filter{width:100%}.shift-filter button{min-width:0;flex:1}.completed-toggle{margin-right:auto}.quick-notes{margin:0 8px 8px;grid-template-columns:1fr}.quick-notes textarea{border-left:0;border-top:1px solid #c8d2e2}.sheet-wrap{margin:0 8px}.down-footnote{display:none}}
+
+/* Mechanic-centered labor planning */
+.down-summary .labor-total{background:#fff8dd;border-color:#d8ad42}
+.down-summary .labor-total strong{font-size:19px;color:#6f4c00}
+.down-summary .view-total{background:#edf7ff;border-color:#76acd9}
+.down-summary .view-total strong{color:#075b9f}
+.estimate-cell{display:table-cell;color:#6f4c00}
+.estimate-cell b,.estimate-cell small{display:block}
+.estimate-cell b{font-size:13px}
+.estimate-cell small{margin-top:3px;color:#8b7a56;font-size:7px;font-weight:900}
+.mechanic-estimate{margin:2px 0 4px;padding:0;border:1px solid #cfaa4c;border-radius:8px;background:#fffdf5;overflow:hidden}
+.mechanic-estimate legend{margin-left:12px;padding:0 7px;color:#694a07;font-size:9px;font-weight:900;letter-spacing:.55px}
+.estimate-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 13px;background:linear-gradient(110deg,#fff1bd,#fff9e4);border-bottom:1px solid #e1c576}
+.estimate-heading span{display:flex;flex-direction:column;gap:3px}
+.estimate-heading b{color:#5d4309;font-size:11px}
+.estimate-heading small{color:#7a642d!important;font-size:8px!important;line-height:1.35}
+.estimate-heading strong{flex:none;padding:7px 10px;border-radius:6px;background:#15365f;color:#fff;font-size:20px}
+.mechanic-estimate>p{margin:0;padding:10px 13px;border-bottom:1px solid #eadba9;color:#5f542f;font-size:9px;line-height:1.45;font-weight:700}
+.estimate-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:12px 13px}
+.repair-form .estimate-grid label{min-width:0;padding:9px;border:1px solid #d6cba9;border-radius:6px;background:#fff}
+.estimate-grid label>span{display:grid;grid-template-columns:1fr auto;align-items:center}
+.estimate-grid label>span input{min-width:0;border-radius:5px 0 0 5px;border-right:0;font-size:13px}
+.estimate-grid label>span b{height:37px;display:flex;align-items:center;padding:0 8px;border:1px solid #b7c2d5;border-radius:0 5px 5px 0;background:#edf1f6;color:#53627a;font-size:7px}
+.estimate-grid label small{min-height:28px;line-height:1.35}
+.repair-form .estimate-notes{margin:0 13px 13px;padding-top:10px;border-top:1px solid #eadba9}
+.estimate-notes textarea{min-height:58px}
+@media(max-width:1180px) and (min-width:901px){.down-summary{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:900px){.estimate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.estimate-grid{grid-template-columns:1fr}.estimate-heading{align-items:flex-start}.estimate-heading strong{font-size:17px}}

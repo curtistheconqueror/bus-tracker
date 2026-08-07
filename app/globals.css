@@ -390,3 +390,15 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .confirmation-settings>label{margin-top:8px}
 .confirmation-settings>label:first-of-type{margin-top:0}
 .confirmation-settings .confirmation-note{display:block;margin-top:8px;font-size:9px;color:#61708c}
+
+/* Individual facility section expansion */
+.title-actions .toggle-section{opacity:1;background:#173d70;border-color:#173d70;color:#fff;font-size:13px;letter-spacing:0}
+.title-actions .toggle-section:hover,.title-actions .toggle-section:focus-visible{background:#0b68c9;border-color:#0b68c9;color:#fff}
+.section-collapsed{height:auto!important;min-height:28px!important;align-self:start;overflow:hidden}
+.section-collapsed>:not(.title){display:none!important}
+.section-collapsed>.title{min-height:28px}
+.all-collapsed .mid{height:auto;grid-template-rows:auto auto;align-items:start}
+.all-collapsed .bottom{align-items:start}
+.special.section-collapsed{display:block;padding:4px 6px}
+.vertical-zone.section-collapsed{padding:0 5px 4px}
+.bays.section-collapsed,.east.section-collapsed,.road.section-collapsed,.wall.section-collapsed,.garage.section-collapsed,.west.section-collapsed,.service.section-collapsed{padding-bottom:4px}

@@ -2,6 +2,7 @@
 
 import {useMemo,useState} from "react";
 import {REPAIR_OPTIONS} from "../repair-catalog";
+import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,resetCoreRepairEstimate,type RepairTimeEstimate} from "./repair-time-estimates";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -15,31 +16,52 @@ export type DownSheetRecord={
  id:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
+ timeEstimate:RepairTimeEstimate;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
 };
 
 const SECTIONS:RepairSection[]=["Pending","Accident","Scheduled Repair","Inspection","Vendor Repair","Roadcall","Other"];
 const WORKFLOWS:Workflow[]=["Scheduled","In Progress","Waiting for Parts","On Hold","Completed","Deferred"];
 const STATUS_OPTIONS:[FleetStatus,string][]=[["service","In Service / On Road"],["defect","In Service with Defects"],["shop","Work in Progress"],["out","Out of Service"],["decommissioned","Decommissioned"],["unknown","Unknown"]];
+const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:string;help:string}[]=[
+ {key:"repairMinutes",label:"HANDS-ON REPAIR",help:"Actual wrench, replacement, adjustment, inspection, and verification time."},
+ {key:"diagnosticMinutes",label:"DIAGNOSIS / VERIFY",help:"Reproduce the complaint, inspect, test, isolate, and confirm the failure."},
+ {key:"accessMinutes",label:"BUS ACCESS & SETUP",help:"Locate and stage the bus, move blocking buses, jump or air it up, push it, gather tools, and make the work area safe."},
+ {key:"complicationMinutes",label:"COMPLICATIONS",help:"Stripped or seized bolts, corrosion, broken hardware, rework, and unexpected access problems."},
+ {key:"heatMinutes",label:"HEAT / FATIGUE",help:"Realistic pace and recovery allowance for extreme shop or outdoor conditions."},
+ {key:"interruptionMinutes",label:"ROADCALL / INTERRUPTIONS",help:"Road calls, reassignment, waiting on direction, and other work that interrupts this repair."},
+ {key:"otherMinutes",label:"OTHER WORKFLOW TIME",help:"Parts counter, vendor coordination, cleanup, paperwork, retest, or another documented delay."},
+];
+
+function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
 export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void}){
- const [draft,setDraft]=useState(entry);
+ const [draft,setDraft]=useState(()=>({...entry,timeEstimate:normalizeRepairTimeEstimate(entry.timeEstimate,entry.category,entry.repair)}));
  const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
  const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
+ const updateEstimateHours=(key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>setDraft(current=>({...current,timeEstimate:{...current.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
  const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
  const repairs=REPAIR_OPTIONS[draft.category]||[];
  const isNew=!entries.some(item=>item.id===entry.id);
- const submit=(event:React.FormEvent)=>{event.preventDefault();const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);if(!bus){alert("Select a bus number.");return}if(!draft.category){alert("Select a repair category.");return}if(!draft.repair){alert("Select the specific repair or service.");return}if(!operator){alert("Enter your initials before saving this update.");return}const now=new Date().toISOString(),action=isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow,next={...draft,busNumber:bus.n,updatedAt:now,updatedBy:operator,completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",history:[...draft.history,{at:now,initials:operator,action}]};onSave(next)};
+ const estimateTotal=repairTimeTotal(draft.timeEstimate);
+ const submit=(event:React.FormEvent)=>{event.preventDefault();const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);if(!bus){alert("Select a bus number.");return}if(!draft.category){alert("Select a repair category.");return}if(!draft.repair){alert("Select the specific repair or service.");return}if(!operator){alert("Enter your initials before saving this update.");return}const now=new Date().toISOString(),action=(isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow)+" - mechanic estimate "+formatRepairTime(estimateTotal),next={...draft,busNumber:bus.n,updatedAt:now,updatedBy:operator,completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",history:[...draft.history,{at:now,initials:operator,action}]};onSave(next)};
 
  return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
   <form className="repair-editor" onSubmit={submit}>
-   <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>×</button></div>
+   <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
    <div className="repair-form">
     <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker and cannot be typed here.</small></label>
     <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
-    <label className="wide repair-category">REPAIR CATEGORY<select value={draft.category} onChange={event=>setDraft(current=>({...current,category:event.target.value,repair:""}))}><option value="">Choose a system or service</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select><small>Choose the broad repair family first.</small></label>
-    <label className="wide repair-specific">SPECIFIC REPAIR / SERVICE<select value={draft.repair} onChange={event=>update("repair",event.target.value)} disabled={!draft.category}><option value="">{draft.category?"Choose a "+draft.category+" item":"Select a repair category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select><small>Only choices from {draft.category||"the selected family"} are shown.</small></label>
+    <label className="wide repair-category">REPAIR CATEGORY<select value={draft.category} onChange={event=>{const category=event.target.value;setDraft(current=>({...current,category,repair:"",timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Choose a system or service</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select><small>Choose the broad repair family first.</small></label>
+    <label className="wide repair-specific">SPECIFIC REPAIR / SERVICE<select value={draft.repair} onChange={event=>{const repair=event.target.value;setDraft(current=>({...current,repair,timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}))}} disabled={!draft.category}><option value="">{draft.category?"Choose a "+draft.category+" item":"Select a repair category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select><small>Selecting a repair loads a conservative starting allowance. The mechanic can adjust every part.</small></label>
     <label className="wide">ADDITIONAL REASON / DETAILS<textarea value={draft.customReason} onChange={event=>update("customReason",event.target.value)} placeholder="Optional details that are specific to this bus"/></label>
+    <fieldset className="mechanic-estimate wide">
+     <legend>MECHANIC PLANNING ESTIMATE</legend>
+     <div className="estimate-heading"><span><b>REAL-WORLD WORK ALLOWANCE</b><small>Planning forecast only - not a flat-rate promise, disciplinary standard, or guarantee.</small></span><strong>{formatRepairTime(estimateTotal)}</strong></div>
+     <p>Count the time the job actually requires, including diagnosis, finding and staging the bus, blocked access, failed jumps, airing or pushing a bus, stripped hardware, heat, road calls, parts, cleanup, and retesting.</p>
+     <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(draft.timeEstimate[field.key])} onChange={event=>updateEstimateHours(field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
+     <label className="estimate-notes">ESTIMATE NOTES<textarea value={draft.timeEstimate.notes} onChange={event=>setDraft(current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Document the conditions or workflow facts supporting this allowance."/></label>
+    </fieldset>
     <label>ASSIGNMENT TYPE<select value={draft.assignmentType} onChange={event=>update("assignmentType",event.target.value as AssignmentType)}><option>Mechanic</option><option>Vendor</option></select></label>
     <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
     <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>

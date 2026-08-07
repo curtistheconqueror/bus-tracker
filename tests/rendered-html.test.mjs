@@ -15,6 +15,7 @@ import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/fac
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
+import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -753,4 +754,38 @@ test("confirmation prompts are per-device settings that default to on", async ()
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);
+});
+
+test("every facility section can collapse independently while global controls remain", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(page, /aria-expanded=\{!collapsed\}/);
+  assert.match(page, /setCollapsedSections\(new Set\(Object\.keys\(SECTION_SLOTS\)\)\)/);
+  assert.match(page, /sectionClass\("IN SERVICE \/ ON ROAD","road"\)/);
+  assert.match(page, /sectionClass\("MAIN GARAGE \(BAYS 1-12\)","garage panel"\)/);
+  assert.match(css, /\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
+  assert.match(css, /\.title-actions \.toggle-section/);
+});
+
+test("mechanic planning estimates include real workflow allowances and accumulated totals", async () => {
+  assert.equal(recommendedRepairMinutes("Engine", "Engine replacement"), 960);
+  const estimate = normalizeRepairTimeEstimate(undefined, "Engine", "Engine replacement");
+  assert.equal(estimate.diagnosticMinutes, 45);
+  assert.equal(estimate.accessMinutes, 90);
+  const realistic = {...estimate, complicationMinutes:120, heatMinutes:60, interruptionMinutes:90, otherMinutes:30};
+  assert.equal(repairTimeTotal(realistic), 1395);
+  assert.equal(formatRepairTime(repairTimeTotal(realistic)), "23h 15m");
+
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const editor = await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  assert.match(page, /EST\. ACTIVE LABOR/);
+  assert.match(page, /EST\. CURRENT VIEW/);
+  assert.match(page, /className="estimate-cell"/);
+  assert.match(editor, /BUS ACCESS & SETUP/);
+  assert.match(editor, /HEAT \/ FATIGUE/);
+  assert.match(editor, /ROADCALL \/ INTERRUPTIONS/);
+  assert.match(editor, /not a flat-rate promise/);
+  assert.match(css, /\.mechanic-estimate/);
+  assert.match(css, /\.estimate-grid/);
 });
