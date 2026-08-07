@@ -298,6 +298,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CREATE NEW BUS/);
   assert.match(page, /Map spaces only relocate buses that already exist/);
   assert.match(page, /SWITCH \/ REASSIGN/);
+  assert.match(page, /aria-expanded=\{switchOpen\}/);
+  assert.match(page, /switchOpen&&<div className="switch-grid">/);
+  assert.match(page, /Optional: move this bus into an occupied space/);
   assert.match(page, /WHERE SHOULD/);
   assert.match(page, /SWITCH WITH BUS<select value=\{switchBusId\}/);
   assert.match(page, /Choose an existing bus/);
@@ -308,6 +311,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.move-here-modal\{/);
   assert.match(css, /\.fleet-creation-control\{/);
   assert.match(css, /\.switch-reassign\{/);
+  assert.match(css, /\.switch-toggle\{/);
   assert.match(page, /Protected fleet identity\. Change only in Settings\./);
   assert.match(page, /FLEET NUMBER CONTROL/);
   assert.match(page, /Duplicate numbers are blocked/);
@@ -347,6 +351,8 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CHECK TRANSMISSION LIGHT/);
   assert.match(page, /checked=\{d\.noHorn\}/);
   assert.match(page, /checked=\{d\.badRampKneeler\}/);
+  assert.match(css, /\.modal>\.form\{[^}]*align-content:start;grid-auto-rows:max-content/);
+  assert.match(css, /\.defect-workbench\{min-height:88px/);
   assert.match(page, /ramp-kneeler-command/);
   assert.match(page, /<span>RAMP\/KNEELER<\/span><small>ADA/);
   assert.match(css, /\.ramp-kneeler-command\{/);
