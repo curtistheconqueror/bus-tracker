@@ -224,7 +224,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .defect-card.deferred{border-left-color:#efa400}.defect-card.completed{border-left-color:#687384;opacity:.72}
 .defect-card>div:first-child{display:flex;justify-content:space-between;gap:10px}
 .defect-card>div:first-child>span{display:flex;flex-direction:column;gap:2px;min-width:0}
-.defect-card b{font-size:8px;color:#65758f;text-transform:uppercase}.defect-card strong{font-size:11px;color:#17345e}.defect-card small{font-size:9px;color:#4f6079;overflow-wrap:anywhere}
+.defect-card b{font-size:11px;color:#080b10;font-weight:900;text-transform:uppercase}.defect-card strong{font-size:14px;line-height:1.25;color:#05070a;font-weight:900;overflow-wrap:anywhere}.defect-card small{font-size:12px;line-height:1.3;color:#111827;font-weight:800;overflow-wrap:anywhere}
 .defect-card>div:first-child>button{align-self:start;border:0;background:transparent;color:#aa2730;font-size:7px;font-weight:900;cursor:pointer}
 .defect-controls{display:grid;grid-template-columns:1fr 1.5fr;gap:8px;margin-top:8px}.defect-controls label{font-size:7px}.defect-controls select{padding:6px}
 .defect-entry{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-top:1px solid #c6d1e2;background:#fff}

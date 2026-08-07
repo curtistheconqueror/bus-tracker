@@ -125,7 +125,7 @@ export default function DownSheet(){
 
  return <main className="down-app">
   <header className="down-header">
-   <div><span>PACE SOUTH MAINTENANCE</span><h1>Interactive Down Sheet</h1><p>Repair scheduling and live fleet-status control</p></div>
+   <div><span>FLEET MAINTENANCE</span><h1>Interactive Down Sheet</h1><p>Repair scheduling and live fleet-status control</p></div>
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a className="active" href="/down-sheet" aria-current="page">DOWN SHEET</a></nav>
   </header>
 
@@ -154,7 +154,7 @@ export default function DownSheet(){
    <textarea id="down-quick-notes" value={quickNotes} onChange={event=>setQuickNotes(event.target.value)} placeholder="Example: 3 road calls today; follow up with vendor; check late-shift parts delivery."/>
   </section>
   <section className="sheet-wrap">
-   <div className="sheet-title"><div><b>PACE SOUTH FACILITY</b><span>Maintenance Down Sheet</span></div><p>{filter==="All"?"ALL SHIFTS":filter+" SHIFT"} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p></div>
+   <div className="sheet-title"><div><b>MAINTENANCE FACILITY</b><span>Maintenance Down Sheet</span></div><p>{filter==="All"?"ALL SHIFTS":filter+" SHIFT"} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p></div>
    <div className="sheet-scroll">
     <table className="down-table">
      <thead><tr><th>LINE</th><th>BUS NUMBER</th><th>REASON DOWN</th><th>MECHANIC / VENDOR</th><th>SECTION</th><th>SHIFT</th><th>WORK STATUS</th><th>EST. TIME</th><th>UPDATED BY</th></tr></thead>

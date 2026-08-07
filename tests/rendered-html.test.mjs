@@ -9,7 +9,7 @@ import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/sm
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectSummary } from "../app/repair-catalog.ts";
+import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
@@ -161,7 +161,9 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
 
-  assert.match(html, /<title>Pace Maintenance Bus Tracking System<\/title>/i);
+  assert.match(html, /<title>Fleet Maintenance Bus Tracking System<\/title>/i);
+  assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
+  assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
   assert.match(html, />AC BUSES</);
@@ -211,6 +213,26 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.equal((road.match(/class="spot"/g) ?? []).length, 75);
   const west = section(html, '<section class="west lot panel">', '<footer class="command-bar">');
   assert.equal((west.match(/class="spot"/g) ?? []).length, 40);
+});
+
+test("removes prospective customer branding from visible app titles", async () => {
+  const [layout, manifestText, operator, downSheet, tracker] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
+    readFile(new URL("../app/operator-modal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+  const manifest = JSON.parse(manifestText);
+  assert.equal(manifest.name, "Fleet Maintenance Bus Tracking System");
+  assert.equal(manifest.short_name, "Fleet Bus Tracker");
+  assert.match(layout, /title:"Fleet Maintenance Bus Tracking System"/);
+  assert.match(operator, /FLEET INTELLIGENT COMMAND CONSOLE/);
+  assert.match(downSheet, /FLEET MAINTENANCE/);
+  assert.match(downSheet, /MAINTENANCE FACILITY/);
+  assert.doesNotMatch(operator, /PACE/);
+  assert.doesNotMatch(downSheet, /PACE/);
+  assert.doesNotMatch(tracker, /PACE MAINTENANCE/);
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
@@ -591,14 +613,18 @@ test("down sheet synchronization changes repairs and status without moving the b
   assert.equal(completed[0].defects[0].state, "completed");
   assert.equal(completed[0].mechanic, "JD");
 });
-test("smart status returns repaired and defect-carrying buses to the road correctly", () => {
+test("smart status returns repaired and defect-carrying buses to road and main garage correctly", () => {
   const minor = [{ id: "d1", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
   const downing = [{ id: "d2", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" }];
   const completed = minor.map(defect => ({ ...defect, state: "completed" }));
   assert.equal(statusForLocation("road-4", "shop", { defects: minor, pendingRepair: "" }), "defect");
   assert.equal(statusForLocation("road-4", "shop", { defects: downing, pendingRepair: "" }), "out");
   assert.equal(statusForLocation("road-4", "shop", { defects: completed, pendingRepair: "" }), "service");
-  assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "service");
+  assert.equal(statusForLocation("garage-4", "out", { defects: [], pendingRepair: "" }), "service");
+  assert.equal(statusForLocation("garage-4", "shop", { defects: minor, pendingRepair: "" }), "defect");
+  assert.equal(statusForLocation("garage-4", "shop", { defects: downing, pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("garage-4", "decommissioned", { defects: [], pendingRepair: "" }), "decommissioned");
   assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
   assert.equal(statusForLocation("east-1", "defect", { defects: minor, pendingRepair: "" }), "out");
   assert.equal(statusForLocation("west-4", "service", { defects: minor, pendingRepair: "" }), "out");
@@ -710,7 +736,8 @@ test("dropping onto an occupied parking space swaps both buses atomically", () =
 test("manual defect drafts are captured when the main editor is saved", () => {
   const draft = defectFromDraft({ category: "", issue: "", details: "  Driver reports intermittent rattle  ", operability: "service", state: "open" }, "manual", "manual-test");
   assert.deepEqual(draft, { id: "manual-test", category: "Miscellaneous", issue: "Manual entry", details: "Driver reports intermittent rattle", operability: "service", state: "open" });
-  assert.match(defectSummary([draft]), /Manual entry.*Driver reports intermittent rattle/);
+  assert.equal(defectLabel(draft), "Driver reports intermittent rattle");
+  assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);

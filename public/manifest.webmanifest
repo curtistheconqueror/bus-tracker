@@ -1,6 +1,6 @@
 {
-  "name": "Pace Maintenance Bus Tracking System",
-  "short_name": "Pace Bus Tracker",
+  "name": "Fleet Maintenance Bus Tracking System",
+  "short_name": "Fleet Bus Tracker",
   "description": "Offline-capable facility-wide fleet location and maintenance tracking board.",
   "start_url": "/",
   "scope": "/",

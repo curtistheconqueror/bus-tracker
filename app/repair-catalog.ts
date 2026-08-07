@@ -55,5 +55,8 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
 }
 
 export function isUnresolved(defect:StructuredDefect){return defect.state!=="completed"}
-export function defectLabel(defect:StructuredDefect){return [defect.category,defect.issue,defect.details].map(value=>value.trim()).filter(Boolean).join(" — ")}
+export function defectLabel(defect:StructuredDefect){
+ if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();
+ return [defect.category,defect.issue,defect.details].map(value=>value.trim()).filter(Boolean).join(" — ")
+}
 export function defectSummary(defects:StructuredDefect[]){return defects.filter(isUnresolved).map(defectLabel).join("; ")}
