@@ -58,7 +58,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <fieldset className="mechanic-estimate wide">
      <legend>MECHANIC PLANNING ESTIMATE</legend>
      <div className="estimate-heading"><span><b>REAL-WORLD WORK ALLOWANCE</b><small>Planning forecast only - not a flat-rate promise, disciplinary standard, or guarantee.</small></span><strong>{formatRepairTime(estimateTotal)}</strong></div>
-     <p>Count the time the job actually requires, including diagnosis, finding and staging the bus, blocked access, failed jumps, airing or pushing a bus, stripped hardware, heat, road calls, parts, cleanup, and retesting.</p>
+     <p><b>SHOP RULE: 30-MINUTE ABSOLUTE MINIMUM.</b> Tire allowances are per tire and a full-day rotor job is set to 8 hours. Count the time the job actually requires, including diagnosis, finding and staging the bus, blocked access, failed jumps, airing or pushing a bus, stripped hardware, heat, road calls, parts, cleanup, and retesting.</p>
      <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(draft.timeEstimate[field.key])} onChange={event=>updateEstimateHours(field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
      <label className="estimate-notes">ESTIMATE NOTES<textarea value={draft.timeEstimate.notes} onChange={event=>setDraft(current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Document the conditions or workflow facts supporting this allowance."/></label>
     </fieldset>

@@ -11,16 +11,16 @@ export type StructuredDefect={
 };
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
- "A/C and HVAC":["No cooling","Compressor","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check-engine diagnosis","Loss of power","Oil leak","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
+ "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
+ "Engine":["Check-engine diagnosis","Loss of power","Oil leak","Rear main seal","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
  "Suspension":["Air bag","Shock / strut","Ride-height issue","Suspension leak","Bushing / linkage","Other suspension repair"],
  "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
- "Brakes":["Brake inspection","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Parking brake","Other brake repair"],
+ "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
- "Battery, Starting and Charging":["Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Cables / terminals","Other starting or charging repair"],
- "Electrical / Multiplex":["Horn","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
+ "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
+ "Electrical / Multiplex":["Horn","MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Tech Services":["Farebox","Ventra","MDT Screen","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
@@ -29,7 +29,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Mirrors / fixtures","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
- "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Valve Adjustment and Spark Plug Refresh"],
+ "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Oil and filter service","Lubrication","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };

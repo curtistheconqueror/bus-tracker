@@ -767,25 +767,59 @@ test("every facility section can collapse independently while global controls re
   assert.match(css, /\.title-actions \.toggle-section/);
 });
 
-test("mechanic planning estimates include real workflow allowances and accumulated totals", async () => {
+test("mechanic planning estimates enforce Curtis's shop baselines and accumulated totals", async () => {
+  const estimateTotal = (category, repair) => repairTimeTotal(normalizeRepairTimeEstimate(undefined, category, repair));
+
+  assert.equal(formatRepairTime(repairTimeTotal({repairMinutes:0,diagnosticMinutes:0,accessMinutes:0,complicationMinutes:0,heatMinutes:0,interruptionMinutes:0,otherMinutes:0,notes:""})), "30m");
+  assert.equal(estimateTotal("Engine", "Check-engine diagnosis"), 180);
+  assert.equal(estimateTotal("Tires and Wheels", "Tire replacement"), 60);
+  assert.equal(estimateTotal("Battery, Starting and Charging", "Jump / boost bus"), 30);
+  assert.equal(estimateTotal("Battery, Starting and Charging", "Battery replacement"), 120);
+  assert.equal(normalizeRepairTimeEstimate(undefined, "Battery, Starting and Charging", "Starting / charging diagnosis").diagnosticMinutes, 60);
+  assert.equal(estimateTotal("Battery, Starting and Charging", "Starting / charging diagnosis"), 60);
+  assert.equal(normalizeRepairTimeEstimate(undefined, "No Start", "Cranks / no start").diagnosticMinutes, 90);
+  assert.equal(estimateTotal("No Start", "Cranks / no start"), 120);
+  assert.equal(estimateTotal("A/C and HVAC", "No cooling"), 150);
+  assert.equal(estimateTotal("A/C and HVAC", "Compressor"), 960);
+  assert.equal(estimateTotal("A/C and HVAC", "Evaporator core"), 960);
+  assert.equal(estimateTotal("A/C and HVAC", "Condenser core"), 960);
+  assert.equal(estimateTotal("Engine", "Rear main seal"), 960);
+  assert.equal(estimateTotal("Engine", "Spark plugs"), 300);
+  assert.equal(estimateTotal("Engine", "Valve adjustment"), 360);
+  assert.equal(estimateTotal("Inspection", "A-6"), 390);
+  assert.equal(estimateTotal("Inspection", "B-18"), 390);
+  assert.equal(estimateTotal("Inspection", "C-24"), 720);
+  assert.equal(estimateTotal("Brakes", "Front brake pads"), 180);
+  assert.equal(estimateTotal("Brakes", "Brake rotors"), 480);
+  assert.equal(estimateTotal("Brakes", "Rear shoes and drums"), 720);
+  assert.equal(estimateTotal("Brakes", "ABS warning"), 120);
+  assert.equal(normalizeRepairTimeEstimate(undefined, "Brakes", "ABS warning").diagnosticMinutes, 60);
+  assert.equal(estimateTotal("Electrical / Multiplex", "MOD light"), 120);
+  assert.equal(normalizeRepairTimeEstimate(undefined, "Electrical / Multiplex", "MOD light").diagnosticMinutes, 60);
   assert.equal(recommendedRepairMinutes("Engine", "Engine replacement"), 960);
-  const estimate = normalizeRepairTimeEstimate(undefined, "Engine", "Engine replacement");
-  assert.equal(estimate.diagnosticMinutes, 45);
-  assert.equal(estimate.accessMinutes, 90);
+
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Evaporator core"));
+  assert.ok(REPAIR_OPTIONS.Engine.includes("Rear main seal"));
+  assert.ok(REPAIR_OPTIONS.Brakes.includes("Rear shoes and drums"));
+  assert.ok(REPAIR_OPTIONS["Battery, Starting and Charging"].includes("Jump / boost bus"));
+  assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("MOD light"));
+
+  const estimate = normalizeRepairTimeEstimate(undefined, "Engine", "Check-engine diagnosis");
   const realistic = {...estimate, complicationMinutes:120, heatMinutes:60, interruptionMinutes:90, otherMinutes:30};
-  assert.equal(repairTimeTotal(realistic), 1395);
-  assert.equal(formatRepairTime(repairTimeTotal(realistic)), "23h 15m");
+  assert.equal(repairTimeTotal(realistic), 480);
+  assert.equal(formatRepairTime(repairTimeTotal(realistic)), "8h");
 
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   const editor = await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
-  assert.match(page, /EST\. ACTIVE LABOR/);
-  assert.match(page, /EST\. CURRENT VIEW/);
+  assert.ok(page.includes("EST. ACTIVE LABOR"));
+  assert.ok(page.includes("EST. CURRENT VIEW"));
   assert.match(page, /className="estimate-cell"/);
+  assert.match(editor, /30-MINUTE ABSOLUTE MINIMUM/);
   assert.match(editor, /BUS ACCESS & SETUP/);
-  assert.match(editor, /HEAT \/ FATIGUE/);
-  assert.match(editor, /ROADCALL \/ INTERRUPTIONS/);
+  assert.ok(editor.includes("HEAT / FATIGUE"));
+  assert.ok(editor.includes("ROADCALL / INTERRUPTIONS"));
   assert.match(editor, /not a flat-rate promise/);
-  assert.match(css, /\.mechanic-estimate/);
-  assert.match(css, /\.estimate-grid/);
+  assert.ok(css.includes(".mechanic-estimate"));
+  assert.ok(css.includes(".estimate-grid"));
 });
