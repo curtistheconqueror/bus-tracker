@@ -892,6 +892,7 @@ test("AI operator plans and atomically applies multi-bus moves, statuses, and Wa
   const areas = [
     { name: "MAIN GARAGE (BAYS 1-10)", slots: ["garage-0", "garage-1"] },
     { name: "CNG EAST LOT", slots: ["east-0", "east-1"] },
+    { name: "CNG WEST LOT", slots: ["west-0", "west-1", "west-2"] },
     { name: "IN SERVICE / ON ROAD", slots: ["road-0", "road-1"] },
     { name: "WAITING AREA", slots: ["waiting-0", "waiting-1", "waiting-2"] },
   ];
@@ -930,6 +931,22 @@ test("AI operator plans and atomically applies multi-bus moves, statuses, and Wa
   assert.equal(waitingCount.kind, "plan");
   assert.equal(waitingCount.plan.kind, "analysis");
   assert.match(waitingCount.plan.response, /3 buses/);
+  const areaFleet = fleet.map(bus => bus.id === "a" ? { ...bus, l: "west-1" } : bus);
+  const directAreaMove = planOperatorCommand("Move all buses in CNG West to the Waiting Area", areaFleet, areas);
+  assert.equal(directAreaMove.kind, "plan");
+  assert.equal(directAreaMove.plan.kind, "bulkMove");
+  assert.deepEqual(directAreaMove.plan.busNumbers, ["17525", "17531"]);
+  assert.equal(directAreaMove.plan.areaName, "WAITING AREA");
+  assert.match(directAreaMove.plan.summary, /all 2 buses from CNG WEST LOT/);
+
+  const addBack = planOperatorCommand("Add buses 25 and 48 back to CNG West", fleet, areas);
+  assert.equal(addBack.kind, "plan");
+  assert.equal(addBack.plan.kind, "batch");
+  assert.deepEqual(addBack.plan.items.map(item => item.areaName), ["CNG WEST LOT", "CNG WEST LOT"]);
+
+  const missingSource = planOperatorCommand("Move all buses to the Waiting Area", fleet, areas);
+  assert.equal(missingSource.kind, "message");
+  assert.match(missingSource.message, /need the source area/i);
 });
 
 test("movement paths recalculate Main Garage and On Road status from remaining defects", () => {

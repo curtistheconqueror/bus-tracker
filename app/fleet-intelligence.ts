@@ -56,6 +56,18 @@ export function findOperatorArea(command:string,areas:FleetInsightArea[]){
  }
  return [...areas].sort((a,b)=>normalized(b.name).length-normalized(a.name).length).find(area=>haystack.includes(normalized(area.name)));
 }
+export function findOperatorAreaMentions(command:string,areas:FleetInsightArea[]){
+ const haystack=normalized(command),mentions:{area:FleetInsightArea;index:number}[]=[];
+ const remember=(area:FleetInsightArea,phrase:string)=>{const index=haystack.indexOf(normalized(phrase));if(index>=0)mentions.push({area,index})};
+ for(const [canonical,aliases] of AREA_ALIASES){
+  const area=areas.find(item=>item.name===canonical);
+  if(area)aliases.forEach(alias=>remember(area,alias));
+ }
+ areas.forEach(area=>remember(area,area.name));
+ const earliest=new Map<string,{area:FleetInsightArea;index:number}>();
+ mentions.forEach(mention=>{const current=earliest.get(mention.area.name);if(!current||mention.index<current.index)earliest.set(mention.area.name,mention)});
+ return [...earliest.values()].sort((a,b)=>a.index-b.index);
+}
 
 function statusQuestion(text:string){
  if(/\bdecommissioned\b/.test(text))return "decommissioned";

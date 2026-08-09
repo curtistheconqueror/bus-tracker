@@ -1,6 +1,6 @@
 import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver.ts";
 import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "./repair-catalog.ts";
-import {analyzeFleetQuestion,findOperatorArea,type FleetInsightBus} from "./fleet-intelligence.ts";
+import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "./fleet-intelligence.ts";
 import type {FleetStatus} from "./smart-status.ts";
 
 export type OperatorBus=FleetInsightBus;
@@ -66,7 +66,7 @@ function statusFromCommand(command:string):FleetStatus|undefined{
 }
 function statusLabel(status:FleetStatus){return STATUS_LABELS[status]||status}
 
-function capacityMessage(area:OperatorArea,needed:number,open:number){return area.name+" has "+open+" open spaces but "+needed+" are needed. Nothing was prepared. Use the WAITING AREA if the buses need to be recorded before you can sort them."}
+function capacityMessage(area:OperatorArea,needed:number,open:number){return area.name+" has "+open+" open spaces but "+needed+" are needed. Nothing was prepared."+(area.name==="WAITING AREA"?" Clear or reassign buses already in the Waiting Area before trying again.":" Use the WAITING AREA if the buses need to be recorded before you can sort them.")}
 
 function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string}{
  const query=busQuery(command);
@@ -99,9 +99,19 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  const text=normalized(command);
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
 
- const moveAction=/\b(move|relocate|place|send|put)\b/.test(text),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
- const repeatedClauses=command.split(/;|,(?=\s*(?:move|relocate|place|send|put)\b)/i).map(clause=>clause.trim()).filter(Boolean);
- if(repeatedClauses.length>1&&repeatedClauses.every(clause=>/\b(move|relocate|place|send|put)\b/i.test(clause))){
+ const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
+ if(moveAction&&!explicitQueries.length&&areaMentions.length>=2){
+  const source=areaMentions[0].area,destination=areaMentions[areaMentions.length-1].area;
+  if(source.name===destination.name)return {kind:"message",message:"The source and destination are both "+source.name+". Name a different destination area."};
+  const selected=fleet.filter(bus=>source.slots.includes(bus.l)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})||a.id.localeCompare(b.id));
+  if(!selected.length)return {kind:"message",message:source.name+" is currently empty on this device, so there are no buses to move."};
+  const already=selected.filter(bus=>destination.slots.includes(bus.l)).length,needed=selected.length-already,open=destination.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
+  if(open<needed)return {kind:"message",message:capacityMessage(destination,needed,open)};
+  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:destination.name,status:desiredStatus,selectionLabel:"all buses in "+source.name,summary:"Move all "+selected.length+" buses from "+source.name+" to the first available spaces in "+destination.name+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
+ }
+ if(moveAction&&!explicitQueries.length&&/\b(all|every)\b/.test(text)&&areaMentions.length===1)return {kind:"message",message:"I found the destination "+areaMentions[0].area.name+", but I need the source area too. Try: Move all buses from CNG West to the Waiting Area."};
+ const repeatedClauses=command.split(/;|,(?=\s*(?:move|relocate|place|send|put|transfer|shift|bring|return|add)\b)/i).map(clause=>clause.trim()).filter(Boolean);
+ if(repeatedClauses.length>1&&repeatedClauses.every(clause=>/\b(move|relocate|place|send|put|transfer|shift|bring|return|add)\b/i.test(clause))){
   const items:OperatorBatchItem[]=[];
   for(const clause of repeatedClauses){
    const queries=busQueries(clause),resolved=resolveMany(fleet,queries),area=areaFromCommand(clause,areas),clauseStatus=statusFromCommand(clause);
@@ -166,7 +176,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  if(!resolved.bus)return {kind:"message",message:resolved.message||"Tell me which bus you mean."};
  const bus=resolved.bus;
 
- if(/\b(move|relocate|place|send|put)\b/.test(text)){
+ if(moveAction){
   const area=areaFromCommand(command,areas);
   if(!area)return {kind:"message",message:"I found Bus "+bus.n+", but I could not identify the destination area. Try a label such as CNG East, Shop Wall, Main Garage, or On Road."};
   if(area.slots.includes(bus.l))return {kind:"message",message:"Bus "+bus.n+" is already in "+area.name+"."};
