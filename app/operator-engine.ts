@@ -1,6 +1,7 @@
 import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver.ts";
 import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "./repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,type FleetInsightBus} from "./fleet-intelligence.ts";
+import type {FleetStatus} from "./smart-status.ts";
 
 export type OperatorBus=FleetInsightBus;
 
@@ -8,13 +9,15 @@ export type OperatorArea={name:string;slots:string[]};
 export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string};
 
 type DefectDraft=Omit<StructuredDefect,"id">;
+export type OperatorBatchItem={busId:string;busNumber:string;areaName?:string;status?:FleetStatus};
 
 export type OperatorPlan=
  | {kind:"locate";requiresConfirmation:false;busIds:string[];busNumbers:string[];summary:string}
  | {kind:"analysis";requiresConfirmation:false;busIds:string[];busNumbers:string[];selectionLabel:string;summary:string;response:string}
  | {kind:"inspect";requiresConfirmation:false;busId:string;busNumber:string;summary:string;response:string}
  | {kind:"move";requiresConfirmation:true;busId:string;busNumber:string;areaName:string;summary:string}
- | {kind:"bulkMove";requiresConfirmation:true;busIds:string[];busNumbers:string[];areaName:string;selectionLabel:string;summary:string}
+ | {kind:"bulkMove";requiresConfirmation:true;busIds:string[];busNumbers:string[];areaName:string;status?:FleetStatus;selectionLabel:string;summary:string}
+ | {kind:"batch";requiresConfirmation:true;items:OperatorBatchItem[];summary:string}
  | {kind:"downsheet";requiresConfirmation:true;busId:string;busNumber:string;selected:boolean;summary:string}
  | {kind:"defect";requiresConfirmation:true;busId:string;busNumber:string;defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler";summary:string};
 
@@ -32,6 +35,38 @@ function busQuery(command:string){
  const fallback=command.match(/\b(\d{2}|\d{5})\b/);
  return fallback?.[1]||"";
 }
+
+function busQueries(command:string){
+ const matches=[...command.matchAll(/\b(\d{5}|\d{2})\b/g)];
+ return matches.filter(match=>{const before=command.slice(Math.max(0,(match.index||0)-12),match.index||0);return !/\bbay\s*$/i.test(before)}).map(match=>match[1]);
+}
+function resolveMany(fleet:OperatorBus[],queries:string[]):{buses?:OperatorBus[];message?:string}{
+ const buses:OperatorBus[]=[];
+ for(const query of queries){
+  const resolution=resolveBusNumber(fleet,query);
+  if(resolution.kind==="invalid")return {message:"Enter a complete fleet number or exactly two ending digits for "+query+"."};
+  if(resolution.kind==="not-found")return {message:"I could not find a bus matching "+query+" on this device."};
+  if(resolution.kind==="ambiguous")return {message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Use the complete fleet number before I make a group change."};
+  if(buses.some(bus=>bus.id===resolution.bus.id))return {message:"The command points to Bus "+resolution.bus.n+" more than once. Remove the duplicate number and try again."};
+  buses.push(resolution.bus);
+ }
+ return {buses};
+}
+
+function statusFromCommand(command:string):FleetStatus|undefined{
+ const text=normalized(command);
+ if(/\b(?:decommissioned|down indefinitely|dark gr[ae]y)\b/.test(text))return "decommissioned";
+ if(/\b(?:unknown|mystery)\b/.test(text))return "unknown";
+ if(/\b(?:out of service|oos|red)\b/.test(text))return "out";
+ if(/\b(?:work in progress|wip|yellow)\b/.test(text))return "shop";
+ if(/\b(?:in service with defects|serviceable defects|green)\b/.test(text))return "defect";
+ if(/\b(?:fully in service|no defects|blue)\b/.test(text))return "service";
+ if(/\b(?:mark|set|update|change)\b/.test(text)&&/\bin service\b/.test(text))return "service";
+ return undefined;
+}
+function statusLabel(status:FleetStatus){return STATUS_LABELS[status]||status}
+
+function capacityMessage(area:OperatorArea,needed:number,open:number){return area.name+" has "+open+" open spaces but "+needed+" are needed. Nothing was prepared. Use the WAITING AREA if the buses need to be recorded before you can sort them."}
 
 function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string}{
  const query=busQuery(command);
@@ -64,7 +99,43 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  const text=normalized(command);
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
 
- const groupMove=/\b(move|relocate|place|send|put)\b/.test(text)&&(/\b(those|them|these|selected|that group|the group)\b/.test(text)||Boolean(context?.busIds.length&&!busQuery(command)));
+ const moveAction=/\b(move|relocate|place|send|put)\b/.test(text),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
+ const repeatedClauses=command.split(/;|,(?=\s*(?:move|relocate|place|send|put)\b)/i).map(clause=>clause.trim()).filter(Boolean);
+ if(repeatedClauses.length>1&&repeatedClauses.every(clause=>/\b(move|relocate|place|send|put)\b/i.test(clause))){
+  const items:OperatorBatchItem[]=[];
+  for(const clause of repeatedClauses){
+   const queries=busQueries(clause),resolved=resolveMany(fleet,queries),area=areaFromCommand(clause,areas),clauseStatus=statusFromCommand(clause);
+   if(!queries.length)return {kind:"message",message:"Each movement instruction needs at least one bus number."};
+   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command."};
+   if(!area)return {kind:"message",message:"I could not identify the destination in: "+clause+"."};
+   items.push(...resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:area.name,status:clauseStatus})));
+  }
+  if(new Set(items.map(item=>item.busId)).size!==items.length)return {kind:"message",message:"A bus appears in more than one movement instruction. Give each bus only one destination."};
+  for(const area of areas){
+   const arriving=items.filter(item=>item.areaName===area.name).filter(item=>!area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
+   const leaving=items.filter(item=>item.areaName!==area.name).filter(item=>area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
+   const open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length+leaving;
+   if(arriving>open)return {kind:"message",message:capacityMessage(area,arriving,open)};
+  }
+  const summary=items.map(item=>"Bus "+item.busNumber+" to "+item.areaName+(item.status?" as "+statusLabel(item.status):"")).join("; ");
+  return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items,summary}};
+ }
+ if(explicitQueries.length&&(explicitQueries.length>1||statusAction||(moveAction&&Boolean(desiredStatus)))){
+  const resolved=resolveMany(fleet,explicitQueries);
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command."};
+  const area=moveAction?areaFromCommand(command,areas):undefined;
+  if(moveAction&&!area)return {kind:"message",message:"I found the buses, but I could not identify the destination area. Try On Road, Main Garage, CNG East, CNG West, or Waiting Area."};
+  if(!moveAction&&!desiredStatus)return {kind:"message",message:"Tell me which status to apply to those buses."};
+  if(area){
+   const already=resolved.buses.filter(bus=>area.slots.includes(bus.l)).length,needed=resolved.buses.length-already,open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
+   if(open<needed)return {kind:"message",message:capacityMessage(area,needed,open)};
+  }
+  const items=resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:area?.name,status:desiredStatus}));
+  const action=area?"Move "+resolved.buses.map(bus=>bus.n).join(", ")+" to "+area.name:"Update "+resolved.buses.map(bus=>bus.n).join(", ");
+  return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items,summary:action+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
+ }
+
+ const groupMove=moveAction&&(/\b(those|them|these|selected|that group|the group)\b/.test(text)||Boolean(context?.busIds.length&&!busQuery(command)));
  if(groupMove){
   if(!context?.busIds.length)return {kind:"message",message:"I do not have a remembered fleet group yet. Ask a question such as “Which buses have been sitting for 8+ hours?” first."};
   const area=areaFromCommand(command,areas);
@@ -72,9 +143,9 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   const selected=context.busIds.map(id=>fleet.find(bus=>bus.id===id)).filter(Boolean) as OperatorBus[];
   if(selected.length!==context.busIds.length)return {kind:"message",message:"The remembered group changed after the last answer. Ask the fleet question again before relocating it."};
   const already=selected.filter(bus=>area.slots.includes(bus.l)).length,needed=selected.length-already,open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
-  if(open<needed)return {kind:"message",message:area.name+" has "+open+" open spaces but "+needed+" are needed for the remembered group. Nothing was prepared."};
+  if(open<needed)return {kind:"message",message:capacityMessage(area,needed,open)};
   if(!needed)return {kind:"message",message:"All "+selected.length+" remembered buses are already in "+area.name+"."};
-  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:area.name,selectionLabel:context.label,summary:"Move "+needed+" of "+selected.length+" remembered buses ("+context.label+") to the first available spaces in "+area.name+(already?" and leave "+already+" already there":"")}};
+  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:area.name,status:desiredStatus,selectionLabel:context.label,summary:"Move "+needed+" of "+selected.length+" remembered buses ("+context.label+") to the first available spaces in "+area.name+(already?" and leave "+already+" already there":"")+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
  }
 
  const insight=analyzeFleetQuestion(command,fleet,areas,now);
@@ -99,7 +170,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   const area=areaFromCommand(command,areas);
   if(!area)return {kind:"message",message:"I found Bus "+bus.n+", but I could not identify the destination area. Try a label such as CNG East, Shop Wall, Main Garage, or On Road."};
   if(area.slots.includes(bus.l))return {kind:"message",message:"Bus "+bus.n+" is already in "+area.name+"."};
-  if(!area.slots.some(slot=>!fleet.some(item=>item.l===slot)))return {kind:"message",message:area.name+" is full on this device, so I did not prepare a move."};
+  if(!area.slots.some(slot=>!fleet.some(item=>item.l===slot)))return {kind:"message",message:area.name+" is full on this device, so I did not prepare a move. Use the WAITING AREA if the bus needs to be recorded before you can sort it."};
   return {kind:"plan",plan:{kind:"move",requiresConfirmation:true,busId:bus.id,busNumber:bus.n,areaName:area.name,summary:"Move Bus "+bus.n+" from "+areaLabel(bus,areas)+" to the first open space in "+area.name}};
  }
 

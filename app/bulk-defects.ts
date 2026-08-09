@@ -1,5 +1,5 @@
 import {defectSummary,isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
-import {roadServiceStatus,type FleetStatus} from "./smart-status.ts";
+import {statusForLocation,type FleetStatus} from "./smart-status.ts";
 import {stampOperationalChange} from "./operational-time.ts";
 
 export type BulkDefectBus={
@@ -26,8 +26,7 @@ export function applyDefectToBuses<T extends BulkDefectBus>(fleet:T[],selectedId
   const duplicate=bus.defects.some(item=>isUnresolved(item)&&defectIdentity(item)===identity);
   if(duplicate){skipped++;return}
   const added={...defect,id:defect.id+"-"+bus.id+"-"+stamp},defects=[...bus.defects,added],next={...bus,defects,pendingRepair:defectSummary(defects)} as T;
-  const smartStatus=["service","defect"].includes(bus.s)||bus.l.startsWith("road-")&&bus.s==="shop";
-  const statusAware=smartStatus?{...next,s:roadServiceStatus(next)} as T:next;
+  const statusAware={...next,s:statusForLocation(bus.l,bus.s,next)} as T;
   updates.set(bus.id,stampOperationalChange(bus,statusAware,now) as T);
   applied++;
  });

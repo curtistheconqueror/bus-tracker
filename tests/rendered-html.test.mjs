@@ -14,6 +14,7 @@ import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
+import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 
@@ -211,8 +212,12 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
   assert.equal((road.match(/class="spot"/g) ?? []).length, 75);
-  const west = section(html, '<section class="west lot panel">', '<footer class="command-bar">');
+  const west = section(html, '<section class="west lot panel">', '<section class="waiting panel">');
   assert.equal((west.match(/class="spot"/g) ?? []).length, 40);
+  const waiting = section(html, '<section class="waiting panel">', '<footer class="command-bar">');
+  assert.equal((waiting.match(/class="spot"/g) ?? []).length, 98);
+  assert.match(waiting, /WAITING AREA/);
+  assert.match(commandBar, /WAITING[\s\S]*<b>0<\/b>/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -587,7 +592,7 @@ test("down sheet synchronization changes repairs and status without moving the b
     operationalStatus: "shop",
   });
   assert.equal(updated[0].l, "east-4");
-  assert.equal(updated[0].s, "shop");
+  assert.equal(updated[0].s, "out");
   assert.equal(updated[0].down, true);
   assert.equal(updated[0].mechanic, "JD");
   assert.match(updated[0].pendingRepair, /Brakes.*ABS warning.*Intermittent warning light/);
@@ -673,10 +678,10 @@ test("bulk defect assignment appends safely, skips duplicates, and updates road 
   assert.equal(updated.skipped, 1);
   assert.equal(updated.fleet.find(bus => bus.id === "a").s, "defect");
   assert.equal(updated.fleet.find(bus => bus.id === "a").defects.length, 1);
-  assert.equal(updated.fleet.find(bus => bus.id === "b").s, "shop");
+  assert.equal(updated.fleet.find(bus => bus.id === "b").s, "defect");
   assert.equal(updated.fleet.find(bus => bus.id === "b").defects.length, 2);
   assert.equal(updated.fleet.find(bus => bus.id === "c").defects.length, 1);
-  assert.equal(updated.fleet.find(bus => bus.id === "d").s, "defect");
+  assert.equal(updated.fleet.find(bus => bus.id === "d").s, "out");
   assert.match(updated.fleet.find(bus => bus.id === "b").pendingRepair, /No cooling.*Horn/);
   assert.notEqual(updated.fleet.find(bus => bus.id === "a").defects[0].id, updated.fleet.find(bus => bus.id === "b").defects[1].id);
 
@@ -877,3 +882,122 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.ok(css.includes(".mechanic-estimate"));
   assert.ok(css.includes(".estimate-grid"));
 });
+test("AI operator plans and atomically applies multi-bus moves, statuses, and Waiting Area commands", () => {
+  const minor = [{ id: "minor", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" }];
+  const fleet = [
+    { id: "a", n: "17525", l: "east-0", s: "out", down: true, parkedAt: "old-a", defects: [], pendingRepair: "" },
+    { id: "b", n: "17531", l: "west-0", s: "out", down: true, parkedAt: "old-b", defects: minor, pendingRepair: defectSummary(minor) },
+    { id: "c", n: "17548", l: "road-0", s: "service", down: false, parkedAt: "old-c", defects: [], pendingRepair: "" },
+  ];
+  const areas = [
+    { name: "MAIN GARAGE (BAYS 1-10)", slots: ["garage-0", "garage-1"] },
+    { name: "CNG EAST LOT", slots: ["east-0", "east-1"] },
+    { name: "IN SERVICE / ON ROAD", slots: ["road-0", "road-1"] },
+    { name: "WAITING AREA", slots: ["waiting-0", "waiting-1", "waiting-2"] },
+  ];
+
+  const waitingPlan = planOperatorCommand("Move buses 25, 31, and 48 to the Waiting Area", fleet, areas);
+  assert.equal(waitingPlan.kind, "plan");
+  assert.equal(waitingPlan.plan.kind, "batch");
+  assert.equal(waitingPlan.plan.items.length, 3);
+  const waitingMove = applyOperatorBatch(fleet, waitingPlan.plan.items, areas, "now");
+  assert.equal(waitingMove.error, undefined);
+  assert.deepEqual(waitingMove.fleet.map(bus => bus.l), ["waiting-0", "waiting-1", "waiting-2"]);
+  assert.deepEqual(waitingMove.fleet.map(bus => bus.s), ["out", "out", "service"]);
+
+  const commonStatus = planOperatorCommand("Move buses 25 and 31 to Main Garage and mark them green", fleet, areas);
+  assert.equal(commonStatus.kind, "plan");
+  assert.equal(commonStatus.plan.kind, "batch");
+  assert.equal(commonStatus.plan.items.every(item => item.status === "defect"), true);
+  const statusMove = applyOperatorBatch(fleet, commonStatus.plan.items, areas, "now");
+  assert.equal(statusMove.error, undefined);
+  assert.deepEqual(statusMove.fleet.filter(bus => ["a", "b"].includes(bus.id)).map(bus => bus.s), ["defect", "defect"]);
+
+  const splitPlan = planOperatorCommand("Move bus 25 to Main Garage; move bus 48 to CNG East", fleet, areas);
+  assert.equal(splitPlan.kind, "plan");
+  assert.equal(splitPlan.plan.kind, "batch");
+  assert.deepEqual(splitPlan.plan.items.map(item => item.areaName), ["MAIN GARAGE (BAYS 1-10)", "CNG EAST LOT"]);
+
+  const tooSmallAreas = [{ name: "WAITING AREA", slots: ["waiting-0"] }];
+  const blocked = applyOperatorBatch(fleet, [
+    { busId: "a", areaName: "WAITING AREA" },
+    { busId: "b", areaName: "WAITING AREA" },
+  ], tooSmallAreas, "now");
+  assert.equal(blocked.error, "insufficient-space");
+  assert.equal(blocked.fleet, fleet);
+
+  const waitingCount = planOperatorCommand("How many buses are in the Waiting Area?", waitingMove.fleet, areas);
+  assert.equal(waitingCount.kind, "plan");
+  assert.equal(waitingCount.plan.kind, "analysis");
+  assert.match(waitingCount.plan.response, /3 buses/);
+});
+
+test("movement paths recalculate Main Garage and On Road status from remaining defects", () => {
+  const minor = [{ id: "minor", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
+  const downing = [{ id: "down", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" }];
+  const fleet = [
+    { id: "clear", l: "bay-1", s: "shop", parkedAt: "old-clear", defects: [], pendingRepair: "" },
+    { id: "minor", l: "east-1", s: "out", parkedAt: "old-minor", defects: minor, pendingRepair: defectSummary(minor) },
+    { id: "down", l: "west-1", s: "out", parkedAt: "old-down", defects: downing, pendingRepair: defectSummary(downing) },
+  ];
+  const clearToGarage = moveOrSwapBuses(fleet, "clear", "garage-0", "now");
+  assert.equal(clearToGarage.find(bus => bus.id === "clear").s, "service");
+  const minorToRoad = moveOrSwapBuses(fleet, "minor", "road-1", "now");
+  assert.equal(minorToRoad.find(bus => bus.id === "minor").s, "defect");
+  const downToGarage = moveOrSwapBuses(fleet, "down", "garage-1", "now");
+  assert.equal(downToGarage.find(bus => bus.id === "down").s, "out");
+});
+
+test("down-sheet completion updates only its linked repair and recalculates tracker status in place", () => {
+  const manual = { id: "manual-1", category: "A/C and HVAC", issue: "No cooling", details: "Intermittent", operability: "service", state: "open" };
+  const fleet = [{ id: "bus-1", l: "garage-4", s: "defect", pendingRepair: defectSummary([manual]), defects: [manual], down: false, mechanic: "", parkedAt: "old", lastLocationChangeAt: "old", lastStatusChangeAt: "old" }];
+  const active = applyDownEntryToFleet(fleet, {
+    id: "repair-1",
+    busId: "bus-1",
+    category: "Brakes",
+    repair: "Air brake fault",
+    customReason: "Low air warning",
+    assignmentType: "Mechanic",
+    assignedTo: "JD",
+    workflow: "In Progress",
+    operationalStatus: "out",
+  }, "2026-08-09T10:00:00.000Z");
+  assert.equal(active[0].l, "garage-4");
+  assert.equal(active[0].s, "out");
+  assert.equal(active[0].defects.length, 2);
+  assert.equal(active[0].defects.find(defect => defect.id === "manual-1").state, "open");
+
+  const completed = applyDownEntryToFleet(active, {
+    id: "repair-1",
+    busId: "bus-1",
+    category: "Brakes",
+    repair: "Air brake fault",
+    customReason: "Repaired",
+    assignmentType: "Mechanic",
+    assignedTo: "JD",
+    workflow: "Completed",
+    operationalStatus: "service",
+  }, "2026-08-09T12:00:00.000Z");
+  assert.equal(completed[0].l, "garage-4");
+  assert.equal(completed[0].s, "defect");
+  assert.equal(completed[0].down, false);
+  assert.equal(completed[0].defects.find(defect => defect.id === "manual-1").state, "open");
+  assert.equal(completed[0].defects.find(defect => defect.id === "downsheet-repair-1").state, "completed");
+  assert.match(completed[0].pendingRepair, /No cooling/);
+  assert.doesNotMatch(completed[0].pendingRepair, /Air brake fault/);
+  assert.equal(completed[0].lastStatusChangeAt, "2026-08-09T12:00:00.000Z");
+
+  const laterRepair = applyDownEntryToFleet(completed, {
+    id: "repair-2",
+    busId: "bus-1",
+    category: "Electrical / Multiplex",
+    repair: "Horn",
+    customReason: "",
+    assignmentType: "Mechanic",
+    assignedTo: "AB",
+    workflow: "Scheduled",
+    operationalStatus: "defect",
+  }, "2026-08-09T13:00:00.000Z");
+  assert.equal(laterRepair[0].defects.length, 3);
+  assert.equal(laterRepair[0].defects.find(defect => defect.id === "downsheet-repair-1").state, "completed");
+  assert.equal(laterRepair[0].defects.find(defect => defect.id === "downsheet-repair-2").state, "open");});

@@ -95,6 +95,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .wall{background:var(--section-wall);border-color:var(--theme-border)}
 .garage{background:var(--section-garage)}
 .west{background:var(--section-west)}
+.waiting{background:var(--section-waiting)}
 .special,.vertical section{border-color:var(--theme-border)}
 .garagegrid>i,.garagegrid>b,.grow>strong{background:var(--header-bg);color:var(--header-text)}
 .command-bar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);width:min(920px,calc(100vw - 22px));min-height:45px;padding:6px 8px;border:1px solid color-mix(in srgb,var(--command-text) 28%,transparent);border-radius:8px;background:var(--command-bg);color:var(--command-text);box-shadow:0 8px 28px #0006;display:flex;align-items:center;justify-content:center;gap:9px;z-index:2147482000;white-space:normal;letter-spacing:0}
@@ -403,7 +404,7 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .all-collapsed .bottom{align-items:start}
 .special.section-collapsed{display:block;padding:4px 6px}
 .vertical-zone.section-collapsed{padding:0 5px 4px}
-.bays.section-collapsed,.east.section-collapsed,.road.section-collapsed,.wall.section-collapsed,.garage.section-collapsed,.west.section-collapsed,.service.section-collapsed{padding-bottom:4px}
+.bays.section-collapsed,.east.section-collapsed,.road.section-collapsed,.wall.section-collapsed,.garage.section-collapsed,.west.section-collapsed,.waiting.section-collapsed,.service.section-collapsed{padding-bottom:4px}
 
 /* Per-device bus marker display: icon + number or large number tile */
 .app[data-bus-display="number"] .token{--marker-status:#777;width:100%;min-height:25px;justify-content:center;gap:0;padding:3px 4px;border:2px solid var(--marker-status);background:color-mix(in srgb,var(--marker-status) 22%,#fff);color:#07101f;box-shadow:0 1px 3px #24364f55}
@@ -417,3 +418,14 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .app[data-bus-display="number"] .token>.bus{display:none}
 .app[data-bus-display="number"] .token-number{font-size:12px;line-height:1;font-weight:900;letter-spacing:.15px;text-shadow:0 1px 0 #fff}
 .bus-display-settings>label{margin-top:8px}
+/* Waiting Area: a status-neutral temporary holding location with always-visible awareness controls. */
+.waiting{width:100%;padding:0 10px 7px;border:2px solid color-mix(in srgb,var(--theme-border) 78%,#7456b8);border-radius:7px;overflow:visible}
+.waiting .title{color:var(--title-color)}
+.waiting-grid{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));grid-auto-rows:33px;gap:5px;max-height:150px;overflow-y:auto;overscroll-behavior:contain;padding:4px 5px 6px;border-top:1px solid color-mix(in srgb,var(--theme-border) 60%,transparent);scrollbar-gutter:stable}
+.waiting-grid .spot{height:33px;min-width:48px}
+.waiting>p{margin:4px 0 0;text-align:center;color:color-mix(in srgb,var(--theme-text) 72%,transparent);font-size:8px;font-weight:900;letter-spacing:.35px}
+.app.highlight-waiting .token[data-waiting="false"]{opacity:.18;filter:grayscale(.8)}
+.app.highlight-waiting .token[data-waiting="true"]{position:relative;z-index:3;outline:2px solid #a96cff;box-shadow:0 0 14px #a96cff;animation:command-glow 1.05s ease-in-out infinite alternate}
+.command-highlights button[aria-pressed="true"]{background:#0873df;color:#fff;border-color:#69adff}
+@media(max-width:800px){.waiting-grid{grid-template-columns:repeat(10,minmax(0,1fr));max-height:145px}}
+@media(max-width:560px){.command-highlights button:nth-child(8):after{content:"WAIT"}.command-highlights button:nth-child(8) b{font-size:8px}}

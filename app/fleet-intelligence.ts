@@ -22,6 +22,7 @@ export type FleetInsight={response:string;busIds:string[];busNumbers:string[];se
 
 const STATUS_LABELS:Record<string,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown / Mystery"};
 const AREA_ALIASES:[string,string[]][]=[
+ ["WAITING AREA",["waiting area","waiting","unsorted","holding area","hold area","void zone"]],
  ["TROUBLE BAY 11",["trouble bay 11","bay 11"]],
  ["TROUBLE BAY 12",["trouble bay 12","bay 12"]],
  ["IN SERVICE / ON ROAD",["in service on road","on the road","on road","road section","road area"]],
