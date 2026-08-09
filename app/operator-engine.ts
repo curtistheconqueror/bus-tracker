@@ -68,6 +68,16 @@ function statusLabel(status:FleetStatus){return STATUS_LABELS[status]||status}
 
 function capacityMessage(area:OperatorArea,needed:number,open:number){return area.name+" has "+open+" open spaces but "+needed+" are needed. Nothing was prepared."+(area.name==="WAITING AREA"?" Clear or reassign buses already in the Waiting Area before trying again.":" Use the WAITING AREA if the buses need to be recorded before you can sort them.")}
 
+function batchCapacityShortage(items:OperatorBatchItem[],fleet:OperatorBus[],areas:OperatorArea[]){
+ for(const area of areas){
+  const arriving=items.filter(item=>item.areaName===area.name).filter(item=>!area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
+  const leaving=items.filter(item=>item.areaName!==area.name).filter(item=>area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
+  const open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length+leaving;
+  if(arriving>open)return {area,needed:arriving,open};
+ }
+ return null;
+}
+
 function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string}{
  const query=busQuery(command);
  if(!query)return {query,message:"Tell me which bus you mean. Use the full fleet number or its last two digits."};
@@ -100,6 +110,21 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
 
  const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
+ const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
+ if(moveAction&&splitFleet&&explicitQueries.length&&areaMentions.length>=2){
+  const selectedArea=areaMentions[0].area,remainderArea=areaMentions[areaMentions.length-1].area;
+  if(selectedArea.name===remainderArea.name)return {kind:"message",message:"The named buses and the remaining fleet cannot both use "+selectedArea.name+" as different destinations. Name a second destination area."};
+  const resolved=resolveMany(fleet,explicitQueries);
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every named bus in that fleet split."};
+  const selectedIds=new Set(resolved.buses.map(bus=>bus.id)),remaining=fleet.filter(bus=>!selectedIds.has(bus.id));
+  const items:OperatorBatchItem[]=[...resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:selectedArea.name})),...remaining.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:remainderArea.name}))];
+  const shortage=batchCapacityShortage(items,fleet,areas);
+  if(shortage){
+   const mainGarageNote=shortage.area.name==="MAIN GARAGE (BAYS 1-10)"?" Main Garage means bays 1-10 only; Trouble Bays 11 and 12 remain separate. Explicitly include those trouble bays in a separate instruction or send the overflow buses to the WAITING AREA.":" Use the WAITING AREA for overflow buses until they can be sorted.";
+   return {kind:"message",message:shortage.area.name+" can hold "+shortage.open+" of the "+shortage.needed+" buses that must enter it. Nothing was prepared."+mainGarageNote};
+  }
+  return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items,summary:"Move "+resolved.buses.length+" named buses to "+selectedArea.name+" and the remaining "+remaining.length+" buses to "+remainderArea.name+" as one all-or-nothing fleet update"}};
+ }
  if(moveAction&&!explicitQueries.length&&areaMentions.length>=2){
   const source=areaMentions[0].area,destination=areaMentions[areaMentions.length-1].area;
   if(source.name===destination.name)return {kind:"message",message:"The source and destination are both "+source.name+". Name a different destination area."};
@@ -121,12 +146,8 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
    items.push(...resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:area.name,status:clauseStatus})));
   }
   if(new Set(items.map(item=>item.busId)).size!==items.length)return {kind:"message",message:"A bus appears in more than one movement instruction. Give each bus only one destination."};
-  for(const area of areas){
-   const arriving=items.filter(item=>item.areaName===area.name).filter(item=>!area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
-   const leaving=items.filter(item=>item.areaName!==area.name).filter(item=>area.slots.includes(fleet.find(bus=>bus.id===item.busId)!.l)).length;
-   const open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length+leaving;
-   if(arriving>open)return {kind:"message",message:capacityMessage(area,arriving,open)};
-  }
+  const shortage=batchCapacityShortage(items,fleet,areas);
+  if(shortage)return {kind:"message",message:capacityMessage(shortage.area,shortage.needed,shortage.open)};
   const summary=items.map(item=>"Bus "+item.busNumber+" to "+item.areaName+(item.status?" as "+statusLabel(item.status):"")).join("; ");
   return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items,summary}};
  }

@@ -944,6 +944,38 @@ test("AI operator plans and atomically applies multi-bus moves, statuses, and Wa
   assert.equal(addBack.plan.kind, "batch");
   assert.deepEqual(addBack.plan.items.map(item => item.areaName), ["CNG WEST LOT", "CNG WEST LOT"]);
 
+  const fleetSplit = planOperatorCommand("Move buses 25 and 31 to CNG West and everything else to Main Garage", fleet, areas);
+  assert.equal(fleetSplit.kind, "plan");
+  assert.equal(fleetSplit.plan.kind, "batch");
+  assert.equal(fleetSplit.plan.items.length, fleet.length);
+  assert.deepEqual(fleetSplit.plan.items.filter(item => item.areaName === "CNG WEST LOT").map(item => item.busNumber), ["17525", "17531"]);
+  assert.deepEqual(fleetSplit.plan.items.filter(item => item.areaName === "MAIN GARAGE (BAYS 1-10)").map(item => item.busNumber), ["17548"]);
+  assert.match(fleetSplit.plan.summary, /2 named buses.+remaining 1 bus/i);
+  const splitMove = applyOperatorBatch(fleet, fleetSplit.plan.items, areas, "now");
+  assert.equal(splitMove.error, undefined);
+  assert.equal(splitMove.fleet.find(bus => bus.id === "a").l.startsWith("west-"), true);
+  assert.equal(splitMove.fleet.find(bus => bus.id === "b").l.startsWith("west-"), true);
+  assert.equal(splitMove.fleet.find(bus => bus.id === "c").l.startsWith("garage-"), true);
+
+  const limitedAreas = areas.map(area => area.name === "MAIN GARAGE (BAYS 1-10)" ? { ...area, slots: ["garage-0"] } : area);
+  const capacityStop = planOperatorCommand("Move bus 25 to CNG West and everything else to Main Garage", fleet, limitedAreas);
+  assert.equal(capacityStop.kind, "message");
+  assert.match(capacityStop.message, /can hold 1 of the 2 buses/i);
+  assert.match(capacityStop.message, /Trouble Bays 11 and 12 remain separate/i);
+  assert.match(capacityStop.message, /Nothing was prepared/i);
+
+  const cngWestNumbers = ["20503", "17529", "15509", "18510", "18505", "15510", "15516", "17556", "17562", "17560", "17569", "17539", "17512", "17504", "17544", "15520", "15515", "17546", "18500", "18504", "17508", "20505", "20500", "17526"];
+  const fullFleet = [...cngWestNumbers, ...Array.from({ length: 73 }, (_, index) => String(30000 + index))].map((number, index) => ({ id: "fleet-" + index, n: number, l: "holding-" + index, s: "service", defects: [], pendingRepair: "" }));
+  const fullAreas = [
+    { name: "MAIN GARAGE (BAYS 1-10)", slots: Array.from({ length: 70 }, (_, index) => "garage-" + index) },
+    { name: "CNG WEST LOT", slots: Array.from({ length: 40 }, (_, index) => "west-" + index) },
+    { name: "WAITING AREA", slots: Array.from({ length: 98 }, (_, index) => "waiting-" + index) },
+  ];
+  const exactFleetRequest = planOperatorCommand("Move buses " + cngWestNumbers.join(" ") + " to rear CNG West and everything else to Main Garage", fullFleet, fullAreas);
+  assert.equal(exactFleetRequest.kind, "message");
+  assert.match(exactFleetRequest.message, /can hold 70 of the 73 buses/i);
+  assert.match(exactFleetRequest.message, /Nothing was prepared/i);
+
   const missingSource = planOperatorCommand("Move all buses to the Waiting Area", fleet, areas);
   assert.equal(missingSource.kind, "message");
   assert.match(missingSource.message, /need the source area/i);
