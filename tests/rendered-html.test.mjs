@@ -760,6 +760,18 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(twoDefects.length, 3);
   assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
 });
+test("bus marker display toggles between icons and large number tiles per device", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(page, /BUS MARKER DISPLAY/);
+  assert.match(page, /SHOW LARGE NUMBER TILES INSTEAD OF BUS ICONS/);
+  assert.match(page, /data-bus-display=\{busDisplay\}/);
+  assert.match(page, /setBusDisplay\(ui\.busDisplay==="number"\?"number":"icon"\)/);
+  assert.match(page, /if\(saved\.busDisplay==="icon"\|\|saved\.busDisplay==="number"\)setBusDisplay\(saved\.busDisplay\)/);
+  assert.match(css, /\.app\[data-bus-display="number"\] \.token>\.bus\{display:none\}/);
+  assert.match(css, /\.app\[data-bus-display="number"\] \.token-number\{font-size:12px/);
+  assert.match(css, /color-mix\(in srgb,var\(--marker-status\) 22%,#fff\)/);
+});
 test("confirmation prompts are per-device settings that default to on", async () => {
   const { confirmationPreference, confirmAction } = await import("../app/confirmation-preferences.ts");
   // Missing, damaged, or legacy saved settings must restore the safer prompting default.
@@ -791,8 +803,8 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,confirmMoves,confirmDefects\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,confirmMoves,confirmDefects\}/);
+  assert.match(page, /singleTapEmptySpaces,busDisplay,confirmMoves,confirmDefects\}\)\)/);
+  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,confirmMoves,confirmDefects\}/);
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);

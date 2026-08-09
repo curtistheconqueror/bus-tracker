@@ -404,3 +404,16 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .special.section-collapsed{display:block;padding:4px 6px}
 .vertical-zone.section-collapsed{padding:0 5px 4px}
 .bays.section-collapsed,.east.section-collapsed,.road.section-collapsed,.wall.section-collapsed,.garage.section-collapsed,.west.section-collapsed,.service.section-collapsed{padding-bottom:4px}
+
+/* Per-device bus marker display: icon + number or large number tile */
+.app[data-bus-display="number"] .token{--marker-status:#777;width:100%;min-height:25px;justify-content:center;gap:0;padding:3px 4px;border:2px solid var(--marker-status);background:color-mix(in srgb,var(--marker-status) 22%,#fff);color:#07101f;box-shadow:0 1px 3px #24364f55}
+.app[data-bus-display="number"] .token[data-status="service"]{--marker-status:var(--status-service)}
+.app[data-bus-display="number"] .token[data-status="defect"]{--marker-status:var(--status-defect)}
+.app[data-bus-display="number"] .token[data-status="shop"]{--marker-status:var(--status-shop)}
+.app[data-bus-display="number"] .token[data-status="out"]{--marker-status:var(--status-out)}
+.app[data-bus-display="number"] .token[data-status="decommissioned"]{--marker-status:var(--status-decommissioned)}
+.app[data-bus-display="number"] .token[data-status="unknown"]{--marker-status:var(--status-unknown)}
+.app[data-bus-display="number"] .token.roadcall-solid{--marker-status:var(--roadcall-color)}
+.app[data-bus-display="number"] .token>.bus{display:none}
+.app[data-bus-display="number"] .token-number{font-size:12px;line-height:1;font-weight:900;letter-spacing:.15px;text-shadow:0 1px 0 #fff}
+.bus-display-settings>label{margin-top:8px}
