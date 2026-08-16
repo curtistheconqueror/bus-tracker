@@ -5,6 +5,7 @@ import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "..
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
+import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
@@ -94,6 +95,13 @@ test("AI operator plans safe tracker and down-sheet actions with number-smart re
   assert.equal(downSheet.kind, "plan");
   assert.equal(downSheet.plan.kind, "downsheet");
   assert.equal(downSheet.plan.selected, true);
+  const clearDownSheet = planOperatorCommand("Clear the entire downsheet", fleet, areas);
+  assert.equal(clearDownSheet.kind, "plan");
+  assert.equal(clearDownSheet.plan.kind, "clearDownSheet");
+  assert.equal(clearDownSheet.plan.requiresConfirmation, true);
+  const undoClear = planOperatorCommand("Undo clear downsheet", fleet, areas);
+  assert.equal(undoClear.kind, "plan");
+  assert.equal(undoClear.plan.kind, "undoDownSheetClear");
   const defect = planOperatorCommand("Add check-engine diagnosis to bus 25", fleet, areas);
   assert.equal(defect.kind, "plan");
   assert.equal(defect.plan.kind, "defect");
@@ -523,11 +531,14 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /SHEET CAPACITY/);
   assert.match(html, /SHOW COMPLETED/);
   assert.match(html, /ADD DOWN BUS/);
+  assert.match(html, /CLEAR DOWNSHEET/);
   assert.match(html, /SETTINGS/);
   assert.match(html, /QUICK NOTES/);
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   assert.match(source, /knownActive/);
   assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
+  assert.match(source, /UNDO CLEAR/);
+  assert.match(source, /clearDownSheetState\(entries,fleet\)/);
 });
 
 test("tracker down-sheet highlight uses only explicitly selected buses", () => {
@@ -558,6 +569,35 @@ test("tracker checkbox creates and completes its matching down-sheet row", () =>
   assert.equal(removed.entries[0].workflow, "Completed");
   assert.equal(removed.entries[0].completedAt, "2026-08-02T13:00:00.000Z");
   assert.equal(removed.entries[0].updatedBy, "AI");
+});
+
+test("clear entire down sheet unchecks the tracker and undo restores both without changing repairs or locations", () => {
+  const entries = [
+    { id: "repair-a", busId: "a", workflow: "Scheduled", repair: "ABS warning" },
+    { id: "repair-b", busId: "b", workflow: "Completed", repair: "Tire" },
+  ];
+  const defect = { id: "defect-a", category: "Brakes", issue: "ABS warning", details: "", operability: "service", state: "open" };
+  const fleet = [
+    { id: "a", l: "west-1", down: true, defects: [defect], pendingRepair: "Brakes - ABS warning" },
+    { id: "b", l: "garage-1", down: false, defects: [], pendingRepair: "" },
+  ];
+  const cleared = clearDownSheetState(entries, fleet, "2026-08-16T12:00:00.000Z");
+  assert.deepEqual(cleared.entries, []);
+  assert.deepEqual(cleared.fleet.map(bus => bus.down), [false, false]);
+  assert.equal(cleared.fleet[0].l, "west-1");
+  assert.deepEqual(cleared.fleet[0].defects, [defect]);
+  assert.equal(cleared.fleet[0].pendingRepair, "Brakes - ABS warning");
+  assert.equal(cleared.clearedEntries, 2);
+  assert.equal(cleared.uncheckedBuses, 1);
+  const parsed = readDownSheetClearSnapshot(JSON.stringify(cleared.snapshot));
+  assert.ok(parsed);
+  const restored = restoreDownSheetState([], cleared.fleet, parsed);
+  assert.deepEqual(restored.entries, entries);
+  assert.deepEqual(restored.fleet.map(bus => bus.down), [true, false]);
+  assert.equal(restored.fleet[0].l, "west-1");
+  assert.deepEqual(restored.fleet[0].defects, [defect]);
+  assert.equal(restored.restoredEntries, 2);
+  assert.equal(restored.restoredBuses, 1);
 });
 test("section counters include assigned and overflow buses and update from fleet state", () => {
   const slots = ["east-0", "east-1", "east-2"];

@@ -19,6 +19,8 @@ export type OperatorPlan=
  | {kind:"bulkMove";requiresConfirmation:true;busIds:string[];busNumbers:string[];areaName:string;status?:FleetStatus;selectionLabel:string;summary:string}
  | {kind:"batch";requiresConfirmation:true;items:OperatorBatchItem[];summary:string}
  | {kind:"downsheet";requiresConfirmation:true;busId:string;busNumber:string;selected:boolean;summary:string}
+ | {kind:"clearDownSheet";requiresConfirmation:true;summary:string}
+ | {kind:"undoDownSheetClear";requiresConfirmation:true;summary:string}
  | {kind:"defect";requiresConfirmation:true;busId:string;busNumber:string;defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler";summary:string};
 
 export type OperatorPlanningResult=
@@ -181,6 +183,9 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
 
  const insight=analyzeFleetQuestion(command,fleet,areas,now);
  if(insight)return {kind:"plan",plan:{kind:"analysis",requiresConfirmation:false,summary:"Analyze "+insight.selectionLabel,response:insight.response,busIds:insight.busIds,busNumbers:insight.busNumbers,selectionLabel:insight.selectionLabel}};
+
+ if(/\b(down sheet|downsheet)\b/.test(text)&&/\b(undo|restore)\b/.test(text)&&/\b(clear|reset|empty)\b/.test(text))return {kind:"plan",plan:{kind:"undoDownSheetClear",requiresConfirmation:true,summary:"Restore the last cleared down sheet and its tracker checkboxes"}};
+ if(/\b(down sheet|downsheet)\b/.test(text)&&/\b(clear|reset|empty)\b/.test(text))return {kind:"plan",plan:{kind:"clearDownSheet",requiresConfirmation:true,summary:"Clear the entire down sheet and uncheck every tracker bus marked on it. Save one undo snapshot"}};
 
  const resolved=resolveOne(fleet,command);
  const isLocate=/\b(locate|find|highlight)\b/.test(text);
