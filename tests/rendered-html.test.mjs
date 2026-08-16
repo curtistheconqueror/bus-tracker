@@ -811,6 +811,10 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required"]);
   assert.equal(defaultDefectOperability("Interior Cleaning", "Scheduled Cleaning"), "service");
   assert.equal(defaultDefectOperability("Interior Cleaning", "Cleaning Required"), "down");
+  const cleaningRequired = { defects: [{ id: "clean", category: "Interior Cleaning", issue: "Cleaning Required", details: "", operability: "down", state: "open" }] };
+  assert.equal(statusForLocation("garage-4", "out", cleaningRequired), "shop");
+  assert.equal(statusForLocation("road-4", "out", cleaningRequired), "shop");
+  assert.equal(statusForLocation("west-4", "shop", cleaningRequired), "out");
   const twoDefects = [
     { id: "one", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" },
     { id: "two", category: "Tech Services", issue: "Farebox", details: "Reader offline", operability: "service", state: "open" },

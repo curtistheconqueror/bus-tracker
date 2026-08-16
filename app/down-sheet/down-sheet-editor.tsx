@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo,useState} from "react";
-import {defaultDefectOperability,REPAIR_OPTIONS} from "../repair-catalog";
+import {REPAIR_OPTIONS} from "../repair-catalog";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,resetCoreRepairEstimate,type RepairTimeEstimate} from "./repair-time-estimates";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -53,7 +53,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker and cannot be typed here.</small></label>
     <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
     <label className="wide repair-category">REPAIR CATEGORY<select value={draft.category} onChange={event=>{const category=event.target.value;setDraft(current=>({...current,category,repair:"",timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Choose a system or service</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select><small>Choose the broad repair family first.</small></label>
-    <label className="wide repair-specific">SPECIFIC REPAIR / SERVICE<select value={draft.repair} onChange={event=>{const repair=event.target.value;setDraft(current=>({...current,repair,operationalStatus:defaultDefectOperability(current.category,repair)==="down"?"out":current.operationalStatus,timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}))}} disabled={!draft.category}><option value="">{draft.category?"Choose a "+draft.category+" item":"Select a repair category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select><small>Selecting a repair loads a conservative starting allowance. The mechanic can adjust every part.</small></label>
+    <label className="wide repair-specific">SPECIFIC REPAIR / SERVICE<select value={draft.repair} onChange={event=>{const repair=event.target.value;setDraft(current=>({...current,repair,operationalStatus:current.category==="Interior Cleaning"&&repair==="Cleaning Required"?"shop":current.operationalStatus,timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}))}} disabled={!draft.category}><option value="">{draft.category?"Choose a "+draft.category+" item":"Select a repair category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select><small>Selecting a repair loads a conservative starting allowance. The mechanic can adjust every part.</small></label>
     <label className="wide">ADDITIONAL REASON / DETAILS<textarea value={draft.customReason} onChange={event=>update("customReason",event.target.value)} placeholder="Optional details that are specific to this bus"/></label>
     <fieldset className="mechanic-estimate wide">
      <legend>MECHANIC PLANNING ESTIMATE</legend>

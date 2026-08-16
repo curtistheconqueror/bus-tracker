@@ -14,6 +14,10 @@ export function hasDowningDefects(bus:RepairAwareBus){
  return Array.isArray(bus.defects)&&bus.defects.some(defect=>isUnresolved(defect)&&defect.operability==="down");
 }
 
+export function hasRequiredInteriorCleaning(bus:RepairAwareBus){
+ return Array.isArray(bus.defects)&&bus.defects.some(defect=>isUnresolved(defect)&&defect.category==="Interior Cleaning"&&defect.issue==="Cleaning Required");
+}
+
 export function roadServiceStatus(bus:RepairAwareBus):FleetStatus{
  if(hasDowningDefects(bus))return "out";
  return hasUnresolvedDefects(bus)?"defect":"service";
@@ -22,6 +26,7 @@ export function roadServiceStatus(bus:RepairAwareBus):FleetStatus{
 export function statusForLocation(location:string,current:FleetStatus,bus:RepairAwareBus):FleetStatus{
  if(current==="decommissioned")return current;
  if(location.startsWith("east-")||location.startsWith("west-"))return "out";
+ if(hasRequiredInteriorCleaning(bus))return "shop";
  if(location.startsWith("bay-")||location.startsWith("body-"))return "shop";
  if(location.startsWith("road-")||location.startsWith("garage-"))return roadServiceStatus(bus);
  return current;
