@@ -10,7 +10,7 @@ import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/sm
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
+import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
@@ -796,8 +796,8 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
-  assert.ok(Object.values(REPAIR_OPTIONS).every(options => options.length >= 5));
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 22);
+  assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
@@ -808,6 +808,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
+  assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required"]);
+  assert.equal(defaultDefectOperability("Interior Cleaning", "Scheduled Cleaning"), "service");
+  assert.equal(defaultDefectOperability("Interior Cleaning", "Cleaning Required"), "down");
   const twoDefects = [
     { id: "one", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" },
     { id: "two", category: "Tech Services", issue: "Farebox", details: "Reader offline", operability: "service", state: "open" },

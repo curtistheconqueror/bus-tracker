@@ -35,6 +35,7 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "Air System":180,
  "Inspection":390,
  "Preventive Maintenance":300,
+ "Interior Cleaning":60,
  "Miscellaneous":60,
 };
 

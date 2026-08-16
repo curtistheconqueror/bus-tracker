@@ -31,6 +31,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Oil and filter service","Lubrication","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
+ "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
  "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
 
@@ -44,6 +45,9 @@ export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|
  const manual=mode==="manual",details=draft.details.trim(),category=manual?"Miscellaneous":draft.category,issue=manual?"Manual entry":draft.issue;
  if(!category||!issue||manual&&!details)return null;
  return {...draft,id,category,issue,details};
+}
+export function defaultDefectOperability(category:string,issue:string):DefectOperability{
+ return category==="Interior Cleaning"&&issue==="Cleaning Required"?"down":"service";
 }
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
