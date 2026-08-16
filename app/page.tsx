@@ -73,12 +73,8 @@ function migrateBuses(source:unknown[],legacy:boolean){
 }
 function sittingTime(value:string){const minutes=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/60000));if(minutes<1)return "Just arrived";if(minutes<60)return minutes+"m";const hours=Math.floor(minutes/60);if(hours<24)return hours+"h "+minutes%60+"m";return Math.floor(hours/24)+"d "+hours%24+"h"}
 function migrateFacilitySlots(source:B[]){
- const migrated=source.map(bus=>({...bus}));
- (["service","wall"] as const).forEach(prefix=>{
-  migrated.filter(bus=>bus.l.startsWith(prefix+"-"))
-   .sort((a,b)=>(Number(a.l.split("-")[1])||0)-(Number(b.l.split("-")[1])||0))
-   .forEach((bus,index)=>{bus.l=index<SINGLE_FILE_CAPACITY?prefix+"-"+index:prefix+"-overflow-"+(index-SINGLE_FILE_CAPACITY)});
- });
+ let migrated=migrateReducedCapacity(source,"service",SINGLE_FILE_CAPACITY);
+ migrated=migrateReducedCapacity(migrated,"wall",SINGLE_FILE_CAPACITY);
  const retainedBays=slots("bay",9,1),occupied=new Set(migrated.filter(bus=>retainedBays.includes(bus.l)).map(bus=>bus.l));
  migrated.filter(bus=>/^bay-(?:1[0-2])$/.test(bus.l)||bus.l.startsWith("bay-overflow-"))
   .sort((a,b)=>(Number(a.l.split("-").at(-1))||0)-(Number(b.l.split("-").at(-1))||0))

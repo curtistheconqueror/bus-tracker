@@ -618,6 +618,13 @@ test("restored CNG West row pulls saved overflow buses back into visible spaces"
   assert.equal(migrated.length, fleet.length);
   assert.equal(migrated.find(bus => bus.id === "previous-overflow").l, "west-39");
   assert.equal(new Set(migrated.map(bus => bus.l)).size, migrated.length);
+
+  const singleFile = migrateReducedCapacity([
+    { id: "front", l: "wall-0" },
+    { id: "middle", l: "wall-4" },
+    { id: "rear", l: "wall-7" },
+  ], "wall", 8);
+  assert.deepEqual(singleFile.map(bus => bus.l), ["wall-0", "wall-4", "wall-7"]);
 });
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
   const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
