@@ -611,7 +611,7 @@ test("down sheet synchronization changes repairs and status without moving the b
     operationalStatus: "service",
   });
   assert.equal(completed[0].l, "east-4");
-  assert.equal(completed[0].s, "service");
+  assert.equal(completed[0].s, "out");
   assert.equal(completed[0].down, false);
   assert.equal(completed[0].pendingRepair, "");
   assert.equal(completed[0].defects.length, 1);
@@ -631,9 +631,13 @@ test("smart status returns repaired and defect-carrying buses to road and main g
   assert.equal(statusForLocation("garage-4", "shop", { defects: downing, pendingRepair: "" }), "out");
   assert.equal(statusForLocation("garage-4", "decommissioned", { defects: [], pendingRepair: "" }), "decommissioned");
   assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
+  assert.equal(statusForLocation("body-0", "service", { defects: [], pendingRepair: "" }), "shop");
   assert.equal(statusForLocation("east-1", "defect", { defects: minor, pendingRepair: "" }), "out");
   assert.equal(statusForLocation("west-4", "service", { defects: minor, pendingRepair: "" }), "out");
-  assert.equal(statusForLocation("east-1", "service", { defects: [], pendingRepair: "" }), "service");
+  assert.equal(statusForLocation("east-1", "service", { defects: [], pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("west-4", "service", { defects: [], pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("body-0", "decommissioned", { defects: [], pendingRepair: "" }), "decommissioned");
+  assert.equal(statusForLocation("east-1", "decommissioned", { defects: [], pendingRepair: "" }), "decommissioned");
   assert.equal(roadServiceStatus({ defects: minor }), "defect");
 });
 
@@ -981,7 +985,7 @@ test("AI operator plans and atomically applies multi-bus moves, statuses, and Wa
   assert.match(missingSource.message, /need the source area/i);
 });
 
-test("movement paths recalculate Main Garage and On Road status from remaining defects", () => {
+test("all relocation controls use the same destination-aware smart status", () => {
   const minor = [{ id: "minor", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
   const downing = [{ id: "down", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" }];
   const fleet = [
@@ -995,6 +999,21 @@ test("movement paths recalculate Main Garage and On Road status from remaining d
   assert.equal(minorToRoad.find(bus => bus.id === "minor").s, "defect");
   const downToGarage = moveOrSwapBuses(fleet, "down", "garage-1", "now");
   assert.equal(downToGarage.find(bus => bus.id === "down").s, "out");
+  const clearToCng = moveOrSwapBuses(fleet, "clear", "east-2", "now");
+  assert.equal(clearToCng.find(bus => bus.id === "clear").s, "out");
+  const minorToBody = moveOrSwapBuses(fleet, "minor", "body-0", "now");
+  assert.equal(minorToBody.find(bus => bus.id === "minor").s, "shop");
+
+  const controlledMove = applyOperatorBatch(fleet, [
+    { busId: "clear", areaName: "CNG WEST LOT" },
+    { busId: "minor", areaName: "BODY SHOP" },
+  ], [
+    { name: "CNG WEST LOT", slots: ["west-2"] },
+    { name: "BODY SHOP", slots: ["body-0"] },
+  ], "now");
+  assert.equal(controlledMove.error, undefined);
+  assert.equal(controlledMove.fleet.find(bus => bus.id === "clear").s, "out");
+  assert.equal(controlledMove.fleet.find(bus => bus.id === "minor").s, "shop");
 });
 
 test("down-sheet completion updates only its linked repair and recalculates tracker status in place", () => {

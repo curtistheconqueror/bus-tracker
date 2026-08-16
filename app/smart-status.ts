@@ -20,9 +20,10 @@ export function roadServiceStatus(bus:RepairAwareBus):FleetStatus{
 }
 
 export function statusForLocation(location:string,current:FleetStatus,bus:RepairAwareBus):FleetStatus{
- if(location.startsWith("bay-"))return "shop";
- if((location.startsWith("east-")||location.startsWith("west-"))&&hasUnresolvedDefects(bus))return "out";
- if((location.startsWith("road-")||location.startsWith("garage-"))&&current!=="decommissioned")return roadServiceStatus(bus);
+ if(current==="decommissioned")return current;
+ if(location.startsWith("east-")||location.startsWith("west-"))return "out";
+ if(location.startsWith("bay-")||location.startsWith("body-"))return "shop";
+ if(location.startsWith("road-")||location.startsWith("garage-"))return roadServiceStatus(bus);
  return current;
 }
 
