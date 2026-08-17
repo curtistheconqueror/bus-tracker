@@ -974,6 +974,8 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.ok(scanner.includes("TAKE PHOTO"));
   assert.ok(scanner.includes("UPLOAD FILE"));
   assert.ok(scanner.includes("IMPORT APPROVED"));
+  assert.ok(scanner.includes("READING PAGE"));
+  assert.ok(scanner.includes("scanReadyPhoto"));
   assert.ok(route.includes("OPENAI_API_KEY"));
   assert.ok(route.includes('import("cloudflare:workers")'));
   assert.ok(route.includes('"gpt-5.4-mini"'));

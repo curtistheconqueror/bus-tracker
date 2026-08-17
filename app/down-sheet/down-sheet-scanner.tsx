@@ -15,12 +15,30 @@ type Props={
 };
 
 const MAX_FILES=6;
+const MAX_SCAN_BYTES=3.25*1024*1024;
+
+async function scanReadyPhoto(file:File,page:number){
+ if(file.size<=MAX_SCAN_BYTES&&file.type==="image/jpeg")return file;
+ const url=URL.createObjectURL(file);
+ try{
+  const image=await new Promise<HTMLImageElement>((resolve,reject)=>{const element=new Image();element.onload=()=>resolve(element);element.onerror=()=>reject(new Error("One selected photo could not be prepared."));element.src=url});
+  const longest=Math.max(image.naturalWidth,image.naturalHeight),scale=Math.min(1,2800/longest),canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+  const context=canvas.getContext("2d");if(!context)throw new Error("One selected photo could not be prepared.");
+  context.drawImage(image,0,0,canvas.width,canvas.height);
+  let quality=.84,blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
+  while(blob&&blob.size>MAX_SCAN_BYTES&&quality>.52){quality-=.08;blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/jpeg",quality))}
+  if(!blob)throw new Error("One selected photo could not be prepared.");
+  return new File([blob],`down-sheet-page-${page}.jpg`,{type:"image/jpeg",lastModified:Date.now()});
+ }finally{URL.revokeObjectURL(url)}
+}
 
 export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:Props){
  const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
  const [rows,setRows]=useState<ReviewedScanRow[]>([]);
  const [mode,setMode]=useState<ScanMode>("merge");
  const [busy,setBusy]=useState(false);
+ const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
  const cameraRef=useRef<HTMLInputElement>(null),uploadRef=useRef<HTMLInputElement>(null),photosRef=useRef<SelectedPhoto[]>([]);
 
@@ -46,13 +64,20 @@ export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:P
   if(!photos.length)return;
   setBusy(true);setError("");
   try{
-   const form=new FormData();photos.forEach(photo=>form.append("photos",photo.file));
-   const response=await fetch("/api/down-sheet-scan",{method:"POST",body:form}),payload=await response.json() as {rows?:ScannedDownSheetRow[];error?:string};
-   if(!response.ok)throw new Error(payload.error||"The photos could not be processed.");
-   const reviewed=reviewScannedRows(Array.isArray(payload.rows)?payload.rows:[],fleet).map(row=>({...row,shift:row.shift||defaultShift}));
+   const scanned:ScannedDownSheetRow[]=[];
+   for(let index=0;index<photos.length;index++){
+    setProgress(`READING PAGE ${index+1} OF ${photos.length}`);
+    const prepared=await scanReadyPhoto(photos[index].file,index+1),form=new FormData();form.append("photos",prepared);
+    const response=await fetch("/api/down-sheet-scan",{method:"POST",body:form});
+    let payload:{rows?:ScannedDownSheetRow[];error?:string}={};
+    try{payload=await response.json() as typeof payload}catch{}
+    if(!response.ok){if(response.status===413)throw new Error(`Page ${index+1} is still too large. Retake it closer to the sheet.`);throw new Error(payload.error||`Page ${index+1} could not be processed.`)}
+    scanned.push(...(Array.isArray(payload.rows)?payload.rows:[]).map(row=>({...row,pageNumber:index+1})));
+   }
+   const reviewed=reviewScannedRows(scanned,fleet).map(row=>({...row,shift:row.shift||defaultShift}));
    setRows(reviewed);
    if(!reviewed.length)setError("No bus repair rows were found. Try a clearer photo.");
-  }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false)}
+  }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
  const approve=()=>{
   if(!imports.length){setError("Select at least one fleet-matched row.");return}
@@ -74,7 +99,7 @@ export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:P
       <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
      </div>
      <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
-     <button className="scan-read" type="button" onClick={readSheet} disabled={!photos.length||busy}>{busy?"READING…":"READ SHEET"}</button>
+     <button className="scan-read" type="button" onClick={readSheet} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEET"}</button>
     </>}
     {rows.length>0&&<>
      <div className="scan-review-head"><div><b>REVIEW ROWS</b><span>{imports.length} bus{imports.length===1?"":"es"} ready{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRows([]);setError("")}}>CHANGE PHOTOS</button></div>
