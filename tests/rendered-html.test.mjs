@@ -18,6 +18,7 @@ import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
+import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -940,6 +941,45 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.ok(css.includes(".mechanic-estimate"));
   assert.ok(css.includes(".estimate-grid"));
 });
+
+test("photo scan review validates fleet numbers and safely merges repeated rows", async () => {
+  const fleet = [
+    { id: "bus-17510", n: "17510" },
+    { id: "bus-17520-a", n: "17520" },
+    { id: "bus-17520-b", n: "17520" },
+  ];
+  const rows = [
+    { pageNumber: 1, lineNumber: "1", busNumber: "17510", reason: "Check engine light", assignedTo: "Armon", category: "Engine", repair: "Check-engine diagnosis", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .98, reviewNote: "" },
+    { pageNumber: 2, lineNumber: "35", busNumber: "17510", reason: "B-12", assignedTo: "", category: "Inspection", repair: "B-12", section: "Inspection", shift: "3rd", operationalStatus: "out", confidence: .95, reviewNote: "" },
+    { pageNumber: 1, lineNumber: "2", busNumber: "17520", reason: "Quarantine", assignedTo: "", category: "Miscellaneous", repair: "Manual entry", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .9, reviewNote: "" },
+    { pageNumber: 1, lineNumber: "3", busNumber: "99999", reason: "Unknown bus", assignedTo: "", category: "Miscellaneous", repair: "Manual entry", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .7, reviewNote: "Verify number" },
+  ];
+  const reviewed = reviewScannedRows(rows, fleet);
+  assert.equal(reviewed[0].fleetMatch, "matched");
+  assert.equal(reviewed[0].repeatedCount, 2);
+  assert.equal(reviewed[2].fleetMatch, "duplicate");
+  assert.equal(reviewed[2].selected, false);
+  assert.equal(reviewed[3].fleetMatch, "unknown");
+  const merged = mergeReviewedRows(reviewed);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].busId, "bus-17510");
+  assert.match(merged[0].reason, /Check engine light \/ B-12/);
+  assert.equal(merged[0].shift, "3rd");
+
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const scanner = await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8");
+  const route = await readFile(new URL("../app/api/down-sheet-scan/route.ts", import.meta.url), "utf8");
+  assert.ok(page.includes("SCAN SHEET"));
+  assert.ok(page.includes("UNDO IMPORT"));
+  assert.ok(scanner.includes("TAKE PHOTO"));
+  assert.ok(scanner.includes("UPLOAD FILE"));
+  assert.ok(scanner.includes("IMPORT APPROVED"));
+  assert.ok(route.includes("OPENAI_API_KEY"));
+  assert.ok(route.includes('"gpt-5.4-mini"'));
+  assert.ok(route.includes("store:false"));
+  assert.ok(route.includes('"Cache-Control":"no-store"'));
+});
+
 test("AI operator plans and atomically applies multi-bus moves, statuses, and Waiting Area commands", () => {
   const minor = [{ id: "minor", category: "Electrical / Multiplex", issue: "Horn", details: "", operability: "service", state: "open" }];
   const fleet = [

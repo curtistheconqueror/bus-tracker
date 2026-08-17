@@ -4,10 +4,12 @@ import {useEffect,useMemo,useState} from "react";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetSettings from "./down-sheet-settings";
+import DownSheetScanner from "./down-sheet-scanner";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "./down-sheet-clear";
 import {isUnresolved,type StructuredDefect} from "../repair-catalog";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "./repair-time-estimates";
+import type {ScanImportRecord} from "./down-sheet-scan-import";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -35,6 +37,7 @@ const MAX_ENTRIES=98;
 const FLEET_KEY="pace-board-v1";
 const DOWN_KEY="pace-down-sheet-v1";
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
+const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 const STATUS_LABELS:Record<FleetStatus,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 
 function shiftFromFleet(value?:string):Shift{
@@ -105,18 +108,20 @@ export default function DownSheet(){
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
  const [settingsOpen,setSettingsOpen]=useState(false);
+ const [scannerOpen,setScannerOpen]=useState(false);
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
  const [quickNotes,setQuickNotes]=useState("");
  const [undoClearAvailable,setUndoClearAvailable]=useState(false);
+ const [undoScanAvailable,setUndoScanAvailable]=useState(false);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
  // eslint-disable-next-line react-hooks/set-state-in-effect
- useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;const restored=Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):[],knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(typeof settings.quickNotes==="string"?settings.quickNotes:"")}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetRaw=localStorage.getItem(FLEET_KEY),fleetPayload=fleetRaw?JSON.parse(fleetRaw):null,nextFleet=(Array.isArray(fleetPayload)?fleetPayload:fleetPayload?.buses)||[];setFleet(nextFleet);const downRaw=localStorage.getItem(DOWN_KEY),downPayload=downRaw?JSON.parse(downRaw):null,nextEntries=Array.isArray(downPayload)?downPayload:downPayload?.entries;const restored=Array.isArray(nextEntries)?nextEntries.map(normalizeEntry):[],knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(typeof settings.quickNotes==="string"?settings.quickNotes:"")}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  useEffect(()=>{if(hydrated)localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries}))},[entries,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes}))},[showCompleted,defaultInitials,defaultShift,quickNotes,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),nextFleet=(Array.isArray(payload)?payload:payload.buses)||[];setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find((item:FleetBus)=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}catch{}}if(event.key===DOWN_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),next=Array.isArray(payload)?payload:payload.entries;if(Array.isArray(next))setEntries(next.map(normalizeEntry))}catch{}}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),nextFleet=(Array.isArray(payload)?payload:payload.buses)||[];setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find((item:FleetBus)=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}catch{}}if(event.key===DOWN_KEY&&event.newValue){try{const payload=JSON.parse(event.newValue),next=Array.isArray(payload)?payload:payload.entries;if(Array.isArray(next))setEntries(next.map(normalizeEntry))}catch{}}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  const visible=useMemo(()=>entries.filter(entry=>(showCompleted||isActive(entry))&&(filter==="All"||entry.shift===filter)),[entries,filter,showCompleted]);
@@ -126,6 +131,23 @@ export default function DownSheet(){
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
  const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet),downText=JSON.stringify({version:1,entries:result.entries}),fleetText=JSON.stringify({version:4,buses:result.fleet});localStorage.setItem(DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot));localStorage.setItem(DOWN_KEY,downText);localStorage.setItem(FLEET_KEY,fleetText);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
  const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const result=restoreDownSheetState(entries,fleet,snapshot),downText=JSON.stringify({version:1,entries:result.entries}),fleetText=JSON.stringify({version:4,buses:result.fleet});localStorage.setItem(DOWN_KEY,downText);localStorage.setItem(FLEET_KEY,fleetText);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
+ const importScan=(records:ScanImportRecord[],mode:"merge"|"replace")=>{
+  const now=new Date().toISOString(),baseEntries=mode==="replace"?[]:entries,baseFleet=mode==="replace"?fleet.map(bus=>({...bus,down:false})):fleet;
+  const incomingIds=new Set(records.map(record=>record.busId)),remaining=baseEntries.filter(entry=>!isActive(entry)||!incomingIds.has(entry.busId));
+  const imported=records.map((record,index)=>{
+   const prior=baseEntries.find(entry=>isActive(entry)&&entry.busId===record.busId),assignmentType:AssignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic",workflow:Workflow=record.operationalStatus==="shop"?"In Progress":"Scheduled";
+   return normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index);
+  });
+  const nextEntries=[...remaining,...imported];
+  if(nextEntries.filter(isActive).length>MAX_ENTRIES){alert("This import would exceed the 98-bus Down Sheet capacity. Deselect some rows and try again.");return}
+  const nextFleet=imported.reduce((current,entry)=>applyDownEntryToFleet(current,entry,now),baseFleet);
+  localStorage.setItem(SCAN_UNDO_KEY,JSON.stringify({createdAt:now,entries,fleet}));
+  localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries:nextEntries}));
+  localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));
+  setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);
+  alert(`${imported.length} bus${imported.length===1?"":"es"} imported. Review the Down Sheet before relying on it.`);
+ };
+ const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries:snapshot.entries}));localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:snapshot.fleet}));localStorage.removeItem(SCAN_UNDO_KEY);setEntries(snapshot.entries.map(normalizeEntry));setFleet(snapshot.fleet);setUndoScanAvailable(false)}catch{localStorage.removeItem(SCAN_UNDO_KEY);setUndoScanAvailable(false);alert("There is no photo import to restore.")}};
 
  return <main className="down-app">
   <header className="down-header">
@@ -149,8 +171,10 @@ export default function DownSheet(){
     <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
    </div>
    <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
+   {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
    {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
    <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
+   <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
    <button className="add-repair" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
    <button className="down-settings" type="button" onClick={()=>setSettingsOpen(true)} aria-label="Open down sheet settings">⚙ SETTINGS</button>
   </section>
@@ -181,5 +205,6 @@ export default function DownSheet(){
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
   {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   {settingsOpen&&<DownSheetSettings defaultInitials={defaultInitials} setDefaultInitials={setDefaultInitials} defaultShift={defaultShift} setDefaultShift={setDefaultShift} showCompleted={showCompleted} setShowCompleted={setShowCompleted} onClose={()=>setSettingsOpen(false)}/>}
+  {scannerOpen&&<DownSheetScanner fleet={fleet} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
  </main>;
 }
