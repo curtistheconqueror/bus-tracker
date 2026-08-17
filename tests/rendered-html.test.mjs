@@ -982,6 +982,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.ok(route.includes('"gpt-5.4-mini"'));
   assert.ok(route.includes("store:false"));
   assert.ok(route.includes('"Cache-Control":"no-store"'));
+  assert.ok(route.includes("OpenAI API billing or credits"));
 });
 
 test("AI operator plans and atomically applies multi-bus moves, statuses, and Waiting Area commands", () => {
