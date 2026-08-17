@@ -48,7 +48,7 @@ export async function POST(request:Request){
   const detail=await response.text();let upstreamCode="";
   try{const parsed=JSON.parse(detail) as {error?:{code?:string;type?:string}};upstreamCode=parsed.error?.code||parsed.error?.type||""}catch{}
   console.error("Down sheet scan failed",response.status,upstreamCode||"unknown");
-  const error=response.status===401?"Photo processing authorization was rejected.":response.status===429?upstreamCode==="insufficient_quota"?"Photo processing needs OpenAI API billing or credits.":"Photo processing is temporarily rate limited. Try again shortly.":response.status===400?"The photo-processing request was rejected. Please try a clearer JPG photo.":"The photos could not be processed. Please try again.";
+  const error=response.status===401?"Photo processing authorization was rejected.":response.status===429?["insufficient_quota","billing_not_active"].includes(upstreamCode)?"Photo processing needs OpenAI API billing or credits.":"Photo processing is temporarily rate limited. Try again shortly.":response.status===400?"The photo-processing request was rejected. Please try a clearer JPG photo.":"The photos could not be processed. Please try again.";
   return json({error,upstreamStatus:response.status,upstreamCode},502);
  }
  const payload=await response.json() as {output_text?:string;output?:Array<{content?:Array<{type?:string;text?:string}>}>},outputText=payload.output_text||payload.output?.flatMap(item=>item.content||[]).find(item=>item.type==="output_text")?.text;

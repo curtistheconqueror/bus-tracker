@@ -983,6 +983,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.ok(route.includes("store:false"));
   assert.ok(route.includes('"Cache-Control":"no-store"'));
   assert.ok(route.includes("OpenAI API billing or credits"));
+  assert.ok(route.includes("billing_not_active"));
 });
 
 test("AI operator plans and atomically applies multi-bus moves, statuses, and Waiting Area commands", () => {
