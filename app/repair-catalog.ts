@@ -1,5 +1,6 @@
-export type DefectState="open"|"deferred"|"completed";
+export type DefectState="open"|"in-progress"|"deferred"|"completed";
 export type DefectOperability="service"|"down";
+export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
 
 export type StructuredDefect={
  id:string;
@@ -8,6 +9,15 @@ export type StructuredDefect={
  details:string;
  operability:DefectOperability;
  state:DefectState;
+ createdAt?:string;
+ updatedAt?:string;
+ completedAt?:string;
+ reportedBy?:string;
+ diagnosticNote?:string;
+ actionTaken?:string;
+ partNumber?:string;
+ reportedLocation?:string;
+ source?:DefectSource;
 };
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
@@ -44,7 +54,8 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
 export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|"manual",id="defect-"+Date.now()+"-"+Math.random().toString(36).slice(2,7)):StructuredDefect|null{
  const manual=mode==="manual",details=draft.details.trim(),category=manual?"Miscellaneous":draft.category,issue=manual?"Manual entry":draft.issue;
  if(!category||!issue||manual&&!details)return null;
- return {...draft,id,category,issue,details};
+ const now=new Date().toISOString();
+ return {...draft,id,category,issue,details,createdAt:draft.createdAt||now,updatedAt:now,source:draft.source||"tracker"};
 }
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{
  return category==="Interior Cleaning"&&issue==="Cleaning Required"?"down":"service";
@@ -52,7 +63,8 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
-  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue:defect.issue||"Driver-reported defect",details:defect.details||"",operability:defect.operability==="down"?"down":"service",state:defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":"open"};
+  const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
+  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue:defect.issue||"Driver-reported defect",details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,source:defect.source};
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];

@@ -26,7 +26,7 @@ type FleetBus={
 type RepairHistory={at:string;initials:string;action:string};
 
 type DownEntry={
- id:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+ id:string;defectId?:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
  timeEstimate:RepairTimeEstimate;
@@ -50,6 +50,7 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
  const now=new Date().toISOString();
  return {
   id:value.id||"repair-imported-"+index,
+  defectId:value.defectId,
   busId:value.busId||"",
   busNumber:value.busNumber||"",
   category:value.category||"Miscellaneous",
@@ -152,7 +153,7 @@ export default function DownSheet(){
  return <main className="down-app">
   <header className="down-header">
    <div><span>FLEET MAINTENANCE</span><h1>Interactive Down Sheet</h1><p>Repair scheduling and live fleet-status control</p></div>
-   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a className="active" href="/down-sheet" aria-current="page">DOWN SHEET</a></nav>
+   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a className="active" href="/down-sheet" aria-current="page">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a></nav>
   </header>
 
   <section className="down-summary" aria-label="Down sheet summary">

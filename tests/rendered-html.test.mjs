@@ -19,6 +19,7 @@ import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
+import { saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -646,7 +647,7 @@ test("down sheet synchronization changes repairs and status without moving the b
   assert.match(updated[0].pendingRepair, /Brakes.*ABS warning.*Intermittent warning light/);
   assert.equal(updated[0].defects.length, 1);
   assert.equal(updated[0].defects[0].category, "Brakes");
-  assert.equal(updated[0].defects[0].state, "open");
+  assert.equal(updated[0].defects[0].state, "in-progress");
 
   const completed = applyDownEntryToFleet(updated, {
     busId: "bus-1",
@@ -792,7 +793,10 @@ test("dropping onto an occupied parking space swaps both buses atomically", () =
 });
 test("manual defect drafts are captured when the main editor is saved", () => {
   const draft = defectFromDraft({ category: "", issue: "", details: "  Driver reports intermittent rattle  ", operability: "service", state: "open" }, "manual", "manual-test");
-  assert.deepEqual(draft, { id: "manual-test", category: "Miscellaneous", issue: "Manual entry", details: "Driver reports intermittent rattle", operability: "service", state: "open" });
+  assert.equal(draft.id, "manual-test");
+  assert.equal(draft.category, "Miscellaneous");
+  assert.equal(draft.details, "Driver reports intermittent rattle");
+  assert.equal(draft.source, "tracker");
   assert.equal(defectLabel(draft), "Driver reports intermittent rattle");
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
@@ -1169,3 +1173,62 @@ test("down-sheet completion updates only its linked repair and recalculates trac
   assert.equal(laterRepair[0].defects.length, 3);
   assert.equal(laterRepair[0].defects.find(defect => defect.id === "downsheet-repair-1").state, "completed");
   assert.equal(laterRepair[0].defects.find(defect => defect.id === "downsheet-repair-2").state, "open");});
+
+test("real-time defect log keeps one linked repair across tracker and down sheet", async () => {
+  const fleet = [{
+    id: "bus-20501", n: "20501", l: "garage-4", s: "service", down: false, parkedAt: "2026-08-19T10:00:00.000Z",
+    pendingRepair: "", defects: [], mechanic: "", shift: "Night", roadcall: false,
+  }];
+  const defect = {
+    id: "defect-log-20501-misfire", category: "Engine", issue: "Loss of power",
+    details: "Severe cylinder 1 misfire; engine derate", operability: "down", state: "open",
+    reportedBy: "CJ", source: "defect-log",
+  };
+  const added = saveDefectLogRecord(fleet, [], "bus-20501", defect, true, "2026-08-19T11:00:00.000Z");
+  assert.equal(added.error, null);
+  assert.equal(added.fleet[0].defects.length, 1);
+  assert.equal(added.fleet[0].defects[0].id, defect.id);
+  assert.equal(added.fleet[0].s, "out");
+  assert.equal(added.fleet[0].down, true);
+  assert.equal(added.downEntries.length, 1);
+  assert.equal(added.downEntries[0].defectId, defect.id);
+  assert.equal(added.downEntries[0].workflow, "Scheduled");
+
+  const inProgress = saveDefectLogRecord(
+    added.fleet,
+    added.downEntries,
+    "bus-20501",
+    {...added.fleet[0].defects[0], state: "in-progress", actionTaken: "Diagnosing cylinder 1"},
+    true,
+    "2026-08-19T12:00:00.000Z",
+  );
+  assert.equal(inProgress.fleet[0].defects.length, 1);
+  assert.equal(inProgress.fleet[0].s, "shop");
+  assert.equal(inProgress.downEntries[0].workflow, "In Progress");
+
+  const fixed = saveDefectLogRecord(
+    inProgress.fleet,
+    inProgress.downEntries,
+    "bus-20501",
+    {...inProgress.fleet[0].defects[0], state: "completed", actionTaken: "Repair verified"},
+    false,
+    "2026-08-19T14:00:00.000Z",
+  );
+  assert.equal(fixed.fleet[0].defects.length, 1);
+  assert.equal(fixed.fleet[0].defects[0].state, "completed");
+  assert.equal(fixed.fleet[0].down, false);
+  assert.equal(fixed.fleet[0].s, "service");
+  assert.equal(fixed.downEntries[0].workflow, "Completed");
+
+  const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.ok(page.includes("Real-Time Defect Log"));
+  assert.ok(page.includes("+ LOG DEFECT"));
+  assert.ok(page.includes("DOWN SHEET"));
+  assert.ok(page.includes("AI OPERATOR"));
+  assert.ok(css.includes("@media(max-width:760px)"));
+  const response = await render("/defect-log");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Real-Time Defect Log/);
+});

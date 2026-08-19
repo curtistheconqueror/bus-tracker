@@ -111,6 +111,7 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .settings-command{display:flex;align-items:center;gap:6px}
 .settings-command span{font-size:15px;line-height:1}
 .downsheet-command{background:#0873df!important;color:#fff!important;border-color:#6db3ff!important}
+.defectlog-command{background:#087347!important;color:#fff!important;border-color:#55c78e!important}
 .refresh-command{display:flex;align-items:center;gap:5px}
 .refresh-command span{font-size:16px;line-height:1}
 .refresh-command:disabled{opacity:.65;cursor:wait}
