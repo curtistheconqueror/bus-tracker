@@ -463,6 +463,11 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.modal>\.actions\{position:sticky;bottom:0/);
   assert.match(css, /body\.modal-scroll-locked \.shade\{z-index:2147483500!important/);
   assert.match(css, /body\.modal-scroll-locked \.command-bar\{pointer-events:none!important/);
+  assert.match(css, /\.command-bar\{[^}]*width:min\(1240px,calc\(100vw - 16px\)\)/);
+  assert.match(css, /\.command-bar\{[^}]*flex-wrap:wrap/);
+  assert.match(css, /\.command-highlights\{[^}]*flex:1 1 auto/);
+  assert.match(css, /@media\(max-width:1100px\)\{\.command-bar\{[^}]*width:calc\(100vw - 12px\)/);
+  assert.match(css, /@media\(max-width:560px\)\{\.command-highlights\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(css, /max-height:calc\(100dvh - 16px\)/);
   const commandZ = Number(css.match(/\.command-bar\{[^}]*z-index:(\d+)/)?.[1] || 0);
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
