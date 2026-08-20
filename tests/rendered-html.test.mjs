@@ -1228,6 +1228,14 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   assert.ok(page.includes("DOWN SHEET"));
   assert.ok(page.includes("AI OPERATOR"));
   assert.ok(css.includes("@media(max-width:760px)"));
+  assert.ok(page.includes("BACKGROUND"));
+  assert.ok(page.includes("PRIMARY TEXT"));
+  assert.ok(page.includes("SECONDARY TEXT"));
+  assert.ok(page.includes("Midnight"));
+  assert.ok(page.includes("Tactical"));
+  assert.ok(page.includes("Extra Large"));
+  assert.ok(page.includes("pace-defect-log-settings-v1"));
+  assert.ok(css.includes("--log-page"));
   const response = await render("/defect-log");
   assert.equal(response.status, 200);
   const html = await response.text();

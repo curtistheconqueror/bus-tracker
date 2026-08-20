@@ -7,12 +7,25 @@ import {defectLogRecords,saveDefectLogRecord,type DefectLogDownEntry,type Defect
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean};
-type LogSettings={defaultInitials:string;defaultFilter:Filter;showFixed:boolean};
+type LogTheme="light"|"dark"|"midnight"|"tactical"|"custom";
+type LogFontSize="standard"|"large"|"extra";
+type LogFontFamily="clean"|"condensed"|"classic";
+type LogAppearance={page:string;surface:string;text:string;muted:string;header:string;headerText:string;accent:string};
+type LogSettings={defaultInitials:string;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;appearance:LogAppearance};
 
 const FLEET_KEY="pace-board-v1";
 const DOWN_KEY="pace-down-sheet-v1";
 const SETTINGS_KEY="pace-defect-log-settings-v1";
-const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",defaultFilter:"all",showFixed:true};
+const LIGHT_APPEARANCE:LogAppearance={page:"#e9eef6",surface:"#ffffff",text:"#172b4d",muted:"#60728c",header:"#061d45",headerText:"#ffffff",accent:"#0b64bd"};
+const LOG_THEMES:Record<Exclude<LogTheme,"custom">,{label:string;appearance:LogAppearance}>={
+ light:{label:"Light",appearance:LIGHT_APPEARANCE},
+ dark:{label:"Dark",appearance:{page:"#101318",surface:"#1d222a",text:"#f3f6fa",muted:"#aeb9c8",header:"#06080c",headerText:"#ffffff",accent:"#4d9cff"}},
+ midnight:{label:"Midnight",appearance:{page:"#071225",surface:"#10213d",text:"#e4eeff",muted:"#9eb0cb",header:"#020a18",headerText:"#ffffff",accent:"#68a4ff"}},
+ tactical:{label:"Tactical",appearance:{page:"#26291f",surface:"#393e30",text:"#f0ecd7",muted:"#b8b49d",header:"#15180f",headerText:"#f4e8b8",accent:"#bca75f"}},
+};
+const FONT_STACKS:Record<LogFontFamily,string>={clean:"Arial, Helvetica, sans-serif",condensed:"'Arial Narrow', 'Roboto Condensed', Arial, sans-serif",classic:"Georgia, 'Times New Roman', serif"};
+const COLOR_FIELDS:[keyof LogAppearance,string][]=[["page","BACKGROUND"],["surface","CARDS"],["text","PRIMARY TEXT"],["muted","SECONDARY TEXT"],["header","HEADER"],["headerText","HEADER TEXT"],["accent","ACCENT"]];
+const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",defaultFilter:"all",showFixed:true,theme:"light",fontSize:"standard",fontFamily:"clean",appearance:{...LIGHT_APPEARANCE}};
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 const CATEGORY_ICONS:Record<string,string>={
@@ -24,6 +37,7 @@ const CATEGORY_ICONS:Record<string,string>={
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.buses;return Array.isArray(items)?items.map((bus:DefectLogFleetBus)=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}catch{return []}}
 function readDown(raw:string|null):DefectLogDownEntry[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.entries;return Array.isArray(items)?items:[]}catch{return []}}
+function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean";return {...DEFAULT_SETTINGS,...saved,theme,fontSize,fontFamily,appearance:{...preset,...saved.appearance}}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE}}}}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function locationLabel(location:string){
@@ -61,12 +75,17 @@ function DefectEditor({draft,fleet,defaultInitials,save,close}:{draft:LogDraft;f
 }
 
 function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog:()=>void}){
+ const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
+ const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><section className="log-settings">
   <header><span><small>DEFECT LOG</small><h2>Settings</h2></span><button onClick={close}>x</button></header>
   <div>
    <label>INITIALS<input maxLength={6} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase()})}/></label>
    <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
+   <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
+   <section className="log-settings-group"><h3>FONT</h3><div className="log-font-grid"><label>STYLE<select value={settings.fontFamily} onChange={event=>setSettings({...settings,fontFamily:event.target.value as LogFontFamily})}><option value="clean">Clean</option><option value="condensed">Condensed</option><option value="classic">Classic</option></select></label><label>SIZE<select value={settings.fontSize} onChange={event=>setSettings({...settings,fontSize:event.target.value as LogFontSize})}><option value="standard">Standard</option><option value="large">Large</option><option value="extra">Extra Large</option></select></label></div></section>
+   <section className="log-settings-group"><h3>COLORS</h3><div className="log-color-grid">{COLOR_FIELDS.map(([key,label])=><label className="log-color-field" key={key}><span>{label}</span><input type="color" value={settings.appearance[key]} onChange={event=>setColor(key,event.target.value)}/></label>)}</div><button type="button" className="reset-look" onClick={()=>applyTheme("light")}>RESET LOOK</button></section>
    <button className="export-log" onClick={exportLog}>EXPORT LOG</button>
    <p>Repair records are included with the board backup because they stay attached to each bus.</p>
   </div>
@@ -83,7 +102,7 @@ export default function DefectLog(){
  const [settingsOpen,setSettingsOpen]=useState(false);
  const [hydrated,setHydrated]=useState(false);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY));let nextSettings=DEFAULT_SETTINGS;try{nextSettings={...DEFAULT_SETTINGS,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")}}catch{}setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
@@ -104,8 +123,9 @@ export default function DefectLog(){
  const saveDraft=(draft:LogDraft)=>{const result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);setEditing(null)};
  const markFixed=(record:DefectLogRecord)=>{if(!settings.defaultInitials){setEditing(recordDraft(record));alert("Enter your initials before marking this repair fixed.");return}saveDraft({...recordDraft(record),onDownSheet:false,defect:{...record.defect,state:"completed",reportedBy:settings.defaultInitials,actionTaken:record.defect.actionTaken||"Repair completed"}})};
  const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:records.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ const appStyle={"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--log-font":FONT_STACKS[settings.fontFamily]} as React.CSSProperties;
 
- return <main className="defect-log-app">
+ return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize}>
   <header className="log-header">
    <div><span>FLEET MAINTENANCE</span><h1>Real-Time Defect Log</h1><p>Repairs, findings, and follow-up as they happen</p></div>
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a className="active" href="/defect-log" aria-current="page">DEFECT LOG</a></nav>
