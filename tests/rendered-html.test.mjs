@@ -981,13 +981,14 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.ok(scanner.includes("READING PAGE"));
   assert.ok(scanner.includes("scanReadyPhoto"));
   assert.ok(scanner.includes("700*1024"));
-  assert.ok(route.includes("OPENAI_API_KEY"));
+  assert.ok(route.includes("OPENROUTER_API_KEY"));
   assert.ok(route.includes('import("cloudflare:workers")'));
-  assert.ok(route.includes('"gpt-5.4-mini"'));
-  assert.ok(route.includes("store:false"));
+  assert.ok(route.includes('"google/gemini-2.5-flash"'));
+  assert.ok(route.includes("https://openrouter.ai/api/v1/chat/completions"));
+  assert.ok(route.includes('response_format:{type:"json_schema"'));
   assert.ok(route.includes('"Cache-Control":"no-store"'));
-  assert.ok(route.includes("OpenAI API billing or credits"));
-  assert.ok(route.includes("billing_not_active"));
+  assert.ok(route.includes("OpenRouter credits"));
+  assert.ok(route.includes("OpenRouter authorization was rejected"));
 });
 
 test("AI operator plans and atomically applies multi-bus moves, statuses, and Waiting Area commands", () => {
