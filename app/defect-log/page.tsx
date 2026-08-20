@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
 import {defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
 import {defectLogRecords,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
+import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean};
@@ -16,6 +17,7 @@ type LogSettings={defaultInitials:string;defaultFilter:Filter;showFixed:boolean;
 const FLEET_KEY="pace-board-v1";
 const DOWN_KEY="pace-down-sheet-v1";
 const SETTINGS_KEY="pace-defect-log-settings-v1";
+const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 const LIGHT_APPEARANCE:LogAppearance={page:"#e9eef6",surface:"#ffffff",text:"#172b4d",muted:"#60728c",header:"#061d45",headerText:"#ffffff",accent:"#0b64bd"};
 const LOG_THEMES:Record<Exclude<LogTheme,"custom">,{label:string;appearance:LogAppearance}>={
  light:{label:"Light",appearance:LIGHT_APPEARANCE},
@@ -37,6 +39,7 @@ const CATEGORY_ICONS:Record<string,string>={
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.buses;return Array.isArray(items)?items.map((bus:DefectLogFleetBus)=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}catch{return []}}
 function readDown(raw:string|null):DefectLogDownEntry[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.entries;return Array.isArray(items)?items:[]}catch{return []}}
+function readMysterySlot(raw:string|null){try{const value=JSON.parse(raw||"{}").visuals?.mysterySlot;return /^#[0-9a-f]{6}$/i.test(String(value))?String(value):"#edf3ff"}catch{return "#edf3ff"}}
 function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean";return {...DEFAULT_SETTINGS,...saved,theme,fontSize,fontFamily,appearance:{...preset,...saved.appearance}}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE}}}}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
@@ -100,13 +103,18 @@ export default function DefectLog(){
  const [search,setSearch]=useState("");
  const [editing,setEditing]=useState<LogDraft|null>(null);
  const [settingsOpen,setSettingsOpen]=useState(false);
+ const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const records=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
+ const activeDownBusIds=useMemo(()=>downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId),[downEntries]);
+ const mysteryIdSet=useMemo(()=>new Set(mysteryBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
+ const awarenessIdSet=useMemo(()=>new Set(bay12AwarenessBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
+ const mysteryBuses=useMemo(()=>fleet.filter(bus=>mysteryIdSet.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,mysteryIdSet]);
  const active=records.filter(record=>isUnresolved(record.defect));
  const visible=records.filter(record=>{
   if(!settings.showFixed&&record.defect.state==="completed")return false;
@@ -122,8 +130,9 @@ export default function DefectLog(){
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{setFleet(nextFleet);setDownEntries(nextDown);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries:nextDown}))};
  const saveDraft=(draft:LogDraft)=>{const result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);setEditing(null)};
  const markFixed=(record:DefectLogRecord)=>{if(!settings.defaultInitials){setEditing(recordDraft(record));alert("Enter your initials before marking this repair fixed.");return}saveDraft({...recordDraft(record),onDownSheet:false,defect:{...record.defect,state:"completed",reportedBy:settings.defaultInitials,actionTaken:record.defect.actionTaken||"Repair completed"}})};
+ const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
  const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:records.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000)};
- const appStyle={"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--log-font":FONT_STACKS[settings.fontFamily]} as React.CSSProperties;
+ const appStyle={"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--log-font":FONT_STACKS[settings.fontFamily]} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize}>
   <header className="log-header">
@@ -137,6 +146,14 @@ export default function DefectLog(){
    <div className="log-filters">{([["all","ALL"],["open","OPEN"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],["downsheet","DOWN SHEET"]] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{label}</button>)}</div>
    <label className="log-search"><span>FIND</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus, repair, code, or note"/></label>
    <button className="log-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open defect log settings">&#9881;</button>
+  </section>
+  <section className="mystery-board" aria-label="Mystery buses">
+   <header><span><b>MYSTERY BUSES</b><small>SHOP, CNG &amp; BAYS 11–12 NOT ON DOWN SHEET</small></span><strong>{mysteryBuses.length}</strong></header>
+   {mysteryBuses.length?<div className="mystery-list">{mysteryBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),inLog=defects.some(defect=>defect.source==="defect-log"),onDownSheet=activeDownBusIds.includes(bus.id),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; ")+(defects.length>2?" +"+(defects.length-2)+" more":""):"No known defects logged";return <button className={"mystery-card"+(awarenessIdSet.has(bus.id)?" bay12-awareness":"")} onClick={()=>openMysteryBus(bus)} key={bus.id}>
+    <span className="mystery-number"><small>BUS</small><b>{bus.n}</b></span>
+    <span className="mystery-detail"><b>{locationLabel(bus.l)}</b><small>{preview}</small></span>
+    <span className="mystery-badges">{bus.s==="unknown"&&<i>UNKNOWN</i>}{awarenessIdSet.has(bus.id)&&<i>BAY 12</i>}{!onDownSheet&&<i>NOT ON DOWN SHEET</i>}{inLog&&<i>DEFECT LOG</i>}<small>{STATUS_LABELS[bus.s]||bus.s}</small></span>
+   </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Eligible shop, CNG, and Bays 11–12 match the active Down Sheet.</span></div>}
   </section>
   <section className="log-feed">
    <div className="feed-title"><span><b>LIVE REPAIR FEED</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button></div>

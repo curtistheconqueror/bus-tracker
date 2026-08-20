@@ -5,7 +5,7 @@ import {stampOperationalChange} from "../operational-time.ts";
 
 export type DefectLogFleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;shift?:string;roadcall?:boolean;down?:boolean;
- parkedAt?:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string;pendingRepair?:string;defects?:StructuredDefect[];
+ parkedAt?:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string;pendingRepair?:string;defects?:StructuredDefect[];bay12Watch?:boolean;
 };
 
 export type DefectLogDownEntry={

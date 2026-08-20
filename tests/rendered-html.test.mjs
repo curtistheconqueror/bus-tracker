@@ -20,6 +20,7 @@ import { operationalUpdateAt, stampOperationalChange } from "../app/operational-
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -166,6 +167,22 @@ test("operational sitting time resets on either a real location or status change
 });
 
 
+test("restricts Mystery awareness to CNG, shop areas, and Main Garage Bays 11-12", () => {
+  for (const location of ["east-1", "west-0", "bay-1", "bay-overflow-1", "wall-0", "service-0", "paint-0", "wash-0", "body-0", "pit-0", "brake-0", "tow-0", "garage-10", "garage-11", "garage-22", "garage-23"]) assert.equal(isMysteryArea(location), true, location);
+  for (const location of ["road-0", "waiting-0", "garage-0", "garage-9", "garage-12", "garage-21"]) assert.equal(isMysteryArea(location), false, location);
+  const fleet=[{id:"east",n:"17501",l:"east-1",s:"out",defects:[]},{id:"road",n:"17502",l:"road-0",s:"unknown",defects:[]},{id:"garage10",n:"17503",l:"garage-9",s:"unknown",defects:[]},{id:"garage11",n:"17504",l:"garage-10",s:"service",defects:[]},{id:"listed",n:"17505",l:"west-0",s:"out",defects:[]}];
+  assert.deepEqual(mysteryBusIds(fleet,["listed"]),["east","garage11"]);
+  const enteredBay12=stampOperationalChange({id:"watch",n:"17512",l:"road-0",s:"defect",defects:[{state:"open"}],bay12Watch:false},{id:"watch",n:"17512",l:"bay-12",s:"shop",defects:[{state:"open"}],bay12Watch:false},"2026-08-20T12:00:00.000Z");
+  assert.equal(enteredBay12.bay12Watch,true);
+  const movedToCng=stampOperationalChange(enteredBay12,{...enteredBay12,l:"west-1"},"2026-08-20T13:00:00.000Z");
+  assert.deepEqual(bay12AwarenessBusIds([movedToCng],[]),["watch"]);
+  assert.deepEqual(bay12AwarenessBusIds([{...movedToCng,l:"road-1"}],[]),[]);
+  assert.deepEqual(bay12AwarenessBusIds([movedToCng],["watch"]),[]);
+  const fixed=stampOperationalChange(movedToCng,{...movedToCng,defects:[{state:"completed"}]},"2026-08-20T14:00:00.000Z");
+  assert.equal(fixed.bay12Watch,false);
+  assert.deepEqual(bay12AwarenessBusIds([fixed],[]),[]);
+});
+
 test("server-renders the live fleet command dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -178,10 +195,10 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
   assert.match(html, />AC BUSES</);
-  assert.match(html, />MYSTERY BUSES</);
+  assert.match(html, />MYSTERY <b>/);
   assert.match(html, /DOWN SHEET/);
   assert.match(html, />PENDING REPAIR</);
-  assert.match(html, />UNSCHEDULED WORK</);
+
   assert.match(html, />LOCATE</);
   assert.match(html, />REFRESH</);
   assert.match(html, /> SETTINGS</);
@@ -190,6 +207,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.ok(commandBar.indexOf('class="locate-command"')<commandBar.indexOf('class="command-highlights"'));
   assert.ok(commandBar.indexOf('class="settings-command"')<commandBar.indexOf('class="ai-operator-command"'));
   assert.match(commandBar, /RAMP\/KNEELER[\s\S]*ADA/);
+  assert.doesNotMatch(commandBar, /PENDING REPAIR|UNSCHEDULED WORK|>WAITING/);
   assert.doesNotMatch(commandBar, /BAD RAMP\/KNEELER/);
   assert.doesNotMatch(commandBar, /<small>PACE<\/small>/);
   assert.match(html, /data-bus-id="b0" data-status="service" data-pending="false"/);
@@ -227,7 +245,18 @@ test("server-renders the live fleet command dashboard", async () => {
   const waiting = section(html, '<section class="waiting panel">', '<footer class="command-bar">');
   assert.equal((waiting.match(/class="spot"/g) ?? []).length, 98);
   assert.match(waiting, /WAITING AREA/);
-  assert.match(commandBar, /WAITING[\s\S]*<b>0<\/b>/);
+
+});
+
+test("renders the mobile Mystery list on the Defect Log", async () => {
+  const response=await render("/defect-log");
+  assert.equal(response.status,200);
+  const html=await response.text();
+  assert.match(html,/MYSTERY BUSES/);
+  assert.match(html,/SHOP, CNG &amp; BAYS 11–12 NOT ON DOWN SHEET/);
+  assert.match(html,/class="mystery-board"/);
+  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -262,9 +291,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   for (const control of ["Page Background", "Panel Background", "Parking Spaces", "Command Bar", "SECTION BACKGROUNDS", "BUS STATUS COLORS"]) {
     assert.match(page, new RegExp(control));
   }
-  assert.match(page, /garageSpecial:string;garageFrame:string/);
+  assert.match(page, /garageSpecial:string;garageFrame:string;mysterySlot:string/);
   assert.match(page, /Bays 11 & 12 Parking Spaces/);
   assert.match(page, /Garage Border, Top & Row Banners/);
+  assert.match(page, /Mystery Spaces/);
+  assert.match(page, /bay12AwarenessBusIds/);
+  assert.match(css, /\.spot\.awareness-slot/);
   assert.match(page, /className=\{c>=10\?"garage-special-slot":undefined\}/);
   assert.match(page, /"--garage-special",visuals\.garageSpecial/);
   assert.match(page, /"--garage-frame",visuals\.garageFrame/);
@@ -288,8 +320,10 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /@keyframes roadcall-dot-pulse/);
   assert.match(css, /\.app\.highlight-service/);
   assert.match(css, /\.app\.highlight-pending/);
-  assert.match(css, /\.app\.highlight-unscheduled/);
-  assert.match(page, /data-unscheduled=\{bus\.outReason==="Unscheduled"\}/);
+  assert.match(css, /\.app\.highlight-mystery/);
+  assert.match(page, /data-mystery=\{Boolean\(bus\.mystery\)\}/);
+  assert.doesNotMatch(css, /highlight-unscheduled|highlight-waiting/);
+  assert.doesNotMatch(page, /data-unscheduled=|data-waiting=/);
   assert.match(page, /data-ac=\{Boolean\(bus\.acIssue\)/);
   assert.match(page, /data-downsheet=\{Boolean\(bus\.onDownSheet\)\}/);
   assert.match(page, /downSheetBusIds\.length/);
@@ -467,7 +501,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.command-bar\{[^}]*flex-wrap:wrap/);
   assert.match(css, /\.command-highlights\{[^}]*flex:1 1 auto/);
   assert.match(css, /@media\(max-width:1100px\)\{\.command-bar\{[^}]*width:calc\(100vw - 12px\)/);
-  assert.match(css, /@media\(max-width:560px\)\{\.command-highlights\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css, /@media\(max-width:560px\)\{\.command-highlights\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(css, /max-height:calc\(100dvh - 16px\)/);
   const commandZ = Number(css.match(/\.command-bar\{[^}]*z-index:(\d+)/)?.[1] || 0);
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
