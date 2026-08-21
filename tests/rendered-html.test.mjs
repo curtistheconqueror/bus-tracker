@@ -21,6 +21,7 @@ import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recomme
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
+import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -183,6 +184,26 @@ test("restricts Mystery awareness to CNG, shop areas, and Main Garage Bays 11-12
   assert.deepEqual(bay12AwarenessBusIds([fixed],[]),[]);
 });
 
+test("shared Quick Filters classify active tracker and Defect Log records", () => {
+  const buses=[
+    {id:"ac",n:"1",defects:[{category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]},
+    {id:"engine",n:"2",checkEngine:true,defects:[]},
+    {id:"ramp",n:"3",badRampKneeler:true,defects:[]},
+    {id:"horn",n:"4",noHorn:true,defects:[]},
+    {id:"leak",n:"5",defects:[{category:"Cooling System",issue:"Coolant leak",details:"",state:"open"}]},
+    {id:"oil",n:"6",defects:[{category:"Preventive Maintenance",issue:"Add engine oil",details:"",quantity:10,unit:"quarts",state:"open"}]},
+    {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
+  ];
+  assert.equal(QUICK_FILTERS.length,6);
+  assert.equal(quickFilterMatch(buses[0],"ac"),true);
+  assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
+  assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
+  assert.deepEqual(quickFilterBusIds(buses,"no-horn"),["horn"]);
+  assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
+  assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
+  assert.equal(defectLabel(buses[5].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
+});
+
 test("server-renders the live fleet command dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -194,7 +215,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
-  assert.match(html, />AC BUSES</);
+  assert.match(html, />QUICK FILTERS</);
   assert.match(html, />MYSTERY <b>/);
   assert.match(html, /DOWN SHEET/);
   assert.match(html, />PENDING REPAIR</);
@@ -206,7 +227,7 @@ test("server-renders the live fleet command dashboard", async () => {
   const commandBar=html.slice(html.indexOf('<footer class="command-bar">'),html.indexOf('</footer>')+9);
   assert.ok(commandBar.indexOf('class="locate-command"')<commandBar.indexOf('class="command-highlights"'));
   assert.ok(commandBar.indexOf('class="settings-command"')<commandBar.indexOf('class="ai-operator-command"'));
-  assert.match(commandBar, /RAMP\/KNEELER[\s\S]*ADA/);
+  assert.doesNotMatch(commandBar, /AC BUSES|CHECK ENGINES|RAMP\/KNEELER/);
   assert.doesNotMatch(commandBar, /PENDING REPAIR|UNSCHEDULED WORK|>WAITING/);
   assert.doesNotMatch(commandBar, /BAD RAMP\/KNEELER/);
   assert.doesNotMatch(commandBar, /<small>PACE<\/small>/);
@@ -255,8 +276,10 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(html,/MYSTERY BUSES/);
   assert.match(html,/SHOP, CNG &amp; BAYS 11–12 NOT ON DOWN SHEET/);
   assert.match(html,/class="mystery-board"/);
+  assert.match(html,/>QUICK FILTERS</);
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
   assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
+  assert.match(css,/\.quick-filter-drawer\{position:fixed/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -324,7 +347,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /data-mystery=\{Boolean\(bus\.mystery\)\}/);
   assert.doesNotMatch(css, /highlight-unscheduled|highlight-waiting/);
   assert.doesNotMatch(page, /data-unscheduled=|data-waiting=/);
-  assert.match(page, /data-ac=\{Boolean\(bus\.acIssue\)/);
+  assert.match(page, /data-ac=\{quickFilterMatch\(bus,"ac"\)\}/);
   assert.match(page, /data-downsheet=\{Boolean\(bus\.onDownSheet\)\}/);
   assert.match(page, /downSheetBusIds\.length/);
   assert.match(page, /entry\.category==="A\/C and HVAC"/);
@@ -424,12 +447,16 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.badRampKneeler\}/);
   assert.match(css, /\.modal>\.form\{[^}]*align-content:start;grid-auto-rows:max-content/);
   assert.match(css, /\.defect-workbench\{min-height:88px/);
-  assert.match(page, /ramp-kneeler-command/);
-  assert.match(page, /<span>RAMP\/KNEELER<\/span><small>ADA/);
-  assert.match(css, /\.ramp-kneeler-command\{/);
-  assert.match(page, /CHECK ENGINES/);
-  assert.match(page, /data-check-engine=\{bus\.checkEngine\}/);
-  assert.match(page, /data-bad-ramp=\{bus\.badRampKneeler\}/);
+  assert.match(page, /QuickFilterMenu/);
+  assert.match(page, /QUICK_FILTERS/);
+  assert.match(page, /data-check-engine=\{quickFilterMatch\(bus,"check-engine"\)\}/);
+  assert.match(page, /data-bad-ramp=\{quickFilterMatch\(bus,"bad-ramp"\)\}/);
+  assert.match(page, /data-no-horn=\{quickFilterMatch\(bus,"no-horn"\)\}/);
+  assert.match(page, /data-leak=\{quickFilterMatch\(bus,"leak"\)\}/);
+  assert.match(page, /data-add-oil=\{quickFilterMatch\(bus,"add-oil"\)\}/);
+  assert.match(css, /\.app\.highlight-no-horn/);
+  assert.match(css, /\.app\.highlight-leak/);
+  assert.match(css, /\.app\.highlight-add-oil/);
   assert.match(page, /function MultiLocateModal/);
   assert.match(page, /Array\(Math\.max\(7-initial\.length,0\)\)\.fill\(\"\"\)/);
   assert.match(page, /\+ ADD FIELD/);
@@ -498,10 +525,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /body\.modal-scroll-locked \.shade\{z-index:2147483500!important/);
   assert.match(css, /body\.modal-scroll-locked \.command-bar\{pointer-events:none!important/);
   assert.match(css, /\.command-bar\{[^}]*width:min\(1240px,calc\(100vw - 16px\)\)/);
-  assert.match(css, /\.command-bar\{[^}]*flex-wrap:wrap/);
-  assert.match(css, /\.command-highlights\{[^}]*flex:1 1 auto/);
+  assert.match(css, /\/\* Single-row command bar and shared Quick Filters \*\//);
+  assert.match(css, /\.command-bar\{height:53px!important;min-height:53px!important;flex-wrap:nowrap!important/);
+  assert.match(css, /\.command-highlights\{display:flex!important;flex:0 0 auto!important/);
+  assert.match(css, /\.quick-filter-popover\{position:fixed/);
   assert.match(css, /@media\(max-width:1100px\)\{\.command-bar\{[^}]*width:calc\(100vw - 12px\)/);
-  assert.match(css, /@media\(max-width:560px\)\{\.command-highlights\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(css, /@media\(max-width:560px\)\{\.command-highlights\{display:flex!important/);
   assert.match(css, /max-height:calc\(100dvh - 16px\)/);
   const commandZ = Number(css.match(/\.command-bar\{[^}]*z-index:(\d+)/)?.[1] || 0);
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
