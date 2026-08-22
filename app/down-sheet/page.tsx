@@ -9,6 +9,7 @@ import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "./down-sheet-clear";
 import {isUnresolved,type StructuredDefect} from "../repair-catalog";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "./repair-time-estimates";
+import {blankRepairItem,normalizeRepairItems,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -27,6 +28,7 @@ type RepairHistory={at:string;initials:string;action:string};
 
 type DownEntry={
  id:string;defectId?:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+ repairItems?:DownSheetRepairItem[];
  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
  timeEstimate:RepairTimeEstimate;
@@ -56,6 +58,7 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
   category:value.category||"Miscellaneous",
   repair:value.repair||"Repair required",
   customReason:value.customReason||"",
+  repairItems:normalizeRepairItems(value.repairItems,{category:value.category||"Miscellaneous",repair:value.repair||"Repair required",details:value.customReason||"",timeEstimate:value.timeEstimate}),
   assignmentType:value.assignmentType||"Mechanic",
   assignedTo:value.assignedTo||"",
   section:value.section||"Pending",
@@ -81,6 +84,7 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
   category:bus.defects?.find(isUnresolved)?.category||"Miscellaneous",
   repair:bus.defects?.find(isUnresolved)?.issue||bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
   customReason:bus.defects?.find(isUnresolved)?.details||"",
+  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defect.details||"",estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue)})),
   assignmentType:"Mechanic",
   assignedTo:bus.mechanic||"",
   section:bus.roadcall?"Roadcall":"Pending",
@@ -96,7 +100,8 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
  })).map(normalizeEntry);
 }
 
-function reasonLabel(entry:DownEntry){return [entry.category,entry.repair,entry.customReason].filter(Boolean).join(" — ")}
+function reasonLabel(entry:DownEntry){return entry.repairItems?.length?repairItemsReason(entry.repairItems):[entry.category,entry.repair,entry.customReason].filter(Boolean).join(" — ")}
+function entryEstimateMinutes(entry:DownEntry){return entry.repairItems?repairItemsTotal(entry.repairItems):repairTimeTotal(entry.timeEstimate)}
 function isActive(entry:DownEntry){return entry.workflow!=="Completed"}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){if(!value)return "Not updated";return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value))}
@@ -126,9 +131,9 @@ export default function DownSheet(){
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  const visible=useMemo(()=>entries.filter(entry=>(showCompleted||isActive(entry))&&(filter==="All"||entry.shift===filter)),[entries,filter,showCompleted]);
- const visibleMinutes=visible.reduce((total,entry)=>total+repairTimeTotal(entry.timeEstimate),0);
- const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+repairTimeTotal(entry.timeEstimate),0)};
- const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
+ const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
+ const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
+ const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
  const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet),downText=JSON.stringify({version:1,entries:result.entries}),fleetText=JSON.stringify({version:4,buses:result.fleet});localStorage.setItem(DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot));localStorage.setItem(DOWN_KEY,downText);localStorage.setItem(FLEET_KEY,fleetText);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
  const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const result=restoreDownSheetState(entries,fleet,snapshot),downText=JSON.stringify({version:1,entries:result.entries}),fleetText=JSON.stringify({version:4,buses:result.fleet});localStorage.setItem(DOWN_KEY,downText);localStorage.setItem(FLEET_KEY,fleetText);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
@@ -192,12 +197,12 @@ export default function DownSheet(){
      <tbody>{visible.length?visible.map((entry,index)=><tr className={entry.workflow==="Completed"?"completed":""} key={entry.id}>
       <td className="line-number">{String(index+1).padStart(2,"0")}</td>
       <td className="fleet-number"><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></td>
-      <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
+      <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?entry.repairItems.length+" REPAIRS":entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
       <td><b className="shift-tag">{entry.shift}</b></td>
       <td><b className={"workflow "+entry.workflow.toLowerCase().replaceAll(" ","-")}>{entry.workflow}</b></td>
-      <td className="estimate-cell"><b>{formatRepairTime(repairTimeTotal(entry.timeEstimate))}</b><small>MECHANIC PLAN</small></td>
+      <td className="estimate-cell"><b>{entryEstimateMinutes(entry)?formatRepairTime(entryEstimateMinutes(entry)):"NOT SET"}</b><small>MECHANIC PLAN</small></td>
       <td className="updated"><b>{entry.updatedBy||"—"}</b><small>{timeLabel(entry.updatedAt)}</small></td>
      </tr>):<tr><td className="empty-sheet" colSpan={9}><b>No buses match this view.</b><span>All shifts are shown by default. Use Add Down Bus to create the first repair entry.</span></td></tr>}</tbody>
     </table>

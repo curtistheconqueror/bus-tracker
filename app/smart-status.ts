@@ -23,12 +23,17 @@ export function roadServiceStatus(bus:RepairAwareBus):FleetStatus{
  return hasUnresolvedDefects(bus)?"defect":"service";
 }
 
+export function garageServiceStatus(bus:RepairAwareBus):FleetStatus{
+ return hasUnresolvedDefects(bus)?"defect":"service";
+}
+
 export function statusForLocation(location:string,current:FleetStatus,bus:RepairAwareBus):FleetStatus{
  if(current==="decommissioned")return current;
  if(location.startsWith("east-")||location.startsWith("west-"))return "out";
  if(hasRequiredInteriorCleaning(bus))return "shop";
  if(location.startsWith("bay-")||location.startsWith("body-"))return "shop";
- if(location.startsWith("road-")||location.startsWith("garage-"))return roadServiceStatus(bus);
+ if(location.startsWith("garage-"))return garageServiceStatus(bus);
+ if(location.startsWith("road-"))return roadServiceStatus(bus);
  return current;
 }
 

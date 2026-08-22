@@ -18,6 +18,7 @@ import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
+import { aggregateRepairItemEstimates, blankRepairItem, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
@@ -256,7 +257,7 @@ test("server-renders the live fleet command dashboard", async () => {
   const pit = section(html, "PIT", "BRAKE TEST");
   assert.equal((pit.match(/class="spot"/g) ?? []).length, 2);
   const brake = section(html, "BRAKE TEST", "TOW STAGING");
-  assert.equal((brake.match(/class="spot"/g) ?? []).length, 2);
+  assert.equal((brake.match(/class="spot"/g) ?? []).length, 3);
   const east = section(html, '<section class="east lot">', '<section class="road">');
   assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
@@ -420,7 +421,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.equal(ROAD_CAPACITY, 75);
   assert.equal(WEST_CAPACITY, 40);
   assert.match(page, /"PIT":slots\("pit",2\)/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",2\)/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
   assert.ok(page.includes('const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
@@ -745,7 +746,7 @@ test("smart status returns repaired and defect-carrying buses to road and main g
   assert.equal(statusForLocation("road-4", "out", { defects: [], pendingRepair: "" }), "service");
   assert.equal(statusForLocation("garage-4", "out", { defects: [], pendingRepair: "" }), "service");
   assert.equal(statusForLocation("garage-4", "shop", { defects: minor, pendingRepair: "" }), "defect");
-  assert.equal(statusForLocation("garage-4", "shop", { defects: downing, pendingRepair: "" }), "out");
+  assert.equal(statusForLocation("garage-4", "shop", { defects: downing, pendingRepair: "" }), "defect");
   assert.equal(statusForLocation("garage-4", "decommissioned", { defects: [], pendingRepair: "" }), "decommissioned");
   assert.equal(statusForLocation("bay-3", "out", { defects: downing, pendingRepair: "" }), "shop");
   assert.equal(statusForLocation("body-0", "service", { defects: [], pendingRepair: "" }), "shop");
@@ -1171,7 +1172,7 @@ test("all relocation controls use the same destination-aware smart status", () =
   const minorToRoad = moveOrSwapBuses(fleet, "minor", "road-1", "now");
   assert.equal(minorToRoad.find(bus => bus.id === "minor").s, "defect");
   const downToGarage = moveOrSwapBuses(fleet, "down", "garage-1", "now");
-  assert.equal(downToGarage.find(bus => bus.id === "down").s, "out");
+  assert.equal(downToGarage.find(bus => bus.id === "down").s, "defect");
   const clearToCng = moveOrSwapBuses(fleet, "clear", "east-2", "now");
   assert.equal(clearToCng.find(bus => bus.id === "clear").s, "out");
   const minorToBody = moveOrSwapBuses(fleet, "minor", "body-0", "now");
@@ -1204,7 +1205,7 @@ test("down-sheet completion updates only its linked repair and recalculates trac
     operationalStatus: "out",
   }, "2026-08-09T10:00:00.000Z");
   assert.equal(active[0].l, "garage-4");
-  assert.equal(active[0].s, "out");
+  assert.equal(active[0].s, "defect");
   assert.equal(active[0].defects.length, 2);
   assert.equal(active[0].defects.find(defect => defect.id === "manual-1").state, "open");
 
@@ -1226,7 +1227,7 @@ test("down-sheet completion updates only its linked repair and recalculates trac
   assert.equal(completed[0].defects.find(defect => defect.id === "downsheet-repair-1").state, "completed");
   assert.match(completed[0].pendingRepair, /No cooling/);
   assert.doesNotMatch(completed[0].pendingRepair, /Air brake fault/);
-  assert.equal(completed[0].lastStatusChangeAt, "2026-08-09T12:00:00.000Z");
+  assert.equal(completed[0].lastStatusChangeAt, "2026-08-09T10:00:00.000Z");
 
   const laterRepair = applyDownEntryToFleet(completed, {
     id: "repair-2",
@@ -1308,4 +1309,77 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Real-Time Defect Log/);
+});
+
+test("down-sheet repair items keep independent optional estimates and a bus total", () => {
+  const first = {...blankRepairItem(0), category:"Engine", repair:"Check-engine diagnosis", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check-engine diagnosis")};
+  const second = {...blankRepairItem(1), category:"A/C and HVAC", repair:"Compressor", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"A/C and HVAC","Compressor")};
+  const optional = {...blankRepairItem(2), category:"Electrical / Multiplex", repair:"Horn", estimateEnabled:false, timeEstimate:normalizeRepairTimeEstimate(undefined,"Electrical / Multiplex","Horn")};
+  assert.equal(repairItemsTotal([first]), 180);
+  assert.equal(repairItemsTotal([first,second,optional]), 1140);
+  const aggregate = aggregateRepairItemEstimates([first,second,optional]);
+  assert.equal(aggregate.repairMinutes + aggregate.diagnosticMinutes + aggregate.accessMinutes, 1140);
+  const restored = normalizeRepairItems([first,second,optional], {});
+  assert.equal(restored.length, 3);
+  assert.equal(restored[2].estimateEnabled, false);
+});
+
+test("operator retains incomplete status commands and accepts natural area moves", () => {
+  const fleet = [
+    {id:"a",n:"18509",s:"out",l:"waiting-0",down:true,pendingRepair:"Engine"},
+    {id:"b",n:"18511",s:"out",l:"waiting-1",down:true,pendingRepair:"Transmission"},
+  ];
+  const areas = [
+    {name:"WAITING AREA",slots:["waiting-0","waiting-1","waiting-2"]},
+    {name:"MAIN GARAGE (BAYS 1-10)",slots:["garage-0","garage-1","garage-2"]},
+  ];
+  const request = planOperatorCommand("Update buses 18509 and 18511 with defects from downsheet", fleet, areas);
+  assert.equal(request.kind, "message");
+  assert.deepEqual(request.context.busNumbers, ["18509","18511"]);
+  const status = planOperatorCommand("In service with defects", fleet, areas, request.context);
+  assert.equal(status.kind, "plan");
+  assert.equal(status.plan.kind, "batch");
+  assert.equal(status.plan.items.every(item => item.status === "defect"), true);
+
+  const statusFirst = planOperatorCommand("Set status to in service with defects", fleet, areas);
+  assert.equal(statusFirst.kind, "message");
+  assert.equal(statusFirst.context.pendingStatus, "defect");
+  const busesSecond = planOperatorCommand("18509 and 18511", fleet, areas, statusFirst.context);
+  assert.equal(busesSecond.kind, "plan");
+  assert.equal(busesSecond.plan.kind, "batch");
+  assert.equal(busesSecond.plan.items.length, 2);
+
+  const naturalAreaMove = planOperatorCommand("Buses from the Waiting Area, place in the Main Garage", fleet, areas);
+  assert.equal(naturalAreaMove.kind, "plan");
+  assert.equal(naturalAreaMove.plan.kind, "bulkMove");
+  assert.deepEqual(naturalAreaMove.plan.busNumbers, ["18509","18511"]);
+  assert.equal(naturalAreaMove.plan.areaName, "MAIN GARAGE (BAYS 1-10)");
+});
+
+test("inactive interface tabs keep an explicit high-contrast treatment", async () => {
+  const downCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.match(downCss, /down-header nav a\{background:#0b4f9e/);
+  assert.match(logCss, /Readable inactive page tabs/);
+  assert.match(logCss, /log-header nav a\{background:/);
+});
+test("main garage always normalizes destination status from every facility source", () => {
+  const defect = [{id:"d",category:"Brakes",issue:"Air brake fault",details:"",operability:"down",state:"open"}];
+  const fleet = [
+    {id:"brake",n:"17501",l:"brake-0",s:"out",parkedAt:"old",defects:defect,pendingRepair:defectSummary(defect)},
+    {id:"tow",n:"17502",l:"tow-0",s:"out",parkedAt:"old",defects:[],pendingRepair:""},
+    {id:"east",n:"17503",l:"east-1",s:"out",parkedAt:"old",defects:defect,pendingRepair:defectSummary(defect)},
+    {id:"west",n:"17504",l:"west-1",s:"out",parkedAt:"old",defects:[],pendingRepair:""},
+    {id:"service",n:"17505",l:"service-0",s:"out",parkedAt:"old",defects:defect,pendingRepair:defectSummary(defect)},
+    {id:"pit",n:"17506",l:"pit-0",s:"out",parkedAt:"old",defects:[],pendingRepair:""},
+  ];
+  const expected = {brake:"defect",tow:"service",east:"defect",west:"service",service:"defect",pit:"service"};
+  Object.keys(expected).forEach((id,index) => {
+    const moved = moveOrSwapBuses(fleet,id,"garage-"+index,"now");
+    assert.equal(moved.find(bus => bus.id === id).s,expected[id],id);
+  });
+  const areas=[{name:"MAIN GARAGE (BAYS 1-10)",slots:Array.from({length:6},(_,index)=>"garage-"+index)}];
+  const batch=applyOperatorBatch(fleet,fleet.map(bus=>({busId:bus.id,areaName:"MAIN GARAGE (BAYS 1-10)"})),areas,"now");
+  assert.equal(batch.error,undefined);
+  assert.deepEqual(Object.fromEntries(batch.fleet.map(bus=>[bus.id,bus.s])),expected);
 });

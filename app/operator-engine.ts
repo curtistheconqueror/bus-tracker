@@ -6,7 +6,7 @@ import type {FleetStatus} from "./smart-status.ts";
 export type OperatorBus=FleetInsightBus;
 
 export type OperatorArea={name:string;slots:string[]};
-export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string};
+export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string;pendingStatus?:FleetStatus;pendingIntent?:"status"};
 
 type DefectDraft=Omit<StructuredDefect,"id">;
 export type OperatorBatchItem={busId:string;busNumber:string;areaName?:string;status?:FleetStatus};
@@ -25,7 +25,7 @@ export type OperatorPlan=
 
 export type OperatorPlanningResult=
  | {kind:"plan";plan:OperatorPlan}
- | {kind:"message";message:string};
+ | {kind:"message";message:string;context?:OperatorSelectionContext};
 
 const STATUS_LABELS:Record<string,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown / Mystery"};
 
@@ -113,6 +113,19 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
 
  const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
  const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
+ if(desiredStatus&&!explicitQueries.length&&!moveAction){
+  if(context?.busIds.length){
+   const selected=context.busIds.map(id=>fleet.find(bus=>bus.id===id)).filter(Boolean) as OperatorBus[];
+   if(selected.length!==context.busIds.length)return {kind:"message",message:"The remembered bus group changed. Enter the bus numbers again before updating status."};
+   return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items:selected.map(bus=>({busId:bus.id,busNumber:bus.n,status:desiredStatus})),summary:"Update "+selected.map(bus=>bus.n).join(", ")+" to "+statusLabel(desiredStatus)}};
+  }
+  return {kind:"message",message:"Tell me which buses should be set to "+statusLabel(desiredStatus)+".",context:{busIds:[],busNumbers:[],label:"Status: "+statusLabel(desiredStatus),pendingStatus:desiredStatus,pendingIntent:"status"}};
+ }
+ if(explicitQueries.length&&context?.pendingStatus&&!moveAction&&!desiredStatus){
+  const resolved=resolveMany(fleet,explicitQueries);
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that status update.",context};
+  return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items:resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,status:context.pendingStatus})),summary:"Update "+resolved.buses.map(bus=>bus.n).join(", ")+" to "+statusLabel(context.pendingStatus)}};
+ }
  if(moveAction&&splitFleet&&explicitQueries.length&&areaMentions.length>=2){
   const selectedArea=areaMentions[0].area,remainderArea=areaMentions[areaMentions.length-1].area;
   if(selectedArea.name===remainderArea.name)return {kind:"message",message:"The named buses and the remaining fleet cannot both use "+selectedArea.name+" as different destinations. Name a second destination area."};
@@ -158,7 +171,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command."};
   const area=moveAction?areaFromCommand(command,areas):undefined;
   if(moveAction&&!area)return {kind:"message",message:"I found the buses, but I could not identify the destination area. Try On Road, Main Garage, CNG East, CNG West, or Waiting Area."};
-  if(!moveAction&&!desiredStatus)return {kind:"message",message:"Tell me which status to apply to those buses."};
+  if(!moveAction&&!desiredStatus)return {kind:"message",message:"Tell me which status to apply to those buses.",context:{busIds:resolved.buses.map(bus=>bus.id),busNumbers:resolved.buses.map(bus=>bus.n),label:"Buses "+resolved.buses.map(bus=>bus.n).join(", "),pendingIntent:"status"}};
   if(area){
    const already=resolved.buses.filter(bus=>area.slots.includes(bus.l)).length,needed=resolved.buses.length-already,open=area.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
    if(open<needed)return {kind:"message",message:capacityMessage(area,needed,open)};

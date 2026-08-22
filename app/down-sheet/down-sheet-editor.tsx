@@ -1,8 +1,16 @@
 "use client";
 
-import {useMemo,useState} from "react";
+import {useMemo, useState} from "react";
 import {REPAIR_OPTIONS} from "../repair-catalog";
-import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,resetCoreRepairEstimate,type RepairTimeEstimate} from "./repair-time-estimates";
+import {
+  aggregateRepairItemEstimates,
+  blankRepairItem,
+  normalizeRepairItems,
+  repairItemsReason,
+  repairItemsTotal,
+  type DownSheetRepairItem,
+} from "./down-sheet-repair-items";
+import {formatRepairTime, resetCoreRepairEstimate, type RepairTimeEstimate} from "./repair-time-estimates";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -13,65 +21,104 @@ type FleetBus={id:string;n:string;s:FleetStatus;l:string};
 type RepairHistory={at:string;initials:string;action:string};
 
 export type DownSheetRecord={
- id:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
- assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
- workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
- timeEstimate:RepairTimeEstimate;
- createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
+  id:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+  repairItems?:DownSheetRepairItem[];
+  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
+  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
+  timeEstimate:RepairTimeEstimate;
+  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
 };
 
 const SECTIONS:RepairSection[]=["Pending","Accident","Scheduled Repair","Inspection","Vendor Repair","Roadcall","Other"];
 const WORKFLOWS:Workflow[]=["Scheduled","In Progress","Waiting for Parts","On Hold","Completed","Deferred"];
 const STATUS_OPTIONS:[FleetStatus,string][]=[["service","In Service / On Road"],["defect","In Service with Defects"],["shop","Work in Progress"],["out","Out of Service"],["decommissioned","Decommissioned"],["unknown","Unknown"]];
 const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:string;help:string}[]=[
- {key:"repairMinutes",label:"HANDS-ON REPAIR",help:"Actual wrench, replacement, adjustment, inspection, and verification time."},
- {key:"diagnosticMinutes",label:"DIAGNOSIS / VERIFY",help:"Reproduce the complaint, inspect, test, isolate, and confirm the failure."},
- {key:"accessMinutes",label:"BUS ACCESS & SETUP",help:"Locate and stage the bus, move blocking buses, jump or air it up, push it, gather tools, and make the work area safe."},
- {key:"complicationMinutes",label:"COMPLICATIONS",help:"Stripped or seized bolts, corrosion, broken hardware, rework, and unexpected access problems."},
- {key:"heatMinutes",label:"HEAT / FATIGUE",help:"Realistic pace and recovery allowance for extreme shop or outdoor conditions."},
- {key:"interruptionMinutes",label:"ROADCALL / INTERRUPTIONS",help:"Road calls, reassignment, waiting on direction, and other work that interrupts this repair."},
- {key:"otherMinutes",label:"OTHER WORKFLOW TIME",help:"Parts counter, vendor coordination, cleanup, paperwork, retest, or another documented delay."},
+  {key:"repairMinutes",label:"HANDS-ON REPAIR",help:"Repair, replacement, adjustment, inspection, and verification."},
+  {key:"diagnosticMinutes",label:"DIAGNOSIS / VERIFY",help:"Reproduce, inspect, test, isolate, and confirm."},
+  {key:"accessMinutes",label:"BUS ACCESS & SETUP",help:"Find and stage the bus, move blockers, jump, air, or push."},
+  {key:"complicationMinutes",label:"COMPLICATIONS",help:"Seized parts, stripped hardware, corrosion, or rework."},
+  {key:"heatMinutes",label:"HEAT / FATIGUE",help:"Realistic pace for extreme shop or outdoor conditions."},
+  {key:"interruptionMinutes",label:"ROADCALL / INTERRUPTIONS",help:"Road calls, reassignment, or waiting on direction."},
+  {key:"otherMinutes",label:"OTHER TIME",help:"Parts, vendor coordination, cleanup, paperwork, or retest."},
 ];
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
 export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void}){
- const [draft,setDraft]=useState(()=>({...entry,timeEstimate:normalizeRepairTimeEstimate(entry.timeEstimate,entry.category,entry.repair)}));
- const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
- const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
- const updateEstimateHours=(key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>setDraft(current=>({...current,timeEstimate:{...current.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
- const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
- const repairs=REPAIR_OPTIONS[draft.category]||[];
- const isNew=!entries.some(item=>item.id===entry.id);
- const estimateTotal=repairTimeTotal(draft.timeEstimate);
- const submit=(event:React.FormEvent)=>{event.preventDefault();const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);if(!bus){alert("Select a bus number.");return}if(!draft.category){alert("Select a repair category.");return}if(!draft.repair){alert("Select the specific repair or service.");return}if(!operator){alert("Enter your initials before saving this update.");return}const now=new Date().toISOString(),action=(isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow)+" - mechanic estimate "+formatRepairTime(estimateTotal),next={...draft,busNumber:bus.n,updatedAt:now,updatedBy:operator,completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",history:[...draft.history,{at:now,initials:operator,action}]};onSave(next)};
+  const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
+  const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
+  const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
+  const updateItem=(id:string,change:(item:DownSheetRepairItem)=>DownSheetRepairItem)=>setDraft(current=>({...current,repairItems:current.repairItems.map(item=>item.id===id?change(item):item)}));
+  const updateEstimateHours=(id:string,key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>updateItem(id,item=>({...item,timeEstimate:{...item.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
+  const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
+  const isNew=!entries.some(item=>item.id===entry.id);
+  const estimateTotal=repairItemsTotal(draft.repairItems);
 
- return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
-  <form className="repair-editor" onSubmit={submit}>
-   <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
-   <div className="repair-form">
-    <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker and cannot be typed here.</small></label>
-    <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
-    <label className="wide repair-category">REPAIR CATEGORY<select value={draft.category} onChange={event=>{const category=event.target.value;setDraft(current=>({...current,category,repair:"",timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Choose a system or service</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select><small>Choose the broad repair family first.</small></label>
-    <label className="wide repair-specific">SPECIFIC REPAIR / SERVICE<select value={draft.repair} onChange={event=>{const repair=event.target.value;setDraft(current=>({...current,repair,operationalStatus:current.category==="Interior Cleaning"&&repair==="Cleaning Required"?"shop":current.operationalStatus,timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}))}} disabled={!draft.category}><option value="">{draft.category?"Choose a "+draft.category+" item":"Select a repair category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select><small>Selecting a repair loads a conservative starting allowance. The mechanic can adjust every part.</small></label>
-    <label className="wide">ADDITIONAL REASON / DETAILS<textarea value={draft.customReason} onChange={event=>update("customReason",event.target.value)} placeholder="Optional details that are specific to this bus"/></label>
-    <fieldset className="mechanic-estimate wide">
-     <legend>MECHANIC PLANNING ESTIMATE</legend>
-     <div className="estimate-heading"><span><b>REAL-WORLD WORK ALLOWANCE</b><small>Planning forecast only - not a flat-rate promise, disciplinary standard, or guarantee.</small></span><strong>{formatRepairTime(estimateTotal)}</strong></div>
-     <p><b>SHOP RULE: 30-MINUTE ABSOLUTE MINIMUM.</b> Tire allowances are per tire and a full-day rotor job is set to 8 hours. Count the time the job actually requires, including diagnosis, finding and staging the bus, blocked access, failed jumps, airing or pushing a bus, stripped hardware, heat, road calls, parts, cleanup, and retesting.</p>
-     <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(draft.timeEstimate[field.key])} onChange={event=>updateEstimateHours(field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
-     <label className="estimate-notes">ESTIMATE NOTES<textarea value={draft.timeEstimate.notes} onChange={event=>setDraft(current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Document the conditions or workflow facts supporting this allowance."/></label>
-    </fieldset>
-    <label>ASSIGNMENT TYPE<select value={draft.assignmentType} onChange={event=>update("assignmentType",event.target.value as AssignmentType)}><option>Mechanic</option><option>Vendor</option></select></label>
-    <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
-    <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
-    <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>update("workflow",event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
-    <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>This changes status only, never the parking location.</small></label>
-    <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
-    <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required for every saved change.</small></label>
-   </div>
-   {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
-   <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair">{isNew?"ADD TO DOWN SHEET":"SAVE UPDATE"}</button></div>
-  </form>
- </div>;
+  const submit=(event:React.FormEvent)=>{
+    event.preventDefault();
+    const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);
+    if(!bus){alert("Select a bus number.");return}
+    if(!operator){alert("Enter your initials before saving this update.");return}
+    const now=new Date().toISOString();
+    const repairItems=draft.repairItems.filter(item=>item.category||item.repair||item.details||item.estimateEnabled);
+    const first=repairItems[0];
+    const action=(isNew?"Created down-sheet entry":"Updated repair entry - "+draft.workflow)+(estimateTotal?" - mechanic estimate "+formatRepairTime(estimateTotal):" - no time estimate");
+    onSave({
+      ...draft,
+      busNumber:bus.n,
+      category:first?.category||"Miscellaneous",
+      repair:first?.repair||"Repair required",
+      customReason:repairItemsReason(repairItems),
+      repairItems,
+      timeEstimate:aggregateRepairItemEstimates(repairItems),
+      updatedAt:now,
+      updatedBy:operator,
+      completedAt:draft.workflow==="Completed"?(draft.completedAt||now):"",
+      history:[...draft.history,{at:now,initials:operator,action}],
+    });
+  };
+
+  return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
+    <form className="repair-editor" onSubmit={submit}>
+      <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
+      <div className="repair-form">
+        <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker.</small></label>
+        <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
+
+        <fieldset className="repair-items wide">
+          <legend>REPAIRS & ESTIMATES</legend>
+          <div className="repair-items-head"><span><b>BUS TOTAL</b><small>Each repair keeps its own optional estimate.</small></span><strong>{estimateTotal?formatRepairTime(estimateTotal):"NOT SET"}</strong></div>
+          <div className="repair-item-list">{draft.repairItems.map((item,index)=>{
+            const repairs=REPAIR_OPTIONS[item.category]||[];
+            const itemTotal=item.estimateEnabled?repairItemsTotal([item]):0;
+            return <section className="repair-item-card" key={item.id}>
+              <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
+              <div className="repair-item-fields">
+                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select></label>
+                <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
+                <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
+              </div>
+              <label className="estimate-toggle"><input type="checkbox" checked={item.estimateEnabled} onChange={event=>updateItem(item.id,current=>({...current,estimateEnabled:event.target.checked}))}/><span>ESTIMATE TIME</span><small>Optional. Category and specific repair load a starting allowance.</small></label>
+              {item.estimateEnabled&&<div className="item-estimate">
+                <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(item.timeEstimate[field.key])} onChange={event=>updateEstimateHours(item.id,field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
+                <label className="estimate-notes">ESTIMATE NOTES<textarea value={item.timeEstimate.notes} onChange={event=>updateItem(item.id,current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Optional conditions supporting this estimate"/></label>
+              </div>}
+            </section>;
+          })}</div>
+          <button className="add-repair-item" type="button" onClick={()=>setDraft(current=>({...current,repairItems:[...current.repairItems,blankRepairItem(current.repairItems.length)]}))}>+ ADD REPAIR</button>
+          <p><b>30-MINUTE ABSOLUTE MINIMUM PER ESTIMATED REPAIR.</b> This is a planning forecast, not a flat-rate promise. Include diagnosis, access and staging, blocked buses, failed jumps, airing or pushing, stripped hardware, heat, interruptions, parts, cleanup, and retesting.</p>
+        </fieldset>
+
+        <label>ASSIGNMENT TYPE<select value={draft.assignmentType} onChange={event=>update("assignmentType",event.target.value as AssignmentType)}><option>Mechanic</option><option>Vendor</option></select></label>
+        <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
+        <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
+        <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>update("workflow",event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
+        <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>Status only; location stays unchanged.</small></label>
+        <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
+        <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>
+      </div>
+      {draft.history.length>0&&<section className="repair-history editor-history"><b>RECENT CHANGE HISTORY</b>{draft.history.slice(-5).reverse().map((item,index)=><div key={item.at+index}><strong>{item.initials}</strong><span>{item.action}</span><time>{new Date(item.at).toLocaleString()}</time></div>)}</section>}
+      <div className="repair-editor-actions"><button type="button" onClick={onClose}>CANCEL</button><button className="save-repair" type="submit">SAVE UPDATE</button></div>
+    </form>
+  </div>;
 }
