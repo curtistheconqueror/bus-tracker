@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
-import { downSheetCountLabel, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
+import { downSheetCountLabel, readyDownSheetBusIds, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
@@ -70,6 +70,22 @@ test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", 
   const duplicateExact = resolveBusNumber([...fleet, { id: "duplicate", n: "17525" }], "17525");
   assert.equal(duplicateExact.kind, "ambiguous");
   assert.equal(duplicateExact.matchType, "exact");
+});
+
+test("DS badge marks active Down Sheet buses only in ready-use locations", async () => {
+  const fleet = [
+    { id: "road", l: "road-4" },
+    { id: "garage", l: "garage-10" },
+    { id: "shop", l: "bay-12" },
+    { id: "cng", l: "west-2" },
+    { id: "clear", l: "garage-11" },
+  ];
+  assert.deepEqual(readyDownSheetBusIds(fleet, ["road", "garage", "shop", "cng"]), ["road", "garage"]);
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(page, /downSheetReady&&<span className="downsheet-ready-badge"/);
+  assert.match(page, /ON DOWN SHEET · READY LOCATION/);
+  assert.match(css, /\.downsheet-ready-badge\{position:absolute;top:-5px;left:-5px/);
 });
 
 test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
