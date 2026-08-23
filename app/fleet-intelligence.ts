@@ -64,6 +64,12 @@ export function findOperatorAreaMentions(command:string,areas:FleetInsightArea[]
   if(area)aliases.forEach(alias=>remember(area,alias));
  }
  areas.forEach(area=>remember(area,area.name));
+ const pairedTroubleBays=haystack.match(/\bbays? 11 (?:and|plus) (?:bay )?12\b/);
+ if(pairedTroubleBays?.index!==undefined){
+  const bay11=areas.find(area=>area.name==="TROUBLE BAY 11"),bay12=areas.find(area=>area.name==="TROUBLE BAY 12");
+  if(bay11)mentions.push({area:bay11,index:pairedTroubleBays.index});
+  if(bay12)mentions.push({area:bay12,index:pairedTroubleBays.index+pairedTroubleBays[0].lastIndexOf("12")});
+ }
  const earliest=new Map<string,{area:FleetInsightArea;index:number}>();
  mentions.forEach(mention=>{const current=earliest.get(mention.area.name);if(!current||mention.index<current.index)earliest.set(mention.area.name,mention)});
  return [...earliest.values()].sort((a,b)=>a.index-b.index);

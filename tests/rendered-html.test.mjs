@@ -1187,6 +1187,60 @@ test("AI operator plans and atomically applies multi-bus moves, statuses, and Wa
   assert.match(missingSource.message, /need the source area/i);
 });
 
+test("AI operator distinguishes garage bay labels from bus suffixes and resumes ambiguous commands", () => {
+  const fleet = [
+    { id: "garage", n: "17520", l: "garage-0", s: "service", defects: [], pendingRepair: "" },
+    { id: "bay11", n: "17525", l: "garage-10", s: "defect", defects: [], pendingRepair: "Ramp" },
+    { id: "bay12", n: "17530", l: "garage-11", s: "shop", defects: [], pendingRepair: "Inspection" },
+    { id: "suffix11a", n: "15511", l: "road-0", s: "service", defects: [], pendingRepair: "" },
+    { id: "suffix11b", n: "17511", l: "road-1", s: "service", defects: [], pendingRepair: "" },
+    { id: "suffix11c", n: "18511", l: "road-2", s: "service", defects: [], pendingRepair: "" },
+    { id: "suffix12a", n: "15512", l: "road-3", s: "service", defects: [], pendingRepair: "" },
+    { id: "suffix12b", n: "17512", l: "road-4", s: "service", defects: [], pendingRepair: "" },
+  ];
+  const areas = [
+    { name: "MAIN GARAGE (BAYS 1-10)", slots: ["garage-0"] },
+    { name: "TROUBLE BAY 11", slots: ["garage-10"] },
+    { name: "TROUBLE BAY 12", slots: ["garage-11"] },
+    { name: "IN SERVICE / ON ROAD", slots: Array.from({ length: 5 }, (_, index) => "road-" + index) },
+    { name: "WAITING AREA", slots: Array.from({ length: 8 }, (_, index) => "waiting-" + index) },
+  ];
+
+  const areaMove = planOperatorCommand("Move all buses in Main Garage plus Bay 11 and 12 to Waiting Area", fleet, areas);
+  assert.equal(areaMove.kind, "plan");
+  assert.equal(areaMove.plan.kind, "bulkMove");
+  assert.deepEqual(areaMove.plan.busNumbers, ["17520", "17525", "17530"]);
+  assert.equal(areaMove.plan.areaName, "WAITING AREA");
+  assert.match(areaMove.plan.summary, /MAIN GARAGE \(BAYS 1-10\), TROUBLE BAY 11 and TROUBLE BAY 12/);
+
+  const wholeGarage = planOperatorCommand("Move all buses in the entire garage, all bays and rows, to Waiting Area", fleet, areas);
+  assert.equal(wholeGarage.kind, "plan");
+  assert.equal(wholeGarage.plan.kind, "bulkMove");
+  assert.deepEqual(wholeGarage.plan.busNumbers, ["17520", "17525", "17530"]);
+
+  const oneArea = planOperatorCommand("Move all buses from Bay 11 to Waiting Area", fleet, areas);
+  assert.equal(oneArea.kind, "plan");
+  assert.equal(oneArea.plan.kind, "bulkMove");
+  assert.deepEqual(oneArea.plan.busNumbers, ["17525"]);
+
+  const ambiguousGroup = planOperatorCommand("Move buses 20, 11, and 30 to Waiting Area", fleet, areas);
+  assert.equal(ambiguousGroup.kind, "message");
+  assert.match(ambiguousGroup.message, /11 matches multiple buses: 15511, 17511, 18511/);
+  assert.equal(ambiguousGroup.context.pendingIntent, "clarify-bus");
+
+  const resumedGroup = planOperatorCommand("15511", fleet, areas, ambiguousGroup.context);
+  assert.equal(resumedGroup.kind, "plan");
+  assert.equal(resumedGroup.plan.kind, "batch");
+  assert.deepEqual(resumedGroup.plan.items.map(item => item.busNumber), ["17520", "15511", "17530"]);
+
+  const ambiguousSingle = planOperatorCommand("Move bus 11 to Waiting Area", fleet, areas);
+  assert.equal(ambiguousSingle.kind, "message");
+  assert.equal(ambiguousSingle.context.pendingIntent, "clarify-bus");
+  const resumedSingle = planOperatorCommand("17511", fleet, areas, ambiguousSingle.context);
+  assert.equal(resumedSingle.kind, "plan");
+  assert.equal(resumedSingle.plan.kind, "move");
+  assert.equal(resumedSingle.plan.busNumber, "17511");
+});
 test("all relocation controls use the same destination-aware smart status", () => {
   const minor = [{ id: "minor", category: "A/C and HVAC", issue: "No cooling", details: "", operability: "service", state: "open" }];
   const downing = [{ id: "down", category: "Brakes", issue: "Air brake fault", details: "", operability: "down", state: "open" }];

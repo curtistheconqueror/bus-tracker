@@ -6,7 +6,7 @@ import type {FleetStatus} from "./smart-status.ts";
 export type OperatorBus=FleetInsightBus;
 
 export type OperatorArea={name:string;slots:string[]};
-export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string;pendingStatus?:FleetStatus;pendingIntent?:"status"};
+export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string;pendingStatus?:FleetStatus;pendingIntent?:"status"|"clarify-bus";pendingCommand?:string;ambiguousQuery?:string;candidateBusIds?:string[]};
 
 type DefectDraft=Omit<StructuredDefect,"id">;
 export type OperatorBatchItem={busId:string;busNumber:string;areaName?:string;status?:FleetStatus};
@@ -38,22 +38,35 @@ function busQuery(command:string){
  return fallback?.[1]||"";
 }
 
-function busQueries(command:string){
- const matches=[...command.matchAll(/\b(\d{5}|\d{2})\b/g)];
- return matches.filter(match=>{const before=command.slice(Math.max(0,(match.index||0)-12),match.index||0);return !/\bbay\s*$/i.test(before)}).map(match=>match[1]);
+function isAreaNumber(command:string,index:number){
+ const before=command.slice(Math.max(0,index-32),index);
+ return /\bbays?\s*$/i.test(before)||/\bbays?\s+\d{1,2}\s+(?:and|plus|&|\/|-)\s*(?:bay\s*)?$/i.test(before)||/\bbays?\s+\d{1,2}\s*(?:-|through|to)\s*$/i.test(before);
 }
-function resolveMany(fleet:OperatorBus[],queries:string[]):{buses?:OperatorBus[];message?:string}{
+function busQueries(command:string){
+ return [...command.matchAll(/\b(\d{5}|\d{2})\b/g)].filter(match=>!isAreaNumber(command,match.index||0)).map(match=>match[1]);
+}
+function replaceBusQuery(command:string,query:string,replacement:string){
+ const match=[...command.matchAll(/\b(\d{5}|\d{2})\b/g)].find(item=>item[1]===query&&!isAreaNumber(command,item.index||0));
+ if(!match||match.index===undefined)return command;
+ return command.slice(0,match.index)+replacement+command.slice(match.index+match[0].length);
+}
+function resolveMany(fleet:OperatorBus[],queries:string[]):{buses?:OperatorBus[];message?:string;ambiguous?:{query:string;matches:OperatorBus[]}}{
  const buses:OperatorBus[]=[];
  for(const query of queries){
   const resolution=resolveBusNumber(fleet,query);
   if(resolution.kind==="invalid")return {message:"Enter a complete fleet number or exactly two ending digits for "+query+"."};
   if(resolution.kind==="not-found")return {message:"I could not find a bus matching "+query+" on this device."};
-  if(resolution.kind==="ambiguous")return {message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Use the complete fleet number before I make a group change."};
+  if(resolution.kind==="ambiguous")return {message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Reply with the complete fleet number and I will continue this command.",ambiguous:{query,matches:resolution.matches}};
   if(buses.some(bus=>bus.id===resolution.bus.id))return {message:"The command points to Bus "+resolution.bus.n+" more than once. Remove the duplicate number and try again."};
   buses.push(resolution.bus);
  }
  return {buses};
 }
+function clarificationContext(command:string,resolved:{ambiguous?:{query:string;matches:OperatorBus[]}},base:OperatorSelectionContext|null=null):OperatorSelectionContext|undefined{
+ if(!resolved.ambiguous)return undefined;
+ return {busIds:resolved.ambiguous.matches.map(bus=>bus.id),busNumbers:resolved.ambiguous.matches.map(bus=>bus.n),label:"Clarify "+resolved.ambiguous.query,pendingStatus:base?.pendingStatus,pendingIntent:"clarify-bus",pendingCommand:command,ambiguousQuery:resolved.ambiguous.query,candidateBusIds:resolved.ambiguous.matches.map(bus=>bus.id)};
+}
+
 
 function statusFromCommand(command:string):FleetStatus|undefined{
  const text=normalized(command);
@@ -80,13 +93,13 @@ function batchCapacityShortage(items:OperatorBatchItem[],fleet:OperatorBus[],are
  return null;
 }
 
-function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string}{
+function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string;ambiguous?:{query:string;matches:OperatorBus[]}}{
  const query=busQuery(command);
  if(!query)return {query,message:"Tell me which bus you mean. Use the full fleet number or its last two digits."};
  const resolution=resolveBusNumber(fleet,query);
  if(resolution.kind==="invalid")return {query,message:"Enter a complete fleet number or exactly two ending digits."};
  if(resolution.kind==="not-found")return {query,message:"I could not find a bus matching "+query+" on this device."};
- if(resolution.kind==="ambiguous")return {query,message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Use the complete fleet number before I make a change."};
+ if(resolution.kind==="ambiguous")return {query,message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Reply with the complete fleet number and I will continue this command.",ambiguous:{query,matches:resolution.matches}};
  return {query,bus:resolution.bus};
 }
 
@@ -110,6 +123,16 @@ function areaLabel(bus:OperatorBus,areas:OperatorArea[]){return areas.find(area=
 export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:OperatorArea[],context:OperatorSelectionContext|null=null,now=Date.now()):OperatorPlanningResult{
  const text=normalized(command);
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
+ if(context?.pendingIntent==="clarify-bus"&&context.pendingCommand&&context.ambiguousQuery){
+  const answers=busQueries(command);
+  if(answers.length!==1||answers[0].length!==5)return {kind:"message",message:"Reply with one complete five-digit fleet number from: "+context.busNumbers.join(", ")+".",context};
+  const resolution=resolveBusNumber(fleet,answers[0]),allowed=new Set(context.candidateBusIds||context.busIds);
+  if(resolution.kind!=="exact"||!allowed.has(resolution.bus.id))return {kind:"message",message:answers[0]+" is not one of the choices for "+context.ambiguousQuery+". Reply with: "+context.busNumbers.join(", ")+".",context};
+  const resumedCommand=replaceBusQuery(context.pendingCommand,context.ambiguousQuery,resolution.bus.n);
+  const resumeContext=context.pendingStatus?{busIds:[],busNumbers:[],label:"Status: "+statusLabel(context.pendingStatus),pendingStatus:context.pendingStatus,pendingIntent:"status" as const}:null;
+  return planOperatorCommand(resumedCommand,fleet,areas,resumeContext,now);
+ }
+
 
  const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
  const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
@@ -123,14 +146,14 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  }
  if(explicitQueries.length&&context?.pendingStatus&&!moveAction&&!desiredStatus){
   const resolved=resolveMany(fleet,explicitQueries);
-  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that status update.",context};
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that status update.",context:clarificationContext(command,resolved,context)||context};
   return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items:resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,status:context.pendingStatus})),summary:"Update "+resolved.buses.map(bus=>bus.n).join(", ")+" to "+statusLabel(context.pendingStatus)}};
  }
  if(moveAction&&splitFleet&&explicitQueries.length&&areaMentions.length>=2){
   const selectedArea=areaMentions[0].area,remainderArea=areaMentions[areaMentions.length-1].area;
   if(selectedArea.name===remainderArea.name)return {kind:"message",message:"The named buses and the remaining fleet cannot both use "+selectedArea.name+" as different destinations. Name a second destination area."};
   const resolved=resolveMany(fleet,explicitQueries);
-  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every named bus in that fleet split."};
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every named bus in that fleet split.",context:clarificationContext(command,resolved)};
   const selectedIds=new Set(resolved.buses.map(bus=>bus.id)),remaining=fleet.filter(bus=>!selectedIds.has(bus.id));
   const items:OperatorBatchItem[]=[...resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:selectedArea.name})),...remaining.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:remainderArea.name}))];
   const shortage=batchCapacityShortage(items,fleet,areas);
@@ -141,13 +164,17 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   return {kind:"plan",plan:{kind:"batch",requiresConfirmation:true,items,summary:"Move "+resolved.buses.length+" named buses to "+selectedArea.name+" and the remaining "+remaining.length+" buses to "+remainderArea.name+" as one all-or-nothing fleet update"}};
  }
  if(moveAction&&!explicitQueries.length&&areaMentions.length>=2){
-  const source=areaMentions[0].area,destination=areaMentions[areaMentions.length-1].area;
-  if(source.name===destination.name)return {kind:"message",message:"The source and destination are both "+source.name+". Name a different destination area."};
-  const selected=fleet.filter(bus=>source.slots.includes(bus.l)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})||a.id.localeCompare(b.id));
-  if(!selected.length)return {kind:"message",message:source.name+" is currently empty on this device, so there are no buses to move."};
+  const destination=areaMentions[areaMentions.length-1].area,sourceAreas=[...new Map(areaMentions.slice(0,-1).map(mention=>[mention.area.name,mention.area])).values()];
+  const wholeGarage=/\b(?:entire|whole)\s+(?:main\s+)?garage\b|\ball\s+(?:of\s+the\s+)?(?:main\s+)?garage\s+(?:bays?|rows?|area)\b|\b(?:main\s+)?garage\s+(?:all|every)\s+(?:bays?|rows?)\b/.test(text);
+  if(wholeGarage&&sourceAreas.some(source=>source.name==="MAIN GARAGE (BAYS 1-10)"))for(const name of ["TROUBLE BAY 11","TROUBLE BAY 12"]){const area=areas.find(item=>item.name===name);if(area&&!sourceAreas.some(source=>source.name===name))sourceAreas.push(area)}
+  if(sourceAreas.some(source=>source.name===destination.name))return {kind:"message",message:"The source and destination both include "+destination.name+". Name a different destination area."};
+  const sourceNames=sourceAreas.map(source=>source.name),sourceSlots=new Set(sourceAreas.flatMap(source=>source.slots));
+  const selected=fleet.filter(bus=>sourceSlots.has(bus.l)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})||a.id.localeCompare(b.id));
+  if(!selected.length)return {kind:"message",message:sourceNames.join(", ")+" currently contain no buses on this device, so there are no buses to move."};
   const already=selected.filter(bus=>destination.slots.includes(bus.l)).length,needed=selected.length-already,open=destination.slots.filter(slot=>!fleet.some(bus=>bus.l===slot)).length;
   if(open<needed)return {kind:"message",message:capacityMessage(destination,needed,open)};
-  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:destination.name,status:desiredStatus,selectionLabel:"all buses in "+source.name,summary:"Move all "+selected.length+" buses from "+source.name+" to the first available spaces in "+destination.name+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
+  const sourceLabel=sourceNames.length===1?sourceNames[0]:sourceNames.slice(0,-1).join(", ")+" and "+sourceNames[sourceNames.length-1];
+  return {kind:"plan",plan:{kind:"bulkMove",requiresConfirmation:true,busIds:selected.map(bus=>bus.id),busNumbers:selected.map(bus=>bus.n),areaName:destination.name,status:desiredStatus,selectionLabel:"all buses in "+sourceLabel,summary:"Move all "+selected.length+" buses from "+sourceLabel+" to the first available spaces in "+destination.name+(desiredStatus?" and set status to "+statusLabel(desiredStatus):"")}};
  }
  if(moveAction&&!explicitQueries.length&&/\b(all|every)\b/.test(text)&&areaMentions.length===1)return {kind:"message",message:"I found the destination "+areaMentions[0].area.name+", but I need the source area too. Try: Move all buses from CNG West to the Waiting Area."};
  const repeatedClauses=command.split(/;|,(?=\s*(?:move|relocate|place|send|put|transfer|shift|bring|return|add)\b)/i).map(clause=>clause.trim()).filter(Boolean);
@@ -156,7 +183,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   for(const clause of repeatedClauses){
    const queries=busQueries(clause),resolved=resolveMany(fleet,queries),area=areaFromCommand(clause,areas),clauseStatus=statusFromCommand(clause);
    if(!queries.length)return {kind:"message",message:"Each movement instruction needs at least one bus number."};
-   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command."};
+   if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command.",context:clarificationContext(command,resolved)};
    if(!area)return {kind:"message",message:"I could not identify the destination in: "+clause+"."};
    items.push(...resolved.buses.map(bus=>({busId:bus.id,busNumber:bus.n,areaName:area.name,status:clauseStatus})));
   }
@@ -168,7 +195,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  }
  if(explicitQueries.length&&(explicitQueries.length>1||statusAction||(moveAction&&Boolean(desiredStatus)))){
   const resolved=resolveMany(fleet,explicitQueries);
-  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command."};
+  if(!resolved.buses)return {kind:"message",message:resolved.message||"I could not resolve every bus in that command.",context:clarificationContext(command,resolved)};
   const area=moveAction?areaFromCommand(command,areas):undefined;
   if(moveAction&&!area)return {kind:"message",message:"I found the buses, but I could not identify the destination area. Try On Road, Main Garage, CNG East, CNG West, or Waiting Area."};
   if(!moveAction&&!desiredStatus)return {kind:"message",message:"Tell me which status to apply to those buses.",context:{busIds:resolved.buses.map(bus=>bus.id),busNumbers:resolved.buses.map(bus=>bus.n),label:"Buses "+resolved.buses.map(bus=>bus.n).join(", "),pendingIntent:"status"}};
@@ -212,7 +239,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
   return {kind:"plan",plan:{kind:"locate",requiresConfirmation:false,busIds:matches.map(bus=>bus.id),busNumbers:numbers,summary:matches.length===1?"Locate Bus "+numbers[0]:"Highlight all matches: "+numbers.join(", ")}};
  }
 
- if(!resolved.bus)return {kind:"message",message:resolved.message||"Tell me which bus you mean."};
+ if(!resolved.bus)return {kind:"message",message:resolved.message||"Tell me which bus you mean.",context:clarificationContext(command,resolved)};
  const bus=resolved.bus;
 
  if(moveAction){
