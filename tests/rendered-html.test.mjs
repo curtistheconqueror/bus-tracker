@@ -281,7 +281,7 @@ test("server-renders the live fleet command dashboard", async () => {
   const pit = section(html, "PIT", "BRAKE TEST");
   assert.equal((pit.match(/class="spot"/g) ?? []).length, 2);
   const brake = section(html, "BRAKE TEST", "TOW STAGING");
-  assert.equal((brake.match(/class="spot"/g) ?? []).length, 3);
+  assert.equal((brake.match(/class="spot"/g) ?? []).length, 4);
   const east = section(html, '<section class="east lot">', '<section class="road">');
   assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
@@ -445,7 +445,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.equal(ROAD_CAPACITY, 75);
   assert.equal(WEST_CAPACITY, 40);
   assert.match(page, /"PIT":slots\("pit",2\)/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",4\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
   assert.ok(page.includes('const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
@@ -980,6 +980,10 @@ test("every facility section can collapse independently while global controls re
   assert.match(page, /sectionClass\("MAIN GARAGE \(BAYS 1-12\)","garage panel"\)/);
   assert.match(css, /\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
   assert.match(css, /\.title-actions \.toggle-section/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",4\)/);
+  assert.match(page, /\["BRAKE TEST","brake",4\]/);
+  assert.match(css, /\.brake \.vspots\{grid-template-rows:repeat\(4,minmax\(0,1fr\)\)\}/);
+  assert.match(css, /\.vertical-zone\.brake \.title-actions,\.vertical-zone\.tow \.title-actions\{transform:translateY\(-3px\)\}/);
 });
 
 test("mechanic planning estimates enforce Curtis's shop baselines and accumulated totals", async () => {

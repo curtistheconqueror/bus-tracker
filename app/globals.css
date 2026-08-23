@@ -206,7 +206,8 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .roadgrid{grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(15,minmax(0,1fr));gap:5px}
 .west{align-self:end}
 .westgrid{grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));height:222px}
-.pit .vspots{grid-template-rows:repeat(2,minmax(0,1fr))}.brake .vspots{grid-template-rows:repeat(3,minmax(0,1fr))}
+.pit .vspots{grid-template-rows:repeat(2,minmax(0,1fr))}.brake .vspots{grid-template-rows:repeat(4,minmax(0,1fr))}
+.vertical-zone.brake .title-actions,.vertical-zone.tow .title-actions{transform:translateY(-3px)}
 .east-overflow{position:absolute;left:8px;right:8px;bottom:4px;z-index:5}
 /* Tow-in-progress operational flag */
 .tow-badge{margin-left:auto;padding:3px 5px;border-radius:4px;background:#6f42c1;color:#fff;font-size:7px;letter-spacing:.45px}
