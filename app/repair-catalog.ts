@@ -17,6 +17,7 @@ export type StructuredDefect={
  actionTaken?:string;
  partNumber?:string;
  reportedLocation?:string;
+ defectLogHiddenAt?:string;
  quantity?:number;
  unit?:string;
  source?:DefectSource;
@@ -66,7 +67,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
-  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue:defect.issue||"Driver-reported defect",details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,source:defect.source};
+  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue:defect.issue||"Driver-reported defect",details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];

@@ -59,9 +59,11 @@ button,input,select,textarea{font:inherit}
 .down-table tr.completed td{opacity:.62;background:#eef7f1}
 .line-number{text-align:center!important;font-weight:900;color:#7d8aa0;background:#eef2f8!important}
 .fleet-number b{display:block;font-size:14px;color:#0b3a78}.fleet-number small{display:block;margin-top:3px;font-size:7px;font-weight:900;color:#75839a;text-transform:uppercase}
+.fleet-number-button{width:100%;min-height:39px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;padding:3px 5px;text-align:left;cursor:pointer;touch-action:manipulation}
+.fleet-number-button:hover,.fleet-number-button:focus-visible{border-color:#88b6e9;background:#edf6ff;outline:none}
 .reason-button{width:100%;min-height:39px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;border:1px solid transparent;border-radius:4px;background:transparent;color:#1c3154;padding:3px 5px;text-align:left;cursor:pointer}
 .reason-button:hover,.reason-button:focus-visible{border-color:#88b6e9;background:#edf6ff}
-.reason-button b{font-size:9px;color:#075dbb}.reason-button span{margin-top:2px;font-size:9px;line-height:1.25}
+.reason-button b{font-size:10.5px;font-weight:900;line-height:1.15;color:#075dbb}.reason-button span{margin-top:2px;font-size:9px;line-height:1.25}
 .assignment{display:flex;flex-direction:column;font-weight:800}.assignment small{margin-bottom:2px;font-size:7px;color:#75839a;text-transform:uppercase}.assignment.vendor{color:#7b4713}
 .section-tag,.shift-tag,.workflow{display:inline-flex;min-height:24px;align-items:center;justify-content:center;border-radius:4px;padding:4px 7px;font-size:8px;text-transform:uppercase}
 .section-tag{background:#e8edf5;color:#384c6c}.section-tag.pending{background:#fff1bd;color:#705200}.section-tag.accident{background:#ffdede;color:#8a151c}.section-tag.inspection{background:#e3efff;color:#124f9a}.section-tag.vendor-repair{background:#f3e5ff;color:#67368c}

@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
 import {defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
-import {defectLogRecords,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
+import {defectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,isPendingDownSheetRecord,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
 import {QUICK_FILTERS,quickFilterBusIds,type QuickFilterKey} from "../quick-filters";
@@ -114,8 +114,10 @@ export default function DefectLog(){
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
- const records=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
+ const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
+ const records=useMemo(()=>allRecords.filter(record=>!record.defect.defectLogHiddenAt),[allRecords]);
  const activeDownBusIds=useMemo(()=>downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId),[downEntries]);
+ const activeDownBusIdSet=useMemo(()=>new Set(activeDownBusIds),[activeDownBusIds]);
  const mysteryIdSet=useMemo(()=>new Set(mysteryBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
  const awarenessIdSet=useMemo(()=>new Set(bay12AwarenessBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
  const mysteryBuses=useMemo(()=>fleet.filter(bus=>mysteryIdSet.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,mysteryIdSet]);
@@ -136,7 +138,9 @@ export default function DefectLog(){
  const saveDraft=(draft:LogDraft)=>{const result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);setEditing(null)};
  const markFixed=(record:DefectLogRecord)=>{if(!settings.defaultInitials){setEditing(recordDraft(record));alert("Enter your initials before marking this repair fixed.");return}saveDraft({...recordDraft(record),onDownSheet:false,defect:{...record.defect,state:"completed",reportedBy:settings.defaultInitials,actionTaken:record.defect.actionTaken||"Repair completed"}})};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
- const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:records.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[record.defect.id]),downEntries)};
+ const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>record.defect.id)),downEntries)};
+ const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:allRecords.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000)};
  const appStyle={"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--log-font":FONT_STACKS[settings.fontFamily]} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize}>
@@ -162,18 +166,18 @@ export default function DefectLog(){
    </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Eligible shop, CNG, and Bays 11–12 match the active Down Sheet.</span></div>}
   </section>
   <section className="log-feed">
-   <div className="feed-title"><span><b>LIVE REPAIR FEED</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button></div>
-   {visible.length?<div className="log-list">{visible.map(record=><article className={"log-card "+record.defect.state+(record.defect.operability==="down"?" downing":"")} key={record.bus.id+"-"+record.defect.id}>
+   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button></div><span><b>LIVE REPAIR FEED</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span></div>
+   {visible.length?<div className="log-list">{visible.map(record=>{const pendingDownSheet=isPendingDownSheetRecord(record,activeDownBusIdSet),busOnDownSheet=activeDownBusIdSet.has(record.bus.id);return <article className={"log-card "+record.defect.state+(record.defect.operability==="down"?" downing":"")+(pendingDownSheet?" pending-down-sheet":"")} key={record.bus.id+"-"+record.defect.id}>
     <button className="log-card-main" onClick={()=>setEditing(recordDraft(record))}>
      <span className="log-icon" aria-hidden="true">{CATEGORY_ICONS[record.defect.category]||CATEGORY_ICONS.Miscellaneous}</span>
      <span className="log-bus"><small>BUS</small><strong>{record.bus.n}</strong><em>{locationLabel(record.bus.l)}</em></span>
      <span className="log-repair"><b>{record.defect.category}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span>
-     <span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{record.onDownSheet&&<b className="downsheet-badge">DOWN SHEET</b>}<small>{STATUS_LABELS[record.bus.s]||record.bus.s}</small><time>{timeLabel(record.updatedAt)}</time>{record.defect.reportedBy&&<em>{record.defect.reportedBy}</em>}</span>
+     <span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{record.defect.state==="completed"&&record.defect.reportedBy&&<em className="fixed-by">{record.defect.reportedBy}</em>}{(record.onDownSheet||busOnDownSheet)&&<b className="downsheet-badge">DOWN SHEET</b>}{pendingDownSheet&&<b className="pending-downsheet-badge">PENDING DOWN SHEET</b>}<small>{STATUS_LABELS[record.bus.s]||record.bus.s}</small><time>{timeLabel(record.updatedAt)}</time>{record.defect.state!=="completed"&&record.defect.reportedBy&&<em>{record.defect.reportedBy}</em>}</span>
     </button>
-    {record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)}>&#10003; FIXED</button>}
-   </article>)}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
+    <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" repair fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" repair from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
+   </article>})}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
   </section>
-  <footer className="mobile-log-bar"><a className="operator-link" href="/?operator=1"><span>&#10022;</span> AI OPERATOR</a><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button></footer>
+  <footer className="mobile-log-bar"><a className="operator-link" href="/?operator=1"><span>&#10022;</span> AI OPERATOR</a></footer>
   {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} save={saveDraft} close={()=>setEditing(null)}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;

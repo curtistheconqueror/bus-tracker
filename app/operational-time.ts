@@ -4,6 +4,7 @@ export type OperationalTimeBus={
  parkedAt?:string;
  lastLocationChangeAt?:string;
  lastStatusChangeAt?:string;
+ lastMovedFrom?:string;
  bay12Watch?:boolean;
  defects?:{state?:string}[];
 };
@@ -29,6 +30,6 @@ export function operationalAgeMs(bus:OperationalTimeBus,now=Date.now()){
 }
 
 export function stampOperationalChange<T extends OperationalTimeBus>(previous:T,next:T,now=new Date().toISOString()):T&{parkedAt:string;lastLocationChangeAt:string;lastStatusChangeAt:string}{
- const baseline=normalizeOperationalTimestamps(previous,now),lastLocationChangeAt=previous.l===next.l?baseline.lastLocationChangeAt:now,lastStatusChangeAt=previous.s===next.s?baseline.lastStatusChangeAt:now,bay12Watch=activeDefects(next)&&Boolean(previous.bay12Watch||previous.l==="bay-12"||next.l==="bay-12");
- return {...next,bay12Watch,parkedAt:Date.parse(lastLocationChangeAt)>=Date.parse(lastStatusChangeAt)?lastLocationChangeAt:lastStatusChangeAt,lastLocationChangeAt,lastStatusChangeAt};
+ const moved=previous.l!==next.l,baseline=normalizeOperationalTimestamps(previous,now),lastLocationChangeAt=moved?now:baseline.lastLocationChangeAt,lastStatusChangeAt=previous.s===next.s?baseline.lastStatusChangeAt:now,lastMovedFrom=moved?previous.l:previous.lastMovedFrom,bay12Watch=activeDefects(next)&&Boolean(previous.bay12Watch||previous.l==="bay-12"||next.l==="bay-12");
+ return {...next,lastMovedFrom,bay12Watch,parkedAt:Date.parse(lastLocationChangeAt)>=Date.parse(lastStatusChangeAt)?lastLocationChangeAt:lastStatusChangeAt,lastLocationChangeAt,lastStatusChangeAt};
 }

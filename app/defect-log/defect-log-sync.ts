@@ -18,6 +18,32 @@ export type DefectLogDownEntry={
 
 export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean};
 
+export function isPendingDownSheetRecord(record:DefectLogRecord,activeDownBusIds:ReadonlySet<string>){
+ if(!isUnresolved(record.defect)||record.onDownSheet||activeDownBusIds.has(record.bus.id))return false;
+ const quarantineText=[
+  record.defect.category,record.defect.issue,record.defect.details,
+  record.defect.diagnosticNote,record.defect.actionTaken,
+ ].filter(Boolean).join(" ");
+ return record.bus.s==="out"||/\bquarantin(?:e|ed)\b/i.test(quarantineText);
+}
+
+export function isDefectLogCleanupCandidate(record:DefectLogRecord,activeDownBusIds:ReadonlySet<string>){
+ if(record.defect.defectLogHiddenAt)return false;
+ if(record.defect.source==="defect-log"&&isUnresolved(record.defect))return false;
+ if(!isUnresolved(record.defect))return true;
+ return record.bus.s==="out"||activeDownBusIds.has(record.bus.id);
+}
+
+export function hideDefectLogRecords(fleet:DefectLogFleetBus[],defectIds:Iterable<string>,now=new Date().toISOString()){
+ const hiddenIds=new Set(defectIds);
+ if(!hiddenIds.size)return fleet;
+ return fleet.map(bus=>{
+  const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
+  if(!defects.some(defect=>hiddenIds.has(defect.id)))return bus;
+  return {...bus,defects:defects.map(defect=>hiddenIds.has(defect.id)?{...defect,defectLogHiddenAt:now}:defect)};
+ });
+}
+
 function shiftFromFleet(value?:string):"1st"|"2nd"|"3rd"{return value==="Evening"?"2nd":value==="Night"?"3rd":"1st"}
 function workflowForState(state:DefectState):DefectLogDownEntry["workflow"]{return state==="completed"?"Completed":state==="deferred"?"Deferred":state==="in-progress"?"In Progress":"Scheduled"}
 

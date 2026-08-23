@@ -18,9 +18,9 @@ import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
-import { aggregateRepairItemEstimates, blankRepairItem, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
+import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
-import { saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { hideDefectLogRecords, isDefectLogCleanupCandidate, isPendingDownSheetRecord, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 
@@ -86,6 +86,9 @@ test("DS badge marks active Down Sheet buses only in ready-use locations", async
   assert.match(page, /downSheetReady&&<span className="downsheet-ready-badge"/);
   assert.match(page, /ON DOWN SHEET · READY LOCATION/);
   assert.match(css, /\.downsheet-ready-badge\{position:absolute;top:-5px;left:-5px/);
+  assert.match(page, /LAST MOVED FROM/);
+  assert.match(page, /movedFromLabel\(bus\.lastMovedFrom\)/);
+  assert.match(page, /Not recorded yet/);
 });
 
 test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
@@ -176,12 +179,17 @@ test("operational sitting time resets on either a real location or status change
   const statusUpdated = stampOperationalChange(previous, { ...previous, s: "out" }, "2026-08-05T12:00:00.000Z");
   assert.equal(statusUpdated.lastLocationChangeAt, "2026-08-05T01:00:00.000Z");
   assert.equal(statusUpdated.lastStatusChangeAt, "2026-08-05T12:00:00.000Z");
+  assert.equal(statusUpdated.lastMovedFrom, undefined);
   assert.equal(operationalUpdateAt(statusUpdated), "2026-08-05T12:00:00.000Z");
 
   const locationUpdated = stampOperationalChange(statusUpdated, { ...statusUpdated, l: "road-0" }, "2026-08-05T13:00:00.000Z");
   assert.equal(locationUpdated.lastLocationChangeAt, "2026-08-05T13:00:00.000Z");
   assert.equal(locationUpdated.lastStatusChangeAt, "2026-08-05T12:00:00.000Z");
+  assert.equal(locationUpdated.lastMovedFrom, "east-1");
   assert.equal(operationalUpdateAt(locationUpdated), "2026-08-05T13:00:00.000Z");
+
+  const statusAfterMove = stampOperationalChange(locationUpdated, { ...locationUpdated, s: "defect" }, "2026-08-05T14:00:00.000Z");
+  assert.equal(statusAfterMove.lastMovedFrom, "east-1");
 });
 
 
@@ -1327,6 +1335,48 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   assert.match(html, /Real-Time Defect Log/);
 });
 
+
+test("defect log distinguishes pending down-sheet buses and keeps actions unambiguous", async () => {
+  const defect = {id:"d1",category:"Engine",issue:"Misfire",details:"",operability:"down",state:"open"};
+  const pendingRecord = {bus:{id:"bus-1",n:"17501",s:"out",l:"west-0"},defect,createdAt:"",updatedAt:"",onDownSheet:false};
+  assert.equal(isPendingDownSheetRecord(pendingRecord,new Set()), true);
+  assert.equal(isPendingDownSheetRecord(pendingRecord,new Set(["bus-1"])), false);
+  const quarantineRecord = {...pendingRecord,bus:{...pendingRecord.bus,s:"defect"},defect:{...defect,operability:"service",details:"Legal quarantine - do not move"}};
+  assert.equal(isPendingDownSheetRecord(quarantineRecord,new Set()), true);
+  const completedRecord = {...pendingRecord,defect:{...defect,state:"completed"}};
+  assert.equal(isPendingDownSheetRecord(completedRecord,new Set()), false);
+  const page = await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  const css = await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  const footer = page.match(/<footer className="mobile-log-bar">([\s\S]*?)<\/footer>/)?.[1]||"";
+  assert.ok(page.includes('<div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>'));
+  assert.equal((page.match(/\+ LOG DEFECT/g)||[]).length,1);
+  assert.doesNotMatch(footer,/<button/);
+  assert.match(page,/PENDING DOWN SHEET/);
+  assert.match(css,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.quick-fix\{[^}]*background:transparent/);
+  assert.match(css,/\.log-meta \.state\{font-size:9px/);
+  assert.ok(page.includes('(record.onDownSheet||busOnDownSheet)&&<b className="downsheet-badge">DOWN SHEET</b>'));
+  assert.match(page,/CLEAN UP/);
+  assert.match(page,/className="remove-log"/);
+  assert.match(css,/\.log-actions\{/);
+});
+
+test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
+  const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};
+  const bus = {id:"bus-1",n:"17501",s:"out",l:"west-0",down:true,pendingRepair:"Ramp will not deploy",defects:[activeDefect]};
+  const logRecord = {bus,defect:activeDefect,createdAt:"",updatedAt:"",onDownSheet:false};
+  assert.equal(isDefectLogCleanupCandidate(logRecord,new Set(["bus-1"])), false);
+  const trackerRecord = {...logRecord,defect:{...activeDefect,id:"tracker-ramp",source:"tracker"}};
+  assert.equal(isDefectLogCleanupCandidate(trackerRecord,new Set(["bus-1"])), true);
+  const fixedRecord = {...logRecord,defect:{...activeDefect,state:"completed"}};
+  assert.equal(isDefectLogCleanupCandidate(fixedRecord,new Set()), true);
+  const archived = hideDefectLogRecords([bus],[activeDefect.id],"2026-08-22T12:00:00.000Z");
+  assert.equal(archived[0].s,"out");
+  assert.equal(archived[0].l,"west-0");
+  assert.equal(archived[0].down,true);
+  assert.equal(archived[0].defects[0].state,"open");
+  assert.equal(archived[0].defects[0].defectLogHiddenAt,"2026-08-22T12:00:00.000Z");
+});
 test("down-sheet repair items keep independent optional estimates and a bus total", () => {
   const first = {...blankRepairItem(0), category:"Engine", repair:"Check-engine diagnosis", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check-engine diagnosis")};
   const second = {...blankRepairItem(1), category:"A/C and HVAC", repair:"Compressor", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"A/C and HVAC","Compressor")};
@@ -1338,6 +1388,18 @@ test("down-sheet repair items keep independent optional estimates and a bus tota
   const restored = normalizeRepairItems([first,second,optional], {});
   assert.equal(restored.length, 3);
   assert.equal(restored[2].estimateEnabled, false);
+});
+
+test("quarantine down-sheet entries use non-labor treatment", async () => {
+  assert.equal(isQuarantineEntry({category:"Miscellaneous",repair:"Manual entry",customReason:"QUARANTINE DO NOT MOVE (PER SAFETY)"}), true);
+  assert.equal(isQuarantineEntry({category:"Miscellaneous",repairItems:[{category:"Legal",repair:"Quarantined",details:"Await instruction"}]}), true);
+  assert.equal(isQuarantineEntry({category:"Engine",repair:"Check-engine diagnosis",customReason:"No start"}), false);
+  const page = await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
+  assert.match(page, /if\(isQuarantineEntry\(entry\)\)return 0/);
+  assert.match(page, /isQuarantineEntry\(entry\)\?"N\/A"/);
+  assert.match(page, /className="fleet-number-button"[\s\S]*?onClick=\{\(\)=>setEditing\(entry\)\}/);
+  assert.match(css, /\.reason-button b\{font-size:10\.5px;font-weight:900/);
 });
 
 test("operator retains incomplete status commands and accepts natural area moves", () => {

@@ -13,6 +13,16 @@ export type DownSheetRepairItem = {
   timeEstimate: RepairTimeEstimate;
 };
 
+export function isQuarantineEntry(entry: {
+  category?: string;
+  repair?: string;
+  customReason?: string;
+  repairItems?: Array<{category?: string; repair?: string; details?: string}>;
+}) {
+  const fields = [entry.category, entry.repair, entry.customReason];
+  for (const item of entry.repairItems || []) fields.push(item.category, item.repair, item.details);
+  return /\bquarantin(?:e|ed)\b/i.test(fields.filter(Boolean).join(" "));
+}
 function itemId(index: number) {
   return `repair-item-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
 }
