@@ -15,6 +15,7 @@ export type StructuredDefect={
  reportedBy?:string;
  diagnosticNote?:string;
  actionTaken?:string;
+ shopNotes?:string;
  partNumber?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;

@@ -25,6 +25,8 @@ import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusId
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
+import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
+import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -1649,4 +1651,39 @@ test("main garage always normalizes destination status from every facility sourc
   const batch=applyOperatorBatch(fleet,fleet.map(bus=>({busId:bus.id,areaName:"MAIN GARAGE (BAYS 1-10)"})),areas,"now");
   assert.equal(batch.error,undefined);
   assert.deepEqual(Object.fromEntries(batch.fleet.map(bus=>[bus.id,bus.s])),expected);
+});
+test("Version 85 stores Shop Notes and persists editable interface wording and styles", async () => {
+  const downDisplay = normalizeDownSheetDisplay({labels:{reasonDown:"REPAIR REASON"},styles:{reasonCategory:{color:"#111111",fontSize:16}}});
+  assert.equal(downDisplay.labels.reasonDown,"REPAIR REASON");
+  assert.equal(downDisplay.styles.reasonCategory.fontSize,16);
+  assert.equal(normalizeDownSheetDisplay({styles:{reasonCategory:{color:"invalid",fontSize:99}}}).styles.reasonCategory.color,DEFAULT_DOWN_SHEET_DISPLAY.styles.reasonCategory.color);
+  assert.equal(normalizeDownSheetDisplay({styles:{reasonCategory:{fontSize:99}}}).styles.reasonCategory.fontSize,32);
+  const logDisplay = normalizeDefectLogDisplay({labels:{shopNotes:"SHIFT NOTES"},styles:{shopNotes:{color:"#123456",fontSize:12}}});
+  assert.equal(logDisplay.labels.shopNotes,"SHIFT NOTES");
+  assert.deepEqual(logDisplay.styles.shopNotes,{color:"#123456",fontSize:12});
+  assert.equal(normalizeDefectLogDisplay(null).labels.pageTitle,DEFAULT_DEFECT_LOG_DISPLAY.labels.pageTitle);
+
+  const defect={id:"shop-note-1",category:"Engine",issue:"Misfire",details:"Cylinder 1",operability:"down",state:"open",source:"defect-log",shopNotes:"Bay 12 follow-up"};
+  const fleet=[{id:"bus-1",n:"20501",s:"out",l:"west-0",defects:[]}];
+  const result=saveDefectLogRecord(fleet,[],"bus-1",defect,false,"2026-08-23T18:00:00.000Z");
+  assert.equal(result.error,null);
+  assert.equal(result.fleet[0].defects[0].shopNotes,"Bay 12 follow-up");
+
+  const [downPage,downSettings,downCss,logPage,logCss,catalog]=await Promise.all([
+    readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/down-sheet/down-sheet-settings.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+    readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+  ]);
+  assert.match(downPage,/display:displaySettings/);
+  assert.match(downSettings,/WORDING/);
+  assert.match(downSettings,/TEXT STYLE/);
+  assert.match(downCss,/--down-reason-category-size/);
+  assert.match(logPage,/ShopNotesEditor/);
+  assert.match(logPage,/shopNotes:value/);
+  assert.match(logCss,/\.shop-notes-column/);
+  assert.match(logCss,/\.log-wording-grid/);
+  assert.match(catalog,/shopNotes\?:string/);
 });

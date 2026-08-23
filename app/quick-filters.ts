@@ -17,7 +17,7 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
 ];
 
 function activeText(bus:QuickFilterBus){
- const defectText=(bus.defects||[]).filter(defect=>defect.state!=="completed").map(defect=>[defect.category,defect.issue,defect.details,defect.diagnosticNote,defect.actionTaken].filter(Boolean).join(" "));
+ const defectText=(bus.defects||[]).filter(defect=>defect.state!=="completed").map(defect=>[defect.category,defect.issue,defect.details,defect.diagnosticNote,defect.actionTaken,defect.shopNotes].filter(Boolean).join(" "));
  return [bus.pendingRepair||"",...defectText].join(" ").toLowerCase();
 }
 
