@@ -57,9 +57,12 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
  return bus.s==="service"||bus.s==="defect"?roadServiceStatus(repairAware):bus.s;
 }
 
+export function activeDefectLogBusCount(fleet:DefectLogFleetBus[]){
+ return new Set(fleet.filter(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).some(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt)).map(bus=>bus.id)).size;
+}
 export function defectLogRecords(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]):DefectLogRecord[]{
  const activeDownIds=new Set(downEntries.filter(entry=>entry.workflow!=="Completed"&&entry.defectId).map(entry=>entry.defectId));
- return fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>{
+ return fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log").map(defect=>{
   const createdAt=defect.createdAt||bus.parkedAt||new Date(0).toISOString();
   return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:activeDownIds.has(defect.id)};
  })).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
@@ -95,6 +98,24 @@ export function saveDefectLogRecord(
  return {fleet:fleet.map(item=>item.id===bus.id?nextBus:item),downEntries:nextDown,error:null};
 }
 
+export function returnDefectLogBusToService(
+ fleet:DefectLogFleetBus[],
+ downEntries:DefectLogDownEntry[],
+ busId:string,
+ defectId:string,
+ now=new Date().toISOString(),
+){
+ const bus=fleet.find(item=>item.id===busId);
+ if(!bus)return {fleet,downEntries,status:null,error:"missing-bus" as const};
+ if(bus.s==="decommissioned")return {fleet,downEntries,status:bus.s,error:"decommissioned" as const};
+ const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id),target=current.find(defect=>defect.id===defectId);
+ if(!target||target.source!=="defect-log")return {fleet,downEntries,status:bus.s,error:"missing-defect" as const};
+ const defects=current.map(defect=>defect.id===defectId?{...defect,operability:"service" as const,state:defect.state==="in-progress"?"open" as const:defect.state,updatedAt:now}:defect);
+ const status:FleetStatus=defects.some(defect=>isUnresolved(defect)&&defect.operability==="down")?"out":"defect";
+ const nextBus=stampOperationalChange(bus,{...bus,s:status,defects,pendingRepair:defectSummary(defects)},now) as DefectLogFleetBus;
+ const nextDown=downEntries.map(entry=>entry.busId!==bus.id||entry.workflow==="Completed"?entry:{...entry,operationalStatus:status,updatedAt:now,history:[...(entry.history||[]),{at:now,initials:"",action:"Returned to service from Defect Log"}]});
+ return {fleet:fleet.map(item=>item.id===bus.id?nextBus:item),downEntries:nextDown,status,error:null};
+}
 export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(entries:T[],bus:DefectLogFleetBus,now=new Date().toISOString(),updatedBy=""):T[]{
  const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  return entries.map(entry=>{

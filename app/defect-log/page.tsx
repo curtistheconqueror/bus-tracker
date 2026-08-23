@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
 import {defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
-import {defectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,isPendingDownSheetRecord,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
+import {defectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
 import {QUICK_FILTERS,quickFilterBusIds,type QuickFilterKey} from "../quick-filters";
@@ -58,7 +58,7 @@ function DefectEditor({draft,fleet,defaultInitials,save,close}:{draft:LogDraft;f
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
  const selectedBus=fleet.find(bus=>bus.id===value.busId);
- const submit=(event:React.FormEvent)=>{event.preventDefault();const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(!issue&&!details){alert("Select a repair or describe the symptom.");return}if(!initials){alert("Enter your initials.");return}const finalIssue=issue&&issue!=="Manual entry"?issue:"Manual entry";save({...value,onDownSheet:value.defect.state==="completed"?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials}})};
+ const submit=(event:React.FormEvent)=>{event.preventDefault();const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(!issue&&!details){alert("Select a repair or describe the symptom.");return}const finalIssue=issue&&issue!=="Manual entry"?issue:"Manual entry";save({...value,onDownSheet:value.defect.state==="completed"?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials}})};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   <form className="log-editor" onSubmit={submit}>
    <header><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><button type="button" onClick={close} aria-label="Close">x</button></header>
@@ -74,7 +74,7 @@ function DefectEditor({draft,fleet,defaultInitials,save,close}:{draft:LogDraft;f
     <label>DIAGNOSTIC NOTE<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, or findings"/></label>
     <label>ACTION TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, or temporary action"/></label>
     <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Optional"/></label>
-    <label>INITIALS<input required maxLength={6} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase())} placeholder="Required"/></label>
+    <label>INITIALS (OPTIONAL)<input maxLength={6} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase())} placeholder="Optional"/></label>
    </div>
    <footer><button type="button" onClick={close}>CANCEL</button><button className="save-log">{draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE"}</button></footer>
   </form>
@@ -99,7 +99,7 @@ function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSe
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><section className="log-settings">
   <header><span><small>DEFECT LOG</small><h2>Settings</h2></span><button onClick={close}>x</button></header>
   <div>
-   <label>INITIALS<input maxLength={6} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase()})}/></label>
+   <label>INITIALS (OPTIONAL)<input maxLength={6} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase()})}/></label>
    <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
    <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
@@ -142,7 +142,7 @@ export default function DefectLog(){
   if(filter==="open"&&!(record.defect.state==="open"||record.defect.state==="deferred"))return false;
   if(filter==="in-progress"&&record.defect.state!=="in-progress")return false;
   if(filter==="fixed"&&!(record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)))return false;
-  if(filter==="downsheet"&&!record.onDownSheet)return false;
+  if(filter==="downsheet"&&!activeDownBusIdSet.has(record.bus.id))return false;
   const query=search.trim().toLowerCase();if(!query)return true;
   return [record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
  });
@@ -152,7 +152,8 @@ export default function DefectLog(){
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{setFleet(nextFleet);setDownEntries(nextDown);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries:nextDown}))};
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const saveDraft=(draft:LogDraft)=>{const result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);setEditing(null)};
- const markFixed=(record:DefectLogRecord)=>{if(!settings.defaultInitials){setEditing(recordDraft(record));alert("Enter your initials before marking this repair fixed.");return}saveDraft({...recordDraft(record),onDownSheet:false,defect:{...record.defect,state:"completed",reportedBy:settings.defaultInitials,actionTaken:record.defect.actionTaken||"Repair completed"}})};
+ const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",reportedBy:record.defect.reportedBy||settings.defaultInitials,actionTaken:record.defect.actionTaken||"Repair completed"},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
+ const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
  const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[record.defect.id]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>record.defect.id)),downEntries)};
@@ -182,19 +183,19 @@ export default function DefectLog(){
    </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>}
   </section>
   <section className="log-feed">
-   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button></div><span><b>{settings.display.labels.feedTitle}</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span></div>
-   {visible.length?<div className="log-list">{visible.map(record=>{const pendingDownSheet=isPendingDownSheetRecord(record,activeDownBusIdSet),busOnDownSheet=activeDownBusIdSet.has(record.bus.id);return <article className={"log-card "+record.defect.state+(record.defect.operability==="down"?" downing":"")+(pendingDownSheet?" pending-down-sheet":"")} key={record.bus.id+"-"+record.defect.id}>
+   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span></div>
+   {visible.length?<div className="log-list">{visible.map(record=>{const busOnDownSheet=activeDownBusIdSet.has(record.bus.id);return <article className={"log-card "+record.defect.state+(record.defect.operability==="down"?" downing":"")+(record.bus.s==="out"?" out-of-service":"")} key={record.bus.id+"-"+record.defect.id}>
     <button className="log-card-main" onClick={()=>setEditing(recordDraft(record))}>
      <span className="log-icon" aria-hidden="true">{CATEGORY_ICONS[record.defect.category]||CATEGORY_ICONS.Miscellaneous}</span>
-     <span className="log-bus"><small>BUS</small><strong>{record.bus.n}</strong><em>{locationLabel(record.bus.l)}</em></span>
+     <span className="log-bus"><small>BUS</small><span className="log-bus-number"><strong>{record.bus.n}</strong>{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}</span><em>{locationLabel(record.bus.l)}</em></span>
      <span className="log-repair"><b>{record.defect.category}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span>
-     <span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{record.defect.state==="completed"&&record.defect.reportedBy&&<em className="fixed-by">{record.defect.reportedBy}</em>}{(record.onDownSheet||busOnDownSheet)&&<b className="downsheet-badge">DOWN SHEET</b>}{pendingDownSheet&&<b className="pending-downsheet-badge">PENDING DOWN SHEET</b>}<small>{STATUS_LABELS[record.bus.s]||record.bus.s}</small><time>{timeLabel(record.updatedAt)}</time>{record.defect.state!=="completed"&&record.defect.reportedBy&&<em>{record.defect.reportedBy}</em>}</span>
+     <span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{record.defect.state==="completed"&&record.defect.reportedBy&&<em className="fixed-by">{record.defect.reportedBy}</em>}<small>{STATUS_LABELS[record.bus.s]||record.bus.s}</small><time>{timeLabel(record.updatedAt)}</time>{record.defect.state!=="completed"&&record.defect.reportedBy&&<em>{record.defect.reportedBy}</em>}</span>
     </button>
     <ShopNotesEditor record={record} label={settings.display.labels.shopNotes} save={saveShopNotes}/>
-    <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" repair fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" repair from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
+    <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" repair fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with its defect still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" repair from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
    </article>})}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
   </section>
-  <footer className="mobile-log-bar"><a className="operator-link" href="/?operator=1"><span>&#10022;</span> AI OPERATOR</a></footer>
+
   {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} save={saveDraft} close={()=>setEditing(null)}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;

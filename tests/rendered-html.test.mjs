@@ -20,7 +20,7 @@ import { operationalUpdateAt, stampOperationalChange } from "../app/operational-
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
-import { hideDefectLogRecords, isDefectLogCleanupCandidate, isPendingDownSheetRecord, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { activeDefectLogBusCount, defectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
@@ -752,7 +752,7 @@ test("tracker uses one counted Down Sheet control and one counted Defect Log con
   assert.equal((page.match(/className="defectlog-command"/g) || []).length, 1);
   assert.match(page, /DOWN SHEET <b>\{actualDownSet\.size\}<\/b>/);
   assert.match(page, /DEFECT LOG <b>\{defectLogCount\}<\/b>/);
-  assert.match(page, /filter\(defect=>isUnresolved\(defect\)&&!defect\.defectLogHiddenAt\)/);
+  assert.match(page, /defectLogCount=activeDefectLogBusCount\(buses\)/);
 });
 test("down-sheet button shows a ratio only when tracker and sheet counts differ", () => {
   assert.equal(downSheetCountLabel(30, 30), "30");
@@ -1527,31 +1527,43 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
 });
 
 
-test("defect log distinguishes pending down-sheet buses and keeps actions unambiguous", async () => {
-  const defect = {id:"d1",category:"Engine",issue:"Misfire",details:"",operability:"down",state:"open"};
-  const pendingRecord = {bus:{id:"bus-1",n:"17501",s:"out",l:"west-0"},defect,createdAt:"",updatedAt:"",onDownSheet:false};
-  assert.equal(isPendingDownSheetRecord(pendingRecord,new Set()), true);
-  assert.equal(isPendingDownSheetRecord(pendingRecord,new Set(["bus-1"])), false);
-  const quarantineRecord = {...pendingRecord,bus:{...pendingRecord.bus,s:"defect"},defect:{...defect,operability:"service",details:"Legal quarantine - do not move"}};
-  assert.equal(isPendingDownSheetRecord(quarantineRecord,new Set()), true);
-  const completedRecord = {...pendingRecord,defect:{...defect,state:"completed"}};
-  assert.equal(isPendingDownSheetRecord(completedRecord,new Set()), false);
-  const page = await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
-  const css = await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
-  const footer = page.match(/<footer className="mobile-log-bar">([\s\S]*?)<\/footer>/)?.[1]||"";
-  assert.ok(page.includes('<div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button>'));
-  assert.equal((page.match(/\+ LOG DEFECT/g)||[]).length,1);
-  assert.doesNotMatch(footer,/<button/);
-  assert.match(page,/PENDING DOWN SHEET/);
-  assert.match(css,/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
-  assert.match(css,/\.quick-fix\{[^}]*background:transparent/);
-  assert.match(css,/\.log-meta \.state\{font-size:9px/);
-  assert.ok(page.includes('(record.onDownSheet||busOnDownSheet)&&<b className="downsheet-badge">DOWN SHEET</b>'));
-  assert.match(page,/CLEAN UP/);
-  assert.match(page,/className="remove-log"/);
-  assert.match(css,/\.log-actions\{/);
-});
+test("Defect Log counts only direct log records and returns buses to service without losing repairs", async () => {
+  const logDefect={id:"log-1",category:"Engine",issue:"Misfire",details:"Cylinder 1",operability:"down",state:"open",source:"defect-log",shopNotes:"Watch after pullout"};
+  const secondLogDefect={id:"log-2",category:"Electrical / Multiplex",issue:"Horn",details:"Intermittent",operability:"service",state:"open",source:"defect-log"};
+  const trackerDefect={id:"tracker-1",category:"Brakes",issue:"ABS light",details:"",operability:"down",state:"open",source:"tracker"};
+  const downDefect={id:"down-1",category:"Inspection",issue:"B-12",details:"",operability:"down",state:"open",source:"down-sheet"};
+  const fleet=[
+    {id:"bus-1",n:"17501",s:"out",l:"west-0",defects:[logDefect,secondLogDefect]},
+    {id:"bus-2",n:"17502",s:"out",l:"east-0",defects:[trackerDefect,downDefect]},
+  ];
+  const records=defectLogRecords(fleet,[]);
+  assert.deepEqual(records.map(record=>record.defect.id).sort(),["log-1","log-2"]);
+  assert.equal(activeDefectLogBusCount(fleet),1);
+  assert.equal(records.find(record=>record.defect.id==="log-1").defect.shopNotes,"Watch after pullout");
 
+  const linked=[{id:"repair-log-1",defectId:"log-1",busId:"bus-1",workflow:"Scheduled",operationalStatus:"out",updatedAt:"old",history:[]}];
+  const returned=returnDefectLogBusToService([{...fleet[0],defects:[logDefect]}],linked,"bus-1","log-1","2026-08-23T18:30:00.000Z");
+  assert.equal(returned.error,null);
+  assert.equal(returned.status,"defect");
+  assert.equal(returned.fleet[0].s,"defect");
+  assert.equal(returned.fleet[0].defects[0].operability,"service");
+  assert.equal(returned.fleet[0].defects[0].state,"open");
+  assert.equal(returned.downEntries[0].operationalStatus,"defect");
+  assert.match(returned.downEntries[0].history[0].action,/Returned to service/);
+
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.match(page,/feed-operator/);
+  assert.match(page,/inline-ds-badge/);
+  assert.match(page,/BACK IN SERVICE/);
+  assert.match(page,/hideDefectLogRecords\(result\.fleet/);
+  assert.doesNotMatch(page,/PENDING DOWN SHEET/);
+  assert.doesNotMatch(page,/mobile-log-bar/);
+  assert.doesNotMatch(page,/Enter your initials before marking/);
+  assert.doesNotMatch(page,/input required maxLength=\{6\}/);
+  assert.match(css,/out-of-service \.log-bus strong/);
+  assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};
   const bus = {id:"bus-1",n:"17501",s:"out",l:"west-0",down:true,pendingRepair:"Ramp will not deploy",defects:[activeDefect]};

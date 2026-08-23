@@ -18,7 +18,7 @@ import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver";
 import {migrateBrakeTowCapacities,migrateReducedCapacity,ROAD_CAPACITY,WEST_CAPACITY} from "./facility-layout";
 import {confirmAction,confirmationPreference} from "./confirmation-preferences";
 import {normalizeOperationalTimestamps,operationalUpdateAt,stampOperationalChange} from "./operational-time";
-import {syncLinkedDownEntriesFromFleet} from "./defect-log/defect-log-sync";
+import {activeDefectLogBusCount,syncLinkedDownEntriesFromFleet} from "./defect-log/defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "./mystery-buses";
 import QuickFilterMenu from "./quick-filter-menu";
 import DownSheetBadgeMenu from "./down-sheet-badge-menu";
@@ -160,7 +160,7 @@ useEffect(()=>{const touchDrop=(event:Event)=>{const detail=(event as CustomEven
  // eslint-disable-next-line react-hooks/set-state-in-effect
  useEffect(()=>{if(hydrated)setBuses(current=>reconcileDownSheetMembership(current,activeDownIds))},[activeDownIds,hydrated]);
 const showBase=q?buses.filter(x=>x.n.includes(q)):buses;
- const actualDownSet=new Set(activeDownIds),downSheetBadgeCounts=downSheetBadgeViewCounts(buses,actualDownSet),downSheetBadgeSet=new Set(showDownSheetBadges?downSheetBadgeViewBusIds(buses,actualDownSet,downSheetBadgeView):[]),acIssueSet=new Set(acIssueIds),defectLogCount=buses.reduce((total,bus)=>total+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>isUnresolved(defect)&&!defect.defectLogHiddenAt).length,0),mysteryIds=mysteryBusIds(buses,actualDownSet),mysterySet=new Set(mysteryIds),awarenessSet=new Set(bay12AwarenessBusIds(buses,actualDownSet));
+ const actualDownSet=new Set(activeDownIds),downSheetBadgeCounts=downSheetBadgeViewCounts(buses,actualDownSet),downSheetBadgeSet=new Set(showDownSheetBadges?downSheetBadgeViewBusIds(buses,actualDownSet,downSheetBadgeView):[]),acIssueSet=new Set(acIssueIds),defectLogCount=activeDefectLogBusCount(buses),mysteryIds=mysteryBusIds(buses,actualDownSet),mysterySet=new Set(mysteryIds),awarenessSet=new Set(bay12AwarenessBusIds(buses,actualDownSet));
  const multiLocateSet=new Set(multiLocateIds),locatedBusSet=new Set(locatedBusIds);
  const show=showBase.map(bus=>({...bus,onDownSheet:actualDownSet.has(bus.id),downSheetReady:downSheetBadgeSet.has(bus.id),mystery:mysterySet.has(bus.id),awareness:awarenessSet.has(bus.id),acIssue:acIssueSet.has(bus.id),multiLocated:multiLocateSet.has(bus.id),located:locatedBusSet.has(bus.id)}));
  const activeQuickFilter=QUICK_FILTERS.some(item=>item.key===highlight)?highlight as QuickFilterKey:null,quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,quickFilterBusIds(buses,item.key).length])) as Record<QuickFilterKey,number>;
