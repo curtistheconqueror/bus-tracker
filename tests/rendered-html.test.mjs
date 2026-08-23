@@ -21,7 +21,7 @@ import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recomme
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { hideDefectLogRecords, isDefectLogCleanupCandidate, isPendingDownSheetRecord, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
-import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
+import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -249,22 +249,32 @@ test("operational sitting time resets on either a real location or status change
 });
 
 
-test("restricts Mystery awareness to CNG, shop areas, and Main Garage Bays 11-12", () => {
-  for (const location of ["east-1", "west-0", "bay-1", "bay-overflow-1", "wall-0", "service-0", "paint-0", "wash-0", "body-0", "office-0", "pit-0", "brake-0", "tow-0", "garage-10", "garage-11", "garage-22", "garage-23"]) assert.equal(isMysteryArea(location), true, location);
-  for (const location of ["road-0", "waiting-0", "garage-0", "garage-9", "garage-12", "garage-21"]) assert.equal(isMysteryArea(location), false, location);
-  const fleet=[{id:"east",n:"17501",l:"east-1",s:"out",defects:[]},{id:"road",n:"17502",l:"road-0",s:"unknown",defects:[]},{id:"garage10",n:"17503",l:"garage-9",s:"unknown",defects:[]},{id:"garage11",n:"17504",l:"garage-10",s:"service",defects:[]},{id:"listed",n:"17505",l:"west-0",s:"out",defects:[]}];
-  assert.deepEqual(mysteryBusIds(fleet,["listed"]),["east","garage11"]);
+test("Mystery counts only active on-site work-area buses absent from the Down Sheet", () => {
+  for (const location of ["east-1", "west-0", "bay-1", "bay-overflow-1", "wall-0", "service-0", "paint-0", "wash-0", "body-0", "office-0", "pit-0", "brake-0", "tow-0", "waiting-0"]) assert.equal(isMysteryArea(location), true, location);
+  for (const location of ["road-0", "garage-0", "garage-9", "garage-10", "garage-11", "garage-22", "garage-23"]) assert.equal(isMysteryArea(location), false, location);
+  assert.equal(isBay12AwarenessArea("garage-10"),true);
+  assert.equal(isBay12AwarenessArea("garage-11"),true);
+  assert.equal(isBay12AwarenessArea("garage-9"),false);
+  const fleet=[
+    {id:"east",n:"17501",l:"east-1",s:"out",defects:[]},
+    {id:"waiting",n:"17502",l:"waiting-0",s:"unknown",defects:[]},
+    {id:"road",n:"17503",l:"road-0",s:"unknown",defects:[]},
+    {id:"garage11",n:"17504",l:"garage-10",s:"service",defects:[]},
+    {id:"listedUnknown",n:"17505",l:"west-0",s:"unknown",defects:[]},
+    {id:"decommissioned",n:"15503",l:"west-1",s:"decommissioned",defects:[]},
+  ];
+  assert.deepEqual(mysteryBusIds(fleet,["listedUnknown"]),["east","waiting"]);
   const enteredBay12=stampOperationalChange({id:"watch",n:"17512",l:"road-0",s:"defect",defects:[{state:"open"}],bay12Watch:false},{id:"watch",n:"17512",l:"bay-12",s:"shop",defects:[{state:"open"}],bay12Watch:false},"2026-08-20T12:00:00.000Z");
   assert.equal(enteredBay12.bay12Watch,true);
   const movedToCng=stampOperationalChange(enteredBay12,{...enteredBay12,l:"west-1"},"2026-08-20T13:00:00.000Z");
   assert.deepEqual(bay12AwarenessBusIds([movedToCng],[]),["watch"]);
+  assert.deepEqual(bay12AwarenessBusIds([{...movedToCng,l:"garage-10"}],[]),["watch"]);
   assert.deepEqual(bay12AwarenessBusIds([{...movedToCng,l:"road-1"}],[]),[]);
   assert.deepEqual(bay12AwarenessBusIds([movedToCng],["watch"]),[]);
   const fixed=stampOperationalChange(movedToCng,{...movedToCng,defects:[{state:"completed"}]},"2026-08-20T14:00:00.000Z");
   assert.equal(fixed.bay12Watch,false);
   assert.deepEqual(bay12AwarenessBusIds([fixed],[]),[]);
 });
-
 test("shared Quick Filters classify active tracker and Defect Log records", () => {
   const buses=[
     {id:"ac",n:"1",defects:[{category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]},
@@ -359,7 +369,7 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.equal(response.status,200);
   const html=await response.text();
   assert.match(html,/MYSTERY BUSES/);
-  assert.match(html,/SHOP, CNG &amp; BAYS 11–12 NOT ON DOWN SHEET/);
+  assert.match(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
   assert.match(html,/class="mystery-board"/);
   assert.match(html,/>QUICK FILTERS</);
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");

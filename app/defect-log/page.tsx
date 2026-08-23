@@ -158,12 +158,12 @@ export default function DefectLog(){
   </section>
   {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong>{quickFilterBuses.length}</strong><button onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header><div>{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):"Tracker warning flag";return <button className="quick-filter-bus" onClick={()=>openMysteryBus(bus)} key={bus.id}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{STATUS_LABELS[bus.s]||bus.s}</i></button>}):<p>No buses currently match this filter.</p>}</div></aside>}
   <section className="mystery-board" aria-label="Mystery buses">
-   <header><span><b>MYSTERY BUSES</b><small>SHOP, CNG &amp; BAYS 11–12 NOT ON DOWN SHEET</small></span><strong>{mysteryBuses.length}</strong></header>
+   <header><span><b>MYSTERY BUSES</b><small>ON-SITE WORK AREAS NOT ON DOWN SHEET</small></span><strong>{mysteryBuses.length}</strong></header>
    {mysteryBuses.length?<div className="mystery-list">{mysteryBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),inLog=defects.some(defect=>defect.source==="defect-log"),onDownSheet=activeDownBusIds.includes(bus.id),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; ")+(defects.length>2?" +"+(defects.length-2)+" more":""):"No known defects logged";return <button className={"mystery-card"+(awarenessIdSet.has(bus.id)?" bay12-awareness":"")} onClick={()=>openMysteryBus(bus)} key={bus.id}>
     <span className="mystery-number"><small>BUS</small><b>{bus.n}</b></span>
     <span className="mystery-detail"><b>{locationLabel(bus.l)}</b><small>{preview}</small></span>
     <span className="mystery-badges">{bus.s==="unknown"&&<i>UNKNOWN</i>}{awarenessIdSet.has(bus.id)&&<i>BAY 12</i>}{!onDownSheet&&<i>NOT ON DOWN SHEET</i>}{inLog&&<i>DEFECT LOG</i>}<small>{STATUS_LABELS[bus.s]||bus.s}</small></span>
-   </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Eligible shop, CNG, and Bays 11–12 match the active Down Sheet.</span></div>}
+   </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>}
   </section>
   <section className="log-feed">
    <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button></div><span><b>LIVE REPAIR FEED</b><small>{visible.length} RECORD{visible.length===1?"":"S"} IN VIEW</small></span></div>
