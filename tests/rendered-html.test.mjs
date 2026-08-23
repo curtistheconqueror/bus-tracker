@@ -23,6 +23,8 @@ import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-she
 import { hideDefectLogRecords, isDefectLogCleanupCandidate, isPendingDownSheetRecord, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
+import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
+import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -86,7 +88,8 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /downSheetReady&&<span className="downsheet-ready-badge"/);
   assert.match(page, /ON DOWN SHEET/);
   assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
-  assert.match(page, /showDownSheetBadges\?downSheetBadgeBusIds/);
+  assert.match(page, /showDownSheetBadges\?downSheetBadgeViewBusIds/);
+  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<button className="downsheet-command"/);
   assert.match(page, /<h3>DS BADGE<\/h3>/);
   assert.match(page, /<b>SHOW BADGE<\/b>/);
   assert.match(page, /visuals\.downSheetBadgeText/);
@@ -97,6 +100,53 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /Not recorded yet/);
 });
 
+test("DS badge view filters display without changing Down Sheet membership", async () => {
+  const fleet = [
+    { id: "road", l: "road-4" },
+    { id: "garage", l: "garage-71" },
+    { id: "shop", l: "bay-9" },
+    { id: "cng", l: "west-2" },
+    { id: "clear", l: "garage-11" },
+  ];
+  const active = ["road", "garage", "shop", "cng"];
+  assert.equal(isReadyRoadLocation("garage-71"), true);
+  assert.equal(isReadyRoadLocation("road-4"), true);
+  assert.equal(isReadyRoadLocation("bay-9"), false);
+  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "all"), active);
+  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "ready-road"), ["road", "garage"]);
+  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "off-road"), ["shop", "cng"]);
+  assert.deepEqual(downSheetBadgeViewCounts(fleet, active), {all:4,"ready-road":2,"off-road":2});
+  const menu = await readFile(new URL("../app/down-sheet-badge-menu.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(menu, /DS BADGES/);
+  assert.match(menu, /Badge view never changes Down Sheet membership/);
+  assert.match(css, /\.ds-badge-view-popover\{position:fixed/);
+});
+
+test("Down Sheet supports search, bus ordering, work groups, and explicit note saving", async () => {
+  const entries = [
+    {busNumber:"17520",category:"Inspection",repair:"A-15",customReason:"",assignmentType:"Mechanic",assignedTo:""},
+    {busNumber:"15505",category:"Engine",repair:"Misfire",customReason:"",assignmentType:"Mechanic",assignedTo:""},
+    {busNumber:"20501",category:"Body Shop",repair:"Panel repair",customReason:"",assignmentType:"Mechanic",assignedTo:""},
+    {busNumber:"17505",category:"Transmission",repair:"Shift fault",customReason:"",assignmentType:"Vendor",assignedTo:"Allison"},
+  ];
+  assert.deepEqual(orderDownSheetEntries(entries,"number-asc").map(entry=>entry.busNumber),["15505","17505","17520","20501"]);
+  assert.deepEqual(orderDownSheetEntries(entries,"number-desc").map(entry=>entry.busNumber),["20501","17520","17505","15505"]);
+  assert.deepEqual(entries.filter(entry=>matchesDownSheetSearch(entry,"05")).map(entry=>entry.busNumber),["15505","17505"]);
+  assert.equal(matchesDownSheetSearch(entries[3],"Allison"),true);
+  const grouped=orderDownSheetEntries(entries,"category");
+  assert.equal(downSheetWorkGroup(grouped[0]).label,"GENERAL REPAIRS");
+  assert.equal(downSheetWorkGroup(grouped.at(-1)).label,"INSPECTIONS / SCHEDULED MAINTENANCE");
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  assert.match(page, /aria-label="Search Down Sheet"/);
+  assert.match(page, /BUS NUMBER ↑/);
+  assert.match(page, /WORK CATEGORIES/);
+  assert.match(page, /SAVE NOTE/);
+  assert.match(page, /Unsaved changes/);
+  assert.match(css, /\.down-view-controls\{/);
+  assert.match(css, /\.work-group-row/);
+});
 test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
   const fleet = [
     { id: "a", n: "17525", s: "service", l: "road-0", down: false, pendingRepair: "" },
@@ -1018,8 +1068,8 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,confirmMoves,confirmDefects\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,confirmMoves,confirmDefects\}/);
+  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects\}\)\)/);
+  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects\}/);
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);
