@@ -1,6 +1,6 @@
 export type MysteryFleetBus={id:string;l:string;s?:string;bay12Watch?:boolean;defects?:{state?:string}[]};
 
-const SHOP_AND_CNG_PREFIXES=["east-","west-","bay-","bay-overflow-","wall-","wall-overflow-","service-","service-overflow-","paint-","wash-","body-","pit-","brake-","tow-"] as const;
+const SHOP_AND_CNG_PREFIXES=["east-","west-","bay-","bay-overflow-","wall-","wall-overflow-","service-","service-overflow-","paint-","wash-","body-","office-","pit-","brake-","tow-"] as const;
 
 export function isMysteryArea(location:string){
  if(SHOP_AND_CNG_PREFIXES.some(prefix=>location.startsWith(prefix)))return true;

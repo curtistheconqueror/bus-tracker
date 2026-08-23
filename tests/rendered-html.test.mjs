@@ -12,7 +12,7 @@ import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
-import { migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
+import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
@@ -200,7 +200,7 @@ test("operational sitting time resets on either a real location or status change
 
 
 test("restricts Mystery awareness to CNG, shop areas, and Main Garage Bays 11-12", () => {
-  for (const location of ["east-1", "west-0", "bay-1", "bay-overflow-1", "wall-0", "service-0", "paint-0", "wash-0", "body-0", "pit-0", "brake-0", "tow-0", "garage-10", "garage-11", "garage-22", "garage-23"]) assert.equal(isMysteryArea(location), true, location);
+  for (const location of ["east-1", "west-0", "bay-1", "bay-overflow-1", "wall-0", "service-0", "paint-0", "wash-0", "body-0", "office-0", "pit-0", "brake-0", "tow-0", "garage-10", "garage-11", "garage-22", "garage-23"]) assert.equal(isMysteryArea(location), true, location);
   for (const location of ["road-0", "waiting-0", "garage-0", "garage-9", "garage-12", "garage-21"]) assert.equal(isMysteryArea(location), false, location);
   const fleet=[{id:"east",n:"17501",l:"east-1",s:"out",defects:[]},{id:"road",n:"17502",l:"road-0",s:"unknown",defects:[]},{id:"garage10",n:"17503",l:"garage-9",s:"unknown",defects:[]},{id:"garage11",n:"17504",l:"garage-10",s:"service",defects:[]},{id:"listed",n:"17505",l:"west-0",s:"out",defects:[]}];
   assert.deepEqual(mysteryBusIds(fleet,["listed"]),["east","garage11"]);
@@ -267,7 +267,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, /IN SERVICE WITH DEFECTS/);
   assert.match(html, /WORK IN PROGRESS/);
   assert.match(html, /DECOMMISSIONED \/ DOWN INDEFINITELY/);
-  assert.doesNotMatch(html, /TOW \/ STAGING/);
+  assert.match(html, /TOW \/ STAGING/);
   assert.match(html, /--status-service:#1764d8/);
   assert.match(html, /--status-defect:#159447/);
   assert.match(html, /--status-shop:#efa400/);
@@ -275,7 +275,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(html, /--status-decommissioned:#343a40/);
   assert.doesNotMatch(html, /TOTAL SPACES:/);
   assert.doesNotMatch(html, /SHOP BAYS \(DIAGONAL - 12 TOTAL\)/);
-  const bays = section(html, "SHOP BAYS (DIAGONAL)", "PIT");
+  const bays = section(html, "SHOP BAYS (DIAGONAL)", "FOREMAN OFFICE");
   assert.equal((bays.match(/class="bay"/g) ?? []).length, 9);
   assert.equal((bays.match(/class="bay-placeholder"/g) ?? []).length, 1);
   assert.match(bays, /NEEDS REASSIGNMENT/);
@@ -284,10 +284,14 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.equal((service.match(/class="spot"/g) ?? []).length, 8);
   const wall = section(html, "SHOP WALL (SINGLE FILE)", "MAIN GARAGE (BAYS 1-12)");
   assert.equal((wall.match(/class="spot"/g) ?? []).length, 8);
+  const office = section(html, "FOREMAN OFFICE", "PIT");
+  assert.equal((office.match(/class="spot"/g) ?? []).length, 3);
   const pit = section(html, "PIT", "BRAKE TEST");
   assert.equal((pit.match(/class="spot"/g) ?? []).length, 2);
-  const brake = section(html, "BRAKE TEST", "TOW STAGING");
-  assert.equal((brake.match(/class="spot"/g) ?? []).length, 4);
+  const brake = section(html, "BRAKE TEST", "TOW / STAGING");
+  assert.equal((brake.match(/class="spot"/g) ?? []).length, 3);
+  const tow = section(html, "TOW / STAGING", '<section class="east lot">');
+  assert.equal((tow.match(/class="spot"/g) ?? []).length, 4);
   const east = section(html, '<section class="east lot">', '<section class="road">');
   assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
@@ -451,7 +455,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.equal(ROAD_CAPACITY, 75);
   assert.equal(WEST_CAPACITY, 40);
   assert.match(page, /"PIT":slots\("pit",2\)/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",4\)/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
+  assert.match(page, /"TOW \/ STAGING":slots\("tow",4\)/);
+  assert.match(page, /"FOREMAN OFFICE":slots\("office",3\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
   assert.ok(page.includes('const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
@@ -748,6 +754,27 @@ test("restored CNG West row pulls saved overflow buses back into visible spaces"
   ], "wall", 8);
   assert.deepEqual(singleFile.map(bus => bus.l), ["wall-0", "wall-4", "wall-7"]);
 });
+
+test("Brake and Tow capacity migration preserves every bus without duplicate occupancy", () => {
+  const fleet = [
+    { id: "brake-0", l: "brake-0" },
+    { id: "brake-1", l: "brake-1" },
+    { id: "brake-2", l: "brake-2" },
+    { id: "former-fourth-brake", l: "brake-3" },
+    { id: "tow-0", l: "tow-0" },
+    { id: "tow-1", l: "tow-1" },
+    { id: "tow-2", l: "tow-2" },
+  ];
+  const migrated = migrateBrakeTowCapacities(fleet);
+  assert.equal(migrated.length, fleet.length);
+  assert.equal(migrated.find(bus => bus.id === "former-fourth-brake").l, "tow-3");
+  assert.equal(new Set(migrated.map(bus => bus.l)).size, migrated.length);
+  assert.deepEqual(fleet.map(bus => bus.l), ["brake-0", "brake-1", "brake-2", "brake-3", "tow-0", "tow-1", "tow-2"]);
+
+  const priorTowOverflow = migrateBrakeTowCapacities([{ id: "tow-front", l: "tow-0" }, { id: "tow-overflow", l: "tow-overflow-0" }]);
+  assert.equal(priorTowOverflow.find(bus => bus.id === "tow-overflow").l, "tow-3");
+});
+
 test("down sheet synchronization changes repairs and status without moving the bus", () => {
   const fleet = [{ id: "bus-1", l: "east-4", s: "service", pendingRepair: "", down: false, mechanic: "" }];
   const updated = applyDownEntryToFleet(fleet, {
@@ -1007,9 +1034,14 @@ test("every facility section can collapse independently while global controls re
   assert.match(page, /sectionClass\("MAIN GARAGE \(BAYS 1-12\)","garage panel"\)/);
   assert.match(css, /\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
   assert.match(css, /\.title-actions \.toggle-section/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",4\)/);
-  assert.match(page, /\["BRAKE TEST","brake",4\]/);
-  assert.match(css, /\.brake \.vspots\{grid-template-rows:repeat\(4,minmax\(0,1fr\)\)\}/);
+  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
+  assert.match(page, /"TOW \/ STAGING":slots\("tow",4\)/);
+  assert.match(page, /"FOREMAN OFFICE":slots\("office",3\)/);
+  assert.match(page, /\["BRAKE TEST","brake",3\]/);
+  assert.match(page, /\["TOW \/ STAGING","tow",4\]/);
+  assert.match(css, /\.foreman-office\{grid-column:1\/-1/);
+  assert.match(css, /\.brake \.vspots\{grid-template-rows:repeat\(3,minmax\(0,1fr\)\)\}/);
+  assert.match(css, /\.tow \.vspots\{grid-template-rows:repeat\(4,minmax\(0,1fr\)\)\}/);
   assert.match(css, /\.vertical-zone\.brake \.title-actions,\.vertical-zone\.tow \.title-actions\{transform:translateY\(-3px\)\}/);
 });
 

@@ -36,7 +36,8 @@ const AREA_ALIASES:[string,string[]][]=[
  ["WASH RACK",["wash rack"]],
  ["BODY SHOP",["body shop"]],
  ["BRAKE TEST",["brake test"]],
- ["TOW STAGING",["tow staging","tow area"]],
+ ["TOW / STAGING",["tow staging","tow area","tow / staging"]],
+ ["FOREMAN OFFICE",["foreman office","office"]],
  ["PIT",["the pit","pit"]],
 ];
 

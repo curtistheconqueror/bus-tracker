@@ -72,7 +72,7 @@
 .remove-list>div>button{border:1px solid #dfa3a6;border-radius:4px;background:#fff4f4;color:#ac1d25;padding:6px 9px;font-size:9px;font-weight:900}
 
 /* Bottom command center, bus discovery, and dashboard themes */
-:root{--page-bg:#f4f6fa;--panel-bg:#fff;--theme-text:#112657;--header-bg:#06275c;--header-text:#fff;--title-color:#172957;--theme-border:#9cadd1;--slot-bg:#fff;--command-bg:#16284d;--command-text:#fff;--section-service:#fbfcff;--section-paint:#fbfcff;--section-wash:#fbfcff;--section-body:#fbfcff;--section-bays:#fbfcff;--section-pit:#fbfcff;--section-brake:#fbfcff;--section-tow:#fbfcff;--section-east:#fbfcff;--section-road:#fbfcff;--section-wall:#fbfcff;--section-garage:#fbfcff;--section-west:#fbfcff}
+:root{--page-bg:#f4f6fa;--panel-bg:#fff;--theme-text:#112657;--header-bg:#06275c;--header-text:#fff;--title-color:#172957;--theme-border:#9cadd1;--slot-bg:#fff;--command-bg:#16284d;--command-text:#fff;--section-service:#fbfcff;--section-paint:#fbfcff;--section-wash:#fbfcff;--section-body:#fbfcff;--section-bays:#fbfcff;--section-office:#fbfcff;--section-pit:#fbfcff;--section-brake:#fbfcff;--section-tow:#fbfcff;--section-east:#fbfcff;--section-road:#fbfcff;--section-wall:#fbfcff;--section-garage:#fbfcff;--section-west:#fbfcff}
 html,body{background:var(--page-bg);color:var(--theme-text)}
 .app{background:var(--page-bg);color:var(--theme-text);border-color:var(--header-bg);padding-bottom:66px}
 header{background:var(--header-bg);color:var(--header-text);text-shadow:none}
@@ -445,3 +445,12 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .app.highlight-no-horn .token[data-no-horn="true"]{outline:2px solid #ffd230;box-shadow:0 0 14px #ffd230;animation:command-glow 1.05s ease-in-out infinite alternate}.app.highlight-leak .token[data-leak="true"]{outline:2px solid #00b7a8;box-shadow:0 0 14px #00b7a8;animation:command-glow 1.05s ease-in-out infinite alternate}.app.highlight-add-oil .token[data-add-oil="true"]{outline:2px solid #d97706;box-shadow:0 0 14px #d97706;animation:command-glow 1.05s ease-in-out infinite alternate}
 @media(max-width:1100px){.command-bar{flex-wrap:nowrap!important}.app{padding-bottom:68px!important}}
 @media(max-width:560px){.command-highlights{display:flex!important;width:auto!important}.command-highlights>button{font-size:8px!important;padding:0 6px!important}.command-highlights>button:after{content:none!important}.quick-filter-trigger{padding:0 8px!important}.command-bar{left:6px;right:6px;width:auto!important;transform:none;scroll-padding-right:58px}.locate-command{min-width:190px}}
+
+/* Foreman Office strip above the lowered Pit, Brake Test, and Tow / Staging areas */
+.vertical{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:auto minmax(0,1fr);gap:7px 5px;min-width:0;min-height:0}
+.foreman-office{grid-column:1/-1;min-height:56px;padding:0 5px 5px!important;border:1px solid #b4bdd1;border-radius:5px;background:var(--section-office)}
+.foreman-office .title{height:24px}
+.foreman-spots{height:27px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.vertical-zone{grid-row:2;min-width:0}
+.brake .vspots{grid-template-rows:repeat(3,minmax(0,1fr))}
+.tow .vspots{grid-template-rows:repeat(4,minmax(0,1fr))}
