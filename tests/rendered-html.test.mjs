@@ -281,18 +281,22 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"engine",n:"2",checkEngine:true,defects:[]},
     {id:"ramp",n:"3",badRampKneeler:true,defects:[]},
     {id:"horn",n:"4",noHorn:true,defects:[]},
+    {id:"farebox",n:"41",farebox:true,defects:[]},
+    {id:"ibsVentra",n:"42",ibsVentra:true,defects:[]},
     {id:"leak",n:"5",defects:[{category:"Cooling System",issue:"Coolant leak",details:"",state:"open"}]},
     {id:"oil",n:"6",defects:[{category:"Preventive Maintenance",issue:"Add engine oil",details:"",quantity:10,unit:"quarts",state:"open"}]},
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
   ];
-  assert.equal(QUICK_FILTERS.length,6);
+  assert.equal(QUICK_FILTERS.length,8);
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
   assert.deepEqual(quickFilterBusIds(buses,"no-horn"),["horn"]);
+  assert.deepEqual(quickFilterBusIds(buses,"farebox"),["farebox"]);
+  assert.deepEqual(quickFilterBusIds(buses,"ibs-ventra"),["ibsVentra"]);
   assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
-  assert.equal(defectLabel(buses[5].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
+  assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -534,14 +538,18 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{d\.towInProgress\}/);
   assert.match(css, /\.tow-badge\{/);
   assert.match(css, /\.form \.tow-check\{/);
-  assert.match(page, /checkEngine:boolean;checkTransmission:boolean;noHorn:boolean;badRampKneeler:boolean/);
+  assert.match(page, /checkEngine:boolean;checkTransmission:boolean;noHorn:boolean;badRampKneeler:boolean;farebox:boolean;ibsVentra:boolean/);
   assert.match(page, /checkEngine:Boolean\(bus\.checkEngine\)/);
   assert.match(page, /checkTransmission:Boolean\(bus\.checkTransmission\)/);
+  assert.match(page, /farebox:Boolean\(bus\.farebox\)/);
+  assert.match(page, /ibsVentra:Boolean\(bus\.ibsVentra\)/);
   assert.match(page, /checked=\{d\.checkEngine\}/);
   assert.match(page, /checked=\{d\.checkTransmission\}/);
   assert.match(page, /CHECK TRANSMISSION LIGHT/);
   assert.match(page, /checked=\{d\.noHorn\}/);
   assert.match(page, /checked=\{d\.badRampKneeler\}/);
+  assert.match(page, /checked=\{d\.farebox\}/);
+  assert.match(page, /checked=\{d\.ibsVentra\}/);
   assert.match(css, /\.modal>\.form\{[^}]*align-content:start;grid-auto-rows:max-content/);
   assert.match(css, /\.defect-workbench\{min-height:88px/);
   assert.match(page, /QuickFilterMenu/);
@@ -549,9 +557,13 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /data-check-engine=\{quickFilterMatch\(bus,"check-engine"\)\}/);
   assert.match(page, /data-bad-ramp=\{quickFilterMatch\(bus,"bad-ramp"\)\}/);
   assert.match(page, /data-no-horn=\{quickFilterMatch\(bus,"no-horn"\)\}/);
+  assert.match(page, /data-farebox=\{quickFilterMatch\(bus,"farebox"\)\}/);
+  assert.match(page, /data-ibs-ventra=\{quickFilterMatch\(bus,"ibs-ventra"\)\}/);
   assert.match(page, /data-leak=\{quickFilterMatch\(bus,"leak"\)\}/);
   assert.match(page, /data-add-oil=\{quickFilterMatch\(bus,"add-oil"\)\}/);
   assert.match(css, /\.app\.highlight-no-horn/);
+  assert.match(css, /\.app\.highlight-farebox/);
+  assert.match(css, /\.app\.highlight-ibs-ventra/);
   assert.match(css, /\.app\.highlight-leak/);
   assert.match(css, /\.app\.highlight-add-oil/);
   assert.match(page, /function MultiLocateModal/);
