@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
-import { downSheetCountLabel, readyDownSheetBusIds, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
+import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
@@ -72,7 +72,7 @@ test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", 
   assert.equal(duplicateExact.matchType, "exact");
 });
 
-test("DS badge marks active Down Sheet buses only in ready-use locations", async () => {
+test("DS badge marks every active Down Sheet bus regardless of location", async () => {
   const fleet = [
     { id: "road", l: "road-4" },
     { id: "garage", l: "garage-10" },
@@ -80,12 +80,18 @@ test("DS badge marks active Down Sheet buses only in ready-use locations", async
     { id: "cng", l: "west-2" },
     { id: "clear", l: "garage-11" },
   ];
-  assert.deepEqual(readyDownSheetBusIds(fleet, ["road", "garage", "shop", "cng"]), ["road", "garage"]);
+  assert.deepEqual(downSheetBadgeBusIds(fleet, ["road", "garage", "shop", "cng"]), ["road", "garage", "shop", "cng"]);
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(page, /downSheetReady&&<span className="downsheet-ready-badge"/);
-  assert.match(page, /ON DOWN SHEET · READY LOCATION/);
+  assert.match(page, /ON DOWN SHEET/);
+  assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
+  assert.match(page, /showDownSheetBadges\?downSheetBadgeBusIds/);
+  assert.match(page, /<h3>DS BADGE<\/h3>/);
+  assert.match(page, /<b>SHOW BADGE<\/b>/);
+  assert.match(page, /visuals\.downSheetBadgeText/);
   assert.match(css, /\.downsheet-ready-badge\{position:absolute;top:-5px;left:-5px/);
+  assert.match(css, /color:var\(--downsheet-badge-text\)/);
   assert.match(page, /LAST MOVED FROM/);
   assert.match(page, /movedFromLabel\(bus\.lastMovedFrom\)/);
   assert.match(page, /Not recorded yet/);
@@ -374,7 +380,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.doesNotMatch(page, /data-unscheduled=|data-waiting=/);
   assert.match(page, /data-ac=\{quickFilterMatch\(bus,"ac"\)\}/);
   assert.match(page, /data-downsheet=\{Boolean\(bus\.onDownSheet\)\}/);
-  assert.match(page, /downSheetBusIds\.length/);
+  assert.match(page, /actualDownSet\.size/);
   assert.match(page, /entry\.category==="A\/C and HVAC"/);
   assert.match(css, /\.app\.highlight-ac/);
   assert.match(css, /\.app\.highlight-downsheet/);
@@ -647,6 +653,27 @@ test("tracker down-sheet highlight uses only explicitly selected buses", () => {
   assert.equal(ids.includes("20501"), false);
 });
 
+test("active Down Sheet rows reconcile every tracker checkbox exactly", () => {
+  const fleet = [
+    { id: "bus-a", down: false },
+    { id: "bus-b", down: true },
+    { id: "bus-c", down: true },
+  ];
+  const reconciled = reconcileDownSheetMembership(fleet, ["bus-a", "bus-c"]);
+  assert.deepEqual(selectedDownSheetBusIds(reconciled), ["bus-a", "bus-c"]);
+  assert.equal(downSheetMembershipMatches(reconciled, ["bus-a", "bus-c"]), true);
+  assert.equal(downSheetMembershipMatches(reconciled, ["bus-b"]), false);
+  assert.equal(reconcileDownSheetMembership(reconciled, ["bus-a", "bus-c"]), reconciled);
+});
+
+test("tracker uses one counted Down Sheet control and one counted Defect Log control", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.equal((page.match(/className="downsheet-command"/g) || []).length, 1);
+  assert.equal((page.match(/className="defectlog-command"/g) || []).length, 1);
+  assert.match(page, /DOWN SHEET <b>\{actualDownSet\.size\}<\/b>/);
+  assert.match(page, /DEFECT LOG <b>\{defectLogCount\}<\/b>/);
+  assert.match(page, /filter\(defect=>isUnresolved\(defect\)&&!defect\.defectLogHiddenAt\)/);
+});
 test("down-sheet button shows a ratio only when tracker and sheet counts differ", () => {
   assert.equal(downSheetCountLabel(30, 30), "30");
   assert.equal(downSheetCountLabel(30, 40), "30 / 40");
@@ -964,8 +991,8 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,confirmMoves,confirmDefects\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,confirmMoves,confirmDefects\}/);
+  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,confirmMoves,confirmDefects\}\)\)/);
+  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,confirmMoves,confirmDefects\}/);
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);

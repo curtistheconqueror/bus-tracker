@@ -110,8 +110,10 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .locate-command button{border:0;border-left:1px solid color-mix(in srgb,var(--command-text) 25%,transparent);border-radius:0;background:#0873df;color:#fff}
 .settings-command{display:flex;align-items:center;gap:6px}
 .settings-command span{font-size:15px;line-height:1}
-.downsheet-command{background:#0873df!important;color:#fff!important;border-color:#6db3ff!important}
-.defectlog-command{background:#087347!important;color:#fff!important;border-color:#55c78e!important}
+.downsheet-command{min-width:112px;background:#0873df!important;color:#fff!important;border-color:#6db3ff!important}
+.defectlog-command{min-width:104px;background:#087347!important;color:#fff!important;border-color:#55c78e!important}
+.downsheet-command,.defectlog-command{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.downsheet-command>b,.defectlog-command>b{min-width:19px;height:19px;padding:0 4px;display:grid;place-items:center;border-radius:10px;background:#fff;color:#14315d;font-size:8px;line-height:1}
 .refresh-command{display:flex;align-items:center;gap:5px}
 .refresh-command span{font-size:16px;line-height:1}
 .refresh-command:disabled{opacity:.65;cursor:wait}
@@ -152,13 +154,13 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 @media(max-width:800px){.command-bar{gap:5px;justify-content:center}.command-bar button{padding:0 7px;font-size:8px}.locate-command input{width:63px}.theme-grid{grid-template-columns:repeat(3,1fr)}.manual-grid{grid-template-columns:1fr}.settings-modal{max-height:94vh}.settings-body{padding:11px}.app{padding-bottom:104px}}
 @media(max-width:560px){.command-highlights{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}.command-highlights button{font-size:0;padding:0 4px}.command-highlights button:after{font-size:9px}.command-highlights button:nth-child(1):after{content:"AC"}.command-highlights button:nth-child(2):after{content:"ENGINE"}.command-highlights button:nth-child(3):after{content:"ADA"}.command-highlights button:nth-child(4):after{content:"MYSTERY"}.command-highlights button:nth-child(5):after{content:"DOWN"}.command-highlights button:nth-child(4) b,.command-highlights button:nth-child(5) b{font-size:8px}.app{padding-bottom:112px}.settings-command,.refresh-command{font-size:0!important;padding:0 7px!important}.settings-command span,.refresh-command span{font-size:17px}.locate-command input{width:55px}.ai-operator-command{order:9}}
 /* Nine service bays and official Roadcall treatment */
-:root{--roadcall-color:#f97316;--downsheet-ready-color:#7c3aed}
+:root{--roadcall-color:#f97316;--downsheet-badge:#7c3aed;--downsheet-badge-text:#fff}
 .bay-placeholder{visibility:hidden;pointer-events:none}
 .bays .bay-overflow{min-height:29px;margin:5px 6px 0;padding:4px 7px;gap:5px}
 .bays .bay-overflow .token{padding:2px 4px;font-size:8px}
 .roadcall-dot{position:absolute;top:-5px;right:-5px;width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:var(--roadcall-color);box-shadow:0 0 0 1px #8f3700;z-index:4;animation:roadcall-dot-pulse .85s ease-in-out infinite}
-.downsheet-ready-badge{position:absolute;top:-5px;left:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:var(--downsheet-ready-color);color:#fff;box-shadow:0 1px 3px #3a176d99;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
-.downsheet-ready-detail{border-left:3px solid var(--downsheet-ready-color);padding-left:7px;color:#57308f}.downsheet-ready-detail>b{background:var(--downsheet-ready-color);color:#fff;border-radius:4px;padding:2px 4px}
+.downsheet-ready-badge{position:absolute;top:-5px;left:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:var(--downsheet-badge);color:var(--downsheet-badge-text);box-shadow:0 1px 3px #3a176d99;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
+.downsheet-ready-detail{border-left:3px solid var(--downsheet-badge);padding-left:7px;color:var(--theme-text)}.downsheet-ready-detail>b{background:var(--downsheet-badge);color:var(--downsheet-badge-text);border-radius:4px;padding:2px 4px}
 @keyframes roadcall-dot-pulse{0%,100%{transform:scale(.82);box-shadow:0 0 0 1px #8f3700,0 0 0 0 color-mix(in srgb,var(--roadcall-color) 70%,transparent)}50%{transform:scale(1.2);box-shadow:0 0 0 1px #8f3700,0 0 0 5px color-mix(in srgb,var(--roadcall-color) 15%,transparent)}}
 .roadcall-badge{background:var(--roadcall-color);color:#fff}
 .roadcall-location{border-left:3px solid var(--roadcall-color);padding-left:7px}
