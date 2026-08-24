@@ -42,3 +42,6 @@ next-env.d.ts
 /work/
 
 dev-server.*.log
+
+# agent-local state
+/.remember/
