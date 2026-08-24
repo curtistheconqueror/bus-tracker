@@ -20,7 +20,7 @@ import { operationalUpdateAt, stampOperationalChange } from "../app/operational-
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
-import { activeDefectLogBusCount, defectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { activeDefectLogBusCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
@@ -1563,6 +1563,27 @@ test("Defect Log counts only direct log records and returns buses to service wit
   assert.doesNotMatch(page,/input required maxLength=\{6\}/);
   assert.match(css,/out-of-service \.log-bus strong/);
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
+test("Defect Log groups multiple repairs per bus and streamlines phone entry", async () => {
+  const bus={id:"bus-17528",n:"17528",s:"defect",l:"garage-11"};
+  const records=[
+    {bus,defect:{id:"d1",category:"Tech Services",issue:"Farebox",details:"",operability:"service",state:"open",source:"defect-log"},createdAt:"2026-08-24T01:00:00.000Z",updatedAt:"2026-08-24T01:00:00.000Z",onDownSheet:false},
+    {bus,defect:{id:"d2",category:"Engine",issue:"Check-engine diagnosis",details:"",operability:"service",state:"open",source:"defect-log"},createdAt:"2026-08-24T02:00:00.000Z",updatedAt:"2026-08-24T02:00:00.000Z",onDownSheet:false},
+  ];
+  const groups=groupDefectLogRecords(records);
+  assert.equal(groups.length,1);
+  assert.equal(groups[0].bus.n,"17528");
+  assert.deepEqual(groups[0].records.map(record=>record.defect.id),["d1","d2"]);
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.match(page,/groupDefectLogRecords\(visible\)/);
+  assert.match(page,/className="defect-count-badge">×\{group\.records\.length\}/);
+  assert.match(page,/\+ ADD DEFECT/);
+  assert.match(page,/className="bus-generations"/);
+  assert.match(page,/input autoFocus inputMode="numeric"/);
+  assert.match(page,/Choose generation first/);
+  assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
+  assert.match(css,/\.grouped-defect-row/);
 });
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};

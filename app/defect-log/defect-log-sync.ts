@@ -17,6 +17,7 @@ export type DefectLogDownEntry={
 };
 
 export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean};
+export type DefectLogBusGroup={bus:DefectLogFleetBus;records:DefectLogRecord[];updatedAt:string};
 
 export function isPendingDownSheetRecord(record:DefectLogRecord,activeDownBusIds:ReadonlySet<string>){
  if(!isUnresolved(record.defect)||record.onDownSheet||activeDownBusIds.has(record.bus.id))return false;
@@ -66,6 +67,15 @@ export function defectLogRecords(fleet:DefectLogFleetBus[],downEntries:DefectLog
   const createdAt=defect.createdAt||bus.parkedAt||new Date(0).toISOString();
   return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:activeDownIds.has(defect.id)};
  })).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+}
+export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGroup[]{
+ const groups=new Map<string,DefectLogBusGroup>();
+ records.forEach(record=>{
+  const current=groups.get(record.bus.id);
+  if(current){current.records.push(record);if(record.updatedAt>current.updatedAt)current.updatedAt=record.updatedAt}
+  else groups.set(record.bus.id,{bus:record.bus,records:[record],updatedAt:record.updatedAt});
+ });
+ return [...groups.values()].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function saveDefectLogRecord(
