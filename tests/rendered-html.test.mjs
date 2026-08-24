@@ -1720,3 +1720,19 @@ test("Version 85 stores Shop Notes and persists editable interface wording and s
   assert.match(logCss,/\.log-wording-grid/);
   assert.match(catalog,/shopNotes\?:string/);
 });
+test("phone layouts expose large primary controls and category-only defect entry", async () => {
+  const [trackerPage, trackerCss, downCss, defectPage, defectCss] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(trackerPage, /className="mobile-mode-nav"[\s\S]*?FLEET TRACKER[\s\S]*?DOWN SHEET[\s\S]*?DEFECT LOG/);
+  assert.match(trackerCss, /\.mobile-mode-nav a\{[^}]*min-height:50px/);
+  assert.match(trackerCss, /\.command-bar\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
+  assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
+  assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
+  assert.match(defectCss, /\.log-editor header \.save-log-top\{[^}]*min-width:82px/);
+});
