@@ -20,7 +20,7 @@ import { operationalUpdateAt, stampOperationalChange } from "../app/operational-
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
-import { activeDefectLogBusCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
@@ -752,7 +752,7 @@ test("tracker uses one counted Down Sheet control and one counted Defect Log con
   assert.equal((page.match(/className="defectlog-command"/g) || []).length, 1);
   assert.match(page, /DOWN SHEET <b>\{actualDownSet\.size\}<\/b>/);
   assert.match(page, /DEFECT LOG <b>\{defectLogCount\}<\/b>/);
-  assert.match(page, /defectLogCount=activeDefectLogBusCount\(buses\)/);
+  assert.match(page, /defectLogCount=activeDefectLogCount\(buses\)/);
 });
 test("down-sheet button shows a ratio only when tracker and sheet counts differ", () => {
   assert.equal(downSheetCountLabel(30, 30), "30");
@@ -1538,7 +1538,7 @@ test("Defect Log counts only direct log records and returns buses to service wit
   ];
   const records=defectLogRecords(fleet,[]);
   assert.deepEqual(records.map(record=>record.defect.id).sort(),["log-1","log-2"]);
-  assert.equal(activeDefectLogBusCount(fleet),1);
+  assert.equal(activeDefectLogCount(fleet),2);
   assert.equal(records.find(record=>record.defect.id==="log-1").defect.shopNotes,"Watch after pullout");
 
   const linked=[{id:"repair-log-1",defectId:"log-1",busId:"bus-1",workflow:"Scheduled",operationalStatus:"out",updatedAt:"old",history:[]}];
@@ -1735,4 +1735,23 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
   assert.match(defectCss, /\.log-editor header \.save-log-top\{[^}]*min-width:82px/);
+});
+
+test("Defect Log timestamps reports and blocks only recent identical unresolved defects", () => {
+  const existing={id:"old-defect",category:"Engine",issue:"Loss of power",details:"First report",operability:"service",state:"open",source:"defect-log",createdAt:"2026-08-22T12:00:00.000Z",updatedAt:"2026-08-22T12:00:00.000Z"};
+  const bus={id:"bus-1",n:"17501",s:"defect",l:"road-1",defects:[existing]};
+  const incoming={id:"new-defect",category:"Engine",issue:"Loss of power",details:"Second report",operability:"service",state:"open",source:"defect-log"};
+  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-24T11:59:00.000Z")?.id,"old-defect");
+  const blocked=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-24T11:59:00.000Z");
+  assert.equal(blocked.error,"recent-duplicate");
+  assert.equal(blocked.fleet[0].defects.length,1);
+  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-24T12:00:00.000Z"),null);
+  const allowed=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-24T12:00:00.000Z");
+  assert.equal(allowed.error,null);
+  assert.equal(allowed.fleet[0].defects.length,2);
+  assert.equal(allowed.fleet[0].defects.find(defect=>defect.id==="new-defect").createdAt,"2026-08-24T12:00:00.000Z");
+  const completedBus={...bus,defects:[{...existing,state:"completed"}]};
+  assert.equal(recentDefectDuplicate(completedBus,incoming,"2026-08-22T13:00:00.000Z"),null);
+  const manual=saveDefectLogRecord([bus],[],"bus-1",{...incoming,id:"manual-defect",issue:"Manual entry"},false,"2026-08-22T13:00:00.000Z");
+  assert.equal(manual.error,null);
 });
