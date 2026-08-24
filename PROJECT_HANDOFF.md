@@ -4,8 +4,8 @@ Updated: 2026-08-24
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 85
-Newest tested candidate: Version 86 at commit 0f1324c
+Live release: Sites Version 86
+Live source checkpoint: commit 7d62809
 
 ## Read this first
 
@@ -46,9 +46,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 85 is the current user-approved live release. Its latest source checkpoint is commit 14a80e9.
-
-Version 86 is a tested local candidate at commit 0f1324c. It adds:
+Version 86 is the current user-approved live release. Its feature commit is 0f1324c, and its published source checkpoint is commit 7d62809. It adds:
 
 - one phone card per bus with ×2, ×3, and similar defect counts;
 - expandable per-defect controls without merging repair records;
@@ -57,7 +55,7 @@ Version 86 is a tested local candidate at commit 0f1324c. It adds:
 - direct full-number typing; and
 - hidden inline Shop Notes on phone widths while retaining them on iPad and desktop.
 
-The Version 86 production build and all 52 regression tests passed. It has not replaced Version 85 unless a later release record says otherwise.
+The Version 86 production build and all 52 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-24.
 
 ## Repository and remotes
 

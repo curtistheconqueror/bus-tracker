@@ -4,8 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 85 | Live | 14a80e9 | Refined Defect Log workflow controls and the current approved three-surface application |
-| 86 | Local candidate | 0f1324c | Mobile Defect Log grouping, defect counts, generation filters, typed bus entry, and hidden phone Shop Notes |
+| 85 | Previous live | 14a80e9 | Refined Defect Log workflow controls and the approved three-surface application before the mobile grouping update |
+| 86 | Live | 7d62809 | Mobile Defect Log grouping, defect counts, generation filters, typed bus entry, hidden phone Shop Notes, and organized project documentation |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
