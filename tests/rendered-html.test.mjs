@@ -1632,8 +1632,14 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="bus-generations"/);
   assert.match(page,/input autoFocus inputMode="numeric"/);
   assert.match(page,/Choose generation first/);
+  assert.match(page,/className="log-header-save">\{saveLabel\}/);
+  assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
+  assert.match(css,/body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
+  assert.match(css,/\.log-editor\{max-height:96vh;max-height:96dvh\}/);
+  assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
+  assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
 });
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};
