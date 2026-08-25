@@ -1,6 +1,6 @@
 import type {StructuredDefect} from "./repair-catalog";
 
-export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil";
+export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"not-duplicated";
 export type QuickFilterBus={
  id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];
 };
@@ -14,6 +14,7 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
  {key:"ibs-ventra",label:"IBS & Ventra",shortLabel:"IBS/Ventra"},
  {key:"leak",label:"Leaks",shortLabel:"Leaks"},
  {key:"add-oil",label:"Add Oil",shortLabel:"Oil"},
+ {key:"not-duplicated",label:"Defect / Condition Not Duplicated",shortLabel:"Not Duplicated"},
 ];
 
 function activeText(bus:QuickFilterBus){
@@ -30,6 +31,7 @@ export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey){
  if(key==="farebox")return Boolean(bus.farebox)||/\bfare\s*box\b|\bfarebox\b/i.test(text);
  if(key==="ibs-ventra")return Boolean(bus.ibsVentra)||/\b(?:ibs|ventra)\b/i.test(text);
  if(key==="leak")return /\b(?:leak|leaks|leaking|seep|seeping)\b/i.test(text);
+ if(key==="not-duplicated")return (bus.defects||[]).some(defect=>Boolean(defect.conditionNotDuplicated));
  return /\b(?:add(?:ed|ing)?|needs?|low)\s+(?:(?:\d+(?:\.\d+)?\s*)?(?:qt|qts|quart|quarts)\s+(?:of\s+)?)?(?:engine\s+)?oil\b|\b(?:engine\s+)?oil\s+(?:low|needed|required)\b/i.test(text);
 }
 

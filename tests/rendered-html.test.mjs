@@ -298,8 +298,9 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"leak",n:"5",defects:[{category:"Cooling System",issue:"Coolant leak",details:"",state:"open"}]},
     {id:"oil",n:"6",defects:[{category:"Preventive Maintenance",issue:"Add engine oil",details:"",quantity:10,unit:"quarts",state:"open"}]},
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
+    {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,8);
+  assert.equal(QUICK_FILTERS.length,9);
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
@@ -308,8 +309,10 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"ibs-ventra"),["ibsVentra"]);
   assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
+  assert.deepEqual(quickFilterBusIds(buses,"not-duplicated"),["notDuplicated"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
   assert.equal(quickFilterShareText("A/C",[buses[0],buses[7]]),"A/C — 2 buses\nBus 1 — A/C and HVAC — No cooling\nBus 6 — Preventive Maintenance — Add engine oil — 10 quarts");
+  assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\nBus 8 — Electrical / Multiplex — Intermittent electrical — Reported cutting out");
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -397,7 +400,7 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
   assert.match(page,/aria-expanded=\{expanded\}/);
-  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses\)/);
+  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses,quickFilter\)/);
   assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
@@ -1885,16 +1888,20 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
   assert.match(defectPage,/completedBy/);
+  assert.match(defectPage,/DEFECT \/ CONDITION NOT DUPLICATED/);
+  assert.match(defectPage,/updateDefect\("conditionNotDuplicated",event\.target\.checked\)/);
   assert.match(defectCss,/save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
   assert.match(fixedPage,/state==="completed"/);
   assert.match(fixedPage,/ORIGINAL DEFECT/);
   assert.match(fixedPage,/FIX \/ STEPS TAKEN/);
   assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
+  assert.match(fixedPage,/not-duplicated-note/);
   assert.match(fixedPage,/FIXED DATE &amp; TIME/);
   assert.match(fixedPage,/localStorage\.setItem\(FLEET_KEY/);
   assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(4/);
   assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs"\]/);
   assert.match(catalog,/completedBy\?:string/);
+  assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
   assert.equal(response.status,200);
   assert.match(await response.text(),/Fixed Repairs/);
