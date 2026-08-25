@@ -427,6 +427,8 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .app[data-bus-display="number"] .token>.bus{display:none}
 .app[data-bus-display="number"] .token-number{font-size:12px;line-height:1;font-weight:900;letter-spacing:.15px;text-shadow:0 1px 0 #fff}
 .bus-display-settings>label{margin-top:8px}
+/* Phone-only containment keeps five-digit number tiles inside their parking spaces. */
+@media(max-width:560px){.app[data-bus-display="number"] .spot>.token{min-width:0;max-width:100%;padding:2px 1px;overflow:hidden}.app[data-bus-display="number"] .spot>.token .token-number{max-width:100%;overflow:hidden;font-size:10px;letter-spacing:-.35px;text-align:center;white-space:nowrap}}
 /* Waiting Area: a status-neutral temporary holding location with always-visible awareness controls. */
 .waiting{width:100%;padding:0 10px 7px;border:2px solid color-mix(in srgb,var(--theme-border) 78%,#7456b8);border-radius:7px;overflow:visible}
 .waiting .title{color:var(--title-color)}

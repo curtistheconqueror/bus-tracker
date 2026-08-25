@@ -7,6 +7,7 @@ import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogC
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
 import {QUICK_FILTERS,quickFilterBusIds,type QuickFilterKey} from "../quick-filters";
+import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
@@ -21,6 +22,7 @@ const FLEET_KEY="pace-board-v1";
 const DOWN_KEY="pace-down-sheet-v1";
 const SETTINGS_KEY="pace-defect-log-settings-v1";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
+const MYSTERY_COLLAPSED_KEY="pace-defect-log-mystery-collapsed-v1";
 const LIGHT_APPEARANCE:LogAppearance={page:"#e9eef6",surface:"#ffffff",text:"#172b4d",muted:"#60728c",header:"#061d45",headerText:"#ffffff",accent:"#0b64bd"};
 const LOG_THEMES:Record<Exclude<LogTheme,"custom">,{label:string;appearance:LogAppearance}>={
  light:{label:"Light",appearance:LIGHT_APPEARANCE},
@@ -145,9 +147,11 @@ export default function DefectLog(){
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
+ const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
+ useEffect(()=>{if(hydrated)localStorage.setItem(MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
@@ -157,6 +161,8 @@ export default function DefectLog(){
  const mysteryIdSet=useMemo(()=>new Set(mysteryBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
  const awarenessIdSet=useMemo(()=>new Set(bay12AwarenessBusIds(fleet,activeDownBusIds)),[fleet,activeDownBusIds]);
  const mysteryBuses=useMemo(()=>fleet.filter(bus=>mysteryIdSet.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,mysteryIdSet]);
+ const busSearch=resolveBusNumberList(fleet,search),busSearchIds=new Set(busSearch.kind==="numbers"?busSearch.buses.map(bus=>bus.id):[]);
+ const searchFeedback=busSearch.kind==="numbers"?[...busSearch.ambiguous.map(item=>item.query+" matches "+candidateBusNumbers(item.matches).join(", ")+" — enter the full bus number"),...(busSearch.invalid.length?["Use a full bus number or two ending digits: "+busSearch.invalid.join(", ")]:[]),...(busSearch.missing.length?["No bus matches: "+busSearch.missing.join(", ")]:[])].join(" · "):"";
  const active=records.filter(record=>isUnresolved(record.defect));
  const visible=records.filter(record=>{
   if(!settings.showFixed&&record.defect.state==="completed")return false;
@@ -164,6 +170,7 @@ export default function DefectLog(){
   if(filter==="in-progress"&&record.defect.state!=="in-progress")return false;
   if(filter==="fixed"&&!(record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)))return false;
   if(filter==="downsheet"&&!activeDownBusIdSet.has(record.bus.id))return false;
+  if(busSearch.kind==="numbers")return busSearchIds.has(record.bus.id);
   const query=search.trim().toLowerCase();if(!query)return true;
   return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
  });
@@ -192,17 +199,17 @@ export default function DefectLog(){
   </section>
   <section className="log-controls">
    <div className="log-filters">{([["all","ALL"],["open","OPEN"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],["downsheet","DOWN SHEET"]] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{label}</button>)}</div>
-   <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={setQuickFilter}/><label className="log-search"><span>FIND</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus, repair, code, or note"/></label>
+   <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={setQuickFilter}/><div className="log-search-wrap"><label className="log-search"><span>FIND</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/></label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
    <button className="log-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open defect log settings">&#9881;</button>
   </section>
   {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong>{quickFilterBuses.length}</strong><button onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header><div>{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):"Tracker warning flag";return <button className="quick-filter-bus" onClick={()=>openMysteryBus(bus)} key={bus.id}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{STATUS_LABELS[bus.s]||bus.s}</i></button>}):<p>No buses currently match this filter.</p>}</div></aside>}
-  <section className="mystery-board" aria-label="Mystery buses">
-   <header><span><b>{settings.display.labels.mysteryTitle}</b><small>{settings.display.labels.mysterySubtitle}</small></span><strong>{mysteryBuses.length}</strong></header>
-   {mysteryBuses.length?<div className="mystery-list">{mysteryBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),inLog=defects.some(defect=>defect.source==="defect-log"),onDownSheet=activeDownBusIds.includes(bus.id),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; ")+(defects.length>2?" +"+(defects.length-2)+" more":""):"No known defects logged";return <button className={"mystery-card"+(awarenessIdSet.has(bus.id)?" bay12-awareness":"")} onClick={()=>openMysteryBus(bus)} key={bus.id}>
+  <section className={"mystery-board"+(mysteryCollapsed?" collapsed":"")} aria-label="Mystery buses">
+   <header><span><b>{settings.display.labels.mysteryTitle}</b><small>{settings.display.labels.mysterySubtitle}</small></span><div className="mystery-header-actions"><strong>{mysteryBuses.length}</strong><button className="mystery-toggle" type="button" onClick={()=>setMysteryCollapsed(value=>!value)} aria-expanded={!mysteryCollapsed} aria-label={(mysteryCollapsed?"Expand ":"Collapse ")+settings.display.labels.mysteryTitle}>{mysteryCollapsed?"+":"−"}</button></div></header>
+   {!mysteryCollapsed&&(mysteryBuses.length?<div className="mystery-list">{mysteryBuses.map(bus=>{const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(isUnresolved),inLog=defects.some(defect=>defect.source==="defect-log"),onDownSheet=activeDownBusIds.includes(bus.id),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; ")+(defects.length>2?" +"+(defects.length-2)+" more":""):"No known defects logged";return <button className={"mystery-card"+(awarenessIdSet.has(bus.id)?" bay12-awareness":"")} onClick={()=>openMysteryBus(bus)} key={bus.id}>
     <span className="mystery-number"><small>BUS</small><b>{bus.n}</b></span>
     <span className="mystery-detail"><b>{locationLabel(bus.l)}</b><small>{preview}</small></span>
     <span className="mystery-badges">{bus.s==="unknown"&&<i>UNKNOWN</i>}{awarenessIdSet.has(bus.id)&&<i>BAY 12</i>}{!onDownSheet&&<i>NOT ON DOWN SHEET</i>}{inLog&&<i>DEFECT LOG</i>}<small>{STATUS_LABELS[bus.s]||bus.s}</small></span>
-   </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>}
+   </button>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>)}
   </section>
   <section className="log-feed">
    <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span></div>

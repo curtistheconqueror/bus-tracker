@@ -13,7 +13,7 @@ import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { CHECK_ENGINE_SYMPTOMS, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
-import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
+import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
@@ -74,6 +74,15 @@ test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", 
   const duplicateExact = resolveBusNumber([...fleet, { id: "duplicate", n: "17525" }], "17525");
   assert.equal(duplicateExact.kind, "ambiguous");
   assert.equal(duplicateExact.matchType, "exact");
+  const multiple = resolveBusNumberList(fleet, "25, 17505 20505");
+  assert.equal(multiple.kind, "numbers");
+  assert.deepEqual(multiple.buses.map(bus => bus.n), ["17525", "17505", "20505"]);
+  const mixedResolution = resolveBusNumberList(fleet, "25 05, 99");
+  assert.equal(mixedResolution.kind, "numbers");
+  assert.deepEqual(mixedResolution.buses.map(bus => bus.n), ["17525"]);
+  assert.deepEqual(mixedResolution.ambiguous.map(item => item.query), ["05"]);
+  assert.deepEqual(mixedResolution.missing, ["99"]);
+  assert.equal(resolveBusNumberList(fleet, "engine light").kind, "text");
 });
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
@@ -377,10 +386,14 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(html,/MYSTERY BUSES/);
   assert.match(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
   assert.match(html,/class="mystery-board"/);
+  assert.match(html,/class="mystery-toggle"/);
+  assert.match(html,/aria-expanded="true"/);
   assert.match(html,/>QUICK FILTERS</);
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
   assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
+  assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
+  assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -1699,10 +1712,17 @@ test("phone layouts keep Defect Log actions large and Down Sheet tabs unobstruct
   assert.match(logCss, /\.log-header nav a\{[^}]*min-width:0;[^}]*height:48px/);
   assert.match(logCss, /\.log-summary\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(logCss, /\.log-summary \.fixed\{[^}]*grid-column:1\/-1/);
+  assert.match(logCss, /\.log-controls \.log-search-wrap\{[^}]*grid-column:1\/-1;grid-row:3/);
   assert.match(downCss, /Phone-only header containment/);
+  assert.match(downCss, /\.down-header\{height:auto;min-height:78px/);
+  assert.match(downCss, /\.down-header\{height:auto;min-height:0;gap:12px/);
   assert.match(downCss, /down-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
   assert.match(downCss, /down-header nav a\{[^}]*min-width:0;[^}]*height:48px/);
   assert.match(downCss, /font-size:min\(var\(--down-page-title-size,25px\),22px\)/);
+  const trackerCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(trackerCss, /Phone-only containment keeps five-digit number tiles/);
+  assert.match(trackerCss, /\.app\[data-bus-display="number"\] \.spot>\.token\{min-width:0;max-width:100%;[^}]*overflow:hidden/);
+  assert.match(trackerCss, /\.token-number\{max-width:100%;overflow:hidden;font-size:10px/);
 });
 test("main garage always normalizes destination status from every facility source", () => {
   const defect = [{id:"d",category:"Brakes",issue:"Air brake fault",details:"",operability:"down",state:"open"}];
