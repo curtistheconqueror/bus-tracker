@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 93
-Live feature checkpoint: commit 4788b6e
+Live release: Sites Version 94
+Live feature checkpoint: commit 13c7244
 
 ## Read this first
 
@@ -46,18 +46,15 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 93 is the current user-approved live release. Its validated feature checkpoint is commit 4788b6e. It combines every change through live Version 92 with the latest defect-entry and phone usability work, including:
+Version 94 is the current user-approved live release. Its validated feature checkpoint is commit 13c7244. It builds on Version 93 with:
 
-- grouped multi-defect bus records, expandable per-defect controls, and accurate individual-defect totals;
-- multi-symptom Check Engine records that remain one underlying defect;
-- generation-first and typed bus selection, collapsible Mystery search, and shared Quick Filter bus lists;
-- contained phone headers, 50-pixel page tabs, large touch targets, and a full-height Defect Log editor;
-- top and bottom Defect Log Save controls that remain reachable while scrolling;
-- optional quick-select subcategories so a category-only defect can be saved immediately;
-- visible Logged and Updated timestamps on defects; and
-- prevention of identical unresolved dropdown defects for 48 hours, while allowing a fresh dated report after that window.
+- a new Operator Controls category covering gauges, front and left-side dashes, switches, doors, HVAC controls, lighting, start controls, seat belts, driver-seat faults, and persistent horn or seat alarms;
+- a Bike Rack bodywork option;
+- Cooling System choices for radiator leaks, fan diagnostic lights, fans constantly running on high, and one through eight failed radiator fans;
+- a centered Save & Close action immediately above Add to Down Sheet while retaining the bottom Save action; and
+- a collapsed Advanced Details section for diagnostic notes, actions, part numbers, and initials.
 
-The Version 93 production build, lint gate, and all 56 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+The Version 94 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
