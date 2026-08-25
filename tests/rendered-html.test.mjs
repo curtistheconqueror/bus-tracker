@@ -1665,6 +1665,15 @@ test("inactive interface tabs keep an explicit high-contrast treatment", async (
   assert.match(logCss, /Readable inactive page tabs/);
   assert.match(logCss, /log-header nav a\{background:/);
 });
+test("phone layouts keep Defect Log actions large and Down Sheet tabs unobstructed", async () => {
+  const downCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.match(logCss, /feed-title \.feed-operator,\.feed-title button\{[^}]*height:52px;min-height:52px[^}]*font-size:11px/);
+  assert.match(downCss, /Phone-only header containment/);
+  assert.match(downCss, /down-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
+  assert.match(downCss, /down-header nav a\{[^}]*min-width:0;[^}]*height:48px/);
+  assert.match(downCss, /font-size:min\(var\(--down-page-title-size,25px\),22px\)/);
+});
 test("main garage always normalizes destination status from every facility source", () => {
   const defect = [{id:"d",category:"Brakes",issue:"Air brake fault",details:"",operability:"down",state:"open"}];
   const fleet = [
