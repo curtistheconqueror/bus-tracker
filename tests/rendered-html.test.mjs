@@ -1632,7 +1632,8 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="bus-generations"/);
   assert.match(page,/input autoFocus inputMode="numeric"/);
   assert.match(page,/Choose generation first/);
-  assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{middleSaveLabel\}/);
+  assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
+  assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
   assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
@@ -1813,9 +1814,10 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
   assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
-  assert.match(defectCss, /\.save-log-middle\{[^}]*min-height:50px/);
+  assert.match(defectCss, /\.save-log-middle,\.close-log-middle\{[^}]*min-height:50px/);
   assert.match(defectPage, /<details className="advanced-defect-details"/);
-  assert.match(defectPage, /SAVE & CLOSE/);
+  assert.match(defectPage, /save-log-middle-actions[\s\S]*\{saveLabel\}[\s\S]*>CLOSE</);
+  assert.doesNotMatch(defectPage, /SAVE & CLOSE/);
 });
 
 test("Operator Controls and Cooling System expose field-ready defect choices", async () => {
