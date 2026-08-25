@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 95
-Live feature checkpoint: commit 5924f3f
+Live release: Sites Version 96
+Live feature checkpoint: commit 1ffffc5
 
 ## Read this first
 
@@ -48,14 +48,14 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 95 is the current user-approved live release. Its validated feature checkpoint is commit 5924f3f. It retains all Version 94 Operator Controls, Bike Rack, radiator-fan, phone-entry, and Advanced Details improvements while correcting the centered Defect Log action area.
+Version 96 is the current user-approved live release. Its validated feature checkpoint is commit 1ffffc5. It includes the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth offline Fixed Repairs workflow, Save as Fixed as the third action in both Defect Log button rows, and editable completion details.
 
-- Save Defect or Save Update persists the entry through the existing validation and duplicate-prevention workflow.
-- Close exits the editor without saving, providing the separate choice intended by the bottom controls.
+- The Defect Log editor includes a Defect / Condition Not Duplicated checkbox for findings that could not be reproduced.
+- The shared Quick Filters can locate buses carrying that flag, including completed records retained for later diagnosis.
+- Fixed Repairs visibly preserves the not-duplicated result with the original defect history.
+- Save Defect, Close, and Save as Fixed remain three separate choices in both editor action rows.
 
-The Version 95 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
-
-An unpublished candidate now adds the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth Fixed Repairs workflow, Save as Fixed in both Defect Log action rows, editable completion details, and offline caching for all four routes. It is not live and must not be published without explicit approval. Its lint, production build, and all 58 regression tests pass.
+The Version 96 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
