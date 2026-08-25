@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 94
-Live feature checkpoint: commit 13c7244
+Live release: Sites Version 95
+Live feature checkpoint: commit 5924f3f
 
 ## Read this first
 
@@ -46,15 +46,12 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 94 is the current user-approved live release. Its validated feature checkpoint is commit 13c7244. It builds on Version 93 with:
+Version 95 is the current user-approved live release. Its validated feature checkpoint is commit 5924f3f. It retains all Version 94 Operator Controls, Bike Rack, radiator-fan, phone-entry, and Advanced Details improvements while correcting the centered Defect Log action area.
 
-- a new Operator Controls category covering gauges, front and left-side dashes, switches, doors, HVAC controls, lighting, start controls, seat belts, driver-seat faults, and persistent horn or seat alarms;
-- a Bike Rack bodywork option;
-- Cooling System choices for radiator leaks, fan diagnostic lights, fans constantly running on high, and one through eight failed radiator fans;
-- a centered Save & Close action immediately above Add to Down Sheet while retaining the bottom Save action; and
-- a collapsed Advanced Details section for diagnostic notes, actions, part numbers, and initials.
+- Save Defect or Save Update persists the entry through the existing validation and duplicate-prevention workflow.
+- Close exits the editor without saving, providing the separate choice intended by the bottom controls.
 
-The Version 94 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+The Version 95 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 

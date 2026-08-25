@@ -8,7 +8,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 86 | Historical | 7d62809 | Mobile Defect Log grouping, defect counts, generation filters, typed bus entry, hidden phone Shop Notes, and organized project documentation |
 | 92 | Previous live | be6ab31 | Multi-symptom Check Engine defects, contained phone layouts, collapsible Mystery search, shared Quick Filter bus lists, and stable full-height phone editor saving |
 | 93 | Previous live | 4788b6e | Version 92 merged with optional defect subcategories, reachable dual Save controls, dated defects, 48-hour duplicate prevention, and larger phone navigation |
-| 94 | Live | 13c7244 | Operator Controls, Bike Rack and radiator-fan repair choices, a one-to-eight fan count, centered Save & Close, and collapsible Advanced Details |
+| 94 | Previous live | 13c7244 | Operator Controls, Bike Rack and radiator-fan repair choices, a one-to-eight fan count, centered Save & Close, and collapsible Advanced Details |
+| 95 | Live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
