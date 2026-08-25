@@ -1,4 +1,4 @@
-import {defectSummary,isUnresolved,normalizeDefects,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSupportingDetails,defectSummary,isUnresolved,normalizeDefects,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
@@ -91,13 +91,13 @@ export function saveDefectLogRecord(
  const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  const existing=current.find(defect=>defect.id===incoming.id);
  const state=incoming.state;
- const defect:StructuredDefect={...existing,...incoming,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"};
+ const defect:StructuredDefect={...existing,...incoming,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
  if(onDownSheet&&state!=="completed"){
   const workflow=workflowForState(state),historyItem={at:now,initials:defect.reportedBy||"",action:existingDown?"Updated from Defect Log":"Added from Defect Log"};
-  const linked:DefectLogDownEntry=existingDown?{...existingDown,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:defect.details,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:defect.details,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
+  const linked:DefectLogDownEntry=existingDown?{...existingDown,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
   nextDown=existingDown?downEntries.map(entry=>entry.id===existingDown.id?linked:entry):[linked,...downEntries];
  }else if(existingDown&&existingDown.workflow!=="Completed"){
   nextDown=downEntries.map(entry=>entry.id===existingDown.id?{...entry,workflow:"Completed",completedAt:now,updatedAt:now,updatedBy:defect.reportedBy||entry.updatedBy,history:[...(entry.history||[]),{at:now,initials:defect.reportedBy||"",action:state==="completed"?"Repair completed from Defect Log":"Removed from active Down Sheet"}]}:entry);
@@ -131,8 +131,8 @@ export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(ent
  return entries.map(entry=>{
   if(entry.busId!==bus.id||!entry.defectId)return entry;
   const defect=defects.find(item=>item.id===entry.defectId);if(!defect)return entry;
-  const completed=defect.state==="completed",workflow=workflowForState(defect.state),changed=entry.workflow!==workflow||entry.category!==defect.category||entry.repair!==defect.issue||entry.customReason!==defect.details;
+  const completed=defect.state==="completed",workflow=workflowForState(defect.state),supportingDetails=defectSupportingDetails(defect),changed=entry.workflow!==workflow||entry.category!==defect.category||entry.repair!==defect.issue||entry.customReason!==supportingDetails;
   if(!changed)return entry;
-  return {...entry,category:defect.category,repair:defect.issue,customReason:defect.details,workflow,operationalStatus:completed?roadServiceStatus({...bus,defects,pendingRepair:defectSummary(defects)}):defect.operability==="down"?"out":defect.state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:updatedBy||defect.reportedBy||entry.updatedBy,completedAt:completed?(entry.completedAt||now):"",history:[...(entry.history||[]),{at:now,initials:updatedBy||defect.reportedBy||"",action:completed?"Completed from Bus Settings":"Updated from Bus Settings"}]} as T;
+  return {...entry,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:completed?roadServiceStatus({...bus,defects,pendingRepair:defectSummary(defects)}):defect.operability==="down"?"out":defect.state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:updatedBy||defect.reportedBy||entry.updatedBy,completedAt:completed?(entry.completedAt||now):"",history:[...(entry.history||[]),{at:now,initials:updatedBy||defect.reportedBy||"",action:completed?"Completed from Bus Settings":"Updated from Bus Settings"}]} as T;
  });
 }

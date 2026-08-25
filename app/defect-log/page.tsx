@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -74,6 +74,8 @@ function DefectEditor({draft,fleet,defaultInitials,save,close}:{draft:LogDraft;f
  const [value,setValue]=useState(draft);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
+ const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=value.defect.category==="Engine"&&value.quickIssue==="Check-engine diagnosis";
+ const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId);
  const submit=(event:React.FormEvent)=>{event.preventDefault();const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(!issue&&!details){alert("Select a repair or describe the symptom.");return}const finalIssue=issue&&issue!=="Manual entry"?issue:"Manual entry";save({...value,onDownSheet:value.defect.state==="completed"?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials}})};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
@@ -81,8 +83,9 @@ function DefectEditor({draft,fleet,defaultInitials,save,close}:{draft:LogDraft;f
    <header><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><button type="button" onClick={close} aria-label="Close">x</button></header>
    <div className="log-form">
     <BusSelector fleet={fleet} busId={value.busId} select={busId=>setValue(current=>({...current,busId}))}/>
-    <label>CATEGORY<select value={value.defect.category} onChange={event=>setValue(current=>({...current,quickIssue:"",defect:{...current.defect,category:event.target.value,issue:"",operability:"service"}}))}><option value="">Select category</option>{Object.keys(REPAIR_OPTIONS).map(category=><option key={category}>{category}</option>)}</select></label>
-    <label>QUICK SELECT<select value={value.quickIssue} disabled={!value.defect.category} onChange={event=>{const issue=event.target.value;setValue(current=>({...current,quickIssue:issue,defect:{...current.defect,issue,operability:defaultDefectOperability(current.defect.category,issue)}}))}}><option value="">{value.defect.category?"Type the symptom below":"Select category first"}</option>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>
+    <label>CATEGORY<select value={value.defect.category} onChange={event=>setValue(current=>({...current,quickIssue:"",defect:{...current.defect,category:event.target.value,issue:"",symptoms:[],operability:"service"}}))}><option value="">Select category</option>{Object.keys(REPAIR_OPTIONS).map(category=><option key={category}>{category}</option>)}</select></label>
+    <label>QUICK SELECT<select value={value.quickIssue} disabled={!value.defect.category} onChange={event=>{const issue=event.target.value;setValue(current=>({...current,quickIssue:issue,defect:{...current.defect,issue,symptoms:issue==="Check-engine diagnosis"?current.defect.symptoms||[]:[],operability:defaultDefectOperability(current.defect.category,issue)}}))}}><option value="">{value.defect.category?"Type the symptom below":"Select category first"}</option>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>
+    {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
     {value.defect.category==="Preventive Maintenance"&&value.quickIssue==="Add engine oil"&&<><label>QUANTITY<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
     <label>WORK STATUS<select value={value.defect.state} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="deferred">Deferred</option><option value="completed">Fixed</option></select></label>
@@ -162,7 +165,7 @@ export default function DefectLog(){
   if(filter==="fixed"&&!(record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)))return false;
   if(filter==="downsheet"&&!activeDownBusIdSet.has(record.bus.id))return false;
   const query=search.trim().toLowerCase();if(!query)return true;
-  return [record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
+  return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
  });
  const visibleGroups=groupDefectLogRecords(visible);
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";

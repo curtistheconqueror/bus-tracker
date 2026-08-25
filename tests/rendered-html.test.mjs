@@ -10,7 +10,7 @@ import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/sm
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
@@ -1028,6 +1028,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"));
+  assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
+  assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
+  assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
   assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "MDT Screen", "Destination Sign", "Other Tech Services"]);
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
@@ -1048,6 +1051,27 @@ test("repair catalog exposes robust category and issue choices", () => {
   ];
   assert.equal(twoDefects.length, 3);
   assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
+});
+test("Defect Log keeps multiple check-engine symptoms inside one defect record", async () => {
+  assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power","Stop engine light"]);
+  const [defect]=normalizeDefects([{id:"check-engine-1",category:"Engine",issue:"Check-engine diagnosis",symptoms:["Misfire","Loss of power","Misfire"],details:"Under load",operability:"service",state:"open",source:"defect-log"}]);
+  assert.deepEqual(defect.symptoms,["Misfire","Loss of power"]);
+  assert.equal(defectSupportingDetails(defect),"Misfire, Loss of power — Under load");
+  assert.match(defectLabel(defect),/Engine — Check-engine diagnosis — Misfire, Loss of power — Under load/);
+  const saved=saveDefectLogRecord([{id:"bus-1",n:"18505",s:"service",l:"road-1",defects:[]}],[],"bus-1",defect,true,"2026-08-24T20:00:00.000Z");
+  assert.equal(saved.error,null);
+  assert.equal(saved.fleet[0].defects.length,1);
+  assert.deepEqual(saved.fleet[0].defects[0].symptoms,["Misfire","Loss of power"]);
+  assert.equal(saved.downEntries[0].customReason,"Misfire, Loss of power — Under load");
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.match(page,/CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY/);
+  assert.match(page,/All selections save as one defect record/);
+  assert.match(page,/toggleCheckEngineSymptom/);
+  assert.match(css,/\.engine-symptom-picker/);
+  assert.match(css,/Keep every phone filter, including Fixed Today/);
+  assert.match(css,/\.log-settings-button\{position:static;grid-column:2;grid-row:2/);
+  assert.match(css,/\.log-summary \.fixed\{position:static;z-index:auto\}/);
 });
 test("bus marker display toggles between icons and large number tiles per device", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
