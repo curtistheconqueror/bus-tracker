@@ -1048,7 +1048,7 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.equal(Object.keys(REPAIR_OPTIONS).length, 22);
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 23);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
@@ -1632,7 +1632,8 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="bus-generations"/);
   assert.match(page,/input autoFocus inputMode="numeric"/);
   assert.match(page,/Choose generation first/);
-  assert.match(page,/className="log-header-save save-log-top" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
+  assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{middleSaveLabel\}/);
+  assert.doesNotMatch(page,/className="log-header-save/);
   assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
@@ -1812,9 +1813,33 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
   assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
-  assert.match(defectCss, /\.log-editor header \.save-log-top\{[^}]*min-width:82px/);
+  assert.match(defectCss, /\.save-log-middle\{[^}]*min-height:50px/);
+  assert.match(defectPage, /<details className="advanced-defect-details"/);
+  assert.match(defectPage, /SAVE & CLOSE/);
 });
 
+test("Operator Controls and Cooling System expose field-ready defect choices", async () => {
+  const [catalog,page]=await Promise.all([
+    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+    readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  ]);
+  assert.match(catalog,/"Operator Controls"/);
+  assert.match(catalog,/"Fuel gauge"/);
+  assert.match(catalog,/"Front instrument dash damaged \/ replacement"/);
+  assert.match(catalog,/"Driver seat belt"/);
+  assert.match(catalog,/"Driver seat leaking air"/);
+  assert.match(catalog,/"Horn \/ seat alarm will not stop"/);
+  assert.match(catalog,/"Bike rack damaged \/ not operating"/);
+  assert.match(catalog,/"Radiator fan\(s\) out"/);
+  assert.match(catalog,/"Radiator fan diagnostic light"/);
+  assert.match(catalog,/"Radiator fans constantly running on high"/);
+  assert.match(catalog,/"Radiator leak"/);
+  assert.match(page,/fanCountMode=value\.defect\.category==="Cooling System"/);
+  assert.match(page,/Array\.from\(\{length:8\}/);
+  assert.match(page,/Select how many radiator fans are out \(1 through 8\)/);
+  assert.match(page,/save-log-middle[\s\S]*downsheet-check/);
+  assert.match(page,/advanced-defect-details/);
+});
 test("Defect Log timestamps reports and blocks only recent identical unresolved defects", () => {
   const existing={id:"old-defect",category:"Engine",issue:"Loss of power",details:"First report",operability:"service",state:"open",source:"defect-log",createdAt:"2026-08-22T12:00:00.000Z",updatedAt:"2026-08-22T12:00:00.000Z"};
   const bus={id:"bus-1",n:"17501",s:"defect",l:"road-1",defects:[existing]};
