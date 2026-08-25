@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 86
-Live source checkpoint: commit 7d62809
+Live release: Sites Version 93
+Live feature checkpoint: commit 4788b6e
 
 ## Read this first
 
@@ -46,16 +46,18 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 86 is the current user-approved live release. Its feature commit is 0f1324c, and its published source checkpoint is commit 7d62809. It adds:
+Version 93 is the current user-approved live release. Its validated feature checkpoint is commit 4788b6e. It combines every change through live Version 92 with the latest defect-entry and phone usability work, including:
 
-- one phone card per bus with ×2, ×3, and similar defect counts;
-- expandable per-defect controls without merging repair records;
-- Add Defect with the current bus preselected;
-- generation-first selection for 15s, 17s, 18s, and 20s;
-- direct full-number typing; and
-- hidden inline Shop Notes on phone widths while retaining them on iPad and desktop.
+- grouped multi-defect bus records, expandable per-defect controls, and accurate individual-defect totals;
+- multi-symptom Check Engine records that remain one underlying defect;
+- generation-first and typed bus selection, collapsible Mystery search, and shared Quick Filter bus lists;
+- contained phone headers, 50-pixel page tabs, large touch targets, and a full-height Defect Log editor;
+- top and bottom Defect Log Save controls that remain reachable while scrolling;
+- optional quick-select subcategories so a category-only defect can be saved immediately;
+- visible Logged and Updated timestamps on defects; and
+- prevention of identical unresolved dropdown defects for 48 hours, while allowing a fresh dated report after that window.
 
-The Version 86 production build and all 52 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-24.
+The Version 93 production build, lint gate, and all 56 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
