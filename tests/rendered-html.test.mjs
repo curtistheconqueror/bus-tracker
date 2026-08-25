@@ -1069,9 +1069,9 @@ test("Defect Log keeps multiple check-engine symptoms inside one defect record",
   assert.match(page,/All selections save as one defect record/);
   assert.match(page,/toggleCheckEngineSymptom/);
   assert.match(css,/\.engine-symptom-picker/);
-  assert.match(css,/Keep every phone filter, including Fixed Today/);
+  assert.match(css,/Phone-only header containment and in-flow summary\/filter layout/);
   assert.match(css,/\.log-settings-button\{position:static;grid-column:2;grid-row:2/);
-  assert.match(css,/\.log-summary \.fixed\{position:static;z-index:auto\}/);
+  assert.match(css,/\.log-summary \.fixed\{position:static;z-index:auto;grid-column:1\/-1\}/);
 });
 test("bus marker display toggles between icons and large number tiles per device", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -1693,6 +1693,12 @@ test("phone layouts keep Defect Log actions large and Down Sheet tabs unobstruct
   const downCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
   const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
   assert.match(logCss, /feed-title \.feed-operator,\.feed-title button\{[^}]*height:52px;min-height:52px[^}]*font-size:11px/);
+  assert.match(logCss, /Phone-only header containment/);
+  assert.match(logCss, /\.log-header\{height:auto;min-height:0;gap:12px;[^}]*overflow:visible/);
+  assert.match(logCss, /\.log-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
+  assert.match(logCss, /\.log-header nav a\{[^}]*min-width:0;[^}]*height:48px/);
+  assert.match(logCss, /\.log-summary\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(logCss, /\.log-summary \.fixed\{[^}]*grid-column:1\/-1/);
   assert.match(downCss, /Phone-only header containment/);
   assert.match(downCss, /down-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
   assert.match(downCss, /down-header nav a\{[^}]*min-width:0;[^}]*height:48px/);
