@@ -21,3 +21,15 @@ export function resolveBusNumber<T extends BusNumberRecord>(fleet:T[],raw:string
 export function candidateBusNumbers<T extends BusNumberRecord>(matches:T[]):string[]{
  return [...new Set(matches.map(bus=>bus.n))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
 }
+
+export type BusNumberListResolution<T extends BusNumberRecord>=
+ | {kind:"text";tokens:[];buses:[];ambiguous:[];invalid:[];missing:[]}
+ | {kind:"numbers";tokens:string[];buses:T[];ambiguous:Array<{query:string;matches:T[]}>;invalid:string[];missing:string[]};
+
+export function resolveBusNumberList<T extends BusNumberRecord>(fleet:T[],raw:string):BusNumberListResolution<T>{
+ const tokens=raw.trim().split(/[\s,]+/).filter(Boolean);
+ if(!tokens.length||tokens.some(token=>!/^[0-9]+$/.test(token)))return {kind:"text",tokens:[],buses:[],ambiguous:[],invalid:[],missing:[]};
+ const buses:T[]=[],seen=new Set<string>(),ambiguous:Array<{query:string;matches:T[]}>=[],invalid:string[]=[],missing:string[]=[];
+ tokens.forEach(query=>{const result=resolveBusNumber(fleet,query);if(result.kind==="exact"||result.kind==="suffix"){if(!seen.has(result.bus.id)){seen.add(result.bus.id);buses.push(result.bus)}return}if(result.kind==="ambiguous"){ambiguous.push({query,matches:result.matches});return}if(result.kind==="invalid")invalid.push(query);else missing.push(query)});
+ return {kind:"numbers",tokens,buses,ambiguous,invalid,missing};
+}

@@ -7,7 +7,7 @@ import DownSheetSettings from "./down-sheet-settings";
 import DownSheetScanner from "./down-sheet-scanner";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "./down-sheet-clear";
-import {isUnresolved,type StructuredDefect} from "../repair-catalog";
+import {defectSupportingDetails,isUnresolved,type StructuredDefect} from "../repair-catalog";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "./repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
@@ -87,7 +87,7 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
   category:bus.defects?.find(isUnresolved)?.category||"Miscellaneous",
   repair:bus.defects?.find(isUnresolved)?.issue||bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
   customReason:bus.defects?.find(isUnresolved)?.details||"",
-  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defect.details||"",estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue)})),
+  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defectSupportingDetails(defect),estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue)})),
   assignmentType:"Mechanic",
   assignedTo:bus.mechanic||"",
   section:bus.roadcall?"Roadcall":"Pending",

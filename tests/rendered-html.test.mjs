@@ -10,10 +10,10 @@ import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/sm
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSummary } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
-import { candidateBusNumbers, resolveBusNumber } from "../app/bus-number-resolver.ts";
+import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
@@ -27,6 +27,7 @@ import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
+import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -74,6 +75,15 @@ test("bus-number resolver accepts unique suffixes and blocks unsafe ambiguity", 
   const duplicateExact = resolveBusNumber([...fleet, { id: "duplicate", n: "17525" }], "17525");
   assert.equal(duplicateExact.kind, "ambiguous");
   assert.equal(duplicateExact.matchType, "exact");
+  const multiple = resolveBusNumberList(fleet, "25, 17505 20505");
+  assert.equal(multiple.kind, "numbers");
+  assert.deepEqual(multiple.buses.map(bus => bus.n), ["17525", "17505", "20505"]);
+  const mixedResolution = resolveBusNumberList(fleet, "25 05, 99");
+  assert.equal(mixedResolution.kind, "numbers");
+  assert.deepEqual(mixedResolution.buses.map(bus => bus.n), ["17525"]);
+  assert.deepEqual(mixedResolution.ambiguous.map(item => item.query), ["05"]);
+  assert.deepEqual(mixedResolution.missing, ["99"]);
+  assert.equal(resolveBusNumberList(fleet, "engine light").kind, "text");
 });
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
@@ -299,6 +309,7 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
+  assert.equal(quickFilterShareText("A/C",[buses[0],buses[7]]),"A/C — 2 buses\nBus 1 — A/C and HVAC — No cooling\nBus 6 — Preventive Maintenance — Add engine oil — 10 quarts");
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -377,10 +388,25 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(html,/MYSTERY BUSES/);
   assert.match(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
   assert.match(html,/class="mystery-board"/);
+  assert.match(html,/class="mystery-toggle"/);
+  assert.match(html,/aria-expanded="true"/);
   assert.match(html,/>QUICK FILTERS</);
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
   assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  assert.match(page,/quickFilterExpandedBusIds/);
+  assert.match(page,/aria-expanded=\{expanded\}/);
+  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses\)/);
+  assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
+  assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
+  assert.match(page,/aria-label="Copy filtered bus list"/);
+  assert.match(page,/aria-label="Share filtered bus list as text"/);
+  assert.match(css,/\.quick-filter-defects\{/);
+  assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
+  assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
+  assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
+  assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -1028,6 +1054,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"));
+  assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
+  assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
+  assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
   assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "MDT Screen", "Destination Sign", "Other Tech Services"]);
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
@@ -1048,6 +1077,27 @@ test("repair catalog exposes robust category and issue choices", () => {
   ];
   assert.equal(twoDefects.length, 3);
   assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
+});
+test("Defect Log keeps multiple check-engine symptoms inside one defect record", async () => {
+  assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power","Stop engine light"]);
+  const [defect]=normalizeDefects([{id:"check-engine-1",category:"Engine",issue:"Check-engine diagnosis",symptoms:["Misfire","Loss of power","Misfire"],details:"Under load",operability:"service",state:"open",source:"defect-log"}]);
+  assert.deepEqual(defect.symptoms,["Misfire","Loss of power"]);
+  assert.equal(defectSupportingDetails(defect),"Misfire, Loss of power — Under load");
+  assert.match(defectLabel(defect),/Engine — Check-engine diagnosis — Misfire, Loss of power — Under load/);
+  const saved=saveDefectLogRecord([{id:"bus-1",n:"18505",s:"service",l:"road-1",defects:[]}],[],"bus-1",defect,true,"2026-08-24T20:00:00.000Z");
+  assert.equal(saved.error,null);
+  assert.equal(saved.fleet[0].defects.length,1);
+  assert.deepEqual(saved.fleet[0].defects[0].symptoms,["Misfire","Loss of power"]);
+  assert.equal(saved.downEntries[0].customReason,"Misfire, Loss of power — Under load");
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.match(page,/CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY/);
+  assert.match(page,/All selections save as one defect record/);
+  assert.match(page,/toggleCheckEngineSymptom/);
+  assert.match(css,/\.engine-symptom-picker/);
+  assert.match(css,/Phone-only header containment and in-flow summary\/filter layout/);
+  assert.match(css,/\.log-settings-button\{position:static;grid-column:2;grid-row:2/);
+  assert.match(css,/\.log-summary \.fixed\{position:static;z-index:auto;grid-column:1\/-1\}/);
 });
 test("bus marker display toggles between icons and large number tiles per device", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -1582,8 +1632,14 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="bus-generations"/);
   assert.match(page,/input autoFocus inputMode="numeric"/);
   assert.match(page,/Choose generation first/);
+  assert.match(page,/className="log-header-save save-log-top" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
+  assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
+  assert.match(css,/body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
+  assert.match(css,/\.log-editor\{max-height:96vh;max-height:96dvh\}/);
+  assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
+  assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
 });
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};
@@ -1664,6 +1720,28 @@ test("inactive interface tabs keep an explicit high-contrast treatment", async (
   assert.match(downCss, /down-header nav a\{background:#0b4f9e/);
   assert.match(logCss, /Readable inactive page tabs/);
   assert.match(logCss, /log-header nav a\{background:/);
+});
+test("phone layouts keep Defect Log actions large and Down Sheet tabs unobstructed", async () => {
+  const downCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.match(logCss, /feed-title \.feed-operator,\.feed-title button\{[^}]*height:52px;min-height:52px[^}]*font-size:11px/);
+  assert.match(logCss, /Phone-only header containment/);
+  assert.match(logCss, /\.log-header\{height:auto;min-height:0;gap:12px;[^}]*overflow:visible/);
+  assert.match(logCss, /\.log-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
+  assert.match(logCss, /\.log-header nav a\{[^}]*min-width:0;[^}]*height:50px/);
+  assert.match(logCss, /\.log-summary\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(logCss, /\.log-summary \.fixed\{[^}]*grid-column:1\/-1/);
+  assert.match(logCss, /\.log-controls \.log-search-wrap\{[^}]*grid-column:1\/-1;grid-row:3/);
+  assert.match(downCss, /Phone-only header containment/);
+  assert.match(downCss, /\.down-header\{height:auto;min-height:78px/);
+  assert.match(downCss, /\.down-header\{height:auto;min-height:0;gap:12px/);
+  assert.match(downCss, /down-header nav\{[^}]*height:auto;[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)[^}]*overflow:visible/);
+  assert.match(downCss, /down-header nav a\{[^}]*min-width:0;[^}]*height:50px/);
+  assert.match(downCss, /font-size:min\(var\(--down-page-title-size,25px\),22px\)/);
+  const trackerCss = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(trackerCss, /Phone-only containment keeps five-digit number tiles/);
+  assert.match(trackerCss, /\.app\[data-bus-display="number"\] \.spot>\.token\{min-width:0;max-width:100%;[^}]*overflow:hidden/);
+  assert.match(trackerCss, /\.token-number\{max-width:100%;overflow:hidden;font-size:10px/);
 });
 test("main garage always normalizes destination status from every facility source", () => {
   const defect = [{id:"d",category:"Brakes",issue:"Air brake fault",details:"",operability:"down",state:"open"}];
