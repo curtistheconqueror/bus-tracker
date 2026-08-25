@@ -1,6 +1,6 @@
-const CACHE_NAME = "pace-bus-tracker-shell-v2";
+const CACHE_NAME = "pace-bus-tracker-shell-v3";
 const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg"];
-const CORE_PAGES = ["/", "/down-sheet"];
+const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs"];
 
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);

@@ -699,6 +699,7 @@ test("installs and caches an offline app shell", async () => {
   assert.match(worker, /html\.matchAll/);
   assert.match(worker, /request\.mode === "navigate"/);
   assert.match(worker, /caches\.match\("\/"\)/);
+  assert.match(worker, /\/fixed-repairs/);
 });
 
 test("allows ordinary edits to an existing duplicated number while protecting identity and occupancy", () => {
@@ -1810,7 +1811,13 @@ test("phone layouts expose large primary controls and category-only defect entry
   ]);
   assert.match(trackerPage, /className="mobile-mode-nav"[\s\S]*?FLEET TRACKER[\s\S]*?DOWN SHEET[\s\S]*?DEFECT LOG/);
   assert.match(trackerCss, /\.mobile-mode-nav a\{[^}]*min-height:50px/);
-  assert.match(trackerCss, /\.command-bar\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(trackerPage, /className="phone-command-dock"[\s\S]*?>FIND<[\s\S]*?>FILTERS<[\s\S]*?>AI<[\s\S]*?>MORE</);
+  assert.match(trackerPage, /className="garage-scroll"[\s\S]*?className="garagegrid"/);
+  assert.match(trackerPage, /COLLAPSED_SECTIONS_KEY/);
+  assert.match(trackerCss, /@media\(max-width:620px\)\{[\s\S]*?\.facility\{[^}]*min-width:0!important[^}]*zoom:1!important/);
+  assert.match(trackerCss, /\.facility \.title-actions \.toggle-section\{[^}]*width:44px!important[^}]*height:44px!important/);
+  assert.match(trackerCss, /\.command-bar\{display:none!important\}/);
+  assert.match(trackerCss, /\.phone-command-dock\{[^}]*grid-template-columns:repeat\(4/);
   assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
   assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
@@ -1859,4 +1866,36 @@ test("Defect Log timestamps reports and blocks only recent identical unresolved 
   assert.equal(recentDefectDuplicate(completedBus,incoming,"2026-08-22T13:00:00.000Z"),null);
   const manual=saveDefectLogRecord([bus],[],"bus-1",{...incoming,id:"manual-defect",issue:"Manual entry"},false,"2026-08-22T13:00:00.000Z");
   assert.equal(manual.error,null);
+});
+
+
+test("Fixed Repairs is a fourth offline workflow with carried defect data and editable completion details", async () => {
+  const [trackerPage,downPage,defectPage,defectCss,fixedPage,fixedCss,worker,catalog]=await Promise.all([
+    readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+    readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+    readFile(new URL("../public/sw.js",import.meta.url),"utf8"),
+    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+  ]);
+  for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/href="\/fixed-repairs"[\s\S]*?FIXED REPAIRS/);
+  assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
+  assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
+  assert.match(defectPage,/FIX \/ STEPS TAKEN/);
+  assert.match(defectPage,/completedBy/);
+  assert.match(defectCss,/save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
+  assert.match(fixedPage,/state==="completed"/);
+  assert.match(fixedPage,/ORIGINAL DEFECT/);
+  assert.match(fixedPage,/FIX \/ STEPS TAKEN/);
+  assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
+  assert.match(fixedPage,/FIXED DATE &amp; TIME/);
+  assert.match(fixedPage,/localStorage\.setItem\(FLEET_KEY/);
+  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs"\]/);
+  assert.match(catalog,/completedBy\?:string/);
+  const response=await render("/fixed-repairs");
+  assert.equal(response.status,200);
+  assert.match(await response.text(),/Fixed Repairs/);
 });

@@ -11,11 +11,12 @@ Live feature checkpoint: commit 5924f3f
 
 This file is the authoritative continuation guide. Older snapshots are preserved under docs/archive for historical reference only. Do not use an archived handoff as current implementation guidance.
 
-The project is an offline-capable fleet maintenance operations application with three connected surfaces:
+The project is an offline-capable fleet maintenance operations application with four connected surfaces:
 
 1. Facility Map — physical location, operating status, fleet markers, fast movement, and AI Operator commands.
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
 3. Real-Time Defect Log — mobile-first field observations and smaller repairs that usually do not belong on the Down Sheet.
+4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
 
 ## Domain ownership
 
@@ -24,6 +25,7 @@ These boundaries prevent synchronization bugs:
 - The Facility Map owns physical bus location.
 - The Down Sheet owns formal maintenance scheduling and active Down Sheet membership.
 - The Defect Log owns records created directly from the Defect Log.
+- Fixed Repairs reads completed structured defects from the fleet record and owns only their completion-detail edits; it is not a separate duplicate repair store.
 - Repair and status changes may synchronize across surfaces; Down Sheet or Defect Log edits must not silently relocate a bus.
 - A bus may have multiple independent repair records. The phone Defect Log groups them visually by bus but does not merge or discard the underlying records.
 
@@ -53,6 +55,8 @@ Version 95 is the current user-approved live release. Its validated feature chec
 
 The Version 95 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
+An unpublished candidate now adds the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth Fixed Repairs workflow, Save as Fixed in both Defect Log action rows, editable completion details, and offline caching for all four routes. It is not live and must not be published without explicit approval. Its lint, production build, and all 58 regression tests pass.
+
 ## Repository and remotes
 
 - origin — private GitHub backup at curtistheconqueror/bus-tracker
@@ -68,6 +72,7 @@ The history is intentionally linear. Do not rewrite published commits, force-pus
 - app/operator-engine.ts and app/operator-batch.ts — AI Operator parsing and atomic actions
 - app/down-sheet/ — Down Sheet route, editor, estimates, scan review, and two-way synchronization
 - app/defect-log/ — Defect Log route, grouping, filters, settings, and linked-repair behavior
+- app/fixed-repairs/ — offline completed-repair history and completion-detail editing
 - app/repair-catalog.ts — structured repair categories and quick selections
 - tests/rendered-html.test.mjs — release-gate regression coverage
 - db/ and drizzle/ — intentionally dormant shared-backend scaffolding
@@ -119,7 +124,7 @@ The next major phase is immediate phone/iPad synchronization without losing offl
 8. Import one trusted current backup as the initial shared dataset.
 9. Run dual-write and rollback validation before making the backend authoritative.
 
-The first backend milestone should synchronize fleet location and bus status between two test devices while preserving the current offline behavior. Down Sheet and Defect Log records follow after the identity, revision, and conflict model is proven.
+The first backend milestone should synchronize fleet location and bus status between two test devices while preserving the current offline behavior. Down Sheet, Defect Log, and Fixed Repairs completion details follow after the identity, revision, and conflict model is proven.
 
 ## Product roadmaps
 

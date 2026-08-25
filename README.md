@@ -1,6 +1,6 @@
 # Fleet Maintenance Bus Tracker
 
-A mobile-friendly fleet location and maintenance operations application. It combines a facility map, an interactive Down Sheet, and a real-time Defect Log while preserving offline use and device-local backups.
+A mobile-friendly fleet location and maintenance operations application. It combines a facility map, an interactive Down Sheet, a real-time Defect Log, and an offline Fixed Repairs history while preserving device-local backups.
 
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
@@ -12,7 +12,7 @@ Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site
 | /down-sheet | Shift maintenance planning, repair estimates, assignments, photo import, and Down Sheet history |
 | /defect-log | Mobile-first capture of operator and mechanic findings that may not belong on the Down Sheet |
 
-The facility map owns physical location. The Down Sheet owns scheduled maintenance workflow. The Defect Log owns direct field observations. Shared bus status and repair records synchronize between all three surfaces on the same device.
+The facility map owns physical location. The Down Sheet owns scheduled maintenance workflow. The Defect Log owns direct field observations. Fixed Repairs presents completed history and completion details. Shared bus status and repair records synchronize between all four surfaces on the same device.
 
 ## Current capabilities
 
@@ -20,6 +20,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - Two-way tracker and Down Sheet membership synchronization
 - DS badges, Mystery detection, road-call and tow indicators, and configurable quick filters
 - Direct Defect Log entries with per-repair lifecycle controls
+- Offline Fixed Repairs history with carried defect details, fix steps, verification, parts, technician, and completion time
 - AI Operator commands for fleet questions, multi-bus movement, status updates, and Down Sheet actions
 - Down Sheet photo scanning through a server-side OpenRouter integration
 - Export and import of the complete device-local board state
@@ -31,6 +32,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - app/ — application routes, UI, and domain logic
 - app/down-sheet/ — Down Sheet UI, synchronization, scanning, estimates, and settings
 - app/defect-log/ — mobile Defect Log UI, grouping, filters, and display settings
+- app/fixed-repairs/ — completed repair history and fix-detail editor
 - app/api/ — server-side API routes
 - tests/ — release-gate regression tests
 - public/ — manifest, service worker, icons, and static assets

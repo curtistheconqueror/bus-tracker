@@ -11,6 +11,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 94 | Previous live | 13c7244 | Operator Controls, Bike Rack and radiator-fan repair choices, a one-to-eight fan count, centered Save & Close, and collapsible Advanced Details |
 | 95 | Live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
 
+Unpublished candidate: the working tree adds the contained phone Facility Map, compact phone command dock, persistent per-device section collapse choices, a fourth offline Fixed Repairs route, Save as Fixed in both Defect Log action rows, and editable repair-completion details. It has not been saved or published as a Sites version.
+
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
 When a release is published, update this table and PROJECT_HANDOFF.md in the same follow-up commit.

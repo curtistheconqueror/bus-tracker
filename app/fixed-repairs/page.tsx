@@ -1,0 +1,56 @@
+"use client";
+
+import {useEffect,useMemo,useState} from "react";
+import "./fixed-repairs.css";
+import {defectLabel,normalizeDefects,type StructuredDefect} from "../repair-catalog";
+import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
+
+const FLEET_KEY="pace-board-v1";
+type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
+type CompletionDraft={actionTaken:string;diagnosticNote:string;partNumber:string;completedBy:string;completedAt:string};
+
+function readFleet(raw:string|null):DefectLogFleetBus[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.buses;return Array.isArray(items)?items.map((bus:DefectLogFleetBus)=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}catch{return []}}
+function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
+function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Not recorded":new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
+function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return "";return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}
+function locationLabel(location:string){const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not recorded"}
+
+function CompletionEditor({record,save,close}:{record:FixedRecord;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void}){
+ const [draft,setDraft]=useState<CompletionDraft>({actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",partNumber:record.defect.partNumber||"",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
+ const update=(key:keyof CompletionDraft,value:string)=>setDraft(current=>({...current,[key]:value}));
+ return <div className="fixed-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><form className="fixed-editor" onSubmit={event=>{event.preventDefault();save(record,draft)}}>
+  <header><span><small>FIXED REPAIR</small><h2>Bus {record.bus.n}</h2></span><button type="button" onClick={close} aria-label="Close fixed repair editor">×</button></header>
+  <div className="fixed-editor-body">
+   <section className="fixed-original"><b>ORIGINAL DEFECT</b><strong>{record.defect.category} — {record.defect.issue}</strong><p>{record.defect.details||"No additional defect description was entered."}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · Reported by "+record.defect.reportedBy:""}</small></section>
+   <label className="wide">FIX / STEPS TAKEN<textarea autoFocus value={draft.actionTaken} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced, or reset? Include useful steps for the next diagnosis."/></label>
+   <label className="wide">DIAGNOSIS / TEST / VERIFICATION<textarea value={draft.diagnosticNote} onChange={event=>update("diagnosticNote",event.target.value)} placeholder="Codes, tests, root cause, or how the repair was verified"/></label>
+   <label>PART NUMBER<input value={draft.partNumber} onChange={event=>update("partNumber",event.target.value)} placeholder="Optional"/></label>
+   <label>FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
+   <label className="wide">FIXED DATE &amp; TIME<input type="datetime-local" value={draft.completedAt} onChange={event=>update("completedAt",event.target.value)}/></label>
+  </div>
+  <footer><button type="button" onClick={close}>CLOSE</button><button className="save-fixed-repair">SAVE FIX DETAILS</button></footer>
+ </form></div>
+}
+
+export default function FixedRepairs(){
+ const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null);
+ useEffect(()=>{setFleet(readFleet(localStorage.getItem(FLEET_KEY)))},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
+ const categories=useMemo(()=>[...new Set(records.map(record=>record.defect.category))].sort(),[records]);
+ const visible=useMemo(()=>{const query=search.trim().toLowerCase();return records.filter(record=>(category==="all"||record.defect.category===category)&&(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.shopNotes,record.defect.partNumber,record.defect.reportedBy,record.defect.completedBy].some(value=>String(value||"").toLowerCase().includes(query))))},[records,search,category]);
+ const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime())?(record.defect.completedAt||new Date().toISOString()):parsed.toISOString(),now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),partNumber:draft.partNumber.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now})});setFleet(next);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:next}));setEditing(null)};
+ const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
+ return <main className="fixed-repairs-app">
+  <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a></nav></header>
+  <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
+  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{value}</option>)}</select></label><button type="button" onClick={exportHistory}>EXPORT FIXED HISTORY</button></section>
+  <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{visible.length} REPAIR{visible.length===1?"":"S"} SHOWN</small></span></header>{visible.length?<div className="fixed-list">{visible.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
+   <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{record.defect.category}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
+   <div className="fixed-card-body"><section><b>ORIGINAL REPORT</b><p>{defectLabel(record.defect)}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · By "+record.defect.reportedBy:""}</small>{record.defect.shopNotes&&<em>SHOP NOTES: {record.defect.shopNotes}</em>}</section><section className="repair-result"><b>FIX / STEPS TAKEN</b><p>{record.defect.actionTaken||"Fix details have not been entered yet."}</p>{record.defect.diagnosticNote&&<small><b>DIAG / VERIFY:</b> {record.defect.diagnosticNote}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}{record.defect.completedBy&&<small><b>FIXED BY:</b> {record.defect.completedBy}</small>}</section></div>
+   <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}<button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FIX DETAILS":"ADD FIX DETAILS"}</button></footer>
+  </article>)}</div>:<div className="fixed-empty"><b>No fixed repairs match this view.</b><span>Completed repairs will flow here automatically from the Defect Log, Down Sheet, and Fleet Tracker.</span></div>}</section>
+  {editing&&<CompletionEditor record={editing} save={saveCompletion} close={()=>setEditing(null)}/>}
+ </main>
+}
