@@ -27,6 +27,7 @@ import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
+import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -308,6 +309,7 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
+  assert.equal(quickFilterShareText("A/C",[buses[0],buses[7]]),"A/C — 2 buses\nBus 1 — A/C and HVAC — No cooling\nBus 6 — Preventive Maintenance — Add engine oil — 10 quarts");
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -392,6 +394,17 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
   assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  assert.match(page,/quickFilterExpandedBusIds/);
+  assert.match(page,/aria-expanded=\{expanded\}/);
+  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses\)/);
+  assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
+  assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
+  assert.match(page,/aria-label="Copy filtered bus list"/);
+  assert.match(page,/aria-label="Share filtered bus list as text"/);
+  assert.match(css,/\.quick-filter-defects\{/);
+  assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
+  assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
   assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
   assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
