@@ -65,6 +65,7 @@ The private GitHub origin is the code backup. The sites remote belongs to the ex
 - Current live release: Sites Version 94
 - Current live feature checkpoint: commit 13c7244
 - Release reference: docs/RELEASES.md
+- Publishing and recovery runbook: docs/SITES_PUBLISHING_RUNBOOK.md
 
 ## Security
 
@@ -72,4 +73,4 @@ Never commit API keys, Sites credentials, exported fleet backups, or employee-se
 
 ## Continuation
 
-Read PROJECT_HANDOFF.md before making material changes. Contribution and release rules are in CONTRIBUTING.md.
+Read PROJECT_HANDOFF.md before making material changes. Contribution and release rules are in CONTRIBUTING.md. If a Sites publish disconnects or work was completed in a remote checkout, follow docs/SITES_PUBLISHING_RUNBOOK.md instead of retrying an opaque checkpoint command.

@@ -3,6 +3,7 @@
 ## Current guidance
 
 - ../PROJECT_HANDOFF.md — authoritative project state, invariants, and backend starting point
+- SITES_PUBLISHING_RUNBOOK.md — resumable publishing and remote-session recovery procedure
 - ../CONTRIBUTING.md — change and release workflow
 - RELEASES.md — source checkpoints for live and candidate Sites versions
 
