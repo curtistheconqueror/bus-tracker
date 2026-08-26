@@ -12,7 +12,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 95 | Previous live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
 | 96 | Previous live | 1ffffc5 | Phone Facility Map overhaul, persistent collapsible sections, offline Fixed Repairs, separate Save as Fixed actions, and searchable condition-not-duplicated records |
 | 97 | Previous live | 439531b | Four-surface mobile navigation, editable Fixed Repairs with undo/reopen/delete, aligned phone defect actions, condition-not-duplicated tracking, and curated Quick Filter sharing |
-| 98 | Live | b98b0d5 | Uniform Fixed Repairs header/navigation, contained one-row repair actions on phones, and quiet always-present Undo controls in Defect Log and Fixed Repairs |
+| 98 | Previous live | b98b0d5 | Uniform Fixed Repairs header/navigation, contained one-row repair actions on phones, and quiet always-present Undo controls in Defect Log and Fixed Repairs |
+| 99 | Live | 3aec06e | Reconciled the Version 96 GitHub history with the Version 98 Sites source while preserving both release lines and application behavior |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 

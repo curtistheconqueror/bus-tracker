@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 98
-Live feature checkpoint: commit b98b0d5
+Live release: Sites Version 99
+Live feature checkpoint: commit 3aec06e
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 98 is the current user-approved live release. Its validated feature checkpoint is commit b98b0d5. It builds on the four-surface workflow with a uniform Fixed Repairs phone layout and quieter Undo controls.
+Version 99 is the current user-approved live release. Its validated source checkpoint is commit 3aec06e. It preserves the Version 98 application behavior while reconciling the previously diverged GitHub and Sites histories without force-pushing or discarding either release line.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -57,7 +57,7 @@ Version 98 is the current user-approved live release. Its validated feature chec
 - Quick Filter copy/share output includes only defects that match the selected filter, including Defect / Condition Not Duplicated records.
 - Bus Controls, IBS Screen wording, Check Engine symptoms, kneeler/ramp choices, and both Bike Rack repair paths remain available.
 
-The Version 98 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+The Version 99 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
