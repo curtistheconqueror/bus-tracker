@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 105
-Live feature checkpoint: commit bdfe8e2
+Live release: Sites Version 106
+Live feature checkpoint: commit 194c0b4
 
 ## Read this first
 
@@ -22,7 +22,7 @@ The project is an offline-capable fleet maintenance operations application with 
 
 These boundaries prevent synchronization bugs:
 
-- The Facility Map owns physical bus location.
+- The Facility Map owns physical bus location and operating status. Repairs entered there must be explicitly routed to the Defect Log, Down Sheet, or both; the map must not maintain an ambiguous third defect log.
 - The Down Sheet owns formal maintenance scheduling and active Down Sheet membership.
 - The Defect Log owns records created directly from the Defect Log.
 - Fixed Repairs reads completed structured defects from the fleet record and owns only their completion-detail edits; it is not a separate duplicate repair store.
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 105 is the current user-approved live release. Its validated source checkpoint is commit bdfe8e2. It moves the Facility Map phone navigation to the top for four-page uniformity and adds Defect Log-matched theme, font, and color settings to Fixed Repairs while preserving Version 104 Down Sheet replacement behavior, Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
+Version 106 is the current user-approved live release. Its validated source checkpoint is commit 194c0b4. It routes every new Facility Map repair to the Defect Log, Down Sheet, or both; converts newly enabled Facility Map repair alerts into Defect Log records; and adds undoable cleanup for legacy map-only repairs and flags. It preserves Version 105 phone navigation and Fixed Repairs settings, Version 104 Down Sheet replacement behavior, Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -68,7 +68,7 @@ Version 105 is the current user-approved live release. Its validated source chec
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until Stage 3 records inspection history.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 105 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+The Version 106 production build, lint gate, and all 69 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 

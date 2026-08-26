@@ -18,8 +18,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 101 | Previous live | f730ecd | Dated actual odometer readings on every bus, append-only reading history, current-reading summary, and phone-friendly entry controls |
 | 102 | Previous live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
 | 103 | Previous live | f4628f7 | Estimated operating mileage at 275 miles per day, pause/resume checkpoints, and inspection readiness at 3,000 miles or 10 days |
-| 105 | Live | bdfe8e2 | Phone Facility Map navigation moved to the uniform top position; Fixed Repairs now shares Defect Log theme, font, and color settings |
-| 104 | Live | 519e748 | Authoritative reviewed-photo Down Sheet replacement, automatic DS badge reconciliation, explicit coming-off review, undo coverage, and preserved Defect Log records |
+| 106 | Live | 194c0b4 | Facility Map repairs route explicitly to Defect Log, Down Sheet, or both; legacy map-only repair cleanup is scoped and undoable |
+| 105 | Previous live | bdfe8e2 | Phone Facility Map navigation moved to the uniform top position; Fixed Repairs now shares Defect Log theme, font, and color settings |
+| 104 | Previous live | 519e748 | Authoritative reviewed-photo Down Sheet replacement, automatic DS badge reconciliation, explicit coming-off review, undo coverage, and preserved Defect Log records |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
