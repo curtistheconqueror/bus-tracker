@@ -29,7 +29,7 @@ import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } fro
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
-import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, readDownSheetPayload, readFleetPayload, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
+import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
 
 function memoryStorage(initial={}){
  const values=new Map(Object.entries(initial));
@@ -80,6 +80,64 @@ test("shared storage refuses malformed or newer payloads without overwriting the
  const downMalformed=memoryStorage({[DOWN_SHEET_STORAGE_KEY]:"not-json"});
  assert.equal(writeDownSheetStorage(downMalformed,[{id:"entry"}]),false);
  assert.equal(downMalformed.value(DOWN_SHEET_STORAGE_KEY),"not-json");
+});
+
+test("fleet writes keep a last-known-good copy and block accidental bulk defect loss",()=>{
+ const defects=Array.from({length:6},(_,index)=>({id:"defect-"+index,source:"defect-log",state:"open"}));
+ const original=[{id:"bus-1",n:"17501",defects}];
+ const raw=serializeFleetPayload(original,{syncRevision:14});
+ const storage=memoryStorage({[FLEET_STORAGE_KEY]:raw});
+
+ assert.equal(fleetDefectCount(original),6);
+ assert.equal(fleetDefectLogCount(original),6);
+ assert.equal(writeFleetStorage(storage,[{...original[0],defects:[]}]),false);
+ assert.equal(writeFleetStorage(storage,[]),false);
+ assert.equal(storage.value(FLEET_STORAGE_KEY),raw);
+
+ const recovery=readFleetRecoverySnapshot(storage.value(FLEET_RECOVERY_STORAGE_KEY));
+ assert.equal(recovery?.defectCount,6);
+ assert.equal(recovery?.busCount,1);
+ assert.equal(readFleetPayload(recovery?.raw||null).envelope.syncRevision,14);
+
+ assert.equal(writeFleetStorage(storage,[{...original[0],defects:[]}],{allowBulkDefectLoss:true}),true);
+ assert.equal(readFleetPayload(storage.value(FLEET_STORAGE_KEY)).buses[0].defects.length,0);
+ assert.equal(writeFleetStorage(storage,original,{allowBulkDefectLoss:true,skipRecoverySnapshot:true}),true);
+ assert.equal(readFleetPayload(storage.value(FLEET_STORAGE_KEY)).buses[0].defects.length,6);
+});
+
+test("successful ordinary writes snapshot the previous board and backup reminders recur every 20 new logs",()=>{
+ const original=[{id:"bus-1",n:"17501",l:"road-1",defects:[{id:"a",source:"defect-log"},{id:"b",source:"tracker"}]}];
+ const storage=memoryStorage({[FLEET_STORAGE_KEY]:serializeFleetPayload(original)});
+ assert.equal(writeFleetStorage(storage,[{...original[0],l:"garage-1"}]),true);
+ const recovery=readFleetRecoverySnapshot(storage.value(FLEET_RECOVERY_STORAGE_KEY));
+ assert.equal(readFleetPayload(recovery?.raw||null).buses[0].l,"road-1");
+
+ const logs=count=>[{id:"bus-1",defects:Array.from({length:count},(_,index)=>({id:"log-"+index,source:"defect-log"}))}];
+ assert.equal(fleetBackupDue(storage,logs(19)).due,false);
+ assert.equal(fleetBackupDue(storage,logs(20)).due,true);
+ assert.equal(markFleetBackupExported(storage,logs(20),"2026-08-26T12:00:00.000Z"),true);
+ assert.equal(JSON.parse(storage.value(FLEET_BACKUP_REMINDER_STORAGE_KEY)).lastExportedDefectLogCount,20);
+ assert.equal(fleetBackupDue(storage,logs(39)).due,false);
+ assert.equal(fleetBackupDue(storage,logs(40)).due,true);
+});
+
+test("phone safety controls expose full-board export reminders and recovery",async()=>{
+ const [tracker,recovery,defect,reminder,backup]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fleet-recovery-control.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+ ]);
+ assert.match(tracker,/FleetRecoveryControl/);
+ assert.match(recovery,/RESTORE LAST GOOD COPY/);
+ assert.match(defect,/OfflineBackupReminder buses=\{fleet\}/);
+ assert.match(reminder,/OFFLINE BACKUP DUE/);
+ assert.match(reminder,/EXPORT FULL BACKUP/);
+ assert.match(backup,/pace-south-fleet-board-backup/);
+ assert.match(backup,/DOWN_SHEET_STORAGE_KEY/);
+ assert.match(backup,/DEFECT_LOG_SETTINGS_STORAGE_KEY/);
+ assert.doesNotMatch(tracker,/setItem\("pace-board-v1"/);
 });
 
 test("defect normalization preserves future odometer and parts fields",()=>{
@@ -507,9 +565,10 @@ test("removes prospective customer branding from visible app titles", async () =
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
-  const [page, css] = await Promise.all([
+  const [page, css, backup] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/fleet-backup.ts", import.meta.url), "utf8"),
   ]);
 
   for (const theme of ["Default", "Terminal", "Black / Dark", "Midnight", "Tactical"]) {
@@ -749,7 +808,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   const commandZ = Number(css.match(/\.command-bar\{[^}]*z-index:(\d+)/)?.[1] || 0);
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
   assert.ok(modalZ > commandZ, `Bus editor layer ${modalZ} must exceed command strip ${commandZ}`);
-  assert.match(page, /pace-south-fleet-board-backup/);
+  assert.match(backup, /pace-south-fleet-board-backup/);
   assert.match(page, /EXPORT \/ SHARE BACKUP/);
   assert.match(page, /IMPORT BACKUP/);
   assert.match(page, /registration\?\.update\(\)/);

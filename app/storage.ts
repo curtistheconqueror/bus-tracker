@@ -5,10 +5,17 @@ export const DOWN_SHEET_STORAGE_VERSION=1;
 export const BOARD_SETTINGS_STORAGE_KEY="pace-board-settings-v1";
 export const DOWN_SHEET_SETTINGS_STORAGE_KEY="pace-down-sheet-settings-v1";
 export const DEFECT_LOG_SETTINGS_STORAGE_KEY="pace-defect-log-settings-v1";
+export const FLEET_RECOVERY_STORAGE_KEY="pace-board-recovery-v1";
+export const FLEET_BACKUP_REMINDER_STORAGE_KEY="pace-board-backup-reminder-v1";
+export const FLEET_BACKUP_INTERVAL=20;
 
 type JsonRecord=Record<string,unknown>;
 type StorageReader=Pick<Storage,"getItem">;
 type StorageWriter=Pick<Storage,"getItem"|"setItem">;
+
+export type FleetWriteOptions={allowBulkDefectLoss?:boolean;skipRecoverySnapshot?:boolean};
+export type FleetRecoverySnapshot={version:1;savedAt:string;busCount:number;defectCount:number;raw:string};
+type FleetBackupReminder={version:1;lastExportedAt:string;lastExportedDefectLogCount:number};
 
 export type CollectionPayload<T>={
  version:number;
@@ -64,11 +71,45 @@ export function serializeDownSheetPayload<T>(entries:T[],base:unknown={}){
  return JSON.stringify({...envelopeBase(base,"entries"),version:DOWN_SHEET_STORAGE_VERSION,entries});
 }
 
-export function writeFleetStorage<T>(storage:StorageWriter,buses:T[]){
+function busDefects(bus:unknown){
+ if(!isRecord(bus)||!Array.isArray(bus.defects))return [] as JsonRecord[];
+ return bus.defects.filter(isRecord);
+}
+
+export function fleetDefectCount(buses:unknown[]){return buses.reduce((count,bus)=>count+busDefects(bus).length,0)}
+
+export function fleetDefectLogCount(buses:unknown[]){
+ return buses.reduce((count,bus)=>count+busDefects(bus).filter(defect=>defect.source==="defect-log").length,0);
+}
+
+export function readFleetRecoverySnapshot(raw:string|null):FleetRecoverySnapshot|null{
+ if(!raw)return null;
+ try{
+  const value=JSON.parse(raw) as Partial<FleetRecoverySnapshot>;
+  if(value.version!==1||typeof value.savedAt!=="string"||typeof value.raw!=="string"||!Number.isFinite(value.busCount)||!Number.isFinite(value.defectCount))return null;
+  const fleet=readFleetPayload(value.raw);
+  return fleet.valid&&fleet.supported?value as FleetRecoverySnapshot:null;
+ }catch{return null}
+}
+
+function saveFleetRecoverySnapshot(storage:StorageWriter,raw:string,buses:unknown[]){
+ const snapshot:FleetRecoverySnapshot={version:1,savedAt:new Date().toISOString(),busCount:buses.length,defectCount:fleetDefectCount(buses),raw};
+ try{storage.setItem(FLEET_RECOVERY_STORAGE_KEY,JSON.stringify(snapshot));return true}catch{return false}
+}
+
+function warnBulkLoss(currentDefects:number,nextDefects:number,currentBuses:number,nextBuses:number){
+ if(typeof window==="undefined")return;
+ const removedDefects=Math.max(0,currentDefects-nextDefects),removedBuses=Math.max(0,currentBuses-nextBuses),loss=[removedDefects?removedDefects+" saved defect"+(removedDefects===1?"":"s"):"",removedBuses?removedBuses+" bus record"+(removedBuses===1?"":"s"):""].filter(Boolean).join(" and ");
+ window.setTimeout(()=>window.alert("SAFETY STOP: This change would remove "+loss+" at once. Nothing was overwritten. Reload the page, then export or restore the last-known-good copy from Fleet Tracker Settings."),0);
+}
+
+export function writeFleetStorage<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}){
  const raw=storage.getItem(FLEET_STORAGE_KEY),current=readFleetPayload<T>(raw);
  if(raw!==null&&(!current.valid||!current.supported))return false;
- storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));
- return true;
+ const currentDefects=fleetDefectCount(current.buses),nextDefects=fleetDefectCount(buses),bulkLoss=currentDefects-nextDefects>=5||current.buses.length-buses.length>=5;
+ if(raw!==null&&bulkLoss&&!options.allowBulkDefectLoss){saveFleetRecoverySnapshot(storage,raw,current.buses);warnBulkLoss(currentDefects,nextDefects,current.buses.length,buses.length);return false}
+ if(raw!==null&&!options.skipRecoverySnapshot&&!saveFleetRecoverySnapshot(storage,raw,current.buses))return false;
+ try{storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));return true}catch{return false}
 }
 
 export function writeDownSheetStorage<T>(storage:StorageWriter,entries:T[]){
@@ -84,4 +125,18 @@ export function readFleetStorage<T=unknown>(storage:StorageReader){
 
 export function readDownSheetStorage<T=unknown>(storage:StorageReader){
  return readDownSheetPayload<T>(storage.getItem(DOWN_SHEET_STORAGE_KEY));
+}
+
+export function fleetBackupDue(storage:StorageReader,buses:unknown[],interval=FLEET_BACKUP_INTERVAL){
+ const current=fleetDefectLogCount(buses);
+ try{
+  const value=JSON.parse(storage.getItem(FLEET_BACKUP_REMINDER_STORAGE_KEY)||"null") as Partial<FleetBackupReminder>|null;
+  const baseline=value?.version===1&&Number.isFinite(value.lastExportedDefectLogCount)?Number(value.lastExportedDefectLogCount):0;
+  return {due:current-baseline>=interval,newLogs:Math.max(0,current-baseline),current,interval};
+ }catch{return {due:current>=interval,newLogs:current,current,interval}}
+}
+
+export function markFleetBackupExported(storage:StorageWriter,buses:unknown[],at=new Date().toISOString()){
+ const reminder:FleetBackupReminder={version:1,lastExportedAt:at,lastExportedDefectLogCount:fleetDefectLogCount(buses)};
+ try{storage.setItem(FLEET_BACKUP_REMINDER_STORAGE_KEY,JSON.stringify(reminder));return true}catch{return false}
 }

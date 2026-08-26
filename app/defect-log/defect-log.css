@@ -140,3 +140,11 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
  .quick-filter-bus>span:nth-child(2) small{font-size:9px;line-height:1.35}
  .quick-filter-defects>section>div>strong{font-size:11px}
 }
+
+/* Device-local backup reminder after each 20 new Defect Log entries. */
+.offline-backup-reminder{display:flex;align-items:center;gap:14px;margin:0 14px 10px;padding:12px 14px;border:2px solid #c78a15;border-radius:9px;background:#fff7dc;color:#593b00;box-shadow:0 3px 10px #4a35001a}
+.offline-backup-reminder span{display:grid;gap:3px;min-width:0;flex:1}
+.offline-backup-reminder b{font-size:11px;font-weight:1000;letter-spacing:.4px}
+.offline-backup-reminder small{font-size:9px;font-weight:750;line-height:1.35}
+.offline-backup-reminder button{min-height:44px;border:0;border-radius:7px;background:#8b5d00;color:#fff;padding:0 16px;font-size:9px;font-weight:1000;white-space:nowrap}
+@media(max-width:760px){.offline-backup-reminder{margin:0 8px 8px;align-items:stretch;flex-direction:column}.offline-backup-reminder button{min-height:52px;width:100%;font-size:10px}}
