@@ -2073,17 +2073,19 @@ test("Defect Log timestamps reports and blocks only recent identical unresolved 
 
 
 test("Fixed Repairs is a fourth offline workflow with carried defect data and editable completion details", async () => {
-  const [trackerPage,downPage,defectPage,defectCss,fixedPage,fixedCss,worker,catalog]=await Promise.all([
+  const [trackerPage,downPage,defectPage,defectCss,fixedPage,fixedCss,fixedSettings,worker,catalog]=await Promise.all([
     readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
     readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+    readFile(new URL("../app/fixed-repairs/fixed-repairs-settings.tsx",import.meta.url),"utf8"),
     readFile(new URL("../public/sw.js",import.meta.url),"utf8"),
     readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
   ]);
   for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/href="\/fixed-repairs"[\s\S]*?FIXED REPAIRS/);
+  assert.ok(trackerPage.indexOf("mobile-mode-nav")<trackerPage.indexOf("FLEET MAINTENANCE BUS TRACKING SYSTEM"),"phone route navigation must render before the Facility Map header");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
@@ -2102,6 +2104,11 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/writeFleetStorage\(localStorage,next\)/);
   assert.doesNotMatch(fixedPage,/className="fixed-undo"/);
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
+  assert.match(fixedPage,/className="fixed-settings-button"[\s\S]*Open Fixed Repairs settings/);
+  assert.match(fixedPage,/FixedAppearanceModal settings=\{settings\}/);
+  assert.match(fixedSettings,/pace-defect-log-settings-v1/);
+  assert.match(fixedSettings,/THEME[\s\S]*FONT[\s\S]*COLORS/);
+  assert.match(fixedSettings,/localStorage\.setItem\(SETTINGS_KEY/);
   assert.match(fixedPage,/UNDO FIX/);
   assert.match(fixedPage,/DELETE/);
   assert.match(fixedPage,/state:"open",completedAt:undefined,completedBy:undefined/);
@@ -2113,6 +2120,8 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(4/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-header\{[^}]*overflow:visible/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header\{height:auto\}/);
+  assert.match(fixedCss,/\.fixed-settings-button\{background:var\(--fixed-accent/);
+  assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-settings-shade\{align-items:stretch/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header nav\{[^}]*height:auto[^}]*background:transparent/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-editor>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);

@@ -34,3 +34,25 @@
  .fixed-repairs-app .fixed-card-actions{gap:4px}
  .fixed-repairs-app .fixed-card>footer button{padding:0 2px;font-size:7px}
 }
+
+/* Fixed Repairs shares Defect Log appearance preferences through the same settings key. */
+.fixed-repairs-app{background:var(--fixed-page,#e8eef6);color:var(--fixed-ink,#172b4d);font-family:var(--fixed-font,Arial,Helvetica,sans-serif);font-size:calc(1em * var(--fixed-scale,1))}
+.fixed-header{background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff)}
+.fixed-header nav a{color:var(--fixed-header-text,#fff)}
+.fixed-header nav a.active{background:var(--fixed-surface,#fff);color:var(--fixed-header,#061d45)}
+.fixed-summary>div,.fixed-controls,.fixed-card{background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
+.fixed-feed{background:color-mix(in srgb,var(--fixed-page,#e8eef6) 70%,var(--fixed-surface,#fff))}
+.fixed-feed>header{background:var(--fixed-header,#102e58);color:var(--fixed-header-text,#fff)}
+.fixed-card-head{background:color-mix(in srgb,var(--fixed-surface,#fff) 90%,var(--fixed-accent,#0b64bd));color:var(--fixed-ink,#172b4d)}
+.fixed-card-head>span strong,.fixed-card-head>div b{color:var(--fixed-accent,#0b64bd)}
+.fixed-controls input,.fixed-controls select{background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
+.fixed-settings-button{background:var(--fixed-accent,#0b64bd)!important}
+.fixed-settings-shade{position:fixed;z-index:2147483001;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:#03132ddd}
+.fixed-settings{width:min(620px,96vw);max-height:94vh;border-radius:11px;background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d);box-shadow:0 25px 85px #000b;overflow:auto}
+.fixed-settings>header{position:sticky;z-index:2;top:0;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff)}
+.fixed-settings>header span{display:grid}.fixed-settings>header small{font-size:7px;font-weight:900;letter-spacing:1.2px}.fixed-settings>header h2{margin:2px 0 0;font-size:22px}.fixed-settings>header button{width:42px;height:42px;border:1px solid #ffffff55;border-radius:6px;background:#ffffff15;color:inherit;font-size:22px}
+.fixed-settings>div{display:grid;gap:12px;padding:14px}.fixed-settings>div>section{display:grid;gap:9px;padding:11px;border:1px solid var(--fixed-border);border-radius:8px}.fixed-settings h3{margin:0;font-size:8px;letter-spacing:1px;color:var(--fixed-muted)}
+.fixed-theme-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.fixed-theme-grid button{min-height:66px;display:grid;place-items:center;gap:4px;border:1px solid var(--fixed-border);border-radius:7px;background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d);font-size:8px;font-weight:900}.fixed-theme-grid button.active{border:2px solid var(--fixed-accent,#0b64bd)}.fixed-theme-grid i{width:28px;height:24px;border:3px solid;border-radius:4px}
+.fixed-font-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.fixed-font-grid label{display:grid;gap:4px;font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-font-grid select{min-height:44px;border:1px solid var(--fixed-border);border-radius:6px;background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d);padding:0 9px;font-size:16px}
+.fixed-color-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fixed-color-grid label{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--fixed-border);border-radius:6px;padding:6px 8px;font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-color-grid input{width:48px;height:32px;border:0;background:transparent}.fixed-reset-look{min-height:42px;border:0;border-radius:6px;background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff);font-size:8px;font-weight:900}
+@media(max-width:760px){.fixed-settings-shade{align-items:stretch;padding:0}.fixed-settings{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}.fixed-settings>header{padding-top:max(12px,env(safe-area-inset-top))}.fixed-theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fixed-color-grid{grid-template-columns:1fr}}
