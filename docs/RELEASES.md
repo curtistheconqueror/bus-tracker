@@ -10,7 +10,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 93 | Previous live | 4788b6e | Version 92 merged with optional defect subcategories, reachable dual Save controls, dated defects, 48-hour duplicate prevention, and larger phone navigation |
 | 94 | Previous live | 13c7244 | Operator Controls, Bike Rack and radiator-fan repair choices, a one-to-eight fan count, centered Save & Close, and collapsible Advanced Details |
 | 95 | Previous live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
-| 97 | Live | 439531b | Four-surface mobile navigation, editable Fixed Repairs with undo/reopen/delete, aligned phone defect actions, condition-not-duplicated tracking, and curated Quick Filter sharing |
+| 97 | Previous live | 439531b | Four-surface mobile navigation, editable Fixed Repairs with undo/reopen/delete, aligned phone defect actions, condition-not-duplicated tracking, and curated Quick Filter sharing |
+| 98 | Live | b98b0d5 | Uniform Fixed Repairs header/navigation, contained one-row repair actions on phones, and quiet always-present Undo controls in Defect Log and Fixed Repairs |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
