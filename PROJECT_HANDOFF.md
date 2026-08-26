@@ -1,21 +1,22 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 85
-Newest tested candidate: Version 86 at commit 0f1324c
+Live release: Sites Version 95
+Live feature checkpoint: commit 5924f3f
 
 ## Read this first
 
 This file is the authoritative continuation guide. Older snapshots are preserved under docs/archive for historical reference only. Do not use an archived handoff as current implementation guidance.
 
-The project is an offline-capable fleet maintenance operations application with three connected surfaces:
+The project is an offline-capable fleet maintenance operations application with four connected surfaces:
 
 1. Facility Map — physical location, operating status, fleet markers, fast movement, and AI Operator commands.
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
 3. Real-Time Defect Log — mobile-first field observations and smaller repairs that usually do not belong on the Down Sheet.
+4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
 
 ## Domain ownership
 
@@ -24,6 +25,7 @@ These boundaries prevent synchronization bugs:
 - The Facility Map owns physical bus location.
 - The Down Sheet owns formal maintenance scheduling and active Down Sheet membership.
 - The Defect Log owns records created directly from the Defect Log.
+- Fixed Repairs reads completed structured defects from the fleet record and owns only their completion-detail edits; it is not a separate duplicate repair store.
 - Repair and status changes may synchronize across surfaces; Down Sheet or Defect Log edits must not silently relocate a bus.
 - A bus may have multiple independent repair records. The phone Defect Log groups them visually by bus but does not merge or discard the underlying records.
 
@@ -46,18 +48,14 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 85 is the current user-approved live release. Its latest source checkpoint is commit 14a80e9.
+Version 95 is the current user-approved live release. Its validated feature checkpoint is commit 5924f3f. It retains all Version 94 Operator Controls, Bike Rack, radiator-fan, phone-entry, and Advanced Details improvements while correcting the centered Defect Log action area.
 
-Version 86 is a tested local candidate at commit 0f1324c. It adds:
+- Save Defect or Save Update persists the entry through the existing validation and duplicate-prevention workflow.
+- Close exits the editor without saving, providing the separate choice intended by the bottom controls.
 
-- one phone card per bus with ×2, ×3, and similar defect counts;
-- expandable per-defect controls without merging repair records;
-- Add Defect with the current bus preselected;
-- generation-first selection for 15s, 17s, 18s, and 20s;
-- direct full-number typing; and
-- hidden inline Shop Notes on phone widths while retaining them on iPad and desktop.
+The Version 95 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
-The Version 86 production build and all 52 regression tests passed. It has not replaced Version 85 unless a later release record says otherwise.
+An unpublished candidate now adds the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth Fixed Repairs workflow, Save as Fixed in both Defect Log action rows, editable completion details, and offline caching for all four routes. It is not live and must not be published without explicit approval. Its lint, production build, and all 58 regression tests pass.
 
 ## Repository and remotes
 
@@ -74,6 +72,7 @@ The history is intentionally linear. Do not rewrite published commits, force-pus
 - app/operator-engine.ts and app/operator-batch.ts — AI Operator parsing and atomic actions
 - app/down-sheet/ — Down Sheet route, editor, estimates, scan review, and two-way synchronization
 - app/defect-log/ — Defect Log route, grouping, filters, settings, and linked-repair behavior
+- app/fixed-repairs/ — offline completed-repair history and completion-detail editing
 - app/repair-catalog.ts — structured repair categories and quick selections
 - tests/rendered-html.test.mjs — release-gate regression coverage
 - db/ and drizzle/ — intentionally dormant shared-backend scaffolding
@@ -106,7 +105,7 @@ Before every release:
 5. Run npm run lint and separate legacy warnings from new failures.
 6. Run git diff --check.
 7. Commit only intended files.
-8. Save and publish through the existing Sites project only after user approval.
+8. Follow docs/SITES_PUBLISHING_RUNBOOK.md and save/publish through the existing Sites project only after user approval.
 9. Record the live Sites version and source commit in docs/RELEASES.md and this handoff.
 
 Do not create a new hosting project. Do not publish merely because a commit or build succeeded.
@@ -125,7 +124,7 @@ The next major phase is immediate phone/iPad synchronization without losing offl
 8. Import one trusted current backup as the initial shared dataset.
 9. Run dual-write and rollback validation before making the backend authoritative.
 
-The first backend milestone should synchronize fleet location and bus status between two test devices while preserving the current offline behavior. Down Sheet and Defect Log records follow after the identity, revision, and conflict model is proven.
+The first backend milestone should synchronize fleet location and bus status between two test devices while preserving the current offline behavior. Down Sheet, Defect Log, and Fixed Repairs completion details follow after the identity, revision, and conflict model is proven.
 
 ## Product roadmaps
 
@@ -133,4 +132,4 @@ The future operator-facing defect-card replacement is documented at docs/roadmap
 
 ## Safe continuation prompt
 
-Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, and docs/RELEASES.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.
+Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, docs/RELEASES.md, and docs/SITES_PUBLISHING_RUNBOOK.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.

@@ -58,9 +58,12 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
  return bus.s==="service"||bus.s==="defect"?roadServiceStatus(repairAware):bus.s;
 }
 
-export function activeDefectLogBusCount(fleet:DefectLogFleetBus[]){
- return new Set(fleet.filter(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).some(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt)).map(bus=>bus.id)).size;
+export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
+ return fleet.reduce((count,bus)=>count+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt).length,0);
 }
+const RECENT_DUPLICATE_WINDOW_MS=48*60*60*1000;
+function sameDefectChoice(left:StructuredDefect,right:StructuredDefect){return left.category.trim().toLowerCase()===right.category.trim().toLowerCase()&&left.issue.trim().toLowerCase()===right.issue.trim().toLowerCase()}
+export function recentDefectDuplicate(bus:DefectLogFleetBus,incoming:StructuredDefect,now=new Date().toISOString()){const currentTime=Date.parse(now);if(!Number.isFinite(currentTime)||!incoming.category.trim()||!incoming.issue.trim())return null;return normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).find(defect=>{if(defect.id===incoming.id||!isUnresolved(defect)||!sameDefectChoice(defect,incoming))return false;const loggedTime=Date.parse(defect.createdAt||defect.updatedAt||"");const age=currentTime-loggedTime;return Number.isFinite(loggedTime)&&age>=0&&age<RECENT_DUPLICATE_WINDOW_MS})||null}
 export function defectLogRecords(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]):DefectLogRecord[]{
  const activeDownIds=new Set(downEntries.filter(entry=>entry.workflow!=="Completed"&&entry.defectId).map(entry=>entry.defectId));
  return fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log").map(defect=>{
@@ -88,6 +91,8 @@ export function saveDefectLogRecord(
 ){
  const bus=fleet.find(item=>item.id===busId);
  if(!bus)return {fleet,downEntries,error:"missing-bus" as const};
+ const duplicate=incoming.issue==="Manual entry"||incoming.issue==="Unspecified issue"?null:recentDefectDuplicate(bus,incoming,now);
+ if(duplicate)return {fleet,downEntries,error:"recent-duplicate" as const,duplicate};
  const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  const existing=current.find(defect=>defect.id===incoming.id);
  const state=incoming.state;

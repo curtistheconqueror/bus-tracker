@@ -32,4 +32,4 @@
 
 ## Releases
 
-A successful local build is not permission to publish. Save and deploy only through the existing Sites project after explicit user approval. Record the resulting Sites version and commit in docs/RELEASES.md.
+A successful local build is not permission to publish. Save and deploy only through the existing Sites project after explicit user approval. Follow docs/SITES_PUBLISHING_RUNBOOK.md for the granular, resumable save/deploy/status lifecycle and remote-checkout recovery. Record the resulting Sites version and commit in docs/RELEASES.md.

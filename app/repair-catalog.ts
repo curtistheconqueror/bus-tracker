@@ -12,6 +12,8 @@ export type StructuredDefect={
  createdAt?:string;
  updatedAt?:string;
  completedAt?:string;
+ completedBy?:string;
+ conditionNotDuplicated?:boolean;
  reportedBy?:string;
  diagnosticNote?:string;
  actionTaken?:string;
@@ -28,7 +30,7 @@ export type StructuredDefect={
 export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
  "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
- "Cooling System":["Overheating","Coolant leak","Radiator","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
+ "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
  "Suspension":["Air bag","Shock / strut","Ride-height issue","Suspension leak","Bushing / linkage","Other suspension repair"],
  "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
@@ -36,7 +38,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["Horn","MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Bus Controls":["Kneeler button","Fuel gauge INOP / false reading","Horn","HVAC / heat controls","Driver seat adjustment / locking bar","Seat belt","Steering wheel tilt / telescoping","Red air valve hard to turn","Driver seat air leak","High beams stay on","Switches broken / loose","Front dash damage","Side control panel damage","Other bus control defect"],
+ "Bus Controls":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement","Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","Operator light","HVAC / heat controls","A/C control panel","Blower control","Pedal adjuster","Floor heat switch","Interior light controls","Start button","Red air valve hard to turn","High beams stay on","Switches broken / loose","Side control panel damage","Steering wheel tilt / telescoping","Driver seat belt","Driver seat leaking air","Driver seat will not lock","Driver seat adjustment / locking bar","Driver seat controls / buttons","Horn","Horn / seat alarm will not stop","Other bus control defect"],
  "Tech Services":["Farebox","Ventra","IBS Screen","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
@@ -77,8 +79,8 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
-  const issue=defect.issue==="MDT Screen"?"IBS Screen":defect.issue||"Driver-reported defect";
-  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,shopNotes:defect.shopNotes,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
+  const issue=defect.issue==="MDT Screen"?"IBS Screen":defect.issue||"Driver-reported defect",category=defect.category==="Operator Controls"?"Bus Controls":defect.category||"Miscellaneous";
+  return {id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,completedBy:defect.completedBy,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,shopNotes:defect.shopNotes,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
