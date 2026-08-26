@@ -56,9 +56,9 @@ Each bus has append-only actual odometer readings with dates and optional notes.
 
 Estimated mileage accrues at 275 miles per operating day, pauses outside operating service, and flags inspections at 3,000 miles or 10 days. Bulk-loss protection, last-known-good recovery, export reminders, and authoritative Down Sheet photo replacement are also live.
 
-### Stage 4 — Maintenance completion history: next
+### Stage 4 — Maintenance completion history: complete
 
-Build the UI and domain workflow for recording a completed inspection as a maintenance event. Completion should capture its date, actual odometer reading, and optional note; append rather than overwrite history; and re-anchor both the mileage estimate and inspection-due clock. Reuse the existing `MaintenanceEvent` domain type and preserve old payloads. Do not begin Stage 5 in the same contribution.
+Completed inspections append maintenance history with a date, optional actual odometer reading, and optional note. With mileage, the app adds a matching actual reading and restarts both due clocks. Date-only completion restarts the 10-day clock without changing mileage. Existing and future payload fields remain compatible.
 
 ### Stage 5 — Spark-plug and valve-adjustment intervals: waiting on Curtis
 
@@ -74,7 +74,7 @@ Use the existing Supabase project and authenticated Curtis account. Preserve the
 
 ## Current Claude task
 
-Unless Curtis or Codex changes the assignment, implement **Stage 4 only**. Stop after the validated contribution commit and push. Do not publish it.
+There is no active implementation assignment. Stage 5 is next but remains blocked until Curtis supplies the spark-plug and valve-adjustment mileage intervals. Claude must not invent those values.
 
 ## Required handoff format
 

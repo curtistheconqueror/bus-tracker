@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 106
-Live feature checkpoint: commit 194c0b4
+Live release: Sites Version 107
+Live feature checkpoint: commit de25a4a
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 106 is the current user-approved live release. Its validated source checkpoint is commit 194c0b4. It routes every new Facility Map repair to the Defect Log, Down Sheet, or both; converts newly enabled Facility Map repair alerts into Defect Log records; and adds undoable cleanup for legacy map-only repairs and flags. It preserves Version 105 phone navigation and Fixed Repairs settings, Version 104 Down Sheet replacement behavior, Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
+Version 107 is the current user-approved live release. Its validated source checkpoint is commit de25a4a. It adds append-only completed-inspection history in the bus editor. A completion with an actual odometer reading appends both the maintenance event and reading, re-anchors estimated mileage, and restarts the 3,000-mile / 10-day due clock. A date-only completion remains available when mileage is unknown: it appends the inspection, restarts the 10-day clock, and leaves odometer history and mileage unchanged. It preserves Version 106 Facility Map repair routing and cleanup, all prior Down Sheet replacement behavior and data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -65,10 +65,10 @@ Version 106 is the current user-approved live release. Its validated source chec
 - Fleet Tracker Settings exposes Restore Last Good Copy. This recovery snapshot is stored in the same browser and can also be lost if Safari clears all website data; exported files remain the durable offline recovery path.
 - The Defect Log prompts for a one-tap full-board export after every 20 new direct Defect Log entries. A successful share or download resets that device's reminder baseline.
 - Estimated mileage uses the latest actual reading plus 275 miles per elapsed operating day. Blue In Service and green In Service With Defects accrue; shop, out-of-service, decommissioned, and unknown states pause. Status transitions checkpoint the estimate so paused time is not counted.
-- Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until Stage 3 records inspection history.
+- Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 106 production build, lint gate, and all 69 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+The Version 107 production build, lint gate, and all 72 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
