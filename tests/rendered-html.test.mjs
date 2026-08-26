@@ -22,7 +22,7 @@ import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, norma
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { activeDefectLogBusCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
-import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
+import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
@@ -309,7 +309,16 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"leak"),["leak"]);
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
-  assert.equal(quickFilterShareText("A/C",[buses[0],buses[7]]),"A/C — 2 buses\nBus 1 — A/C and HVAC — No cooling\nBus 6 — Preventive Maintenance — Add engine oil — 10 quarts");
+  const mixed={id:"mixed",n:"8",defects:[buses[0].defects[0],buses[7].defects[0]]};
+  assert.deepEqual(quickFilterDefects(mixed,"ac").map(defect=>defect.issue),["No cooling"]);
+  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\nBus 8 — A/C and HVAC — No cooling");
+  assert.equal(quickFilterShareText("Farebox",[{id:"flag",n:"9",farebox:true,defects:[buses[7].defects[0]]}],"farebox"),"Farebox — 1 bus\nBus 9 — Farebox tracker flag");
+  assert.equal(quickFilterShareText("IBS & Ventra",[{id:"legacy",n:"10",pendingRepair:"Ventra reader blank",defects:[]}],"ibs-ventra"),"IBS & Ventra — 1 bus\nBus 10 — Ventra reader blank");
+  const fifteen=Array.from({length:15},(_,index)=>({id:"fare-"+index,n:String(17500+index),defects:[{id:"farebox-"+index,category:"Tech Services",issue:"Farebox",details:"Reader offline",state:"open"},{id:"ac-"+index,category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]}));
+  const fifteenFarebox=quickFilterShareText("Farebox",fifteen,"farebox");
+  assert.equal(quickFilterBusIds(fifteen,"farebox").length,15);
+  assert.equal(fifteenFarebox.split("\n").length,16);
+  assert.doesNotMatch(fifteenFarebox,/No cooling/);
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -397,14 +406,18 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
   assert.match(page,/aria-expanded=\{expanded\}/);
-  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses\)/);
+  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses,quickFilter\)/);
   assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
   assert.match(page,/aria-label="Share filtered bus list as text"/);
+  assert.match(page,/quickFilterDefects\(bus,quickFilter\)/);
+  assert.match(page,/current\.includes\(bus\.id\)\?\[\]:\[bus\.id\]/);
   assert.match(css,/\.quick-filter-defects\{/);
   assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
   assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
+  assert.match(css,/\.quick-filter-drawer>\.quick-filter-results\{min-height:0;grid-auto-rows:max-content/);
+  assert.match(css,/inset:max\(8px,env\(safe-area-inset-top\)\) 8px max\(8px,env\(safe-area-inset-bottom\)\)/);
   assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
   assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
@@ -1048,7 +1061,7 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.equal(Object.keys(REPAIR_OPTIONS).length, 22);
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 23);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
@@ -1057,7 +1070,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
-  assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "MDT Screen", "Destination Sign", "Other Tech Services"]);
+  assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "IBS Screen", "Destination Sign", "Other Tech Services"]);
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Fuel gauge INOP / false reading"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Kneeler button"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Front dash damage"));
+  assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
+  assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
+  assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
@@ -1632,14 +1651,25 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="bus-generations"/);
   assert.match(page,/input autoFocus inputMode="numeric"/);
   assert.match(page,/Choose generation first/);
-  assert.match(page,/className="log-header-save">\{saveLabel\}/);
+  assert.doesNotMatch(page,/className="log-header-save"/);
+  assert.match(page,/className="wide log-inline-actions" aria-label="Defect form actions"/);
+  assert.ok(page.indexOf('className="wide log-inline-actions"')<page.indexOf('className="wide downsheet-check"'));
+  assert.doesNotMatch(page,/<footer><button type="button" onClick=\{close\}>CANCEL/);
   assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
+  assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
+  assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
   assert.match(css,/body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
   assert.match(css,/\.log-editor\{max-height:96vh;max-height:96dvh\}/);
   assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
   assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
+  assert.match(css,/\.defect-log-app\{[^}]*overflow-anchor:none/);
+  assert.match(css,/\.log-inline-actions button\{[^}]*min-height:46px/);
+  assert.match(css,/\.log-inline-actions button\{min-height:52px;font-size:11px\}/);
+  assert.doesNotMatch(css,/\.log-editor>footer/);
+  assert.doesNotMatch(css,/\.log-header-save/);
+  assert.match(css,/@supports\(height:100svh\)/);
 });
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};

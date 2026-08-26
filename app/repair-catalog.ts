@@ -36,16 +36,17 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["Horn","MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Tech Services":["Farebox","Ventra","MDT Screen","Destination Sign","Other Tech Services"],
+ "Bus Controls":["Kneeler button","Fuel gauge INOP / false reading","Horn","HVAC / heat controls","Driver seat adjustment / locking bar","Seat belt","Steering wheel tilt / telescoping","Red air valve hard to turn","Driver seat air leak","High beams stay on","Switches broken / loose","Front dash damage","Side control panel damage","Other bus control defect"],
+ "Tech Services":["Farebox","Ventra","IBS Screen","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "No Start":["No crank","Cranks / no start","Intermittent no start","Starting-system diagnosis","Fuel-related no start","Electrical no start","Other no-start diagnosis"],
  "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Kneeler","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Mirrors / fixtures","Other light or fixture"],
- "Bodywork":["Accident damage","Body panel","Bumper","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
+ "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
- "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
+ "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
  "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
@@ -76,7 +77,8 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
-  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue:defect.issue||"Driver-reported defect",details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,shopNotes:defect.shopNotes,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
+  const issue=defect.issue==="MDT Screen"?"IBS Screen":defect.issue||"Driver-reported defect";
+  return {id:defect.id||identity+"-defect-"+index,category:defect.category||"Miscellaneous",issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,shopNotes:defect.shopNotes,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
