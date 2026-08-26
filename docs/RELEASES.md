@@ -16,7 +16,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 99 | Previous live | 3aec06e | Reconciled the Version 96 GitHub history with the Version 98 Sites source while preserving both release lines and application behavior |
 | 100 | Previous live | 8fbc710 | Backward-compatible shared storage foundation, expanded repair catalog including CUBIC BUS ER/MV ER, centralized category emojis, and clearer phone defect text |
 | 101 | Previous live | f730ecd | Dated actual odometer readings on every bus, append-only reading history, current-reading summary, and phone-friendly entry controls |
-| 102 | Live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
+| 102 | Previous live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
+| 103 | Live | f4628f7 | Estimated operating mileage at 275 miles per day, pause/resume checkpoints, and inspection readiness at 3,000 miles or 10 days |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 

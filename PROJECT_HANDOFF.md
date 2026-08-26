@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 102
-Live feature checkpoint: commit 4f0315b
+Live release: Sites Version 103
+Live feature checkpoint: commit f4628f7
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 102 is the current user-approved live release. Its validated source checkpoint is commit 4f0315b. It adds offline data-loss safeguards while preserving Version 101 mileage history, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
+Version 103 is the current user-approved live release. Its validated source checkpoint is commit f4628f7. It adds estimated operating mileage and inspection readiness while preserving Version 102 data-loss safeguards, actual mileage history, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -64,7 +64,9 @@ Version 102 is the current user-approved live release. Its validated source chec
 - Every successful fleet write keeps the previous valid board as a device-local last-known-good recovery copy. A single change that would remove five or more defects or five or more bus records is refused unless it is the user-confirmed backup import path.
 - Fleet Tracker Settings exposes Restore Last Good Copy. This recovery snapshot is stored in the same browser and can also be lost if Safari clears all website data; exported files remain the durable offline recovery path.
 - The Defect Log prompts for a one-tap full-board export after every 20 new direct Defect Log entries. A successful share or download resets that device's reminder baseline.
-The Version 102 production build, lint gate, and all 65 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+- Estimated mileage uses the latest actual reading plus 275 miles per elapsed operating day. Blue In Service and green In Service With Defects accrue; shop, out-of-service, decommissioned, and unknown states pause. Status transitions checkpoint the estimate so paused time is not counted.
+- Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until Stage 3 records inspection history.
+The Version 103 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
