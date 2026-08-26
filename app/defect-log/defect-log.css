@@ -127,3 +127,8 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 /* Reversible entry actions stay visible without covering the page. */
 .log-undo{display:flex;align-items:center;gap:10px;margin:0 14px 9px;padding:9px 10px;border:1px solid #d3a441;border-radius:8px;background:#fff7df;color:#684500}.log-undo span{min-width:0;flex:1;font-size:9px;font-weight:900}.log-undo button{min-height:40px;border:0;border-radius:6px;background:#785000;color:#fff;padding:0 12px;font-size:8px;font-weight:900}.log-undo .dismiss-undo{width:40px;padding:0;background:transparent;color:#684500;font-size:20px}
 @media(max-width:760px){.log-undo{margin:0 8px 8px;flex-wrap:wrap}.log-undo span{width:100%;flex-basis:100%}.log-undo button{min-height:46px}}
+/* Undo stays available as a quiet control instead of appearing as a status banner. */
+.log-undo-button{flex:none;min-width:82px;height:34px;border:1px solid var(--log-border,#b7c4d7);border-radius:5px;background:var(--log-surface,#fff);color:var(--log-muted,#52647d);padding:0 9px;font-size:8px;font-weight:900;cursor:pointer}
+.log-undo-button:not(:disabled){border-color:color-mix(in srgb,var(--log-accent) 40%,var(--log-border));color:var(--log-text)}
+.log-undo-button:disabled{opacity:.42;cursor:not-allowed}
+@media(max-width:760px){.log-controls{grid-template-columns:minmax(0,1fr) 82px 48px}.log-controls>.quick-filter-control{grid-column:1;grid-row:2}.log-undo-button{grid-column:2;grid-row:2;width:100%;height:42px;min-height:42px;padding:0 4px}.log-settings-button{grid-column:3;grid-row:2}.log-controls .log-search-wrap{grid-column:1/-1;grid-row:3}}
