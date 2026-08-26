@@ -2246,7 +2246,7 @@ test("Fleet Tracker displays estimated mileage and inspection readiness without 
  assert.match(page,/ESTIMATED OPERATING MILEAGE/);
  assert.match(page,/RUNNING · 275 MI\/DAY/);
  assert.match(page,/INSPECTION STATUS/);
- assert.match(page,/3,000-mile \/ 10-day due clock/);
+ assert.match(page,/3,000-mile due point waits for an inspection with an actual reading/);
  assert.match(page,/data-inspection-due=\{inspection\.due\}/);
  assert.match(page,/inspection-due-badge/);
  assert.match(css,/\.token\[data-inspection-due="true"\]/);
@@ -2301,10 +2301,25 @@ test("a first completed inspection works on legacy payloads and rejects invalid 
  assert.equal(inspectionDueStatus({...legacy,...first},"2026-08-05T00:00:00.000Z").state,"current");
 
  assert.equal(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:120000}),null);
- assert.match(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:""}),/odometer reading/);
+ assert.equal(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:""}),null);
  assert.match(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:-5}),/odometer reading/);
  assert.match(maintenanceCompletionError({completedAt:"not-a-date",odometerMiles:120000}),/date and time/);
  assert.equal(recordMaintenanceCompletion(legacy,{completedAt:"not-a-date",odometerMiles:120000}),null);
+
+ const dated=recordMaintenanceCompletion({s:"service",odometerReadings:first.odometerReadings,maintenanceEvents:first.maintenanceEvents,mileageEstimate:first.mileageEstimate},{completedAt:"2026-08-08T00:00:00.000Z",odometerMiles:"",note:"Date-only shop record",idSeed:"date-only"},"2026-08-08T00:00:00.000Z");
+ assert.equal(dated.maintenanceEvents.length,2);
+ assert.equal(dated.maintenanceEvents[1].odometerMiles,undefined);
+ assert.equal(dated.odometerReadings.length,1);
+ assert.equal(dated.odometerReadings[0].id,first.odometerReadings[0].id);
+ assert.equal(dated.mileageEstimate,undefined);
+ const datedBus={...legacy,...first,...dated,mileageEstimate:first.mileageEstimate},dateOnlyDue=inspectionDueStatus(datedBus,"2026-08-08T00:00:00.000Z");
+ assert.equal(dateOnlyDue.state,"current");
+ assert.equal(dateOnlyDue.dueMiles,undefined);
+ assert.equal(dateOnlyDue.dueAt,"2026-08-18T00:00:00.000Z");
+ const datedSaved=stampOperationalChange({...legacy,...first},{...datedBus},"2026-08-08T00:00:00.000Z");
+ assert.equal(datedSaved.odometerReadings.length,1);
+ assert.equal(datedSaved.mileageEstimate.anchorReadingId,first.odometerReadings[0].id);
+ assert.equal(latestMaintenanceEvent(datedSaved.maintenanceEvents,"inspection").id,"maintenance-inspection-date-only");
 
  const preserved=appendMaintenanceEvent([{id:"kept",kind:"inspection",completedAt:"2026-07-01T00:00:00.000Z",odometerMiles:80000,futureField:"keep"}],{id:"added",kind:"inspection",completedAt:"2026-07-10T00:00:00.000Z",odometerMiles:82000});
  assert.deepEqual(preserved.map(event=>event.id),["kept","added"]);
@@ -2319,10 +2334,11 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
  assert.match(page,/MAINTENANCE HISTORY/);
  assert.match(page,/Completions are appended and never replace earlier maintenance records/);
  assert.match(page,/ODOMETER AT COMPLETION/);
+ assert.match(page,/Leave blank for date only/);
  assert.match(page,/DATE COMPLETED/);
  assert.match(page,/RECORD INSPECTION/);
  assert.match(page,/recordMaintenanceCompletion\(current,input\)/);
- assert.match(page,/restarts the 3,000-mile \/ 10-day due clock/);
+ assert.match(page,/Date only restarts the 10-day clock without changing mileage/);
  assert.match(css,/Completed-maintenance history in the bus editor/);
  assert.match(css,/\.maintenance-current\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
  assert.match(css,/\.maintenance-entry button\{min-height:44px/);
