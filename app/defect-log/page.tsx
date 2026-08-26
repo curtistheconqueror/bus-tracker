@@ -164,6 +164,7 @@ export default function DefectLog(){
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
+ const [focusedBusId,setFocusedBusId]=useState("");
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
 
@@ -193,6 +194,9 @@ export default function DefectLog(){
   return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
  });
  const visibleGroups=groupDefectLogRecords(visible);
+ /* Focus reads one bus at arm's length and never writes. Editing from inside it
+    hands off to the existing editor so only one path ever changes a record. */
+ const focusedGroup=focusedBusId?visibleGroups.find(group=>group.bus.id===focusedBusId):undefined;
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
@@ -240,6 +244,7 @@ export default function DefectLog(){
   <section className="log-feed">
    <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · ");return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
+    <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
      <span className="log-icon" aria-hidden="true">{repairCategoryEmoji(primary.defect.category)}</span>
      <span className="log-bus"><small>BUS</small><span className="log-bus-number"><strong>{group.bus.n}</strong>{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}</span><em>{locationLabel(group.bus.l)}</em></span>
@@ -253,6 +258,21 @@ export default function DefectLog(){
     </section>)}</div>}
    </article>})}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
   </section>
+  {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>
+   <section className="log-focus" role="dialog" aria-modal="true" aria-label={"Bus "+focusedGroup.bus.n+" defects"}>
+    <div className="log-focus-head"><span className="log-focus-bus"><small>BUS</small><strong>{focusedGroup.bus.n}</strong></span><span className="log-focus-where"><b>{locationLabel(focusedGroup.bus.l)}</b><small>{STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s}</small></span><button className="close-log-focus" type="button" onClick={()=>setFocusedBusId("")} aria-label="Close focus view">×</button></div>
+    <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
+     <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
+     <p className="log-focus-defect">{defectLabel(record.defect)}</p>
+     {record.defect.conditionNotDuplicated&&<p><b>RESULT</b>Defect / condition not duplicated</p>}
+     {record.defect.diagnosticNote&&<p><b>DIAG</b>{record.defect.diagnosticNote}</p>}
+     {record.defect.actionTaken&&<p><b>ACTION</b>{record.defect.actionTaken}</p>}
+     {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
+     {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
+     <div className="log-focus-record-foot"><time>LOGGED {timeLabel(record.createdAt)}</time><button type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button></div>
+    </article>)}</div>
+   </section>
+  </div>}
   {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;

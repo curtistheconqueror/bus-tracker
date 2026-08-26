@@ -148,3 +148,44 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 .offline-backup-reminder small{font-size:9px;font-weight:750;line-height:1.35}
 .offline-backup-reminder button{min-height:44px;border:0;border-radius:7px;background:#8b5d00;color:#fff;padding:0 16px;font-size:9px;font-weight:1000;white-space:nowrap}
 @media(max-width:760px){.offline-backup-reminder{margin:0 8px 8px;align-items:stretch;flex-direction:column}.offline-backup-reminder button{min-height:52px;width:100%;font-size:10px}}
+/* Focus opens one bus card for reading at arm's length. The control is a sibling
+   of the card's expand button, never nested inside it, so a tap can only ever do
+   one thing. The header reserves the corner so long repair text cannot run under it. */
+.log-card-group>.log-focus-button{position:absolute;top:6px;right:6px;z-index:2;display:inline-flex;min-width:52px;min-height:36px;align-items:center;justify-content:center;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-accent);padding:0 9px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.log-card-group>.log-focus-button:hover,.log-card-group>.log-focus-button:focus-visible{background:color-mix(in srgb,var(--log-accent) 12%,var(--log-surface));outline:none}
+.log-card-group>.log-group-header{padding-right:64px}
+
+/* Focus view itself: a windowed dialog on large screens, full screen on phones. */
+.log-focus-shade{padding:24px}
+.log-focus{display:flex;width:100%;max-width:760px;max-height:92vh;flex-direction:column;border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
+.log-focus-head{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:2px solid var(--log-accent);background:var(--log-page)}
+.log-focus-bus{display:flex;flex-direction:column}
+.log-focus-bus small{font-size:10px;font-weight:900;letter-spacing:.9px;color:var(--log-muted)}
+.log-focus-bus strong{font-size:34px;line-height:1.05;color:var(--log-accent)}
+.log-focus-where{display:flex;min-width:0;flex-direction:column;gap:3px}
+.log-focus-where b{font-size:15px;color:var(--log-text)}
+.log-focus-where small{font-size:11px;font-weight:900;color:var(--log-muted)}
+.close-log-focus{margin-left:auto;width:48px;height:48px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:10px;background:var(--log-surface);color:var(--log-text);font-family:inherit;font-size:24px;line-height:1;cursor:pointer}
+.log-focus-body{flex:1;display:grid;gap:12px;align-content:start;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.log-focus-record{border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 16px}
+.log-focus-record.in-progress{border-left-color:#c99400}.log-focus-record.deferred{border-left-color:#6b46c1}.log-focus-record.completed{border-left-color:#0a7d47}
+.log-focus-record-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.log-focus-record-head b{font-size:14px;letter-spacing:.4px;color:var(--log-accent)}
+.log-focus-record-head i{border-radius:11px;background:#dce8f5;color:#1d4f84;padding:4px 10px;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
+.log-focus-record-head i.in-progress{background:#ffedb3;color:#765500}.log-focus-record-head i.deferred{background:#e9e1fa;color:#563889}.log-focus-record-head i.completed{background:#d9f2e3;color:#08663a}
+.log-focus-defect{margin:0 0 11px;font-size:21px;line-height:1.35;font-weight:700;color:var(--log-text)}
+.log-focus-record p{margin:0 0 9px;font-size:15px;line-height:1.45;color:var(--log-text);overflow-wrap:anywhere}
+.log-focus-record p b{display:block;margin-bottom:2px;font-size:10px;font-weight:900;letter-spacing:.8px;color:var(--log-muted)}
+.log-focus-record-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
+.log-focus-record-foot time{font-size:11px;font-weight:800;color:var(--log-muted)}
+.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;background:var(--log-accent);color:var(--log-header-text);padding:0 18px;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer}
+@media(max-width:760px){
+ .log-focus-shade{align-items:stretch;padding:0}
+ .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
+ .log-focus-head{padding-top:calc(16px + env(safe-area-inset-top))}
+ .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+ .log-focus-bus strong{font-size:30px}
+ .log-focus-defect{font-size:20px}
+ .log-card-group>.log-focus-button{min-height:40px}
+ .log-card-group>.log-group-header{padding-right:62px}
+}

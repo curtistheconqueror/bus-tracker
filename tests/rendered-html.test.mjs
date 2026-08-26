@@ -2432,3 +2432,56 @@ test("Fleet Tracker records every maintenance type and never invents a service i
  assert.equal(/(SPARK_PLUG|VALVE)[A-Z_]*_(MILE|INTERVAL)[A-Z_]*\s*=\s*\d/.test(intervals),false);
  assert.equal(/\b(15000|18000|20000|24000|30000|36000|50000)\b/.test(intervals),false);
 });
+
+test("every Defect Log bus card carries a focus view that reads without editing",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+
+ // one control per bus card, and it must not be nested inside the card's expand button
+ assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+ const focusButtonAt=page.indexOf('className="log-focus-button"'),headerAt=page.indexOf('className="log-card-main log-group-header"');
+ assert.ok(focusButtonAt>0&&headerAt>focusButtonAt,"focus button must precede the header button as a sibling");
+ assert.equal(/log-card-main log-group-header[\s\S]{0,600}?log-focus-button/.test(page),false);
+ // exactly one focus control exists, on the bus group card and not on individual defect rows
+ assert.equal(page.split('className="log-focus-button"').length-1,1);
+ assert.equal(/grouped-defect-main[\s\S]{0,400}?log-focus-button/.test(page),false);
+
+ // the view is read-only: editing hands off to the one existing editor
+ assert.match(page,/setFocusedBusId\(""\);setEditing\(recordDraft\(record\)\)/);
+ assert.equal(/log-focus-record[\s\S]{0,900}?(saveShopNotes|markFixed|removeRecord)\(/.test(page),false);
+ assert.match(page,/const focusedGroup=focusedBusId\?visibleGroups\.find\(group=>group\.bus\.id===focusedBusId\):undefined/);
+ assert.match(page,/role="dialog" aria-modal="true"/);
+ // shop notes live on the defect, not the record wrapper
+ assert.match(page,/record\.defect\.shopNotes&&<p><b>\{settings\.display\.labels\.shopNotes\.toUpperCase\(\)\}<\/b>\{record\.defect\.shopNotes\}/);
+ // globals.css styles bare <header> and <footer>; the focus view must not use them
+ const focusBlock=page.slice(page.indexOf("log-focus-shade"),page.indexOf("{editing&&<DefectEditor"));
+ assert.ok(focusBlock.length>500);
+ assert.equal(/<header[ >]|<\/header>|<footer[ >]|<\/footer>/.test(focusBlock),false);
+ assert.match(focusBlock,/className="log-focus-head"/);
+ assert.match(focusBlock,/className="log-focus-record-head"/);
+ assert.match(focusBlock,/className="log-focus-record-foot"/);
+ assert.match(page,/aria-label="Close focus view"/);
+
+ // larger reading type than the feed it replaces, and a real touch target
+ assert.match(css,/\.log-focus-defect\{margin:0 0 11px;font-size:21px/);
+ assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
+ assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
+ assert.match(css,/\.log-card-group>\.log-focus-button\{position:absolute;top:6px;right:6px/);
+ // the card header reserves the corner so repair text cannot run under the control
+ assert.match(css,/\.log-card-group>\.log-group-header\{padding-right:64px\}/);
+
+ // phone rules stay in the established phone breakpoint
+ const conditions=[];
+ for(let index=css.indexOf("@media(");index>=0;index=css.indexOf("@media(",index+1)){
+  const conditionEnd=css.indexOf(")",index),open=css.indexOf("{",conditionEnd);
+  let depth=0,end=open;
+  for(;end<css.length;end++){
+   if(css[end]==="{")depth++;
+   else if(css[end]==="}"&&--depth===0)break;
+  }
+  if(css.slice(open+1,end).includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
+ }
+ assert.deepEqual(conditions,["max-width:760px"]);
+});
