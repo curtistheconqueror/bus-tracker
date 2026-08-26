@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 103
-Live feature checkpoint: commit f4628f7
+Live release: Sites Version 104
+Live feature checkpoint: commit 519e748
 
 ## Read this first
 
@@ -43,12 +43,12 @@ Preserve these rules through refactors and backend migration:
 - Mystery logic excludes decommissioned buses, Main Garage ready rows, bays 11 and 12, and road buses. It identifies eligible on-property work-area buses that are absent from the Down Sheet.
 - Completing one linked repair must not erase unrelated active defects.
 - Defect Log totals count direct Defect Log records only. Down Sheet or tracker records may display for continuity but do not inflate that count.
-- Photo import is reviewed and merged. It must not silently discard existing board data.
+- A reviewed photo import is authoritative for the Down Sheet only: it replaces every prior Down Sheet row, reconciles every DS badge, lists buses coming off before approval, and remains undoable. It must never delete or complete Defect Log records.
 - Export and import remain the recovery path until shared persistence is live.
 
 ## Current release state
 
-Version 103 is the current user-approved live release. Its validated source checkpoint is commit f4628f7. It adds estimated operating mileage and inspection readiness while preserving Version 102 data-loss safeguards, actual mileage history, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
+Version 104 is the current user-approved live release. Its validated source checkpoint is commit 519e748. It makes every approved Down Sheet photo an authoritative Down Sheet-only replacement while preserving Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -66,7 +66,9 @@ Version 103 is the current user-approved live release. Its validated source chec
 - The Defect Log prompts for a one-tap full-board export after every 20 new direct Defect Log entries. A successful share or download resets that device's reminder baseline.
 - Estimated mileage uses the latest actual reading plus 275 miles per elapsed operating day. Blue In Service and green In Service With Defects accrue; shop, out-of-service, decommissioned, and unknown states pause. Status transitions checkpoint the estimate so paused time is not counted.
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until Stage 3 records inspection history.
-The Version 103 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+- Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
+- Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
+The Version 104 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
