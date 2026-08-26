@@ -555,3 +555,15 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 
 /* Four-section navigation and Fixed Repairs access. */
 @media(max-width:800px){.mobile-mode-nav{grid-template-columns:repeat(4,minmax(0,1fr))}.mobile-mode-nav a{padding-left:2px;padding-right:2px;font-size:9px}.command-bar>.fixed-repairs-command{display:none}}
+/* Dated actual-mileage history in the bus editor. */
+.odometer-workbench{border:1px solid #9fb4cf;border-radius:8px;background:#f5f9ff;overflow:hidden}
+.odometer-workbench>header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid #c4d2e4;background:#e7f1fd;color:#163b68}.odometer-workbench>header span{display:flex;flex-direction:column;gap:3px}.odometer-workbench>header b{font-size:10px}.odometer-workbench>header small{font-size:8px;color:#5d718d}.odometer-workbench>header>strong{font-size:9px;white-space:nowrap}
+.odometer-current{padding:10px 12px}.odometer-current span{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}.odometer-current small{font-size:7px;font-weight:900;color:#62748d}.odometer-current b{font-size:22px;color:#075fae}.odometer-current time{font-size:8px;color:#52647d}
+.odometer-entry{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(185px,1fr) minmax(180px,1.2fr) auto;gap:8px;align-items:end;padding:0 12px 10px}.odometer-entry button{min-height:42px;border:0;border-radius:6px;background:#0873df;color:#fff;padding:0 13px;font-size:9px;font-weight:900;cursor:pointer}.odometer-entry button:disabled{opacity:.45;cursor:not-allowed}
+.odometer-history{max-height:150px;display:grid;gap:5px;margin:0 12px 10px;padding:6px;border:1px solid #c9d5e5;border-radius:6px;background:#fff;overflow-y:auto}.odometer-history article{display:grid;grid-template-columns:110px minmax(150px,auto) minmax(0,1fr);gap:8px;align-items:center;padding:7px 8px;border-radius:4px;background:#f2f6fb}.odometer-history b{font-size:10px;color:#0a4f91}.odometer-history time,.odometer-history small{font-size:8px;color:#596b83}.odometer-history small{overflow-wrap:anywhere}
+.odometer-workbench>p{margin:0;padding:4px 12px 10px;color:#6b7b91;font-size:9px}.odometer-save-hint{display:block;padding:0 12px 10px;color:#66520a!important;font-size:8px!important;font-weight:800}
+@media(max-width:760px){
+ .odometer-workbench>header{align-items:flex-start}.odometer-current b{font-size:20px}
+ .odometer-entry{grid-template-columns:1fr}.odometer-entry input{font-size:16px}.odometer-entry button{min-height:52px;font-size:11px}
+ .odometer-history{max-height:190px}.odometer-history article{grid-template-columns:1fr auto}.odometer-history article small{grid-column:1/-1}
+}

@@ -12,6 +12,7 @@ import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { CHECK_ENGINE_SYMPTOMS, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
+import { appendOdometerReading, latestOdometerReading, normalizeOdometerReadings } from "../app/domain.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -1999,6 +2000,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/state==="completed"/);
   assert.match(fixedPage,/EDIT THE FULL REPAIR RECORD/);
   assert.match(fixedPage,/ORIGINAL DESCRIPTION/);
+
   assert.match(fixedPage,/FIX \/ STEPS TAKEN/);
   assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
   assert.match(fixedPage,/not-duplicated-note/);
@@ -2029,4 +2031,31 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   const response=await render("/fixed-repairs");
   assert.equal(response.status,200);
   assert.match(await response.text(),/Fixed Repairs/);
+});
+
+test("odometer readings append as dated history and survive legacy fleet migration", async () => {
+  assert.deepEqual(normalizeOdometerReadings(undefined), []);
+  const readings=normalizeOdometerReadings([
+    {id:"later",miles:121000,recordedAt:"2026-08-20T14:00:00.000Z",source:"inspection",note:"A inspection",futureMarker:"keep"},
+    {id:"earlier",miles:120000,recordedAt:"2026-08-10T14:00:00.000Z",source:"manual",note:"Phone entry"},
+    {id:"bad",miles:-1,recordedAt:"not-a-date",source:"manual"},
+  ]);
+  assert.deepEqual(readings.map(reading=>reading.id),["earlier","later"]);
+  assert.equal(readings[1].futureMarker,"keep");
+  const appended=appendOdometerReading(readings,{id:"new",miles:122500,recordedAt:"2026-08-25T14:00:00.000Z",source:"manual",note:"Inspection lane"});
+  assert.deepEqual(appended.map(reading=>reading.miles),[120000,121000,122500]);
+  assert.equal(latestOdometerReading(appended)?.id,"new");
+  assert.equal(readings.length,2);
+
+  const [page,css]=await Promise.all([
+    readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  ]);
+  assert.match(page,/odometerReadings:normalizeOdometerReadings\(bus\.odometerReadings\)/);
+  assert.match(page,/ODOMETER HISTORY/);
+  assert.match(page,/Actual readings are appended and never replace earlier readings/);
+  assert.match(page,/type="datetime-local"/);
+  assert.match(page,/ADD TO HISTORY/);
+  assert.match(css,/Dated actual-mileage history in the bus editor/);
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.odometer-entry\{grid-template-columns:1fr\}/);
 });

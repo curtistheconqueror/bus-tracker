@@ -45,3 +45,29 @@ export type FutureRepairPartFields={
  partsUsed?:boolean;
  parts?:PartUsage[];
 };
+
+export function normalizeOdometerReadings(value:unknown):OdometerReading[]{
+ if(!Array.isArray(value))return [];
+ return value.flatMap((candidate,index)=>{
+  if(!candidate||typeof candidate!=="object")return [];
+  const reading=candidate as Partial<OdometerReading>&Record<string,unknown>;
+  const miles=Number(reading.miles),recordedAt=String(reading.recordedAt||"");
+  if(!Number.isFinite(miles)||miles<0||Number.isNaN(new Date(recordedAt).getTime()))return [];
+  return [{
+   ...reading,
+   id:String(reading.id||"odometer-imported-"+index),
+   miles:Math.round(miles),
+   recordedAt:new Date(recordedAt).toISOString(),
+   source:reading.source==="inspection"?"inspection":"manual",
+   note:String(reading.note||""),
+  } as OdometerReading];
+ }).sort((left,right)=>new Date(left.recordedAt).getTime()-new Date(right.recordedAt).getTime());
+}
+
+export function latestOdometerReading(value:unknown):OdometerReading|undefined{
+ return normalizeOdometerReadings(value).at(-1);
+}
+
+export function appendOdometerReading(value:unknown,reading:OdometerReading):OdometerReading[]{
+ return normalizeOdometerReadings([...normalizeOdometerReadings(value),reading]);
+}
