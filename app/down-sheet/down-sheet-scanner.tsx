@@ -3,15 +3,16 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {mergeReviewedRows,reviewScannedRows,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 
-type ScanMode="merge"|"replace";
 type SelectedPhoto={file:File;url:string;key:string};
 
 type Props={
  fleet:ScanFleetBus[];
+ currentEntries:ReplaceDownEntry[];
  defaultShift:"1st"|"2nd"|"3rd";
  onClose:()=>void;
- onImport:(records:ScanImportRecord[],mode:ScanMode)=>void;
+ onImport:(records:ScanImportRecord[])=>void;
 };
 
 const MAX_FILES=6;
@@ -34,10 +35,9 @@ async function scanReadyPhoto(file:File,page:number){
  }finally{URL.revokeObjectURL(url)}
 }
 
-export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:Props){
+export default function DownSheetScanner({fleet,currentEntries,defaultShift,onClose,onImport}:Props){
  const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
  const [rows,setRows]=useState<ReviewedScanRow[]>([]);
- const [mode,setMode]=useState<ScanMode>("merge");
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
@@ -46,6 +46,7 @@ export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:P
  useEffect(()=>{photosRef.current=photos},[photos]);
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
  const imports=useMemo(()=>mergeReviewedRows(rows),[rows]);
+ const comingOff=useMemo(()=>scannedSheetRemovals(currentEntries,imports.map(record=>record.busId)),[currentEntries,imports]);
  const flagged=rows.filter(row=>row.fleetMatch!=="matched").length;
 
  const addPhotos=(files:FileList|null)=>{
@@ -82,9 +83,8 @@ export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:P
  };
  const approve=()=>{
   if(!imports.length){setError("Select at least one fleet-matched row.");return}
-  const action=mode==="replace"?"replace the current Down Sheet with":"merge into the Down Sheet:";
-  if(!confirm(`Import ${imports.length} bus${imports.length===1?"":"es"} and ${action}\n\n${mode==="replace"?"Current Down Sheet entries will be replaced. Bus locations will not move.":"Existing entries for the same bus will be updated."}`))return;
-  onImport(imports,mode);
+  if(!confirm(`Replace the current Down Sheet with ${imports.length} reviewed bus${imports.length===1?"":"es"}?\n\n${comingOff.length} bus${comingOff.length===1?" is":"es are"} coming off the current sheet. Physical locations and saved defects will remain unchanged. Omitted inspections return to service according to their unresolved defects.`))return;
+  onImport(imports);
  };
 
  return <div className="down-shade scan-shade" role="dialog" aria-modal="true" aria-labelledby="scan-title">
@@ -114,7 +114,10 @@ export default function DownSheetScanner({fleet,defaultShift,onClose,onImport}:P
        <label>REPAIR<select value={repairs.includes(row.repair)?row.repair:repairs[0]} onChange={event=>updateRow(row.key,{repair:event.target.value})}>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>
        <label>MECHANIC / VENDOR<input value={row.assignedTo} onChange={event=>updateRow(row.key,{assignedTo:event.target.value})}/></label>
       </article>})}</div>
-     <div className="scan-mode" role="group" aria-label="Import mode"><button type="button" className={mode==="merge"?"active":""} onClick={()=>setMode("merge")}>MERGE</button><button type="button" className={mode==="replace"?"active danger":""} onClick={()=>setMode("replace")}>REPLACE</button><span>{mode==="merge"?"Update matches and keep other rows.":"Replace the current Down Sheet. Locations stay put."}</span></div>
+     <section className="scan-replacement" aria-label="Buses coming off the Down Sheet">
+      <header><span><b>AUTHORITATIVE REPLACEMENT</b><small>The reviewed photo becomes the current Down Sheet.</small></span><strong>{comingOff.length} COMING OFF</strong></header>
+      {comingOff.length?<><p>These buses are on the current Down Sheet but absent from the reviewed photo. They will come off when you approve the import. Their saved defects and physical locations remain.</p><div>{comingOff.map(entry=><span key={entry.busId}><b>BUS {entry.busNumber}</b><small>{entry.section||"Down Sheet entry"}</small></span>)}</div></>:<p>No current Down Sheet buses are missing from the reviewed photo.</p>}
+     </section>
     </>}
     {error&&<p className="scan-error" role="alert">{error}</p>}
    </div>

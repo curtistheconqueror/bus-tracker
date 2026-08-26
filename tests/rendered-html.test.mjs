@@ -22,6 +22,7 @@ import { operationalUpdateAt, stampOperationalChange } from "../app/operational-
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
+import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterMatch } from "../app/quick-filters.ts";
@@ -1406,6 +1407,33 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.equal(merged[0].busId, "bus-17510");
   assert.match(merged[0].reason, /Check engine light \/ B-12/);
   assert.equal(merged[0].shift, "3rd");
+  const currentEntries = [
+    { busId: "bus-17510", busNumber: "17510", section: "Pending", workflow: "Scheduled" },
+    { id: "repair-inspection", busId: "bus-18501", busNumber: "18501", section: "Inspection", workflow: "In Progress" },
+    { busId: "bus-18502", busNumber: "18502", section: "Pending", workflow: "Completed" },
+  ];
+  const removals = scannedSheetRemovals(currentEntries, merged.map(record => record.busId));
+  assert.deepEqual(removals.map(entry => entry.busId), ["bus-18501"]);
+  const openDefect = { id: "downsheet-repair-inspection", category: "Inspection", issue: "B-12", details: "", operability: "down", state: "open" };
+  const released = prepareFleetForScannedReplacement([
+    { id: "bus-17510", l: "east-0", s: "out", down: true, defects: [], pendingRepair: "" },
+    { id: "bus-18501", l: "garage-0", s: "shop", down: true, defects: [openDefect], pendingRepair: "Misfire", parkedAt: "2026-08-25T00:00:00.000Z" },
+  ], removals, "2026-08-26T00:00:00.000Z");
+  assert.equal(released[0].down, false);
+  assert.equal(released[0].s, "out");
+  assert.equal(released[1].down, false);
+  assert.equal(released[1].s, "defect");
+  assert.equal(released[1].defects.length, 1);
+  assert.equal(released[1].defects[0].id, openDefect.id);
+  assert.equal(released[1].defects[0].state, "open");
+  assert.equal(released[1].defects[0].operability, "service");
+  const safetyDefect = { id: "brake-1", category: "Brakes", issue: "Brake mod light", details: "", operability: "down", state: "open", source: "defect-log" };
+  const safetyReleased = prepareFleetForScannedReplacement([
+    { id: "bus-18501", l: "garage-0", s: "shop", down: true, defects: [openDefect, safetyDefect], pendingRepair: "Inspection; brake" },
+  ], removals, "2026-08-26T00:00:00.000Z");
+  assert.equal(safetyReleased[0].s, "out");
+  assert.equal(safetyReleased[0].defects.find(defect => defect.id === "brake-1").operability, "down");
+  assert.equal(safetyReleased[0].defects.find(defect => defect.id === "brake-1").source, "defect-log");
 
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   const scanner = await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8");
@@ -1415,6 +1443,12 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.ok(scanner.includes("TAKE PHOTO"));
   assert.ok(scanner.includes("UPLOAD FILE"));
   assert.ok(scanner.includes("IMPORT APPROVED"));
+  assert.ok(scanner.includes("AUTHORITATIVE REPLACEMENT"));
+  assert.ok(scanner.includes("COMING OFF"));
+  assert.doesNotMatch(scanner, />MERGE</);
+  assert.match(page, /const nextEntries=\[\.\.\.imported\]/);
+  assert.match(page, /prepareFleetForScannedReplacement\(fleet,removed,now\)/);
+  assert.match(page, /currentEntries=\{active\}/);
   assert.ok(scanner.includes("READING PAGE"));
   assert.ok(scanner.includes("scanReadyPhoto"));
   assert.ok(scanner.includes("700*1024"));
