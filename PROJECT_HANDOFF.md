@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 95
-Live feature checkpoint: commit 5924f3f
+Live release: Sites Version 97
+Live feature checkpoint: commit 439531b
 
 ## Read this first
 
@@ -48,14 +48,14 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 95 is the current user-approved live release. Its validated feature checkpoint is commit 5924f3f. It retains all Version 94 Operator Controls, Bike Rack, radiator-fan, phone-entry, and Advanced Details improvements while correcting the centered Defect Log action area.
+Version 97 is the current user-approved live release. Its validated feature checkpoint is commit 439531b. It combines the mobile Facility Map improvements, the fourth Fixed Repairs workflow, the curated Quick Filter sharing work, and the latest defect-entry safeguards.
 
-- Save Defect or Save Update persists the entry through the existing validation and duplicate-prevention workflow.
-- Close exits the editor without saving, providing the separate choice intended by the bottom controls.
+- Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and an immediate Undo Last Change control.
+- The Defect Log editor keeps Save Defect, Close, and Save as Fixed fully aligned on phones; the middle actions sit above Down Sheet and the page restores its prior scroll position when the editor closes.
+- Quick Filter copy/share output includes only defects that match the selected filter, including Defect / Condition Not Duplicated records.
+- Bus Controls, IBS Screen wording, Check Engine symptoms, kneeler/ramp choices, and both Bike Rack repair paths remain available.
 
-The Version 95 production build, lint gate, and all 57 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
-
-An unpublished candidate now adds the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth Fixed Repairs workflow, Save as Fixed in both Defect Log action rows, editable completion details, and offline caching for all four routes. It is not live and must not be published without explicit approval. Its lint, production build, and all 58 regression tests pass.
+The Version 97 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 

@@ -9,9 +9,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 92 | Previous live | be6ab31 | Multi-symptom Check Engine defects, contained phone layouts, collapsible Mystery search, shared Quick Filter bus lists, and stable full-height phone editor saving |
 | 93 | Previous live | 4788b6e | Version 92 merged with optional defect subcategories, reachable dual Save controls, dated defects, 48-hour duplicate prevention, and larger phone navigation |
 | 94 | Previous live | 13c7244 | Operator Controls, Bike Rack and radiator-fan repair choices, a one-to-eight fan count, centered Save & Close, and collapsible Advanced Details |
-| 95 | Live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
-
-Unpublished candidate: the working tree adds the contained phone Facility Map, compact phone command dock, persistent per-device section collapse choices, a fourth offline Fixed Repairs route, Save as Fixed in both Defect Log action rows, and editable repair-completion details. It has not been saved or published as a Sites version.
+| 95 | Previous live | 5924f3f | Separate centered Save and Close actions in the Defect Log editor, with large phone touch targets |
+| 97 | Live | 439531b | Four-surface mobile navigation, editable Fixed Repairs with undo/reopen/delete, aligned phone defect actions, condition-not-duplicated tracking, and curated Quick Filter sharing |
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
