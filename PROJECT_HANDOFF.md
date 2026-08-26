@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 100
-Live feature checkpoint: commit 8fbc710
+Live release: Sites Version 101
+Live feature checkpoint: commit f730ecd
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 100 is the current user-approved live release. Its validated source checkpoint is commit 8fbc710. It adds the first staged data foundation plus the catalog/readability stage while preserving all existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
+Version 101 is the current user-approved live release. Its validated source checkpoint is commit f730ecd. It adds dated actual odometer readings to every bus while preserving the Version 100 storage foundation, catalog/readability improvements, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -60,7 +60,8 @@ Version 100 is the current user-approved live release. Its validated source chec
 - Shared versioned fleet and Down Sheet storage readers accept legacy payloads, preserve future metadata, and refuse malformed or unsupported newer payloads instead of overwriting them.
 - The repair catalog now includes coolant level sensor, frequent suspension and mirror defects, Brake mod light, Farebox won't lock, and CUBIC Screen BUS ER / MV ER.
 - Repair-category emojis are defined centrally and shown without changing stored category values; phone defect text has a readable minimum size.
-The Version 100 production build, lint gate, and all 61 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+- Every bus editor can append a mileage reading with its date and an optional note. Earlier readings remain visible in history, and the latest dated reading is shown as the current actual mileage.
+The Version 101 production build, lint gate, and all 62 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
