@@ -53,8 +53,16 @@ export function normalizeMaintenanceEvents(value:unknown):MaintenanceEvent[]{
  }).sort((left,right)=>Date.parse(left.completedAt)-Date.parse(right.completedAt));
 }
 
+export function maintenanceEventsOfKind(value:unknown,kind:MaintenanceEventKind):MaintenanceEvent[]{
+ return normalizeMaintenanceEvents(value).filter(event=>event.kind===kind);
+}
+
 export function latestMaintenanceEvent(value:unknown,kind:MaintenanceEventKind){
- return normalizeMaintenanceEvents(value).filter(event=>event.kind===kind).at(-1);
+ return maintenanceEventsOfKind(value,kind).at(-1);
+}
+
+export function appendMaintenanceEvent(value:unknown,event:MaintenanceEvent):MaintenanceEvent[]{
+ return normalizeMaintenanceEvents([...normalizeMaintenanceEvents(value),event]);
 }
 
 export type FutureRepairPartFields={

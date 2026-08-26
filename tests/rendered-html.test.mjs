@@ -13,8 +13,9 @@ import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { CHECK_ENGINE_SYMPTOMS, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
-import { appendOdometerReading, latestOdometerReading, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
+import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
+import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2250,4 +2251,93 @@ test("Fleet Tracker displays estimated mileage and inspection readiness without 
  assert.match(page,/inspection-due-badge/);
  assert.match(css,/\.token\[data-inspection-due="true"\]/);
  assert.match(css,/@media\(max-width:760px\)\{\.odometer-current\{grid-template-columns:1fr\}/);
+});
+
+test("completed inspections append maintenance history and re-anchor mileage and the due clock",()=>{
+ const baseline={id:"inspection-1",kind:"inspection",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,note:"Initial baseline"};
+ const bus={s:"service",lastStatusChangeAt:"2026-08-01T00:00:00.000Z",odometerReadings:[{id:"reading-1",miles:100000,recordedAt:"2026-08-01T00:00:00.000Z",source:"manual",note:"Start"}],maintenanceEvents:[baseline],mileageEstimate:{anchorReadingId:"reading-1",estimatedMiles:102900,lastAccruedAt:"2026-08-11T00:00:00.000Z",rateMilesPerOperatingDay:275}};
+ assert.equal(inspectionDueStatus(bus,"2026-08-12T00:00:00.000Z").due,true);
+
+ const completion=recordMaintenanceCompletion(bus,{completedAt:"2026-08-12T00:00:00.000Z",odometerMiles:"103250",note:"B-check complete",idSeed:"seed-1"},"2026-08-12T00:00:00.000Z");
+ assert.deepEqual(completion.maintenanceEvents.map(event=>event.id),["inspection-1","maintenance-inspection-seed-1"]);
+ assert.equal(completion.maintenanceEvents[1].odometerMiles,103250);
+ assert.equal(completion.maintenanceEvents[1].note,"B-check complete");
+ assert.deepEqual(completion.odometerReadings.map(reading=>reading.miles),[100000,103250]);
+ assert.equal(completion.odometerReadings[1].source,"inspection");
+ assert.equal(bus.maintenanceEvents.length,1);
+ assert.equal(bus.odometerReadings.length,1);
+
+ assert.equal(completion.mileageEstimate.anchorReadingId,completion.odometerReadings[1].id);
+ assert.equal(Math.round(completion.mileageEstimate.estimatedMiles),103250);
+
+ const after={...bus,...completion},restarted=inspectionDueStatus(after,"2026-08-12T00:00:00.000Z");
+ assert.equal(restarted.due,false);
+ assert.equal(restarted.state,"current");
+ assert.equal(restarted.dueMiles,106250);
+ assert.equal(restarted.dueAt,"2026-08-22T00:00:00.000Z");
+ assert.equal(latestMaintenanceEvent(after.maintenanceEvents,"inspection").id,"maintenance-inspection-seed-1");
+ assert.equal(maintenanceEventsOfKind(after.maintenanceEvents,"inspection").length,2);
+ assert.equal(maintenanceEventsOfKind(after.maintenanceEvents,"spark-plugs").length,0);
+
+ const saved=stampOperationalChange(bus,after,"2026-08-12T00:00:00.000Z");
+ assert.equal(latestMaintenanceEvent(saved.maintenanceEvents,"inspection").id,"maintenance-inspection-seed-1");
+ assert.equal(saved.odometerReadings.length,2);
+ assert.equal(saved.mileageEstimate.anchorReadingId,completion.odometerReadings[1].id);
+ assert.equal(Math.round(saved.mileageEstimate.estimatedMiles),103250);
+ assert.equal(inspectionDueStatus(saved,"2026-08-12T00:00:00.000Z").due,false);
+
+ const dueAgain=inspectionDueStatus(after,"2026-08-22T00:00:00.000Z");
+ assert.equal(dueAgain.due,true);
+ assert.equal(dueAgain.reason,"time");
+ assert.equal(Math.round(dueAgain.estimatedMiles),106000);
+});
+
+test("a first completed inspection works on legacy payloads and rejects invalid entries",()=>{
+ const legacy={s:"shop",odometerReadings:undefined,maintenanceEvents:undefined};
+ assert.equal(inspectionDueStatus(legacy,"2026-08-05T00:00:00.000Z").state,"baseline-needed");
+ const first=recordMaintenanceCompletion(legacy,{completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:90000,idSeed:"seed-2"},"2026-08-05T00:00:00.000Z");
+ assert.equal(first.maintenanceEvents.length,1);
+ assert.equal(first.odometerReadings[0].note,COMPLETION_READING_NOTE);
+ assert.equal(inspectionDueStatus({...legacy,...first},"2026-08-05T00:00:00.000Z").state,"current");
+
+ assert.equal(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:120000}),null);
+ assert.match(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:""}),/odometer reading/);
+ assert.match(maintenanceCompletionError({completedAt:"2026-08-05T00:00:00.000Z",odometerMiles:-5}),/odometer reading/);
+ assert.match(maintenanceCompletionError({completedAt:"not-a-date",odometerMiles:120000}),/date and time/);
+ assert.equal(recordMaintenanceCompletion(legacy,{completedAt:"not-a-date",odometerMiles:120000}),null);
+
+ const preserved=appendMaintenanceEvent([{id:"kept",kind:"inspection",completedAt:"2026-07-01T00:00:00.000Z",odometerMiles:80000,futureField:"keep"}],{id:"added",kind:"inspection",completedAt:"2026-07-10T00:00:00.000Z",odometerMiles:82000});
+ assert.deepEqual(preserved.map(event=>event.id),["kept","added"]);
+ assert.equal(preserved[0].futureField,"keep");
+});
+
+test("Fleet Tracker records completed inspections with phone rules scoped away from iPad widths",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+ assert.match(page,/MAINTENANCE HISTORY/);
+ assert.match(page,/Completions are appended and never replace earlier maintenance records/);
+ assert.match(page,/ODOMETER AT COMPLETION/);
+ assert.match(page,/DATE COMPLETED/);
+ assert.match(page,/RECORD INSPECTION/);
+ assert.match(page,/recordMaintenanceCompletion\(current,input\)/);
+ assert.match(page,/restarts the 3,000-mile \/ 10-day due clock/);
+ assert.match(css,/Completed-maintenance history in the bus editor/);
+ assert.match(css,/\.maintenance-current\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.maintenance-entry button\{min-height:44px/);
+ assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry\{grid-template-columns:1fr\}/);
+ assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry button\{min-height:52px/);
+
+ const conditions=[];
+ for(let index=css.indexOf("@media(");index>=0;index=css.indexOf("@media(",index+1)){
+  const conditionEnd=css.indexOf(")",index),open=css.indexOf("{",conditionEnd);
+  let depth=0,end=open;
+  for(;end<css.length;end++){
+   if(css[end]==="{")depth++;
+   else if(css[end]==="}"&&--depth===0)break;
+  }
+  if(css.slice(open+1,end).includes(".maintenance-"))conditions.push(css.slice(index+7,conditionEnd));
+ }
+ assert.deepEqual(conditions,["max-width:760px"]);
 });
