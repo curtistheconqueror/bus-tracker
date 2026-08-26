@@ -80,7 +80,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
   const issue=defect.issue==="MDT Screen"?"IBS Screen":defect.issue||"Driver-reported defect",category=defect.category==="Operator Controls"?"Bus Controls":defect.category||"Miscellaneous";
-  return {id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,createdAt:defect.createdAt,updatedAt:defect.updatedAt,completedAt:defect.completedAt,completedBy:defect.completedBy,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),reportedBy:defect.reportedBy,diagnosticNote:defect.diagnosticNote,actionTaken:defect.actionTaken,shopNotes:defect.shopNotes,partNumber:defect.partNumber,reportedLocation:defect.reportedLocation,symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,unit:defect.unit,defectLogHiddenAt:defect.defectLogHiddenAt,source:defect.source};
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];

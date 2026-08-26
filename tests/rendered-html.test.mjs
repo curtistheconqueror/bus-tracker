@@ -28,6 +28,66 @@ import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } fro
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
+import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, readDownSheetPayload, readFleetPayload, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
+
+function memoryStorage(initial={}){
+ const values=new Map(Object.entries(initial));
+ return {
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>values.set(key,String(value)),
+  value:key=>values.get(key),
+ };
+}
+
+test("shared storage reads legacy payloads and preserves future metadata",()=>{
+ const legacy=readFleetPayload(JSON.stringify([{id:"bus-1",n:"1",futureBusField:{source:"inspection"}}]));
+ assert.equal(legacy.valid,true);
+ assert.equal(legacy.legacy,true);
+ assert.equal(legacy.version,0);
+ assert.deepEqual(legacy.buses[0].futureBusField,{source:"inspection"});
+
+ const serialized=serializeFleetPayload(legacy.buses,{syncRevision:7,deviceClock:"phone",version:2,buses:[]});
+ const current=readFleetPayload(serialized);
+ assert.equal(current.version,FLEET_STORAGE_VERSION);
+ assert.equal(current.envelope.syncRevision,7);
+ assert.equal(current.envelope.deviceClock,"phone");
+ assert.deepEqual(current.buses[0].futureBusField,{source:"inspection"});
+
+ const down=readDownSheetPayload(JSON.stringify([{id:"entry-1",futurePartField:{partNumber:"HORN-1"}}]));
+ assert.equal(down.legacy,true);
+ const downCurrent=readDownSheetPayload(serializeDownSheetPayload(down.entries,{syncRevision:9}));
+ assert.equal(downCurrent.version,DOWN_SHEET_STORAGE_VERSION);
+ assert.equal(downCurrent.envelope.syncRevision,9);
+ assert.deepEqual(downCurrent.entries[0].futurePartField,{partNumber:"HORN-1"});
+});
+
+test("shared storage refuses malformed or newer payloads without overwriting them",()=>{
+ const malformed=memoryStorage({[FLEET_STORAGE_KEY]:"{broken"});
+ assert.equal(writeFleetStorage(malformed,[{id:"bus-1"}]),false);
+ assert.equal(malformed.value(FLEET_STORAGE_KEY),"{broken");
+
+ const newerRaw=JSON.stringify({version:FLEET_STORAGE_VERSION+1,buses:[{id:"future"}],syncRevision:11});
+ const newer=memoryStorage({[FLEET_STORAGE_KEY]:newerRaw});
+ assert.equal(readFleetPayload(newerRaw).supported,false);
+ assert.equal(writeFleetStorage(newer,[{id:"older-app"}]),false);
+ assert.equal(newer.value(FLEET_STORAGE_KEY),newerRaw);
+
+ const legacy=memoryStorage({[FLEET_STORAGE_KEY]:JSON.stringify([{id:"legacy"}])});
+ assert.equal(writeFleetStorage(legacy,[{id:"legacy",kept:true}]),true);
+ assert.deepEqual(readFleetPayload(legacy.value(FLEET_STORAGE_KEY)).buses,[{id:"legacy",kept:true}]);
+
+ const downMalformed=memoryStorage({[DOWN_SHEET_STORAGE_KEY]:"not-json"});
+ assert.equal(writeDownSheetStorage(downMalformed,[{id:"entry"}]),false);
+ assert.equal(downMalformed.value(DOWN_SHEET_STORAGE_KEY),"not-json");
+});
+
+test("defect normalization preserves future odometer and parts fields",()=>{
+ const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
+ assert.equal(defect.odometerMiles,123456);
+ assert.equal(defect.partsUsed,true);
+ assert.deepEqual(defect.parts,[{id:"part-1",partNumber:"HORN-1"}]);
+ assert.deepEqual(defect.futureMetadata,{revision:4});
+});
 
 async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -1926,7 +1986,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
   assert.match(fixedPage,/not-duplicated-note/);
   assert.match(fixedPage,/FIXED DATE &amp; TIME/);
-  assert.match(fixedPage,/localStorage\.setItem\(FLEET_KEY/);
+  assert.match(fixedPage,/writeFleetStorage\(localStorage,next\)/);
   assert.doesNotMatch(fixedPage,/className="fixed-undo"/);
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.match(fixedPage,/UNDO FIX/);

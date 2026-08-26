@@ -4,13 +4,13 @@ import {useEffect,useMemo,useState} from "react";
 import "./fixed-repairs.css";
 import {defectLabel,normalizeDefects,REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "../repair-catalog";
 import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
+import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorage} from "../storage";
 
-const FLEET_KEY="pace-board-v1";
 type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
 type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;partNumber:string;completedBy:string;completedAt:string};
 type UndoSnapshot={fleet:DefectLogFleetBus[];label:string};
 
-function readFleet(raw:string|null):DefectLogFleetBus[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.buses;return Array.isArray(items)?items.map((bus:DefectLogFleetBus)=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}catch{return []}}
+function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Not recorded":new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return "";return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}
@@ -45,7 +45,7 @@ export default function FixedRepairs(){
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
  const categories=useMemo(()=>[...new Set(records.map(record=>record.defect.category))].sort(),[records]);
  const visible=useMemo(()=>{const query=search.trim().toLowerCase();return records.filter(record=>(category==="all"||record.defect.category===category)&&(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.shopNotes,record.defect.partNumber,record.defect.reportedBy,record.defect.completedBy,record.defect.conditionNotDuplicated?"defect condition not duplicated":""].some(value=>String(value||"").toLowerCase().includes(query))))},[records,search,category]);
- const persistFleet=(next:DefectLogFleetBus[])=>{setFleet(next);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:next}))};
+ const persistFleet=(next:DefectLogFleetBus[])=>{setFleet(next);writeFleetStorage(localStorage,next)};
  const changeFleet=(next:DefectLogFleetBus[],label:string)=>{setUndoSnapshot({fleet,label});persistFleet(next);setEditing(null)};
  const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime())?(record.defect.completedAt||new Date().toISOString()):parsed.toISOString(),now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),partNumber:draft.partNumber.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now})});changeFleet(next,"Edited Bus "+record.bus.n+" fixed repair")};
  const reopenRepair=(record:FixedRecord)=>{if(!confirm("Undo this fix and reopen the defect for Bus "+record.bus.n+"? It will return to the active Defect Log."))return;const now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,state:"open",completedAt:undefined,completedBy:undefined,defectLogHiddenAt:undefined,updatedAt:now})});changeFleet(next,"Reopened Bus "+record.bus.n+" defect")};

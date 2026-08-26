@@ -10,6 +10,7 @@ import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLa
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareText} from "./quick-filter-share";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeFleetStorage} from "../storage";
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean};
@@ -20,8 +21,6 @@ type LogAppearance={page:string;surface:string;text:string;muted:string;header:s
 type LogSettings={defaultInitials:string;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;appearance:LogAppearance;display:DefectLogDisplaySettings};
 type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string};
 
-const FLEET_KEY="pace-board-v1";
-const DOWN_KEY="pace-down-sheet-v1";
 const SETTINGS_KEY="pace-defect-log-settings-v1";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 const MYSTERY_COLLAPSED_KEY="pace-defect-log-mystery-collapsed-v1";
@@ -44,8 +43,8 @@ const CATEGORY_ICONS:Record<string,string>={
  Inspection:"\u2713","Preventive Maintenance":"\u2692","Interior Cleaning":"\u2726",Miscellaneous:"\u2022",
 };
 
-function readFleet(raw:string|null):DefectLogFleetBus[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.buses;return Array.isArray(items)?items.map((bus:DefectLogFleetBus)=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}catch{return []}}
-function readDown(raw:string|null):DefectLogDownEntry[]{try{const value=raw?JSON.parse(raw):null,items=Array.isArray(value)?value:value?.entries;return Array.isArray(items)?items:[]}catch{return []}}
+function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
+function readDown(raw:string|null):DefectLogDownEntry[]{const payload=readDownSheetPayload<DefectLogDownEntry>(raw);return payload.valid?payload.entries:[]}
 function readMysterySlot(raw:string|null){try{const value=JSON.parse(raw||"{}").visuals?.mysterySlot;return /^#[0-9a-f]{6}$/i.test(String(value))?String(value):"#edf3ff"}catch{return "#edf3ff"}}
 function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean";return {...DEFAULT_SETTINGS,...saved,theme,fontSize,fontFamily,appearance:{...preset,...saved.appearance},display:normalizeDefectLogDisplay(saved.display)}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE},display:normalizeDefectLogDisplay(null)}}}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
@@ -202,7 +201,7 @@ export default function DefectLog(){
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
- const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{setFleet(nextFleet);setDownEntries(nextDown);localStorage.setItem(FLEET_KEY,JSON.stringify({version:4,buses:nextFleet}));localStorage.setItem(DOWN_KEY,JSON.stringify({version:1,entries:nextDown}))};
+ const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{setFleet(nextFleet);setDownEntries(nextDown);writeFleetStorage(localStorage,nextFleet);writeDownSheetStorage(localStorage,nextDown)};
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
  const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
