@@ -14,8 +14,9 @@ This is the shared handoff for Claude Code, Codex, and Curtis. The live applicat
 ## Ownership and release boundary
 
 - Claude Code may inspect, implement, test, commit, and push to `claude-contributions`.
-- Claude Code must not edit `.openai/hosting.json`, use Sites credentials, save or deploy a Sites version, create release tags, or mark a version live.
-- Codex reviews the branch against `main`, checks invariants and mobile behavior, merges or cherry-picks the approved contribution, and publishes only after Curtis approves production.
+- Once the gates pass, Claude Code also fast-forwards `main` to that validated commit and pushes it, so finished work is visible to the next publish instead of waiting unnoticed on a branch. Curtis set this rule after Stage 5 sat on the branch unpublished and its catalog additions could not be found in the live app. Only a clean fast-forward qualifies: if `main` carries commits the contribution branch does not, stop and hand off instead of merging.
+- Claude Code must not edit `.openai/hosting.json`, use Sites credentials, save or deploy a Sites version, create release tags, or mark a version live. Reaching `main` is not publishing.
+- Codex reviews the contribution against the last released commit, checks invariants and mobile behavior, and publishes only after Curtis approves production.
 - `main` and the `sites-vNN` tags remain the authoritative release history.
 
 ## Phone versus iPad and larger screens
