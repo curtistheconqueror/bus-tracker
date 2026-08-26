@@ -7,6 +7,7 @@ import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, 
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
+import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectClearSnapshot, restoreFacilityOnlyDefects, syncFacilityAlertDefects } from "../app/facility-defect-clear.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
@@ -666,7 +667,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /Select another bus first/);
   assert.match(page, /disabled=\{!switchTarget\}/);
   assert.doesNotMatch(page, /switch-bus-list-/);
-  assert.match(page, /reassignBusPair\(buses,withSummary as B,otherId,targetSlots\)/);
+  assert.match(page, /reassignBusPair\(buses,routed as B,otherId,targetSlots\)/);
   assert.match(css, /\.move-here-modal\{/);
   assert.match(css, /\.fleet-creation-control\{/);
   assert.match(css, /\.switch-reassign\{/);
@@ -739,7 +740,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /MOVE ALL TO AREA/);
   assert.match(page, /ADD SAME DEFECT TO ALL/);
   assert.match(page, /APPLY DEFECT TO/);
-  assert.match(page, /applyDefectToBuses\(buses,multiLocateIds,defect\)/);
+  assert.match(page, /applyDefectToBuses\(buses,multiLocateIds,\{\.\.\.defect,source:"defect-log"\}\)/);
+  assert.match(page, /WHERE SHOULD THIS REPAIR BE SAVED\?/);
+  assert.match(page, /checked=\{addToDefectLog\}[\s\S]*?DEFECT LOG/);
+  assert.match(page, /checked=\{addToDownSheet\}[\s\S]*?DOWN SHEET/);
+  assert.match(page, /Choose Defect Log, Down Sheet, or both/);
+  assert.match(page, /CLEAR MAP-ONLY DEFECTS/);
   assert.match(page, /\["MAIN GARAGE \(BAYS 1-10\)",GARAGE_STANDARD_SLOTS\]/);
   assert.match(page, /\["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS\]/);
   assert.match(page, /\["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS\]/);
@@ -965,6 +971,41 @@ test("clear entire down sheet unchecks the tracker and undo restores both withou
   assert.deepEqual(restored.fleet[0].defects, [defect]);
   assert.equal(restored.restoredEntries, 2);
   assert.equal(restored.restoredBuses, 1);
+});
+test("Facility Map repair entry routes to authoritative workflows and legacy-only cleanup is reversible", () => {
+  const tracker={id:"tracker",category:"A/C and HVAC",issue:"No cooling",details:"",operability:"service",state:"open",source:"tracker"};
+  const operator={id:"operator",category:"Engine",issue:"Misfire",details:"",operability:"service",state:"open",source:"operator"};
+  const logged={id:"logged",category:"Brakes",issue:"ABS warning",details:"",operability:"service",state:"open",source:"defect-log"};
+  const down={id:"down",category:"Inspection",issue:"B-12",details:"",operability:"service",state:"open",source:"down-sheet"};
+  const completed={...tracker,id:"completed",state:"completed"};
+  const fleet=[{id:"bus-1",n:"17501",l:"road-1",s:"defect",pendingRepair:"legacy summary",defects:[tracker,operator,logged,down,completed],checkEngine:true,checkTransmission:false,noHorn:false,badRampKneeler:false,farebox:false,ibsVentra:false}];
+  assert.equal(facilityOnlyDefectCount(fleet),3);
+  const cleared=clearFacilityOnlyDefects(fleet,"2026-08-26T22:00:00.000Z");
+  assert.deepEqual(cleared.fleet[0].defects.map(defect=>defect.id),["logged","down","completed"]);
+  assert.equal(cleared.fleet[0].checkEngine,false);
+  assert.equal(cleared.fleet[0].l,"road-1");
+  assert.equal(quickFilterMatch(cleared.fleet[0],"ac"),false);
+  const snapshot=readFacilityDefectClearSnapshot(JSON.stringify(cleared.snapshot));
+  assert.ok(snapshot);
+  const restored=restoreFacilityOnlyDefects([{...cleared.fleet[0],l:"garage-2"}],snapshot);
+  assert.equal(restored[0].l,"garage-2");
+  assert.deepEqual(restored[0].defects.map(defect=>defect.id),["tracker","operator","logged","down","completed"]);
+  assert.equal(restored[0].checkEngine,true);
+
+  const previous={id:"bus-2",l:"garage-1",s:"service",pendingRepair:"",defects:[],checkEngine:false,checkTransmission:false,noHorn:false,badRampKneeler:false,farebox:false,ibsVentra:false};
+  const routed=syncFacilityAlertDefects(previous,{...previous,noHorn:true},"2026-08-26T22:05:00.000Z");
+  assert.equal(routed.defects.length,1);
+  assert.equal(routed.defects[0].source,"defect-log");
+  assert.equal(routed.defects[0].issue,"Horn");
+  assert.equal(syncFacilityAlertDefects(routed,routed).defects.length,1);
+
+  const defectLogDraft=defectFromDraft({category:"Engine",issue:"Misfire",details:"",operability:"service",state:"open",source:"defect-log"},"select","facility-log");
+  const downSheetDraft=defectFromDraft({category:"Engine",issue:"Misfire",details:"",operability:"service",state:"open",source:"down-sheet"},"select","facility-down");
+  assert.equal(defectLogDraft.source,"defect-log");
+  assert.equal(downSheetDraft.source,"down-sheet");
+
+  const linked=syncTrackerDownSheetSelection(null,{id:"bus-3",n:"17503",s:"defect",down:true,pendingRepair:"Misfire"},"2026-08-26T22:10:00.000Z","","facility-log");
+  assert.equal(linked.entries[0].defectId,"facility-log");
 });
 test("section counters include assigned and overflow buses and update from fleet state", () => {
   const slots = ["east-0", "east-1", "east-2"];
