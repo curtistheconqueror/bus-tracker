@@ -569,3 +569,13 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
  .odometer-entry{grid-template-columns:1fr}.odometer-entry input{font-size:16px}.odometer-entry button{min-height:52px;font-size:11px}
  .odometer-history{max-height:190px}.odometer-history article{grid-template-columns:1fr auto}.odometer-history article small{grid-column:1/-1}
 }
+
+/* Stage 2 estimated mileage and inspection-due visibility. */
+.token{position:relative}.inspection-due-badge{height:13px;min-width:24px;border-radius:3px;background:#c84f00;color:#fff;padding:2px 3px;font-size:6px;font-weight:1000;line-height:1;box-shadow:0 0 0 1px #fff}
+.token[data-inspection-due="true"]{outline:2px solid #ff7300;box-shadow:0 0 8px #ff7300aa}
+.quick-detail.inspection-due-detail{border-color:#e4792a!important;background:#fff2e6!important;color:#8a3700!important}
+.odometer-current{grid-template-columns:repeat(3,minmax(0,1fr))}
+.odometer-current .inspection-summary.due{border-color:#d35c20;background:#fff0e8}.odometer-current .inspection-summary.due b{color:#aa3300}
+.odometer-current .inspection-summary.due-soon{border-color:#d7a51f;background:#fff9df}.odometer-current .inspection-summary.due-soon b{color:#8b6200}
+.odometer-current .inspection-summary.baseline-needed{border-color:#93a3ba;background:#f3f6fa}
+@media(max-width:760px){.odometer-current{grid-template-columns:1fr}.inspection-due-badge{min-width:21px;padding-left:2px;padding-right:2px;font-size:5px}}

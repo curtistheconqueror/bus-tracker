@@ -12,7 +12,8 @@ import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { CHECK_ENGINE_SYMPTOMS, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
-import { appendOdometerReading, latestOdometerReading, normalizeOdometerReadings } from "../app/domain.ts";
+import { appendOdometerReading, latestOdometerReading, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
+import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2117,4 +2118,52 @@ test("odometer readings append as dated history and survive legacy fleet migrati
   assert.match(page,/ADD TO HISTORY/);
   assert.match(css,/Dated actual-mileage history in the bus editor/);
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.odometer-entry\{grid-template-columns:1fr\}/);
+});
+
+test("estimated mileage accrues only in operating service statuses and checkpoints across pauses",()=>{
+ const anchor={id:"reading-1",miles:100000,recordedAt:"2026-08-01T00:00:00.000Z",source:"manual"};
+ const base={id:"bus-1",l:"road-1",s:"service",lastStatusChangeAt:"2026-08-01T00:00:00.000Z",odometerReadings:[anchor]};
+ assert.equal(ESTIMATED_MILES_PER_OPERATING_DAY,275);
+ assert.equal(Math.round(estimatedMileage(base,"2026-08-02T00:00:00.000Z").estimatedMiles),100275);
+ assert.equal(Math.round(estimatedMileage({...base,s:"defect"},"2026-08-02T00:00:00.000Z").estimatedMiles),100275);
+ assert.equal(Math.round(estimatedMileage({...base,s:"shop"},"2026-08-02T00:00:00.000Z").estimatedMiles),100000);
+
+ const paused=stampOperationalChange(base,{...base,s:"shop"},"2026-08-02T00:00:00.000Z");
+ assert.equal(Math.round(paused.mileageEstimate.estimatedMiles),100275);
+ const resumed=stampOperationalChange(paused,{...paused,s:"service"},"2026-08-04T00:00:00.000Z");
+ assert.equal(Math.round(resumed.mileageEstimate.estimatedMiles),100275);
+ assert.equal(Math.round(estimatedMileage(resumed,"2026-08-05T00:00:00.000Z").estimatedMiles),100550);
+ assert.equal(estimatedMileage(resumed,"2026-08-05T00:00:00.000Z").estimatedMiles,estimatedMileage(resumed,"2026-08-05T00:00:00.000Z").estimatedMiles);
+});
+
+test("inspection status uses 3,000 miles or 10 days whichever comes first",()=>{
+ const inspection={id:"inspection-1",kind:"inspection",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,note:"Initial baseline"};
+ assert.equal(INSPECTION_MILE_INTERVAL,3000);
+ assert.equal(INSPECTION_DAY_INTERVAL,10);
+ assert.equal(inspectionDueStatus({s:"service",odometerReadings:[],maintenanceEvents:[]},"2026-08-01T00:00:00.000Z").state,"baseline-needed");
+
+ const dateDue=inspectionDueStatus({s:"shop",odometerReadings:[{id:"reading-1",miles:100000,recordedAt:inspection.completedAt,source:"inspection"}],maintenanceEvents:[inspection]},"2026-08-11T00:00:00.000Z");
+ assert.equal(dateDue.due,true);
+ assert.equal(dateDue.reason,"time");
+ assert.equal(dateDue.dueMiles,103000);
+
+ const mileageDue=inspectionDueStatus({s:"shop",odometerReadings:[{id:"reading-1",miles:100000,recordedAt:inspection.completedAt,source:"inspection"}],maintenanceEvents:[inspection],mileageEstimate:{anchorReadingId:"reading-1",estimatedMiles:103000,lastAccruedAt:"2026-08-02T00:00:00.000Z",rateMilesPerOperatingDay:275}},"2026-08-02T00:00:00.000Z");
+ assert.equal(mileageDue.due,true);
+ assert.equal(mileageDue.reason,"mileage");
+ assert.equal(normalizeMaintenanceEvents([{...inspection,futureField:"kept"}])[0].futureField,"kept");
+});
+
+test("Fleet Tracker displays estimated mileage and inspection readiness without replacing actual readings",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+ assert.match(page,/ESTIMATED OPERATING MILEAGE/);
+ assert.match(page,/RUNNING · 275 MI\/DAY/);
+ assert.match(page,/INSPECTION STATUS/);
+ assert.match(page,/3,000-mile \/ 10-day due clock/);
+ assert.match(page,/data-inspection-due=\{inspection\.due\}/);
+ assert.match(page,/inspection-due-badge/);
+ assert.match(css,/\.token\[data-inspection-due="true"\]/);
+ assert.match(css,/@media\(max-width:760px\)\{\.odometer-current\{grid-template-columns:1fr\}/);
 });

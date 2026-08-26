@@ -39,7 +39,23 @@ export type PartUsage=DurableRecord&{
 export type FutureBusMaintenanceFields={
  odometerReadings?:OdometerReading[];
  maintenanceEvents?:MaintenanceEvent[];
+ mileageEstimate?:{anchorReadingId:string;estimatedMiles:number;lastAccruedAt:IsoDateTime;rateMilesPerOperatingDay:number};
 };
+
+export function normalizeMaintenanceEvents(value:unknown):MaintenanceEvent[]{
+ if(!Array.isArray(value))return [];
+ return value.flatMap((candidate,index)=>{
+  if(!candidate||typeof candidate!=="object")return [];
+  const event=candidate as Partial<MaintenanceEvent>&Record<string,unknown>,completedAt=String(event.completedAt||"");
+  if(!["inspection","spark-plugs","valve-adjustment"].includes(String(event.kind))||Number.isNaN(new Date(completedAt).getTime()))return [];
+  const odometerMiles=event.odometerMiles===undefined?undefined:Number(event.odometerMiles);
+  return [{...event,id:String(event.id||"maintenance-imported-"+index),kind:event.kind as MaintenanceEventKind,completedAt:new Date(completedAt).toISOString(),odometerMiles:Number.isFinite(odometerMiles)&&Number(odometerMiles)>=0?Math.round(Number(odometerMiles)):undefined,note:String(event.note||"")} as MaintenanceEvent];
+ }).sort((left,right)=>Date.parse(left.completedAt)-Date.parse(right.completedAt));
+}
+
+export function latestMaintenanceEvent(value:unknown,kind:MaintenanceEventKind){
+ return normalizeMaintenanceEvents(value).filter(event=>event.kind===kind).at(-1);
+}
 
 export type FutureRepairPartFields={
  partsUsed?:boolean;

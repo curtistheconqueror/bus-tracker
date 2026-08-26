@@ -1,3 +1,4 @@
+import {transitionMileageEstimate} from "./mileage-estimate.ts";
 export type OperationalTimeBus={
  l:string;
  s:string;
@@ -7,6 +8,9 @@ export type OperationalTimeBus={
  lastMovedFrom?:string;
  bay12Watch?:boolean;
  defects?:{state?:string}[];
+ odometerReadings?:unknown;
+ maintenanceEvents?:unknown;
+ mileageEstimate?:unknown;
 };
 
 function validIso(value:string|undefined,fallback:string){
@@ -31,5 +35,6 @@ export function operationalAgeMs(bus:OperationalTimeBus,now=Date.now()){
 
 export function stampOperationalChange<T extends OperationalTimeBus>(previous:T,next:T,now=new Date().toISOString()):T&{parkedAt:string;lastLocationChangeAt:string;lastStatusChangeAt:string}{
  const moved=previous.l!==next.l,baseline=normalizeOperationalTimestamps(previous,now),lastLocationChangeAt=moved?now:baseline.lastLocationChangeAt,lastStatusChangeAt=previous.s===next.s?baseline.lastStatusChangeAt:now,lastMovedFrom=moved?previous.l:previous.lastMovedFrom,bay12Watch=activeDefects(next)&&Boolean(previous.bay12Watch||previous.l==="bay-12"||next.l==="bay-12");
- return {...next,lastMovedFrom,bay12Watch,parkedAt:Date.parse(lastLocationChangeAt)>=Date.parse(lastStatusChangeAt)?lastLocationChangeAt:lastStatusChangeAt,lastLocationChangeAt,lastStatusChangeAt};
+ const mileage=transitionMileageEstimate(previous,next,now);
+ return {...next,...mileage,lastMovedFrom,bay12Watch,parkedAt:Date.parse(lastLocationChangeAt)>=Date.parse(lastStatusChangeAt)?lastLocationChangeAt:lastStatusChangeAt,lastLocationChangeAt,lastStatusChangeAt};
 }
