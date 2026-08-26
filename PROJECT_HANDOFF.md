@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 99
-Live feature checkpoint: commit 3aec06e
+Live release: Sites Version 100
+Live feature checkpoint: commit 8fbc710
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 99 is the current user-approved live release. Its validated source checkpoint is commit 3aec06e. It preserves the Version 98 application behavior while reconciling the previously diverged GitHub and Sites histories without force-pushing or discarding either release line.
+Version 100 is the current user-approved live release. Its validated source checkpoint is commit 8fbc710. It adds the first staged data foundation plus the catalog/readability stage while preserving all existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -57,7 +57,10 @@ Version 99 is the current user-approved live release. Its validated source check
 - Quick Filter copy/share output includes only defects that match the selected filter, including Defect / Condition Not Duplicated records.
 - Bus Controls, IBS Screen wording, Check Engine symptoms, kneeler/ramp choices, and both Bike Rack repair paths remain available.
 
-The Version 99 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+- Shared versioned fleet and Down Sheet storage readers accept legacy payloads, preserve future metadata, and refuse malformed or unsupported newer payloads instead of overwriting them.
+- The repair catalog now includes coolant level sensor, frequent suspension and mirror defects, Brake mod light, Farebox won't lock, and CUBIC Screen BUS ER / MV ER.
+- Repair-category emojis are defined centrally and shown without changing stored category values; phone defect text has a readable minimum size.
+The Version 100 production build, lint gate, and all 61 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
