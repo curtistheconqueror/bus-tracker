@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 104
-Live feature checkpoint: commit 519e748
+Live release: Sites Version 105
+Live feature checkpoint: commit bdfe8e2
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 104 is the current user-approved live release. Its validated source checkpoint is commit 519e748. It makes every approved Down Sheet photo an authoritative Down Sheet-only replacement while preserving Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
+Version 105 is the current user-approved live release. Its validated source checkpoint is commit bdfe8e2. It moves the Facility Map phone navigation to the top for four-page uniformity and adds Defect Log-matched theme, font, and color settings to Fixed Repairs while preserving Version 104 Down Sheet replacement behavior, Version 103 mileage and inspection readiness, Version 102 data-loss safeguards, existing LocalStorage keys, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -68,7 +68,7 @@ Version 104 is the current user-approved live release. Its validated source chec
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until Stage 3 records inspection history.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 104 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+The Version 105 production build, lint gate, and all 68 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
