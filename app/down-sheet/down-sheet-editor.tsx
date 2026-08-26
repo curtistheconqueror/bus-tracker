@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo, useState} from "react";
-import {REPAIR_OPTIONS} from "../repair-catalog";
+import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {
   aggregateRepairItemEstimates,
   blankRepairItem,
@@ -94,7 +94,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <div className="repair-item-fields">
-                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option key={value}>{value}</option>)}</select></label>
+                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
                 <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
                 <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
               </div>

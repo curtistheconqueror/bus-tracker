@@ -29,22 +29,22 @@ export type StructuredDefect={
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
+ "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
- "Suspension":["Air bag","Shock / strut","Ride-height issue","Suspension leak","Bushing / linkage","Other suspension repair"],
+ "Suspension":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Other suspension repair"],
  "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
- "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Parking brake","Other brake repair"],
+ "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["Horn","MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement","Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","Operator light","HVAC / heat controls","A/C control panel","Blower control","Pedal adjuster","Floor heat switch","Interior light controls","Start button","Red air valve hard to turn","High beams stay on","Switches broken / loose","Side control panel damage","Steering wheel tilt / telescoping","Driver seat belt","Driver seat leaking air","Driver seat will not lock","Driver seat adjustment / locking bar","Driver seat controls / buttons","Horn","Horn / seat alarm will not stop","Other bus control defect"],
- "Tech Services":["Farebox","Ventra","IBS Screen","Destination Sign","Other Tech Services"],
+ "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "No Start":["No crank","Cranks / no start","Intermittent no start","Starting-system diagnosis","Fuel-related no start","Electrical no start","Other no-start diagnosis"],
  "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Kneeler","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
- "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Mirrors / fixtures","Other light or fixture"],
+ "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Mirrors / fixtures","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
@@ -52,6 +52,36 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
  "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
+
+export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
+ "A/C and HVAC":"❄️",
+ Engine:"⚙️",
+ "Cooling System":"🌡️",
+ Transmission:"🕹️",
+ Suspension:"🛞",
+ Steering:"🛞",
+ Brakes:"🛑",
+ "Tires and Wheels":"🛞",
+ "Battery, Starting and Charging":"🔋",
+ "Electrical / Multiplex":"⚡",
+ "Bus Controls":"🎛️",
+ "Tech Services":"🖥️",
+ Amerex:"🧯",
+ "Fuel Delivery":"⛽",
+ "No Start":"🚫",
+ "Doors, Ramp and Lift":"🚪",
+ "Lights and Fixtures":"💡",
+ Bodywork:"🚌",
+ "Air System":"💨",
+ Inspection:"🔍",
+ "Preventive Maintenance":"🛠️",
+ "Interior Cleaning":"🧽",
+ Miscellaneous:"🔧",
+};
+
+export function repairCategoryLabel(category:string){return repairCategoryEmoji(category)+" "+category}
+
+export function repairCategoryEmoji(category:string){return REPAIR_CATEGORY_EMOJI[category]||REPAIR_CATEGORY_EMOJI.Miscellaneous}
 
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
 
