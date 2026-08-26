@@ -22,7 +22,7 @@ import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, norma
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
-import { QUICK_FILTERS, quickFilterBusIds, quickFilterMatch } from "../app/quick-filters.ts";
+import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterMatch } from "../app/quick-filters.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
@@ -311,7 +311,16 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"add-oil"),["oil"]);
   assert.deepEqual(quickFilterBusIds(buses,"not-duplicated"),["notDuplicated"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
-  assert.equal(quickFilterShareText("A/C",[buses[0],buses[7]]),"A/C — 2 buses\nBus 1 — A/C and HVAC — No cooling\nBus 6 — Preventive Maintenance — Add engine oil — 10 quarts");
+  const mixed={id:"mixed",n:"8",defects:[buses[0].defects[0],buses[7].defects[0]]};
+  assert.deepEqual(quickFilterDefects(mixed,"ac").map(defect=>defect.issue),["No cooling"]);
+  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\nBus 8 — A/C and HVAC — No cooling");
+  assert.equal(quickFilterShareText("Farebox",[{id:"flag",n:"9",farebox:true,defects:[buses[7].defects[0]]}],"farebox"),"Farebox — 1 bus\nBus 9 — Farebox tracker flag");
+  assert.equal(quickFilterShareText("IBS & Ventra",[{id:"legacy",n:"10",pendingRepair:"Ventra reader blank",defects:[]}],"ibs-ventra"),"IBS & Ventra — 1 bus\nBus 10 — Ventra reader blank");
+  const fifteen=Array.from({length:15},(_,index)=>({id:"fare-"+index,n:String(17500+index),defects:[{id:"farebox-"+index,category:"Tech Services",issue:"Farebox",details:"Reader offline",state:"open"},{id:"ac-"+index,category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]}));
+  const fifteenFarebox=quickFilterShareText("Farebox",fifteen,"farebox");
+  assert.equal(quickFilterBusIds(fifteen,"farebox").length,15);
+  assert.equal(fifteenFarebox.split("\n").length,16);
+  assert.doesNotMatch(fifteenFarebox,/No cooling/);
   assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\nBus 8 — Electrical / Multiplex — Intermittent electrical — Reported cutting out");
 });
 
@@ -405,9 +414,13 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
   assert.match(page,/aria-label="Share filtered bus list as text"/);
+  assert.match(page,/quickFilterDefects\(bus,quickFilter\)/);
+  assert.match(page,/current\.includes\(bus\.id\)\?\[\]:\[bus\.id\]/);
   assert.match(css,/\.quick-filter-defects\{/);
   assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
   assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
+  assert.match(css,/\.quick-filter-drawer>\.quick-filter-results\{min-height:0;grid-auto-rows:max-content/);
+  assert.match(css,/inset:max\(8px,env\(safe-area-inset-top\)\) 8px max\(8px,env\(safe-area-inset-bottom\)\)/);
   assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
   assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
@@ -1061,7 +1074,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
-  assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "MDT Screen", "Destination Sign", "Other Tech Services"]);
+  assert.deepEqual(REPAIR_OPTIONS["Tech Services"], ["Farebox", "Ventra", "IBS Screen", "Destination Sign", "Other Tech Services"]);
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Fuel gauge INOP / false reading"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Kneeler button"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Front dash damage"));
+  assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
+  assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
+  assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
@@ -1639,13 +1658,21 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
+  assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check"'));
   assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
+  assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
+  assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
   assert.match(css,/body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
   assert.match(css,/\.log-editor\{max-height:96vh;max-height:96dvh\}/);
   assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
   assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
+  assert.match(css,/\.defect-log-app\{[^}]*overflow-anchor:none/);
+  assert.match(css,/\.save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
+  assert.match(css,/\.log-form,\.log-form>\*\{min-width:0\}/);
+  assert.doesNotMatch(css,/\.log-header-save/);
+  assert.match(css,/@supports\(height:100svh\)/);
 });
 test("defect log cleanup preserves active log-origin repairs and fleet state", () => {
   const activeDefect = {id:"log-ramp",category:"Doors, Ramp and Lift",issue:"Ramp will not deploy",details:"Operator report",operability:"down",state:"open",source:"defect-log"};
@@ -1830,18 +1857,19 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.doesNotMatch(defectPage, /SAVE & CLOSE/);
 });
 
-test("Operator Controls and Cooling System expose field-ready defect choices", async () => {
+test("Bus Controls and Cooling System expose field-ready defect choices", async () => {
   const [catalog,page]=await Promise.all([
     readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   ]);
-  assert.match(catalog,/"Operator Controls"/);
-  assert.match(catalog,/"Fuel gauge"/);
+  assert.match(catalog,/"Bus Controls"/);
+  assert.match(catalog,/"Fuel gauge INOP \/ false reading"/);
   assert.match(catalog,/"Front instrument dash damaged \/ replacement"/);
   assert.match(catalog,/"Driver seat belt"/);
   assert.match(catalog,/"Driver seat leaking air"/);
   assert.match(catalog,/"Horn \/ seat alarm will not stop"/);
-  assert.match(catalog,/"Bike rack damaged \/ not operating"/);
+  assert.match(catalog,/"Bike rack - bent \/ replacement"/);
+  assert.match(catalog,/"Bike rack - arms \/ pivot adjustment"/);
   assert.match(catalog,/"Radiator fan\(s\) out"/);
   assert.match(catalog,/"Radiator fan diagnostic light"/);
   assert.match(catalog,/"Radiator fans constantly running on high"/);
@@ -1892,13 +1920,32 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/updateDefect\("conditionNotDuplicated",event\.target\.checked\)/);
   assert.match(defectCss,/save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
   assert.match(fixedPage,/state==="completed"/);
-  assert.match(fixedPage,/ORIGINAL DEFECT/);
+  assert.match(fixedPage,/EDIT THE FULL REPAIR RECORD/);
+  assert.match(fixedPage,/ORIGINAL DESCRIPTION/);
   assert.match(fixedPage,/FIX \/ STEPS TAKEN/);
   assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
   assert.match(fixedPage,/not-duplicated-note/);
   assert.match(fixedPage,/FIXED DATE &amp; TIME/);
   assert.match(fixedPage,/localStorage\.setItem\(FLEET_KEY/);
+  assert.doesNotMatch(fixedPage,/className="fixed-undo"/);
+  assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
+  assert.match(fixedPage,/UNDO FIX/);
+  assert.match(fixedPage,/DELETE/);
+  assert.match(fixedPage,/state:"open",completedAt:undefined,completedBy:undefined/);
+  assert.match(fixedPage,/filter\(defect=>defect\.id!==record\.defect\.id\)/);
+  assert.doesNotMatch(defectPage,/className="log-undo"/);
+  assert.match(defectPage,/className="log-undo-button"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
+  assert.match(defectCss,/\.log-undo-button\{[^}]*background:var\(--log-surface[^}]*color:var\(--log-muted/);
+  assert.match(defectCss,/@media\(max-width:760px\)\{\.log-controls\{grid-template-columns:minmax\(0,1fr\) 82px 48px/);
   assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-header\{[^}]*overflow:visible/);
+  assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header\{height:auto\}/);
+  assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header nav\{[^}]*height:auto[^}]*background:transparent/);
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-editor>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
+  assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(4/);
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
   assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs"\]/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);

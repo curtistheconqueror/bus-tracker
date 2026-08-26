@@ -11,7 +11,6 @@ Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site
 | / | Facility map, bus location, operating status, quick filters, bulk movement, and AI Operator controls |
 | /down-sheet | Shift maintenance planning, repair estimates, assignments, photo import, and Down Sheet history |
 | /defect-log | Mobile-first capture of operator and mechanic findings that may not belong on the Down Sheet |
-| /fixed-repairs | Offline completed-repair history, carried defect facts, and editable completion details |
 
 The facility map owns physical location. The Down Sheet owns scheduled maintenance workflow. The Defect Log owns direct field observations. Fixed Repairs presents completed history and completion details. Shared bus status and repair records synchronize between all four surfaces on the same device.
 
@@ -20,7 +19,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - Capacity-safe drag, swap, bulk relocation, and destination-aware status changes
 - Two-way tracker and Down Sheet membership synchronization
 - DS badges, Mystery detection, road-call and tow indicators, and configurable quick filters
-- Direct Defect Log entries with per-repair lifecycle controls and a searchable condition-not-duplicated flag
+- Direct Defect Log entries with per-repair lifecycle controls
 - Offline Fixed Repairs history with carried defect details, fix steps, verification, parts, technician, and completion time
 - AI Operator commands for fleet questions, multi-bus movement, status updates, and Down Sheet actions
 - Down Sheet photo scanning through a server-side OpenRouter integration
@@ -65,8 +64,8 @@ The next major phase is an offline-first shared backend with real-time device sy
 
 The private GitHub origin is the code backup. The sites remote belongs to the existing OpenAI Sites deployment. A coding agent may implement, test, and commit locally, but publishing must use the existing Sites project and must never create a replacement site.
 
-- Current live release: Sites Version 96
-- Current live feature checkpoint: commit 1ffffc5
+- Current live release: Sites Version 98
+- Current live feature checkpoint: commit b98b0d5
 - Release reference: docs/RELEASES.md
 - Publishing and recovery runbook: docs/SITES_PUBLISHING_RUNBOOK.md
 

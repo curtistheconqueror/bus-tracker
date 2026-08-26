@@ -4,8 +4,8 @@ Updated: 2026-08-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 96
-Live feature checkpoint: commit 1ffffc5
+Live release: Sites Version 98
+Live feature checkpoint: commit b98b0d5
 
 ## Read this first
 
@@ -48,14 +48,16 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 96 is the current user-approved live release. Its validated feature checkpoint is commit 1ffffc5. It includes the phone-only contained Facility Map and compact command dock, persistent device-local section collapse choices, a fourth offline Fixed Repairs workflow, Save as Fixed as the third action in both Defect Log button rows, and editable completion details.
+Version 98 is the current user-approved live release. Its validated feature checkpoint is commit b98b0d5. It builds on the four-surface workflow with a uniform Fixed Repairs phone layout and quieter Undo controls.
 
-- The Defect Log editor includes a Defect / Condition Not Duplicated checkbox for findings that could not be reproduced.
-- The shared Quick Filters can locate buses carrying that flag, including completed records retained for later diagnosis.
-- Fixed Repairs visibly preserves the not-duplicated result with the original defect history.
-- Save Defect, Close, and Save as Fixed remain three separate choices in both editor action rows.
+- Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
+- Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
+- Defect Log and Fixed Repairs keep Undo available inside their normal control panels instead of displaying a colored status banner after every saved change.
+- The Defect Log editor keeps Save Defect, Close, and Save as Fixed fully aligned on phones; the middle actions sit above Down Sheet and the page restores its prior scroll position when the editor closes.
+- Quick Filter copy/share output includes only defects that match the selected filter, including Defect / Condition Not Duplicated records.
+- Bus Controls, IBS Screen wording, Check Engine symptoms, kneeler/ramp choices, and both Bike Rack repair paths remain available.
 
-The Version 96 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
+The Version 98 production build, lint gate, and all 58 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-25.
 
 ## Repository and remotes
 
