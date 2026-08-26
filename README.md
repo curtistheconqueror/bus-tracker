@@ -75,4 +75,4 @@ Never commit API keys, Sites credentials, exported fleet backups, or employee-se
 
 ## Continuation
 
-Read PROJECT_HANDOFF.md before making material changes. Contribution and release rules are in CONTRIBUTING.md. If a Sites publish disconnects or work was completed in a remote checkout, follow docs/SITES_PUBLISHING_RUNBOOK.md instead of retrying an opaque checkpoint command.
+Read PROJECT_HANDOFF.md before making material changes. Contribution and release rules are in CONTRIBUTING.md. Claude Code must also read docs/CLAUDE_CONTRIBUTION_GUIDE.md and work through the `claude-contributions` branch. If a Sites publish disconnects or work was completed in a remote checkout, follow docs/SITES_PUBLISHING_RUNBOOK.md instead of retrying an opaque checkpoint command.

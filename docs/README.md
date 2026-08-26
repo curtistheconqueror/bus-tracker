@@ -5,6 +5,7 @@
 - ../PROJECT_HANDOFF.md — authoritative project state, invariants, and backend starting point
 - SITES_PUBLISHING_RUNBOOK.md — resumable publishing and remote-session recovery procedure
 - ../CONTRIBUTING.md — change and release workflow
+- CLAUDE_CONTRIBUTION_GUIDE.md — Claude branch workflow, responsive rules, remaining stages, and handoff prompt
 - RELEASES.md — source checkpoints for live and candidate Sites versions
 
 ## Roadmaps

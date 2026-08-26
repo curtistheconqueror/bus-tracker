@@ -11,6 +11,8 @@
 
 ## Development workflow
 
+Claude Code contributions use the persistent `claude-contributions` branch and must follow `docs/CLAUDE_CONTRIBUTION_GUIDE.md`. Claude implements and validates one bounded stage; Codex reviews and publishes approved releases from `main`.
+
 1. Inspect git status and the relevant feature files.
 2. Update domain helpers before duplicating rules inside UI components.
 3. Add or extend regression coverage in tests/rendered-html.test.mjs.
@@ -21,7 +23,7 @@
 
 ## Product invariants
 
-- The map owns physical location.
+- The map owns physical location and status; repairs entered there route explicitly to Defect Log, Down Sheet, or both.
 - Down Sheet and Defect Log edits do not move buses implicitly.
 - Fleet IDs and fleet numbers remain unique.
 - Capacity-sensitive changes are atomic.
@@ -33,3 +35,5 @@
 ## Releases
 
 A successful local build is not permission to publish. Save and deploy only through the existing Sites project after explicit user approval. Follow docs/SITES_PUBLISHING_RUNBOOK.md for the granular, resumable save/deploy/status lifecycle and remote-checkout recovery. Record the resulting Sites version and commit in docs/RELEASES.md.
+
+Claude Code must stop after pushing its validated contribution branch. It must not use Sites credentials, edit `.openai/hosting.json`, deploy, tag, or mark a version live.
