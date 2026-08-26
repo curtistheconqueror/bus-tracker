@@ -16,6 +16,7 @@ import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
+import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_MILES, SERVICE_KINDS, normalizeServiceIntervals, serviceIntervalMiles, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -1342,8 +1343,9 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects\}/);
+  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervals\}\)\)/);
+  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervals\}/);
+  assert.match(page, /if\(saved\.serviceIntervals\)setServiceIntervals\(normalizeServiceIntervals\(saved\.serviceIntervals\)\)/);
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);
@@ -2336,11 +2338,11 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
  assert.match(page,/ODOMETER AT COMPLETION/);
  assert.match(page,/Leave blank for date only/);
  assert.match(page,/DATE COMPLETED/);
- assert.match(page,/RECORD INSPECTION/);
+ assert.match(page,/RECORD \{maintenanceKindLabel\(maintenanceKind\)\.toUpperCase\(\)\}/);
  assert.match(page,/recordMaintenanceCompletion\(current,input\)/);
  assert.match(page,/Date only restarts the 10-day clock without changing mileage/);
  assert.match(css,/Completed-maintenance history in the bus editor/);
- assert.match(css,/\.maintenance-current\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.maintenance-current\{display:grid;grid-template-columns:repeat\(auto-fit,minmax\(150px,1fr\)\)/);
  assert.match(css,/\.maintenance-entry button\{min-height:44px/);
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry\{grid-template-columns:1fr\}/);
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry button\{min-height:52px/);
@@ -2356,4 +2358,77 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
   if(css.slice(open+1,end).includes(".maintenance-"))conditions.push(css.slice(index+7,conditionEnd));
  }
  assert.deepEqual(conditions,["max-width:760px"]);
+});
+
+test("Bus Controls leads with both turn-signal defects",()=>{
+ const controls=REPAIR_OPTIONS["Bus Controls"];
+ assert.deepEqual(controls.slice(0,2),["Turn signals (steering column)","Turn signals (floor panel)"]);
+ assert.equal(new Set(controls).size,controls.length);
+ assert.ok(controls.includes("Horn"));
+ assert.ok(controls.includes("Other bus control defect"));
+ assert.equal(defectLabel({category:"Bus Controls",issue:"Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
+});
+
+test("spark-plug and valve-adjustment tracking withholds a verdict until Curtis saves an interval",()=>{
+ assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:null,valveAdjustment:null});
+ assert.deepEqual(SERVICE_KINDS.map(service=>service.kind),["spark-plugs","valve-adjustment"]);
+ assert.deepEqual(normalizeServiceIntervals(undefined),{sparkPlugs:null,valveAdjustment:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"30000",valveAdjustment:0}),{sparkPlugs:30000,valveAdjustment:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:-5,valveAdjustment:"abc"}),{sparkPlugs:null,valveAdjustment:null});
+ assert.equal(serviceIntervalMiles("18000.4"),18000);
+ assert.equal(serviceIntervalMiles(""),null);
+
+ const bus={s:"shop",lastStatusChangeAt:"2026-08-01T00:00:00.000Z",odometerReadings:[{id:"reading-1",miles:100000,recordedAt:"2026-08-01T00:00:00.000Z",source:"manual"}],maintenanceEvents:[]};
+ assert.equal(serviceIntervalStatus(bus,"spark-plugs",null,"2026-08-01T00:00:00.000Z").state,"baseline-needed");
+
+ const serviced=recordMaintenanceCompletion(bus,{kind:"spark-plugs",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,idSeed:"seed-3"},"2026-08-01T00:00:00.000Z");
+ const tracked={...bus,...serviced,odometerReadings:[...serviced.odometerReadings,{id:"reading-later",miles:118000,recordedAt:"2026-09-01T00:00:00.000Z",source:"manual"}],mileageEstimate:undefined};
+
+ const noInterval=serviceIntervalStatus(tracked,"spark-plugs",null,"2026-09-01T00:00:00.000Z");
+ assert.equal(noInterval.state,"interval-needed");
+ assert.equal(noInterval.due,false);
+ assert.equal(noInterval.milesSince,18000);
+ assert.equal(noInterval.intervalMiles,undefined);
+
+ const tracking=serviceIntervalStatus(tracked,"spark-plugs",30000,"2026-09-01T00:00:00.000Z");
+ assert.equal(tracking.state,"tracking");
+ assert.equal(tracking.due,false);
+ assert.equal(tracking.milesRemaining,12000);
+
+ const soon=serviceIntervalStatus(tracked,"spark-plugs",18400,"2026-09-01T00:00:00.000Z");
+ assert.equal(soon.state,"due-soon");
+ assert.equal(soon.due,false);
+ assert.equal(soon.milesRemaining,400);
+ assert.ok(soon.milesRemaining<=SERVICE_DUE_SOON_MILES);
+
+ const due=serviceIntervalStatus(tracked,"spark-plugs",15000,"2026-09-01T00:00:00.000Z");
+ assert.equal(due.state,"due");
+ assert.equal(due.due,true);
+ assert.equal(due.milesRemaining,0);
+
+ // a valve adjustment is tracked independently of spark plugs
+ assert.equal(serviceIntervalStatus(tracked,"valve-adjustment",15000,"2026-09-01T00:00:00.000Z").state,"baseline-needed");
+ assert.equal(latestMaintenanceEvent(tracked.maintenanceEvents,"spark-plugs").odometerMiles,100000);
+ assert.equal(maintenanceEventsOfKind(tracked.maintenanceEvents,"inspection").length,0);
+});
+
+test("Fleet Tracker records every maintenance type and never invents a service interval",async()=>{
+ const [page,css,intervals]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/service-intervals.ts",import.meta.url),"utf8"),
+ ]);
+ assert.match(page,/MAINTENANCE TYPE/);
+ assert.match(page,/MAINTENANCE INTERVALS/);
+ assert.match(page,/INTERVAL NOT SET/);
+ assert.match(page,/OVERDUE BY /);
+ assert.match(page,/serviceIntervalStatus\(d,service\.kind,serviceIntervals\[service\.setting\]\)/);
+ assert.match(page,/placeholder="Not set"/);
+ assert.match(css,/\.service-interval-settings input\{width:120px;min-height:44px/);
+ assert.match(css,/\.maintenance-entry select\{min-height:44px\}/);
+
+ // no guessed mileage interval may be baked into the source
+ assert.match(intervals,/sparkPlugs:null,valveAdjustment:null/);
+ assert.equal(/(SPARK_PLUG|VALVE)[A-Z_]*_(MILE|INTERVAL)[A-Z_]*\s*=\s*\d/.test(intervals),false);
+ assert.equal(/\b(15000|18000|20000|24000|30000|36000|50000)\b/.test(intervals),false);
 });
