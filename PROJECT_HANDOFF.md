@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 101
-Live feature checkpoint: commit f730ecd
+Live release: Sites Version 102
+Live feature checkpoint: commit 4f0315b
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 101 is the current user-approved live release. Its validated source checkpoint is commit f730ecd. It adds dated actual odometer readings to every bus while preserving the Version 100 storage foundation, catalog/readability improvements, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
+Version 102 is the current user-approved live release. Its validated source checkpoint is commit 4f0315b. It adds offline data-loss safeguards while preserving Version 101 mileage history, existing LocalStorage keys, offline behavior, fleet identity, locations, repairs, and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -61,7 +61,10 @@ Version 101 is the current user-approved live release. Its validated source chec
 - The repair catalog now includes coolant level sensor, frequent suspension and mirror defects, Brake mod light, Farebox won't lock, and CUBIC Screen BUS ER / MV ER.
 - Repair-category emojis are defined centrally and shown without changing stored category values; phone defect text has a readable minimum size.
 - Every bus editor can append a mileage reading with its date and an optional note. Earlier readings remain visible in history, and the latest dated reading is shown as the current actual mileage.
-The Version 101 production build, lint gate, and all 62 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+- Every successful fleet write keeps the previous valid board as a device-local last-known-good recovery copy. A single change that would remove five or more defects or five or more bus records is refused unless it is the user-confirmed backup import path.
+- Fleet Tracker Settings exposes Restore Last Good Copy. This recovery snapshot is stored in the same browser and can also be lost if Safari clears all website data; exported files remain the durable offline recovery path.
+- The Defect Log prompts for a one-tap full-board export after every 20 new direct Defect Log entries. A successful share or download resets that device's reminder baseline.
+The Version 102 production build, lint gate, and all 65 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
@@ -93,6 +96,8 @@ Primary stores are versioned browser records:
 - pace-down-sheet-v1 — Down Sheet entries and linked workflow state
 - pace-down-sheet-settings-v1 — Down Sheet view and text settings
 - pace-defect-log-settings-v1 — Defect Log view and text settings
+- pace-board-recovery-v1 — last-known-good fleet payload for device-local recovery
+- pace-board-backup-reminder-v1 — device-local count baseline for 20-entry export reminders
 
 Undo snapshots exist for destructive Down Sheet actions. Backup export includes the fleet, connected Down Sheet state, and interface settings. Treat real exported backups as operational data and never commit them.
 
