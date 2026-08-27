@@ -63,11 +63,11 @@ Completed inspections append maintenance history with a date, optional actual od
 
 ### Stage 5 — Spark-plug and valve-adjustment intervals: built, waiting on Curtis for the numbers
 
-The bus editor records any maintenance type, and each bus reports mileage since its last spark-plug service and valve adjustment. Turn signals (steering column) and turn signals (floor panel) lead the Bus Controls catalog. The intervals themselves are a fleet policy value entered in Administrative Settings → Maintenance Intervals and default to blank; nothing guesses one. Until Curtis saves them, a service still reports mileage since its last completion and withholds the overdue verdict.
+The bus editor records any maintenance type, and each bus reports engine hours since its last spark-plug service and valve adjustment, with an optional calendar-month backstop. Turn signals remain available under Bus Controls → Operating Controls. The hour and month limits are fleet policy values entered in Administrative Settings → Maintenance Intervals and default to blank; nothing guesses them. Until Curtis saves them, a service still reports the available history and withholds the overdue verdict. Version 109 marks the stored unit explicitly so earlier mileage values can never be reinterpreted as hours.
 
 ### Stage 6 — Learned Parts Used system: complete
 
-The Defect Log and Fixed Repairs editors both carry a Parts Used checkbox that reveals a part number and an optional exact catalog name. Saving with a part learns it for that exact defect issue, or for the whole category when the mechanic explicitly asks. The next matching repair is offered the remembered part, which is prefilled only when nothing has been typed, is always editable, and can be removed with Forget. Entry is never blocked when the number is unknown, and each repair record keeps its own part snapshot so later mapping edits never rewrite history. Memory lives in pace-parts-memory-v1 on the device and degrades to no memory when storage is unavailable.
+The Defect Log and Fixed Repairs editors both carry a Parts Used checkbox that reveals a part number and an optional exact catalog name. Saving with a part learns it for that exact defect issue, or for the whole category when the mechanic explicitly asks. The next matching repair is offered the remembered part, which is prefilled only when nothing has been typed, is always editable, and can be removed with Forget. Entry is never blocked when the number is unknown, and each repair record keeps its own part snapshot so later mapping edits never rewrite history. Memory lives in pace-parts-memory-v1 on the device, travels with Version 3 full-board backups, and degrades to no memory when storage is unavailable.
 
 The original specification read: add a `Parts Used` checkbox to appropriate Defect Log and Fixed Repairs workflows. When checked, allow a part number and an optional exact catalog name. A saved mapping should learn the association with the exact defect issue, or with a category only when explicitly chosen, and auto-populate it next time. The mapping remains editable, entry must never be blocked when a part is unknown, and the specific repair record keeps its own usage snapshot. Build this offline-first and backward-compatibly. Part photos are deferred to Stage 7.
 
@@ -79,7 +79,7 @@ Use the existing Supabase project and authenticated Curtis account. Preserve the
 
 There is no active implementation assignment. Stages 1 through 6 are implemented. Two things remain open:
 
-1. Stage 5 needs the spark-plug and valve-adjustment mileage intervals from Curtis, entered in Administrative Settings. Claude must not invent those values.
+1. Stage 5 needs the spark-plug and valve-adjustment engine-hour and calendar-month intervals from Curtis, entered in Administrative Settings. Claude must not invent those values.
 2. Stage 7, the shared offline-first backend on the existing Supabase project, has not been started and should not begin without Curtis scoping it.
 
 ## Required handoff format
