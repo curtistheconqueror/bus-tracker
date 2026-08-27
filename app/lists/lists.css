@@ -14,8 +14,8 @@ button,input,select,textarea{font:inherit}
 .lists-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#74a8df}
 .lists-header h1{margin:2px 0 1px;font-size:25px;line-height:1}
 .lists-header p{margin:4px 0 0;font-size:9px;color:#c4d7ee}
-.lists-header nav{display:flex;overflow:hidden;border:1px solid #5c79a2;border-radius:6px}
-.lists-header nav a{min-width:104px;padding:10px 12px;color:#dbe9fb;font-size:8px;font-weight:900;text-align:center;text-decoration:none}
+.lists-header nav{display:flex;overflow:hidden;border:1px solid #7fa4cf;border-radius:6px;background:#082f60}
+.lists-header nav a{min-width:104px;padding:10px 12px;background:#082f60;color:#fff;font-size:8px;font-weight:900;text-align:center;text-decoration:none;text-shadow:0 1px 2px #00152d}
 .lists-header nav a.active{background:#fff;color:#0b407e}
 .lists-header nav a+a{border-left:1px solid #5c79a2}
 

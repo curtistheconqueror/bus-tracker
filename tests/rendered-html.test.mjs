@@ -2700,13 +2700,14 @@ test("bus lists survive a round trip through storage",()=>{
  assert.deepEqual(normalizeBusLists([older,{...list,id:"new",name:"Newer"}]).map(entry=>entry.name),["Newer","Older"]);
 });
 
-test("every page offers the Bus Lists tab",async()=>{
+test("every page offers the Fleet Campaigns tab without changing the lists route",async()=>{
  const pages=await Promise.all(["../app/page.tsx","../app/down-sheet/page.tsx","../app/defect-log/page.tsx","../app/fixed-repairs/page.tsx","../app/lists/page.tsx"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
- for(const page of pages) assert.match(page,/href="\/lists"/);
+ for(const page of pages){assert.match(page,/href="\/lists"/);assert.match(page,/>FLEET CAMPAIGNS<\/a>/)}
  // the lists page marks itself current and links back to the other four
  const listsPage=pages.at(-1);
  assert.match(listsPage,/className="active" href="\/lists" aria-current="page"/);
+ assert.match(listsPage,/<h1>Fleet Campaigns<\/h1>/);
  for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(listsPage.includes('href="'+href+'"'),href);
  // globals.css styles bare <header>, so this page must not use one
  assert.equal(/<header>|<footer>/.test(listsPage),false);
@@ -2726,6 +2727,10 @@ test("the lists page neutralises the global aside and section styling",async()=>
   assert.ok(reset[1].includes(property),"the reset must clear "+property);
  // and it precedes the rules that then style them deliberately
  assert.ok(css.indexOf(".lists-index,.lists-layout{position:static")<css.indexOf(".lists-layout{display:grid"));
+ // The global bare nav is white; Campaigns must explicitly restore the dark
+ // header tab bar so inactive phone tabs cannot become white-on-white.
+ assert.match(css,/\.lists-header nav\{[^}]*background:#082f60/);
+ assert.match(css,/\.lists-header nav a\{[^}]*background:#082f60[^}]*color:#fff/);
 });
 
 test("overdue severity grades how far past the interval a service is",()=>{
