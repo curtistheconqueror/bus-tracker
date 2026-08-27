@@ -2711,6 +2711,17 @@ test("every page offers the Fleet Campaigns tab without changing the lists route
  for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(listsPage.includes('href="'+href+'"'),href);
  // globals.css styles bare <header>, so this page must not use one
  assert.equal(/<header>|<footer>/.test(listsPage),false);
+
+ // On a phone the panels stack and the paste box lands below the fold, so
+ // creating a list looked like it did nothing at all. It is scrolled into view
+ // when a list opens, and not focused, which would throw up the keyboard before
+ // the mechanic has decided what to paste.
+ assert.match(listsPage,/<label>ADD BUSES<textarea ref=\{addBoxRef\}/);
+ assert.match(listsPage,/addBoxRef\.current;[\s\S]{0,120}?scrollIntoView\(\{block:"center",behavior:"smooth"\}\)/);
+ assert.equal(/addBoxRef\.current\?\.focus\(\)/.test(listsPage),false);
+ // and the columns panel starts closed: a chosen format has already filled it
+ // in, so leaving it open only pushes the paste box further down
+ assert.match(listsPage,/<details className="list-columns">/);
  // the Facility Map hides its header nav on desktop and navigates from the
  // command bar, so without this button the page is unreachable there
  assert.match(pages[0],/className="lists-command"[\s\S]{0,90}?window\.location\.assign\("\/lists"\)/);

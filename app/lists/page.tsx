@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import "./lists.css";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
@@ -39,6 +39,7 @@ export default function Lists(){
  const [entryText,setEntryText]=useState("");
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
+ const addBoxRef=useRef<HTMLTextAreaElement|null>(null);
 
  useEffect(()=>{
   setLists(readLists(localStorage.getItem(BUS_LISTS_STORAGE_KEY)));
@@ -49,6 +50,15 @@ export default function Lists(){
  useEffect(()=>{if(hydrated)writeLists(lists)},[lists,hydrated]);
  useEffect(()=>{if(hydrated)try{localStorage.setItem(BUS_LIST_TEMPLATES_STORAGE_KEY,JSON.stringify(savedTemplates))}catch{/* storage may be full or blocked */}},[savedTemplates,hydrated]);
  const templates=useMemo(()=>busListTemplateOptions(savedTemplates),[savedTemplates]);
+ /* Bring the paste box into view when a list opens. The panels stack on a
+    phone, so it sits well below the fold and creating a list otherwise looks
+    like nothing happened. Not focused: that would throw up the keyboard before
+    the mechanic has decided what to paste. */
+ useEffect(()=>{
+  if(!openId)return;
+  const box=addBoxRef.current;
+  if(box?.scrollIntoView)box.scrollIntoView({block:"center",behavior:"smooth"});
+ },[openId]);
 
  const open=useMemo(()=>lists.find(list=>list.id===openId),[lists,openId]);
  const counts=open?busListCounts(open):{total:0,done:0,remaining:0};
@@ -134,7 +144,7 @@ export default function Lists(){
      <span className="list-tally"><strong>{counts.done}</strong><small>CLEARED</small></span>
     </div>
 
-    <details className="list-columns" open={Boolean(open.columns.length)||undefined}>
+    <details className="list-columns">
      <summary>COLUMNS{open.columns.length?" — "+open.columns.join(", "):" — none, rows are free notes"}</summary>
      <p>Name what each list carries. Up to {BUS_LIST_COLUMN_LIMIT}, and none is fine. Renaming or clearing one never touches what is already written down.</p>
      <div className="list-column-fields">
@@ -159,7 +169,7 @@ export default function Lists(){
     </details>
 
     <div className="list-add">
-     <label>ADD BUSES<textarea value={entryText} onChange={event=>setEntryText(event.target.value)}
+     <label>ADD BUSES<textarea ref={addBoxRef} value={entryText} onChange={event=>setEntryText(event.target.value)}
       placeholder={"Type numbers: 17503, 17504 17506\nOr paste rows straight from the report — the bus number is picked out and the rest is kept as detail."}/></label>
      <div className="list-add-actions">
       <label className="list-initials">YOUR INITIALS<input value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z ]/gi,"").toUpperCase())} maxLength={4} placeholder="CM"/></label>
