@@ -4,8 +4,8 @@ Updated: 2026-08-26
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 109
-Live feature checkpoint: commit db3cee6
+Live release: Sites Version 110
+Live feature checkpoint: commit d28b63d
 
 ## Read this first
 
@@ -48,7 +48,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 109 is the current user-approved live release. Its validated source checkpoint is commit db3cee6. It adds the learned Parts Used workflow, grouped and expanded repair choices, engine-hour and calendar tracking for spark-plug and valve-adjustment service, engine-hour and odometer history, service severity and duty-cycle diagnostics, and a Focus-view shortcut for logging another defect on the same bus. It also fixes the Defect Log action bar so it cannot float over the page and restores automatic opening of repair details when a record already contains them. Legacy repair categories migrate without losing records, previous mileage interval settings cannot be misread as engine hours, and changing repair identity cannot attach or learn a stale part. It preserves all prior Down Sheet replacement behavior and data-loss safeguards, offline behavior, fleet identity, physical locations, Defect Log records, and user data.
+Version 110 is the current user-approved live release. Its validated source checkpoint is commit d28b63d. It adds a green Mark Fixed action beside a modestly smaller Edit Defect action on every unresolved repair in the phone-friendly Defect Log Focus view. The new control reuses the established completion and Undo pathway, preserves unrelated defects on the same bus, and remains hidden for already-completed records. It preserves all Version 109 maintenance, learned-parts, catalog, Down Sheet replacement, data-loss safeguard, offline, fleet-identity, location, and user-data behavior.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -68,7 +68,7 @@ Version 109 is the current user-approved live release. Its validated source chec
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 109 production build, lint gate, and all 95 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+The Version 110 production build, lint gate, and all 95 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
 
 ## Repository and remotes
 
