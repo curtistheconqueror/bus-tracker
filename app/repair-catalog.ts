@@ -46,7 +46,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
- "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Kneeler","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
+ "Doors, Ramp and ADA":["Doors - Front door","Doors - Rear door","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request (wheelchair area)","Stop Request - Stop request (curbside)","Stop Request - Stop request (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Mirrors / fixtures","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
@@ -74,6 +74,7 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  "Fuel Delivery":"⛽",
  "No Start":"🚫",
  "Doors, Ramp and Lift":"🚪",
+ "Doors, Ramp and ADA":"♿",
  "Lights and Fixtures":"💡",
  Bodywork:"🚌",
  "Air System":"💨",
@@ -119,6 +120,16 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "System Switches":["Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","HVAC / heat controls","A/C control panel","Blower control","Floor heat switch","Interior light controls"],
   "Operating Controls":["Turn signals (steering column)","Turn signals (floor panel)","Start button","Horn","Horn / seat alarm will not stop","High beams stay on","Red air valve hard to turn","Pedal adjuster","Steering wheel tilt / telescoping","Operator light","Switches broken / loose","Side control panel damage","Other bus control defect"],
  },
+ /* Everything a rider touches or rides in. Bus Controls stays the driver's
+    station; a strap or a stop request cord is not something the operator
+    reaches from the seat, so it is found here instead. Curbside and roadside
+    are called out because each side is a separate unit that fails on its own. */
+ "Doors, Ramp and ADA":{
+  "Doors":["Front door","Rear door","Door controls","Interlock","Other door defect"],
+  "Ramp, Lift and Kneeler":["Wheelchair ramp","Ramp will not deploy","Ramp will not stow","Kneeler","Wheelchair lift","Other ramp, lift or kneeler defect"],
+  "Wheelchair Securement":["Q'STRAINT switch (curbside)","Q'STRAINT switch (roadside)","Securement straps / retractor (curbside)","Securement straps / retractor (roadside)","Flip-up bench seat (curbside)","Flip-up bench seat (roadside)","Occupant lap / shoulder belt","Other securement defect"],
+  "Stop Request":["Stop request (wheelchair area)","Stop request (curbside)","Stop request (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
+ },
  "Amerex":{
   "Fire Suppression":["Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Other Fire Suppression Trouble"],
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
@@ -137,7 +148,7 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Doors, Ramp and ADA"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -185,6 +196,18 @@ const NO_START_ISSUE_MOVES:Record<string,string>={
  "Starting-system diagnosis":"Starting / charging diagnosis",
  "Other no-start diagnosis":"Other starting or charging repair",
 };
+/* Doors, Ramp and Lift picks a group first now, so its bare issues move too. */
+const DOOR_RAMP_ISSUE_GROUPS:Record<string,string>={
+ "Door controls":"Doors - Door controls",
+ "Front door":"Doors - Front door",
+ "Interlock":"Doors - Interlock",
+ "Kneeler":"Ramp, Lift and Kneeler - Kneeler",
+ "Ramp will not deploy":"Ramp, Lift and Kneeler - Ramp will not deploy",
+ "Ramp will not stow":"Ramp, Lift and Kneeler - Ramp will not stow",
+ "Rear door":"Doors - Rear door",
+ "Wheelchair lift":"Ramp, Lift and Kneeler - Wheelchair lift",
+ "Wheelchair ramp":"Ramp, Lift and Kneeler - Wheelchair ramp",
+};
 
 export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  const startedIn=String(rawCategory||"");
@@ -197,6 +220,7 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  if(category==="Suspension and Steering"&&issue==="Other steering repair")issue="Other suspension or steering repair";
  if(category==="Suspension and Steering"&&issue==="Other suspension repair")issue="Other suspension or steering repair";
  if(category==="Bus Controls")issue=BUS_CONTROL_ISSUE_GROUPS[issue]||issue;
+ if(category==="Doors, Ramp and ADA")issue=DOOR_RAMP_ISSUE_GROUPS[issue]||issue;
  return {category,issue};
 }
 

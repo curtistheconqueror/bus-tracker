@@ -111,7 +111,7 @@ const DEFECT_CHOICES=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=
 
 function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler"}|null{
  const text=normalized(command);
- const special=text.includes("check engine")?{category:"Engine",issue:"Check-engine diagnosis",flag:"checkEngine" as const}:text.includes("no horn")||/\bhorn\b/.test(text)?{category:"Electrical / Multiplex",issue:"Horn",flag:"noHorn" as const}:text.includes("bad ramp")||text.includes("kneeler")?{category:"Doors, Ramp and Lift",issue:"Wheelchair ramp",flag:"badRampKneeler" as const}:null;
+ const special=text.includes("check engine")?{category:"Engine",issue:"Check-engine diagnosis",flag:"checkEngine" as const}:text.includes("no horn")||/\bhorn\b/.test(text)?{category:"Electrical / Multiplex",issue:"Horn",flag:"noHorn" as const}:text.includes("bad ramp")||text.includes("kneeler")?{category:"Doors, Ramp and ADA",issue:"Ramp, Lift and Kneeler - Wheelchair ramp",flag:"badRampKneeler" as const}:null;
  const matched=special||DEFECT_CHOICES.find(choice=>text.includes(choice.key));
  if(!matched)return null;
  const downing=/\b(downing|must be removed|out of service|unsafe)\b/.test(text);

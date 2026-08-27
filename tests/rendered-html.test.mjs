@@ -1242,7 +1242,7 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
-  assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
+  assert.ok(REPAIR_OPTIONS["Doors, Ramp and ADA"].includes("Ramp, Lift and Kneeler - Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Coolant level sensor"));
@@ -2490,6 +2490,9 @@ test("every Defect Log bus card carries a focus view that reads without editing"
  assert.match(focusBlock,/className="add-log-focus-defect"/);
  assert.match(focusBlock,/const busId=focusedGroup\.bus\.id;setFocusedBusId\(""\);setEditing\(\{\.\.\.newDraft\(\),busId\}\)/);
  assert.match(focusBlock,/aria-label=\{"Add a defect to bus "\+focusedGroup\.bus\.n\}/);
+ // wording the picker no longer offers still shows, instead of reading as blank
+ assert.match(page,/const offCatalogIssue=value\.quickIssue&&!repairs\.includes\(value\.quickIssue\)\?value\.quickIssue:""/);
+ assert.match(page,/\{offCatalogIssue&&<option value=\{offCatalogIssue\}>\{offCatalogIssue\} \(as logged\)<\/option>\}/);
  // same green as + LOG DEFECT, and it does not squeeze out the close control
  assert.match(css,/\.add-log-focus-defect\{margin-left:auto;min-height:48px[^}]*background:#08733f/);
  assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
@@ -2696,4 +2699,54 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
  assert.equal(steering.length,17);
  assert.equal(defectLabel({category:"Suspension and Steering",issue:"Loose steering",details:"Play in the wheel"}),
   "Suspension and Steering — Loose steering — Play in the wheel");
+});
+
+test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
+ const ada=REPAIR_OPTIONS["Doors, Ramp and ADA"];
+ assert.equal(REPAIR_OPTIONS["Doors, Ramp and Lift"],undefined);
+ const groups=REPAIR_OPTION_GROUPS["Doors, Ramp and ADA"];
+ assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request"]);
+
+ // the Q'STRAINT panel and the straps are separate units per side of the bus
+ for(const side of ["curbside","roadside"]){
+  assert.ok(groups["Wheelchair Securement"].includes("Q'STRAINT switch ("+side+")"),side+" switch");
+  assert.ok(groups["Wheelchair Securement"].includes("Securement straps / retractor ("+side+")"),side+" straps");
+  assert.ok(groups["Wheelchair Securement"].includes("Flip-up bench seat ("+side+")"),side+" bench");
+ }
+ // stop request existed nowhere in the catalog before
+ assert.ok(groups["Stop Request"].includes("Stop request (wheelchair area)"));
+ assert.ok(groups["Stop Request"].includes("Stop request (curbside)"));
+ assert.ok(groups["Stop Request"].includes("Stop request chime / tone"));
+
+ // the picker and the flat list cannot drift apart
+ const flat=Object.entries(groups).flatMap(([group,items])=>items.map(item=>group+" - "+item));
+ assert.deepEqual([...ada].sort(),[...flat].sort());
+
+ // every option the retired category offered still resolves
+ for(const [issue,expected] of [
+  ["Front door","Doors - Front door"],
+  ["Rear door","Doors - Rear door"],
+  ["Door controls","Doors - Door controls"],
+  ["Interlock","Doors - Interlock"],
+  ["Wheelchair ramp","Ramp, Lift and Kneeler - Wheelchair ramp"],
+  ["Kneeler","Ramp, Lift and Kneeler - Kneeler"],
+  ["Wheelchair lift","Ramp, Lift and Kneeler - Wheelchair lift"],
+ ]){
+  assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift",issue),{category:"Doors, Ramp and ADA",issue:expected},issue);
+  assert.ok(ada.includes(expected),expected+" must be pickable");
+ }
+ // the old category-wide catch-all has no single new home, so its wording stands
+ assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift","Other accessibility repair"),
+  {category:"Doors, Ramp and ADA",issue:"Other accessibility repair"});
+
+ // a stored record reads back under the new name with its details intact
+ const [read]=normalizeDefects([{id:"ada-1",category:"Doors, Ramp and Lift",issue:"Kneeler",details:"Will not raise",state:"open",operability:"down"}]);
+ assert.equal(read.category,"Doors, Ramp and ADA");
+ assert.equal(read.issue,"Ramp, Lift and Kneeler - Kneeler");
+ assert.equal(read.details,"Will not raise");
+ assert.equal(read.id,"ada-1");
+
+ // the ADA quick filter keys off wording, so grouped names must keep matching
+ assert.ok(quickFilterMatch({id:"bus-1",defects:[read]},"bad-ramp"));
+ assert.equal(repairCategoryEmoji("Doors, Ramp and ADA"),"♿");
 });

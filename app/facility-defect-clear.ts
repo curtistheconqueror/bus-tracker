@@ -9,7 +9,7 @@ const ALERT_DEFECTS:Record<FlagKey,{category:string;issue:string}>={
  checkEngine:{category:"Engine",issue:"Check-engine diagnosis"},
  checkTransmission:{category:"Transmission",issue:"Control / communication fault"},
  noHorn:{category:"Electrical / Multiplex",issue:"Horn"},
- badRampKneeler:{category:"Doors, Ramp and Lift",issue:"Kneeler"},
+ badRampKneeler:{category:"Doors, Ramp and ADA",issue:"Ramp, Lift and Kneeler - Kneeler"},
  farebox:{category:"Tech Services",issue:"Farebox"},
  ibsVentra:{category:"Tech Services",issue:"IBS Screen"},
 };

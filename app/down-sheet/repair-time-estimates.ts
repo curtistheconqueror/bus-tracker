@@ -31,7 +31,8 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "Amerex":120,
  "Fuel Delivery":180,
  "No Start":30, /* legacy category, kept so an unmigrated read still estimates sensibly */
- "Doors, Ramp and Lift":180,
+ "Doors, Ramp and ADA":180,
+ "Doors, Ramp and Lift":180, /* legacy category, kept so an unmigrated read still estimates sensibly */
  "Lights and Fixtures":60,
  "Bodywork":240,
  "Air System":180,
@@ -69,7 +70,9 @@ const SPECIFIC_ESTIMATE_RULES:EstimateRule[]=[
  {pattern:/Transmission - Transmission replacement$/i,estimate:{repairMinutes:720,diagnosticMinutes:60,accessMinutes:60}},
  {pattern:/Bodywork - Accident damage$/i,estimate:{repairMinutes:600,diagnosticMinutes:30,accessMinutes:60}},
  {pattern:/Tires and Wheels - Wheel-end repair$/i,estimate:{repairMinutes:300,diagnosticMinutes:30,accessMinutes:30}},
- {pattern:/Doors, Ramp and Lift - (Wheelchair ramp|Wheelchair lift)$/i,estimate:{repairMinutes:300,diagnosticMinutes:60,accessMinutes:30}},
+ {pattern:/Doors, Ramp and (?:ADA - Ramp, Lift and Kneeler|Lift) - (?:Wheelchair ramp|Wheelchair lift)$/i,estimate:{repairMinutes:300,diagnosticMinutes:60,accessMinutes:30}},
+ /* Securement is a bolt-in unit swap, not a ramp teardown. */
+ {pattern:/Doors, Ramp and ADA - Wheelchair Securement - /i,estimate:{repairMinutes:120,diagnosticMinutes:30,accessMinutes:15}},
  {pattern:/Inspection - Hub \/ Trans \/ Diff Refill \(Three-Piece\)$/i,estimate:{repairMinutes:360,diagnosticMinutes:0,accessMinutes:30}},
 ];
 
