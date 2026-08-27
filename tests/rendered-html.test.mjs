@@ -2764,7 +2764,7 @@ test("Fleet Tracker records every maintenance type and never invents a service i
  assert.equal(/\b(15000|18000|20000|24000|30000|36000|50000)\b/.test(intervals),false);
 });
 
-test("every Defect Log bus card carries a focus view that reads without editing",async()=>{
+test("every Defect Log bus card carries a focus view with safe repair actions",async()=>{
  const [page,css]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
@@ -2779,9 +2779,12 @@ test("every Defect Log bus card carries a focus view that reads without editing"
  assert.equal(page.split('className="log-focus-button"').length-1,1);
  assert.equal(/grouped-defect-main[\s\S]{0,400}?log-focus-button/.test(page),false);
 
- // the view is read-only: editing hands off to the one existing editor
+ // editing hands off to the one existing editor; completion reuses the
+ // established Mark Fixed path and never creates a second completion flow
  assert.match(page,/setFocusedBusId\(""\);setEditing\(recordDraft\(record\)\)/);
- assert.equal(/log-focus-record[\s\S]{0,900}?(saveShopNotes|markFixed|removeRecord)\(/.test(page),false);
+ assert.match(page,/className="fix-log-focus-defect"[\s\S]{0,180}?onClick=\{\(\)=>markFixed\(record\)\}>MARK FIXED<\/button>/);
+ assert.match(page,/\{isUnresolved\(record\.defect\)&&<button className="fix-log-focus-defect"/);
+ assert.equal(/log-focus-record[\s\S]{0,1100}?(saveShopNotes|removeRecord)\(/.test(page),false);
  assert.match(page,/const focusedGroup=focusedBusId\?visibleGroups\.find\(group=>group\.bus\.id===focusedBusId\):undefined/);
  assert.match(page,/role="dialog" aria-modal="true"/);
  // shop notes live on the defect, not the record wrapper
@@ -2812,6 +2815,9 @@ test("every Defect Log bus card carries a focus view that reads without editing"
  assert.match(css,/\.log-focus-defect\{margin:0 0 11px;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
+ assert.match(css,/\.log-focus-record-actions\{display:flex;align-items:center;gap:8px\}/);
+ assert.match(css,/\.log-focus-record-foot button\{[^}]*padding:0 14px[^}]*font-size:11px/);
+ assert.match(css,/\.fix-log-focus-defect\{background:#08733f\}/);
  assert.match(css,/\.log-card-group>\.log-focus-button\{position:absolute;top:6px;right:6px/);
  // the card header reserves the corner so repair text cannot run under the control
  assert.match(css,/\.log-card-group>\.log-group-header\{padding-right:64px\}/);

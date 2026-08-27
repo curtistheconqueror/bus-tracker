@@ -204,7 +204,12 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 .log-focus-record p b{display:block;margin-bottom:2px;font-size:10px;font-weight:900;letter-spacing:.8px;color:var(--log-muted)}
 .log-focus-record-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
 .log-focus-record-foot time{font-size:11px;font-weight:800;color:var(--log-muted)}
-.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;background:var(--log-accent);color:var(--log-header-text);padding:0 18px;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer}
+.log-focus-record-actions{display:flex;align-items:center;gap:8px}
+.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-header-text);padding:0 14px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.edit-log-focus-defect{background:var(--log-accent)}
+.fix-log-focus-defect{background:#08733f}
+.edit-log-focus-defect:hover,.edit-log-focus-defect:focus-visible{filter:brightness(1.1)}
+.fix-log-focus-defect:hover,.fix-log-focus-defect:focus-visible{background:#0a8b4c}
 @media(max-width:760px){
  .log-focus-shade{align-items:stretch;padding:0}
  .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
@@ -213,6 +218,9 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}
+ .log-focus-record-foot{align-items:flex-end}
+ .log-focus-record-actions{gap:7px}
+ .log-focus-record-foot button{padding:0 12px;font-size:10.5px}
  .log-card-group>.log-focus-button{min-height:40px}
  .log-card-group>.log-group-header{padding-right:62px}
 }
