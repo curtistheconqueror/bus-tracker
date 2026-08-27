@@ -28,7 +28,7 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "Tech Services":90,
  "Amerex":120,
  "Fuel Delivery":180,
- "No Start":30,
+ "No Start":30, /* legacy category, kept so an unmigrated read still estimates sensibly */
  "Doors, Ramp and Lift":180,
  "Lights and Fixtures":60,
  "Bodywork":240,
@@ -54,6 +54,8 @@ const SPECIFIC_ESTIMATE_RULES:EstimateRule[]=[
  {pattern:/Battery, Starting and Charging - Battery replacement$/i,estimate:{repairMinutes:120,diagnosticMinutes:0,accessMinutes:0}},
  {pattern:/Battery, Starting and Charging - Starting \/ charging diagnosis$/i,estimate:{repairMinutes:0,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Battery, Starting and Charging - (Battery drain|No crank)$/i,estimate:{repairMinutes:30,diagnosticMinutes:60,accessMinutes:0}},
+ {pattern:/Battery, Starting and Charging - (Crank no start|Intermittent no start|Only front start|Only rear start|Fuel-related no start|Electrical no start)$/i,estimate:{repairMinutes:30,diagnosticMinutes:90,accessMinutes:0}},
+ /* Records logged before No Start merged into Battery, Starting and Charging. */
  {pattern:/No Start - (Cranks \/ no start|Intermittent no start|Starting-system diagnosis|Fuel-related no start|Electrical no start|Other no-start diagnosis)$/i,estimate:{repairMinutes:30,diagnosticMinutes:90,accessMinutes:0}},
  {pattern:/Brakes - Front brake pads$/i,estimate:{repairMinutes:180,diagnosticMinutes:0,accessMinutes:0}},
  {pattern:/Brakes - (Brake rotors|Rotor \/ drum)$/i,estimate:{repairMinutes:480,diagnosticMinutes:0,accessMinutes:0}},

@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -1231,12 +1231,12 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.equal(Object.keys(REPAIR_OPTIONS).length, 23);
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 22);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
-  assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Horn"));
   assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
@@ -1382,7 +1382,9 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.equal(estimateTotal("Battery, Starting and Charging", "Battery replacement"), 120);
   assert.equal(normalizeRepairTimeEstimate(undefined, "Battery, Starting and Charging", "Starting / charging diagnosis").diagnosticMinutes, 60);
   assert.equal(estimateTotal("Battery, Starting and Charging", "Starting / charging diagnosis"), 60);
-  assert.equal(normalizeRepairTimeEstimate(undefined, "No Start", "Cranks / no start").diagnosticMinutes, 90);
+  // No Start merged into Battery, Starting and Charging; both spellings still estimate
+  assert.equal(normalizeRepairTimeEstimate(undefined, "Battery, Starting and Charging", "Crank no start").diagnosticMinutes, 90);
+  assert.equal(estimateTotal("Battery, Starting and Charging", "Crank no start"), 120);
   assert.equal(estimateTotal("No Start", "Cranks / no start"), 120);
   assert.equal(estimateTotal("A/C and HVAC", "No cooling"), 150);
   assert.equal(estimateTotal("A/C and HVAC", "Compressor"), 960);
@@ -2586,7 +2588,7 @@ test("both repair workflows offer a remembered part without imposing or blocking
 test("starting and charging covers crank-no-start and single-station starting",()=>{
  const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
  // the symptom cluster reads in diagnostic order next to the existing No crank
- const order=["No crank","Crank no start","Only front start","Only rear start","Starter"];
+ const order=["No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter"];
  const at=starting.indexOf("No crank");
  assert.ok(at>=0);
  assert.deepEqual(starting.slice(at,at+order.length),order);
@@ -2597,4 +2599,40 @@ test("starting and charging covers crank-no-start and single-station starting",(
   assert.equal(defect.issue,issue);
   assert.ok(defectLabel(defect).includes(issue));
  }
+});
+
+test("merged categories move old records instead of losing them",()=>{
+ // No Start duplicated Battery, Starting and Charging and is gone from the picker
+ assert.equal(REPAIR_OPTIONS["No Start"],undefined);
+ assert.equal(Object.keys(REPAIR_OPTIONS).length,22);
+
+ // every option the old category offered still has a home
+ const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
+ for(const issue of ["No crank","Crank no start","Intermittent no start","Starting / charging diagnosis","Other starting or charging repair"]) assert.ok(starting.includes(issue),issue);
+
+ // a defect logged under the old category opens under the new one, keeping its meaning
+ assert.deepEqual(migrateRepairIdentity("No Start","Cranks / no start"),{category:"Battery, Starting and Charging",issue:"Crank no start"});
+ assert.deepEqual(migrateRepairIdentity("No Start","Starting-system diagnosis"),{category:"Battery, Starting and Charging",issue:"Starting / charging diagnosis"});
+ assert.deepEqual(migrateRepairIdentity("No Start","Other no-start diagnosis"),{category:"Battery, Starting and Charging",issue:"Other starting or charging repair"});
+ // wording with no clean equivalent is preserved rather than guessed at
+ assert.deepEqual(migrateRepairIdentity("No Start","Fuel-related no start"),{category:"Battery, Starting and Charging",issue:"Fuel-related no start"});
+ // the earlier renames still apply
+ assert.deepEqual(migrateRepairIdentity("Operator Controls","MDT Screen"),{category:"Bus Controls",issue:"IBS Screen"});
+ assert.deepEqual(migrateRepairIdentity("","" ),{category:"Miscellaneous",issue:"Driver-reported defect"});
+
+ // Horn lived in two categories; it now resolves to one without changing its text
+ assert.equal(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"),false);
+ assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Horn"));
+ assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","Horn"),{category:"Bus Controls",issue:"Horn"});
+ assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","MOD light"),{category:"Electrical / Multiplex",issue:"MOD light"});
+
+ // reading a stored record applies the move, and the No Horn quick filter still matches
+ const [moved]=normalizeDefects([{id:"legacy-1",category:"No Start",issue:"Cranks / no start",details:"Turns over, will not fire",state:"open",operability:"down"}]);
+ assert.equal(moved.category,"Battery, Starting and Charging");
+ assert.equal(moved.issue,"Crank no start");
+ assert.equal(moved.details,"Turns over, will not fire");
+ assert.equal(moved.id,"legacy-1");
+ const horn={id:"legacy-2",category:"Electrical / Multiplex",issue:"Horn",details:"",state:"open",operability:"service"};
+ assert.equal(normalizeDefects([horn])[0].category,"Bus Controls");
+ assert.ok(quickFilterMatch({id:"bus-1",defects:[horn]},"no-horn"),"the No Horn filter matches on text, not category");
 });

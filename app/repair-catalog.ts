@@ -41,13 +41,12 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
- "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Only front start","Only rear start","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
- "Electrical / Multiplex":["Horn","MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
+ "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
+ "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Turn signals (steering column)","Turn signals (floor panel)","Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement","Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","Operator light","HVAC / heat controls","A/C control panel","Blower control","Pedal adjuster","Floor heat switch","Interior light controls","Start button","Red air valve hard to turn","High beams stay on","Switches broken / loose","Side control panel damage","Steering wheel tilt / telescoping","Driver seat belt","Driver seat leaking air","Driver seat will not lock","Driver seat adjustment / locking bar","Driver seat controls / buttons","Horn","Horn / seat alarm will not stop","Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
- "No Start":["No crank","Cranks / no start","Intermittent no start","Starting-system diagnosis","Fuel-related no start","Electrical no start","Other no-start diagnosis"],
  "Doors, Ramp and Lift":["Front door","Rear door","Wheelchair ramp","Kneeler","Wheelchair lift","Interlock","Door controls","Other accessibility repair"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Mirrors / fixtures","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
@@ -110,11 +109,34 @@ export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{
  return category==="Interior Cleaning"&&issue==="Cleaning Required"?"down":"service";
 }
+/* Categories and options that were merged away. Records are never dropped or
+   rewritten in storage: they are moved to their surviving home as they are read,
+   so a defect logged under the old No Start category still opens, filters, and
+   reports exactly as before. An issue with no clean equivalent keeps its wording. */
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging"};
+const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
+const NO_START_ISSUE_MOVES:Record<string,string>={
+ "Cranks / no start":"Crank no start",
+ "Starting-system diagnosis":"Starting / charging diagnosis",
+ "Other no-start diagnosis":"Other starting or charging repair",
+};
+
+export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
+ const startedIn=String(rawCategory||"");
+ let issue=String(rawIssue||"")||"Driver-reported defect";
+ if(LEGACY_ISSUE_RENAMES[issue])issue=LEGACY_ISSUE_RENAMES[issue];
+ if(startedIn==="No Start")issue=NO_START_ISSUE_MOVES[issue]||issue;
+ let category=LEGACY_CATEGORY_RENAMES[startedIn]||startedIn||"Miscellaneous";
+ /* Horn is reported off the operator's controls, so Bus Controls keeps it. */
+ if(category==="Electrical / Multiplex"&&issue==="Horn")category="Bus Controls";
+ return {category,issue};
+}
+
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
-  const issue=defect.issue==="MDT Screen"?"IBS Screen":defect.issue||"Driver-reported defect",category=defect.category==="Operator Controls"?"Bus Controls":defect.category||"Miscellaneous";
+   const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
   return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
