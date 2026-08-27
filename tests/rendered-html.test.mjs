@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, engineHourMeterReset, fleetDutyCycle, milesPerEngineHour, monthsBetween, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2391,11 +2391,12 @@ test("Bus Controls leads with both turn-signal defects",()=>{
 });
 
 test("spark-plug and valve-adjustment tracking counts engine hours, not miles",()=>{
- assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:null,valveAdjustment:null});
+ assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
  assert.deepEqual(SERVICE_KINDS.map(service=>service.kind),["spark-plugs","valve-adjustment"]);
- assert.deepEqual(normalizeServiceIntervals(undefined),{sparkPlugs:null,valveAdjustment:null});
- assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"1500",valveAdjustment:0}),{sparkPlugs:1500,valveAdjustment:null});
- assert.deepEqual(normalizeServiceIntervals({sparkPlugs:-5,valveAdjustment:"abc"}),{sparkPlugs:null,valveAdjustment:null});
+ assert.deepEqual(normalizeServiceIntervals(undefined),{sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"1500",valveAdjustment:0}),{sparkPlugs:1500,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:-5,valveAdjustment:"abc"}),{sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:1500,sparkPlugsMonths:"18",valveAdjustment:2000,valveAdjustmentMonths:24}),{sparkPlugs:1500,valveAdjustment:2000,sparkPlugsMonths:18,valveAdjustmentMonths:24});
  assert.equal(serviceIntervalHours("1500.4"),1500);
  assert.equal(serviceIntervalHours(""),null);
 
@@ -2458,6 +2459,97 @@ test("spark-plug and valve-adjustment tracking counts engine hours, not miles",(
  assert.equal(maintenanceEventsOfKind(tracked.maintenanceEvents,"inspection").length,0);
 });
 
+test("a swapped ECM restarts the hour meter and must never read as freshly serviced",()=>{
+ // Several buses here show a few hundred engine hours against 300,000 miles
+ // because Cummins replaced a failed ECM and the meter restarted at zero. If
+ // the counter clamped that to zero hours elapsed, the bus would read as
+ // current forever and its plugs would run to destruction unnoticed.
+ const now="2026-08-27T00:00:00.000Z";
+ const swapped={
+  odometerReadings:[{id:"o1",miles:300000,recordedAt:now,source:"manual"}],
+  engineHourReadings:[
+   {id:"h0",hours:26100,recordedAt:"2025-02-01T00:00:00.000Z",source:"manual"},
+   {id:"h1",hours:500,recordedAt:now,source:"manual"}],
+  maintenanceEvents:[{id:"m1",kind:"spark-plugs",completedAt:"2025-03-01T00:00:00.000Z",engineHours:26000}]};
+
+ assert.equal(engineHourMeterReset(swapped.engineHourReadings),true);
+ assert.equal(engineHourMeterReset([{id:"a",hours:10,recordedAt:now,source:"manual"},{id:"b",hours:20,recordedAt:now,source:"manual"}]),false);
+
+ const status=serviceIntervalStatus(swapped,"spark-plugs",1500,null,now);
+ assert.equal(status.state,"meter-reset");
+ assert.equal(status.due,false);
+ assert.equal(status.hoursSince,undefined,"hours since is unknowable, not zero");
+ assert.equal(status.currentEngineHours,500);
+ assert.equal(status.lastEngineHours,26000);
+
+ // the calendar limit still applies, so the bus is not left entirely unwatched
+ const byCalendar=serviceIntervalStatus(swapped,"spark-plugs",1500,18,now);
+ assert.equal(byCalendar.monthsSince,17);
+ assert.equal(byCalendar.due,false,"17 months is inside an 18-month limit");
+ const late=serviceIntervalStatus(swapped,"spark-plugs",1500,12,now);
+ assert.equal(late.due,true);
+ assert.equal(late.state,"due");
+ assert.equal(late.dueBy,"months");
+ assert.equal(late.monthsOverdue,5);
+
+ // recording a fresh completion against the new meter restores tracking
+ const rebaselined={...swapped,maintenanceEvents:[...swapped.maintenanceEvents,{id:"m2",kind:"spark-plugs",completedAt:"2026-08-01T00:00:00.000Z",engineHours:100}]};
+ const resumed=serviceIntervalStatus(rebaselined,"spark-plugs",1500,null,now);
+ assert.equal(resumed.state,"tracking");
+ assert.equal(resumed.hoursSince,400);
+});
+
+test("whichever comes first: the calendar limit can make a service due before the hours do",()=>{
+ const now="2026-08-27T00:00:00.000Z";
+ // A bus that sits accrues months without accruing engine hours.
+ const parked={engineHourReadings:[{id:"h",hours:9200,recordedAt:now,source:"manual"}],
+  maintenanceEvents:[{id:"m",kind:"spark-plugs",completedAt:"2024-11-27T00:00:00.000Z",engineHours:9000}]};
+ const status=serviceIntervalStatus(parked,"spark-plugs",1500,18,now);
+ assert.equal(status.hoursSince,200,"nowhere near the 1,500 hour limit");
+ assert.equal(status.monthsSince,21);
+ assert.equal(status.due,true);
+ assert.equal(status.dueBy,"months");
+ assert.equal(status.monthsOverdue,3);
+ // with no calendar limit saved the same bus is simply still tracking
+ assert.equal(serviceIntervalStatus(parked,"spark-plugs",1500,null,now).due,false);
+ // and hours win the race when they get there first
+ const busy={engineHourReadings:[{id:"h",hours:10600,recordedAt:now,source:"manual"}],
+  maintenanceEvents:[{id:"m",kind:"spark-plugs",completedAt:"2026-06-27T00:00:00.000Z",engineHours:9000}]};
+ const byHours=serviceIntervalStatus(busy,"spark-plugs",1500,18,now);
+ assert.equal(byHours.due,true);
+ assert.equal(byHours.dueBy,"hours");
+ assert.equal(byHours.hoursOverdue,100);
+
+ assert.equal(monthsBetween("2026-01-15T00:00:00.000Z","2026-02-14T00:00:00.000Z"),0,"a day short is not a month");
+ assert.equal(monthsBetween("2026-01-15T00:00:00.000Z","2026-02-15T00:00:00.000Z"),1);
+});
+
+test("the fleet duty-cycle average ignores buses whose meter was reset",()=>{
+ const now="2026-08-27T00:00:00.000Z";
+ const bus=(miles,hours,extraHours)=>({
+  odometerReadings:[{id:"o",miles,recordedAt:now,source:"manual"}],
+  engineHourReadings:[...(extraHours?[{id:"h0",hours:extraHours,recordedAt:"2025-01-01T00:00:00.000Z",source:"manual"}]:[]),
+   {id:"h",hours,recordedAt:now,source:"manual"}]});
+
+ const empty=fleetDutyCycle([]);
+ assert.equal(empty.rate,undefined);
+ assert.equal(empty.buses,0);
+
+ // Curtis's two real buses, plus one with a swapped ECM that must not count
+ const cycle=fleetDutyCycle([bus(207251,29678),bus(458985,18803),bus(300000,500,26100)]);
+ assert.equal(cycle.buses,2);
+ assert.equal(cycle.excluded,1);
+ assert.ok(cycle.rate>13&&cycle.rate<14,"the pair averages about 13.7 mi/hr, not the 600 the ECM bus implies");
+
+ // an implausible ratio is excluded even without a recorded earlier reading,
+ // since a bus fitted with a replacement meter may have no history at all
+ const noHistory=fleetDutyCycle([bus(300000,500)]);
+ assert.equal(noHistory.buses,0);
+ assert.equal(noHistory.excluded,1);
+ assert.equal(milesPerEngineHour(207251,29678).toFixed(2),"6.98");
+ assert.equal(milesPerEngineHour(100,0),undefined);
+});
+
 test("Curtis's two real buses show why miles cannot decide these services",()=>{
  // Readings he took off the dash: 20505 runs slow, heavy-idle work; 17549 runs
  // far more miles per hour. One fleet mileage interval cannot serve both.
@@ -2493,8 +2585,15 @@ test("Fleet Tracker records every maintenance type and never invents a service i
  assert.match(page,/MAINTENANCE INTERVALS/);
  assert.match(page,/INTERVAL NOT SET/);
  assert.match(page,/OVERDUE BY /);
- assert.match(page,/serviceIntervalStatus\(d,service\.kind,serviceIntervals\[service\.setting\]\)/);
- assert.match(page,/placeholder="Not set"/);
+ assert.match(page,/serviceIntervalStatus\(d,service\.kind,serviceIntervals\[service\.setting\],serviceIntervals\[service\.monthsSetting\]\)/);
+ // each service takes an hour limit and a calendar limit, whichever comes first
+ assert.match(page,/placeholder="Hours" aria-label=\{service\.label\+" interval in engine hours"\}/);
+ assert.match(page,/placeholder="Months" aria-label=\{service\.label\+" interval in months"\}/);
+ assert.match(page,/ENGINE HOURS AT COMPLETION/);
+ assert.match(page,/CURRENT ENGINE HOURS/);
+ assert.match(page,/MILES PER ENGINE HOUR/);
+ assert.match(page,/METER RESET/);
+ assert.match(page,/FLEET AVERAGE/);
  assert.match(css,/\.service-interval-settings input\{width:120px;min-height:44px/);
  assert.match(css,/\.maintenance-entry select\{min-height:44px\}/);
 
