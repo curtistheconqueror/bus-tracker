@@ -60,12 +60,28 @@ button,input,select,textarea{font:inherit}
 .list-entries{display:grid;gap:5px;margin:0;padding:0;list-style:none;max-height:44vh;overflow-y:auto}
 .list-entries li{display:flex;align-items:stretch;gap:4px}
 .list-entries li>label{flex:1;display:grid;grid-template-columns:26px 64px minmax(0,1fr);gap:9px;align-items:center;border:1px solid #cbd6e6;border-radius:7px;background:#fff;padding:9px;cursor:pointer}
+.list-entries{max-height:52vh}
 .list-entries li.done>label{background:#f2f8f4;border-color:#bcdcc8}
 .list-entries input[type=checkbox]{width:20px;height:20px;accent-color:#08733f}
 .list-entry-bus{font-size:15px;font-weight:900;color:#163c70}
 .list-entries li.done .list-entry-bus{color:#5b7f68;text-decoration:line-through}
-.list-entry-detail{min-width:0;display:grid;gap:2px;overflow-wrap:anywhere;font-size:9px;color:#52647d}
-.list-entry-detail i{font-size:8px;font-style:normal;font-weight:900;color:#087347}
+.list-entry-cells{min-width:0;display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.list-entry-cells i{font-size:8px;font-style:normal;font-weight:900;color:#087347;align-self:center}
+.list-cell{min-width:96px;flex:1 1 118px;display:grid;gap:1px}
+.list-cell.empty{color:#8496ad;font-size:9px}
+.list-cell small{font-size:6.5px;font-weight:900;letter-spacing:.5px;color:#8496ad;text-transform:uppercase}
+.list-cell input{width:100%;min-width:0;min-height:26px;border:1px solid transparent;border-radius:5px;background:transparent;padding:0 5px;font-size:10px;color:#52647d}
+.list-cell input:hover{border-color:#dbe3ee}
+.list-cell input:focus{border-color:#0b64bd;background:#fff;outline:none;color:#172b4d}
+
+.list-columns{border:1px solid #cbd6e6;border-radius:8px;background:#f7fafd;padding:9px 11px}
+.list-columns>summary{font-size:9px;font-weight:900;letter-spacing:.4px;color:#163c70;cursor:pointer}
+.list-columns>p{margin:7px 0 8px;font-size:8px;line-height:1.45;color:#62748d}
+.list-column-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:6px}
+.list-column-fields label{display:grid;gap:2px}
+.list-column-fields small{font-size:6.5px;font-weight:900;color:#8496ad}
+.list-column-fields input{min-height:32px;border:1px solid #b7c4d7;border-radius:5px;padding:0 7px;font-size:11px}
+.list-column-warn{display:block;margin-top:8px;color:#7a5600;font-size:8px;font-weight:800;line-height:1.4}
 
 .list-export{display:grid;gap:7px;border-top:1px solid #d7e0ec;padding-top:11px}
 .list-export-modes{display:flex;align-items:center;gap:5px;flex-wrap:wrap}

@@ -2,8 +2,8 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./lists.css";
-import {addBusListEntries,busListCounts,busListExportText,createBusList,normalizeBusLists,setBusListEntryDone,
- BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode} from "../bus-lists";
+import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,createBusList,normalizeBusLists,setBusListColumns,setBusListEntryCell,setBusListEntryDone,
+ BUS_LIST_COLUMN_LIMIT,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode} from "../bus-lists";
 
 function readLists(raw:string|null):BusList[]{
  try{return normalizeBusLists(JSON.parse(raw||"[]"))}catch{return []}
@@ -33,6 +33,7 @@ export default function Lists(){
  const [initials,setInitials]=useState("");
  const [newName,setNewName]=useState("");
  const [newSource,setNewSource]=useState("");
+ const [newColumns,setNewColumns]=useState("");
  const [entryText,setEntryText]=useState("");
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
@@ -46,6 +47,10 @@ export default function Lists(){
 
  const open=useMemo(()=>lists.find(list=>list.id===openId),[lists,openId]);
  const counts=open?busListCounts(open):{total:0,done:0,remaining:0};
+ /* Every cell that was pasted is shown even where no column was named for it,
+    so a value can never disappear from a list someone else is going to act on. */
+ const cellCount=open?busListColumnCount(open):0;
+ const unnamed=open?Math.max(0,cellCount-open.columns.length):0;
  const exportText=open?busListExportText(open,exportMode):"";
 
  const touch=(id:string,change:(list:BusList)=>BusList)=>setLists(current=>current.map(list=>
@@ -54,9 +59,9 @@ export default function Lists(){
  const addList=()=>{
   const name=newName.trim();
   if(!name){alert("Give the list a name, such as Farebox — Coin Bypass.");return}
-  const list=createBusList(name,newSource,new Date().toISOString(),seedId());
+  const list=createBusList(name,newSource,new Date().toISOString(),seedId(),newColumns.split(",").map(part=>part.trim()).filter(Boolean));
   setLists(current=>[list,...current]);
-  setOpenId(list.id);setNewName("");setNewSource("");
+  setOpenId(list.id);setNewName("");setNewSource("");setNewColumns("");
  };
  const addEntries=()=>{
   if(!open||!entryText.trim())return;
@@ -96,6 +101,7 @@ export default function Lists(){
      <b>NEW LIST</b>
      <label>NAME<input value={newName} onChange={event=>setNewName(event.target.value)} placeholder="Farebox — Coin Bypass"/></label>
      <label>WHERE IT CAME FROM<input value={newSource} onChange={event=>setNewSource(event.target.value)} placeholder="Farebox report 8-27-26"/></label>
+     <label>COLUMNS — OPTIONAL<input value={newColumns} onChange={event=>setNewColumns(event.target.value)} placeholder="Farebox ID, Last Probed, Bypass"/></label>
      <button type="button" onClick={addList}>CREATE LIST</button>
     </div>
     {lists.length?<ul className="lists-saved">{lists.map(list=>{
@@ -118,6 +124,18 @@ export default function Lists(){
      <span className="list-tally"><strong>{counts.done}</strong><small>CLEARED</small></span>
     </div>
 
+    <details className="list-columns" open={Boolean(open.columns.length)||undefined}>
+     <summary>COLUMNS{open.columns.length?" — "+open.columns.join(", "):" — none, rows are free notes"}</summary>
+     <p>Name what each list carries. Up to {BUS_LIST_COLUMN_LIMIT}, and none is fine. Renaming or clearing one never touches what is already written down.</p>
+     <div className="list-column-fields">
+      {Array.from({length:BUS_LIST_COLUMN_LIMIT},(_ignored,index)=>
+       <label key={index}><small>{index+1}</small><input value={open.columns[index]||""} placeholder={index?"":"Farebox ID"}
+        onChange={event=>{const next=[...open.columns];while(next.length<=index)next.push("");next[index]=event.target.value;
+         touch(open.id,list=>setBusListColumns(list,next))}}/></label>)}
+     </div>
+     {unnamed?<small className="list-column-warn">{unnamed===1?"One value per row has":unnamed+" values per row have"} no column name yet. {unnamed===1?"It is":"They are"} still kept and still exported, just unlabelled.</small>:null}
+    </details>
+
     <div className="list-add">
      <label>ADD BUSES<textarea value={entryText} onChange={event=>setEntryText(event.target.value)}
       placeholder={"Type numbers: 17503, 17504 17506\nOr paste rows straight from the report — the bus number is picked out and the rest is kept as detail."}/></label>
@@ -131,7 +149,15 @@ export default function Lists(){
      <label>
       <input type="checkbox" checked={entry.done} onChange={event=>touch(open.id,list=>setBusListEntryDone(list,entry.id,event.target.checked,new Date().toISOString(),initials))}/>
       <span className="list-entry-bus">{entry.busNumber||"—"}</span>
-      <span className="list-entry-detail">{entry.detail}{entry.done&&(entry.doneAt||entry.doneBy)?<i>{[dayLabel(entry.doneAt||""),entry.doneBy].filter(Boolean).join(" · ")}</i>:null}</span>
+      <span className="list-entry-cells">
+       {cellCount?Array.from({length:cellCount},(_ignored,index)=><span className="list-cell" key={index}>
+        <small>{open.columns[index]||"—"}</small>
+        <input value={entry.cells[index]||""} aria-label={(open.columns[index]||"Value "+(index+1))+" for bus "+(entry.busNumber||"row")}
+         onClick={event=>event.preventDefault()}
+         onChange={event=>touch(open.id,list=>setBusListEntryCell(list,entry.id,index,event.target.value))}/>
+       </span>):<span className="list-cell empty">No details</span>}
+       {entry.done&&(entry.doneAt||entry.doneBy)?<i>{[dayLabel(entry.doneAt||""),entry.doneBy].filter(Boolean).join(" · ")}</i>:null}
+      </span>
      </label>
      <button type="button" className="remove-entry" onClick={()=>removeEntry(entry.id)} aria-label={"Remove bus "+(entry.busNumber||"row")}>×</button>
     </li>)}</ul>:<p className="lists-empty">Nothing on this list yet.</p>}

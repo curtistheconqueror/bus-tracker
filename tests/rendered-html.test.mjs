@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { addBusListEntries, busListCounts, busListExportText, createBusList, normalizeBusLists, parseBusListInput, setBusListEntryDone } from "../app/bus-lists.ts";
+import { BUS_LIST_COLUMN_LIMIT, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2481,8 +2481,8 @@ test("a bus list is a punch list: fixed membership, progress that moves",()=>{
  // the bus number is picked out and everything else on the row is kept, so a
  // farebox ID and a last-probed time survive without being modelled here
  assert.equal(list.entries[0].busNumber,"15501");
- assert.match(list.entries[0].detail,/21790/);
- assert.match(list.entries[0].detail,/08-21-2026/);
+ assert.ok(list.entries[0].cells.join(" ").includes("21790"));
+ assert.ok(list.entries[0].cells.join(" ").includes("08-21-2026"));
  assert.equal(list.entries[1].busNumber,"17547");
 
  // nothing here consults a defect record: these buses need not exist in the app
@@ -2508,15 +2508,27 @@ test("bus list input accepts typed numbers and pasted report rows alike",()=>{
  assert.deepEqual(parseBusListInput("").length,0);
 
  // a row with other columns keeps them as detail
+ // single spaces cannot be cut into columns reliably, so what sits either side
+ // of the bus number is kept whole rather than split in the wrong places
  const [row]=parseBusListInput("South 17520 21820 05-05-2026 9:03:27 PM Yes");
  assert.equal(row.busNumber,"17520");
- assert.equal(row.detail,"South 21820 05-05-2026 9:03:27 PM Yes");
+ assert.deepEqual(row.cells,["South","21820 05-05-2026 9:03:27 PM Yes"]);
+
+ // commas and tabs are exact, so they cut into real cells
+ const [commas]=parseBusListInput("South, 17520, 21820, 05-05-2026 9:03:27 PM, Yes");
+ assert.equal(commas.busNumber,"17520");
+ assert.deepEqual(commas.cells,["South","21820","05-05-2026 9:03:27 PM","Yes"]);
+ const [tabs]=parseBusListInput("South\t17520\t21820\tYes");
+ assert.deepEqual(tabs.cells,["South","21820","Yes"]);
+ // and so is a printed table lined up with runs of spaces
+ const [spaced]=parseBusListInput("South   17520   21820   Yes");
+ assert.deepEqual(spaced.cells,["South","21820","Yes"]);
 
  // a line with no bus number is kept rather than dropped, so a stray heading is
  // visible and can be deleted instead of vanishing without explanation
  const [heading]=parseBusListInput("Location Vehicle Number Farebox ID");
  assert.equal(heading.busNumber,"");
- assert.equal(heading.detail,"Location Vehicle Number Farebox ID");
+ assert.deepEqual(heading.cells,["Location Vehicle Number Farebox ID"]);
 
  // the same bus twice on one list is a transcription slip, not two jobs
  let list=createBusList("Dupes","",  "2026-08-27T14:00:00.000Z","s");
@@ -2537,7 +2549,7 @@ test("the list export is written to be read by someone without the app",()=>{
  // outstanding work leads, because that is what the reader has to act on
  assert.ok(full.indexOf("REMAINING (2)")<full.indexOf("CLEARED (1)"));
  assert.match(full,/ {2}17547$/m);
- assert.match(full,/15501 — South 21790 .* {2}\[Aug 27 CM\]/);
+ assert.match(full,/15501 — South · 21790 .* {2}\[Aug 27 CM\]/m);
  // real line breaks, so it survives a text message or an email
  assert.ok(full.split("\n").length>6);
 
@@ -2554,6 +2566,76 @@ test("the list export is written to be read by someone without the app",()=>{
  const cleared=setBusListEntryDone(setBusListEntryDone(list,list.entries[1].id,true,now,"cm"),list.entries[2].id,true,now,"cm");
  assert.match(busListExportText(cleared,"full",now),/All 3 cleared\./);
  assert.equal(busListExportText(cleared,"numbers",now),"");
+});
+
+test("a list names its own columns, and never loses a value it was not told about",()=>{
+ const now="2026-08-27T14:00:00.000Z";
+ const rows="South, 15501, 21790, 08-21-2026 7:14:16 PM, Yes\nSouth, 17547, 21731, 04-09-2026 12:38:57 PM, Yes";
+
+ // seven is the cap on naming; beyond it the extra names are simply not taken
+ assert.equal(normalizeBusListColumns(["a","b","c","d","e","f","g","h","i"]).length,BUS_LIST_COLUMN_LIMIT);
+ assert.deepEqual(normalizeBusListColumns(["Farebox ID","","  ","Bypass"]),["Farebox ID","Bypass"]);
+ assert.deepEqual(normalizeBusListColumns("not an array"),[]);
+
+ let named=createBusList("Farebox","rep",now,"s",["Location","Farebox ID","Last Probed","Bypass"]);
+ named=addBusListEntries(named,rows,"a");
+ const table=busListExportText(named,"remaining",now);
+ const lines=table.split("\n");
+ const header=lines.find(row=>row.includes("FAREBOX ID"));
+ const first=lines.find(row=>row.includes("15501"));
+ assert.ok(header&&first);
+ // columns line up: each value starts under its own heading, which is what
+ // makes the pasted table readable to someone reading it in an email
+ for(const [heading,value] of [["LOCATION","South"],["FAREBOX ID","21790"],["BYPASS","Yes"]])
+  assert.equal(first.indexOf(value),header.indexOf(heading),heading+" must align with "+value);
+ assert.ok(header.indexOf("BUS")<header.indexOf("LOCATION"));
+
+ // naming fewer columns than the rows carry must not hide the rest. A value
+ // that vanished from a list someone else acts on is worse than an unlabelled
+ // one, so every cell is still printed.
+ let short=createBusList("Farebox","rep",now,"s",["Farebox ID","Last Probed"]);
+ short=addBusListEntries(short,rows,"a");
+ assert.equal(busListColumnCount(short),4,"the rows carry four values");
+ const clipped=busListExportText(short,"remaining",now);
+ assert.ok(clipped.includes("Yes"),"the unnamed fourth value still prints");
+ assert.ok(clipped.includes("08-21-2026 7:14:16 PM"));
+
+ // clearing the columns falls back to a plain note and keeps every cell
+ const freeform=busListExportText(setBusListColumns(named,[]),"remaining",now);
+ assert.match(freeform,/15501 — South · 21790 · 08-21-2026 7:14:16 PM · Yes/);
+
+ // renaming or dropping a column never edits a row: put the column back and
+ // the values are still there, because a list reshaped mid-job must not lose
+ // what was already written down
+ const stripped=setBusListColumns(named,[]);
+ assert.deepEqual(stripped.entries[0].cells,named.entries[0].cells);
+ const restored=setBusListColumns(stripped,["Location","Farebox ID","Last Probed","Bypass"]);
+ assert.equal(busListExportText(restored,"remaining",now),table);
+
+ // a single cell can be corrected without touching its neighbours
+ const fixed=setBusListEntryCell(named,named.entries[0].id,1,"21999");
+ assert.equal(fixed.entries[0].cells[1],"21999");
+ assert.equal(fixed.entries[0].cells[0],"South");
+ assert.equal(fixed.entries[0].cells[3],"Yes");
+
+ // one long value cannot push every other line off the side of a phone
+ const wide=setBusListEntryCell(named,named.entries[0].id,0,"x".repeat(80));
+ const capped=busListExportText(wide,"remaining",now).split("\n").find(row=>row.includes("xxxx"));
+ assert.ok(capped.includes("x".repeat(80)),"the value itself is never cut");
+});
+
+test("lists written before columns existed still open",()=>{
+ // the first release stored one free-text detail per row
+ const legacy=[{id:"l",name:"Farebox",source:"rep",createdAt:"2026-08-27T00:00:00.000Z",updatedAt:"2026-08-27T00:00:00.000Z",
+  entries:[{id:"e1",busNumber:"17547",detail:"South 21731 04-09-2026",done:true,doneBy:"CM",doneAt:"2026-08-27T00:00:00.000Z"},
+           {id:"e2",busNumber:"17563",detail:"",done:false}]}];
+ const [list]=normalizeBusLists(legacy);
+ assert.deepEqual(list.columns,[]);
+ assert.deepEqual(list.entries[0].cells,["South 21731 04-09-2026"]);
+ assert.deepEqual(list.entries[1].cells,[]);
+ assert.equal(list.entries[0].doneBy,"CM");
+ assert.equal(busListCounts(list).done,1);
+ assert.match(busListExportText(list,"full","2026-08-27T00:00:00.000Z"),/17547 — South 21731 04-09-2026/);
 });
 
 test("bus lists survive a round trip through storage",()=>{
