@@ -2582,3 +2582,19 @@ test("both repair workflows offer a remembered part without imposing or blocking
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-remembered button\{min-height:44px;width:100%\}/,name);
  }
 });
+
+test("starting and charging covers crank-no-start and single-station starting",()=>{
+ const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
+ // the symptom cluster reads in diagnostic order next to the existing No crank
+ const order=["No crank","Crank no start","Only front start","Only rear start","Starter"];
+ const at=starting.indexOf("No crank");
+ assert.ok(at>=0);
+ assert.deepEqual(starting.slice(at,at+order.length),order);
+ assert.equal(new Set(starting).size,starting.length,"no duplicated option in the category");
+ // each new option survives a round trip through a saved defect
+ for(const issue of ["Crank no start","Only front start","Only rear start"]){
+  const [defect]=normalizeDefects([{id:"d-"+issue,category:"Battery, Starting and Charging",issue,details:"",state:"open",operability:"down"}]);
+  assert.equal(defect.issue,issue);
+  assert.ok(defectLabel(defect).includes(issue));
+ }
+});
