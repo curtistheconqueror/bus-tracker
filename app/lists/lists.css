@@ -1,0 +1,90 @@
+*{box-sizing:border-box}
+body{margin:0}
+button,input,select,textarea{font:inherit}
+/* globals.css styles bare <aside> as a panel pinned to the top-right of the
+   viewport, and bare <section> with a border and padding, for the Facility Map.
+   Those element selectors reach this page too, so everything here that uses one
+   neutralises them first and is then styled deliberately below. Without this the
+   list index floats over the page instead of sitting in its column. */
+.lists-index,.lists-layout{position:static;top:auto;right:auto;width:auto;border:0;border-radius:0;background:none;padding:0;box-shadow:none;z-index:auto;font-size:inherit}
+/* globals.css styles bare <header> as a dark banner, so this page's header
+   carries a class and sets what it needs explicitly. */
+.lists-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#031839,#07376d);color:#fff;box-shadow:0 3px 14px #00152d55}
+.lists-app{min-height:100vh;padding-bottom:20px;background:linear-gradient(180deg,#e9eef6,#f8fafc);color:#172b4d;font-family:Arial,Helvetica,sans-serif}
+.lists-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#74a8df}
+.lists-header h1{margin:2px 0 1px;font-size:25px;line-height:1}
+.lists-header p{margin:4px 0 0;font-size:9px;color:#c4d7ee}
+.lists-header nav{display:flex;overflow:hidden;border:1px solid #5c79a2;border-radius:6px}
+.lists-header nav a{min-width:104px;padding:10px 12px;color:#dbe9fb;font-size:8px;font-weight:900;text-align:center;text-decoration:none}
+.lists-header nav a.active{background:#fff;color:#0b407e}
+.lists-header nav a+a{border-left:1px solid #5c79a2}
+
+.lists-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;padding:12px 14px;align-items:start}
+.lists-index,.list-detail{border:1px solid #aebdd1;border-radius:9px;background:#fff;box-shadow:0 6px 22px #17355718}
+.lists-index{padding:12px}
+.lists-new{display:grid;gap:7px;padding-bottom:10px;border-bottom:1px solid #d7e0ec}
+.lists-new b{font-size:9px;letter-spacing:.6px;color:#163c70}
+.lists-new label{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#62748d}
+.lists-new input,.list-initials input{min-height:38px;border:1px solid #b7c4d7;border-radius:6px;padding:0 9px;font-size:12px}
+.lists-new button{min-height:40px;border:0;border-radius:6px;background:#08733f;color:#fff;font-size:9px;font-weight:900;cursor:pointer}
+.lists-new button:hover{background:#0a8b4c}
+
+.lists-saved{display:grid;gap:5px;margin:10px 0 0;padding:0;list-style:none}
+.lists-saved li{display:flex;align-items:stretch;gap:4px}
+.lists-saved li>button:first-child{flex:1;display:grid;gap:2px;border:1px solid #cbd6e6;border-radius:7px;background:#f7fafd;padding:8px 9px;text-align:left;cursor:pointer}
+.lists-saved li>button:first-child.active{border-color:#0b64bd;background:#eaf3fd}
+.lists-saved b{font-size:11px;color:#163c70}
+.lists-saved small{font-size:8px;font-weight:800;color:#62748d}
+.lists-saved time{font-size:7px;font-weight:900;color:#8496ad}
+.remove-list,.remove-entry{width:32px;flex:0 0 auto;border:1px solid #e0c3c5;border-radius:7px;background:#fff5f5;color:#a5252d;font-size:16px;line-height:1;cursor:pointer}
+.lists-empty{margin:10px 0 0;color:#62748d;font-size:9px}
+
+.list-detail{padding:12px;display:grid;gap:12px;align-content:start}
+.list-detail.placeholder{min-height:180px;place-items:center;color:#62748d;font-size:10px}
+.list-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid #d7e0ec;padding-bottom:10px}
+.list-detail-head>span:first-child{display:grid;gap:2px}
+.list-detail-head small{font-size:7px;font-weight:900;letter-spacing:.6px;color:#62748d}
+.list-detail-head b{font-size:17px;color:#163c70}
+.list-tally{display:grid;gap:1px;justify-items:center}
+.list-tally strong{font-size:22px;color:#0b64bd}
+.list-tally:last-child strong{color:#087347}
+
+.list-add{display:grid;gap:7px}
+.list-add label{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#62748d}
+.list-add textarea{min-height:74px;border:1px solid #b7c4d7;border-radius:7px;padding:8px 9px;font-size:12px;line-height:1.4;resize:vertical}
+.list-add-actions{display:flex;align-items:end;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.list-initials{max-width:120px}
+.list-add-actions>button{min-height:42px;border:0;border-radius:7px;background:#08733f;color:#fff;padding:0 20px;font-size:10px;font-weight:900;cursor:pointer}
+.list-add-actions>button:disabled{opacity:.5;cursor:not-allowed}
+
+.list-entries{display:grid;gap:5px;margin:0;padding:0;list-style:none;max-height:44vh;overflow-y:auto}
+.list-entries li{display:flex;align-items:stretch;gap:4px}
+.list-entries li>label{flex:1;display:grid;grid-template-columns:26px 64px minmax(0,1fr);gap:9px;align-items:center;border:1px solid #cbd6e6;border-radius:7px;background:#fff;padding:9px;cursor:pointer}
+.list-entries li.done>label{background:#f2f8f4;border-color:#bcdcc8}
+.list-entries input[type=checkbox]{width:20px;height:20px;accent-color:#08733f}
+.list-entry-bus{font-size:15px;font-weight:900;color:#163c70}
+.list-entries li.done .list-entry-bus{color:#5b7f68;text-decoration:line-through}
+.list-entry-detail{min-width:0;display:grid;gap:2px;overflow-wrap:anywhere;font-size:9px;color:#52647d}
+.list-entry-detail i{font-size:8px;font-style:normal;font-weight:900;color:#087347}
+
+.list-export{display:grid;gap:7px;border-top:1px solid #d7e0ec;padding-top:11px}
+.list-export-modes{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.list-export-modes b{margin-right:4px;font-size:9px;letter-spacing:.6px;color:#163c70}
+.list-export-modes button{min-height:32px;border:1px solid #b7c4d7;border-radius:5px;background:#f3f6fa;color:#344a69;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
+.list-export-modes button.active{border-color:#0b64bd;background:#0b64bd;color:#fff}
+.list-export-preview{margin:0;max-height:210px;overflow:auto;border:1px solid #cbd6e6;border-radius:7px;background:#f7fafd;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;line-height:1.5;white-space:pre-wrap;color:#1d3557}
+.list-export-actions{display:flex;gap:8px;flex-wrap:wrap}
+.list-export-actions button{min-height:44px;border:1px solid #b7c4d7;border-radius:7px;background:#fff;color:#172b4d;padding:0 18px;font-size:10px;font-weight:900;cursor:pointer}
+.list-export-actions .copy-list{border-color:#08733f;background:#08733f;color:#fff}
+.list-export-actions .copy-list:hover{background:#0a8b4c}
+
+@media(max-width:860px){
+ .lists-header{align-items:flex-start;flex-direction:column;padding:11px 12px}
+ .lists-header nav{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .lists-header nav a{min-width:0;padding:9px 4px}
+ .lists-header nav a+a{border-left:0}
+ .lists-layout{grid-template-columns:minmax(0,1fr);padding:10px 8px}
+ .list-entries li>label{grid-template-columns:24px 58px minmax(0,1fr);gap:7px}
+ .list-entries{max-height:none}
+ .list-export-actions button{flex:1}
+}

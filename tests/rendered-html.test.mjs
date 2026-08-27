@@ -17,6 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
+import { addBusListEntries, busListCounts, busListExportText, createBusList, normalizeBusLists, parseBusListInput, setBusListEntryDone } from "../app/bus-lists.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2462,6 +2463,146 @@ test("spark-plug and valve-adjustment tracking counts engine hours, not miles",(
  assert.equal(latestMaintenanceEvent(tracked.maintenanceEvents,"spark-plugs").engineHours,12000);
  assert.equal(latestMaintenanceEvent(tracked.maintenanceEvents,"spark-plugs").odometerMiles,100000);
  assert.equal(maintenanceEventsOfKind(tracked.maintenanceEvents,"inspection").length,0);
+});
+
+test("a bus list is a punch list: fixed membership, progress that moves",()=>{
+ const now="2026-08-27T14:00:00.000Z";
+ let list=createBusList("Farebox — Coin Bypass","Farebox report 8-27-26",now,"seed1");
+ assert.equal(list.name,"Farebox — Coin Bypass");
+ assert.deepEqual(busListCounts(list),{total:0,done:0,remaining:0});
+
+ // rows pasted straight off the report the other department produces
+ list=addBusListEntries(list,[
+  "South 15501 21790 08-21-2026 7:14:16 PM Yes",
+  "South 17547 21731 04-09-2026 12:38:57 PM Yes",
+  "South 17563 21802 08-25-2026 1:13:15 AM Yes",
+ ].join("\n"),"a");
+ assert.equal(busListCounts(list).total,3);
+ // the bus number is picked out and everything else on the row is kept, so a
+ // farebox ID and a last-probed time survive without being modelled here
+ assert.equal(list.entries[0].busNumber,"15501");
+ assert.match(list.entries[0].detail,/21790/);
+ assert.match(list.entries[0].detail,/08-21-2026/);
+ assert.equal(list.entries[1].busNumber,"17547");
+
+ // nothing here consults a defect record: these buses need not exist in the app
+ assert.equal(list.entries.every(entry=>entry.done),false);
+
+ // clearing a bus records who and when, which the paper sheet relies on
+ // somebody remembering to do by hand
+ list=setBusListEntryDone(list,list.entries[0].id,true,now,"cm");
+ assert.equal(list.entries[0].done,true);
+ assert.equal(list.entries[0].doneBy,"CM");
+ assert.equal(list.entries[0].doneAt,now);
+ assert.deepEqual(busListCounts(list),{total:3,done:1,remaining:2});
+ // and unticking clears the attribution rather than leaving a stale name on it
+ const undone=setBusListEntryDone(list,list.entries[0].id,false,now,"cm");
+ assert.equal(undone.entries[0].doneBy,undefined);
+ assert.equal(undone.entries[0].doneAt,undefined);
+});
+
+test("bus list input accepts typed numbers and pasted report rows alike",()=>{
+ // a bare run of numbers is a list of buses, however it is separated
+ assert.deepEqual(parseBusListInput("17503, 17504 17506").map(entry=>entry.busNumber),["17503","17504","17506"]);
+ assert.deepEqual(parseBusListInput("17503\n17504").map(entry=>entry.busNumber),["17503","17504"]);
+ assert.deepEqual(parseBusListInput("").length,0);
+
+ // a row with other columns keeps them as detail
+ const [row]=parseBusListInput("South 17520 21820 05-05-2026 9:03:27 PM Yes");
+ assert.equal(row.busNumber,"17520");
+ assert.equal(row.detail,"South 21820 05-05-2026 9:03:27 PM Yes");
+
+ // a line with no bus number is kept rather than dropped, so a stray heading is
+ // visible and can be deleted instead of vanishing without explanation
+ const [heading]=parseBusListInput("Location Vehicle Number Farebox ID");
+ assert.equal(heading.busNumber,"");
+ assert.equal(heading.detail,"Location Vehicle Number Farebox ID");
+
+ // the same bus twice on one list is a transcription slip, not two jobs
+ let list=createBusList("Dupes","",  "2026-08-27T14:00:00.000Z","s");
+ list=addBusListEntries(list,"17503\n17503\n17504","a");
+ assert.equal(busListCounts(list).total,2);
+});
+
+test("the list export is written to be read by someone without the app",()=>{
+ const now="2026-08-27T14:00:00.000Z";
+ let list=createBusList("Farebox — Coin Bypass","Farebox report 8-27-26",now,"seed1");
+ list=addBusListEntries(list,"South 15501 21790 08-21-2026 7:14:16 PM Yes\n17547\n17563","a");
+ list=setBusListEntryDone(list,list.entries[0].id,true,now,"cm");
+
+ const full=busListExportText(list,"full",now);
+ assert.match(full,/^FAREBOX — COIN BYPASS\n/);
+ assert.match(full,/3 buses · 1 cleared · 2 remaining/);
+ assert.match(full,/Farebox report 8-27-26/);
+ // outstanding work leads, because that is what the reader has to act on
+ assert.ok(full.indexOf("REMAINING (2)")<full.indexOf("CLEARED (1)"));
+ assert.match(full,/ {2}17547$/m);
+ assert.match(full,/15501 — South 21790 .* {2}\[Aug 27 CM\]/);
+ // real line breaks, so it survives a text message or an email
+ assert.ok(full.split("\n").length>6);
+
+ // remaining-only drops the cleared section entirely
+ const remaining=busListExportText(list,"remaining",now);
+ assert.equal(remaining.includes("CLEARED"),false);
+ assert.match(remaining,/REMAINING \(2\)/);
+
+ // numbers-only is the one to read over the radio or paste elsewhere
+ assert.equal(busListExportText(list,"numbers",now),"17547, 17563");
+
+ // an empty and a finished list both say so rather than exporting a bare title
+ assert.match(busListExportText(createBusList("Empty","",now,"e"),"full",now),/No buses on this list yet\./);
+ const cleared=setBusListEntryDone(setBusListEntryDone(list,list.entries[1].id,true,now,"cm"),list.entries[2].id,true,now,"cm");
+ assert.match(busListExportText(cleared,"full",now),/All 3 cleared\./);
+ assert.equal(busListExportText(cleared,"numbers",now),"");
+});
+
+test("bus lists survive a round trip through storage",()=>{
+ const now="2026-08-27T14:00:00.000Z";
+ let list=createBusList("Farebox","report",now,"s");
+ list=addBusListEntries(list,"17503\n17504","a");
+ list=setBusListEntryDone(list,list.entries[0].id,true,now,"cm");
+ const restored=normalizeBusLists(JSON.parse(JSON.stringify([list])));
+ assert.equal(restored.length,1);
+ assert.equal(restored[0].name,"Farebox");
+ assert.equal(busListCounts(restored[0]).done,1);
+ assert.equal(restored[0].entries[0].doneBy,"CM");
+
+ // junk in storage never takes the page down
+ assert.deepEqual(normalizeBusLists(null),[]);
+ assert.deepEqual(normalizeBusLists("nonsense"),[]);
+ assert.deepEqual(normalizeBusLists([{name:""},null,42]),[]);
+ assert.equal(normalizeBusLists([{name:"Kept",entries:"not an array"}])[0].entries.length,0);
+ // most recently touched first, so the list being worked is at the top
+ const older={...list,id:"old",name:"Older",updatedAt:"2026-08-01T00:00:00.000Z"};
+ assert.deepEqual(normalizeBusLists([older,{...list,id:"new",name:"Newer"}]).map(entry=>entry.name),["Newer","Older"]);
+});
+
+test("every page offers the Bus Lists tab",async()=>{
+ const pages=await Promise.all(["../app/page.tsx","../app/down-sheet/page.tsx","../app/defect-log/page.tsx","../app/fixed-repairs/page.tsx","../app/lists/page.tsx"]
+  .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
+ for(const page of pages) assert.match(page,/href="\/lists"/);
+ // the lists page marks itself current and links back to the other four
+ const listsPage=pages.at(-1);
+ assert.match(listsPage,/className="active" href="\/lists" aria-current="page"/);
+ for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(listsPage.includes('href="'+href+'"'),href);
+ // globals.css styles bare <header>, so this page must not use one
+ assert.equal(/<header>|<footer>/.test(listsPage),false);
+ // the Facility Map hides its header nav on desktop and navigates from the
+ // command bar, so without this button the page is unreachable there
+ assert.match(pages[0],/className="lists-command"[\s\S]{0,90}?window\.location\.assign\("\/lists"\)/);
+});
+
+test("the lists page neutralises the global aside and section styling",async()=>{
+ const css=await readFile(new URL("../app/lists/lists.css",import.meta.url),"utf8");
+ // globals.css pins a bare <aside> to the top-right of the viewport at a fixed
+ // 255px. The list index is an aside, so without a reset it floats over the
+ // page instead of sitting in its grid column.
+ const reset=css.match(/\.lists-index,\.lists-layout\{([^}]*)\}/);
+ assert.ok(reset,"the reset block must exist");
+ for(const property of ["position:static","right:auto","width:auto","box-shadow:none","z-index:auto"])
+  assert.ok(reset[1].includes(property),"the reset must clear "+property);
+ // and it precedes the rules that then style them deliberately
+ assert.ok(css.indexOf(".lists-index,.lists-layout{position:static")<css.indexOf(".lists-layout{display:grid"));
 });
 
 test("overdue severity grades how far past the interval a service is",()=>{

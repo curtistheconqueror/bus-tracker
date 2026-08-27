@@ -1,0 +1,154 @@
+"use client";
+
+import {useEffect,useMemo,useState} from "react";
+import "./lists.css";
+import {addBusListEntries,busListCounts,busListExportText,createBusList,normalizeBusLists,setBusListEntryDone,
+ BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode} from "../bus-lists";
+
+function readLists(raw:string|null):BusList[]{
+ try{return normalizeBusLists(JSON.parse(raw||"[]"))}catch{return []}
+}
+function writeLists(lists:BusList[]){
+ try{localStorage.setItem(BUS_LISTS_STORAGE_KEY,JSON.stringify(lists));return true}catch{return false}
+}
+function seedId(){return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7)}
+function dayLabel(value:string){
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?"":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric"}).format(date);
+}
+
+async function copyText(text:string){
+ if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);return}catch{/* fall through */}}
+ const field=document.createElement("textarea");
+ field.value=text;field.style.position="fixed";field.style.opacity="0";
+ document.body.appendChild(field);field.focus();field.select();
+ const copied=document.execCommand("copy");field.remove();
+ if(!copied)throw new Error("Copy failed");
+}
+
+export default function Lists(){
+ const [lists,setLists]=useState<BusList[]>([]);
+ const [hydrated,setHydrated]=useState(false);
+ const [openId,setOpenId]=useState("");
+ const [initials,setInitials]=useState("");
+ const [newName,setNewName]=useState("");
+ const [newSource,setNewSource]=useState("");
+ const [entryText,setEntryText]=useState("");
+ const [exportMode,setExportMode]=useState<BusListExportMode>("full");
+ const [copyStatus,setCopyStatus]=useState("");
+
+ useEffect(()=>{
+  setLists(readLists(localStorage.getItem(BUS_LISTS_STORAGE_KEY)));
+  try{setInitials(String(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").defaultInitials||""))}catch{/* optional */}
+  setHydrated(true);
+ },[]);
+ useEffect(()=>{if(hydrated)writeLists(lists)},[lists,hydrated]);
+
+ const open=useMemo(()=>lists.find(list=>list.id===openId),[lists,openId]);
+ const counts=open?busListCounts(open):{total:0,done:0,remaining:0};
+ const exportText=open?busListExportText(open,exportMode):"";
+
+ const touch=(id:string,change:(list:BusList)=>BusList)=>setLists(current=>current.map(list=>
+  list.id!==id?list:{...change(list),updatedAt:new Date().toISOString()}));
+
+ const addList=()=>{
+  const name=newName.trim();
+  if(!name){alert("Give the list a name, such as Farebox — Coin Bypass.");return}
+  const list=createBusList(name,newSource,new Date().toISOString(),seedId());
+  setLists(current=>[list,...current]);
+  setOpenId(list.id);setNewName("");setNewSource("");
+ };
+ const addEntries=()=>{
+  if(!open||!entryText.trim())return;
+  touch(open.id,list=>addBusListEntries(list,entryText,seedId()));
+  setEntryText("");
+ };
+ const removeList=(list:BusList)=>{
+  if(!confirm("Delete the list “"+list.name+"” and its "+busListCounts(list).total+" buses? This cannot be undone."))return;
+  setLists(current=>current.filter(item=>item.id!==list.id));
+  if(openId===list.id)setOpenId("");
+ };
+ const removeEntry=(entryId:string)=>{
+  if(!open)return;
+  touch(open.id,list=>({...list,entries:list.entries.filter(entry=>entry.id!==entryId)}));
+ };
+ const copyList=async()=>{
+  try{await copyText(exportText);setCopyStatus("COPIED")}catch{setCopyStatus("COULD NOT COPY")}
+  setTimeout(()=>setCopyStatus(""),2200);
+ };
+ const downloadList=()=>{
+  if(!open)return;
+  const blob=new Blob([exportText],{type:"text/plain;charset=utf-8"});
+  const url=URL.createObjectURL(blob),link=document.createElement("a");
+  link.href=url;link.download=open.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".txt";
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ };
+
+ return <main className="lists-app">
+  <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Bus Lists</h1><p>Working lists you can hand to someone without the app</p></div>
+   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">BUS LISTS</a></nav>
+  </header>
+
+  <section className="lists-layout">
+   <aside className="lists-index" aria-label="Saved lists">
+    <div className="lists-new">
+     <b>NEW LIST</b>
+     <label>NAME<input value={newName} onChange={event=>setNewName(event.target.value)} placeholder="Farebox — Coin Bypass"/></label>
+     <label>WHERE IT CAME FROM<input value={newSource} onChange={event=>setNewSource(event.target.value)} placeholder="Farebox report 8-27-26"/></label>
+     <button type="button" onClick={addList}>CREATE LIST</button>
+    </div>
+    {lists.length?<ul className="lists-saved">{lists.map(list=>{
+     const stat=busListCounts(list);
+     return <li key={list.id}>
+      <button type="button" className={list.id===openId?"active":""} onClick={()=>setOpenId(list.id)}>
+       <b>{list.name}</b>
+       <small>{stat.remaining} of {stat.total} remaining{list.source?" · "+list.source:""}</small>
+       <time>{dayLabel(list.updatedAt)}</time>
+      </button>
+      <button type="button" className="remove-list" onClick={()=>removeList(list)} aria-label={"Delete list "+list.name}>×</button>
+     </li>;
+    })}</ul>:<p className="lists-empty">No lists yet. Create one above, then paste in the buses.</p>}
+   </aside>
+
+   {open?<div className="list-detail">
+    <div className="list-detail-head">
+     <span><small>{open.source||"LIST"}</small><b>{open.name}</b></span>
+     <span className="list-tally"><strong>{counts.remaining}</strong><small>REMAINING</small></span>
+     <span className="list-tally"><strong>{counts.done}</strong><small>CLEARED</small></span>
+    </div>
+
+    <div className="list-add">
+     <label>ADD BUSES<textarea value={entryText} onChange={event=>setEntryText(event.target.value)}
+      placeholder={"Type numbers: 17503, 17504 17506\nOr paste rows straight from the report — the bus number is picked out and the rest is kept as detail."}/></label>
+     <div className="list-add-actions">
+      <label className="list-initials">YOUR INITIALS<input value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z ]/gi,"").toUpperCase())} maxLength={4} placeholder="CM"/></label>
+      <button type="button" onClick={addEntries} disabled={!entryText.trim()}>ADD TO LIST</button>
+     </div>
+    </div>
+
+    {open.entries.length?<ul className="list-entries">{open.entries.map(entry=><li key={entry.id} className={entry.done?"done":""}>
+     <label>
+      <input type="checkbox" checked={entry.done} onChange={event=>touch(open.id,list=>setBusListEntryDone(list,entry.id,event.target.checked,new Date().toISOString(),initials))}/>
+      <span className="list-entry-bus">{entry.busNumber||"—"}</span>
+      <span className="list-entry-detail">{entry.detail}{entry.done&&(entry.doneAt||entry.doneBy)?<i>{[dayLabel(entry.doneAt||""),entry.doneBy].filter(Boolean).join(" · ")}</i>:null}</span>
+     </label>
+     <button type="button" className="remove-entry" onClick={()=>removeEntry(entry.id)} aria-label={"Remove bus "+(entry.busNumber||"row")}>×</button>
+    </li>)}</ul>:<p className="lists-empty">Nothing on this list yet.</p>}
+
+    <div className="list-export">
+     <div className="list-export-modes">
+      <b>SHARE</b>
+      {([["full","EVERYTHING"],["remaining","REMAINING ONLY"],["numbers","NUMBERS ONLY"]] as [BusListExportMode,string][]).map(([mode,label])=>
+       <button type="button" key={mode} className={exportMode===mode?"active":""} onClick={()=>setExportMode(mode)}>{label}</button>)}
+     </div>
+     <pre className="list-export-preview" aria-label="Export preview">{exportText}</pre>
+     <div className="list-export-actions">
+      <button type="button" className="copy-list" onClick={copyList}>{copyStatus||"COPY"}</button>
+      <button type="button" onClick={downloadList}>DOWNLOAD .TXT</button>
+     </div>
+    </div>
+   </div>:<div className="list-detail placeholder"><p>Pick a list on the left, or create one.</p></div>}
+  </section>
+ </main>;
+}
