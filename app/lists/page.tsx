@@ -2,7 +2,9 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import "./lists.css";
-import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,
+import "../work-time.css";
+import WorkTimePanel from "../work-time-panel";
+import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
 
 function readLists(raw:string|null):BusList[]{
@@ -37,6 +39,7 @@ export default function Lists(){
  const [savedTemplates,setSavedTemplates]=useState<BusListTemplate[]>([]);
  const [templateId,setTemplateId]=useState("");
  const [entryText,setEntryText]=useState("");
+ const [quickBus,setQuickBus]=useState("");
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
  const addBoxRef=useRef<HTMLTextAreaElement|null>(null);
@@ -78,6 +81,13 @@ export default function Lists(){
   setLists(current=>[list,...current]);
   setOpenId(list.id);setNewName("");setNewSource("");setNewColumns("");setTemplateId("");
  };
+ /* One bus, Enter, cleared and ready for the next. The paste box is for a whole
+    report; this is for standing at a bus and adding it. */
+ const addQuickBus=()=>{
+  if(!open||!quickBus.trim())return;
+  touch(open.id,list=>addBusListEntries(list,quickBus,seedId()));
+  setQuickBus("");
+ };
  const addEntries=()=>{
   if(!open||!entryText.trim())return;
   touch(open.id,list=>addBusListEntries(list,entryText,seedId()));
@@ -109,6 +119,8 @@ export default function Lists(){
   <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">FLEET CAMPAIGNS</a></nav>
   </header>
+
+  <WorkTimePanel lists={lists} defaultPerson={initials.trim().toUpperCase()}/>
 
   <section className="lists-layout">
    <aside className="lists-index" aria-label="Saved lists">
@@ -142,6 +154,7 @@ export default function Lists(){
      <span><small>{open.source||"LIST"}</small><b>{open.name}</b></span>
      <span className="list-tally"><strong>{counts.remaining}</strong><small>REMAINING</small></span>
      <span className="list-tally"><strong>{counts.done}</strong><small>CLEARED</small></span>
+     {busListHours(open)?<span className="list-tally"><strong>{busListHours(open)}</strong><small>HOURS</small></span>:null}
     </div>
 
     <details className="list-columns">
@@ -168,11 +181,19 @@ export default function Lists(){
      {unnamed?<small className="list-column-warn">{unnamed===1?"One value per row has":unnamed+" values per row have"} no column name yet. {unnamed===1?"It is":"They are"} still kept and still exported, just unlabelled.</small>:null}
     </details>
 
+    <div className="list-quick-add">
+     <label>ADD ONE BUS<input value={quickBus} inputMode="numeric" placeholder="17503"
+      onChange={event=>setQuickBus(event.target.value)}
+      onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();addQuickBus()}}}/></label>
+     <button type="button" onClick={addQuickBus} disabled={!quickBus.trim()}>ADD</button>
+     <small>Type a number and press Enter. Use the box below to paste a whole report.</small>
+    </div>
+
     <div className="list-add">
-     <label>ADD BUSES<textarea ref={addBoxRef} value={entryText} onChange={event=>setEntryText(event.target.value)}
+     <label>PASTE A REPORT<textarea ref={addBoxRef} value={entryText} onChange={event=>setEntryText(event.target.value)}
       placeholder={"Type numbers: 17503, 17504 17506\nOr paste rows straight from the report — the bus number is picked out and the rest is kept as detail."}/></label>
      <div className="list-add-actions">
-      <label className="list-initials">YOUR INITIALS<input value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z ]/gi,"").toUpperCase())} maxLength={4} placeholder="CM"/></label>
+      <label className="list-initials">YOUR NAME<input value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z ]/gi,"").toUpperCase())} maxLength={16} placeholder="CURTIS"/></label>
       <button type="button" onClick={addEntries} disabled={!entryText.trim()}>ADD TO LIST</button>
      </div>
     </div>
@@ -188,6 +209,13 @@ export default function Lists(){
          onClick={event=>event.preventDefault()}
          onChange={event=>touch(open.id,list=>setBusListEntryCell(list,entry.id,index,event.target.value))}/>
        </span>):<span className="list-cell empty">No details</span>}
+       <span className="list-cell list-hours">
+        <small>HOURS</small>
+        <input value={entry.hours===undefined?"":String(entry.hours)} inputMode="decimal" placeholder="—"
+         aria-label={"Billable hours for bus "+(entry.busNumber||"row")}
+         onClick={event=>event.preventDefault()}
+         onChange={event=>touch(open.id,list=>setBusListEntryHours(list,entry.id,event.target.value))}/>
+       </span>
        {entry.done&&(entry.doneAt||entry.doneBy)?<i>{[dayLabel(entry.doneAt||""),entry.doneBy].filter(Boolean).join(" · ")}</i>:null}
       </span>
      </label>
