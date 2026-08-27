@@ -1,3 +1,5 @@
+import {migrateRepairIdentity} from "./repair-catalog.ts";
+
 /* Learned Parts Used memory.
 
    When a mechanic records the part that fixed a defect, the app remembers it and
@@ -29,9 +31,13 @@ export const PARTS_MEMORY_LIMIT=400;
 export const EMPTY_PARTS_MEMORY:PartsMemory={entries:[]};
 
 function clean(value:unknown){return String(value??"").trim()}
+/* Keys follow the catalog. A mapping learned under a retired category or a bare
+   Bus Controls issue still matches after the restructure. */
+function settled(category:string,issue?:string){return migrateRepairIdentity(category,issue||"")}
 
 export function partMemoryKey(scope:PartMemoryScope,category:string,issue?:string){
- return scope==="category"?"category::"+clean(category).toLowerCase():"issue::"+clean(category).toLowerCase()+"::"+clean(issue).toLowerCase();
+ const moved=settled(clean(category),clean(issue));
+ return scope==="category"?"category::"+moved.category.toLowerCase():"issue::"+moved.category.toLowerCase()+"::"+moved.issue.toLowerCase();
 }
 function entryKey(entry:PartMemoryEntry){return partMemoryKey(entry.scope,entry.category,entry.issue)}
 

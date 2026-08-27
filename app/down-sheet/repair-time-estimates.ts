@@ -19,6 +19,8 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "Engine":240,
  "Cooling System":180,
  "Transmission":240,
+ "Suspension and Steering":180,
+ /* retired categories, kept so an unmigrated read still estimates sensibly */
  "Suspension":180,
  "Steering":120,
  "Brakes":180,

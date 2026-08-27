@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -765,10 +765,16 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /CHOOSE A REPAIR CATEGORY/);
   assert.match(page, /native-repair-picker/);
   assert.match(page, /CHOOSE THE SPECIFIC DEFECT/);
-  assert.match(page, /CHOOSE THE AMEREX SYSTEM/);
-
-  assert.match(page, /CHOOSE THE STATUS OR CODE/);
-  assert.match(page, /Choose Fire Suppression or Gas Concentration/);
+  // Both native pickers must read their group wording from the shared helpers.
+  // Hardcoded Amerex language told a mechanic who picked Bus Controls to
+  // "Choose Fire Suppression or Gas Concentration", so the literals stay out.
+  assert.equal(page.includes("CHOOSE THE AMEREX SYSTEM"), false);
+  assert.equal(page.includes("CHOOSE THE STATUS OR CODE"), false);
+  assert.equal(page.includes("Choose Fire Suppression or Gas Concentration"), false);
+  assert.equal(page.match(/repairGroupStepLabel\(newDefect\.category\)/g).length, 2);
+  assert.equal(page.match(/repairGroupPlaceholder\(newDefect\.category\)/g).length, 2);
+  assert.equal(page.match(/repairIssueStepLabel\(newDefect\.category\)/g).length, 2);
+  assert.equal(page.match(/repairIssuePlaceholder\(newDefect\.category,repairGroup\)/g).length, 2);
   assert.match(page, /REPAIR_OPTION_GROUPS\[newDefect\.category\]\[repairGroup\]\.map\(issue=><option/);
 
   assert.match(page, /ADD ANOTHER DEFECT/);
@@ -783,7 +789,6 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /<select value=\{newDefect\.category\}/);
   assert.match(page, /Choose one of \{Object\.keys\(REPAIR_OPTIONS\)\.length\} repair categories/);
   assert.match(page, /REPAIR_OPTIONS\[newDefect\.category\]\.map\(issue=><option/);
-  assert.match(page, /CHOOSE THE AMEREX SYSTEM/);
   assert.match(css, /\.native-repair-picker select\{[^}]*min-height:44px/);
   assert.match(css, /\.native-repair-picker\{grid-template-columns:repeat\(2/);
   assert.match(css, /\.native-repair-picker \.amerex-code\{grid-column:1\/-1\}/);
@@ -1231,21 +1236,21 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
 test("repair catalog exposes robust category and issue choices", () => {
-  assert.equal(Object.keys(REPAIR_OPTIONS).length, 22);
+  assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Horn"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
   assert.ok(REPAIR_OPTIONS["Doors, Ramp and Lift"].includes("Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Coolant level sensor"));
-  assert.ok(REPAIR_OPTIONS.Suspension.includes("Stabilizer link"));
-  assert.ok(REPAIR_OPTIONS.Suspension.includes("Dogtracking"));
-  assert.ok(REPAIR_OPTIONS.Suspension.includes("Leveling valve"));
-  assert.ok(REPAIR_OPTIONS.Suspension.includes("Bus leaning - C/S"));
-  assert.ok(REPAIR_OPTIONS.Suspension.includes("Bus leaning - R/S"));
+  assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Stabilizer link"));
+  assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Dogtracking"));
+  assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Leveling valve"));
+  assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - C/S"));
+  assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - R/S"));
   assert.ok(REPAIR_OPTIONS.Brakes.includes("Brake mod light"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox won't lock"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - BUS ER"));
@@ -1254,9 +1259,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - R/S"));
   assert.equal(repairCategoryEmoji("Engine"), REPAIR_CATEGORY_EMOJI.Engine);
   assert.equal(repairCategoryLabel("Engine"), "⚙️ Engine");
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Fuel gauge INOP / false reading"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Kneeler button"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Front dash damage"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Fuel gauge INOP / false reading"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - Kneeler button"));
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Front dash damage"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
   assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
@@ -1265,6 +1270,18 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
+  // Amerex keeps the wording printed on the panel; every other grouped
+  // category gets plain wording that names its own groups.
+  assert.equal(repairGroupStepLabel("Amerex"), "CHOOSE THE AMEREX SYSTEM");
+  assert.equal(repairGroupPlaceholder("Amerex"), "Choose Fire Suppression or Gas Concentration");
+  assert.equal(repairIssueStepLabel("Amerex"), "CHOOSE THE STATUS OR CODE");
+  assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose an Amerex status or code");
+  assert.equal(repairGroupStepLabel("Bus Controls"), "CHOOSE THE GROUP");
+  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 4 groups");
+  assert.equal(repairIssueStepLabel("Bus Controls"), "CHOOSE THE DEFECT");
+  assert.equal(repairIssuePlaceholder("Bus Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
+  // An ungrouped category never reaches step 2, but the helper must not throw.
+  assert.equal(repairGroupPlaceholder("Engine"), "Choose one of 0 groups");
   assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required"]);
   assert.equal(defaultDefectOperability("Interior Cleaning", "Scheduled Cleaning"), "service");
   assert.equal(defaultDefectOperability("Interior Cleaning", "Cleaning Required"), "down");
@@ -2365,11 +2382,12 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
 
 test("Bus Controls leads with both turn-signal defects",()=>{
  const controls=REPAIR_OPTIONS["Bus Controls"];
- assert.deepEqual(controls.slice(0,2),["Turn signals (steering column)","Turn signals (floor panel)"]);
+ assert.ok(controls.includes("Operating Controls - Turn signals (steering column)"));
+ assert.ok(controls.includes("Operating Controls - Turn signals (floor panel)"));
  assert.equal(new Set(controls).size,controls.length);
- assert.ok(controls.includes("Horn"));
- assert.ok(controls.includes("Other bus control defect"));
- assert.equal(defectLabel({category:"Bus Controls",issue:"Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
+ assert.ok(controls.includes("Operating Controls - Horn"));
+ assert.ok(controls.includes("Operating Controls - Other bus control defect"));
+ assert.equal(defectLabel({category:"Bus Controls",issue:"Operating Controls - Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
 });
 
 test("spark-plug and valve-adjustment tracking withholds a verdict until Curtis saves an interval",()=>{
@@ -2499,7 +2517,9 @@ test("parts memory learns per defect issue and lets a category default be chosen
  assert.equal(memory.entries[0].scope,"issue");
  assert.equal(recallPart(memory,"Bus Controls","Horn").partNumber,"HN-101");
  assert.equal(recallPart(memory,"Bus Controls","Horn").partName,"Horn relay");
- assert.equal(recallPart(memory,"Electrical / Multiplex","Horn"),undefined);
+ // Horn migrated to Bus Controls, so the retired spelling now finds the same mapping
+ assert.equal(recallPart(memory,"Electrical / Multiplex","Horn").partNumber,"HN-101");
+ assert.equal(recallPart(memory,"Electrical / Multiplex","MOD light"),undefined);
  assert.equal(recallPart(memory,"Bus Controls","Speedometer"),undefined);
 
  // a category default only applies where nothing more specific was learned
@@ -2606,7 +2626,7 @@ test("starting and charging covers crank-no-start and single-station starting",(
 test("merged categories move old records instead of losing them",()=>{
  // No Start duplicated Battery, Starting and Charging and is gone from the picker
  assert.equal(REPAIR_OPTIONS["No Start"],undefined);
- assert.equal(Object.keys(REPAIR_OPTIONS).length,22);
+ assert.equal(Object.keys(REPAIR_OPTIONS).length,21);
 
  // every option the old category offered still has a home
  const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
@@ -2624,8 +2644,9 @@ test("merged categories move old records instead of losing them",()=>{
 
  // Horn lived in two categories; it now resolves to one without changing its text
  assert.equal(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"),false);
- assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Horn"));
- assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","Horn"),{category:"Bus Controls",issue:"Horn"});
+ assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
+ // Horn lands in Bus Controls and then in its picking group, in one step
+ assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","Horn"),{category:"Bus Controls",issue:"Operating Controls - Horn"});
  assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","MOD light"),{category:"Electrical / Multiplex",issue:"MOD light"});
 
  // reading a stored record applies the move, and the No Horn quick filter still matches

@@ -37,13 +37,12 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
- "Suspension":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Other suspension repair"],
- "Steering":["Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other steering repair"],
+ "Suspension and Steering":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Bus Controls":["Turn signals (steering column)","Turn signals (floor panel)","Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement","Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","Operator light","HVAC / heat controls","A/C control panel","Blower control","Pedal adjuster","Floor heat switch","Interior light controls","Start button","Red air valve hard to turn","High beams stay on","Switches broken / loose","Side control panel damage","Steering wheel tilt / telescoping","Driver seat belt","Driver seat leaking air","Driver seat will not lock","Driver seat adjustment / locking bar","Driver seat controls / buttons","Horn","Horn / seat alarm will not stop","Other bus control defect"],
+ "Bus Controls":["Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
@@ -64,6 +63,7 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  Transmission:"🕹️",
  Suspension:"🛞",
  Steering:"🛞",
+ "Suspension and Steering":"🛞",
  Brakes:"🛑",
  "Tires and Wheels":"🛞",
  "Battery, Starting and Charging":"🔋",
@@ -87,6 +87,24 @@ export function repairCategoryLabel(category:string){return repairCategoryEmoji(
 
 export function repairCategoryEmoji(category:string){return REPAIR_CATEGORY_EMOJI[category]||REPAIR_CATEGORY_EMOJI.Miscellaneous}
 
+/* Wording for the two-step picker a grouped category needs. Amerex keeps the
+   language the shop already reads off the panel; every other grouped category
+   (Bus Controls today) gets the plain version. Both native pickers call these,
+   so the bus editor and the multi-bus tool cannot drift apart again. */
+export function repairGroupStepLabel(category:string){
+ return category==="Amerex"?"CHOOSE THE AMEREX SYSTEM":"CHOOSE THE GROUP";
+}
+export function repairGroupPlaceholder(category:string){
+ if(category==="Amerex")return "Choose Fire Suppression or Gas Concentration";
+ return "Choose one of "+Object.keys(REPAIR_OPTION_GROUPS[category]||{}).length+" groups";
+}
+export function repairIssueStepLabel(category:string){
+ return category==="Amerex"?"CHOOSE THE STATUS OR CODE":"CHOOSE THE DEFECT";
+}
+export function repairIssuePlaceholder(category:string,group:string){
+ return category==="Amerex"?"Choose an Amerex status or code":"Choose a defect in "+group;
+}
+
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
 
 function normalizedSymptoms(value:unknown){
@@ -95,6 +113,12 @@ function normalizedSymptoms(value:unknown){
 }
 
 export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
+ "Bus Controls":{
+  "Driver Seat":["Seat belt","Leaking air","Will not lock","Adjustment / locking bar","Controls / buttons"],
+  "Gauges and Dash":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement"],
+  "System Switches":["Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","HVAC / heat controls","A/C control panel","Blower control","Floor heat switch","Interior light controls"],
+  "Operating Controls":["Turn signals (steering column)","Turn signals (floor panel)","Start button","Horn","Horn / seat alarm will not stop","High beams stay on","Red air valve hard to turn","Pedal adjuster","Steering wheel tilt / telescoping","Operator light","Switches broken / loose","Side control panel damage","Other bus control defect"],
+ },
  "Amerex":{
   "Fire Suppression":["Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Other Fire Suppression Trouble"],
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
@@ -113,8 +137,49 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
+/* Bus Controls now picks a group first, so a bare issue moves to its group. */
+const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
+ "A/C control panel":"System Switches - A/C control panel",
+ "Adjustment / locking bar":"Driver Seat - Adjustment / locking bar",
+ "Blower control":"System Switches - Blower control",
+ "Controls / buttons":"Driver Seat - Controls / buttons",
+ "Driver seat adjustment / locking bar":"Driver Seat - Adjustment / locking bar",
+ "Driver seat belt":"Driver Seat - Seat belt",
+ "Driver seat controls / buttons":"Driver Seat - Controls / buttons",
+ "Driver seat leaking air":"Driver Seat - Leaking air",
+ "Driver seat will not lock":"Driver Seat - Will not lock",
+ "Floor heat switch":"System Switches - Floor heat switch",
+ "Front dash damage":"Gauges and Dash - Front dash damage",
+ "Front door open / close switch":"System Switches - Front door open / close switch",
+ "Front instrument dash damaged / replacement":"Gauges and Dash - Front instrument dash damaged / replacement",
+ "Fuel gauge INOP / false reading":"Gauges and Dash - Fuel gauge INOP / false reading",
+ "HVAC / heat controls":"System Switches - HVAC / heat controls",
+ "High beams stay on":"Operating Controls - High beams stay on",
+ "Horn":"Operating Controls - Horn",
+ "Horn / seat alarm will not stop":"Operating Controls - Horn / seat alarm will not stop",
+ "Interior light controls":"System Switches - Interior light controls",
+ "Kneeler button":"System Switches - Kneeler button",
+ "Leaking air":"Driver Seat - Leaking air",
+ "Operator light":"Operating Controls - Operator light",
+ "Other bus control defect":"Operating Controls - Other bus control defect",
+ "Other gauge / indicator":"Gauges and Dash - Other gauge / indicator",
+ "Pedal adjuster":"Operating Controls - Pedal adjuster",
+ "Ramp deploy / stow switch":"System Switches - Ramp deploy / stow switch",
+ "Ramp power switch":"System Switches - Ramp power switch",
+ "Rear door open / close switch":"System Switches - Rear door open / close switch",
+ "Red air valve hard to turn":"Operating Controls - Red air valve hard to turn",
+ "Seat belt":"Driver Seat - Seat belt",
+ "Side control panel damage":"Operating Controls - Side control panel damage",
+ "Speedometer":"Gauges and Dash - Speedometer",
+ "Start button":"Operating Controls - Start button",
+ "Steering wheel tilt / telescoping":"Operating Controls - Steering wheel tilt / telescoping",
+ "Switches broken / loose":"Operating Controls - Switches broken / loose",
+ "Turn signals (floor panel)":"Operating Controls - Turn signals (floor panel)",
+ "Turn signals (steering column)":"Operating Controls - Turn signals (steering column)",
+ "Will not lock":"Driver Seat - Will not lock",
+};
 const NO_START_ISSUE_MOVES:Record<string,string>={
  "Cranks / no start":"Crank no start",
  "Starting-system diagnosis":"Starting / charging diagnosis",
@@ -129,6 +194,9 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  let category=LEGACY_CATEGORY_RENAMES[startedIn]||startedIn||"Miscellaneous";
  /* Horn is reported off the operator's controls, so Bus Controls keeps it. */
  if(category==="Electrical / Multiplex"&&issue==="Horn")category="Bus Controls";
+ if(category==="Suspension and Steering"&&issue==="Other steering repair")issue="Other suspension or steering repair";
+ if(category==="Suspension and Steering"&&issue==="Other suspension repair")issue="Other suspension or steering repair";
+ if(category==="Bus Controls")issue=BUS_CONTROL_ISSUE_GROUPS[issue]||issue;
  return {category,issue};
 }
 
