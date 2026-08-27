@@ -2539,6 +2539,7 @@ test("the fleet duty-cycle average ignores buses whose meter was reset",()=>{
  const cycle=fleetDutyCycle([bus(207251,29678),bus(458985,18803),bus(300000,500,26100)]);
  assert.equal(cycle.buses,2);
  assert.equal(cycle.excluded,1);
+ assert.equal(cycle.excludedReset,1);
  assert.ok(cycle.rate>13&&cycle.rate<14,"the pair averages about 13.7 mi/hr, not the 600 the ECM bus implies");
 
  // an implausible ratio is excluded even without a recorded earlier reading,
@@ -2546,6 +2547,19 @@ test("the fleet duty-cycle average ignores buses whose meter was reset",()=>{
  const noHistory=fleetDutyCycle([bus(300000,500)]);
  assert.equal(noHistory.buses,0);
  assert.equal(noHistory.excluded,1);
+ // a bus with no earlier reading is only a guess, and must be reported as one:
+ // the fastest real bus measured runs 31.46 against a cutoff of 45, so a
+ // genuinely fast express bus could be excluded by mistake
+ assert.equal(noHistory.excludedImplausible,1);
+ assert.equal(noHistory.excludedReset,0);
+ // a meter that actually read lower is hard evidence, counted separately
+ const definite=fleetDutyCycle([bus(300000,500,26100)]);
+ assert.equal(definite.excludedReset,1);
+ assert.equal(definite.excludedImplausible,0);
+ // and the fastest real bus is comfortably inside the cutoff, not excluded
+ const fast=fleetDutyCycle([bus(389990,12395)]);
+ assert.equal(fast.buses,1);
+ assert.equal(fast.excluded,0);
  assert.equal(milesPerEngineHour(207251,29678).toFixed(2),"6.98");
  assert.equal(milesPerEngineHour(100,0),undefined);
 });
@@ -2553,13 +2567,15 @@ test("the fleet duty-cycle average ignores buses whose meter was reset",()=>{
 test("Curtis's two real buses show why miles cannot decide these services",()=>{
  // Readings he took off the dash: 20505 runs slow, heavy-idle work; 17549 runs
  // far more miles per hour. One fleet mileage interval cannot serve both.
- const fleet=[{n:"20505",hours:29678,miles:207251},{n:"17549",hours:18803,miles:458985},{n:"17568",hours:13736,miles:409255}];
+ const fleet=[{n:"20505",hours:29678,miles:207251},{n:"17549",hours:18803,miles:458985},
+  {n:"17568",hours:13736,miles:409255},{n:"17563",hours:12395,miles:389990}];
  const rate=bus=>bus.miles/bus.hours;
  assert.ok(Math.abs(rate(fleet[0])-6.98)<0.01);
  assert.ok(Math.abs(rate(fleet[1])-24.41)<0.01);
  assert.ok(Math.abs(rate(fleet[2])-29.79)<0.01);
+ assert.ok(Math.abs(rate(fleet[3])-31.46)<0.01);
  const rates=fleet.map(rate);
- assert.ok(Math.max(...rates)/Math.min(...rates)>4.2,"the spread across the fleet is over 4x");
+ assert.ok(Math.max(...rates)/Math.min(...rates)>4.5,"the spread across the fleet is over 4.5x");
  // every one of them is inside the plausible band, so none is mistaken for a
  // reset meter and quietly dropped from the fleet average
  for(const bus of fleet) assert.ok(rate(bus)<MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR,"bus "+bus.n);
@@ -2569,25 +2585,37 @@ test("Curtis's two real buses show why miles cannot decide these services",()=>{
  assert.equal(Math.round(1500*rate(fleet[0])),10475);
  assert.equal(Math.round(1500*rate(fleet[1])),36615);
  assert.equal(Math.round(1500*rate(fleet[2])),44692);
+ assert.equal(Math.round(1500*rate(fleet[3])),47195);
 
  // The fleet splits by series, which is why one average cannot stand in for a
  // bus: the 17s run about four times the miles per hour that the 20s do.
  const series=prefix=>{const group=fleet.filter(bus=>bus.n.startsWith(prefix));
   return group.reduce((n,bus)=>n+bus.miles,0)/group.reduce((n,bus)=>n+bus.hours,0)};
- assert.ok(Math.abs(series("17")-26.68)<0.01);
+ assert.ok(Math.abs(series("17")-28.00)<0.01);
  assert.ok(Math.abs(series("20")-6.98)<0.01);
+ // the 17s are a tight population; the gap is between the series, not inside one
+ const seventeens=fleet.filter(bus=>bus.n.startsWith("17")).map(rate);
+ assert.ok(Math.max(...seventeens)/Math.min(...seventeens)<1.3,"the 17s run alike");
 
  // The fleet-wide average lands at 17.29, and no bus in the fleet runs near it.
  // The panel has to say so rather than presenting it as a usable figure.
  const cycle=fleetDutyCycle(fleet.map(bus=>({
   odometerReadings:[{id:"o"+bus.n,miles:bus.miles,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}],
   engineHourReadings:[{id:"h"+bus.n,hours:bus.hours,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}]})));
- assert.equal(cycle.buses,3);
- assert.ok(Math.abs(cycle.rate-17.29)<0.01);
+ assert.equal(cycle.buses,4);
+ assert.ok(Math.abs(cycle.rate-19.64)<0.01);
  assert.ok(Math.abs(cycle.low-6.98)<0.01);
- assert.ok(Math.abs(cycle.high-29.79)<0.01);
- assert.equal(cycle.representative,false,"a 4x spread is not one population");
- for(const bus of fleet) assert.ok(Math.abs(rate(bus)-cycle.rate)>7,"bus "+bus.n+" is nowhere near the average");
+ assert.ok(Math.abs(cycle.high-31.46)<0.01);
+ assert.equal(cycle.representative,false,"a 4.5x spread is not one population");
+ for(const bus of fleet) assert.ok(Math.abs(rate(bus)-cycle.rate)>4.7,"bus "+bus.n+" is nowhere near the average");
+
+ // The average tracks whichever buses happen to have been entered, not any
+ // property of the fleet: it walked 6.98 to 19.64 as these four arrived. That
+ // is the clearest argument against ever deriving a mileage interval from it.
+ const asEntered=[1,2,3,4].map(count=>fleetDutyCycle(fleet.slice(0,count).map(bus=>({
+  odometerReadings:[{id:"o"+bus.n,miles:bus.miles,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}],
+  engineHourReadings:[{id:"h"+bus.n,hours:bus.hours,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}]}))).rate);
+ assert.deepEqual(asEntered.map(value=>Number(value.toFixed(2))),[6.98,13.74,17.29,19.64]);
 
  // a fleet that genuinely runs alike does report a usable average
  const alike=fleetDutyCycle([{n:"a",hours:1000,miles:20000},{n:"b",hours:1000,miles:24000}].map(bus=>({

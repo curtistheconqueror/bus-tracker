@@ -144,7 +144,14 @@ export function milesPerEngineHour(miles:unknown,hours:unknown):number|undefined
  return distance/runtime;
 }
 
-export type FleetDutyCycle={rate?:number;low?:number;high?:number;spread?:number;representative:boolean;buses:number;excluded:number};
+export type FleetDutyCycle={rate?:number;low?:number;high?:number;spread?:number;representative:boolean;buses:number;
+ /* Total excluded, split by how certain the exclusion is. A meter that read
+    lower than it did before is hard evidence of an ECM swap. A ratio above the
+    cutoff is only a guess, and the margin is thinner than it looks: the fastest
+    real bus measured here runs 31.46 miles per engine hour against a cutoff of
+    45. Reporting the two separately means a wrongly excluded bus is visible
+    instead of silently missing from the average. */
+ excluded:number;excludedReset:number;excludedImplausible:number};
 
 /* Above this the average stops describing any real bus and starts describing
    the midpoint of two unrelated groups. Curtis's readings sit either side of it:
@@ -153,20 +160,22 @@ export type FleetDutyCycle={rate?:number;low?:number;high?:number;spread?:number
 export const DUTY_CYCLE_BIMODAL_SPREAD=2;
 
 export function fleetDutyCycle(buses:{odometerReadings?:unknown;engineHourReadings?:unknown}[]):FleetDutyCycle{
- let totalMiles=0,totalHours=0,counted=0,excluded=0,low=Infinity,high=0;
+ let totalMiles=0,totalHours=0,counted=0,excluded=0,excludedReset=0,excludedImplausible=0,low=Infinity,high=0;
  for(const bus of buses){
   const hours=latestEngineHourReading(bus.engineHourReadings),reading=latestOdometer(bus.odometerReadings);
   if(!hours||reading===undefined)continue;
   const rate=milesPerEngineHour(reading,hours.hours);
-  if(rate===undefined||rate>MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR||engineHourMeterReset(bus.engineHourReadings)){excluded+=1;continue}
+  if(rate===undefined){excluded+=1;excludedImplausible+=1;continue}
+  if(engineHourMeterReset(bus.engineHourReadings)){excluded+=1;excludedReset+=1;continue}
+  if(rate>MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR){excluded+=1;excludedImplausible+=1;continue}
   totalMiles+=reading;totalHours+=hours.hours;counted+=1;
   low=Math.min(low,rate);high=Math.max(high,rate);
  }
- if(!counted||totalHours<=0)return {representative:false,buses:counted,excluded};
+ if(!counted||totalHours<=0)return {representative:false,buses:counted,excluded,excludedReset,excludedImplausible};
  const spread=low>0?high/low:undefined;
  return {rate:totalMiles/totalHours,low,high,spread,
   representative:spread===undefined||spread<DUTY_CYCLE_BIMODAL_SPREAD,
-  buses:counted,excluded};
+  buses:counted,excluded,excludedReset,excludedImplausible};
 }
 
 function latestOdometer(value:unknown):number|undefined{
