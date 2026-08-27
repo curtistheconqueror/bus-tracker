@@ -2751,6 +2751,60 @@ test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
  assert.equal(repairCategoryEmoji("Doors, Ramp and ADA"),"♿");
 });
 
+test("mirror wording says who does the work, and the missing fixtures exist",()=>{
+ const lights=REPAIR_OPTIONS["Lights and Fixtures"],body=REPAIR_OPTIONS.Bodywork;
+
+ // Curtis keeps mirrors in both categories on purpose: a mirror the mechanic
+ // can simply swap is not the same job as glass the body shop has to do. The
+ // wording now carries that distinction instead of reading as a duplicate.
+ assert.ok(lights.includes("Mirror replacement (no body work)"));
+ assert.ok(body.includes("Mirror damage (body shop)"));
+ assert.ok(body.includes("Glass / windshield cracked or shattered"));
+ assert.equal(lights.includes("Mirrors / fixtures"),false);
+ assert.equal(body.includes("Mirror"),false);
+ assert.equal(body.includes("Glass / windshield"),false);
+
+ // the mirrors that were missing
+ assert.ok(lights.includes("Interior mirror"));
+ assert.ok(lights.includes("Outside rear view mirror - C/S"));
+ assert.ok(lights.includes("Outside rear view mirror - R/S"));
+
+ // the dash cam is an onboard electronic system, so it sits with the others
+ assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Dash cam"));
+ assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Camera / DVR system"));
+
+ // lamps, not the stalk: Bus Controls keeps the turn signal switches
+ assert.ok(lights.includes("Turn signal lamps"));
+ assert.equal(lights.includes("Turn signals"),false);
+ assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Turn signals (steering column)"));
+ assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Turn signals (floor panel)"));
+
+ // renames are scoped to their category, so a word means one thing per place
+ for(const [category,issue,expected] of [
+  ["Lights and Fixtures","Turn signals","Turn signal lamps"],
+  ["Lights and Fixtures","Mirrors / fixtures","Mirror replacement (no body work)"],
+  ["Bodywork","Mirror","Mirror damage (body shop)"],
+  ["Bodywork","Glass / windshield","Glass / windshield cracked or shattered"],
+ ]){
+  const moved=migrateRepairIdentity(category,issue);
+  assert.deepEqual(moved,{category,issue:expected},category+" / "+issue);
+  assert.ok(REPAIR_OPTIONS[category].includes(moved.issue),expected+" must be pickable");
+ }
+ // a rename in one category must not reach the same word in another
+ assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Headlights"),{category:"Lights and Fixtures",issue:"Headlights"});
+
+ // Warning lights was too vague to diagnose from and left the picker. Every
+ // system that lights one already has its own entry.
+ assert.equal(lights.includes("Warning lights"),false);
+ assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("MOD light"));
+ assert.ok(REPAIR_OPTIONS.Brakes.includes("ABS warning"));
+ assert.ok(REPAIR_OPTIONS["Battery, Starting and Charging"].includes("Solid battery light"));
+ // the records that used it keep their wording and still read correctly
+ const [kept]=normalizeDefects([{id:"warn-1",category:"Lights and Fixtures",issue:"Warning lights",details:"Amber lamp on",state:"open",operability:"service"}]);
+ assert.equal(kept.issue,"Warning lights");
+ assert.equal(defectLabel(kept),"Lights and Fixtures — Warning lights — Amber lamp on");
+});
+
 test("the chair mark flags ADA equipment without touching what gets stored",async()=>{
  const [page,logPage]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),

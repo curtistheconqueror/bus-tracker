@@ -43,12 +43,12 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
- "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Other Tech Services"],
+ "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Doors, Ramp and ADA":["Doors - Front door","Doors - Rear door","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request (wheelchair area)","Stop Request - Stop request (curbside)","Stop Request - Stop request (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect"],
- "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signals","Interior lights","Warning lights","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Mirrors / fixtures","Other light or fixture"],
- "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield","Mirror","Paint","Interior body repair","Other bodywork"],
+ "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
+ "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield cracked or shattered","Mirror damage (body shop)","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
@@ -216,6 +216,21 @@ const NO_START_ISSUE_MOVES:Record<string,string>={
  "Starting-system diagnosis":"Starting / charging diagnosis",
  "Other no-start diagnosis":"Other starting or charging repair",
 };
+/* Renames that only apply inside one category, because the same word means
+   different work depending on where it was logged. A mirror in Lights and
+   Fixtures is a swap the mechanic does; a mirror in Bodywork is the body shop's
+   job. The wording now says which, so the two stop looking like duplicates. */
+const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
+ "Lights and Fixtures":{
+  /* The lamps, not the stalk. Bus Controls owns the turn signal switches. */
+  "Turn signals":"Turn signal lamps",
+  "Mirrors / fixtures":"Mirror replacement (no body work)",
+ },
+ "Bodywork":{
+  "Mirror":"Mirror damage (body shop)",
+  "Glass / windshield":"Glass / windshield cracked or shattered",
+ },
+};
 /* Doors, Ramp and Lift picks a group first now, so its bare issues move too. */
 const DOOR_RAMP_ISSUE_GROUPS:Record<string,string>={
  "Door controls":"Doors - Door controls",
@@ -241,6 +256,7 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  if(category==="Suspension and Steering"&&issue==="Other suspension repair")issue="Other suspension or steering repair";
  if(category==="Bus Controls")issue=BUS_CONTROL_ISSUE_GROUPS[issue]||issue;
  if(category==="Doors, Ramp and ADA")issue=DOOR_RAMP_ISSUE_GROUPS[issue]||issue;
+ issue=CATEGORY_ISSUE_RENAMES[category]?.[issue]||issue;
  return {category,issue};
 }
 
