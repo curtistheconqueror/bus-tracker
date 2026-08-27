@@ -2588,7 +2588,9 @@ test("both repair workflows offer a remembered part without imposing or blocking
 test("starting and charging covers crank-no-start and single-station starting",()=>{
  const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
  // the symptom cluster reads in diagnostic order next to the existing No crank
- const order=["No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter"];
+ const order=["No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging"];
+ // solid and flashing are separate diagnostic paths, so they are separate options
+ assert.ok(starting.includes("Solid battery light")&&starting.includes("Flashing battery light"));
  const at=starting.indexOf("No crank");
  assert.ok(at>=0);
  assert.deepEqual(starting.slice(at,at+order.length),order);
