@@ -546,7 +546,7 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
   assert.match(css,/\.quick-filter-drawer>\.quick-filter-results\{min-height:0;grid-auto-rows:max-content/);
   assert.match(css,/inset:max\(8px,env\(safe-area-inset-top\)\) 8px max\(8px,env\(safe-area-inset-bottom\)\)/);
-  assert.match(css,/\.mystery-board\.collapsed>header\{border-bottom:0\}/);
+  assert.match(css,/\.mystery-board\.collapsed>\.mystery-head\{border-bottom:0\}/);
   assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
 });
 
@@ -2958,6 +2958,61 @@ test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
  // the ADA quick filter keys off wording, so grouped names must keep matching
  assert.ok(quickFilterMatch({id:"bus-1",defects:[read]},"bad-ramp"));
  assert.equal(repairCategoryEmoji("Doors, Ramp and ADA"),"♿");
+});
+
+test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
+ const [logPage,logCss]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ // globals.css styles bare <header> as a 38px dark banner and bare <footer> as
+ // a pill fixed to the bottom of the viewport. The editor's action bar had a
+ // rule only inside the phone breakpoint, so on desktop it detached from the
+ // modal, floated over the page and swallowed clicks; the grouped defect list
+ // wore the dark banner. Every one of them now carries a class.
+ assert.equal(/<header>|<footer>/.test(logPage),false,"no bare header or footer may come back");
+ for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions"])
+  assert.ok(logPage.includes('className="'+className+'"'),className+" must be applied in the markup");
+
+ // the element selectors still match these tags, so the global properties are
+ // neutralised before each one is styled deliberately
+ const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions\{([^}]*)\}/);
+ assert.ok(reset,"the reset block must exist");
+ for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
+  assert.ok(reset[1].includes(property),"the reset must clear "+property);
+
+ // the action bar must be sticky OUTSIDE any media query, which is what was
+ // missing: styling it only for phones is how the desktop bug happened
+ const topLevel=(()=>{let out="",depth=0,index=0;
+  while(index<logCss.length){
+   if(logCss.startsWith("@media",index)){const open=logCss.indexOf("{",index);depth=1;index=open+1;
+    while(index<logCss.length&&depth>0){if(logCss[index]==="{")depth++;else if(logCss[index]==="}")depth--;index++}
+    continue}
+   out+=logCss[index];index++}
+  return out})();
+ assert.equal(topLevel.includes("@media"),false,"media blocks must be stripped");
+ assert.match(topLevel,/\.log-editor-actions\{position:sticky;z-index:4;bottom:0;/);
+ assert.match(topLevel,/\.log-editor-actions button\{min-width:150px;min-height:46px;border:/);
+ assert.match(topLevel,/\.log-editor-actions \.save-log\{border-color:#08733f;background:#08733f/);
+
+ // Add Defect is the same green as Log Defect and the focus view's button
+ assert.match(logCss,/\.grouped-defect-head button\{[^}]*background:#08733f/);
+ assert.match(logCss,/\.feed-title button\{[^}]*background:#08733f/);
+ assert.match(logCss,/\.add-log-focus-defect\{[^}]*background:#08733f/);
+ // and it is no longer the blue accent, on a header that is no longer a banner
+ assert.equal(/\.grouped-defect-head button\{[^}]*background:var\(--log-accent\)/.test(logCss),false);
+ assert.match(logCss,/\.grouped-defect-head\{[^}]*background:none/);
+});
+
+test("the repair details panel opens for a record that has repair details",async()=>{
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ // defaultOpen is not a DOM prop. React warned and the panel never opened, so a
+ // completed repair showed its diagnosis, action and part number collapsed
+ // behind a summary that gave no hint anything was inside.
+ assert.equal(/defaultOpen=\{/.test(logPage),false,"the invalid prop must not come back");
+ assert.match(logPage,/const \[advancedOpen,setAdvancedOpen\]=useState\(\(\)=>Boolean\(draft\.defect\.state==="completed"\|\|draft\.defect\.diagnosticNote/);
+ // held in state so it opens when there is something to see and still collapses
+ assert.match(logPage,/<details className="advanced-defect-details" open=\{advancedOpen\} onToggle=\{event=>setAdvancedOpen\(event\.currentTarget\.open\)\}>/);
 });
 
 test("mirror wording says who does the work, and the missing fixtures exist",()=>{
