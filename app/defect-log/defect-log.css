@@ -165,7 +165,10 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 .log-focus-where{display:flex;min-width:0;flex-direction:column;gap:3px}
 .log-focus-where b{font-size:15px;color:var(--log-text)}
 .log-focus-where small{font-size:11px;font-weight:900;color:var(--log-muted)}
+.add-log-focus-defect{margin-left:auto;min-height:48px;flex:0 0 auto;border:0;border-radius:10px;background:#08733f;color:#fff;padding:0 16px;font-family:inherit;font-size:12px;font-weight:900;white-space:nowrap;cursor:pointer}
+.add-log-focus-defect:hover,.add-log-focus-defect:focus-visible{background:#0a8b4c}
 .close-log-focus{margin-left:auto;width:48px;height:48px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:10px;background:var(--log-surface);color:var(--log-text);font-family:inherit;font-size:24px;line-height:1;cursor:pointer}
+.add-log-focus-defect+.close-log-focus{margin-left:0}
 .log-focus-body{flex:1;display:grid;gap:12px;align-content:start;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .log-focus-record{border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 16px}
 .log-focus-record.in-progress{border-left-color:#c99400}.log-focus-record.deferred{border-left-color:#6b46c1}.log-focus-record.completed{border-left-color:#0a7d47}
@@ -182,7 +185,8 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 @media(max-width:760px){
  .log-focus-shade{align-items:stretch;padding:0}
  .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
- .log-focus-head{padding-top:calc(16px + env(safe-area-inset-top))}
+ .log-focus-head{gap:9px;padding-top:calc(16px + env(safe-area-inset-top))}
+ .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}

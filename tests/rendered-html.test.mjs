@@ -2485,6 +2485,16 @@ test("every Defect Log bus card carries a focus view that reads without editing"
  assert.match(focusBlock,/className="log-focus-record-foot"/);
  assert.match(page,/aria-label="Close focus view"/);
 
+ // the focus view can start a new defect on the bus it is already showing,
+ // prefilled with that bus so the mechanic never re-picks the number
+ assert.match(focusBlock,/className="add-log-focus-defect"/);
+ assert.match(focusBlock,/const busId=focusedGroup\.bus\.id;setFocusedBusId\(""\);setEditing\(\{\.\.\.newDraft\(\),busId\}\)/);
+ assert.match(focusBlock,/aria-label=\{"Add a defect to bus "\+focusedGroup\.bus\.n\}/);
+ // same green as + LOG DEFECT, and it does not squeeze out the close control
+ assert.match(css,/\.add-log-focus-defect\{margin-left:auto;min-height:48px[^}]*background:#08733f/);
+ assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
+ assert.match(css,/\.feed-title button\{height:36px;border:0;border-radius:6px;background:#08733f/);
+
  // larger reading type than the feed it replaces, and a real touch target
  assert.match(css,/\.log-focus-defect\{margin:0 0 11px;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
@@ -2658,4 +2668,32 @@ test("merged categories move old records instead of losing them",()=>{
  const horn={id:"legacy-2",category:"Electrical / Multiplex",issue:"Horn",details:"",state:"open",operability:"service"};
  assert.equal(normalizeDefects([horn])[0].category,"Bus Controls");
  assert.ok(quickFilterMatch({id:"bus-1",defects:[horn]},"no-horn"),"the No Horn filter matches on text, not category");
+});
+
+test("a stored Steering defect keeps its wording under the merged category",()=>{
+ // Curtis asked what happens to records already saved as Steering. They are not
+ // rewritten in storage: they surface under the merged name as they are read.
+ const stored=[
+  {id:"s1",category:"Steering",issue:"Steering pull",details:"Pulls right",state:"open",operability:"service"},
+  {id:"s2",category:"Steering",issue:"Other steering repair",details:"Wander",state:"open",operability:"service"},
+  {id:"s3",category:"Suspension",issue:"Air bag",details:"",state:"open",operability:"service"},
+ ];
+ const read=normalizeDefects(stored);
+ assert.deepEqual(read.map(defect=>defect.category),["Suspension and Steering","Suspension and Steering","Suspension and Steering"]);
+ // the specific complaint is untouched; only the two catch-alls were combined
+ assert.deepEqual(read.map(defect=>defect.issue),["Steering pull","Other suspension or steering repair","Air bag"]);
+ assert.deepEqual(read.map(defect=>defect.id),["s1","s2","s3"]);
+ assert.equal(read[0].details,"Pulls right");
+ assert.equal(defectLabel(read[0]),"Suspension and Steering — Steering pull — Pulls right");
+ // the retired names are gone from the picker but still resolve on read
+ assert.equal(REPAIR_OPTIONS.Steering,undefined);
+ assert.equal(REPAIR_OPTIONS.Suspension,undefined);
+
+ // loose steering is a distinct driver complaint, not "steering pull"
+ const steering=REPAIR_OPTIONS["Suspension and Steering"];
+ assert.ok(steering.includes("Loose steering"));
+ assert.ok(steering.indexOf("Loose steering")<steering.indexOf("Steering pull"));
+ assert.equal(steering.length,17);
+ assert.equal(defectLabel({category:"Suspension and Steering",issue:"Loose steering",details:"Play in the wheel"}),
+  "Suspension and Steering — Loose steering — Play in the wheel");
 });
