@@ -130,9 +130,7 @@ function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forget
      <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
      <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
     </div>
-    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>setValue(current=>({...current,onDownSheet:event.target.checked}))}/><span><b>DOWN SHEET</b><small>Escalate this repair without changing the bus location.</small></span></label>
-    <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Mark when the reported condition could not be reproduced during inspection or testing.</small></span></label>
-    <details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary>REPAIR / COMPLETION DETAILS</summary><div className="advanced-defect-grid">
+    <details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
     <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
     <div className="parts-used-block">
@@ -147,6 +145,9 @@ function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forget
     <label>FIXED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     </div></details>
+    <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>setValue(current=>({...current,onDownSheet:event.target.checked}))}/><span><b>DOWN SHEET</b><small>Escalate this repair without changing the bus location.</small></span></label>
+    <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Mark when the reported condition could not be reproduced during inspection or testing.</small></span></label>
+
    </div>
    <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" onClick={close}>CLOSE</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button></footer>
   </form>
