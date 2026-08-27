@@ -29,6 +29,10 @@ export type BusListEntry={
  done:boolean;
  doneAt?:string;
  doneBy?:string;
+ /* Billable time for this one repair, in decimal hours: .5 is half an hour.
+    Always optional. Most rows on a sweep are a few seconds of work and carry
+    nothing, and a row with no time must never be counted as zero worked. */
+ hours?:number;
 };
 
 export type BusList={
@@ -81,6 +85,17 @@ function splitCells(row:string):string[]{
  if(row.includes(","))return row.split(",").map(cell=>collapse(cell));
  if(/ {2,}/.test(row))return row.split(/ {2,}/).map(cell=>collapse(cell));
  return [collapse(row)];
+}
+
+/* Decimal hours as a mechanic writes them: .5, 0.5, 1, 2.25. Anything that is
+   not a positive number is treated as no time recorded rather than as zero,
+   because the two mean different things on a timesheet. */
+export const BUS_LIST_MAX_HOURS=24;
+export function normalizeBusListHours(value:unknown):number|undefined{
+ if(value===""||value===null||value===undefined)return undefined;
+ const hours=Number(value);
+ if(!Number.isFinite(hours)||hours<=0)return undefined;
+ return Math.min(BUS_LIST_MAX_HOURS,Math.round(hours*100)/100);
 }
 
 export function normalizeBusListColumns(value:unknown):string[]{
@@ -144,6 +159,10 @@ export function normalizeBusListEntries(value:unknown):BusListEntry[]{
    busNumber,cells,done,
    doneAt:done&&doneAt&&!Number.isNaN(new Date(doneAt).getTime())?new Date(doneAt).toISOString():undefined,
    doneBy:done?clean(raw.doneBy)||undefined:undefined,
+   /* Time survives unticking a row. The work was still done, and losing the
+      hours because someone corrected a checkbox would quietly rewrite a
+      timesheet. */
+   hours:normalizeBusListHours(raw.hours),
   });
  }
  return entries.slice(0,BUS_LIST_ENTRY_LIMIT);
@@ -205,6 +224,15 @@ export function setBusListEntryCell(list:BusList,entryId:string,column:number,va
   while(cells.length&&cells[cells.length-1]==="")cells.pop();
   return {...entry,cells};
  })};
+}
+
+export function setBusListEntryHours(list:BusList,entryId:string,value:unknown):BusList{
+ const hours=normalizeBusListHours(value);
+ return {...list,entries:list.entries.map(entry=>entry.id!==entryId?entry:{...entry,hours})};
+}
+
+export function busListHours(list:Pick<BusList,"entries">){
+ return Math.round(list.entries.reduce((total,entry)=>total+(entry.hours||0),0)*100)/100;
 }
 
 export function setBusListEntryDone(list:BusList,entryId:string,done:boolean,now:string,initials:string):BusList{
@@ -269,7 +297,9 @@ export function busListExportText(list:BusList,mode:BusListExportMode="full",now
 
  const head=[list.name.toUpperCase()];
  const stamp=[shortDate(now),list.source].filter(Boolean).join(" · ");
- head.push([stamp,total+" bus"+(total===1?"":"es"),done+" cleared",remaining+" remaining"].filter(Boolean).join(" · "));
+ const billed=busListHours(list);
+ head.push([stamp,total+" bus"+(total===1?"":"es"),done+" cleared",remaining+" remaining",
+  billed?billed+" hr billed":""].filter(Boolean).join(" · "));
 
  const body:string[]=[];
  if(remainingEntries.length){
@@ -283,7 +313,7 @@ export function busListExportText(list:BusList,mode:BusListExportMode="full",now
   body.push("","CLEARED ("+doneEntries.length+")");
   if(headingRow)body.push(headingRow);
   body.push(...doneEntries.map(entry=>{
-   const marks=[shortDate(entry.doneAt||""),entry.doneBy].filter(Boolean).join(" ");
+   const marks=[shortDate(entry.doneAt||""),entry.doneBy,entry.hours===undefined?"":entry.hours+" hr"].filter(Boolean).join(" · ");
    return line(entry,marks?"  ["+marks+"]":"");
   }));
  }

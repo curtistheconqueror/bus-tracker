@@ -17,7 +17,8 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_TEMPLATES, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
+import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
+import { formatWorkHours, workDayKey, workTimePeople, workTimeSummary } from "../app/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2553,7 +2554,7 @@ test("the list export is written to be read by someone without the app",()=>{
  // outstanding work leads, because that is what the reader has to act on
  assert.ok(full.indexOf("REMAINING (2)")<full.indexOf("CLEARED (1)"));
  assert.match(full,/ {2}17547$/m);
- assert.match(full,/15501 — South · 21790 .* {2}\[Aug 27 CM\]/m);
+ assert.match(full,/15501 — South · 21790 .* {2}\[Aug 27 · CM\]/m);
  // real line breaks, so it survives a text message or an email
  assert.ok(full.split("\n").length>6);
 
@@ -2626,6 +2627,122 @@ test("a list names its own columns, and never loses a value it was not told abou
  const wide=setBusListEntryCell(named,named.entries[0].id,0,"x".repeat(80));
  const capped=busListExportText(wide,"remaining",now).split("\n").find(row=>row.includes("xxxx"));
  assert.ok(capped.includes("x".repeat(80)),"the value itself is never cut");
+});
+
+test("billable hours are optional, decimal, and never assumed to be zero",()=>{
+ // decimal notation as a mechanic writes it
+ assert.equal(normalizeBusListHours(".5"),0.5);
+ assert.equal(normalizeBusListHours("0.5"),0.5);
+ assert.equal(normalizeBusListHours("2.25"),2.25);
+ assert.equal(normalizeBusListHours(1.005),1);
+ // a blank is no time recorded, which is not the same as zero hours worked
+ assert.equal(normalizeBusListHours(""),undefined);
+ assert.equal(normalizeBusListHours("0"),undefined);
+ assert.equal(normalizeBusListHours("-1"),undefined);
+ assert.equal(normalizeBusListHours("abc"),undefined);
+ assert.equal(normalizeBusListHours(null),undefined);
+ // a fat-fingered figure cannot book a week to one repair
+ assert.equal(normalizeBusListHours("99"),BUS_LIST_MAX_HOURS);
+
+ const now="2026-08-27T15:00:00.000Z";
+ let list=createBusList("Farebox","rep",now,"s");
+ list=addBusListEntries(list,"17503\n17504\n17506","a");
+ list=setBusListEntryHours(list,list.entries[0].id,".5");
+ list=setBusListEntryHours(list,list.entries[1].id,"1.25");
+ assert.equal(busListHours(list),1.75);
+ assert.equal(list.entries[2].hours,undefined,"an untouched row carries no time");
+
+ // hours survive unticking: the work was done, and losing it because someone
+ // corrected a checkbox would quietly rewrite a timesheet
+ let ticked=setBusListEntryDone(list,list.entries[0].id,true,now,"CURTIS");
+ ticked=setBusListEntryDone(ticked,ticked.entries[0].id,false,now,"CURTIS");
+ assert.equal(ticked.entries[0].hours,0.5);
+ assert.equal(ticked.entries[0].doneBy,undefined);
+
+ // and they survive storage
+ const restored=normalizeBusLists(JSON.parse(JSON.stringify([list])));
+ assert.equal(busListHours(restored[0]),1.75);
+
+ // the shared list carries the time too: a foreman reading it should not have
+ // to open the app to see what the sweep cost
+ let shared=setBusListEntryDone(list,list.entries[0].id,true,now,"CURTIS");
+ shared=setBusListEntryDone(shared,shared.entries[2].id,true,now,"CURTIS");
+ const text=busListExportText(shared,"full",now);
+ assert.match(text,/1\.75 hr billed/);
+ assert.match(text,/17503 {2}\[Aug 27 · CURTIS · 0\.5 hr\]/);
+ // a row cleared with no time recorded says so by omission, not with a zero
+ assert.match(text,/17506 {2}\[Aug 27 · CURTIS\]/);
+ // and a campaign with no time at all does not mention billing
+ assert.equal(busListExportText(createBusList("Empty","",now,"e"),"full",now).includes("hr billed"),false);
+});
+
+test("work time totals per person, day by day, and says what it is not counting",()=>{
+ const yesterday="2026-08-26T15:00:00.000Z",today="2026-08-27T15:00:00.000Z";
+ let farebox=createBusList("Farebox","rep",yesterday,"s");
+ farebox=addBusListEntries(farebox,"17503\n17504\n17506","a");
+ farebox=setBusListEntryDone(farebox,farebox.entries[0].id,true,yesterday,"CURTIS");
+ farebox=setBusListEntryHours(farebox,farebox.entries[0].id,".5");
+ farebox=setBusListEntryDone(farebox,farebox.entries[1].id,true,yesterday,"CURTIS");
+ farebox=setBusListEntryHours(farebox,farebox.entries[1].id,"1.25");
+ // ticked but no hours: a few seconds of work, common on a sweep
+ farebox=setBusListEntryDone(farebox,farebox.entries[2].id,true,today,"CURTIS");
+
+ let ventra=createBusList("Ventra","rep",today,"t");
+ ventra=addBusListEntries(ventra,"17520\n17521","b");
+ ventra=setBusListEntryDone(ventra,ventra.entries[0].id,true,today,"CURTIS");
+ ventra=setBusListEntryHours(ventra,ventra.entries[0].id,"2");
+ ventra=setBusListEntryDone(ventra,ventra.entries[1].id,true,today,"JT");
+ ventra=setBusListEntryHours(ventra,ventra.entries[1].id,".75");
+
+ const lists=[farebox,ventra];
+ assert.deepEqual(workTimePeople(lists),["CURTIS","JT"]);
+
+ const curtis=workTimeSummary(lists,"CURTIS");
+ // totals run across every campaign, not just the one being looked at
+ assert.equal(curtis.hours,3.75);
+ assert.equal(curtis.entries,3);
+ // the untimed row is reported, never counted as zero
+ assert.equal(curtis.untimed,1);
+ assert.equal(curtis.days.length,2);
+ // most recent day first: the one being worked is the one being checked
+ assert.ok(curtis.days[0].day>curtis.days[1].day);
+ assert.equal(curtis.days[0].hours,2);
+ assert.equal(curtis.days[1].hours,1.75);
+ assert.equal(curtis.days[1].entries,2);
+ assert.deepEqual(curtis.days[1].rows.map(row=>row.label),["Bus 17503","Bus 17504"]);
+
+ // one person's time never leaks into another's
+ assert.equal(workTimeSummary(lists,"JT").hours,0.75);
+ assert.equal(workTimeSummary(lists,"NOBODY").hours,0);
+ assert.deepEqual(workTimeSummary(lists,"").days,[]);
+ assert.deepEqual(workTimeSummary([],"CURTIS").days,[]);
+
+ // the day is the viewer's calendar day, so a repair ticked late at night
+ // belongs to that day's timesheet rather than the next one in UTC
+ assert.equal(workDayKey(today),workDayKey("2026-08-27T23:30:00.000Z")||workDayKey(today));
+ assert.equal(workDayKey("not a date"),"");
+ assert.equal(formatWorkHours(2),"2");
+ assert.equal(formatWorkHours(0.5),"0.5");
+ assert.equal(formatWorkHours(1.25),"1.25");
+});
+
+test("the work time panel is written to be moved somewhere else later",async()=>{
+ const [panel,logic,listsPage]=await Promise.all([
+  readFile(new URL("../app/work-time-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/work-time.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
+ ]);
+ // Curtis expects this to move. It takes its records as a prop and holds only
+ // which person is picked, so relocating it is an import and one line.
+ assert.match(panel,/export default function WorkTimePanel\(\{lists,defaultPerson=""\}/);
+ assert.equal(/localStorage/.test(panel),false,"it must not reach for storage of its own");
+ assert.equal(/BUS_LISTS_STORAGE_KEY|useRouter|window\./.test(panel),false,"nor for the page around it");
+ // the aggregation knows nothing about campaigns beyond where rows come from
+ assert.equal(/localStorage|document\.|window\./.test(logic),false);
+ // mounted outside the campaign layout, so it can be lifted out whole
+ assert.match(listsPage,/<WorkTimePanel lists=\{lists\} defaultPerson=\{initials\.trim\(\)\.toUpperCase\(\)\}\/>/);
+ assert.ok(listsPage.indexOf("<WorkTimePanel")<listsPage.indexOf('className="lists-layout"'),"near the top, not inside the list panels");
+ assert.ok(listsPage.indexOf("lists-header")<listsPage.indexOf("<WorkTimePanel"),"but below the header, not at the very top");
 });
 
 test("report formats are reusable, built in for farebox and savable for the rest",()=>{
@@ -2715,6 +2832,21 @@ test("every page offers the Fleet Campaigns tab without changing the lists route
  for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(listsPage.includes('href="'+href+'"'),href);
  // globals.css styles bare <header>, so this page must not use one
  assert.equal(/<header>|<footer>/.test(listsPage),false);
+
+ // On a phone the panels stack and the paste box lands below the fold, so
+ // creating a list looked like it did nothing at all. It is scrolled into view
+ // when a list opens, and not focused, which would throw up the keyboard before
+ // the mechanic has decided what to paste.
+ assert.match(listsPage,/<label>PASTE A REPORT<textarea ref=\{addBoxRef\}/);
+ // one bus, Enter, cleared and ready for the next: for standing at a bus
+ // rather than working from a report
+ assert.match(listsPage,/onKeyDown=\{event=>\{if\(event\.key==="Enter"\)\{event\.preventDefault\(\);addQuickBus\(\)\}\}\}/);
+ assert.match(listsPage,/setQuickBus\(""\)/);
+ assert.match(listsPage,/addBoxRef\.current;[\s\S]{0,120}?scrollIntoView\(\{block:"center",behavior:"smooth"\}\)/);
+ assert.equal(/addBoxRef\.current\?\.focus\(\)/.test(listsPage),false);
+ // and the columns panel starts closed: a chosen format has already filled it
+ // in, so leaving it open only pushes the paste box further down
+ assert.match(listsPage,/<details className="list-columns">/);
  // the Facility Map hides its header nav on desktop and navigates from the
  // command bar, so without this button the page is unreachable there
  assert.match(pages[0],/className="lists-command"[\s\S]{0,90}?window\.location\.assign\("\/lists"\)/);

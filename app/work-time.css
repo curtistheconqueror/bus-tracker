@@ -1,0 +1,26 @@
+/* Styles travel with the Work Time panel so it can be dropped onto another page
+   without hunting for what it depends on. Everything is namespaced under
+   .work-time, and globals.css styles a bare <section>, so the panel neutralises
+   that first and then styles itself. */
+.work-time{position:static;width:auto;border:1px solid #aebdd1;border-radius:9px;background:#fff;padding:11px 13px;box-shadow:0 6px 22px #17355718;font-size:inherit}
+.work-time-head{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.work-time-head label{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#62748d}
+.work-time-head select{min-width:190px;min-height:38px;border:1px solid #b7c4d7;border-radius:6px;padding:0 8px;font-size:12px}
+.work-time-total{display:grid;gap:1px;justify-items:end}
+.work-time-total strong{font-size:24px;line-height:1;color:#0b64bd}
+.work-time-total small{font-size:7px;font-weight:900;letter-spacing:.5px;color:#62748d}
+.work-time-empty{margin:9px 0 0;color:#62748d;font-size:9px;line-height:1.45}
+
+.work-time-days{display:grid;gap:5px;margin:10px 0 0;padding:0;list-style:none}
+.work-time-days li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:baseline;border:1px solid #cbd6e6;border-radius:7px;background:#f7fafd;padding:8px 10px}
+.work-time-day{display:grid;gap:1px}
+.work-time-day b{font-size:11px;color:#163c70}
+.work-time-day small{font-size:7px;font-weight:900;color:#8496ad}
+.work-time-hours{font-size:17px;font-weight:900;color:#087347}
+.work-time-detail{grid-column:1/-1;color:#62748d;font-size:8px;line-height:1.4;overflow-wrap:anywhere}
+.work-time-note{display:block;margin-top:8px;color:#7a5600;font-size:8px;font-weight:800;line-height:1.4}
+
+@media(max-width:860px){
+ .work-time-head select{min-width:0;width:100%}
+ .work-time-head label{width:100%}
+}
