@@ -17,7 +17,7 @@ The project is an offline-capable fleet maintenance operations application with 
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
 3. Real-Time Defect Log — mobile-first field observations and smaller repairs that usually do not belong on the Down Sheet.
 4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
-5. Fleet Campaigns — independent device-local punch lists with custom columns, reusable report formats, completion initials/timestamps, and shareable text output.
+5. Fleet Campaigns — independent device-local punch lists with custom columns, reusable report formats, completion initials/timestamps, and shareable text output. Also hosts the Work Time panel, which totals a person's day across campaign rows and Defect Log repairs; the panel takes its records as props and is built to be relocated.
 
 ## Domain ownership
 
@@ -27,7 +27,8 @@ These boundaries prevent synchronization bugs:
 - The Down Sheet owns formal maintenance scheduling and active Down Sheet membership.
 - The Defect Log owns records created directly from the Defect Log.
 - Fixed Repairs reads completed structured defects from the fleet record and owns only their completion-detail edits; it is not a separate duplicate repair store.
-- Fleet Campaigns owns independent working lists and must not read or mutate fleet, Down Sheet, Defect Log, or Fixed Repairs records.
+- Fleet Campaigns owns independent working lists and must not mutate fleet, Down Sheet, Defect Log, or Fixed Repairs records. Its one read outside its own storage is the fleet, borrowed read-only so the Work Time panel can total Defect Log repair hours alongside campaign rows; the page never writes fleet storage back.
+- Work time is an aggregation, not a store. It records nothing of its own: it reads hours already saved on campaign rows and on completed repairs, so a time total can never disagree with the record it came from.
 - Repair and status changes may synchronize across surfaces; Down Sheet or Defect Log edits must not silently relocate a bus.
 - A bus may have multiple independent repair records. The phone Defect Log groups them visually by bus but does not merge or discard the underlying records.
 

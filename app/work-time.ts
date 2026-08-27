@@ -1,19 +1,34 @@
 import {normalizeBusListHours,type BusList,type BusListEntry} from "./bus-lists.ts";
+import {normalizeDefects,normalizeRepairHours} from "./repair-catalog.ts";
 
 /* Accrued work time, totalled per person per day.
 
    This knows nothing about Fleet Campaigns or any other page. It takes rows
    that carry a person, a date and a number of hours, and returns the daily
-   totals. Campaigns are simply the first place those rows exist; when the time
-   record moves somewhere of its own, or starts drawing on Defect Log repairs
-   as well, this module is what it keeps and only its callers change.
+   totals. Two things produce those rows today: a campaign row ticked off with
+   hours against it, and a Defect Log repair saved as fixed with billable time
+   on it. Both land in the same day totals, because a shift spent half on a
+   farebox sweep and half on a repair is still one shift.
+
+   Adding a third source is a function that returns WorkTimeRow[] and a line in
+   sourceRows below. Nothing else here needs to know where a row came from.
 
    A row with no hours recorded is not a row worked for zero hours. Most of a
-   farebox sweep is seconds of work and carries no time at all, so those rows
-   are counted separately rather than dragging an average down or implying the
-   day was spent on nothing. */
+   farebox sweep is seconds of work and carries no time at all, and repairs
+   fixed before the time field existed carry none either, so those are counted
+   separately rather than dragging a total down or implying the day was spent
+   on nothing. */
 
-export type WorkTimeRow={person:string;day:string;hours:number;label:string;source:string};
+export type WorkTimeRow={person:string;day:string;hours:number;label:string;source:string;note?:string};
+
+/* What a bus has to look like for its repairs to count. Structural on purpose:
+   the board's own Bus type carries fifty fields this has no business knowing
+   about, and a record with a number and some defects is all a timesheet needs. */
+export type WorkTimeBus={id?:string;n?:string;defects?:unknown;pendingRepair?:string};
+
+/* Every record the timesheet draws on. Both are optional so a caller that only
+   has one of them passes only that. */
+export type WorkTimeSource={lists?:BusList[];buses?:WorkTimeBus[]};
 
 export type WorkTimeDay={day:string;hours:number;entries:number;rows:WorkTimeRow[]};
 export type WorkTimeSummary={person:string;hours:number;entries:number;untimed:number;days:WorkTimeDay[]};
@@ -51,30 +66,68 @@ export function workTimeRowsFromLists(lists:BusList[]):WorkTimeRow[]{
  return rows;
 }
 
-export function workTimePeople(lists:BusList[]):string[]{
+/* Every completed repair reads as one row. Diagnostic and repair time are
+   stored apart because they are different work, but a day's total wants them
+   added: the shift was spent on both. The split is kept in the note so a long
+   day reads as what it was rather than as one unexplained number.
+
+   Only one timestamp exists on a repair, so a bus diagnosed on Monday and
+   fixed on Tuesday puts both figures on Tuesday. That is the record's limit,
+   not a rounding: saving the diagnosis on the day it was done is what keeps
+   the two days honest, and the split in the note makes a lopsided day visible. */
+export function workTimeRowsFromFleet(buses:WorkTimeBus[]):WorkTimeRow[]{
+ const rows:WorkTimeRow[]=[];
+ for(const bus of buses){
+  for(const defect of normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id||"bus")){
+   if(defect.state!=="completed")continue;
+   const person=clean(defect.completedBy),day=workDayKey(clean(defect.completedAt));
+   if(!person||!day)continue;
+   const repair=normalizeRepairHours(defect.repairHours)||0,diagnostic=normalizeRepairHours(defect.diagnosticHours)||0;
+   const hours=Math.round((repair+diagnostic)*100)/100;
+   if(!hours)continue;
+   rows.push({person,day,hours,label:clean(bus.n)?"Bus "+clean(bus.n):"Repair",source:"Defect Log",
+    note:diagnostic&&repair?"incl "+formatWorkHours(diagnostic)+" diag":diagnostic?"diagnosis":undefined});
+  }
+ }
+ return rows;
+}
+
+function sourceRows(source:WorkTimeSource):WorkTimeRow[]{
+ return [...workTimeRowsFromLists(source.lists||[]),...workTimeRowsFromFleet(source.buses||[])];
+}
+
+export function workTimePeople(source:WorkTimeSource):string[]{
  const seen=new Set<string>();
- for(const list of lists)for(const entry of list.entries)if(clean(entry.doneBy))seen.add(clean(entry.doneBy));
+ for(const list of source.lists||[])for(const entry of list.entries)if(clean(entry.doneBy))seen.add(clean(entry.doneBy));
+ for(const bus of source.buses||[])for(const defect of normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id||"bus")){
+  if(defect.state==="completed"&&clean(defect.completedBy))seen.add(clean(defect.completedBy));
+ }
  return [...seen].sort((left,right)=>left.localeCompare(right));
 }
 
-/* How many rows this person ticked without recording time. Reported alongside
+/* How many rows this person finished without recording time. Reported alongside
    the total so a light-looking day reads as "mostly quick jobs" rather than as
-   an hour count that cannot be right. */
-function untimedCount(lists:BusList[],person:string){
+   an hour count that cannot be right. Repairs closed before the time field
+   existed land here too, which is the truthful place for them. */
+function untimedCount(source:WorkTimeSource,person:string){
  let count=0;
- for(const list of lists)for(const entry of list.entries){
+ for(const list of source.lists||[])for(const entry of list.entries){
   if(clean(entry.doneBy)!==person)continue;
   if(normalizeBusListHours(entry.hours)===undefined)count+=1;
+ }
+ for(const bus of source.buses||[])for(const defect of normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id||"bus")){
+  if(defect.state!=="completed"||clean(defect.completedBy)!==person)continue;
+  if(!(normalizeRepairHours(defect.repairHours)||0)&&!(normalizeRepairHours(defect.diagnosticHours)||0))count+=1;
  }
  return count;
 }
 
-export function workTimeSummary(lists:BusList[],person:string):WorkTimeSummary{
+export function workTimeSummary(source:WorkTimeSource,person:string):WorkTimeSummary{
  const wanted=clean(person);
  const empty:WorkTimeSummary={person:wanted,hours:0,entries:0,untimed:0,days:[]};
  if(!wanted)return empty;
  const byDay=new Map<string,WorkTimeRow[]>();
- for(const row of workTimeRowsFromLists(lists)){
+ for(const row of sourceRows(source)){
   if(row.person!==wanted)continue;
   if(!byDay.has(row.day))byDay.set(row.day,[]);
   byDay.get(row.day)!.push(row);
@@ -88,7 +141,7 @@ export function workTimeSummary(lists:BusList[],person:string):WorkTimeSummary{
   person:wanted,
   hours:Math.round(days.reduce((total,day)=>total+day.hours,0)*100)/100,
   entries:days.reduce((total,day)=>total+day.entries,0),
-  untimed:untimedCount(lists,wanted),
+  untimed:untimedCount(source,wanted),
   days,
  };
 }

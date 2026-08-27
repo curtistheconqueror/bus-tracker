@@ -4,6 +4,8 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import "./lists.css";
 import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
+import type {WorkTimeBus} from "../work-time";
+import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
 
@@ -43,12 +45,28 @@ export default function Lists(){
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
  const addBoxRef=useRef<HTMLTextAreaElement|null>(null);
+ /* Read only, and never written back from this page. Campaigns own their own
+    storage; the fleet is borrowed purely so the work time panel can add up
+    Defect Log repairs alongside campaign rows. */
+ const [fleet,setFleet]=useState<WorkTimeBus[]>([]);
 
  useEffect(()=>{
   setLists(readLists(localStorage.getItem(BUS_LISTS_STORAGE_KEY)));
   try{setSavedTemplates(normalizeBusListTemplates(JSON.parse(localStorage.getItem(BUS_LIST_TEMPLATES_STORAGE_KEY)||"[]")))}catch{/* optional */}
   try{setInitials(String(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").defaultInitials||""))}catch{/* optional */}
+  try{const saved=readFleetPayload<WorkTimeBus>(localStorage.getItem(FLEET_STORAGE_KEY));if(saved.valid)setFleet(saved.buses)}catch{/* the timesheet still works without it */}
   setHydrated(true);
+ },[]);
+ /* A repair saved as fixed in another tab should show up here without a
+    reload: the Defect Log and this page are commonly open side by side. */
+ useEffect(()=>{
+  const refresh=(event:StorageEvent)=>{
+   if(event.key!==FLEET_STORAGE_KEY||!event.newValue)return;
+   const saved=readFleetPayload<WorkTimeBus>(event.newValue);
+   if(saved.valid)setFleet(saved.buses);
+  };
+  window.addEventListener("storage",refresh);
+  return()=>window.removeEventListener("storage",refresh);
  },[]);
  useEffect(()=>{if(hydrated)writeLists(lists)},[lists,hydrated]);
  useEffect(()=>{if(hydrated)try{localStorage.setItem(BUS_LIST_TEMPLATES_STORAGE_KEY,JSON.stringify(savedTemplates))}catch{/* storage may be full or blocked */}},[savedTemplates,hydrated]);
@@ -120,7 +138,7 @@ export default function Lists(){
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">FLEET CAMPAIGNS</a></nav>
   </header>
 
-  <WorkTimePanel lists={lists} defaultPerson={initials.trim().toUpperCase()}/>
+  <WorkTimePanel lists={lists} buses={fleet} defaultPerson={initials.trim().toUpperCase()}/>
 
   <section className="lists-layout">
    <aside className="lists-index" aria-label="Saved lists">

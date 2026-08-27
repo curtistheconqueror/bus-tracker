@@ -17,7 +17,12 @@
 .work-time-day b{font-size:11px;color:#163c70}
 .work-time-day small{font-size:7px;font-weight:900;color:#8496ad}
 .work-time-hours{font-size:17px;font-weight:900;color:#087347}
-.work-time-detail{grid-column:1/-1;color:#62748d;font-size:8px;line-height:1.4;overflow-wrap:anywhere}
+/* Each job on a day is its own chip with a rule between them. Joining them
+   with a separator character did not survive contact with a real day's work:
+   the dot inside "Bus 17549 · 2" looks the same as the dot between two jobs,
+   so a busy day read as one unbroken run of numbers. */
+.work-time-detail{grid-column:1/-1;display:flex;flex-wrap:wrap;column-gap:11px;row-gap:3px;color:#62748d;font-size:8px;line-height:1.4;overflow-wrap:anywhere}
+.work-time-job+.work-time-job{border-left:1px solid #c3cfe0;padding-left:11px}
 .work-time-note{display:block;margin-top:8px;color:#7a5600;font-size:8px;font-weight:800;line-height:1.4}
 
 @media(max-width:860px){

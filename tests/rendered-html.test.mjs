@@ -18,7 +18,7 @@ import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
-import { formatWorkHours, workDayKey, workTimePeople, workTimeSummary } from "../app/work-time.ts";
+import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2695,9 +2695,9 @@ test("work time totals per person, day by day, and says what it is not counting"
  ventra=setBusListEntryHours(ventra,ventra.entries[1].id,".75");
 
  const lists=[farebox,ventra];
- assert.deepEqual(workTimePeople(lists),["CURTIS","JT"]);
+ assert.deepEqual(workTimePeople({lists}),["CURTIS","JT"]);
 
- const curtis=workTimeSummary(lists,"CURTIS");
+ const curtis=workTimeSummary({lists},"CURTIS");
  // totals run across every campaign, not just the one being looked at
  assert.equal(curtis.hours,3.75);
  assert.equal(curtis.entries,3);
@@ -2712,10 +2712,10 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.deepEqual(curtis.days[1].rows.map(row=>row.label),["Bus 17503","Bus 17504"]);
 
  // one person's time never leaks into another's
- assert.equal(workTimeSummary(lists,"JT").hours,0.75);
- assert.equal(workTimeSummary(lists,"NOBODY").hours,0);
- assert.deepEqual(workTimeSummary(lists,"").days,[]);
- assert.deepEqual(workTimeSummary([],"CURTIS").days,[]);
+ assert.equal(workTimeSummary({lists},"JT").hours,0.75);
+ assert.equal(workTimeSummary({lists},"NOBODY").hours,0);
+ assert.deepEqual(workTimeSummary({lists},"").days,[]);
+ assert.deepEqual(workTimeSummary({},"CURTIS").days,[]);
 
  // the day is the viewer's calendar day, so a repair ticked late at night
  // belongs to that day's timesheet rather than the next one in UTC
@@ -2726,6 +2726,60 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(1.25),"1.25");
 });
 
+test("a day's work time covers Defect Log repairs as well as campaign sweeps",()=>{
+ const yesterday="2026-08-26T15:00:00.000Z",today="2026-08-27T15:00:00.000Z";
+ let farebox=createBusList("Farebox","rep",today,"s");
+ farebox=addBusListEntries(farebox,"17503","a");
+ farebox=setBusListEntryDone(farebox,farebox.entries[0].id,true,today,"CURTIS");
+ farebox=setBusListEntryHours(farebox,farebox.entries[0].id,"1.5");
+
+ const buses=[
+  {id:"a",n:"17549",defects:[
+   // repair time only
+   {id:"a1",category:"Brakes",issue:"Brake light on",state:"completed",completedAt:today,completedBy:"CURTIS",repairHours:2},
+   // diagnostic and repair on the same repair: the day gets both
+   {id:"a2",category:"Engine",issue:"Check engine light",state:"completed",completedAt:today,completedBy:"CURTIS",diagnosticHours:1.5,repairHours:0.5},
+   // finished with no hours: reported, never counted as zero
+   {id:"a3",category:"Lighting","issue":"Headlight out",state:"completed",completedAt:today,completedBy:"CURTIS"},
+   // still open, so not work time yet however long it has been sitting
+   {id:"a4",category:"Engine",issue:"Check engine light",state:"open",repairHours:9},
+  ]},
+  // diagnosed but handed on unfixed: still a day's work
+  {id:"b",n:"17568",defects:[
+   {id:"b1",category:"Engine",issue:"Check engine light",state:"completed",completedAt:yesterday,completedBy:"CURTIS",diagnosticHours:1.25},
+   // somebody else's time never lands on this timesheet
+   {id:"b2",category:"Brakes",issue:"Air leak",state:"completed",completedAt:today,completedBy:"JT",repairHours:3},
+  ]},
+ ];
+
+ // both names surface whether their time came from a campaign or a repair
+ assert.deepEqual(workTimePeople({lists:[farebox],buses}),["CURTIS","JT"]);
+ assert.deepEqual(workTimePeople({buses}),["CURTIS","JT"]);
+
+ const curtis=workTimeSummary({lists:[farebox],buses},"CURTIS");
+ // 1.5 swept + 2 repaired + (1.5 diagnosing + 0.5 fixing) + 1.25 diagnosing
+ assert.equal(curtis.hours,6.75);
+ assert.equal(curtis.entries,4);
+ assert.equal(curtis.untimed,1);
+ assert.equal(curtis.days.length,2);
+ assert.equal(curtis.days[0].hours,5.5);
+ assert.equal(curtis.days[1].hours,1.25);
+
+ // the campaign row and the repairs sit in one day, each named by its bus
+ assert.deepEqual(curtis.days[0].rows.map(row=>row.label),["Bus 17503","Bus 17549","Bus 17549"]);
+ assert.deepEqual(curtis.days[0].rows.map(row=>row.source),["Farebox","Defect Log","Defect Log"]);
+ // and the split is carried so 2 hours of fixing never reads as 2 of diagnosing
+ assert.deepEqual(curtis.days[0].rows.map(row=>row.note),[undefined,undefined,"incl 1.5 diag"]);
+ assert.equal(curtis.days[1].rows[0].note,"diagnosis");
+
+ assert.equal(workTimeSummary({buses},"JT").hours,3);
+ // a page with only one kind of record still totals, and neither is required
+ assert.equal(workTimeSummary({lists:[farebox]},"CURTIS").hours,1.5);
+ assert.equal(workTimeSummary({buses},"CURTIS").hours,5.25);
+ assert.deepEqual(workTimeRowsFromFleet([]),[]);
+ assert.deepEqual(workTimeRowsFromFleet([{id:"c",n:"17563"}]),[]);
+});
+
 test("the work time panel is written to be moved somewhere else later",async()=>{
  const [panel,logic,listsPage]=await Promise.all([
   readFile(new URL("../app/work-time-panel.tsx",import.meta.url),"utf8"),
@@ -2734,15 +2788,30 @@ test("the work time panel is written to be moved somewhere else later",async()=>
  ]);
  // Curtis expects this to move. It takes its records as a prop and holds only
  // which person is picked, so relocating it is an import and one line.
- assert.match(panel,/export default function WorkTimePanel\(\{lists,defaultPerson=""\}/);
+ assert.match(panel,/export default function WorkTimePanel\(\{lists=\[\],buses=\[\],defaultPerson=""\}/);
  assert.equal(/localStorage/.test(panel),false,"it must not reach for storage of its own");
- assert.equal(/BUS_LISTS_STORAGE_KEY|useRouter|window\./.test(panel),false,"nor for the page around it");
+ assert.equal(/BUS_LISTS_STORAGE_KEY|FLEET_STORAGE_KEY|useRouter|window\./.test(panel),false,"nor for the page around it");
  // the aggregation knows nothing about campaigns beyond where rows come from
  assert.equal(/localStorage|document\.|window\./.test(logic),false);
  // mounted outside the campaign layout, so it can be lifted out whole
- assert.match(listsPage,/<WorkTimePanel lists=\{lists\} defaultPerson=\{initials\.trim\(\)\.toUpperCase\(\)\}\/>/);
+ assert.match(listsPage,/<WorkTimePanel lists=\{lists\} buses=\{fleet\} defaultPerson=\{initials\.trim\(\)\.toUpperCase\(\)\}\/>/);
  assert.ok(listsPage.indexOf("<WorkTimePanel")<listsPage.indexOf('className="lists-layout"'),"near the top, not inside the list panels");
  assert.ok(listsPage.indexOf("lists-header")<listsPage.indexOf("<WorkTimePanel"),"but below the header, not at the very top");
+
+ // Each job on a day is its own element. Joined into one string with a
+ // separator character, the dot between two jobs looked identical to the dot
+ // inside one and a busy day read as an unbroken run of numbers.
+ assert.match(panel,/className="work-time-job"/);
+ assert.equal(/\.join\(/.test(panel),false,"jobs are elements, not a joined string");
+ const styles=await readFile(new URL("../app/work-time.css",import.meta.url),"utf8");
+ assert.match(styles,/\.work-time-job\+\.work-time-job\{[^}]*border-left/,"with a rule between them");
+ assert.match(styles,/\.work-time-detail\{[^}]*flex-wrap:wrap/,"wrapping rather than running off a phone");
+
+ // Campaigns borrow the fleet to total repair time and must never write it
+ // back. A bug here would put defect records at risk from a page that has no
+ // business editing them.
+ assert.match(listsPage,/readFleetPayload/,"it reads the fleet for the timesheet");
+ assert.equal(/writeFleetStorage|setItem\(FLEET_STORAGE_KEY/.test(listsPage),false,"but never writes it");
 });
 
 test("report formats are reusable, built in for farebox and savable for the rest",()=>{
