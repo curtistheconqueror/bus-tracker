@@ -61,13 +61,15 @@ Estimated mileage accrues at 275 miles per operating day, pauses outside operati
 
 Completed inspections append maintenance history with a date, optional actual odometer reading, and optional note. With mileage, the app adds a matching actual reading and restarts both due clocks. Date-only completion restarts the 10-day clock without changing mileage. Existing and future payload fields remain compatible.
 
-### Stage 5 — Spark-plug and valve-adjustment intervals: waiting on Curtis
+### Stage 5 — Spark-plug and valve-adjustment intervals: built, waiting on Curtis for the numbers
 
-Track mileage since the last spark-plug service and valve adjustment, with overdue indicators useful for misfire diagnosis. Do not invent the mileage intervals. Curtis still needs to supply both interval values. The data model may remain compatible with missing interval values.
+The bus editor records any maintenance type, and each bus reports mileage since its last spark-plug service and valve adjustment. Turn signals (steering column) and turn signals (floor panel) lead the Bus Controls catalog. The intervals themselves are a fleet policy value entered in Administrative Settings → Maintenance Intervals and default to blank; nothing guesses one. Until Curtis saves them, a service still reports mileage since its last completion and withholds the overdue verdict.
 
-### Stage 6 — Learned Parts Used system: pending
+### Stage 6 — Learned Parts Used system: complete
 
-Add a `Parts Used` checkbox to appropriate Defect Log and Fixed Repairs workflows. When checked, allow a part number and an optional exact catalog name. A saved mapping should learn the association with the exact defect issue, or with a category only when explicitly chosen, and auto-populate it next time. The mapping remains editable, entry must never be blocked when a part is unknown, and the specific repair record keeps its own usage snapshot. Build this offline-first and backward-compatibly. Part photos are deferred to Stage 7.
+The Defect Log and Fixed Repairs editors both carry a Parts Used checkbox that reveals a part number and an optional exact catalog name. Saving with a part learns it for that exact defect issue, or for the whole category when the mechanic explicitly asks. The next matching repair is offered the remembered part, which is prefilled only when nothing has been typed, is always editable, and can be removed with Forget. Entry is never blocked when the number is unknown, and each repair record keeps its own part snapshot so later mapping edits never rewrite history. Memory lives in pace-parts-memory-v1 on the device and degrades to no memory when storage is unavailable.
+
+The original specification read: add a `Parts Used` checkbox to appropriate Defect Log and Fixed Repairs workflows. When checked, allow a part number and an optional exact catalog name. A saved mapping should learn the association with the exact defect issue, or with a category only when explicitly chosen, and auto-populate it next time. The mapping remains editable, entry must never be blocked when a part is unknown, and the specific repair record keeps its own usage snapshot. Build this offline-first and backward-compatibly. Part photos are deferred to Stage 7.
 
 ### Stage 7 — Shared offline-first backend and attachments: pending
 
@@ -75,7 +77,10 @@ Use the existing Supabase project and authenticated Curtis account. Preserve the
 
 ## Current Claude task
 
-There is no active implementation assignment. Stage 5 is next but remains blocked until Curtis supplies the spark-plug and valve-adjustment mileage intervals. Claude must not invent those values.
+There is no active implementation assignment. Stages 1 through 6 are implemented. Two things remain open:
+
+1. Stage 5 needs the spark-plug and valve-adjustment mileage intervals from Curtis, entered in Administrative Settings. Claude must not invent those values.
+2. Stage 7, the shared offline-first backend on the existing Supabase project, has not been started and should not begin without Curtis scoping it.
 
 ## Required handoff format
 

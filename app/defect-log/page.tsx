@@ -11,10 +11,11 @@ import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLa
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareText} from "./quick-filter-share";
+import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeFleetStorage} from "../storage";
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
-type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean};
+type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 type LogTheme="light"|"dark"|"midnight"|"tactical"|"custom";
 type LogFontSize="standard"|"large"|"extra";
 type LogFontFamily="clean"|"condensed"|"classic";
@@ -72,11 +73,25 @@ function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:strin
   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Choose 15s, 17s, 18s, or 20s first, or type the full number."}</small>
  </fieldset>;
 }
-function DefectEditor({draft,fleet,defaultInitials,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
+function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forgetLearned,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
  const [value,setValue]=useState(draft);
  useEffect(()=>{document.body.classList.add("defect-editor-open");return()=>document.body.classList.remove("defect-editor-open")},[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
+ /* A record saved before Stage 6 has a part number but no flag, so treat an
+    existing number as parts used rather than hiding it behind an empty box. */
+ const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
+ const remembered=recallPart(partsMemory,value.defect.category,value.defect.issue);
+ /* Checking the box offers the remembered part; it never fills anything in
+    while a defect is merely being logged, and never overwrites typing. */
+ const togglePartsUsed=(checked:boolean)=>setValue(current=>{
+  if(!checked)return {...current,defect:{...current.defect,partsUsed:false,partNumber:"",partName:""}};
+  const suggestion=recallPart(partsMemory,current.defect.category,current.defect.issue);
+  const hasNumber=Boolean(String(current.defect.partNumber||"").trim());
+  return {...current,rememberScope:current.rememberScope||"issue",defect:{...current.defect,partsUsed:true,
+   partNumber:hasNumber||!suggestion?current.defect.partNumber||"":suggestion.partNumber,
+   partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
+ });
  const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=value.defect.category==="Engine"&&value.quickIssue==="Check-engine diagnosis",fanCountMode=value.defect.category==="Cooling System"&&value.quickIssue==="Radiator fan(s) out";
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
@@ -108,7 +123,15 @@ function DefectEditor({draft,fleet,defaultInitials,save,saveFixed,close}:{draft:
     <details className="advanced-defect-details" defaultOpen={Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy)}><summary>REPAIR / COMPLETION DETAILS</summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
     <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
-    <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Optional"/></label>
+    <div className="parts-used-block">
+     <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
+     {partsUsed&&<div className="parts-used-fields">
+      <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
+      <label>PART NAME (OPTIONAL)<input value={value.defect.partName||""} onChange={event=>updateDefect("partName",event.target.value)} placeholder="Exact catalog name"/></label>
+      <label className="parts-remember-scope"><input type="checkbox" checked={value.rememberScope==="category"} onChange={event=>setValue(current=>({...current,rememberScope:event.target.checked?"category":"issue"}))}/><span><b>REMEMBER FOR EVERY {repairCategoryLabel(value.defect.category||"this category").toUpperCase()} DEFECT</b><small>Off remembers the part for this exact defect only.</small></span></label>
+      {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
+     </div>}
+    </div>
     <label>FIXED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     </div></details>
@@ -165,6 +188,9 @@ export default function DefectLog(){
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
  const [focusedBusId,setFocusedBusId]=useState("");
+ const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
+ useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
+ const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
 
@@ -203,7 +229,7 @@ export default function DefectLog(){
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{if(!writeFleetStorage(localStorage,nextFleet))return;setFleet(nextFleet);setDownEntries(nextDown);writeDownSheetStorage(localStorage,nextDown)};
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
@@ -273,7 +299,7 @@ export default function DefectLog(){
     </article>)}</div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
+  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;
 }

@@ -19,6 +19,11 @@ export type StructuredDefect={
  actionTaken?:string;
  shopNotes?:string;
  partNumber?:string;
+ /* Stage 6 snapshot: what this specific repair used, kept on the record itself so
+    later edits to the learned mapping never rewrite history. Attachments stay on
+    PartUsage in domain.ts for Stage 7. */
+ partsUsed?:boolean;
+ partName?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
  symptoms?:string[];

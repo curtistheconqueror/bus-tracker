@@ -16,6 +16,7 @@ import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
+import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_MILES, SERVICE_KINDS, normalizeServiceIntervals, serviceIntervalMiles, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2484,4 +2485,100 @@ test("every Defect Log bus card carries a focus view that reads without editing"
   if(css.slice(open+1,end).includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
  }
  assert.deepEqual(conditions,["max-width:760px"]);
+});
+
+test("parts memory learns per defect issue and lets a category default be chosen deliberately",()=>{
+ assert.deepEqual(normalizePartsMemory(undefined),{entries:[]});
+ assert.deepEqual(EMPTY_PARTS_MEMORY,{entries:[]});
+
+ // learning defaults to the exact issue, because the same word means different parts per category
+ let memory=learnPart(EMPTY_PARTS_MEMORY,{category:"Bus Controls",issue:"Horn",partNumber:"HN-101",partName:"Horn relay"},"2026-08-26T10:00:00.000Z");
+ assert.equal(memory.entries.length,1);
+ assert.equal(memory.entries[0].scope,"issue");
+ assert.equal(recallPart(memory,"Bus Controls","Horn").partNumber,"HN-101");
+ assert.equal(recallPart(memory,"Bus Controls","Horn").partName,"Horn relay");
+ assert.equal(recallPart(memory,"Electrical / Multiplex","Horn"),undefined);
+ assert.equal(recallPart(memory,"Bus Controls","Speedometer"),undefined);
+
+ // a category default only applies where nothing more specific was learned
+ memory=learnPart(memory,{category:"Bus Controls",issue:"Speedometer",partNumber:"CAT-9",scope:"category"},"2026-08-26T11:00:00.000Z");
+ assert.equal(recallPart(memory,"Bus Controls","Speedometer").partNumber,"CAT-9");
+ assert.equal(recallPart(memory,"Bus Controls","Anything Else").partNumber,"CAT-9");
+ assert.equal(recallPart(memory,"Bus Controls","Horn").partNumber,"HN-101","the exact issue must win over its category");
+
+ // re-learning the same slot replaces the part and counts the use
+ memory=learnPart(memory,{category:"Bus Controls",issue:"Horn",partNumber:"HN-202"},"2026-08-26T12:00:00.000Z");
+ assert.equal(recallPart(memory,"Bus Controls","Horn").partNumber,"HN-202");
+ assert.equal(recallPart(memory,"Bus Controls","Horn").uses,2);
+ assert.equal(memory.entries.filter(entry=>entry.scope==="issue"&&entry.issue==="Horn").length,1);
+
+ // forgetting is scoped, and never blocks entry
+ const forgotten=forgetPart(memory,"issue","Bus Controls","Horn");
+ assert.equal(recallPart(forgotten,"Bus Controls","Horn").partNumber,"CAT-9","falls back to the category default");
+ assert.equal(forgetPart(forgotten,"category","Bus Controls").entries.length,0);
+
+ // an unusable entry is never learned or kept
+ assert.equal(learnPart(memory,{category:"Bus Controls",issue:"Horn",partNumber:"   "}).entries.length,memory.entries.length);
+ assert.equal(learnPart(memory,{category:"",issue:"Horn",partNumber:"X-1"}).entries.length,memory.entries.length);
+ assert.equal(normalizePartsMemory({entries:[{scope:"issue",category:"A",partNumber:"P"}]}).entries.length,0,"an issue mapping needs its issue");
+ assert.equal(normalizePartsMemory({entries:[{scope:"category",category:"A",partNumber:"P",updatedAt:"nope"}]}).entries.length,1);
+ assert.equal(partMemoryKey("category","Bus Controls"),"category::bus controls");
+ assert.match(partMemoryLabel({scope:"category",category:"Bus Controls",partNumber:"X"}),/every defect/);
+
+ // a runaway payload cannot fill device storage
+ const flood={entries:Array.from({length:PARTS_MEMORY_LIMIT+40},(_,index)=>({scope:"issue",category:"C"+index,issue:"I",partNumber:"P"+index,updatedAt:new Date(1e12+index*1000).toISOString()}))};
+ assert.equal(normalizePartsMemory(flood).entries.length,PARTS_MEMORY_LIMIT);
+});
+
+test("parts memory survives storage that is blocked or corrupt",()=>{
+ const values=new Map();
+ const storage={getItem:key=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,value)};
+ assert.equal(writePartsMemory(storage,learnPart(EMPTY_PARTS_MEMORY,{category:"Doors",issue:"Front door",partNumber:"D-7"})),true);
+ assert.equal(recallPart(readPartsMemory(storage),"Doors","Front door").partNumber,"D-7");
+ assert.equal(PARTS_MEMORY_STORAGE_KEY,"pace-parts-memory-v1");
+
+ values.set(PARTS_MEMORY_STORAGE_KEY,"{not json");
+ assert.deepEqual(readPartsMemory(storage),{entries:[]});
+
+ const blocked={getItem(){throw new Error("blocked")},setItem(){throw new Error("blocked")}};
+ assert.deepEqual(readPartsMemory(blocked),{entries:[]});
+ assert.equal(writePartsMemory(blocked,EMPTY_PARTS_MEMORY),false);
+ assert.deepEqual(readPartsMemory(null),{entries:[]});
+});
+
+test("both repair workflows offer a remembered part without imposing or blocking one",async()=>{
+ const [log,fixed,catalog,logCss,fixedCss]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+
+ for(const [name,page] of [["defect log",log],["fixed repairs",fixed]]){
+  assert.match(page,/PARTS USED/,name);
+  assert.match(page,/PART NAME \(OPTIONAL\)/,name);
+  assert.match(page,/REMEMBER FOR EVERY /,name);
+  assert.match(page,/Leave blank if the number is unknown/,name);
+  assert.match(page,/REMEMBERED/,name);
+  assert.match(page,/>FORGET<\/button>/,name);
+  // learning happens on save and is never a precondition of saving
+  assert.match(page,/learnPart\(current,\{category:/,name);
+  // a legacy record with a part number still shows it
+  assert.match(page,/partsUsed\?\?Boolean\(String\(/,name);
+ }
+
+ // the record keeps its own snapshot, separate from the learned mapping
+ assert.match(catalog,/partsUsed\?:boolean;/);
+ assert.match(catalog,/partName\?:string;/);
+ assert.match(fixed,/partsUsed:draft\.partsUsed,partName:draft\.partName\.trim\(\)/);
+ // suggestions never overwrite something already typed
+ assert.match(log,/hasNumber\|\|!suggestion\?current\.defect\.partNumber\|\|"":suggestion\.partNumber/);
+ assert.match(fixed,/hasNumber\|\|!suggestion\?current\.partNumber:suggestion\.partNumber/);
+
+ for(const [name,css] of [["defect log",logCss],["fixed repairs",fixedCss]]){
+  assert.match(css,/\.parts-used-block\{/,name);
+  assert.match(css,/\.parts-remembered button\{min-height:36px/,name);
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-remembered button\{min-height:44px;width:100%\}/,name);
+ }
 });

@@ -56,3 +56,22 @@
 .fixed-font-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.fixed-font-grid label{display:grid;gap:4px;font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-font-grid select{min-height:44px;border:1px solid var(--fixed-border);border-radius:6px;background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d);padding:0 9px;font-size:16px}
 .fixed-color-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.fixed-color-grid label{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--fixed-border);border-radius:6px;padding:6px 8px;font-size:7px;font-weight:900;color:var(--fixed-muted)}.fixed-color-grid input{width:48px;height:32px;border:0;background:transparent}.fixed-reset-look{min-height:42px;border:0;border-radius:6px;background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff);font-size:8px;font-weight:900}
 @media(max-width:760px){.fixed-settings-shade{align-items:stretch;padding:0}.fixed-settings{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}.fixed-settings>header{padding-top:max(12px,env(safe-area-inset-top))}.fixed-theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fixed-color-grid{grid-template-columns:1fr}}
+/* Parts Used, matching the Defect Log control but in this page's palette. */
+.parts-used-block{display:grid;gap:8px;border:1px solid var(--fixed-border);border-radius:8px;padding:10px}
+.parts-used-toggle,.parts-remember-scope{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
+.completion-form .parts-used-toggle input,.completion-form .parts-remember-scope input{width:20px;min-height:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--fixed-blue)}
+.parts-used-toggle input,.parts-remember-scope input{width:20px;height:20px;margin-top:1px;flex:0 0 auto}
+.parts-used-toggle span,.parts-remember-scope span{display:grid;gap:2px}
+.parts-used-toggle b,.parts-remember-scope b{font-size:9px;letter-spacing:.5px;color:var(--fixed-navy)}
+.parts-used-toggle small,.parts-remember-scope small{font-size:8px;color:var(--fixed-muted)}
+.parts-used-fields{display:grid;gap:8px}
+.parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--fixed-blue);border-radius:6px;background:color-mix(in srgb,var(--fixed-blue) 8%,#fff);padding:8px 10px}
+.parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--fixed-ink);overflow-wrap:anywhere}
+.parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--fixed-blue)}
+.parts-remembered small{font-size:8px;font-weight:700;color:var(--fixed-muted)}
+.parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--fixed-border);border-radius:6px;background:#fff;color:var(--fixed-ink);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+@media(max-width:760px){
+ .parts-used-fields input{font-size:16px}
+ .parts-remembered{flex-wrap:wrap}
+ .parts-remembered button{min-height:44px;width:100%}
+}
