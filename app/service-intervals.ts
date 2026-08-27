@@ -26,6 +26,10 @@ export type ServiceIntervals={
 };
 
 export const DEFAULT_SERVICE_INTERVALS:ServiceIntervals={sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null};
+/* Version 108 briefly stored these same property names as mileage limits. The
+   unit marker prevents an older mileage value from being silently treated as
+   engine hours after the service model changed. */
+export const SERVICE_INTERVALS_UNIT="engine-hours-v1";
 /* Roughly a week of running on a busy bus: enough warning to plan the work
    without flagging so early that the badge stops meaning anything. */
 export const SERVICE_DUE_SOON_HOURS=50;

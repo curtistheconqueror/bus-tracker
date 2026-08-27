@@ -219,21 +219,21 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 
 /* Parts Used: the checkbox reveals the fields, and a remembered part is offered
    rather than imposed. Entry is never blocked when the number is unknown. */
-.parts-used-block{grid-column:1/-1;display:grid;gap:8px;border:1px solid var(--log-border);border-radius:8px;padding:10px}
-.parts-used-toggle,.parts-remember-scope{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
-.log-form .parts-used-toggle input,.log-form .parts-remember-scope input{width:20px;min-height:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--log-accent)}
-.parts-used-toggle input,.parts-remember-scope input{width:20px;height:20px;margin-top:1px;flex:0 0 auto}
-.parts-used-toggle span,.parts-remember-scope span{display:grid;gap:2px}
-.parts-used-toggle b,.parts-remember-scope b{font-size:9px;letter-spacing:.5px}
-.parts-used-toggle small,.parts-remember-scope small{font-size:8px;color:var(--log-muted)}
-.parts-used-fields{display:grid;gap:8px}
-.parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));padding:8px 10px}
-.parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--log-text);overflow-wrap:anywhere}
-.parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--log-accent)}
-.parts-remembered small{font-size:8px;font-weight:700;color:var(--log-muted)}
-.parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.defect-log-app .parts-used-block{grid-column:1/-1;display:grid;gap:8px;border:1px solid var(--log-border);border-radius:8px;padding:10px}
+.defect-log-app .parts-used-toggle,.defect-log-app .parts-remember-scope{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
+.defect-log-app .log-form .parts-used-toggle input,.defect-log-app .log-form .parts-remember-scope input{width:20px;min-height:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--log-accent)}
+.defect-log-app .parts-used-toggle input,.defect-log-app .parts-remember-scope input{width:20px;height:20px;margin-top:1px;flex:0 0 auto}
+.defect-log-app .parts-used-toggle span,.defect-log-app .parts-remember-scope span{display:grid;gap:2px}
+.defect-log-app .parts-used-toggle b,.defect-log-app .parts-remember-scope b{font-size:9px;letter-spacing:.5px}
+.defect-log-app .parts-used-toggle small,.defect-log-app .parts-remember-scope small{font-size:8px;color:var(--log-muted)}
+.defect-log-app .parts-used-fields{display:grid;gap:8px}
+.defect-log-app .parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));padding:8px 10px}
+.defect-log-app .parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--log-text);overflow-wrap:anywhere}
+.defect-log-app .parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--log-accent)}
+.defect-log-app .parts-remembered small{font-size:8px;font-weight:700;color:var(--log-muted)}
+.defect-log-app .parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 @media(max-width:760px){
- .parts-used-fields input{font-size:16px}
- .parts-remembered{flex-wrap:wrap}
- .parts-remembered button{min-height:44px;width:100%}
+ .defect-log-app .parts-used-fields input{font-size:16px}
+ .defect-log-app .parts-remembered{flex-wrap:wrap}
+ .defect-log-app .parts-remembered button{min-height:44px;width:100%}
 }
