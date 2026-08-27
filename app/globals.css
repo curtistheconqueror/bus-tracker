@@ -593,7 +593,11 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 /* Completed-maintenance history in the bus editor. */
 .maintenance-workbench{border:1px solid #a8bda6;border-radius:8px;background:#f5fbf5;overflow:hidden}
 .maintenance-workbench>header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid #c6dcc4;background:#e8f6e7;color:#1d4a24}.maintenance-workbench>header span{display:flex;flex-direction:column;gap:3px}.maintenance-workbench>header b{font-size:10px}.maintenance-workbench>header small{font-size:8px;color:#5c7460}.maintenance-workbench>header>strong{font-size:9px;white-space:nowrap}
-.maintenance-current{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:10px 12px}.maintenance-current span{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}.maintenance-current small{font-size:7px;font-weight:900;color:#5f7563}.maintenance-current b{font-size:22px;color:#1c7a35}.maintenance-current time{font-size:8px;color:#546a58}
+.maintenance-current{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 14px;padding:12px}/* Stacked deliberately rather than left to wrap. As a baseline flex row each
+   item broke wherever its own text ran out of width, so three of them stacked
+   and the fourth sat on one line beside its label. */
+.maintenance-current span{display:grid;gap:4px;align-content:start}
+.maintenance-current b{line-height:1.15}.maintenance-current small{font-size:7px;font-weight:900;color:#5f7563}.maintenance-current b{font-size:22px;color:#1c7a35}.maintenance-current time{font-size:8px;color:#546a58}
 .maintenance-entry{display:grid;grid-template-columns:minmax(140px,.8fr) minmax(120px,.7fr) minmax(185px,1fr) minmax(180px,1.2fr) auto;gap:8px;align-items:end;padding:0 12px 10px}.maintenance-entry select{min-height:44px}.maintenance-entry button{min-height:44px;border:0;border-radius:6px;background:#1d7a37;color:#fff;padding:0 13px;font-size:9px;font-weight:900;cursor:pointer}.maintenance-entry button:disabled{opacity:.45;cursor:not-allowed}
 .maintenance-history{max-height:150px;display:grid;gap:5px;margin:0 12px 10px;padding:6px;border:1px solid #cadfc8;border-radius:6px;background:#fff;overflow-y:auto}.maintenance-history article{display:grid;grid-template-columns:110px minmax(150px,auto) minmax(105px,auto) minmax(0,1fr);gap:8px;align-items:center;padding:7px 8px;border-radius:4px;background:#f1f8f1}.maintenance-kind{justify-self:start;border-radius:3px;background:#e0efe0;color:#33603c;padding:3px 6px;font-size:7px;font-weight:900;font-style:normal;letter-spacing:.08em;white-space:nowrap}.maintenance-history b{font-size:10px;color:#1a6b30}.maintenance-history time,.maintenance-history small{font-size:8px;color:#586d5b}.maintenance-history small{overflow-wrap:anywhere}
 .maintenance-current .service-summary.due b{color:#aa3300}.maintenance-current .service-summary.due time{color:#aa3300;font-weight:900}
@@ -607,7 +611,9 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .service-summary.severity-overdue b{color:#b5252c}
 .service-summary.severity-critical b{color:#8c1119}
 .service-summary.severity-overdue time,.service-summary.severity-critical time{font-weight:900;color:#b5252c}
-.service-summary.severity-critical{border-radius:6px;background:#fdecec;box-shadow:inset 0 0 0 1px #e2a5a8}
+.service-summary.severity-critical,.service-summary.severity-overdue{border-radius:7px;padding:7px 9px;margin:-7px -9px}
+.service-summary.severity-critical{background:#fdecec;box-shadow:inset 0 0 0 1px #e2a5a8}
+.service-summary.severity-overdue{background:#fff6ec;box-shadow:inset 0 0 0 1px #e6bf95}
 .fleet-duty-cycle{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;border:1px solid #9fb4cf;border-radius:8px;background:#f6f9fd;padding:10px 12px}
 .fleet-duty-cycle>b{font-size:9px;letter-spacing:.6px;color:#385a86}
 .fleet-duty-cycle>span{display:grid;gap:3px;flex:1;min-width:200px;font-size:13px;font-weight:800;color:#163c70;text-align:right}

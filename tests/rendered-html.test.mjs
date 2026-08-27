@@ -2363,6 +2363,11 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
  assert.match(page,/Date only restarts the 10-day clock without changing mileage/);
  assert.match(css,/Completed-maintenance history in the bus editor/);
  assert.match(css,/\.maintenance-current\{display:grid;grid-template-columns:repeat\(auto-fit,minmax\(150px,1fr\)\)/);
+ // each reading stacks label, value and note in its own rows. As a baseline
+ // flex row an item broke only when its text ran out of width, so the shortest
+ // one sat inline beside its label while its neighbours stacked.
+ assert.match(css,/\.maintenance-current span\{display:grid;gap:4px;align-content:start\}/);
+ assert.equal(/\.maintenance-current span\{display:flex/.test(css),false);
  assert.match(css,/\.maintenance-entry button\{min-height:44px/);
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry\{grid-template-columns:1fr\}/);
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.maintenance-entry button\{min-height:52px/);
