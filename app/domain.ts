@@ -38,6 +38,11 @@ export type MaintenanceEvent=DurableRecord&{
     before hour tracking existed, which is why the status can report that a
     service needs a fresh baseline instead of guessing one. */
  engineHours?:number;
+ /* True when the hours were derived from the odometer reading rather than read
+    off the meter, because the office records these services by mileage. The
+    counter runs on it either way; the record says which it was so nobody reads
+    an estimate as a measurement. */
+ engineHoursEstimated?:boolean;
  note?:string;
 };
 
@@ -69,7 +74,7 @@ export function normalizeMaintenanceEvents(value:unknown):MaintenanceEvent[]{
   if(!["inspection","spark-plugs","valve-adjustment"].includes(String(event.kind))||Number.isNaN(new Date(completedAt).getTime()))return [];
   const odometerMiles=event.odometerMiles===undefined?undefined:Number(event.odometerMiles);
   const engineHours=event.engineHours===undefined?undefined:Number(event.engineHours);
-  return [{...event,id:String(event.id||"maintenance-imported-"+index),kind:event.kind as MaintenanceEventKind,completedAt:new Date(completedAt).toISOString(),odometerMiles:Number.isFinite(odometerMiles)&&Number(odometerMiles)>=0?Math.round(Number(odometerMiles)):undefined,engineHours:Number.isFinite(engineHours)&&Number(engineHours)>=0?Math.round(Number(engineHours)):undefined,note:String(event.note||"")} as MaintenanceEvent];
+  return [{...event,id:String(event.id||"maintenance-imported-"+index),kind:event.kind as MaintenanceEventKind,completedAt:new Date(completedAt).toISOString(),odometerMiles:Number.isFinite(odometerMiles)&&Number(odometerMiles)>=0?Math.round(Number(odometerMiles)):undefined,engineHours:Number.isFinite(engineHours)&&Number(engineHours)>=0?Math.round(Number(engineHours)):undefined,engineHoursEstimated:event.engineHoursEstimated===true||undefined,note:String(event.note||"")} as MaintenanceEvent];
  }).sort((left,right)=>Date.parse(left.completedAt)-Date.parse(right.completedAt));
 }
 

@@ -29,6 +29,26 @@ export const DEFAULT_SERVICE_INTERVALS:ServiceIntervals={sparkPlugs:null,valveAd
 /* Roughly a week of running on a busy bus: enough warning to plan the work
    without flagging so early that the badge stops meaning anything. */
 export const SERVICE_DUE_SOON_HOURS=50;
+/* Past the interval by this share of it. Cummins is blunt about what running a
+   gas engine long on plugs costs: misfire, unburnt fuel into the exhaust, and a
+   three-way catalyst destroyed behind it. A quarter past the interval is not a
+   scheduling matter any more. */
+export type ServiceSeverity="none"|"due-soon"|"due"|"overdue"|"critical";
+export const SERVICE_OVERDUE_FRACTION=0.10;
+export const SERVICE_CRITICAL_FRACTION=0.25;
+
+export function serviceSeverity(overdueFraction:number):ServiceSeverity{
+ if(overdueFraction>=SERVICE_CRITICAL_FRACTION)return "critical";
+ if(overdueFraction>=SERVICE_OVERDUE_FRACTION)return "overdue";
+ return "due";
+}
+export const SERVICE_SEVERITY_LABELS:Record<ServiceSeverity,string>={
+ none:"",
+ "due-soon":"DUE SOON",
+ due:"DUE NOW",
+ overdue:"OVERDUE",
+ critical:"CRITICAL",
+};
 export const SERVICE_KINDS:{kind:ServiceKind;label:string;setting:keyof ServiceIntervals;monthsSetting:keyof ServiceIntervals}[]=[
  {kind:"spark-plugs",label:"Spark Plugs",setting:"sparkPlugs",monthsSetting:"sparkPlugsMonths"},
  {kind:"valve-adjustment",label:"Valve Adjustment",setting:"valveAdjustment",monthsSetting:"valveAdjustmentMonths"},
@@ -81,6 +101,11 @@ export type ServiceIntervalStatus={
     interval-needed  tracking, but no limit saved to judge against */
  state:"baseline-needed"|"hours-needed"|"meter-reset"|"interval-needed"|"tracking"|"due-soon"|"due";
  due:boolean;
+ /* How bad it is, not just whether it is late. Graded as a share of the
+    interval rather than a flat hour count, because 400 hours past a 1,500-hour
+    plug interval is a worse state than 400 past a 2,000-hour valve interval. */
+ severity:ServiceSeverity;
+ overdueFraction?:number;
  /* Which limit put it over, when it is over. Cummins words the rule as
     whichever comes first, so the panel can say which one came first. */
  dueBy?:"hours"|"months";
@@ -98,9 +123,14 @@ export type ServiceIntervalStatus={
  currentEngineHours?:number;
 };
 
+function monthSeverity(monthsSince:number|undefined,intervalMonths:number|null):ServiceSeverity{
+ if(monthsSince===undefined||intervalMonths===null||intervalMonths<=0)return "due";
+ return serviceSeverity((monthsSince-intervalMonths)/intervalMonths);
+}
+
 export function serviceIntervalStatus(bus:ServiceBus,kind:ServiceKind,interval:unknown,intervalMonthsInput:unknown=null,now=new Date().toISOString()):ServiceIntervalStatus{
  const last=latestMaintenanceEvent(bus.maintenanceEvents,kind);
- if(!last)return {kind,state:"baseline-needed",due:false};
+ if(!last)return {kind,state:"baseline-needed",due:false,severity:"none"};
  const baseline=Number(last.engineHours),reading=latestEngineHourReading(bus.engineHourReadings);
  const current=reading?reading.hours:undefined;
  const monthsSince=monthsBetween(last.completedAt,now);
@@ -115,21 +145,27 @@ export function serviceIntervalStatus(bus:ServiceBus,kind:ServiceKind,interval:u
  /* The calendar limit still stands when the hour meter cannot be trusted, so a
     bus with a swapped ECM or no reading is not left entirely unwatched. */
  if(!Number.isFinite(baseline)||current===undefined)
-  return {...shared,state:overByMonths?"due":"hours-needed",due:Boolean(overByMonths),...(overByMonths?{dueBy:"months" as const}:{})};
+  return {...shared,state:overByMonths?"due":"hours-needed",due:Boolean(overByMonths),severity:overByMonths?monthSeverity(monthsSince,intervalMonths):"none",...(overByMonths?{dueBy:"months" as const}:{})};
  if(current<baseline)
-  return {...shared,state:overByMonths?"due":"meter-reset",due:Boolean(overByMonths),...(overByMonths?{dueBy:"months" as const}:{})};
+  return {...shared,state:overByMonths?"due":"meter-reset",due:Boolean(overByMonths),severity:overByMonths?monthSeverity(monthsSince,intervalMonths):"none",...(overByMonths?{dueBy:"months" as const}:{})};
 
  const hoursSince=Math.round(current-baseline);
  const intervalHours=serviceIntervalHours(interval);
  if(intervalHours===null)
-  return {...shared,hoursSince,state:overByMonths?"due":"interval-needed",due:Boolean(overByMonths),...(overByMonths?{dueBy:"months" as const}:{})};
+  return {...shared,hoursSince,state:overByMonths?"due":"interval-needed",due:Boolean(overByMonths),severity:overByMonths?monthSeverity(monthsSince,intervalMonths):"none",...(overByMonths?{dueBy:"months" as const}:{})};
  const overByHours=hoursSince>=intervalHours;
  const hoursRemaining=Math.max(0,intervalHours-hoursSince),hoursOverdue=Math.max(0,hoursSince-intervalHours);
  const due=overByHours||overByMonths;
  const soon=!due&&hoursRemaining<=SERVICE_DUE_SOON_HOURS;
+ /* When both limits are past, the worse of the two sets the severity. */
+ const hourFraction=hoursOverdue/intervalHours;
+ const monthFraction=overByMonths?(monthsSince!-intervalMonths!)/intervalMonths!:0;
+ const overdueFraction=Math.max(hourFraction,monthFraction);
  return {...shared,hoursSince,intervalHours,hoursRemaining,hoursOverdue,
   state:due?"due":soon?"due-soon":"tracking",due,
-  ...(due?{dueBy:(overByHours?"hours":"months") as "hours"|"months"}:{})};
+  severity:due?serviceSeverity(overdueFraction):soon?"due-soon":"none",
+  ...(due?{overdueFraction}:{}),
+  ...(due?{dueBy:(overByHours&&hourFraction>=monthFraction?"hours":"months") as "hours"|"months"}:{})};
 }
 
 /* Miles per engine hour, the number that makes a fleet-wide mileage interval
@@ -142,6 +178,29 @@ export function milesPerEngineHour(miles:unknown,hours:unknown):number|undefined
  const distance=Number(miles),runtime=Number(hours);
  if(!Number.isFinite(distance)||!Number.isFinite(runtime)||runtime<=0||distance<0)return undefined;
  return distance/runtime;
+}
+
+/* The office records these services by mileage, not hours. Given the odometer
+   reading at a past service, the hours on the meter at that moment follow from
+   the bus's own lifetime miles-per-hour: at a constant rate, the share of total
+   miles covered by then is the share of total hours run by then.
+
+   It is an estimate and is stored as one. The rate is a lifetime average, so a
+   bus whose route changed will be off, and a bus whose meter was reset has no
+   usable rate at all and is refused rather than guessed at. Even so it beats
+   the alternative, which is no counter running until the next service comes
+   round again. */
+export type EngineHourEstimate={hours:number;rate:number;milesSince:number};
+
+export function estimateEngineHoursAtMiles(
+ currentMiles:unknown,currentHours:unknown,milesAtService:unknown,meterReset=false):EngineHourEstimate|undefined{
+ const miles=Number(currentMiles),hours=Number(currentHours),past=Number(milesAtService);
+ if(meterReset)return undefined;
+ if(!Number.isFinite(miles)||!Number.isFinite(hours)||!Number.isFinite(past))return undefined;
+ if(miles<=0||hours<=0||past<0||past>miles)return undefined;
+ const rate=miles/hours;
+ if(rate>MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR)return undefined;
+ return {hours:Math.round(hours*(past/miles)),rate,milesSince:Math.round(miles-past)};
 }
 
 export type FleetDutyCycle={rate?:number;low?:number;high?:number;spread?:number;representative:boolean;buses:number;

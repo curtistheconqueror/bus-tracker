@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, engineHourMeterReset, fleetDutyCycle, milesPerEngineHour, monthsBetween, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2459,6 +2459,100 @@ test("spark-plug and valve-adjustment tracking counts engine hours, not miles",(
  assert.equal(maintenanceEventsOfKind(tracked.maintenanceEvents,"inspection").length,0);
 });
 
+test("overdue severity grades how far past the interval a service is",()=>{
+ const now="2026-08-27T00:00:00.000Z";
+ const at=since=>({engineHourReadings:[{id:"h",hours:10000+since,recordedAt:now,source:"manual"}],
+  maintenanceEvents:[{id:"m",kind:"spark-plugs",completedAt:"2026-06-27T00:00:00.000Z",engineHours:10000}]});
+ const grade=since=>serviceIntervalStatus(at(since),"spark-plugs",1500,null,now);
+
+ assert.equal(grade(1400).severity,"none");
+ assert.equal(grade(1460).severity,"due-soon");
+ assert.equal(grade(1500).severity,"due");
+ assert.equal(grade(1600).severity,"due");
+ assert.equal(grade(1650).severity,"overdue");
+ assert.equal(grade(1875).severity,"critical");
+ assert.equal(grade(2400).severity,"critical");
+
+ // graded as a share of the interval, so the same hour count is not the same
+ // state on a 1,500-hour plug interval and a 2,000-hour valve interval
+ assert.equal(serviceSeverity(0),"due");
+ assert.equal(serviceSeverity(SERVICE_OVERDUE_FRACTION),"overdue");
+ assert.equal(serviceSeverity(SERVICE_CRITICAL_FRACTION),"critical");
+ const over=grade(1875);
+ assert.ok(Math.abs(over.overdueFraction-0.25)<0.001);
+ assert.equal(over.hoursOverdue,375);
+ assert.equal(SERVICE_SEVERITY_LABELS.critical,"CRITICAL");
+ // 375 hours past a 2,000-hour interval is not yet critical
+ const valve={engineHourReadings:[{id:"h",hours:12375,recordedAt:now,source:"manual"}],
+  maintenanceEvents:[{id:"m",kind:"valve-adjustment",completedAt:"2026-06-27T00:00:00.000Z",engineHours:10000}]};
+ assert.equal(serviceIntervalStatus(valve,"valve-adjustment",2000,null,now).hoursOverdue,375);
+ assert.equal(serviceIntervalStatus(valve,"valve-adjustment",2000,null,now).severity,"overdue");
+});
+
+test("a service the office recorded only by mileage still starts an hour counter",()=>{
+ const now="2026-08-27T00:00:00.000Z";
+ // Bus 20505 as Curtis read it. The office logs these services by mileage, so
+ // the hours at that service are derived from the bus's own miles per hour.
+ const bus={s:"shop",lastStatusChangeAt:now,
+  odometerReadings:[{id:"o",miles:207251,recordedAt:now,source:"manual"}],
+  engineHourReadings:[{id:"h",hours:29678,recordedAt:now,source:"manual"}],maintenanceEvents:[]};
+
+ const estimate=estimateEngineHoursAtMiles(207251,29678,190000);
+ assert.equal(estimate.hours,27208);
+ assert.equal(estimate.milesSince,17251);
+ assert.ok(Math.abs(estimate.rate-6.98)<0.01);
+
+ const done=recordMaintenanceCompletion(bus,{kind:"spark-plugs",completedAt:"2025-06-01T09:00:00.000Z",odometerMiles:190000,idSeed:"s1"},now);
+ const event=done.maintenanceEvents.at(-1);
+ assert.equal(event.engineHours,27208);
+ assert.equal(event.engineHoursEstimated,true,"the record must say the hours were derived");
+ assert.equal(event.odometerMiles,190000);
+ // an estimate is not a meter reading and must not enter the hour history,
+ // where it could later be mistaken for one or trip the meter-reset check
+ assert.equal(done.engineHourReadings.length,1);
+ assert.equal(done.engineHourReadings[0].hours,29678);
+
+ const status=serviceIntervalStatus({...bus,...done},"spark-plugs",1500,18,now);
+ assert.equal(status.hoursSince,2470);
+ assert.equal(status.hoursOverdue,970);
+ assert.equal(status.severity,"critical");
+ assert.equal(status.dueBy,"hours");
+
+ // a reading taken off the meter is never overwritten by an estimate
+ const measured=recordMaintenanceCompletion(bus,{kind:"valve-adjustment",completedAt:"2025-06-01T09:00:00.000Z",odometerMiles:190000,engineHours:27000,idSeed:"s2"},now);
+ const exact=measured.maintenanceEvents.at(-1);
+ assert.equal(exact.engineHours,27000);
+ assert.equal(exact.engineHoursEstimated,undefined);
+ assert.equal(measured.engineHourReadings.length,2,"a real reading does join the history");
+
+ // refused rather than guessed at when the rate cannot be trusted
+ assert.equal(estimateEngineHoursAtMiles(300000,500,290000,true),undefined,"meter was reset");
+ assert.equal(estimateEngineHoursAtMiles(300000,500,290000),undefined,"implausible rate");
+ assert.equal(estimateEngineHoursAtMiles(207251,29678,300000),undefined,"service ahead of the odometer");
+ assert.equal(estimateEngineHoursAtMiles(undefined,29678,190000),undefined,"no odometer");
+ // and an inspection is mileage-based, so it is left alone
+ const inspection=recordMaintenanceCompletion(bus,{kind:"inspection",completedAt:"2025-06-01T09:00:00.000Z",odometerMiles:190000,idSeed:"s3"},now);
+ assert.equal(inspection.maintenanceEvents.at(-1).engineHours,undefined);
+});
+
+test("the drivetrain has a home and grease fittings have exactly one",()=>{
+ const drivetrain=REPAIR_OPTIONS["Transmission and Drivetrain"];
+ assert.equal(REPAIR_OPTIONS.Transmission,undefined);
+ for(const issue of ["Driveshaft","Driveshaft noise / banging","U-joints","Carrier bearing","Differential","Axle / axle shaft"])
+  assert.ok(drivetrain.includes(issue),issue);
+ // everything the old category offered still resolves to a pickable name
+ for(const [issue,expected] of [["Will not shift","Will not shift"],["Slipping","Slipping"],
+  ["Transmission replacement","Transmission replacement"],["Other transmission repair","Other transmission or drivetrain repair"]]){
+  const moved=migrateRepairIdentity("Transmission",issue);
+  assert.deepEqual(moved,{category:"Transmission and Drivetrain",issue:expected},issue);
+  assert.ok(drivetrain.includes(moved.issue),expected+" must be pickable");
+ }
+ const [read]=normalizeDefects([{id:"t1",category:"Transmission",issue:"Slipping",details:"Under load",state:"open",operability:"service"}]);
+ assert.equal(read.category,"Transmission and Drivetrain");
+ assert.equal(read.details,"Under load");
+ assert.equal(repairCategoryEmoji("Transmission and Drivetrain"),"🕹️");
+});
+
 test("a swapped ECM restarts the hour meter and must never read as freshly serviced",()=>{
  // Several buses here show a few hundred engine hours against 300,000 miles
  // because Cummins replaced a failed ECM and the meter restarted at zero. If
@@ -2644,7 +2738,9 @@ test("Fleet Tracker records every maintenance type and never invents a service i
  assert.match(page,/MAINTENANCE TYPE/);
  assert.match(page,/MAINTENANCE INTERVALS/);
  assert.match(page,/INTERVAL NOT SET/);
- assert.match(page,/OVERDUE BY /);
+ assert.match(page,/SERVICE_SEVERITY_LABELS\[service\.status\.severity\]/);
+ assert.match(page,/HR PAST/);
+ assert.match(page,/severity-"\+service\.status\.severity/);
  assert.match(page,/serviceIntervalStatus\(d,service\.kind,serviceIntervals\[service\.setting\],serviceIntervals\[service\.monthsSetting\]\)/);
  // each service takes an hour limit and a calendar limit, whichever comes first
  assert.match(page,/placeholder="Hours" aria-label=\{service\.label\+" interval in engine hours"\}/);
@@ -2905,7 +3001,12 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
  const steering=REPAIR_OPTIONS["Suspension and Steering"];
  assert.ok(steering.includes("Loose steering"));
  assert.ok(steering.indexOf("Loose steering")<steering.indexOf("Steering pull"));
- assert.equal(steering.length,17);
+ assert.equal(steering.length,19);
+ // grease fittings live only here: the inspection walk that marks off missing
+ // fittings covers the whole underside, driveshaft included
+ assert.ok(steering.includes("Missing grease fitting (Zerk)"));
+ assert.ok(steering.includes("Grease fitting will not take grease"));
+ assert.equal(REPAIR_OPTIONS["Transmission and Drivetrain"].some(option=>/grease|zerk/i.test(option)),false,"no second copy under the drivetrain");
  assert.equal(defectLabel({category:"Suspension and Steering",issue:"Loose steering",details:"Play in the wheel"}),
   "Suspension and Steering — Loose steering — Play in the wheel");
 });

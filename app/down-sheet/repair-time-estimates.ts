@@ -18,7 +18,8 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "A/C and HVAC":90,
  "Engine":240,
  "Cooling System":180,
- "Transmission":240,
+ "Transmission and Drivetrain":240,
+ "Transmission":240, /* legacy category, kept so an unmigrated read still estimates sensibly */
  "Suspension and Steering":180,
  /* retired categories, kept so an unmigrated read still estimates sensibly */
  "Suspension":180,
@@ -67,7 +68,9 @@ const SPECIFIC_ESTIMATE_RULES:EstimateRule[]=[
  {pattern:/Electrical \/ Multiplex - MOD light$/i,estimate:{repairMinutes:60,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Engine - Engine replacement$/i,estimate:{repairMinutes:960,diagnosticMinutes:60,accessMinutes:60}},
  {pattern:/Engine - Internal engine repair$/i,estimate:{repairMinutes:720,diagnosticMinutes:60,accessMinutes:60}},
- {pattern:/Transmission - Transmission replacement$/i,estimate:{repairMinutes:720,diagnosticMinutes:60,accessMinutes:60}},
+ {pattern:/Transmission(?: and Drivetrain)? - Transmission replacement$/i,estimate:{repairMinutes:720,diagnosticMinutes:60,accessMinutes:60}},
+ /* Driveline work is a pit job, not a transmission pull. */
+ {pattern:/Transmission and Drivetrain - (?:Driveshaft|Driveshaft noise \/ banging|U-joints|Carrier bearing)$/i,estimate:{repairMinutes:180,diagnosticMinutes:30,accessMinutes:30}},
  {pattern:/Bodywork - Accident damage$/i,estimate:{repairMinutes:600,diagnosticMinutes:30,accessMinutes:60}},
  {pattern:/Tires and Wheels - Wheel-end repair$/i,estimate:{repairMinutes:300,diagnosticMinutes:30,accessMinutes:30}},
  {pattern:/Doors, Ramp and (?:ADA - Ramp, Lift and Kneeler|Lift) - (?:Wheelchair ramp|Wheelchair lift)$/i,estimate:{repairMinutes:300,diagnosticMinutes:60,accessMinutes:30}},

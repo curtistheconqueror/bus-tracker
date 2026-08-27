@@ -36,8 +36,8 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
  "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
- "Transmission":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Other transmission repair"],
- "Suspension and Steering":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Other suspension or steering repair"],
+ "Transmission and Drivetrain":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
+ "Suspension and Steering":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
@@ -61,6 +61,7 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  Engine:"⚙️",
  "Cooling System":"🌡️",
  Transmission:"🕹️",
+ "Transmission and Drivetrain":"🕹️",
  Suspension:"🛞",
  Steering:"🛞",
  "Suspension and Steering":"🛞",
@@ -168,7 +169,7 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Doors, Ramp and ADA"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Doors, Ramp and ADA","Transmission":"Transmission and Drivetrain"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -225,6 +226,9 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
   /* The lamps, not the stalk. Bus Controls owns the turn signal switches. */
   "Turn signals":"Turn signal lamps",
   "Mirrors / fixtures":"Mirror replacement (no body work)",
+ },
+ "Transmission and Drivetrain":{
+  "Other transmission repair":"Other transmission or drivetrain repair",
  },
  "Bodywork":{
   "Mirror":"Mirror damage (body shop)",

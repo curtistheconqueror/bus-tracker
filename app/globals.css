@@ -560,7 +560,17 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 /* Dated actual-mileage history in the bus editor. */
 .odometer-workbench{border:1px solid #9fb4cf;border-radius:8px;background:#f5f9ff;overflow:hidden}
 .odometer-workbench>header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid #c4d2e4;background:#e7f1fd;color:#163b68}.odometer-workbench>header span{display:flex;flex-direction:column;gap:3px}.odometer-workbench>header b{font-size:10px}.odometer-workbench>header small{font-size:8px;color:#5d718d}.odometer-workbench>header>strong{font-size:9px;white-space:nowrap}
-.odometer-current{padding:10px 12px}.odometer-current span{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}.odometer-current small{font-size:7px;font-weight:900;color:#62748d}.odometer-current b{font-size:22px;color:#075fae}.odometer-current time{font-size:8px;color:#52647d}
+.odometer-current{padding:10px 12px}
+/* Engine hours read the same way the odometer above them does, so the two sit
+   as one block rather than the hours looking bolted on. */
+.engine-hours-block{border-top:1px solid #cbd6e6}
+.engine-hours-current{padding:10px 12px}
+.engine-hours-current span{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.engine-hours-current small{font-size:7px;font-weight:900;color:#62748d}
+.engine-hours-current b{font-size:22px;color:#075fae}
+.engine-hours-current time{font-size:8px;color:#52647d}
+.engine-hours-current .duty-cycle-suspect b{font-size:15px;color:#a5570f}
+.engine-hours-required small{display:block;margin-top:3px;color:#62748d;font-size:8px;line-height:1.35}.odometer-current span{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}.odometer-current small{font-size:7px;font-weight:900;color:#62748d}.odometer-current b{font-size:22px;color:#075fae}.odometer-current time{font-size:8px;color:#52647d}
 .odometer-entry{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(185px,1fr) minmax(180px,1.2fr) auto;gap:8px;align-items:end;padding:0 12px 10px}.odometer-entry button{min-height:42px;border:0;border-radius:6px;background:#0873df;color:#fff;padding:0 13px;font-size:9px;font-weight:900;cursor:pointer}.odometer-entry button:disabled{opacity:.45;cursor:not-allowed}
 .odometer-history{max-height:150px;display:grid;gap:5px;margin:0 12px 10px;padding:6px;border:1px solid #c9d5e5;border-radius:6px;background:#fff;overflow-y:auto}.odometer-history article{display:grid;grid-template-columns:110px minmax(150px,auto) minmax(0,1fr);gap:8px;align-items:center;padding:7px 8px;border-radius:4px;background:#f2f6fb}.odometer-history b{font-size:10px;color:#0a4f91}.odometer-history time,.odometer-history small{font-size:8px;color:#596b83}.odometer-history small{overflow-wrap:anywhere}
 .odometer-workbench>p{margin:0;padding:4px 12px 10px;color:#6b7b91;font-size:9px}.odometer-save-hint{display:block;padding:0 12px 10px;color:#66520a!important;font-size:8px!important;font-weight:800}
@@ -590,6 +600,14 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .maintenance-current .service-summary.due-soon b{color:#8b6200}.maintenance-current .service-summary.interval-needed b,.maintenance-current .service-summary.baseline-needed b{color:#6d8170;font-size:15px}
 .service-interval-settings label{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0}.service-interval-settings label span{display:grid;gap:2px}.service-interval-settings label b{font-size:9px}.service-interval-settings label small{font-size:8px;color:#687791}
 .service-interval-settings input{width:120px;min-height:44px;border:1px solid #9fb4cf;border-radius:6px;padding:0 10px;font-family:inherit;font-size:12px;text-align:right}
+/* Severity, so how far past the interval a service is reads at a glance rather
+   than having to be worked out from the hour count. */
+.service-summary.severity-due-soon b{color:#8a6100}
+.service-summary.severity-due b{color:#a5570f}
+.service-summary.severity-overdue b{color:#b5252c}
+.service-summary.severity-critical b{color:#8c1119}
+.service-summary.severity-overdue time,.service-summary.severity-critical time{font-weight:900;color:#b5252c}
+.service-summary.severity-critical{border-radius:6px;background:#fdecec;box-shadow:inset 0 0 0 1px #e2a5a8}
 .fleet-duty-cycle{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;border:1px solid #9fb4cf;border-radius:8px;background:#f6f9fd;padding:10px 12px}
 .fleet-duty-cycle>b{font-size:9px;letter-spacing:.6px;color:#385a86}
 .fleet-duty-cycle>span{display:grid;gap:3px;flex:1;min-width:200px;font-size:13px;font-weight:800;color:#163c70;text-align:right}
