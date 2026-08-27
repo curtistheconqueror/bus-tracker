@@ -1,6 +1,6 @@
 # Fleet Maintenance Bus Tracker
 
-A mobile-friendly fleet location and maintenance operations application. It combines a facility map, an interactive Down Sheet, a real-time Defect Log, an offline Fixed Repairs history, and independent working Bus Lists while preserving device-local data.
+A mobile-friendly fleet location and maintenance operations application. It combines a facility map, an interactive Down Sheet, a real-time Defect Log, an offline Fixed Repairs history, and independent Fleet Campaigns while preserving device-local data.
 
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
 
@@ -12,9 +12,9 @@ Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site
 | /down-sheet | Shift maintenance planning, repair estimates, assignments, photo import, and Down Sheet history |
 | /defect-log | Mobile-first capture of operator and mechanic findings that may not belong on the Down Sheet |
 | /fixed-repairs | Completed repair history, fix details, parts, verification, and technician records |
-| /lists | Independent working bus lists, reusable report formats, completion tracking, and text sharing |
+| /lists | Independent Fleet Campaigns, reusable report formats, completion tracking, and text sharing |
 
-The facility map owns physical location. The Down Sheet owns scheduled maintenance workflow. The Defect Log owns direct field observations. Fixed Repairs presents completed history and completion details. Bus Lists owns independent punch lists that do not read or alter fleet records. Shared bus status and repair records synchronize between the first four surfaces on the same device.
+The facility map owns physical location. The Down Sheet owns scheduled maintenance workflow. The Defect Log owns direct field observations. Fixed Repairs presents completed history and completion details. Fleet Campaigns owns independent punch lists that do not read or alter fleet records. Shared bus status and repair records synchronize between the first four surfaces on the same device.
 
 ## Current capabilities
 
@@ -23,7 +23,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - DS badges, Mystery detection, road-call and tow indicators, and configurable quick filters
 - Direct Defect Log entries with per-repair lifecycle controls
 - Offline Fixed Repairs history with carried defect details, fix steps, verification, parts, technician, and completion time
-- Independent Bus Lists with custom columns, reusable formats, initials and completion timestamps, and shareable text exports
+- Independent Fleet Campaigns with custom columns, reusable formats, initials and completion timestamps, and shareable text exports
 - AI Operator commands for fleet questions, multi-bus movement, status updates, and Down Sheet actions
 - Down Sheet photo scanning through a server-side OpenRouter integration
 - Export and import of the complete device-local board state
@@ -36,7 +36,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - app/down-sheet/ — Down Sheet UI, synchronization, scanning, estimates, and settings
 - app/defect-log/ — mobile Defect Log UI, grouping, filters, and display settings
 - app/fixed-repairs/ — completed repair history and fix-detail editor
-- app/lists/ and app/bus-lists.ts — independent working lists, reusable formats, and text exports
+- app/lists/ and app/bus-lists.ts — Fleet Campaigns, reusable formats, and text exports
 - app/api/ — server-side API routes
 - tests/ — release-gate regression tests
 - public/ — manifest, service worker, icons, and static assets
@@ -68,8 +68,8 @@ The next major phase is an offline-first shared backend with real-time device sy
 
 The private GitHub origin is the code backup. The sites remote belongs to the existing OpenAI Sites deployment. A coding agent may implement, test, and commit locally, but publishing must use the existing Sites project and must never create a replacement site.
 
-- Current live release: Sites Version 111
-- Current live feature checkpoint: commit 6f99889
+- Current live release: Sites Version 112
+- Current live feature checkpoint: commit 7d4bb32
 - Release reference: docs/RELEASES.md
 - Publishing and recovery runbook: docs/SITES_PUBLISHING_RUNBOOK.md
 
