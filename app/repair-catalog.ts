@@ -2,6 +2,24 @@ export type DefectState="open"|"in-progress"|"deferred"|"completed";
 export type DefectOperability="service"|"down";
 export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
 
+/* How far a repair has got before it is fixed. "Open" and "completed" are the
+   only two things the record could say until now, and between them sits most
+   of a shop week: a bus looked at, a fault found, a part waiting on the truck.
+
+   Three states and no more. A fourth invites two mechanics to tick different
+   boxes for the same job, and a state can be added later far more safely than
+   one already written onto records can be taken away. "Diagnosed" deliberately
+   covers a check-engine code and a multiplex fault alike: on the floor both
+   mean somebody found the cause and it is not fixed yet. */
+export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order";
+export type WorkStateStamp={at?:string;by?:string};
+export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string}[]=[
+ {key:"inspected",label:"INSPECTED",short:"INSP",hint:"Looked at, nothing found yet"},
+ {key:"diagnosed",label:"DIAGNOSED",short:"DIAG",hint:"Cause found, not fixed yet"},
+ {key:"parts-on-order",label:"PARTS ON ORDER",short:"PARTS",hint:"Waiting on a part to arrive"},
+];
+export const WORK_STATE_KEYS=WORK_STATES.map(state=>state.key);
+
 export type StructuredDefect={
  id:string;
  category:string;
@@ -32,6 +50,15 @@ export type StructuredDefect={
     recorded rather than none spent. */
  repairHours?:number;
  diagnosticHours?:number;
+ /* An absent key means not ticked. The stamp carries who and when, filled in
+    where the settings ask for initials and left empty where they do not. */
+ workStates?:Partial<Record<WorkStateKey,WorkStateStamp>>;
+ /* What the diagnosis actually turned up, in the mechanic's own words, when
+    the cause is not something the picker could ever have listed: a throttle
+    pedal reference circuit, a chafed pin. Free text on purpose, and it travels
+    into the label, so the Down Sheet and Fixed Repairs read the finding and
+    not only the symptom that was reported. */
+ finding?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
  symptoms?:string[];
@@ -153,6 +180,69 @@ export function normalizeRepairHours(value:unknown):number|undefined{
 export function isDiagnosticDefect(category:unknown,issue:unknown){
  const text=String(category||"")+" "+String(issue||"");
  return /diagnos|check.?engine|check engine|stop engine light|mod light|abs warning|intermittent|unknown/i.test(text);
+}
+
+/* Anything that is not one of the three known keys is dropped, and anything
+   that is becomes a stamp even if it arrived as a bare `true` from an older
+   record or a hand-edited backup. */
+export function normalizeWorkStates(value:unknown):Partial<Record<WorkStateKey,WorkStateStamp>>|undefined{
+ if(!value||typeof value!=="object"||Array.isArray(value))return undefined;
+ const source=value as Record<string,unknown>,states:Partial<Record<WorkStateKey,WorkStateStamp>>={};
+ let found=false;
+ for(const key of WORK_STATE_KEYS){
+  const entry=source[key];
+  if(entry===undefined||entry===null||entry===false)continue;
+  const stamp=entry&&typeof entry==="object"?entry as Record<string,unknown>:{};
+  const at=String(stamp.at??"").trim(),by=String(stamp.by??"").trim();
+  states[key]={...(at?{at}:{}),...(by?{by}:{})};
+  found=true;
+ }
+ return found?states:undefined;
+}
+
+/* Ticking a state stamps it; unticking removes the key outright rather than
+   leaving a false behind, so a stamp can never outlive the tick that made it
+   and read as work somebody did not do. */
+export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:boolean,at:string,by=""):StructuredDefect{
+ const states={...(defect.workStates||{})};
+ if(on){
+  const person=by.trim();
+  states[key]={...(at?{at}:{}),...(person?{by:person}:{})};
+ }else delete states[key];
+ const next={...defect,workStates:Object.keys(states).length?states:undefined};
+ if(!next.workStates)delete next.workStates;
+ return next;
+}
+
+export function hasWorkState(defect:StructuredDefect,key:WorkStateKey){return Boolean(defect.workStates?.[key])}
+
+/* Ordered as WORK_STATES is, so a record always reads the same way round
+   however the boxes were ticked. */
+export function defectWorkStates(defect:StructuredDefect){
+ return WORK_STATES.filter(state=>hasWorkState(defect,state.key));
+}
+
+/* "CJ, Aug 27" where both are known, either alone where one is, and nothing
+   where the tick carries neither. */
+export function workStateStampLabel(stamp:WorkStateStamp|undefined){
+ if(!stamp)return "";
+ const by=String(stamp.by||"").trim(),at=String(stamp.at||"").trim();
+ const when=at?new Date(at):null;
+ const day=when&&!Number.isNaN(when.getTime())
+  ?new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric"}).format(when):"";
+ return [by,day].filter(Boolean).join(", ");
+}
+
+/* A finding is a cause, not a symptom, so it is marked as one. Without the
+   word a reader cannot tell what the driver reported from what the shop
+   found, and on a Down Sheet those are very different facts. */
+export function normalizeFinding(value:unknown){
+ const text=String(value??"").trim();
+ return text?text.slice(0,180):undefined;
+}
+export function findingLabel(finding:unknown){
+ const text=normalizeFinding(finding);
+ return text?"found: "+text:"";
 }
 
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
@@ -297,7 +387,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
    const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours)} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),finding:normalizeFinding(defect.finding)} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
@@ -311,6 +401,9 @@ export function defectSupportingDetails(defect:StructuredDefect){
 export function defectLabel(defect:StructuredDefect){
  if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();
  const quantity=typeof defect.quantity==="number"&&defect.quantity>0?defect.quantity+" "+(defect.unit||"quarts"):"";
- return [defect.category,defect.issue,quantity,defectSupportingDetails(defect)].map(value=>String(value).trim()).filter(Boolean).join(" — ")
+ /* The finding sits ahead of the reported symptoms: once the cause is known it
+    is the more useful half of the line, and on a Down Sheet that is often all
+    anyone reads before deciding what the bus needs. */
+ return [defect.category,defect.issue,quantity,findingLabel(defect.finding),defectSupportingDetails(defect)].map(value=>String(value).trim()).filter(Boolean).join(" — ")
 }
 export function defectSummary(defects:StructuredDefect[]){return defects.filter(isUnresolved).map(defectLabel).join("; ")}

@@ -142,6 +142,41 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 .billable-time>small{display:block;margin-top:7px;color:var(--log-muted,#62748d);font-size:8px;line-height:1.45}
 .billable-time.diagnostic{border-color:#c99400;background:#fffaf0}
 .billable-time.diagnostic>legend,.billable-time.diagnostic>small{color:#7a5600}
+/* Work states sit in the main form, not behind ADVANCED DETAILS, so the
+   targets are sized for a gloved thumb at the bus rather than for a desk. */
+.work-state-picker{grid-column:1/-1;display:grid;gap:8px;margin:0;border:1px solid var(--log-border,#c7d1df);border-radius:8px;background:var(--log-soft,#f4f7fb);padding:10px 11px}
+.work-state-picker>legend{padding:0 5px;font-size:8px;font-weight:900;letter-spacing:.5px;color:var(--log-muted,#62748d)}
+.work-state-picker>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.log-form .work-state-picker>div label{min-height:52px;display:flex;align-items:center;flex-direction:row;gap:8px;border:1px solid var(--log-border,#c7d1df);border-radius:7px;background:var(--log-surface,#fff);color:var(--log-text,#12233b);padding:8px 9px;cursor:pointer;touch-action:manipulation}
+.log-form .work-state-picker>div label.selected{border-color:#0b64bd;background:color-mix(in srgb,#0b64bd 13%,var(--log-surface,#fff));box-shadow:inset 0 0 0 1px #0b64bd}
+.log-form .work-state-picker input[type=checkbox]{width:19px;min-height:19px;margin:0;accent-color:#0b64bd}
+.work-state-picker>div label span{display:grid;gap:1px;min-width:0}
+.work-state-picker>div label b{font-size:9px;font-weight:900;letter-spacing:.3px}
+.work-state-picker>div label small{color:var(--log-muted,#62748d);font-size:7px;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
+.log-form .work-state-picker label.work-state-finding{display:grid;gap:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--log-muted,#62748d)}
+.work-state-picker .work-state-finding input{min-height:44px;width:100%;border:1px solid var(--log-border,#b7c4d7);border-radius:7px;padding:0 10px;font-size:13px;font-weight:800;color:var(--log-text,#12233b)}
+.work-state-picker>small{display:block;color:var(--log-muted,#62748d);font-size:8px;line-height:1.45}
+/* Three across even on a phone. Stacked they pushed the picker below the fold
+   of the editor, and a control nobody scrolls to is a control nobody uses. The
+   hint drops out at this width and the tick's own stamp takes its place, which
+   is the line worth reading after the first time anyway. */
+@media(max-width:760px){
+ .log-form .work-state-picker>div label{min-height:58px;flex-direction:column;align-items:center;gap:4px;padding:7px 4px;text-align:center}
+ .work-state-picker>div label span{justify-items:center}
+ .work-state-picker>div label b{font-size:8px;line-height:1.15}
+ .work-state-picker>div label small{display:none}
+ .work-state-picker>div label.selected small{display:block;font-size:7px}
+}
+
+/* One badge per ticked state, readable at a glance against the status badge
+   next to it without competing with it. */
+.work-state-badge{border:1px solid #9db4d2;border-radius:5px;background:#eaf2fc;padding:2px 5px;color:#12457e;font-size:7px;font-weight:900;letter-spacing:.4px;white-space:nowrap}
+.work-state-badge.diagnosed{border-color:#8fbfa3;background:#e8f6ee;color:#0a5c39}
+.work-state-badge.parts-on-order{border-color:#d8bd7c;background:#fdf6e6;color:#7a5600}
+.log-focus-work-states{display:flex;align-items:baseline;gap:8px}
+.log-focus-work-states>span{display:flex;flex-wrap:wrap;gap:5px}
+.log-focus-work-states i{font-style:normal}
+
 .require-initials{display:flex;align-items:flex-start;gap:8px}
 .require-initials span{display:grid;gap:2px}
 .require-initials b{font-size:9px}

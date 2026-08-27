@@ -45,6 +45,8 @@ Preserve these rules through refactors and backend migration:
 - Down Sheet membership and the DS badge identify the same active buses regardless of physical location. Badge visibility and badge filters never alter membership.
 - Mystery logic excludes decommissioned buses, Main Garage ready rows, bays 11 and 12, and road buses. It identifies eligible on-property work-area buses that are absent from the Down Sheet.
 - Completing one linked repair must not erase unrelated active defects.
+- Work states are Inspected, Diagnosed and Parts on order, and that set is closed. A state may be added later; one already written onto records must not be removed or renamed. An absent key means not ticked, and unticking deletes the stamp with the key so a name never outlives the tick that made it.
+- A finding is what the shop found, not what the driver reported, and it renders through defectLabel so every surface shows it. Anything that builds its own defect line must go through that function rather than reassembling category and issue, or the finding silently stops reaching the Down Sheet.
 - Defect Log totals count direct Defect Log records only. Down Sheet or tracker records may display for continuity but do not inflate that count.
 - A reviewed photo import is authoritative for the Down Sheet only: it replaces every prior Down Sheet row, reconciles every DS badge, lists buses coming off before approval, and remains undoable. It must never delete or complete Defect Log records.
 - Export and import remain the recovery path until shared persistence is live.

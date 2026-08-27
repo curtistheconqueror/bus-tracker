@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, WORK_STATES, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2724,6 +2724,88 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(2),"2");
  assert.equal(formatWorkHours(0.5),"0.5");
  assert.equal(formatWorkHours(1.25),"1.25");
+});
+
+test("a repair records how far it got, and what was found travels with it",async()=>{
+ const base={id:"d1",category:"Engine",issue:"Check engine light",details:"",operability:"service",state:"open"};
+
+ // three states and no more: a fourth invites two mechanics to tick different
+ // boxes for the same job, and a state written onto records cannot be removed
+ assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order"]);
+
+ // ticking stamps who and when
+ let defect=setDefectWorkState(base,"diagnosed",true,"2026-08-27T15:00:00.000Z","CJ");
+ assert.equal(hasWorkState(defect,"diagnosed"),true);
+ assert.equal(defect.workStates.diagnosed.by,"CJ");
+ assert.equal(workStateStampLabel(defect.workStates.diagnosed),"CJ, Aug 27");
+
+ // unticking removes the key outright. A stamp left behind would read as work
+ // somebody did not do, so there is nothing for it to survive on.
+ defect=setDefectWorkState(defect,"diagnosed",false,"2026-08-27T16:00:00.000Z","CJ");
+ assert.equal(hasWorkState(defect,"diagnosed"),false);
+ assert.equal(defect.workStates,undefined,"the whole map goes when the last tick does");
+
+ // a tick with no name is still a tick: initials are a setting, not a schema rule
+ defect=setDefectWorkState(base,"inspected",true,"2026-08-27T15:00:00.000Z","");
+ assert.equal(hasWorkState(defect,"inspected"),true);
+ assert.equal(workStateStampLabel(defect.workStates.inspected),"Aug 27");
+ assert.equal(workStateStampLabel(undefined),"");
+
+ // states always read in the same order however the boxes were ticked
+ let both=setDefectWorkState(base,"parts-on-order",true,"2026-08-27T15:00:00.000Z","JT");
+ both=setDefectWorkState(both,"inspected",true,"2026-08-26T15:00:00.000Z","CJ");
+ assert.deepEqual(defectWorkStates(both).map(state=>state.key),["inspected","parts-on-order"]);
+
+ // anything that is not a known key is dropped, and a bare true still counts
+ assert.deepEqual(normalizeWorkStates({diagnosed:true,troubleshot:{by:"X"},inspected:false}),{diagnosed:{}});
+ assert.equal(normalizeWorkStates({}),undefined);
+ assert.equal(normalizeWorkStates(null),undefined);
+ assert.equal(normalizeWorkStates(["diagnosed"]),undefined);
+
+ // the finding is the cause, marked as one so a reader can tell it from the
+ // symptom the driver reported
+ assert.equal(defectLabel({...base,finding:"throttle pedal reference circuit"}),
+  "Engine — Check engine light — found: throttle pedal reference circuit");
+ // and it sits ahead of the reported symptoms, which is the half that matters
+ // once the cause is known
+ assert.equal(defectLabel({...base,details:"cuts out on hills",finding:"chafed pin 3"}),
+  "Engine — Check engine light — found: chafed pin 3 — cuts out on hills");
+ assert.equal(defectLabel(base),"Engine — Check engine light");
+ assert.equal(normalizeFinding("  "),undefined);
+ assert.equal(normalizeFinding("x".repeat(400)).length,180);
+
+ // a stored record carries both through a read without being rewritten
+ const [normalized]=normalizeDefects([{...base,workStates:{diagnosed:{by:"CJ",at:"2026-08-27T15:00:00.000Z"}},finding:" chafed pin 3 "}],"","bus");
+ assert.equal(normalized.finding,"chafed pin 3");
+ assert.equal(normalized.workStates.diagnosed.by,"CJ");
+ // and a record that predates all of this reads as having none of it
+ const [old]=normalizeDefects([base],"","bus");
+ assert.equal(old.workStates,undefined);
+ assert.equal(old.finding,undefined);
+
+ // the finding reaches every surface because it goes through defectLabel, and
+ // the Down Sheet summary is built from the same function
+ assert.match(defectSummary([{...base,finding:"chafed pin 3"}]),/found: chafed pin 3/);
+
+ // Ticked mid-job on a phone, so the picker is in the main form and not behind
+ // the advanced disclosure where it would go unused. Rendering it at the end of
+ // the form put it below the fold of a phone editor, which is exactly how the
+ // campaign paste box got missed, so it sits above WORK STATUS instead.
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.ok(page.indexOf("work-state-picker")<page.indexOf("advanced-defect-details"),"above ADVANCED DETAILS");
+ assert.ok(page.indexOf("work-state-picker")<page.indexOf("WORK STATUS<select"),"and above WORK STATUS");
+
+ // Three across at phone width. Stacked, the block was tall enough to push
+ // itself off the bottom of the open editor.
+ const styles=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(styles,/\.work-state-picker>div\{[^}]*grid-template-columns:repeat\(3/);
+ const narrow=styles.slice(styles.indexOf("@media(max-width:760px){\n .log-form .work-state-picker"));
+ assert.equal(/work-state-picker>div\{[^}]*grid-template-columns/.test(narrow),false,"never stacked to one column");
+
+ // The initials setting covers both saving a repair fixed and ticking a state,
+ // so there is one switch rather than two that can disagree.
+ assert.match(page,/before ticking a work state/);
+ assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
 test("a day's work time covers Defect Log repairs as well as campaign sweeps",()=>{

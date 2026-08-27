@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,defectWorkStates,isUnresolved,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -105,6 +105,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
  });
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
+ /* Ticking a state stamps who and when. The name comes from whatever is typed
+    into FIXED BY or the device default, so the common case takes one tap; where
+    initials are required and none are set, the tick is refused rather than
+    stamped anonymously, because "somebody diagnosed this" is worth less than
+    knowing who to ask.
+
+    Unticking clears the stamp with the key, so a state can never carry a name
+    for work that is no longer claimed. */
+ const toggleWorkState=(key:WorkStateKey,on:boolean)=>{
+  const by=(value.defect.completedBy||defaultInitials).trim().toUpperCase();
+  if(on&&requireInitials&&!by){
+   alert("Put your initials or name in FIXED BY before ticking a work state. This is required by the Defect Log setting; turn it off there to make it optional again.");
+   return;
+  }
+  setValue(current=>({...current,defect:setDefectWorkState(current.defect,key,on,new Date().toISOString(),by)}));
+ };
  const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=value.defect.category==="Engine"&&value.quickIssue==="Check-engine diagnosis",fanCountMode=value.defect.category==="Cooling System"&&value.quickIssue==="Radiator fan(s) out";
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
@@ -124,6 +140,24 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     {value.defect.category==="Preventive Maintenance"&&value.quickIssue==="Add engine oil"&&<><label>QUANTITY<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {fanCountMode&&<label className="fan-count-field">FANS OUT<select value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}><option value="">Select 1 through 8</option>{Array.from({length:8},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
     <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
+    {/* Directly above WORK STATUS, and outside ADVANCED DETAILS on purpose:
+        these are what gets ticked mid-job on a phone, by somebody standing at
+        the bus, and burying them behind a disclosure is how they would go
+        unused. Placed further down the form it opened below the fold on a
+        phone, which is the same way the campaign paste box got missed. */}
+    <fieldset className="wide work-state-picker"><legend>WORK DONE SO FAR — OPTIONAL</legend>
+     <div>{WORK_STATES.map(state=>{
+      const stamp=value.defect.workStates?.[state.key],on=Boolean(stamp),who=workStateStampLabel(stamp);
+      return <label className={on?"selected":""} key={state.key}>
+       <input type="checkbox" checked={on} onChange={event=>toggleWorkState(state.key,event.target.checked)}/>
+       <span><b>{state.label}</b><small>{on&&who?who:state.hint}</small></span>
+      </label>;
+     })}</div>
+     <label className="work-state-finding">WHAT WAS FOUND (OPTIONAL)
+      <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
+     </label>
+     <small>A finding is the cause, in your own words, when it is nothing the list could have offered. It shows on this repair everywhere it appears, including the Down Sheet, so the next person reads what was found and not just what was reported.</small>
+    </fieldset>
     <label>WORK STATUS<select value={value.defect.state} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="deferred">Deferred</option><option value="completed">Fixed</option></select></label>
     <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
     <div className="save-log-middle-actions" aria-label="Defect form actions">
@@ -183,7 +217,7 @@ function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSe
   <header className="log-settings-head"><span><small>DEFECT LOG</small><h2>Settings</h2></span><button onClick={close}>x</button></header>
   <div>
    <label>YOUR INITIALS OR NAME<input maxLength={12} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9 ]/gi,"").toUpperCase()})}/></label>
-   <label className="require-initials"><input type="checkbox" checked={settings.requireInitials} onChange={event=>setSettings({...settings,requireInitials:event.target.checked})}/><span><b>REQUIRE INITIALS ON A FIXED REPAIR</b><small>A repair cannot be saved as fixed without a name on it. Leave off to keep it optional.</small></span></label>
+   <label className="require-initials"><input type="checkbox" checked={settings.requireInitials} onChange={event=>setSettings({...settings,requireInitials:event.target.checked})}/><span><b>REQUIRE INITIALS ON RECORDED WORK</b><small>A repair cannot be saved as fixed, and a work state cannot be ticked, without a name on it. Leave off to keep both optional.</small></span></label>
    <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
    <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
@@ -302,7 +336,7 @@ export default function DefectLog(){
      <span className="log-meta">{group.records.length>1&&<b className="defect-count-badge">×{group.records.length}</b>}<b className={"state "+groupState}>{STATE_LABELS[groupState]}</b><small>{STATUS_LABELS[group.bus.s]||group.bus.s}</small><time>LATEST {timeLabel(group.updatedAt)}</time><i className="group-toggle">{expanded?"CLOSE":"VIEW"}</i></span>
     </button>
     {expanded&&<div className="grouped-defect-list"><header className="grouped-defect-head"><span><b>BUS {group.bus.n}</b><small>{group.records.length} DEFECT{group.records.length===1?"":"S"}</small></span><button onClick={()=>setEditing({...newDraft(),busId:group.bus.id})}>+ ADD DEFECT</button></header>{group.records.map((record,index)=><section className="grouped-defect-row" key={record.defect.id}>
-     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b><time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>
+     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
      <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
     </section>)}</div>}
@@ -314,6 +348,10 @@ export default function DefectLog(){
     <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
      <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
+     {/* Spelled out here rather than abbreviated: the focus view is the one a
+         foreman reads standing next to somebody, and "DIAGNOSED — CJ, Aug 27"
+         answers the question without anybody tapping into the record. */}
+     {defectWorkStates(record.defect).length>0&&<p className="log-focus-work-states"><b>DONE</b><span>{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <i className={"work-state-badge "+state.key} key={state.key}>{state.label}{who?" — "+who:""}</i>})}</span></p>}
      {record.defect.conditionNotDuplicated&&<p><b>RESULT</b>Defect / condition not duplicated</p>}
      {record.defect.diagnosticNote&&<p><b>DIAG</b>{record.defect.diagnosticNote}</p>}
      {record.defect.actionTaken&&<p><b>ACTION</b>{record.defect.actionTaken}</p>}

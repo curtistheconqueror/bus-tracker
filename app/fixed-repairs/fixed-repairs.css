@@ -86,3 +86,12 @@
 .billable-time>small{display:block;margin-top:7px;color:#62748d;font-size:8px;line-height:1.45}
 .billable-time.diagnostic{border-color:#c99400;background:#fffaf0}
 .billable-time.diagnostic>legend,.billable-time.diagnostic>small{color:#7a5600}
+
+/* Work states are read-only here: the repair is already closed, and what
+   matters on this page is who got how far, not offering to re-tick it. */
+.work-state-badge{border:1px solid #9db4d2;border-radius:5px;background:#eaf2fc;padding:2px 6px;color:#12457e;font-size:8px;font-weight:900;letter-spacing:.4px;font-style:normal;white-space:nowrap}
+.work-state-badge.diagnosed{border-color:#8fbfa3;background:#e8f6ee;color:#0a5c39}
+.work-state-badge.parts-on-order{border-color:#d8bd7c;background:#fdf6e6;color:#7a5600}
+.completion-work-states{display:grid;gap:5px;margin:0}
+.completion-work-states>b{font-size:7px;font-weight:900;letter-spacing:.5px;color:#62748d}
+.completion-work-states>span{display:flex;flex-wrap:wrap;gap:6px}
