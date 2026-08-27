@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { BUS_LIST_COLUMN_LIMIT, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
+import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_TEMPLATES, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
 import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
@@ -2622,6 +2622,47 @@ test("a list names its own columns, and never loses a value it was not told abou
  const wide=setBusListEntryCell(named,named.entries[0].id,0,"x".repeat(80));
  const capped=busListExportText(wide,"remaining",now).split("\n").find(row=>row.includes("xxxx"));
  assert.ok(capped.includes("x".repeat(80)),"the value itself is never cut");
+});
+
+test("report formats are reusable, built in for farebox and savable for the rest",()=>{
+ // The farebox report arrives the same way every time, so its columns are named
+ // exactly as its own sheet heads them and checking a row against the paper is
+ // a straight read across.
+ const farebox=BUS_LIST_TEMPLATES.find(entry=>entry.id==="farebox");
+ assert.deepEqual(farebox.columns,["Location","Farebox ID","Last Probed Time","Bypass Alarm"]);
+ assert.equal(farebox.builtIn,true);
+
+ // anything else is saved from a list already built, so a new report format
+ // never waits on a code change
+ let saved=saveBusListTemplate([],"Ventra",["Location","Ventra Unit","Last Seen","Status"],"a");
+ assert.equal(saved.length,1);
+ assert.equal(saved[0].name,"Ventra");
+ assert.deepEqual(busListTemplateOptions(saved).map(entry=>entry.name),["Farebox Bypass","Ventra"]);
+
+ // saving the same name again replaces it rather than leaving two that differ
+ // by one heading
+ saved=saveBusListTemplate(saved,"Ventra",["Location","Ventra Unit","Fault"],"b");
+ assert.equal(saved.length,1);
+ assert.deepEqual(saved[0].columns,["Location","Ventra Unit","Fault"]);
+ // and a built-in name cannot be shadowed, which would make picking ambiguous
+ assert.equal(saveBusListTemplate(saved,"Farebox Bypass",["x"],"c").length,1);
+ assert.equal(saveBusListTemplate(saved,"farebox bypass",["x"],"d").length,1);
+
+ // a format with no name or no columns would do nothing
+ assert.equal(saveBusListTemplate(saved,"",["x"],"e").length,1);
+ assert.equal(saveBusListTemplate(saved,"Empty",[],"f").length,1);
+ assert.deepEqual(normalizeBusListTemplates("nonsense"),[]);
+ assert.deepEqual(normalizeBusListTemplates([{name:"No columns",columns:[]},null,7]),[]);
+
+ // deleting a format leaves lists already built with it untouched
+ const now="2026-08-27T14:00:00.000Z";
+ const built=createBusList("Ventra sweep","report",now,"s",saved[0].columns);
+ assert.deepEqual(deleteBusListTemplate(saved,saved[0].id),[]);
+ assert.deepEqual(built.columns,["Location","Ventra Unit","Fault"]);
+
+ // a template only carries headings, so it caps at the same seven
+ const wide=saveBusListTemplate([],"Wide",["a","b","c","d","e","f","g","h","i"],"g");
+ assert.equal(wide[0].columns.length,BUS_LIST_COLUMN_LIMIT);
 });
 
 test("lists written before columns existed still open",()=>{

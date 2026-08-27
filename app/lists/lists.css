@@ -81,6 +81,13 @@ button,input,select,textarea{font:inherit}
 .list-column-fields label{display:grid;gap:2px}
 .list-column-fields small{font-size:6.5px;font-weight:900;color:#8496ad}
 .list-column-fields input{min-height:32px;border:1px solid #b7c4d7;border-radius:5px;padding:0 7px;font-size:11px}
+.list-template-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px}
+.list-template-actions>button{min-height:32px;border:1px solid #0b64bd;border-radius:5px;background:#fff;color:#0b64bd;padding:0 11px;font-size:8px;font-weight:900;cursor:pointer}
+.list-template-actions>button:disabled{border-color:#c6d1e0;color:#9aa8bb;cursor:not-allowed}
+.list-saved-templates{display:flex;gap:5px;flex-wrap:wrap}
+.list-saved-templates button{min-height:28px;border:1px solid #cbd6e6;border-radius:14px;background:#f2f6fb;color:#52647d;padding:0 10px;font-size:8px;font-weight:800;cursor:pointer}
+.list-saved-templates button:hover{border-color:#e0c3c5;background:#fff5f5;color:#a5252d}
+.lists-new select{min-height:38px;border:1px solid #b7c4d7;border-radius:6px;padding:0 8px;font-size:12px}
 .list-column-warn{display:block;margin-top:8px;color:#7a5600;font-size:8px;font-weight:800;line-height:1.4}
 
 .list-export{display:grid;gap:7px;border-top:1px solid #d7e0ec;padding-top:11px}

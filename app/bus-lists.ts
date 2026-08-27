@@ -50,6 +50,20 @@ export const BUS_LIST_ENTRY_LIMIT=500;
    phone. Nothing breaks above it; the extra columns simply cannot be named. */
 export const BUS_LIST_COLUMN_LIMIT=7;
 
+/* Formats that arrive the same way every time. The farebox report is the one
+   we have seen, so its columns are named here exactly as its own sheet heads
+   them, which makes checking a row against the paper trivial. Anything else
+   Curtis receives he saves himself from a list he has already built, so a new
+   report format never waits on a code change. */
+export type BusListTemplate={id:string;name:string;columns:string[];builtIn?:boolean};
+
+export const BUS_LIST_TEMPLATES:BusListTemplate[]=[
+ {id:"farebox",name:"Farebox Bypass",columns:["Location","Farebox ID","Last Probed Time","Bypass Alarm"],builtIn:true},
+];
+
+export const BUS_LIST_TEMPLATES_STORAGE_KEY="pace-bus-list-templates-v1";
+export const BUS_LIST_TEMPLATE_LIMIT=30;
+
 function clean(value:unknown){return String(value??"").trim()}
 function collapse(value:string){return value.replace(/\s+/g," ").trim()}
 
@@ -275,4 +289,38 @@ export function busListExportText(list:BusList,mode:BusListExportMode="full",now
  }
  if(!total)body.push("","No buses on this list yet.");
  return [...head,...body].join("\n");
+}
+
+export function normalizeBusListTemplates(value:unknown):BusListTemplate[]{
+ if(!Array.isArray(value))return [];
+ const seen=new Set(BUS_LIST_TEMPLATES.map(entry=>entry.name.toLowerCase()));
+ const saved:BusListTemplate[]=[];
+ for(const [index,candidate] of value.entries()){
+  if(!candidate||typeof candidate!=="object")continue;
+  const raw=candidate as Partial<BusListTemplate>;
+  const name=collapse(clean(raw.name)),columns=normalizeBusListColumns(raw.columns);
+  /* A template with no columns would do nothing, and a built-in name must not
+     be shadowed by a saved one or picking it would be ambiguous. */
+  if(!name||!columns.length||seen.has(name.toLowerCase()))continue;
+  seen.add(name.toLowerCase());
+  saved.push({id:clean(raw.id)||"template-"+index+"-"+name.toLowerCase().replace(/[^a-z0-9]+/g,"-"),name,columns});
+ }
+ return saved.slice(0,BUS_LIST_TEMPLATE_LIMIT);
+}
+
+export function busListTemplateOptions(saved:unknown):BusListTemplate[]{
+ return [...BUS_LIST_TEMPLATES,...normalizeBusListTemplates(saved)];
+}
+
+/* Saving is idempotent on the name: saving "Ventra" twice replaces the columns
+   rather than leaving two entries that differ by one heading. */
+export function saveBusListTemplate(saved:unknown,name:string,columns:unknown,idSeed:string):BusListTemplate[]{
+ const cleaned=collapse(clean(name)),wanted=normalizeBusListColumns(columns);
+ if(!cleaned||!wanted.length)return normalizeBusListTemplates(saved);
+ const rest=normalizeBusListTemplates(saved).filter(entry=>entry.name.toLowerCase()!==cleaned.toLowerCase());
+ return normalizeBusListTemplates([{id:"template-"+idSeed,name:cleaned,columns:wanted},...rest]);
+}
+
+export function deleteBusListTemplate(saved:unknown,id:string):BusListTemplate[]{
+ return normalizeBusListTemplates(saved).filter(entry=>entry.id!==id);
 }

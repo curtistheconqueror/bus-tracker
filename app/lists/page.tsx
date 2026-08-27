@@ -2,8 +2,8 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./lists.css";
-import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,createBusList,normalizeBusLists,setBusListColumns,setBusListEntryCell,setBusListEntryDone,
- BUS_LIST_COLUMN_LIMIT,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode} from "../bus-lists";
+import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,
+ BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
 
 function readLists(raw:string|null):BusList[]{
  try{return normalizeBusLists(JSON.parse(raw||"[]"))}catch{return []}
@@ -34,16 +34,21 @@ export default function Lists(){
  const [newName,setNewName]=useState("");
  const [newSource,setNewSource]=useState("");
  const [newColumns,setNewColumns]=useState("");
+ const [savedTemplates,setSavedTemplates]=useState<BusListTemplate[]>([]);
+ const [templateId,setTemplateId]=useState("");
  const [entryText,setEntryText]=useState("");
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
 
  useEffect(()=>{
   setLists(readLists(localStorage.getItem(BUS_LISTS_STORAGE_KEY)));
+  try{setSavedTemplates(normalizeBusListTemplates(JSON.parse(localStorage.getItem(BUS_LIST_TEMPLATES_STORAGE_KEY)||"[]")))}catch{/* optional */}
   try{setInitials(String(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").defaultInitials||""))}catch{/* optional */}
   setHydrated(true);
  },[]);
  useEffect(()=>{if(hydrated)writeLists(lists)},[lists,hydrated]);
+ useEffect(()=>{if(hydrated)try{localStorage.setItem(BUS_LIST_TEMPLATES_STORAGE_KEY,JSON.stringify(savedTemplates))}catch{/* storage may be full or blocked */}},[savedTemplates,hydrated]);
+ const templates=useMemo(()=>busListTemplateOptions(savedTemplates),[savedTemplates]);
 
  const open=useMemo(()=>lists.find(list=>list.id===openId),[lists,openId]);
  const counts=open?busListCounts(open):{total:0,done:0,remaining:0};
@@ -61,7 +66,7 @@ export default function Lists(){
   if(!name){alert("Give the list a name, such as Farebox — Coin Bypass.");return}
   const list=createBusList(name,newSource,new Date().toISOString(),seedId(),newColumns.split(",").map(part=>part.trim()).filter(Boolean));
   setLists(current=>[list,...current]);
-  setOpenId(list.id);setNewName("");setNewSource("");setNewColumns("");
+  setOpenId(list.id);setNewName("");setNewSource("");setNewColumns("");setTemplateId("");
  };
  const addEntries=()=>{
   if(!open||!entryText.trim())return;
@@ -101,7 +106,12 @@ export default function Lists(){
      <b>NEW LIST</b>
      <label>NAME<input value={newName} onChange={event=>setNewName(event.target.value)} placeholder="Farebox — Coin Bypass"/></label>
      <label>WHERE IT CAME FROM<input value={newSource} onChange={event=>setNewSource(event.target.value)} placeholder="Farebox report 8-27-26"/></label>
-     <label>COLUMNS — OPTIONAL<input value={newColumns} onChange={event=>setNewColumns(event.target.value)} placeholder="Farebox ID, Last Probed, Bypass"/></label>
+     <label>FORMAT<select value={templateId} onChange={event=>{const picked=templates.find(entry=>entry.id===event.target.value);
+      setTemplateId(event.target.value);setNewColumns(picked?picked.columns.join(", "):"")}}>
+      <option value="">Custom — name your own columns</option>
+      {templates.map(entry=><option value={entry.id} key={entry.id}>{entry.name}</option>)}
+     </select></label>
+     <label>COLUMNS — OPTIONAL<input value={newColumns} onChange={event=>{setNewColumns(event.target.value);setTemplateId("")}} placeholder="Farebox ID, Last Probed, Bypass"/></label>
      <button type="button" onClick={addList}>CREATE LIST</button>
     </div>
     {lists.length?<ul className="lists-saved">{lists.map(list=>{
@@ -132,6 +142,18 @@ export default function Lists(){
        <label key={index}><small>{index+1}</small><input value={open.columns[index]||""} placeholder={index?"":"Farebox ID"}
         onChange={event=>{const next=[...open.columns];while(next.length<=index)next.push("");next[index]=event.target.value;
          touch(open.id,list=>setBusListColumns(list,next))}}/></label>)}
+     </div>
+     <div className="list-template-actions">
+      <button type="button" disabled={!open.columns.length} onClick={()=>{
+       const name=prompt("Save these columns as a reusable format. What is this report called?",open.name);
+       if(!name||!name.trim())return;
+       setSavedTemplates(current=>saveBusListTemplate(current,name,open.columns,seedId()));
+      }}>SAVE AS A FORMAT</button>
+      {savedTemplates.length?<span className="list-saved-templates">{savedTemplates.map(entry=>
+       <button type="button" key={entry.id} onClick={()=>{
+        if(!confirm("Delete the saved format “"+entry.name+"”? Lists already using it keep their columns."))return;
+        setSavedTemplates(current=>deleteBusListTemplate(current,entry.id));
+       }} aria-label={"Delete saved format "+entry.name}>{entry.name} ×</button>)}</span>:null}
      </div>
      {unnamed?<small className="list-column-warn">{unnamed===1?"One value per row has":unnamed+" values per row have"} no column name yet. {unnamed===1?"It is":"They are"} still kept and still exported, just unlabelled.</small>:null}
     </details>
