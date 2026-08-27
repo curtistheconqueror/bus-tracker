@@ -2764,6 +2764,14 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  assert.equal(body.includes("Mirror"),false);
  assert.equal(body.includes("Glass / windshield"),false);
 
+ // The back-up alarm is exterior safety equipment with no control at the seat,
+ // so it sits with the other swap-out safety fixtures. Bus Controls is the
+ // driver's station and must not collect devices the operator never touches.
+ assert.ok(lights.includes("Back-up alarm"));
+ assert.equal(REPAIR_OPTIONS["Bus Controls"].some(option=>/back-?up alarm/i.test(option)),false);
+ // it is not ADA equipment, so the chair mark must not land on it
+ assert.equal(repairIssueDisplayLabel("Back-up alarm"),"Back-up alarm");
+
  // the mirrors that were missing
  assert.ok(lights.includes("Interior mirror"));
  assert.ok(lights.includes("Outside rear view mirror - C/S"));
