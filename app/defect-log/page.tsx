@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,isUnresolved,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,type DefectOperability,type DefectState,type StructuredDefect} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -20,7 +20,7 @@ type LogTheme="light"|"dark"|"midnight"|"tactical"|"custom";
 type LogFontSize="standard"|"large"|"extra";
 type LogFontFamily="clean"|"condensed"|"classic";
 type LogAppearance={page:string;surface:string;text:string;muted:string;header:string;headerText:string;accent:string};
-type LogSettings={defaultInitials:string;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;appearance:LogAppearance;display:DefectLogDisplaySettings};
+type LogSettings={defaultInitials:string;requireInitials:boolean;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;appearance:LogAppearance;display:DefectLogDisplaySettings};
 type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string};
 
 const SETTINGS_KEY="pace-defect-log-settings-v1";
@@ -35,14 +35,14 @@ const LOG_THEMES:Record<Exclude<LogTheme,"custom">,{label:string;appearance:LogA
 };
 const FONT_STACKS:Record<LogFontFamily,string>={clean:"Arial, Helvetica, sans-serif",condensed:"'Arial Narrow', 'Roboto Condensed', Arial, sans-serif",classic:"Georgia, 'Times New Roman', serif"};
 const COLOR_FIELDS:[keyof LogAppearance,string][]=[["page","BACKGROUND"],["surface","CARDS"],["text","PRIMARY TEXT"],["muted","SECONDARY TEXT"],["header","HEADER"],["headerText","HEADER TEXT"],["accent","ACCENT"]];
-const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",defaultFilter:"all",showFixed:true,theme:"light",fontSize:"standard",fontFamily:"clean",appearance:{...LIGHT_APPEARANCE},display:DEFAULT_DEFECT_LOG_DISPLAY};
+const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",requireInitials:false,defaultFilter:"all",showFixed:true,theme:"light",fontSize:"standard",fontFamily:"clean",appearance:{...LIGHT_APPEARANCE},display:DEFAULT_DEFECT_LOG_DISPLAY};
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
 function readDown(raw:string|null):DefectLogDownEntry[]{const payload=readDownSheetPayload<DefectLogDownEntry>(raw);return payload.valid?payload.entries:[]}
 function readMysterySlot(raw:string|null){try{const value=JSON.parse(raw||"{}").visuals?.mysterySlot;return /^#[0-9a-f]{6}$/i.test(String(value))?String(value):"#edf3ff"}catch{return "#edf3ff"}}
-function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean";return {...DEFAULT_SETTINGS,...saved,theme,fontSize,fontFamily,appearance:{...preset,...saved.appearance},display:normalizeDefectLogDisplay(saved.display)}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE},display:normalizeDefectLogDisplay(null)}}}
+function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,requireInitials=saved.requireInitials===true,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean";return {...DEFAULT_SETTINGS,...saved,requireInitials,theme,fontSize,fontFamily,appearance:{...preset,...saved.appearance},display:normalizeDefectLogDisplay(saved.display)}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE},display:normalizeDefectLogDisplay(null)}}}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function locationLabel(location:string){
@@ -73,14 +73,14 @@ function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:strin
   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Choose 15s, 17s, 18s, or 20s first, or type the full number."}</small>
  </fieldset>;
 }
-function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forgetLearned,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
  const [value,setValue]=useState(draft);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
     that already had a diagnosis, an action, or a part recorded. React warned
     about it and the section simply never opened. Held in state instead, seeded
     once from the record, so it opens when there is something to see and the
     mechanic can still collapse it. */
- const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy));
+ const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
  useEffect(()=>{document.body.classList.add("defect-editor-open");return()=>document.body.classList.remove("defect-editor-open")},[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
@@ -104,11 +104,12 @@ function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forget
    partNumber:hasNumber||!suggestion?current.defect.partNumber||"":suggestion.partNumber,
    partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
  });
+ const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
  const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=value.defect.category==="Engine"&&value.quickIssue==="Check-engine diagnosis",fanCountMode=value.defect.category==="Cooling System"&&value.quickIssue==="Radiator fan(s) out";
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
  const recentDuplicate=selectedBus&&value.quickIssue?recentDefectDuplicate(selectedBus,value.defect):null;
- const validateAndSave=(complete:boolean)=>{const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(value.defect.completedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue,fanCount=value.defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(fanCountMode&&(!fanCount||fanCount<1||fanCount>8)){alert("Select how many radiator fans are out (1 through 8).");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after 48 hours.");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",completed=complete||value.defect.state==="completed",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:value.defect.completedBy,state:completed?"completed":value.defect.state,completedAt:completed?(value.defect.completedAt||now):""}};(completed?saveFixed:save)(finalDraft)};
+ const validateAndSave=(complete:boolean)=>{const completed=complete||value.defect.state==="completed";const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(value.defect.completedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue,fanCount=value.defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(fanCountMode&&(!fanCount||fanCount<1||fanCount>8)){alert("Select how many radiator fans are out (1 through 8).");return}if(completed&&requireInitials&&!completedBy){alert("Put your initials or name in FIXED BY before saving this as fixed. This is required by the Defect Log setting; turn it off there to make it optional again.");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after 48 hours.");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:value.defect.completedBy,state:completed?"completed":value.defect.state,completedAt:completed?(value.defect.completedAt||now):""}};(completed?saveFixed:save)(finalDraft)};
  const submit=(event:React.FormEvent)=>{event.preventDefault();validateAndSave(false)};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   <form className="log-editor" onSubmit={submit}>
@@ -142,8 +143,17 @@ function DefectEditor({draft,fleet,defaultInitials,partsMemory,forgetPart:forget
       {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
      </div>}
     </div>
-    <label>FIXED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
+    <label>FIXED BY{requireInitials?" — REQUIRED":" (OPTIONAL)"}<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
+    <fieldset className={"wide billable-time"+(diagnosticDefect?" diagnostic":"")}><legend>BILLABLE TIME — OPTIONAL</legend>
+     <div>
+      <label>REPAIR HOURS<input inputMode="decimal" value={value.defect.repairHours===undefined?"":String(value.defect.repairHours)} placeholder=".5" onChange={event=>updateDefect("repairHours",normalizeRepairHours(event.target.value))}/></label>
+      <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={value.defect.diagnosticHours===undefined?"":String(value.defect.diagnosticHours)} placeholder=".5" onChange={event=>updateDefect("diagnosticHours",normalizeRepairHours(event.target.value))}/></label>
+     </div>
+     <small>{diagnosticDefect
+      ?"This is a diagnostic defect. Record diagnostic hours even when the bus is not fixed — press SAVE DEFECT rather than SAVE AS FIXED and the time is kept against an open repair."
+      :"Decimal hours: .5 is half an hour. Leave blank if no time is being billed."}</small>
+    </fieldset>
     </div></details>
     <label className="wide downsheet-check"><input type="checkbox" checked={value.onDownSheet} disabled={value.defect.state==="completed"} onChange={event=>setValue(current=>({...current,onDownSheet:event.target.checked}))}/><span><b>DOWN SHEET</b><small>Escalate this repair without changing the bus location.</small></span></label>
     <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Mark when the reported condition could not be reproduced during inspection or testing.</small></span></label>
@@ -172,7 +182,8 @@ function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSe
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><section className="log-settings">
   <header className="log-settings-head"><span><small>DEFECT LOG</small><h2>Settings</h2></span><button onClick={close}>x</button></header>
   <div>
-   <label>INITIALS (OPTIONAL)<input maxLength={6} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase()})}/></label>
+   <label>YOUR INITIALS OR NAME<input maxLength={12} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9 ]/gi,"").toUpperCase()})}/></label>
+   <label className="require-initials"><input type="checkbox" checked={settings.requireInitials} onChange={event=>setSettings({...settings,requireInitials:event.target.checked})}/><span><b>REQUIRE INITIALS ON A FIXED REPAIR</b><small>A repair cannot be saved as fixed without a name on it. Leave off to keep it optional.</small></span></label>
    <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
    <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
@@ -312,7 +323,7 @@ export default function DefectLog(){
     </article>)}</div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
+  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;
 }

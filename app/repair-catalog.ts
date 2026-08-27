@@ -24,6 +24,14 @@ export type StructuredDefect={
     PartUsage in domain.ts for Stage 7. */
  partsUsed?:boolean;
  partName?:string;
+ /* Billable time on this repair, in decimal hours: .5 is half an hour.
+    Diagnostic time is kept apart from repair time because they are different
+    work and often different visits. A bus can be diagnosed on one shift and
+    fixed on another, or diagnosed and handed on without being fixed at all, and
+    a single figure would lose that. Both are optional, and blank means no time
+    recorded rather than none spent. */
+ repairHours?:number;
+ diagnosticHours?:number;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
  symptoms?:string[];
@@ -125,6 +133,26 @@ export function repairGroupDisplayLabel(group:string){
 export function repairIssueDisplayLabel(issue:string,group=""){
  if(ADA_GROUPS.has(group))return issue;
  return ADA_ISSUE.test(issue)?ADA_MARK+issue:issue;
+}
+
+/* Decimal hours as a mechanic writes them: .5, 1.25. Anything that is not a
+   positive number reads as no time recorded, which is not the same as zero. */
+export const MAX_REPAIR_HOURS=24;
+export function normalizeRepairHours(value:unknown):number|undefined{
+ if(value===""||value===null||value===undefined)return undefined;
+ const hours=Number(value);
+ if(!Number.isFinite(hours)||hours<=0)return undefined;
+ return Math.min(MAX_REPAIR_HOURS,Math.round(hours*100)/100);
+}
+
+/* Work that is diagnosis before it is repair. Curtis may only get as far as
+   reading the fault on a shift, so these always offer a diagnostic time field
+   and say so, rather than leaving that work unrecorded because the bus was
+   never fixed. Check-engine is the case he named; the rest match how the
+   catalog already words its own diagnostic entries. */
+export function isDiagnosticDefect(category:unknown,issue:unknown){
+ const text=String(category||"")+" "+String(issue||"");
+ return /diagnos|check.?engine|check engine|stop engine light|mod light|abs warning|intermittent|unknown/i.test(text);
 }
 
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
@@ -269,7 +297,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
    const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours)} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
