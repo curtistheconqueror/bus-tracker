@@ -144,18 +144,29 @@ export function milesPerEngineHour(miles:unknown,hours:unknown):number|undefined
  return distance/runtime;
 }
 
-export type FleetDutyCycle={rate?:number;buses:number;excluded:number};
+export type FleetDutyCycle={rate?:number;low?:number;high?:number;spread?:number;representative:boolean;buses:number;excluded:number};
+
+/* Above this the average stops describing any real bus and starts describing
+   the midpoint of two unrelated groups. Curtis's readings sit either side of it:
+   the 20-series runs about 7 miles per engine hour and the 17-series about 27,
+   so their average of 17 is a speed no bus in the fleet actually runs. */
+export const DUTY_CYCLE_BIMODAL_SPREAD=2;
 
 export function fleetDutyCycle(buses:{odometerReadings?:unknown;engineHourReadings?:unknown}[]):FleetDutyCycle{
- let totalMiles=0,totalHours=0,counted=0,excluded=0;
+ let totalMiles=0,totalHours=0,counted=0,excluded=0,low=Infinity,high=0;
  for(const bus of buses){
   const hours=latestEngineHourReading(bus.engineHourReadings),reading=latestOdometer(bus.odometerReadings);
   if(!hours||reading===undefined)continue;
   const rate=milesPerEngineHour(reading,hours.hours);
   if(rate===undefined||rate>MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR||engineHourMeterReset(bus.engineHourReadings)){excluded+=1;continue}
   totalMiles+=reading;totalHours+=hours.hours;counted+=1;
+  low=Math.min(low,rate);high=Math.max(high,rate);
  }
- return {rate:counted&&totalHours>0?totalMiles/totalHours:undefined,buses:counted,excluded};
+ if(!counted||totalHours<=0)return {representative:false,buses:counted,excluded};
+ const spread=low>0?high/low:undefined;
+ return {rate:totalMiles/totalHours,low,high,spread,
+  representative:spread===undefined||spread<DUTY_CYCLE_BIMODAL_SPREAD,
+  buses:counted,excluded};
 }
 
 function latestOdometer(value:unknown):number|undefined{

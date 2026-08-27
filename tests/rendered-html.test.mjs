@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, engineHourMeterReset, fleetDutyCycle, milesPerEngineHour, monthsBetween, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, engineHourMeterReset, fleetDutyCycle, milesPerEngineHour, monthsBetween, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2553,16 +2553,48 @@ test("the fleet duty-cycle average ignores buses whose meter was reset",()=>{
 test("Curtis's two real buses show why miles cannot decide these services",()=>{
  // Readings he took off the dash: 20505 runs slow, heavy-idle work; 17549 runs
  // far more miles per hour. One fleet mileage interval cannot serve both.
- const fleet=[{n:"20505",hours:29678,miles:207251},{n:"17549",hours:18803,miles:458985}];
+ const fleet=[{n:"20505",hours:29678,miles:207251},{n:"17549",hours:18803,miles:458985},{n:"17568",hours:13736,miles:409255}];
  const rate=bus=>bus.miles/bus.hours;
  assert.ok(Math.abs(rate(fleet[0])-6.98)<0.01);
  assert.ok(Math.abs(rate(fleet[1])-24.41)<0.01);
- assert.ok(rate(fleet[1])/rate(fleet[0])>3.4,"the spread across the fleet is over 3x");
+ assert.ok(Math.abs(rate(fleet[2])-29.79)<0.01);
+ const rates=fleet.map(rate);
+ assert.ok(Math.max(...rates)/Math.min(...rates)>4.2,"the spread across the fleet is over 4x");
+ // every one of them is inside the plausible band, so none is mistaken for a
+ // reset meter and quietly dropped from the fleet average
+ for(const bus of fleet) assert.ok(rate(bus)<MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR,"bus "+bus.n);
 
  // At the Cummins 1,500-hour plug interval those buses are thousands of miles
  // apart, which is the whole reason the counter moved to hours.
  assert.equal(Math.round(1500*rate(fleet[0])),10475);
  assert.equal(Math.round(1500*rate(fleet[1])),36615);
+ assert.equal(Math.round(1500*rate(fleet[2])),44692);
+
+ // The fleet splits by series, which is why one average cannot stand in for a
+ // bus: the 17s run about four times the miles per hour that the 20s do.
+ const series=prefix=>{const group=fleet.filter(bus=>bus.n.startsWith(prefix));
+  return group.reduce((n,bus)=>n+bus.miles,0)/group.reduce((n,bus)=>n+bus.hours,0)};
+ assert.ok(Math.abs(series("17")-26.68)<0.01);
+ assert.ok(Math.abs(series("20")-6.98)<0.01);
+
+ // The fleet-wide average lands at 17.29, and no bus in the fleet runs near it.
+ // The panel has to say so rather than presenting it as a usable figure.
+ const cycle=fleetDutyCycle(fleet.map(bus=>({
+  odometerReadings:[{id:"o"+bus.n,miles:bus.miles,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}],
+  engineHourReadings:[{id:"h"+bus.n,hours:bus.hours,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}]})));
+ assert.equal(cycle.buses,3);
+ assert.ok(Math.abs(cycle.rate-17.29)<0.01);
+ assert.ok(Math.abs(cycle.low-6.98)<0.01);
+ assert.ok(Math.abs(cycle.high-29.79)<0.01);
+ assert.equal(cycle.representative,false,"a 4x spread is not one population");
+ for(const bus of fleet) assert.ok(Math.abs(rate(bus)-cycle.rate)>7,"bus "+bus.n+" is nowhere near the average");
+
+ // a fleet that genuinely runs alike does report a usable average
+ const alike=fleetDutyCycle([{n:"a",hours:1000,miles:20000},{n:"b",hours:1000,miles:24000}].map(bus=>({
+  odometerReadings:[{id:"o"+bus.n,miles:bus.miles,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}],
+  engineHourReadings:[{id:"h"+bus.n,hours:bus.hours,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}]})));
+ assert.equal(alike.representative,true);
+ assert.equal(alike.rate,22);
 
  // Hours are the same number on every bus regardless of the route it draws.
  for(const bus of fleet){

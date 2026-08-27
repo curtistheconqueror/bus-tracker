@@ -590,6 +590,14 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .maintenance-current .service-summary.due-soon b{color:#8b6200}.maintenance-current .service-summary.interval-needed b,.maintenance-current .service-summary.baseline-needed b{color:#6d8170;font-size:15px}
 .service-interval-settings label{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0}.service-interval-settings label span{display:grid;gap:2px}.service-interval-settings label b{font-size:9px}.service-interval-settings label small{font-size:8px;color:#687791}
 .service-interval-settings input{width:120px;min-height:44px;border:1px solid #9fb4cf;border-radius:6px;padding:0 10px;font-family:inherit;font-size:12px;text-align:right}
+.fleet-duty-cycle{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;border:1px solid #9fb4cf;border-radius:8px;background:#f6f9fd;padding:10px 12px}
+.fleet-duty-cycle>b{font-size:9px;letter-spacing:.6px;color:#385a86}
+.fleet-duty-cycle>span{display:grid;gap:3px;flex:1;min-width:200px;font-size:13px;font-weight:800;color:#163c70;text-align:right}
+.fleet-duty-cycle small{font-size:8px;font-weight:700;color:#687791}
+.fleet-duty-cycle.duty-cycle-split{border-color:#c99400;background:#fffaf0}
+.fleet-duty-cycle .duty-cycle-warning{color:#7a5600}
+.duty-cycle-suspect b{color:#a5570f}
+
 .maintenance-workbench>p{margin:0;padding:4px 12px 10px;color:#6d8170;font-size:9px}.maintenance-save-hint{display:block;padding:0 12px 10px;color:#4c5f16!important;font-size:8px!important;font-weight:800}
 @media(max-width:760px){
  .maintenance-workbench>header{align-items:flex-start}.maintenance-current{grid-template-columns:1fr}.maintenance-current b{font-size:20px}
