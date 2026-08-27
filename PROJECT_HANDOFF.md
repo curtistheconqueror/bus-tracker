@@ -1,22 +1,23 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 110
-Live feature checkpoint: commit d28b63d
+Live release: Sites Version 111
+Live feature checkpoint: commit 6f99889
 
 ## Read this first
 
 This file is the authoritative continuation guide. Older snapshots are preserved under docs/archive for historical reference only. Do not use an archived handoff as current implementation guidance.
 
-The project is an offline-capable fleet maintenance operations application with four connected surfaces:
+The project is an offline-capable fleet maintenance operations application with five surfaces:
 
 1. Facility Map — physical location, operating status, fleet markers, fast movement, and AI Operator commands.
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
 3. Real-Time Defect Log — mobile-first field observations and smaller repairs that usually do not belong on the Down Sheet.
 4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
+5. Bus Lists — independent device-local punch lists with custom columns, reusable report formats, completion initials/timestamps, and shareable text output.
 
 ## Domain ownership
 
@@ -26,6 +27,7 @@ These boundaries prevent synchronization bugs:
 - The Down Sheet owns formal maintenance scheduling and active Down Sheet membership.
 - The Defect Log owns records created directly from the Defect Log.
 - Fixed Repairs reads completed structured defects from the fleet record and owns only their completion-detail edits; it is not a separate duplicate repair store.
+- Bus Lists owns independent working lists and must not read or mutate fleet, Down Sheet, Defect Log, or Fixed Repairs records.
 - Repair and status changes may synchronize across surfaces; Down Sheet or Defect Log edits must not silently relocate a bus.
 - A bus may have multiple independent repair records. The phone Defect Log groups them visually by bus but does not merge or discard the underlying records.
 
@@ -48,7 +50,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 110 is the current user-approved live release. Its validated source checkpoint is commit d28b63d. It adds a green Mark Fixed action beside a modestly smaller Edit Defect action on every unresolved repair in the phone-friendly Defect Log Focus view. The new control reuses the established completion and Undo pathway, preserves unrelated defects on the same bus, and remains hidden for already-completed records. It preserves all Version 109 maintenance, learned-parts, catalog, Down Sheet replacement, data-loss safeguard, offline, fleet-identity, location, and user-data behavior.
+Version 111 is the current user-approved live release. Its validated source checkpoint is commit 6f99889. It adds Bus Lists as a fifth, independent domain at `/lists`, linked from all existing pages and the Facility Map command bar. Lists support typed or pasted buses, up to seven named columns, a built-in Farebox Bypass format, reusable custom formats, completion initials and timestamps, and full, remaining-only, or numbers-only text exports. The feature uses only `pace-bus-lists-v1` and `pace-bus-list-templates-v1`; it does not read or alter fleet, Down Sheet, Defect Log, or Fixed Repairs records. It preserves all Version 110 behavior and user data.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -68,7 +70,7 @@ Version 110 is the current user-approved live release. Its validated source chec
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 110 production build, lint gate, and all 95 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-26.
+The Version 111 production build, lint gate, and all 104 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-27.
 
 ## Repository and remotes
 
@@ -100,6 +102,8 @@ Primary stores are versioned browser records:
 - pace-down-sheet-v1 — Down Sheet entries and linked workflow state
 - pace-down-sheet-settings-v1 — Down Sheet view and text settings
 - pace-defect-log-settings-v1 — Defect Log view and text settings
+- pace-bus-lists-v1 — independent Bus Lists and their row completion state
+- pace-bus-list-templates-v1 — reusable custom Bus List report formats
 - pace-board-recovery-v1 — last-known-good fleet payload for device-local recovery
 - pace-board-backup-reminder-v1 — device-local count baseline for 20-entry export reminders
 
