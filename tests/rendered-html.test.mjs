@@ -17,7 +17,7 @@ import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, 
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_MILES, SERVICE_KINDS, normalizeServiceIntervals, serviceIntervalMiles, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_KINDS, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -2390,47 +2390,97 @@ test("Bus Controls leads with both turn-signal defects",()=>{
  assert.equal(defectLabel({category:"Bus Controls",issue:"Operating Controls - Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
 });
 
-test("spark-plug and valve-adjustment tracking withholds a verdict until Curtis saves an interval",()=>{
+test("spark-plug and valve-adjustment tracking counts engine hours, not miles",()=>{
  assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:null,valveAdjustment:null});
  assert.deepEqual(SERVICE_KINDS.map(service=>service.kind),["spark-plugs","valve-adjustment"]);
  assert.deepEqual(normalizeServiceIntervals(undefined),{sparkPlugs:null,valveAdjustment:null});
- assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"30000",valveAdjustment:0}),{sparkPlugs:30000,valveAdjustment:null});
+ assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"1500",valveAdjustment:0}),{sparkPlugs:1500,valveAdjustment:null});
  assert.deepEqual(normalizeServiceIntervals({sparkPlugs:-5,valveAdjustment:"abc"}),{sparkPlugs:null,valveAdjustment:null});
- assert.equal(serviceIntervalMiles("18000.4"),18000);
- assert.equal(serviceIntervalMiles(""),null);
+ assert.equal(serviceIntervalHours("1500.4"),1500);
+ assert.equal(serviceIntervalHours(""),null);
 
- const bus={s:"shop",lastStatusChangeAt:"2026-08-01T00:00:00.000Z",odometerReadings:[{id:"reading-1",miles:100000,recordedAt:"2026-08-01T00:00:00.000Z",source:"manual"}],maintenanceEvents:[]};
- assert.equal(serviceIntervalStatus(bus,"spark-plugs",null,"2026-08-01T00:00:00.000Z").state,"baseline-needed");
+ const bus={s:"shop",lastStatusChangeAt:"2026-08-01T00:00:00.000Z",
+  odometerReadings:[{id:"reading-1",miles:100000,recordedAt:"2026-08-01T00:00:00.000Z",source:"manual"}],
+  engineHourReadings:[],maintenanceEvents:[]};
+ assert.equal(serviceIntervalStatus(bus,"spark-plugs",null).state,"baseline-needed");
 
- const serviced=recordMaintenanceCompletion(bus,{kind:"spark-plugs",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,idSeed:"seed-3"},"2026-08-01T00:00:00.000Z");
- const tracked={...bus,...serviced,odometerReadings:[...serviced.odometerReadings,{id:"reading-later",miles:118000,recordedAt:"2026-09-01T00:00:00.000Z",source:"manual"}],mileageEstimate:undefined};
+ // recording the completion with an hour reading is what starts the counter
+ const serviced=recordMaintenanceCompletion(bus,{kind:"spark-plugs",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,engineHours:12000,idSeed:"seed-3"},"2026-08-01T00:00:00.000Z");
+ assert.equal(serviced.engineHourReadings.length,1);
+ assert.equal(serviced.engineHourReadings[0].hours,12000);
+ assert.equal(serviced.engineHourReadings[0].source,"service");
+ const tracked={...bus,...serviced,engineHourReadings:[...serviced.engineHourReadings,{id:"hours-later",hours:13400,recordedAt:"2026-09-01T00:00:00.000Z",source:"manual"}],mileageEstimate:undefined};
 
- const noInterval=serviceIntervalStatus(tracked,"spark-plugs",null,"2026-09-01T00:00:00.000Z");
+ const noInterval=serviceIntervalStatus(tracked,"spark-plugs",null);
  assert.equal(noInterval.state,"interval-needed");
  assert.equal(noInterval.due,false);
- assert.equal(noInterval.milesSince,18000);
- assert.equal(noInterval.intervalMiles,undefined);
+ assert.equal(noInterval.hoursSince,1400);
+ assert.equal(noInterval.intervalHours,undefined);
 
- const tracking=serviceIntervalStatus(tracked,"spark-plugs",30000,"2026-09-01T00:00:00.000Z");
+ const tracking=serviceIntervalStatus(tracked,"spark-plugs",2000);
  assert.equal(tracking.state,"tracking");
  assert.equal(tracking.due,false);
- assert.equal(tracking.milesRemaining,12000);
+ assert.equal(tracking.hoursRemaining,600);
+ assert.equal(tracking.hoursOverdue,0);
 
- const soon=serviceIntervalStatus(tracked,"spark-plugs",18400,"2026-09-01T00:00:00.000Z");
+ const soon=serviceIntervalStatus(tracked,"spark-plugs",1440);
  assert.equal(soon.state,"due-soon");
  assert.equal(soon.due,false);
- assert.equal(soon.milesRemaining,400);
- assert.ok(soon.milesRemaining<=SERVICE_DUE_SOON_MILES);
+ assert.equal(soon.hoursRemaining,40);
+ assert.ok(soon.hoursRemaining<=SERVICE_DUE_SOON_HOURS);
 
- const due=serviceIntervalStatus(tracked,"spark-plugs",15000,"2026-09-01T00:00:00.000Z");
+ // due the moment hours-since reaches the interval, exactly on the boundary
+ const due=serviceIntervalStatus(tracked,"spark-plugs",1400);
  assert.equal(due.state,"due");
  assert.equal(due.due,true);
- assert.equal(due.milesRemaining,0);
+ assert.equal(due.hoursRemaining,0);
+ assert.equal(due.hoursOverdue,0);
+ // and the overdue count keeps growing past it, which is the behind-counter
+ assert.equal(serviceIntervalStatus(tracked,"spark-plugs",1000).hoursOverdue,400);
+ // at the real Cummins ISL G interval this bus still has 100 hours to run,
+ // which is outside the 50-hour warning window, so it reads as tracking
+ assert.equal(serviceIntervalStatus(tracked,"spark-plugs",1500).hoursRemaining,100);
+ assert.equal(serviceIntervalStatus(tracked,"spark-plugs",1500).state,"tracking");
+
+ // a completion logged before hour tracking cannot start a counter, and says so
+ // rather than reading as tracked at zero
+ const milesOnly=recordMaintenanceCompletion(bus,{kind:"valve-adjustment",completedAt:"2026-08-01T00:00:00.000Z",odometerMiles:100000,idSeed:"seed-4"},"2026-08-01T00:00:00.000Z");
+ const noHours={...tracked,maintenanceEvents:[...tracked.maintenanceEvents,...milesOnly.maintenanceEvents]};
+ const stalled=serviceIntervalStatus(noHours,"valve-adjustment",2000);
+ assert.equal(stalled.state,"hours-needed");
+ assert.equal(stalled.due,false);
+ assert.equal(stalled.hoursSince,undefined);
 
  // a valve adjustment is tracked independently of spark plugs
- assert.equal(serviceIntervalStatus(tracked,"valve-adjustment",15000,"2026-09-01T00:00:00.000Z").state,"baseline-needed");
+ assert.equal(serviceIntervalStatus(tracked,"valve-adjustment",2000).state,"baseline-needed");
+ assert.equal(latestMaintenanceEvent(tracked.maintenanceEvents,"spark-plugs").engineHours,12000);
  assert.equal(latestMaintenanceEvent(tracked.maintenanceEvents,"spark-plugs").odometerMiles,100000);
  assert.equal(maintenanceEventsOfKind(tracked.maintenanceEvents,"inspection").length,0);
+});
+
+test("Curtis's two real buses show why miles cannot decide these services",()=>{
+ // Readings he took off the dash: 20505 runs slow, heavy-idle work; 17549 runs
+ // far more miles per hour. One fleet mileage interval cannot serve both.
+ const fleet=[{n:"20505",hours:29678,miles:207251},{n:"17549",hours:18803,miles:458985}];
+ const rate=bus=>bus.miles/bus.hours;
+ assert.ok(Math.abs(rate(fleet[0])-6.98)<0.01);
+ assert.ok(Math.abs(rate(fleet[1])-24.41)<0.01);
+ assert.ok(rate(fleet[1])/rate(fleet[0])>3.4,"the spread across the fleet is over 3x");
+
+ // At the Cummins 1,500-hour plug interval those buses are thousands of miles
+ // apart, which is the whole reason the counter moved to hours.
+ assert.equal(Math.round(1500*rate(fleet[0])),10475);
+ assert.equal(Math.round(1500*rate(fleet[1])),36615);
+
+ // Hours are the same number on every bus regardless of the route it draws.
+ for(const bus of fleet){
+  const serviced={engineHourReadings:[{id:"h1",hours:bus.hours,recordedAt:"2026-08-27T00:00:00.000Z",source:"manual"}],
+   maintenanceEvents:[{id:"m1",kind:"spark-plugs",completedAt:"2026-01-01T00:00:00.000Z",engineHours:bus.hours-1500}]};
+  const status=serviceIntervalStatus(serviced,"spark-plugs",1500);
+  assert.equal(status.hoursSince,1500,"bus "+bus.n);
+  assert.equal(status.due,true,"bus "+bus.n+" is due at exactly the interval");
+  assert.equal(status.hoursOverdue,0,"bus "+bus.n);
+ }
 });
 
 test("Fleet Tracker records every maintenance type and never invents a service interval",async()=>{
