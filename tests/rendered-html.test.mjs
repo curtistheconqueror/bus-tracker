@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, normalizeDefects, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2749,4 +2749,48 @@ test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
  // the ADA quick filter keys off wording, so grouped names must keep matching
  assert.ok(quickFilterMatch({id:"bus-1",defects:[read]},"bad-ramp"));
  assert.equal(repairCategoryEmoji("Doors, Ramp and ADA"),"♿");
+});
+
+test("the chair mark flags ADA equipment without touching what gets stored",async()=>{
+ const [page,logPage]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+ ]);
+ // the two wheelchair groups carry the mark for everything inside them
+ assert.equal(repairGroupDisplayLabel("Wheelchair Securement"),"♿ Wheelchair Securement");
+ assert.equal(repairGroupDisplayLabel("Ramp, Lift and Kneeler"),"♿ Ramp, Lift and Kneeler");
+ assert.equal(repairGroupDisplayLabel("Doors"),"Doors");
+ assert.equal(repairGroupDisplayLabel("Driver Seat"),"Driver Seat");
+
+ // a marked group speaks for its options, so they are not marked twice
+ assert.equal(repairIssueDisplayLabel("Q'STRAINT switch (curbside)","Wheelchair Securement"),"Q'STRAINT switch (curbside)");
+ assert.equal(repairIssueDisplayLabel("Kneeler","Ramp, Lift and Kneeler"),"Kneeler");
+
+ // ADA items outside those groups are marked individually. The ramp and kneeler
+ // switches stay in Bus Controls where the operator reaches them, and the mark
+ // is what ties them back to the ramp itself.
+ assert.equal(repairIssueDisplayLabel("Kneeler button","System Switches"),"♿ Kneeler button");
+ assert.equal(repairIssueDisplayLabel("Ramp power switch","System Switches"),"♿ Ramp power switch");
+ assert.equal(repairIssueDisplayLabel("Ramp deploy / stow switch","System Switches"),"♿ Ramp deploy / stow switch");
+ assert.equal(repairIssueDisplayLabel("Stop request (wheelchair area)","Stop Request"),"♿ Stop request (wheelchair area)");
+ assert.equal(repairIssueDisplayLabel("Horn","Operating Controls"),"Horn");
+ assert.equal(repairIssueDisplayLabel("Bike rack - bent / replacement"),"Bike rack - bent / replacement");
+
+ // display only: nothing stored, exported, or shown in the feed carries the
+ // mark, or a record saved after this would differ from one saved before it
+ for(const category of Object.keys(REPAIR_OPTIONS))
+  for(const option of REPAIR_OPTIONS[category])
+   assert.equal(option.includes("♿"),false,category+" / "+option+" must not store the mark");
+ for(const category of Object.keys(REPAIR_OPTION_GROUPS))
+  for(const group of Object.keys(REPAIR_OPTION_GROUPS[category]))
+   assert.equal(group.includes("♿"),false,group+" must not store the mark");
+ assert.equal(defectLabel({category:"Doors, Ramp and ADA",issue:"Wheelchair Securement - Q'STRAINT switch (curbside)",details:""}).includes("♿"),false);
+
+ // every picker renders through the helpers rather than printing raw text
+ assert.equal(page.match(/repairGroupDisplayLabel\(group\)/g).length,2);
+ assert.equal(page.match(/repairIssueDisplayLabel\(issue,repairGroup\)/g).length,2);
+ assert.equal(page.match(/repairIssueDisplayLabel\(issue\)/g).length,2);
+ assert.match(logPage,/<optgroup label=\{repairGroupDisplayLabel\(group\)\}/);
+ assert.match(logPage,/\{repairIssueDisplayLabel\(entry,group\)\}/);
+ assert.match(logPage,/<option value=\{repair\} key=\{repair\}>\{repairIssueDisplayLabel\(repair\)\}/);
 });

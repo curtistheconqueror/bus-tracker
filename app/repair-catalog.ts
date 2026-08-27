@@ -106,6 +106,26 @@ export function repairIssuePlaceholder(category:string,group:string){
  return category==="Amerex"?"Choose an Amerex status or code":"Choose a defect in "+group;
 }
 
+/* ADA equipment is spread across more than one category on purpose: the ramp is
+   in Doors, Ramp and ADA, the switch that runs it is in Bus Controls where the
+   operator reaches it. The chair mark restores the connection at a glance
+   without moving anything. It is display only. Stored values keep their plain
+   text, so nothing already logged has to be rewritten to gain the mark, and a
+   record still reads the same in the feed, an export, or a Down Sheet line. */
+export const ADA_MARK="♿ ";
+const ADA_GROUPS=new Set(["Ramp, Lift and Kneeler","Wheelchair Securement"]);
+const ADA_ISSUE=/wheelchair|kneeler|q'straint|securement|\bramp\b/i;
+
+export function repairGroupDisplayLabel(group:string){
+ return ADA_GROUPS.has(group)?ADA_MARK+group:group;
+}
+/* Inside a group that already carries the mark every option would repeat it, so
+   the group speaks for its contents and the options stay clean. */
+export function repairIssueDisplayLabel(issue:string,group=""){
+ if(ADA_GROUPS.has(group))return issue;
+ return ADA_ISSUE.test(issue)?ADA_MARK+issue:issue;
+}
+
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
 
 function normalizedSymptoms(value:unknown){
