@@ -1277,7 +1277,7 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
-  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Other Fire Suppression Trouble"]);
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
@@ -2963,19 +2963,57 @@ test("the parking brake knob and the rear air valves are in the catalog",()=>{
  assert.ok(air.includes("R-12 relay valve (C/S rear)"));
  assert.ok(air.includes("R-14 relay valve (R/S rear)"));
 
- // Bus Controls is a grouped category: the picker renders REPAIR_OPTION_GROUPS
- // while the stored identity comes from REPAIR_OPTIONS. An entry added to one
- // and not the other is storable and invisible, which is how this nearly went in.
- for(const [group,items] of Object.entries(REPAIR_OPTION_GROUPS["Bus Controls"])){
-  for(const item of items){
-   assert.ok(controls.includes(group+" - "+item),group+" - "+item+" is missing from REPAIR_OPTIONS");
+ // Every grouped category is held in two structures: the picker renders
+ // REPAIR_OPTION_GROUPS while the stored identity comes from REPAIR_OPTIONS. An
+ // entry added to one and not the other is storable and invisible, which is how
+ // the parking brake knob nearly went in.
+ for(const category of Object.keys(REPAIR_OPTION_GROUPS)){
+  const flat=REPAIR_OPTIONS[category];
+  assert.ok(flat,category+" is grouped but has no REPAIR_OPTIONS list");
+  for(const [group,items] of Object.entries(REPAIR_OPTION_GROUPS[category])){
+   for(const item of items){
+    assert.ok(flat.includes(group+" - "+item),category+" / "+group+" - "+item+" is missing from REPAIR_OPTIONS");
+   }
+  }
+  for(const issue of flat){
+   const [group,...rest]=issue.split(" - ");
+   assert.ok(REPAIR_OPTION_GROUPS[category][group]?.includes(rest.join(" - ")),category+" / "+issue+" is missing from REPAIR_OPTION_GROUPS");
   }
  }
- for(const issue of controls){
-  const [group,...rest]=issue.split(" - ");
-  const item=rest.join(" - ");
-  assert.ok(REPAIR_OPTION_GROUPS["Bus Controls"][group]?.includes(item),issue+" is missing from REPAIR_OPTION_GROUPS");
- }
+});
+
+test("the Amerex panel is two systems, and the states that down a bus say so",()=>{
+ const amerex=REPAIR_OPTIONS.Amerex;
+
+ // Fire Suppression is four heat sensors at the rear where the CNG lines run. It
+ // fires on its own with no operator input, so FIRE means the bottles have
+ // already gone off — a different report from a sensor that stopped answering.
+ assert.ok(amerex.includes("Fire Suppression - FIRE alarm (system discharged)"));
+ assert.ok(amerex.includes("Fire Suppression - Heat sensor communication fault"));
+ assert.ok(amerex.includes("Fire Suppression - Control head no power"));
+ // the existing panel codes are kept: records logged under them must still read
+ assert.ok(amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
+
+ // Gas Concentration keeps the panel's own wording, because a mechanic reads the
+ // faceplate and the list should say the same thing.
+ assert.ok(amerex.includes("Gas Concentration - Trace")&&amerex.includes("Gas Concentration - Significant Leak"));
+
+ // Red Significant normally puts the bus down, and so does a system that has
+ // discharged. The picker starts those two as Remove From Service rather than
+ // leaving a mechanic to remember which colour meant what.
+ assert.equal(defaultDefectOperability("Amerex","Gas Concentration - Significant Leak"),"down");
+ assert.equal(defaultDefectOperability("Amerex","Fire Suppression - FIRE alarm (system discharged)"),"down");
+ // amber Trace keeps running while somebody finds the leak
+ assert.equal(defaultDefectOperability("Amerex","Gas Concentration - Trace"),"service");
+ assert.equal(defaultDefectOperability("Amerex","Fire Suppression - Heat sensor communication fault"),"service");
+ // and the rule that was already there still holds
+ assert.equal(defaultDefectOperability("Interior Cleaning","Cleaning Required"),"down");
+ assert.equal(defaultDefectOperability("Engine","Check engine light"),"service");
+
+ // The check CNG valves lamp is its own warning and not this panel: it is the
+ // roof valves wanting service, which is fuel delivery on a gas fleet.
+ assert.ok(REPAIR_OPTIONS["Fuel Delivery"].includes("Check CNG valves light"));
+ assert.equal(amerex.some(issue=>/CNG valve/i.test(issue)),false);
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{

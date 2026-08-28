@@ -83,8 +83,8 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Door, Ramp and Kneeler Failures - Front door will not open","Door, Ramp and Kneeler Failures - Front door will not close","Door, Ramp and Kneeler Failures - Front door opens / closes slowly","Door, Ramp and Kneeler Failures - Rear door will not open","Door, Ramp and Kneeler Failures - Rear door will not close","Door, Ramp and Kneeler Failures - Rear door opens / closes slowly","Door, Ramp and Kneeler Failures - Ramp not working","Door, Ramp and Kneeler Failures - Ramp no power","Door, Ramp and Kneeler Failures - Kneeler not functioning correctly","Door, Ramp and Kneeler Failures - Kneeler sits too high","Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
- "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
- "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
+ "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
+ "Fuel Delivery":["Check CNG valves light","Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Doors, Ramp and ADA":["Doors - Front door","Doors - Rear door","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request (wheelchair area)","Stop Request - Stop request (curbside)","Stop Request - Stop request (roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
@@ -310,7 +310,7 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "Stop Request":["Stop request (wheelchair area)","Stop request (curbside)","Stop request (roadside)","Stop request pull cord / line - broken (curbside)","Stop request pull cord / line - broken (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
  },
  "Amerex":{
-  "Fire Suppression":["Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Other Fire Suppression Trouble"],
+  "Fire Suppression":["FIRE alarm (system discharged)","Heat sensor communication fault","Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Control head no power","Other Fire Suppression Trouble"],
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
  },
 };
@@ -320,8 +320,28 @@ export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|
  const now=new Date().toISOString();
  return {...draft,id,category,issue,details,createdAt:draft.createdAt||now,updatedAt:now,source:draft.source||"tracker"};
 }
+/* The Amerex Vehicle SafetyNet control head is two systems behind one faceplate,
+   and they fail very differently.
+
+   Gas Concentration watches for escaping CNG. Amber Trace means it can smell
+   something and the bus keeps running while somebody finds it. Red Significant
+   normally puts the bus down; holding Relay Reset will move it under its own
+   power, but that is getting it off the road, not clearing the fault.
+
+   Fire Suppression is four heat sensors set in four sections at the rear, where
+   the CNG lines run. It fires on its own with no operator input at all, so FIRE
+   on this panel means the bottles have already gone off, not that somebody
+   needs to decide something. Trouble is the amber one: most often a sensor that
+   has stopped answering.
+
+   These two states take the bus off the road on their own, so the picker starts
+   them as Remove From Service rather than leaving a mechanic to remember. */
+const DOWNING_ISSUES:Record<string,readonly string[]>={
+ "Interior Cleaning":["Cleaning Required"],
+ "Amerex":["Gas Concentration - Significant Leak","Fire Suppression - FIRE alarm (system discharged)"],
+};
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{
- return category==="Interior Cleaning"&&issue==="Cleaning Required"?"down":"service";
+ return DOWNING_ISSUES[category]?.includes(issue)?"down":"service";
 }
 /* Categories and options that were merged away. Records are never dropped or
    rewritten in storage: they are moved to their surviving home as they are read,
