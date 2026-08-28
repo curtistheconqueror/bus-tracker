@@ -3931,7 +3931,19 @@ test("release safety keeps interval units and learned parts attached to the righ
  assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)\)/);
  assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(saved\.serviceIntervalsUnit,saved\.serviceIntervals\)\)/);
  assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
- assert.match(backup,/version:3/);
+ // Campaigns were absent from the backup until version 4. Everything that
+ // page holds — completed rows, initials, timestamps, billable hours — sat
+ // outside the one control that promises to save the whole board, and the
+ // Work Time totals are built from those same rows.
+ assert.match(backup,/version:4/);
+ assert.match(backup,/busLists:readSavedValue\(storage,BUS_LISTS_STORAGE_KEY\)/);
+ assert.match(backup,/busListTemplates:readSavedValue\(storage,BUS_LIST_TEMPLATES_STORAGE_KEY\)/);
+ // and a restore brings them back, through the same normalizers the page uses
+ assert.match(page,/parsed\.busLists\)localStorage\.setItem\("pace-bus-lists-v1",JSON\.stringify\(normalizeBusLists\(parsed\.busLists\)\)\)/);
+ assert.match(page,/parsed\.busListTemplates\)localStorage\.setItem\("pace-bus-list-templates-v1"/);
+ // A version 3 file has neither key, so restoring one must leave the campaigns
+ // already on this device alone rather than clearing them.
+ assert.equal(/busLists\?[^)]*\)\s*:\s*\[\]|setItem\("pace-bus-lists-v1",JSON\.stringify\(normalizeBusLists\(parsed\.busLists\|\|/.test(page),false);
  assert.match(backup,/partsMemory:readSavedValue\(storage,PARTS_MEMORY_STORAGE_KEY\)/);
  assert.match(page,/writePartsMemory\(localStorage,normalizePartsMemory\(parsed\.partsMemory\)\)/);
  for(const source of [log,fixed]){
