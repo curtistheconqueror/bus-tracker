@@ -4,8 +4,8 @@ Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 117
-Live feature checkpoint: commit ff62fa3
+Live release: Sites Version 118
+Live feature checkpoint: commit 6f45d14
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 117 is the current user-approved live release. Its validated source checkpoint is commit ff62fa3. Suspension and Steering now begins with an actionable NVH complaint whose note asks for location, driving condition, and speed. The Down Sheet and Defect Log editors now lock the actual scrolling element, restore the operator's position when closed, and give phones a single-column Down Sheet form with a full-width, unclipped Repairs and Estimates section and larger primary repair controls. No storage key, record, or migration changed.
+Version 118 is the current user-approved live release. Its validated source checkpoint is commit 6f45d14. Each Down Sheet repair card now becomes its own independently countable and filterable defect and Fixed Repairs record, with optional fix, finding, repair-hours, diagnostic-hours, and technician details carried through completion. Existing legacy entries adopt their original defect instead of creating duplicates on repeated saves. Diagnostic time entered below one hour floors to one hour without rewriting historical records. Estimated hours show one true total by default, with the seven-way breakdown collapsed behind an explicit control. No LocalStorage key was renamed and no stored record was rewritten.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 117 production build, lint gate, and all 117 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-28.
+The Version 118 production build, lint gate, and all 118 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-28.
 
 ## Repository and remotes
 

@@ -18,7 +18,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 101 | Previous live | f730ecd | Dated actual odometer readings on every bus, append-only reading history, current-reading summary, and phone-friendly entry controls |
 | 102 | Previous live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
 | 103 | Previous live | f4628f7 | Estimated operating mileage at 275 miles per day, pause/resume checkpoints, and inspection readiness at 3,000 miles or 10 days |
-| 117 | Live | ff62fa3 | NVH added to Suspension and Steering with an actionable defect note, plus working editor scroll locks and a phone-usable single-column Down Sheet editor with a full-width repairs section |
+| 118 | Live | 6f45d14 | Each Down Sheet repair is now its own defect and Fixed Repairs record with its own completion details and hours; estimates collapse to one true total, and entered diagnostic time starts at one hour |
+| 117 | Previous live | ff62fa3 | NVH added to Suspension and Steering with an actionable defect note, plus working editor scroll locks and a phone-usable single-column Down Sheet editor with a full-width repairs section |
 | 116 | Previous live | 54b5322 | Complete campaign and learned-cause backups, issue-scoped diagnostic memory, expanded field repair choices, corrected dash/start wording, and separated Amerex Fire Suppression, Gas Concentration, and CNG safety workflows |
 | 115 | Previous live | d0189f9 | First-position ADA mechanical failures for doors, ramp, and kneeler, plus missing road-hazard triangles and fire-extinguisher safety defects |
 | 114 | Previous live | cc662ac | Billable and diagnostic repair time, stamped work states and findings, confirmed Cummins service defaults, Down Sheet recommendations, Fleet Campaign work-time and entry improvements, and safer farebox-report pasting |

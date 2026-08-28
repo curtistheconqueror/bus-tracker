@@ -1,6 +1,8 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 118 is validated and awaiting publication approval.**
+**STATUS: NONE PENDING**
+
+Sites Version 118 was published from commit `6f45d14` on 2026-08-28. Replace this file with the next complete pending-release handoff in the same push as the next contribution to `main`.
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
@@ -26,10 +28,10 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Release source | the current tip of `origin/main` |
+| Last published source | `6f45d14` |
 | Last code-bearing commit | `cd97a16` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
-| Previous live | Version 117, `ff62fa3` |
+| Current live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
 release commit. Confirm with `git log --oneline cd97a16..origin/main` that
