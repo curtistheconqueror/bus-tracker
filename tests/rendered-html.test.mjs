@@ -1276,17 +1276,26 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(repairIssueDisplayLabel("Fire extinguisher missing"),"🧯 Fire extinguisher missing");
   assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
-  assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
+  assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration", "CNG"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
   // Amerex keeps the wording printed on the panel; every other grouped
   // category gets plain wording that names its own groups.
-  assert.equal(repairGroupStepLabel("Amerex"), "CHOOSE THE AMEREX SYSTEM");
-  assert.equal(repairGroupPlaceholder("Amerex"), "Choose Fire Suppression or Gas Concentration");
-  assert.equal(repairIssueStepLabel("Amerex"), "CHOOSE THE STATUS OR CODE");
-  assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose an Amerex status or code");
+  assert.equal(repairGroupStepLabel("Amerex"), "CHOOSE THE SYSTEM");
+  // Derived from the groups, never a literal. This line used to name its two in
+  // a string, so adding a third would have told a mechanic to choose between
+  // two of the three options in front of them.
+  const amerexGroups = Object.keys(REPAIR_OPTION_GROUPS.Amerex);
+  assert.ok(amerexGroups.length >= 3);
+  assert.equal(repairGroupPlaceholder("Amerex"), "Choose " + amerexGroups.slice(0, -1).join(", ") + " or " + amerexGroups.at(-1));
+  assert.match(repairGroupPlaceholder("Amerex"), /CNG/);
+  assert.equal(repairIssueStepLabel("Amerex"), "CHOOSE THE STATUS OR DEFECT");
+  // named by its group, because "an Amerex status or code" is wrong for a
+  // missing PRD cap
+  assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose a Fire Suppression status or defect");
+  assert.equal(repairIssuePlaceholder("Amerex", "CNG"), "Choose a CNG status or defect");
   assert.equal(repairGroupStepLabel("Bus Controls"), "CHOOSE THE GROUP");
   assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 5 groups");
   assert.equal(repairIssueStepLabel("Bus Controls"), "CHOOSE THE DEFECT");
@@ -3010,10 +3019,16 @@ test("the Amerex panel is two systems, and the states that down a bus say so",()
  assert.equal(defaultDefectOperability("Interior Cleaning","Cleaning Required"),"down");
  assert.equal(defaultDefectOperability("Engine","Check engine light"),"service");
 
- // The check CNG valves lamp is its own warning and not this panel: it is the
- // roof valves wanting service, which is fuel delivery on a gas fleet.
- assert.ok(REPAIR_OPTIONS["Fuel Delivery"].includes("Check CNG valves light"));
- assert.equal(amerex.some(issue=>/CNG valve/i.test(issue)),false);
+ // Every bus on this property runs CNG, so the gas equipment sits beside the
+ // panel that watches it rather than scattered through Fuel Delivery. The Gas
+ // Concentration side was already half a CNG system.
+ assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex),["Fire Suppression","Gas Concentration","CNG"]);
+ assert.ok(amerex.includes("CNG - Check CNG valves light"));
+ assert.ok(amerex.includes("CNG - PRD cap missing"));
+ assert.ok(amerex.includes("CNG - Other CNG defect"));
+ // and it is not left in two places: Fuel Delivery held it only inside this same
+ // unpublished release, so no record can exist under that identity
+ assert.equal(REPAIR_OPTIONS["Fuel Delivery"].includes("Check CNG valves light"),false);
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
