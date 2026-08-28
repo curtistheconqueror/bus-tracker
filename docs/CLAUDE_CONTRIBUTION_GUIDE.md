@@ -62,9 +62,9 @@ Estimated mileage accrues at 275 miles per operating day, pauses outside operati
 
 Completed inspections append maintenance history with a date, optional actual odometer reading, and optional note. With mileage, the app adds a matching actual reading and restarts both due clocks. Date-only completion restarts the 10-day clock without changing mileage. Existing and future payload fields remain compatible.
 
-### Stage 5 — Spark-plug and valve-adjustment intervals: built, waiting on Curtis for the numbers
+### Stage 5 — Spark-plug and valve-adjustment intervals: complete
 
-The bus editor records any maintenance type, and each bus reports engine hours since its last spark-plug service and valve adjustment, with an optional calendar-month backstop. Turn signals remain available under Bus Controls → Operating Controls. The hour and month limits are fleet policy values entered in Administrative Settings → Maintenance Intervals and default to blank; nothing guesses them. Until Curtis saves them, a service still reports the available history and withholds the overdue verdict. Version 109 marks the stored unit explicitly so earlier mileage values can never be reinterpreted as hours.
+The bus editor records any maintenance type, and each bus reports engine hours since its last spark-plug service and valve adjustment, with a calendar-month backstop. Confirmed defaults are 1,500 hours or 18 months for spark plugs and 2,000 hours or 24 months for valve adjustment. Version 114 migrates the settings marker to engine-hours-v2 so a never-configured device receives those defaults while an explicitly cleared or user-entered value remains authoritative. Turn signals remain available under Bus Controls → Operating Controls.
 
 ### Stage 6 — Learned Parts Used system: complete
 
@@ -78,10 +78,7 @@ Use the existing Supabase project and authenticated Curtis account. Preserve the
 
 ## Current Claude task
 
-There is no active implementation assignment. Stages 1 through 6 are implemented. Two things remain open:
-
-1. Stage 5 needs the spark-plug and valve-adjustment engine-hour and calendar-month intervals from Curtis, entered in Administrative Settings. Claude must not invent those values.
-2. Stage 7, the shared offline-first backend on the existing Supabase project, has not been started and should not begin without Curtis scoping it.
+There is no active implementation assignment. Stages 1 through 6 are implemented. Stage 7, the shared offline-first backend on the existing Supabase project, has not been started and should not begin without Curtis scoping it.
 
 ## Required handoff format
 
