@@ -32,6 +32,7 @@ import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterMatch } from "../app/quick-filters.ts";
+import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
@@ -2878,6 +2879,78 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
+test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
+ const engine={category:"Engine",issue:"Check-engine diagnosis"};
+ let memory=learnFinding(EMPTY_FINDINGS_MEMORY,{...engine,finding:"throttle pedal reference circuit"},"2026-08-27T10:00:00.000Z");
+ assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),["throttle pedal reference circuit"]);
+
+ // and nowhere else. Putting causes in the catalog would bury the twelve engine
+ // choices a mechanic picks from under a hundred that each apply to one bus.
+ assert.deepEqual(recallFindings(memory,"Engine","Oil leak"),[]);
+ assert.deepEqual(recallFindings(memory,"Brakes","Check-engine diagnosis"),[]);
+ assert.deepEqual(recallFindings(memory,"Engine",""),[]);
+ assert.equal(REPAIR_OPTIONS.Engine.includes("throttle pedal reference circuit"),false,"the picker never grows");
+
+ // Two spellings of one fault collapse to one entry, or a year of history reads
+ // as several different faults that each happened once.
+ memory=learnFinding(memory,{...engine,finding:"Throttle Pedal Reference Circuit "},"2026-08-27T11:00:00.000Z");
+ memory=learnFinding(memory,{...engine,finding:"throttle  pedal reference circuit."},"2026-08-27T12:00:00.000Z");
+ const recalled=recallFindings(memory,"Engine","Check-engine diagnosis");
+ assert.equal(recalled.length,1);
+ assert.equal(recalled[0].uses,3);
+ // the wording recorded first is the wording kept: a later spelling winning
+ // would rewrite what earlier repairs appear to say
+ assert.equal(recalled[0].finding,"throttle pedal reference circuit");
+
+ // most-used first, so the answer that keeps turning out right sits at the front
+ memory=learnFinding(memory,{...engine,finding:"EGR differential pressure sensor"},"2026-08-27T13:00:00.000Z");
+ assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),
+  ["throttle pedal reference circuit","EGR differential pressure sensor"]);
+
+ // a guess can be taken back out
+ memory=forgetFinding(memory,"Engine","Check-engine diagnosis","THROTTLE PEDAL REFERENCE CIRCUIT");
+ assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),["EGR differential pressure sensor"]);
+
+ // nothing to learn from is not an error
+ assert.deepEqual(learnFinding(EMPTY_FINDINGS_MEMORY,{...engine,finding:"   "}).entries,[]);
+ assert.deepEqual(learnFinding(EMPTY_FINDINGS_MEMORY,{category:"",issue:"",finding:"x"}).entries,[]);
+ assert.deepEqual(normalizeFindingsMemory(null).entries,[]);
+ assert.deepEqual(normalizeFindingsMemory({entries:[{category:"Engine"}]}).entries,[]);
+
+ // a cause learned under a category that has since been merged still matches,
+ // because the key runs through the same catalog migration the parts memory uses
+ const moved=migrateRepairIdentity("Steering","Loose steering");
+ const legacy=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Steering",issue:"Loose steering",finding:"worn drag link"},"2026-08-27T10:00:00.000Z");
+ assert.deepEqual(recallFindings(legacy,moved.category,moved.issue).map(entry=>entry.finding),["worn drag link"]);
+
+ // Learned on any save carrying a finding, not only one marked Diagnosed.
+ // Making the checkbox the trigger would mean a mechanic writes the cause, sees
+ // nothing remembered, and never learns why.
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/if\(normalizeFinding\(draft\.defect\.finding\)\)setFindingsMemory/);
+ // offered under the finding field, scoped to the symptom on the form right now
+ assert.match(page,/recallFindings\(findingsMemory,value\.defect\.category,value\.quickIssue\|\|value\.defect\.issue\)/);
+ assert.match(page,/learned-findings/);
+ // and forgettable from where they are shown
+ assert.match(page,/forgetLearnedFinding\(entry\)/);
+
+ // Fixed Repairs learns too. A fault is often only named properly once the bus
+ // is apart, and that is the page open at the time; a finding typed there
+ // teaching nothing would be a gap nobody would ever notice.
+ const fixed=await readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8");
+ assert.match(fixed,/if\(normalizeFinding\(draft\.finding\)\)setFindingsMemory/);
+ assert.match(fixed,/recallFindings\(findingsMemory,draft\.category,draft\.issue\)/);
+ assert.match(fixed,/learned-findings/);
+
+ // Both pages style the chips, because each ships its own stylesheet and an
+ // unstyled chip row on one of them is how globals.css leaks in.
+ for(const [name,file] of [["defect-log","../app/defect-log/defect-log.css"],["fixed-repairs","../app/fixed-repairs/fixed-repairs.css"]]){
+  const css=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(css,/\.learned-finding\{/,name+" styles the chip");
+  assert.match(css,/\.learned-findings>div\{[^}]*flex-wrap:wrap/,name+" wraps them rather than running off a phone");
+ }
+});
+
 test("a repair can be put forward for the Down Sheet without being put on it",async()=>{
  const base={id:"d1",category:"Engine",issue:"Check engine light",details:"",operability:"service",state:"open"};
 
@@ -3935,9 +4008,13 @@ test("release safety keeps interval units and learned parts attached to the righ
  // page holds — completed rows, initials, timestamps, billable hours — sat
  // outside the one control that promises to save the whole board, and the
  // Work Time totals are built from those same rows.
- assert.match(backup,/version:4/);
+ assert.match(backup,/version:5/);
  assert.match(backup,/busLists:readSavedValue\(storage,BUS_LISTS_STORAGE_KEY\)/);
  assert.match(backup,/busListTemplates:readSavedValue\(storage,BUS_LIST_TEMPLATES_STORAGE_KEY\)/);
+ // Learned causes went into the backup in the same change that created them,
+ // rather than being noticed missing later the way the campaigns were.
+ assert.match(backup,/findingsMemory:readSavedValue\(storage,FINDINGS_MEMORY_STORAGE_KEY\)/);
+ assert.match(page,/parsed\.findingsMemory\)writeFindingsMemory\(localStorage,normalizeFindingsMemory\(parsed\.findingsMemory\)\)/);
  // and a restore brings them back, through the same normalizers the page uses
  assert.match(page,/parsed\.busLists\)localStorage\.setItem\("pace-bus-lists-v1",JSON\.stringify\(normalizeBusLists\(parsed\.busLists\)\)\)/);
  assert.match(page,/parsed\.busListTemplates\)localStorage\.setItem\("pace-bus-list-templates-v1"/);

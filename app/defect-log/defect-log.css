@@ -298,3 +298,15 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
    glance in a list somebody is about to act on. */
 .work-state-badge.down-sheet-recommended{border-color:#d09a3c;background:#fdf1dd;color:#8a4c00}
 .downsheet-recommend-check b{color:#8a4c00}
+
+/* Causes learned under this symptom. Chips rather than a dropdown: on a phone a
+   select hides its options behind a tap, and the whole point is that the
+   mechanic sees what has been found here before without going looking. */
+.learned-findings{display:grid;gap:5px}
+.learned-findings>small{color:var(--log-muted,#62748d);font-size:7px;font-weight:900;letter-spacing:.4px;overflow-wrap:anywhere}
+.learned-findings>div{display:flex;flex-wrap:wrap;gap:6px}
+.learned-finding{display:flex;align-items:stretch;border:1px solid #9db4d2;border-radius:7px;background:var(--log-surface,#fff);overflow:hidden;max-width:100%}
+.log-form .learned-finding button{min-height:38px;border:0;background:transparent;padding:6px 9px;color:#12457e;font-size:10px;font-weight:800;text-align:left;cursor:pointer;touch-action:manipulation;overflow-wrap:anywhere}
+.learned-finding button i{margin-left:5px;color:var(--log-muted,#62748d);font-style:normal;font-size:8px;font-weight:900}
+.learned-finding.selected{border-color:#0b64bd;background:color-mix(in srgb,#0b64bd 14%,var(--log-surface,#fff));box-shadow:inset 0 0 0 1px #0b64bd}
+.log-form .learned-finding .forget-finding{min-width:32px;border-left:1px solid #cbd6e6;padding:0;color:var(--log-muted,#8496ad);font-size:12px;text-align:center}

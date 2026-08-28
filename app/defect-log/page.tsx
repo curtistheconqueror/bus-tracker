@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,defectWorkStates,isDownSheetRecommended,isUnresolved,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,defectWorkStates,isDownSheetRecommended,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -12,6 +12,7 @@ import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareText} from "./quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
+import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeFleetStorage} from "../storage";
 
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
@@ -73,7 +74,7 @@ function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:strin
   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Choose 15s, 17s, 18s, or 20s first, or type the full number."}</small>
  </fieldset>;
 }
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
  const [value,setValue]=useState(draft);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
     that already had a diagnosis, an action, or a part recorded. React warned
@@ -105,6 +106,10 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
  });
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
+ /* Scoped to the exact symptom on the form right now, so changing the picker
+    changes what is offered and a cause never leaks to a defect it was not
+    found under. */
+ const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
  /* Ticking a state stamps who and when. The name comes from whatever is typed
     into FIXED BY or the device default, so the common case takes one tap; where
     initials are required and none are set, the tick is refused rather than
@@ -168,6 +173,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      <label className="work-state-finding">WHAT WAS FOUND (OPTIONAL)
       <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
      </label>
+     {/* Causes found under this exact symptom before, offered here and nowhere
+         else. Tapping one fills the box; typing something new is always
+         allowed. Offering them is what stops the same fault being written five
+         ways, which is the whole reason a year of history is readable. */}
+     {learnedFindings.length>0&&<div className="learned-findings" aria-label="Causes found before on this defect">
+      <small>FOUND BEFORE ON {(repairIssueDisplayLabel(value.quickIssue||value.defect.issue)||"THIS DEFECT").toUpperCase()}</small>
+      <div>{learnedFindings.map(entry=>{
+       const picked=findingMatchKey(entry.finding)===findingMatchKey(value.defect.finding);
+       return <span className={"learned-finding"+(picked?" selected":"")} key={entry.finding}>
+        <button type="button" onClick={()=>updateDefect("finding",picked?"":entry.finding)} aria-pressed={picked}>
+         {entry.finding}{entry.uses>1?<i>×{entry.uses}</i>:null}
+        </button>
+        <button type="button" className="forget-finding" title={"Forget "+entry.finding} aria-label={"Forget "+entry.finding} onClick={()=>forgetLearnedFinding(entry)}>×</button>
+       </span>;
+      })}</div>
+     </div>}
      <small>A finding is the cause, in your own words, when it is nothing the list could have offered. It shows on this repair everywhere it appears, including the Down Sheet, so the next person reads what was found and not just what was reported.</small>
     </fieldset>
     <label>WORK STATUS<select value={value.defect.state} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="deferred">Deferred</option><option value="completed">Fixed</option></select></label>
@@ -267,6 +288,9 @@ export default function DefectLog(){
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
+ const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
+ useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
+ const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
 
@@ -305,7 +329,7 @@ export default function DefectLog(){
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{if(!writeFleetStorage(localStorage,nextFleet))return;setFleet(nextFleet);setDownEntries(nextDown);writeDownSheetStorage(localStorage,nextDown)};
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
@@ -380,7 +404,7 @@ export default function DefectLog(){
     </article>)}</div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
+  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
   {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
  </main>;
 }
