@@ -220,6 +220,19 @@ export function normalizeRepairHours(value:unknown):number|undefined{
    and say so, rather than leaving that work unrecorded because the bus was
    never fixed. Check-engine is the case he named; the rest match how the
    catalog already words its own diagnostic entries. */
+/* Shop policy: a diagnosis is never billed under an hour. Finding a fault takes
+   an hour before it takes anything else, and a fifteen-minute figure is somebody
+   guessing rather than reading a meter.
+
+   Applied where time is typed in, never on read. Running it inside
+   normalizeDefects would quietly round every historical half-hour up to one and
+   rewrite what those repairs say they cost. */
+export const MINIMUM_DIAGNOSTIC_HOURS=1;
+export function normalizeDiagnosticHours(value:unknown):number|undefined{
+ const hours=normalizeRepairHours(value);
+ return hours===undefined?undefined:Math.max(MINIMUM_DIAGNOSTIC_HOURS,hours);
+}
+
 export function isDiagnosticDefect(category:unknown,issue:unknown){
  const text=String(category||"")+" "+String(issue||"");
  return /diagnos|check.?engine|check engine|stop engine light|mod light|abs warning|intermittent|unknown/i.test(text);

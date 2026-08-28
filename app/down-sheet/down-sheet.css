@@ -206,3 +206,16 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    itself should be findable by a thumb too. */
 .repair-editor .estimate-toggle input[type=checkbox]{width:22px;height:22px;min-height:22px}
 .repair-editor .estimate-toggle{min-height:44px;align-items:center}
+
+/* The path to Fixed Repairs, shown only while an entry is being closed out.
+   Green rather than the form's blue: this is the finishing act, and it should
+   look like the SAVE AS FIXED it mirrors in the Defect Log. */
+.completion-block{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:9px 11px;margin:2px 0 4px;border:1px solid #8fbfa3;border-radius:8px;background:#f3fbf6;padding:11px 13px}
+.completion-block>legend{padding:0 5px;color:#0a5c39;font-size:8px;font-weight:900;letter-spacing:.4px}
+.completion-block>.wide{grid-column:1/-1}
+.completion-block label{display:grid;gap:3px;font-size:8px;font-weight:900;letter-spacing:.4px;color:#3d5a72}
+.completion-block input,.completion-block textarea{min-height:44px;border:1px solid #b7c4d7;border-radius:7px;padding:8px 10px;font-size:16px;background:#fff}
+.completion-block textarea{min-height:62px;resize:vertical}
+.completion-block small{color:#3d6b52;font-size:8px;font-weight:700;line-height:1.4}
+.completion-block .learned-finding button{min-height:38px;border:0;background:transparent;padding:6px 9px;color:#12457e;font-size:10px;font-weight:800;text-align:left;cursor:pointer}
+@media(max-width:760px){.completion-block{grid-template-columns:1fr}}

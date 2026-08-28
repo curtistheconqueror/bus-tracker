@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isDiagnosticDefect,normalizeRepairHours,defaultDefectOperability,defectLabel,defectNote,defectWorkStates,isDownSheetRecommended,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectLabel,defectNote,defectWorkStates,isDownSheetRecommended,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -220,11 +220,11 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <fieldset className={"wide billable-time"+(diagnosticDefect?" diagnostic":"")}><legend>BILLABLE TIME — OPTIONAL</legend>
      <div>
       <label>REPAIR HOURS<input inputMode="decimal" value={value.defect.repairHours===undefined?"":String(value.defect.repairHours)} placeholder=".5" onChange={event=>updateDefect("repairHours",normalizeRepairHours(event.target.value))}/></label>
-      <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={value.defect.diagnosticHours===undefined?"":String(value.defect.diagnosticHours)} placeholder=".5" onChange={event=>updateDefect("diagnosticHours",normalizeRepairHours(event.target.value))}/></label>
+      <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={value.defect.diagnosticHours===undefined?"":String(value.defect.diagnosticHours)} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} onChange={event=>updateDefect("diagnosticHours",normalizeDiagnosticHours(event.target.value))}/></label>
      </div>
      <small>{diagnosticDefect
       ?"This is a diagnostic defect. Record diagnostic hours even when the bus is not fixed — press SAVE DEFECT rather than SAVE AS FIXED and the time is kept against an open repair."
-      :"Decimal hours: .5 is half an hour. Leave blank if no time is being billed."}</small>
+      :"Decimal hours: .5 is half an hour. Diagnostic time starts at "+MINIMUM_DIAGNOSTIC_HOURS+" hour and only goes up. Leave blank if no time is being billed."}</small>
     </fieldset>
     </div></details>
     {/* Both rows stay below ADVANCED DETAILS, where the Down Sheet control has

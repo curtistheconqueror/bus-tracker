@@ -1,7 +1,8 @@
 "use client";
 
 import {useEffect, useMemo, useState} from "react";
-import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {findingMatchKey,readFindingsMemory,recallFindings} from "../findings-memory";
 import {lockPageScroll} from "../scroll-lock";
 import {
   aggregateRepairItemEstimates,
@@ -55,7 +56,13 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
   const isNew=!entries.some(item=>item.id===entry.id);
   const estimateTotal=repairItemsTotal(draft.repairItems);
 
-  const submit=(event:React.FormEvent)=>{
+  /* The sheet already knew who had the bus. Dropping it was why every completed
+    entry reached Fixed Repairs with nobody's name on it. */
+ const findingsMemory=useMemo(()=>readFindingsMemory(typeof localStorage==="undefined"?null:localStorage),[]);
+ const assignedMechanic=draft.assignmentType==="Mechanic"?draft.assignedTo.trim().toUpperCase():"";
+ const learnedFindings=recallFindings(findingsMemory,draft.category,draft.repair);
+
+ const submit=(event:React.FormEvent)=>{
     event.preventDefault();
     const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);
     if(!bus){alert("Select a bus number.");return}
@@ -69,7 +76,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
       busNumber:bus.n,
       category:first?.category||"Miscellaneous",
       repair:first?.repair||"Repair required",
-      customReason:repairItemsReason(repairItems),
+      customReason:repairItems.length===1?(repairItems[0].details||"").trim():repairItemsReason(repairItems),
       repairItems,
       timeEstimate:aggregateRepairItemEstimates(repairItems),
       updatedAt:now,
@@ -120,6 +127,28 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
         <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
         <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>update("workflow",event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
         <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>Status only; location stays unchanged.</small></label>
+        {/* Shown only once the entry is being closed out. The Defect Log has a
+            straight path to Fixed Repairs through SAVE AS FIXED, and this is the
+            same path from here: what was done, who did it, what it turned out to
+            be, and how long it took. Every field optional, because flipping a
+            dropdown to Completed must not turn into a form to fill in when a
+            foreman is closing out ten buses at end of shift. */}
+        {draft.workflow==="Completed"&&<fieldset className="wide completion-block"><legend>WHAT WAS DONE — GOES TO FIXED REPAIRS</legend>
+         <label className="wide">FIX / STEPS TAKEN<textarea value={draft.actionTaken||""} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced or reset?"/></label>
+         <label className="wide">WHAT WAS FOUND (OPTIONAL)<input maxLength={180} value={draft.finding||""} onChange={event=>update("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/></label>
+         {learnedFindings.length>0&&<div className="wide learned-findings" aria-label="Causes found before on this repair">
+          <small>FOUND BEFORE ON {(draft.repair||"THIS REPAIR").toUpperCase()}</small>
+          <div>{learnedFindings.map(found=>{
+           const picked=findingMatchKey(found.finding)===findingMatchKey(draft.finding);
+           return <span className={"learned-finding"+(picked?" selected":"")} key={found.finding}>
+            <button type="button" onClick={()=>update("finding",picked?"":found.finding)} aria-pressed={picked}>{found.finding}{found.uses>1?<i>×{found.uses}</i>:null}</button>
+           </span>;
+          })}</div>
+         </div>}
+         <label>FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy||assignedMechanic} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/><small>{assignedMechanic?"Starts from the assigned mechanic.":"Who actually did the work."}</small></label>
+         <label>REPAIR HOURS<input inputMode="decimal" value={draft.repairHours===undefined?"":String(draft.repairHours)} placeholder=".5" onChange={event=>update("repairHours",normalizeRepairHours(event.target.value))}/></label>
+         <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={draft.diagnosticHours===undefined?"":String(draft.diagnosticHours)} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} onChange={event=>update("diagnosticHours",normalizeDiagnosticHours(event.target.value))}/><small>{MINIMUM_DIAGNOSTIC_HOURS} hour minimum; it only goes up from there.</small></label>
+        </fieldset>}
         <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
         <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>
       </div>

@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectNote, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectFromDraft, defectNote, normalizeDiagnosticHours, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2944,6 +2944,63 @@ test("dash lights are named as reported, and the start rename does not invert hi
  // memory key runs through the same migration
  const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
+test("closing out a Down Sheet entry carries the repair through to Fixed Repairs",async()=>{
+ const base={id:"e1",defectId:"downsheet-e1",busId:"a",category:"Brakes",repair:"Air brake fault",customReason:"",
+  assignmentType:"Mechanic",assignedTo:"cj",workflow:"Scheduled",operationalStatus:"out"};
+ const bus={id:"a",l:"bay-3",s:"defect",defects:[],pendingRepair:""};
+
+ // Completing wrote state and a timestamp and nothing else, so a scheduled
+ // repair arrived in Fixed Repairs as an empty shell: no technician, no fix, no
+ // time, no cause.
+ const done={...base,workflow:"Completed",completedBy:"",actionTaken:"Replaced R-14 relay valve",
+  finding:"R-14 relay valve leaking",repairHours:2,diagnosticHours:1};
+ const [after]=applyDownEntryToFleet([bus],done,"2026-08-27T15:00:00.000Z");
+ const defect=after.defects[0];
+ assert.equal(defect.state,"completed");
+ assert.equal(defect.actionTaken,"Replaced R-14 relay valve");
+ assert.equal(defect.finding,"R-14 relay valve leaking");
+ assert.equal(defect.repairHours,2);
+ assert.equal(defect.diagnosticHours,1);
+
+ // The sheet already knew who had the bus and used to drop it, so every
+ // completed entry reached Fixed Repairs with nobody's name on it.
+ assert.equal(defect.completedBy,"CJ");
+ // but a vendor is not a technician in this shop, and must not read as one
+ const [vendor]=applyDownEntryToFleet([bus],{...done,assignmentType:"Vendor",assignedTo:"Cummins"},"2026-08-27T15:00:00.000Z");
+ assert.equal(vendor.defects[0].completedBy,"");
+ // and anything typed in wins over the assignment
+ const [typed]=applyDownEntryToFleet([bus],{...done,completedBy:"JT"},"2026-08-27T15:00:00.000Z");
+ assert.equal(typed.defects[0].completedBy,"JT");
+
+ // An entry still open carries no completion, however much has been typed.
+ const [open]=applyDownEntryToFleet([bus],{...done,workflow:"Scheduled"},"2026-08-27T15:00:00.000Z");
+ assert.equal(open.defects[0].state,"open");
+ assert.equal(open.defects[0].completedBy,undefined);
+
+ // Shop policy: a diagnosis is never billed under an hour.
+ assert.equal(MINIMUM_DIAGNOSTIC_HOURS,1);
+ assert.equal(normalizeDiagnosticHours("0.25"),1);
+ assert.equal(normalizeDiagnosticHours("2.5"),2.5);
+ assert.equal(normalizeDiagnosticHours(""),undefined,"blank still means no time recorded, not one hour");
+ assert.equal(normalizeDiagnosticHours("abc"),undefined);
+ // The floor is applied where time is typed, never on read. Running it inside
+ // normalizeDefects would round every historical half-hour up and rewrite what
+ // those repairs say they cost.
+ assert.equal(normalizeDefects([{id:"d",category:"Brakes",issue:"x",details:"",state:"completed",diagnosticHours:0.5}])[0].diagnosticHours,0.5);
+
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ // The Defect Log has a straight path to Fixed Repairs through SAVE AS FIXED.
+ // This is the same path from here, and it appears only while an entry is being
+ // closed out.
+ assert.match(editor,/draft\.workflow==="Completed"&&<fieldset className="wide completion-block"/);
+ // Never required: flipping a dropdown to Completed must not become a form to
+ // fill in when a foreman is closing out ten buses at end of shift.
+ const block=editor.slice(editor.indexOf("completion-block"),editor.indexOf("</fieldset>",editor.indexOf("completion-block")));
+ assert.equal(/required/.test(block),false,"no field in the completion block is required");
+ assert.match(editor,/value=\{draft\.completedBy\|\|assignedMechanic\}/,"prefilled from the assignment, and a falsy check because the entry stores an empty string");
+ assert.match(editor,/normalizeDiagnosticHours\(event\.target\.value\)/);
 });
 
 test("the Down Sheet editor holds the page still and fills a phone screen",async()=>{

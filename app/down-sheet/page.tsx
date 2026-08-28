@@ -6,8 +6,9 @@ import DownSheetEditor from "./down-sheet-editor";
 import DownSheetSettings from "./down-sheet-settings";
 import DownSheetScanner from "./down-sheet-scanner";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
+import {learnFinding,readFindingsMemory,writeFindingsMemory} from "../findings-memory";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "./down-sheet-clear";
-import {defectSupportingDetails,isUnresolved,type StructuredDefect} from "../repair-catalog";
+import {defectSupportingDetails,isUnresolved,normalizeFinding,normalizeRepairHours,type StructuredDefect} from "../repair-catalog";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "./repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
@@ -37,6 +38,13 @@ type DownEntry={
  assignmentType:AssignmentType;assignedTo:string;section:RepairSection;shift:Shift;
  workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
  timeEstimate:RepairTimeEstimate;
+ /* What was actually done, captured when the entry is closed out. The Down
+    Sheet already knew who was assigned and never wrote it anywhere the repair
+    history could read, so a completed entry reached Fixed Repairs with no
+    technician, no fix, no time and no cause on it. All optional: a foreman
+    closing ten buses at end of shift must never be made to fill in a form to
+    flip a dropdown. */
+ completedBy?:string;actionTaken?:string;finding?:string;repairHours?:number;diagnosticHours?:number;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
 };
 
@@ -64,6 +72,11 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
   repairItems:normalizeRepairItems(value.repairItems,{category:value.category||"Miscellaneous",repair:value.repair||"Repair required",details:value.customReason||"",timeEstimate:value.timeEstimate}),
   assignmentType:value.assignmentType||"Mechanic",
   assignedTo:value.assignedTo||"",
+  completedBy:value.completedBy||"",
+  actionTaken:value.actionTaken||"",
+  finding:normalizeFinding(value.finding),
+  repairHours:normalizeRepairHours(value.repairHours),
+  diagnosticHours:normalizeRepairHours(value.diagnosticHours),
   section:value.section||"Pending",
   shift:value.shift||"1st",
   workflow:value.workflow||"Scheduled",
@@ -142,7 +155,7 @@ export default function DownSheet(){
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
  const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,order,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,order,display:displaySettings}))}};
- const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
+ const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);if(normalizeFinding(next.finding))writeFindingsMemory(localStorage,learnFinding(readFindingsMemory(localStorage),{category:next.category,issue:next.repair,finding:next.finding}));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
  const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet);localStorage.setItem(DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot));writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
  const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const result=restoreDownSheetState(entries,fleet,snapshot);writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
  const importScan=(records:ScanImportRecord[])=>{
