@@ -1913,12 +1913,14 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
   assert.ok(page.indexOf('className="save-log-middle-actions"')<page.indexOf('className="wide downsheet-check"'));
-  assert.match(page,/document\.body\.classList\.add\("defect-editor-open"\)/);
+  assert.match(page,/lockPageScroll\("defect-editor-open"\)/);
   assert.match(page,/const closeEditor=\(\)=>\{const left=window\.scrollX,top=window\.scrollY/);
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
-  assert.match(css,/body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
+  // <html> is the scrolling element here, so a rule on <body> alone stopped
+  // nothing: this lock existed for months and the page still dragged 2,462px.
+  assert.match(css,/html\.defect-editor-open,body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
   assert.match(css,/\.log-editor\{max-height:96vh;max-height:96dvh\}/);
   assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
   assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
@@ -2942,6 +2944,53 @@ test("dash lights are named as reported, and the start rename does not invert hi
  // memory key runs through the same migration
  const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
+test("the Down Sheet editor holds the page still and fills a phone screen",async()=>{
+ const [css,editor,logCss,lock]=await Promise.all([
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/scroll-lock.ts",import.meta.url),"utf8"),
+ ]);
+
+ // One lock, used by both editors. The Defect Log carried its own copy for
+ // months and it never worked: <html> is the scrolling element in this app, so
+ // overflow:hidden on <body> stopped nothing and the page behind an open editor
+ // dragged 2,462px on a phone. The Down Sheet had none at all and dragged 610px.
+ assert.match(editor,/lockPageScroll\("down-editor-open"\)/);
+ assert.match(lock,/documentElement/,"the lock must reach the element that actually scrolls");
+ assert.match(css,/html\.down-editor-open,body\.down-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
+ assert.match(logCss,/html\.defect-editor-open,body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
+ // and it puts the foreman back where they were in a long sheet
+ assert.match(lock,/scrollTop=top/);
+
+ // The repairs box is a <fieldset>, and the rule matched only <label>, so it
+ // never spanned: 153px of a 354px editor on a phone.
+ assert.match(css,/\.repair-form>\.wide\{grid-column:1\/-1\}/);
+ assert.equal(/\.repair-form label\.wide/.test(css),false);
+
+ // Nothing collapsed the form to one column at any width, so every control sat
+ // in half a phone screen.
+ assert.match(css,/@media\(max-width:760px\)\{\.repair-form\{grid-template-columns:1fr\}/);
+ // and this surface used 600px while the rest of the app uses 760px, which left
+ // a large phone in landscape on the desktop layout here and the phone layout
+ // everywhere else. 760 stays below an iPad's 768.
+ assert.equal(css.includes("@media(max-width:600px)"),false);
+
+ // A <fieldset> with overflow:hidden is a scroll container, and a grid item that
+ // is a scroll container contributes no height. The grid handed the repairs box
+ // a 20px row and clipped 577px of repairs inside it. It only ever rendered
+ // because the cell beside it propped the row open; the moment it spanned the
+ // full width, alone in its row, it collapsed to a sliver.
+ assert.equal(/\.repair-items\{[^}]*overflow:hidden/.test(css),false,"the repairs fieldset must not be a scroll container");
+ assert.match(css,/\.repair-items-head\{[^}]*border-radius:7px 7px 0 0\}/,"the header rounds itself instead");
+
+ // the editor cannot run past the visible screen behind iOS browser chrome
+ assert.match(css,/\.repair-editor\{[^}]*max-height:94vh;max-height:94dvh/);
+ // and the two thumb targets that were 34px and 17px
+ assert.match(css,/\.repair-editor \.add-repair-item\{min-height:44px\}/);
+ assert.match(css,/\.repair-form \.estimate-toggle\{display:grid;grid-template-columns:22px auto 1fr/);
 });
 
 test("the parking brake knob and the rear air valves are in the catalog",()=>{

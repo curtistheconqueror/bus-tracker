@@ -8,6 +8,7 @@ import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,type QuickFilterKey} from "../quick-filters";
+import {lockPageScroll} from "../scroll-lock";
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareText} from "./quick-filter-share";
@@ -82,7 +83,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     once from the record, so it opens when there is something to see and the
     mechanic can still collapse it. */
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
- useEffect(()=>{document.body.classList.add("defect-editor-open");return()=>document.body.classList.remove("defect-editor-open")},[]);
+ useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
  /* A record can hold wording the picker no longer offers: a merged category kept

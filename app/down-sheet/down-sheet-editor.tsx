@@ -1,7 +1,8 @@
 "use client";
 
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {lockPageScroll} from "../scroll-lock";
 import {
   aggregateRepairItemEstimates,
   blankRepairItem,
@@ -77,6 +78,11 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
       history:[...draft.history,{at:now,initials:operator,action}],
     });
   };
+
+  /* Hold the page still. Without this a scroll inside the form carried straight
+     through to the page behind: 610px of it on a phone, which is what made the
+     modal feel like it was fighting back. */
+  useEffect(()=>lockPageScroll("down-editor-open"),[]);
 
   return <div className="down-shade" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
     <form className="repair-editor" onSubmit={submit}>

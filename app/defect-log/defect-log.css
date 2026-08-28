@@ -117,7 +117,7 @@ button,input,select,textarea{font:inherit}
 
 @media(max-width:760px){.log-header nav a{width:100%;min-width:0;height:50px;font-size:10px}}
 /* Stable full-height phone editor with save actions always in reach. */
-body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max-height:96vh;max-height:96dvh}.log-form{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scroll-padding-block:12px 92px}.log-editor-header-actions{display:flex;align-items:center;gap:8px}.log-editor-header-actions>button[aria-label="Close"]{width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0}
+html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max-height:96vh;max-height:96dvh}.log-form{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;scroll-padding-block:12px 92px}.log-editor-header-actions{display:flex;align-items:center;gap:8px}.log-editor-header-actions>button[aria-label="Close"]{width:36px;height:36px;display:flex;align-items:center;justify-content:center;padding:0}
 @media(max-width:760px){.log-shade{align-items:stretch}.log-editor{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;border-radius:0}.log-editor-head{flex:none;padding-top:max(12px,env(safe-area-inset-top))}.log-editor-header-actions>button[aria-label="Close"]{width:44px;height:44px}.log-form{overflow-y:auto}}
 
 /* Large Quick Filter result sets stay readable and use one accordion row at a time. */
