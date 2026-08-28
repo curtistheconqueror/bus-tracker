@@ -26,7 +26,7 @@ import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
-import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
+import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
@@ -3022,7 +3022,8 @@ test("one repair on the sheet is one defect on the bus",async()=>{
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
  // The Defect Log has a straight path to Fixed Repairs through SAVE AS FIXED.
  // This is that path from here, on each repair, and only while closing out.
- assert.match(editor,/draft\.workflow==="Completed"&&<div className="wide item-completion"/);
+ // The fix fields follow the repair that was finished, not the whole entry.
+ assert.match(editor,/\{item\.done&&<div className="wide item-completion"/);
  assert.equal(/required/.test(editor.slice(editor.indexOf("item-completion"),editor.indexOf("</div>}",editor.indexOf("item-completion")))),false,"nothing in it is required");
  assert.match(editor,/value=\{draft\.completedBy\|\|assignedMechanic\}/);
 
@@ -3038,6 +3039,68 @@ test("one repair on the sheet is one defect on the bus",async()=>{
  assert.match(editor,/showBreakdown=\(item:DownSheetRepairItem\)=>advancedEstimates\.has\(item\.id\);/);
  assert.match(editor,/value=\{hoursValue\(repairTimeTotal\(item\.timeEstimate\)\)\}/);
  assert.match(editor,/setSimpleTotal=\(item:DownSheetRepairItem,value:string\)/);
+});
+
+test("a repair on the Down Sheet finishes on its own day",async()=>{
+ const item=(id,category,repair,extra={})=>({id,category,repair,details:"",...extra});
+ const base={id:"e1",busId:"a",category:"Brakes",repair:"Air brake fault",customReason:"",
+  assignmentType:"Mechanic",assignedTo:"cj",workflow:"In Progress",operationalStatus:"out"};
+ const bus={id:"a",l:"bay-3",s:"defect",defects:[],pendingRepair:""};
+
+ // Brakes done Monday, A/C still open. Until a card could say so the whole
+ // entry had to stay open and none of that work could be written down.
+ const partly={...base,repairItems:[
+  item("i1","Brakes","Air brake fault",{done:true,actionTaken:"Replaced R-14 relay valve",repairHours:2}),
+  item("i2","A/C and HVAC","No cooling")]};
+ const [mid]=applyDownEntryToFleet([bus],partly,"2026-08-27T15:00:00.000Z");
+ assert.deepEqual(mid.defects.map(defect=>defect.state),["completed","in-progress"]);
+ assert.equal(mid.defects[0].actionTaken,"Replaced R-14 relay valve");
+ assert.equal(mid.defects[0].completedBy,"CJ");
+ assert.equal(mid.defects[1].completedBy,undefined,"the unfinished repair carries no technician");
+ // and the bus stays down while any repair on it is still open
+ assert.equal(mid.down,true);
+
+ // The finished repair keeps the day it was finished when the rest close later.
+ const [later]=applyDownEntryToFleet([mid],{...partly,repairItems:[
+  item("i1","Brakes","Air brake fault",{done:true,actionTaken:"Replaced R-14 relay valve",repairHours:2}),
+  item("i2","A/C and HVAC","No cooling",{done:true})]},"2026-08-29T15:00:00.000Z");
+ assert.equal(later.defects[0].completedAt,"2026-08-27T15:00:00.000Z","Monday's repair keeps Monday");
+ assert.equal(later.defects[1].completedAt,"2026-08-29T15:00:00.000Z");
+ assert.equal(later.down,false,"and the bus comes off once the last one is done");
+
+ // Setting the whole entry Completed still finishes everything, which is what
+ // keeps closing out ten buses at end of shift a dropdown and not a checklist.
+ const [swept]=applyDownEntryToFleet([bus],{...base,workflow:"Completed",repairItems:[
+  item("i1","Brakes","Air brake fault"),item("i2","A/C and HVAC","No cooling")]},"2026-08-27T15:00:00.000Z");
+ assert.ok(swept.defects.every(defect=>defect.state==="completed"));
+
+ // An entry saved before cards could be finished individually reads as all done
+ // when it was already Completed, rather than reopening every repair on it.
+ const migrated=normalizeRepairItems([{id:"i1",category:"Brakes",repair:"Air brake fault"}],{entryCompleted:true});
+ assert.equal(migrated[0].done,true);
+ assert.equal(normalizeRepairItems([{id:"i1",category:"Brakes",repair:"Air brake fault"}],{})[0].done,false);
+
+ // How far along, for the row on the sheet: two of three done must not look
+ // like a bus nobody has touched.
+ const progress=repairItemsProgress([item("a","Brakes","x",{done:true}),item("b","Engine","y",{done:true}),item("c","A/C and HVAC","z")]);
+ assert.deepEqual([progress.done,progress.total,progress.complete],[2,3,false]);
+ assert.equal(repairItemsProgress([item("a","Brakes","x",{done:true})]).complete,true);
+ assert.equal(repairItemsProgress([]).complete,false,"an empty entry is not a finished one");
+ // blank cards are not counted as repairs waiting to be done
+ assert.equal(repairItemsProgress([item("a","Brakes","x",{done:true}),item("b","","")]).complete,true);
+
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ // The entry's workflow and its cards have to agree, and it is the cards that
+ // know: ticking the last one closes the entry, unticking one reopens it.
+ assert.match(editor,/progress\.complete\?"Completed":current\.workflow==="Completed"\?"In Progress":current\.workflow/);
+ assert.match(editor,/workflow==="Completed"\?current\.repairItems\.map\(item=>\(\{\.\.\.item,done:true\}\)\)/);
+ assert.match(editor,/className="repair-item-done"/);
+
+ // Two of three finished must not read on the sheet like a bus nobody has
+ // touched. The count is what a foreman scans down the row for.
+ const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(sheet,/progress\.done\+" OF "\+progress\.total\+" DONE"/);
+ assert.match(sheet,/repairProgressLabel\(entry\)/);
 });
 
 test("the Down Sheet editor holds the page still and fills a phone screen",async()=>{

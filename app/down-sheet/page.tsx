@@ -11,7 +11,7 @@ import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "../repair-catalog";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
 import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "./repair-time-estimates";
-import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
+import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
 import {downSheetWorkGroup,matchesDownSheetSearch,orderDownSheetEntries,type DownSheetOrder} from "./down-sheet-view";
@@ -69,7 +69,7 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
   category:value.category||"Miscellaneous",
   repair:value.repair||"Repair required",
   customReason:value.customReason||"",
-  repairItems:normalizeRepairItems(value.repairItems,{category:value.category||"Miscellaneous",repair:value.repair||"Repair required",details:value.customReason||"",timeEstimate:value.timeEstimate}),
+  repairItems:normalizeRepairItems(value.repairItems,{category:value.category||"Miscellaneous",repair:value.repair||"Repair required",details:value.customReason||"",timeEstimate:value.timeEstimate,entryCompleted:value.workflow==="Completed"}),
   assignmentType:value.assignmentType||"Mechanic",
   assignedTo:value.assignedTo||"",
   completedBy:value.completedBy||"",
@@ -112,6 +112,14 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
  })).map(normalizeEntry);
 }
 
+/* Two of three finished must not read the same as a bus nobody has touched.
+   The count is what the foreman scans down the sheet for. */
+function repairProgressLabel(entry:DownEntry){
+ const progress=repairItemsProgress(entry.repairItems||[]);
+ return progress.done>0&&!progress.complete
+  ?progress.done+" OF "+progress.total+" DONE"
+  :(entry.repairItems||[]).length+" REPAIRS";
+}
 function reasonLabel(entry:DownEntry){return entry.repairItems?.length?repairItemsReason(entry.repairItems):[entry.category,entry.repair,entry.customReason].filter(Boolean).join(" — ")}
 function entryEstimateMinutes(entry:DownEntry){if(isQuarantineEntry(entry))return 0;return entry.repairItems?repairItemsTotal(entry.repairItems):repairTimeTotal(entry.timeEstimate)}
 function isActive(entry:DownEntry){return entry.workflow!=="Completed"}
@@ -224,7 +232,7 @@ export default function DownSheet(){
      <tbody>{visible.length?visible.map((entry,index)=>{const group=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(visible[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&group.label!==previous?.label&&<tr className={"work-group-row group-"+group.rank}><td colSpan={9}>{group.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
       <td className="line-number">{String(index+1).padStart(2,"0")}</td>
       <td className="fleet-number"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button></td>
-      <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?entry.repairItems.length+" REPAIRS":entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
+      <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
       <td><b className="shift-tag">{entry.shift}</b></td>

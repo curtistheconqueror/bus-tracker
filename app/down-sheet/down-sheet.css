@@ -242,3 +242,11 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .item-completion small{color:#3d6b52;font-size:8px;font-weight:700}
 .item-completion .learned-finding button{min-height:38px;border:0;background:transparent;padding:6px 9px;color:#12457e;font-size:10px;font-weight:800;text-align:left;cursor:pointer}
 .completion-signoff input{min-height:44px;border:1px solid #b7c4d7;border-radius:7px;padding:0 10px;font-size:16px}
+
+/* Each repair says for itself whether it is finished. Repairs on one bus do not
+   land together, and until this existed the whole entry had to stay open. */
+.repair-form .repair-item-done{display:flex;flex-direction:row;align-items:center;gap:9px;min-height:44px;margin:10px 10px 0;padding:7px 10px;border:1px solid #cbd6e6;border-radius:7px;background:#f7fafd;cursor:pointer;touch-action:manipulation}
+.repair-item-done input[type=checkbox]{width:22px;height:22px;min-height:22px;margin:0;accent-color:#0a5c39}
+.repair-item-done span{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d5a72}
+.repair-form .repair-item-done:has(input:checked){border-color:#8fbfa3;background:#eef8f2}
+.repair-form .repair-item-done:has(input:checked) span{color:#0a5c39}

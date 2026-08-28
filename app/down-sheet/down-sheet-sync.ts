@@ -22,6 +22,7 @@ export type SyncRepairItem={
  category:string;
  repair:string;
  details:string;
+ done?:boolean;
  actionTaken?:string;
  finding?:string;
  repairHours?:number;
@@ -76,14 +77,14 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  const items=(entry.repairItems||[]).filter(item=>clean(item.category)||clean(item.repair)||clean(item.details));
  const legacyIds=[clean(entry.defectId),"downsheet-"+entryKey(entry),"downsheet-"+entry.busId].filter(Boolean);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
- if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,actionTaken:"",finding:undefined,repairHours:undefined,diagnosticHours:undefined}];
+ if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,repairHours:undefined,diagnosticHours:undefined}];
  const taken=new Set<string>();
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
   const adopts=index===0&&legacy&&!current.some(defect=>defect.id===own)&&!taken.has(legacy.id);
   const id=adopts?legacy.id:own;
   taken.add(id);
-  return {id,category:item.category,repair:item.repair,details:item.details,
+  return {id,category:item.category,repair:item.repair,details:item.details,done:item.done===true,
    actionTaken:item.actionTaken,finding:item.finding,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
  });
 }
@@ -91,8 +92,10 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
 export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:SyncDownEntry,now=new Date().toISOString()):T[]{
  return fleet.map(bus=>{
   if(bus.id!==entry.busId)return bus;
-  const completed=entry.workflow==="Completed";
-  const state:StructuredDefect["state"]=completed?"completed":entry.workflow==="Deferred"?"deferred":entry.workflow==="In Progress"?"in-progress":"open";
+  const entryCompleted=entry.workflow==="Completed";
+  /* The entry's workflow still describes the bus. A repair carries its own,
+     because repairs on one bus do not finish together. */
+  const openState:StructuredDefect["state"]=entry.workflow==="Deferred"?"deferred":entry.workflow==="In Progress"?"in-progress":"open";
   const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
   const targets=defectTargets(entry,current);
   /* A card taken off the sheet does not delete its defect. Coming off a sheet
@@ -100,6 +103,8 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
   const defects=[...current];
   for(const target of targets){
    const linked=defects.find(defect=>defect.id===target.id);
+   const completed=target.done||entryCompleted;
+   const state:StructuredDefect["state"]=completed?"completed":openState;
    const nextDefect:StructuredDefect={...linked,
     id:target.id,
     category:target.category||"Miscellaneous",
@@ -126,7 +131,7 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
   const repairAware={...bus,defects,pendingRepair:defectSummary(defects)};
   const status=statusForLocation(bus.l,entry.operationalStatus,repairAware);
   const next={...repairAware,s:status,
-   down:!completed&&entry.operationalStatus!=="decommissioned",
+   down:!targets.every(target=>target.done||entryCompleted)&&entry.operationalStatus!=="decommissioned",
    mechanic:entry.assignmentType==="Mechanic"&&entry.assignedTo.trim()?entry.assignedTo.trim():bus.mechanic} as T;
   return stampOperationalChange(bus,next,now) as T;
  });

@@ -12,6 +12,10 @@ export type DownSheetRepairItem = {
   details: string;
   estimateEnabled: boolean;
   timeEstimate: RepairTimeEstimate;
+  /* Finished on its own. Repairs on one bus do not land together: brakes can be
+     done on Monday and the A/C on Wednesday, and until a card could say so the
+     whole entry had to stay open and none of the work could be written down. */
+  done?: boolean;
   /* What was done, per repair rather than per entry. Hours especially: an entry
      with three repairs and two hours recorded once would bill those two hours
      three times over as each repair became its own record. */
@@ -48,7 +52,7 @@ export function blankRepairItem(index = 0): DownSheetRepairItem {
 
 export function normalizeRepairItems(
   value: unknown,
-  legacy: {category?: string; repair?: string; details?: string; timeEstimate?: unknown},
+  legacy: {category?: string; repair?: string; details?: string; timeEstimate?: unknown; entryCompleted?: boolean},
 ): DownSheetRepairItem[] {
   if (Array.isArray(value) && value.length) {
     return value.map((raw, index) => {
@@ -62,6 +66,9 @@ export function normalizeRepairItems(
         details: typeof source.details === "string" ? source.details : "",
         estimateEnabled: source.estimateEnabled !== false,
         timeEstimate: normalizeRepairTimeEstimate(source.timeEstimate, category, repair),
+        /* An entry saved before cards could be finished individually has no flag
+           on any of them, so a completed entry reads as every repair done. */
+        done: source.done === true || legacy.entryCompleted === true,
         actionTaken: typeof source.actionTaken === "string" ? source.actionTaken : "",
         finding: normalizeFinding(source.finding),
         repairHours: normalizeRepairHours(source.repairHours),
@@ -81,6 +88,7 @@ export function normalizeRepairItems(
     details,
     estimateEnabled: true,
     timeEstimate: normalizeRepairTimeEstimate(legacy.timeEstimate, category, repair),
+    done: legacy.entryCompleted === true,
   }];
 }
 
@@ -116,4 +124,13 @@ export function repairItemsReason(items: DownSheetRepairItem[]) {
     .filter(item => item.category || item.repair || item.details)
     .map(item => [item.category, item.repair, item.details].filter(Boolean).join(" — "))
     .join(" | ");
+}
+
+/* How much of an entry is finished, for the row on the sheet. Without it a bus
+   with two of three repairs done looks exactly like one that has not been
+   touched. */
+export function repairItemsProgress(items: DownSheetRepairItem[]) {
+  const real = items.filter(item => item.category || item.repair || item.details);
+  const done = real.filter(item => item.done).length;
+  return {done, total: real.length, complete: real.length > 0 && done === real.length};
 }

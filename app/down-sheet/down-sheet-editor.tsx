@@ -8,6 +8,7 @@ import {
   aggregateRepairItemEstimates,
   blankRepairItem,
   normalizeRepairItems,
+  repairItemsProgress,
   repairItemsReason,
   repairItemsTotal,
   type DownSheetRepairItem,
@@ -72,6 +73,21 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
  const findingsMemory=useMemo(()=>readFindingsMemory(typeof localStorage==="undefined"?null:localStorage),[]);
  const assignedMechanic=draft.assignmentType==="Mechanic"?draft.assignedTo.trim().toUpperCase():"";
 
+ /* The entry's workflow and the cards under it have to agree, and it is the
+    cards that know. Ticking the last repair closes the entry, because a bus
+    with everything done must not sit on the sheet as active work. Untick one
+    and the entry reopens. Setting the entry Completed marks them all, which is
+    what keeps closing out ten buses at end of shift a dropdown rather than a
+    checklist. */
+ const setRepairDone=(id:string,done:boolean)=>setDraft(current=>{
+  const repairItems=current.repairItems.map(item=>item.id===id?{...item,done}:item);
+  const progress=repairItemsProgress(repairItems);
+  const workflow:Workflow=progress.complete?"Completed":current.workflow==="Completed"?"In Progress":current.workflow;
+  return {...current,repairItems,workflow};
+ });
+ const setWorkflow=(workflow:Workflow)=>setDraft(current=>({...current,workflow,
+  repairItems:workflow==="Completed"?current.repairItems.map(item=>({...item,done:true})):current.repairItems}));
+
  const submit=(event:React.FormEvent)=>{
     event.preventDefault();
     const operator=initials.trim().toUpperCase(),bus=fleet.find(item=>item.id===draft.busId);
@@ -116,11 +132,12 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
             const itemTotal=item.estimateEnabled?repairItemsTotal([item]):0;
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
+              <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
               <div className="repair-item-fields">
                 <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
                 <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
                 <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
-                {draft.workflow==="Completed"&&<div className="wide item-completion">
+                {item.done&&<div className="wide item-completion">
                  <b>WHAT WAS DONE — GOES TO FIXED REPAIRS</b>
                  <label className="wide">FIX / STEPS TAKEN<textarea value={item.actionTaken||""} onChange={event=>updateItem(item.id,current=>({...current,actionTaken:event.target.value}))} placeholder="What was repaired, adjusted, replaced or reset?"/></label>
                  <label className="wide">WHAT WAS FOUND (OPTIONAL)<input maxLength={180} value={item.finding||""} onChange={event=>updateItem(item.id,current=>({...current,finding:event.target.value}))} placeholder="Throttle pedal reference circuit"/></label>
@@ -160,9 +177,9 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
         <label>ASSIGNMENT TYPE<select value={draft.assignmentType} onChange={event=>update("assignmentType",event.target.value as AssignmentType)}><option>Mechanic</option><option>Vendor</option></select></label>
         <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
         <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
-        <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>update("workflow",event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
+        <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>setWorkflow(event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
         <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>Status only; location stays unchanged.</small></label>
-        {draft.workflow==="Completed"&&<label className="wide completion-signoff">FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy||assignedMechanic} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/><small>{assignedMechanic?"Starts from the assigned mechanic. What was done goes on each repair above.":"Who closed this entry out. What was done goes on each repair above."}</small></label>}
+        {repairItemsProgress(draft.repairItems).done>0&&<label className="wide completion-signoff">FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy||assignedMechanic} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/><small>{assignedMechanic?"Starts from the assigned mechanic. What was done goes on each repair above.":"Who closed this entry out. What was done goes on each repair above."}</small></label>}
         <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
         <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>
       </div>
