@@ -54,6 +54,22 @@ Doors, Ramp and ADA → Stop Request now distinguishes a broken stop-request pul
 
 Also in this change: *Stop engine light* leaves the check-engine symptom tick boxes, now that it is an entry of its own and half of the combined entry. The symptom picker follows all three dash-light entries rather than only one, so choosing the combined entry does not drop symptoms already ticked. The Down Sheet time estimate matches all three plus the old wording.
 
+### Amerex told apart as two systems, and the states that down a bus
+
+One faceplate, two systems that fail very differently. **Fire Suppression** is four heat sensors at the rear where the CNG lines run; it fires on its own with no operator input, so FIRE means the bottles have already gone off. **Gas Concentration** watches for escaping gas: amber Trace keeps running, red Significant normally puts the bus down.
+
+Fire Suppression gains three entries, keeping the existing Mod codes so records logged under them still read:
+
+- FIRE alarm (system discharged)
+- Heat sensor communication fault
+- Control head no power
+
+Gas Concentration keeps the panel's own wording — a mechanic reads the faceplate, so the list says what the faceplate says.
+
+**The picker now sets bus availability from the fault.** *Gas Concentration - Significant Leak* and *Fire Suppression - FIRE alarm (system discharged)* start on **Remove From Service**; Trace and a sensor fault stay on May Stay In Service. `defaultDefectOperability` grew from one hard-coded pair to a table now that it answers this for more than one category.
+
+**Fuel Delivery** gains *Check CNG valves light*. That lamp is the roof valves wanting service, which on a gas fleet is fuel delivery, not the Amerex panel — placing it under Amerex would make that category mean two unrelated things.
+
 ## Migration and data safety
 
 No LocalStorage key is renamed and no stored record is rewritten. The catalog renames are read-time only, through the same `migrateRepairIdentity` path the earlier category merges use: an existing *Only front start* record opens as *Rear start INOP*, and an existing *Check-engine diagnosis* record as *Check engine light*, without either being written back. Both were confirmed in a browser against seeded old records. Backup export/import expands backward-compatibly to payload version 5, while all repair choices are additive catalog entries. Existing version 3 backups and all stored repair records remain readable.
@@ -61,7 +77,7 @@ No LocalStorage key is renamed and no stored record is rewritten. The catalog re
 ## Validation
 
 - Production build passed
-- All 115 regression tests passed
+- All 116 regression tests passed
 - ESLint passed
 - `git diff --check` passed
 
@@ -87,3 +103,9 @@ Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicit
 9. Under **Transmission and Drivetrain**, confirm *Check transmission light* is first.
 10. Under **Battery, Starting and Charging**, confirm *Front start INOP* and *Rear start INOP*, with no *Only ...* entries left.
 11. Open any bus that already had an *Only front start* defect and confirm it now reads **Rear start INOP**. If it reads *Front start INOP*, the migration is inverted and the release must be pulled.
+
+### Checks added by the Amerex work
+
+12. Under **Amerex**, confirm Fire Suppression lists FIRE alarm (system discharged), Heat sensor communication fault, both Mod codes, Control head no power and Other.
+13. Choose *Gas Concentration - Significant Leak* and confirm BUS AVAILABILITY reads **Remove From Service** without touching it. Choose *Trace* and confirm it reads May Stay In Service. All four combinations were confirmed in a browser before the change was pushed.
+14. Under **Fuel Delivery**, confirm *Check CNG valves light* is first.
