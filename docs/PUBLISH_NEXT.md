@@ -5,7 +5,7 @@
 ## Source
 
 - Branch: `main`
-- Release source: `51d7b2f` (code-bearing commit `9116cab`)
+- Release source: the current tip of `main`
 - Previous live release: Sites Version 115 at `d0189f9`
 
 ## What changed
@@ -14,7 +14,20 @@
 
 `EXPORT / SHARE BACKUP` previously captured the buses, settings, Down Sheet, and learned parts but omitted `pace-bus-lists-v1` and `pace-bus-list-templates-v1`. Version 116 adds every Fleet Campaign, completed row, initials, timestamps, and billable hours to the full backup so Work Time history is not lost with the lists.
 
-Backup payload version 3 becomes version 4. Import restores both campaign keys through the same normalizers used by Fleet Campaigns. Importing an older version 3 backup leaves the device's existing campaigns in place instead of clearing them.
+Import restores both campaign keys through the same normalizers used by Fleet Campaigns. Importing an older backup that predates a key leaves the device's existing campaigns in place instead of clearing them.
+
+### Learned causes, remembered under the symptom they were found beneath
+
+The picker can only ever list symptoms. A check-engine light is one entry, but the things behind it are endless and specific — a throttle pedal reference circuit, a chafed pin, an EGR differential pressure sensor. Putting those in the catalog would bury the twelve engine choices a mechanic actually picks from under a hundred causes that each apply to one bus on one day.
+
+So a cause typed into WHAT WAS FOUND is learned where it was found and offered nowhere else. Diagnose a check-engine light as a throttle pedal reference circuit, and the next person who picks Check-engine diagnosis is offered it as a chip under that field; somebody picking Brake light on never sees it. **The repair catalog itself does not grow at all.**
+
+- Matching ignores case, spacing and trailing punctuation, so one fault is not written five ways. The wording recorded first is the wording kept.
+- Learned on any save carrying a finding, not only one marked Diagnosed, and Fixed Repairs learns and offers them too.
+- Each chip can be tapped to fill the field, or forgotten with its ×.
+- New storage key `pace-findings-memory-v1`, capped at 600 entries, least recently used first.
+
+Backup payload version 3 becomes version 5: campaigns, campaign templates and learned causes. Older payloads stay readable.
 
 ## Migration and data safety
 
@@ -23,7 +36,7 @@ No LocalStorage key is renamed and normal application storage is not rewritten. 
 ## Validation
 
 - Production build passed
-- All 112 regression tests passed
+- All 113 regression tests passed, re-run after rebasing onto the Version 115 release
 - ESLint passed
 - `git diff --check` passed
 
@@ -34,3 +47,13 @@ No LocalStorage key is renamed and normal application storage is not rewritten. 
 3. Verify an import round trip restores a campaign with its initials and hours.
 
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicitly approves the release, including the shorthand **publishing approved**.
+
+### Checks added by the learned catalog
+
+1. In the Defect Log, diagnose a check-engine light on one bus: type a cause into **WHAT WAS FOUND** and save.
+2. Open a *different* bus's check-engine light. The cause should appear as a chip under that field, labelled FOUND BEFORE ON CHECK-ENGINE DIAGNOSIS. Tapping it fills the field.
+3. Open a brake defect and confirm no chips appear — causes never leak to a symptom they were not found under.
+4. Confirm the Engine quick-select list is unchanged and does not contain the cause.
+5. Export a backup and confirm `"version": 5` with a `findingsMemory` key.
+
+This loop was verified in a browser before the change was pushed, including the count reaching ×2 and the picker still listing its original fourteen engine choices.
