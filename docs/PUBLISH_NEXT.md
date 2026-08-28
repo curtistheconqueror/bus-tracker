@@ -68,7 +68,19 @@ Gas Concentration keeps the panel's own wording — a mechanic reads the facepla
 
 **The picker now sets bus availability from the fault.** *Gas Concentration - Significant Leak* and *Fire Suppression - FIRE alarm (system discharged)* start on **Remove From Service**; Trace and a sensor fault stay on May Stay In Service. `defaultDefectOperability` grew from one hard-coded pair to a table now that it answers this for more than one category.
 
-**Fuel Delivery** gains *Check CNG valves light*. That lamp is the roof valves wanting service, which on a gas fleet is fuel delivery, not the Amerex panel — placing it under Amerex would make that category mean two unrelated things.
+### A CNG group under Amerex
+
+Every bus on the property runs compressed natural gas, so the gas equipment now sits beside the panel that watches it. The Gas Concentration side is already half a CNG system — it exists to smell escaping gas — and one place to look for anything gas beats scattering it through Fuel Delivery.
+
+Amerex now has three groups: **Fire Suppression**, **Gas Concentration**, **CNG**. The CNG group holds:
+
+- Check CNG valves light
+- PRD cap missing
+- Other CNG defect
+
+*Check CNG valves light* moves out of Fuel Delivery, where it sat for exactly one unpublished release, so no migration is needed and no record can exist under that identity.
+
+The Amerex group placeholder named its two systems in a literal string, which a third group would have turned into a lie. It reads the group names now.
 
 ## Migration and data safety
 
@@ -108,4 +120,5 @@ Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicit
 
 12. Under **Amerex**, confirm Fire Suppression lists FIRE alarm (system discharged), Heat sensor communication fault, both Mod codes, Control head no power and Other.
 13. Choose *Gas Concentration - Significant Leak* and confirm BUS AVAILABILITY reads **Remove From Service** without touching it. Choose *Trace* and confirm it reads May Stay In Service. All four combinations were confirmed in a browser before the change was pushed.
-14. Under **Fuel Delivery**, confirm *Check CNG valves light* is first.
+14. Under **Amerex**, confirm three groups: Fire Suppression, Gas Concentration and **CNG**, and that the group prompt reads "Choose Fire Suppression, Gas Concentration or CNG" rather than naming only two.
+15. Under Amerex → CNG, confirm *Check CNG valves light*, *PRD cap missing* and *Other CNG defect*, and that Fuel Delivery no longer lists a CNG entry.
