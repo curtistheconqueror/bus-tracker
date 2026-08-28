@@ -76,7 +76,24 @@ Amerex now has three groups: **Fire Suppression**, **Gas Concentration**, **CNG*
 
 - Check CNG valves light
 - PRD cap missing
+- PRD leaking — starts as **Remove From Service**
 - Other CNG defect
+
+### Defect notes: what the entry does not say on its own
+
+A missing PRD cap is not a cap to replace. It is a reason to test for a leak, because gas may have been venting past it. The editor now shows a short amber note directly under the defect just chosen, so that reaches whoever is standing at the bus rather than living in one person's head.
+
+Deliberately rare — five entries carry one. A note on every entry is a wall of text nobody reads, which is worse than none. These are the few where the obvious repair is not the whole job, or where what looks like a fix is really a way of moving the bus:
+
+| Entry | What the note says |
+| --- | --- |
+| CNG - PRD cap missing | Fit a balloon over the vent and watch whether it inflates; if it does, log *PRD leaking* as well |
+| CNG - PRD leaking | Confirmed gas escaping from a pressure relief device |
+| Gas Concentration - Significant Leak | Holding Relay Reset moves the bus under its own power, it does not clear the fault |
+| Gas Concentration - Trace | Amber: the system can smell something and the bus keeps running |
+| Fire Suppression - FIRE alarm | The bottles have already gone off; the bus does not move until recharged and inspected |
+
+Notes are looked up through the same catalog migration as everything else, so one written for an entry that is later renamed does not quietly stop appearing.
 
 *Check CNG valves light* moves out of Fuel Delivery, where it sat for exactly one unpublished release, so no migration is needed and no record can exist under that identity.
 
@@ -121,4 +138,5 @@ Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicit
 12. Under **Amerex**, confirm Fire Suppression lists FIRE alarm (system discharged), Heat sensor communication fault, both Mod codes, Control head no power and Other.
 13. Choose *Gas Concentration - Significant Leak* and confirm BUS AVAILABILITY reads **Remove From Service** without touching it. Choose *Trace* and confirm it reads May Stay In Service. All four combinations were confirmed in a browser before the change was pushed.
 14. Under **Amerex**, confirm three groups: Fire Suppression, Gas Concentration and **CNG**, and that the group prompt reads "Choose Fire Suppression, Gas Concentration or CNG" rather than naming only two.
-15. Under Amerex → CNG, confirm *Check CNG valves light*, *PRD cap missing* and *Other CNG defect*, and that Fuel Delivery no longer lists a CNG entry.
+15. Under Amerex → CNG, confirm *Check CNG valves light*, *PRD cap missing*, *PRD leaking* and *Other CNG defect*, and that Fuel Delivery no longer lists a CNG entry.
+16. Choose *CNG - PRD cap missing* and confirm an amber note appears directly under the picker telling you to fit a balloon over the vent. Choose *CNG - PRD leaking* and confirm BUS AVAILABILITY reads **Remove From Service**. Choose a Mod code and confirm no note appears — most entries carry none.
