@@ -111,7 +111,7 @@ const DEFECT_CHOICES=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=
 
 function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler"}|null{
  const text=normalized(command);
- const special=text.includes("check engine")?{category:"Engine",issue:"Check-engine diagnosis",flag:"checkEngine" as const}:text.includes("no horn")||/\bhorn\b/.test(text)?{category:"Electrical / Multiplex",issue:"Horn",flag:"noHorn" as const}:text.includes("bad ramp")||text.includes("kneeler")?{category:"Doors, Ramp and ADA",issue:"Ramp, Lift and Kneeler - Wheelchair ramp",flag:"badRampKneeler" as const}:null;
+ const special=text.includes("check engine")?{category:"Engine",issue:"Check engine light",flag:"checkEngine" as const}:text.includes("no horn")||/\bhorn\b/.test(text)?{category:"Electrical / Multiplex",issue:"Horn",flag:"noHorn" as const}:text.includes("bad ramp")||text.includes("kneeler")?{category:"Doors, Ramp and ADA",issue:"Ramp, Lift and Kneeler - Wheelchair ramp",flag:"badRampKneeler" as const}:null;
  const matched=special||DEFECT_CHOICES.find(choice=>text.includes(choice.key));
  if(!matched)return null;
  const downing=/\b(downing|must be removed|out of service|unsafe)\b/.test(text);
@@ -259,7 +259,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
 
  if(/\b(defect|issue|check engine|horn|ramp|kneeler)\b/.test(text)){
   const selected=defectFromCommand(command);
-  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check-engine diagnosis, Horn, No cooling, ABS warning, or Wheelchair ramp."};
+  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp."};
   return {kind:"plan",plan:{kind:"defect",requiresConfirmation:true,busId:bus.id,busNumber:bus.n,defect:selected.defect,flag:selected.flag,summary:"Add "+selected.defect.category+" — "+selected.defect.issue+" to Bus "+bus.n+(selected.defect.operability==="down"?" as a downing defect":" as a serviceable defect")}};
  }
 

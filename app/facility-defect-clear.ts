@@ -6,7 +6,7 @@ export const FACILITY_DEFECT_CLEAR_UNDO_KEY="pace-facility-defect-clear-undo-v1"
 const FLAG_KEYS=["checkEngine","checkTransmission","noHorn","badRampKneeler","farebox","ibsVentra"] as const;
 type FlagKey=typeof FLAG_KEYS[number];
 const ALERT_DEFECTS:Record<FlagKey,{category:string;issue:string}>={
- checkEngine:{category:"Engine",issue:"Check-engine diagnosis"},
+ checkEngine:{category:"Engine",issue:"Check engine light"},
  checkTransmission:{category:"Transmission",issue:"Control / communication fault"},
  noHorn:{category:"Electrical / Multiplex",issue:"Horn"},
  badRampKneeler:{category:"Doors, Ramp and ADA",issue:"Ramp, Lift and Kneeler - Kneeler"},

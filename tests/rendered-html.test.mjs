@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, WORK_STATES, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -325,7 +325,7 @@ test("AI operator plans safe tracker and down-sheet actions with number-smart re
   const defect = planOperatorCommand("Add check-engine diagnosis to bus 25", fleet, areas);
   assert.equal(defect.kind, "plan");
   assert.equal(defect.plan.kind, "defect");
-  assert.equal(defect.plan.defect.issue, "Check-engine diagnosis");
+  assert.equal(defect.plan.defect.issue, "Check engine light");
   assert.equal(defect.plan.flag, "checkEngine");
 });
 test("AI operator answers fleet audits, remembers sitting-time groups, and plans a follow-up bulk move", () => {
@@ -1309,11 +1309,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.match(defectSummary(twoDefects), /Horn.*Farebox.*Reader offline.*Horn.*Intermittent/);
 });
 test("Defect Log keeps multiple check-engine symptoms inside one defect record", async () => {
-  assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power","Stop engine light"]);
-  const [defect]=normalizeDefects([{id:"check-engine-1",category:"Engine",issue:"Check-engine diagnosis",symptoms:["Misfire","Loss of power","Misfire"],details:"Under load",operability:"service",state:"open",source:"defect-log"}]);
+ // Stop engine light is now a catalog entry of its own and half of the combined
+ // entry, so offering it again as a tick box would be two ways to say one thing.
+ assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power"]);
+  const [defect]=normalizeDefects([{id:"check-engine-1",category:"Engine",issue:"Check engine light",symptoms:["Misfire","Loss of power","Misfire"],details:"Under load",operability:"service",state:"open",source:"defect-log"}]);
   assert.deepEqual(defect.symptoms,["Misfire","Loss of power"]);
   assert.equal(defectSupportingDetails(defect),"Misfire, Loss of power — Under load");
-  assert.match(defectLabel(defect),/Engine — Check-engine diagnosis — Misfire, Loss of power — Under load/);
+  assert.match(defectLabel(defect),/Engine — Check engine light — Misfire, Loss of power — Under load/);
   const saved=saveDefectLogRecord([{id:"bus-1",n:"18505",s:"service",l:"road-1",defects:[]}],[],"bus-1",defect,true,"2026-08-24T20:00:00.000Z");
   assert.equal(saved.error,null);
   assert.equal(saved.fleet[0].defects.length,1);
@@ -1404,7 +1406,7 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   const estimateTotal = (category, repair) => repairTimeTotal(normalizeRepairTimeEstimate(undefined, category, repair));
 
   assert.equal(formatRepairTime(repairTimeTotal({repairMinutes:0,diagnosticMinutes:0,accessMinutes:0,complicationMinutes:0,heatMinutes:0,interruptionMinutes:0,otherMinutes:0,notes:""})), "30m");
-  assert.equal(estimateTotal("Engine", "Check-engine diagnosis"), 180);
+  assert.equal(estimateTotal("Engine", "Check engine light"), 180);
   assert.equal(estimateTotal("Tires and Wheels", "Tire replacement"), 60);
   assert.equal(estimateTotal("Battery, Starting and Charging", "Jump / boost bus"), 30);
   assert.equal(estimateTotal("Battery, Starting and Charging", "Battery replacement"), 120);
@@ -1439,7 +1441,7 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.ok(REPAIR_OPTIONS["Battery, Starting and Charging"].includes("Jump / boost bus"));
   assert.ok(REPAIR_OPTIONS["Electrical / Multiplex"].includes("MOD light"));
 
-  const estimate = normalizeRepairTimeEstimate(undefined, "Engine", "Check-engine diagnosis");
+  const estimate = normalizeRepairTimeEstimate(undefined, "Engine", "Check engine light");
   const realistic = {...estimate, complicationMinutes:120, heatMinutes:60, interruptionMinutes:90, otherMinutes:30};
   assert.equal(repairTimeTotal(realistic), 480);
   assert.equal(formatRepairTime(repairTimeTotal(realistic)), "8h");
@@ -1466,7 +1468,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
     { id: "bus-17520-b", n: "17520" },
   ];
   const rows = [
-    { pageNumber: 1, lineNumber: "1", busNumber: "17510", reason: "Check engine light", assignedTo: "Armon", category: "Engine", repair: "Check-engine diagnosis", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .98, reviewNote: "" },
+    { pageNumber: 1, lineNumber: "1", busNumber: "17510", reason: "Check engine light", assignedTo: "Armon", category: "Engine", repair: "Check engine light", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .98, reviewNote: "" },
     { pageNumber: 2, lineNumber: "35", busNumber: "17510", reason: "B-12", assignedTo: "", category: "Inspection", repair: "B-12", section: "Inspection", shift: "3rd", operationalStatus: "out", confidence: .95, reviewNote: "" },
     { pageNumber: 1, lineNumber: "2", busNumber: "17520", reason: "Quarantine", assignedTo: "", category: "Miscellaneous", repair: "Manual entry", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .9, reviewNote: "" },
     { pageNumber: 1, lineNumber: "3", busNumber: "99999", reason: "Unknown bus", assignedTo: "", category: "Miscellaneous", repair: "Manual entry", section: "Pending", shift: "3rd", operationalStatus: "out", confidence: .7, reviewNote: "Verify number" },
@@ -1884,7 +1886,7 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   const bus={id:"bus-17528",n:"17528",s:"defect",l:"garage-11"};
   const records=[
     {bus,defect:{id:"d1",category:"Tech Services",issue:"Farebox",details:"",operability:"service",state:"open",source:"defect-log"},createdAt:"2026-08-24T01:00:00.000Z",updatedAt:"2026-08-24T01:00:00.000Z",onDownSheet:false},
-    {bus,defect:{id:"d2",category:"Engine",issue:"Check-engine diagnosis",details:"",operability:"service",state:"open",source:"defect-log"},createdAt:"2026-08-24T02:00:00.000Z",updatedAt:"2026-08-24T02:00:00.000Z",onDownSheet:false},
+    {bus,defect:{id:"d2",category:"Engine",issue:"Check engine light",details:"",operability:"service",state:"open",source:"defect-log"},createdAt:"2026-08-24T02:00:00.000Z",updatedAt:"2026-08-24T02:00:00.000Z",onDownSheet:false},
   ];
   const groups=groupDefectLogRecords(records);
   assert.equal(groups.length,1);
@@ -1934,7 +1936,7 @@ test("defect log cleanup preserves active log-origin repairs and fleet state", (
   assert.equal(archived[0].defects[0].defectLogHiddenAt,"2026-08-22T12:00:00.000Z");
 });
 test("down-sheet repair items keep independent optional estimates and a bus total", () => {
-  const first = {...blankRepairItem(0), category:"Engine", repair:"Check-engine diagnosis", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check-engine diagnosis")};
+  const first = {...blankRepairItem(0), category:"Engine", repair:"Check engine light", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check engine light")};
   const second = {...blankRepairItem(1), category:"A/C and HVAC", repair:"Compressor", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"A/C and HVAC","Compressor")};
   const optional = {...blankRepairItem(2), category:"Electrical / Multiplex", repair:"Horn", estimateEnabled:false, timeEstimate:normalizeRepairTimeEstimate(undefined,"Electrical / Multiplex","Horn")};
   assert.equal(repairItemsTotal([first]), 180);
@@ -1949,7 +1951,7 @@ test("down-sheet repair items keep independent optional estimates and a bus tota
 test("quarantine down-sheet entries use non-labor treatment", async () => {
   assert.equal(isQuarantineEntry({category:"Miscellaneous",repair:"Manual entry",customReason:"QUARANTINE DO NOT MOVE (PER SAFETY)"}), true);
   assert.equal(isQuarantineEntry({category:"Miscellaneous",repairItems:[{category:"Legal",repair:"Quarantined",details:"Await instruction"}]}), true);
-  assert.equal(isQuarantineEntry({category:"Engine",repair:"Check-engine diagnosis",customReason:"No start"}), false);
+  assert.equal(isQuarantineEntry({category:"Engine",repair:"Check engine light",customReason:"No start"}), false);
   const page = await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
   const css = await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
   assert.match(page, /if\(isQuarantineEntry\(entry\)\)return 0/);
@@ -2881,6 +2883,58 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
+test("dash lights are named as reported, and the start rename does not invert history",()=>{
+ const engine=REPAIR_OPTIONS.Engine;
+
+ // The light on the dash is what a driver hands in. "Diagnosis" described what
+ // the shop then does about it, which is a different thing.
+ assert.deepEqual(engine.slice(0,3),["Check engine light","Stop engine light","Check engine and stop engine light"]);
+ assert.equal(engine.includes("Check-engine diagnosis"),false);
+ // both lit is its own report, not two records or a note on one
+ assert.equal(new Set(engine).size,engine.length);
+
+ // Records already logged are never rewritten in storage. They move to the new
+ // wording as they are read, so an old defect opens, filters and reports the
+ // same as before.
+ assert.deepEqual(migrateRepairIdentity("Engine","Check-engine diagnosis"),{category:"Engine",issue:"Check engine light"});
+ const [old]=normalizeDefects([{id:"e1",category:"Engine",issue:"Check-engine diagnosis",details:"",state:"open",operability:"service"}]);
+ assert.equal(old.issue,"Check engine light");
+
+ // The symptom picker follows all three, so choosing the combined entry does not
+ // silently drop the symptoms already ticked.
+ for(const issue of CHECK_ENGINE_ISSUES)assert.equal(isCheckEngineIssue("Engine",issue),true);
+ assert.equal(isCheckEngineIssue("Engine","Oil leak"),false);
+ assert.equal(isCheckEngineIssue("Brakes","Check engine light"),false);
+
+ // Transmission has its own dash light and had no entry for it at all.
+ assert.equal(REPAIR_OPTIONS["Transmission and Drivetrain"][0],"Check transmission light");
+
+ // Name the fault, not the half that still works. The catalog already writes
+ // INOP for the fuel gauge, so this reads the same way.
+ const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
+ assert.ok(starting.includes("Front start INOP")&&starting.includes("Rear start INOP"));
+ assert.equal(starting.some(issue=>issue.startsWith("Only ")),false);
+
+ // THE CROSS, and the whole reason this rename needed care. "Only front start"
+ // said which half still worked, so the broken half is the REAR one. Mapping
+ // each old name to the similar-sounding new one would silently invert every
+ // record already logged, and nobody would ever notice.
+ assert.deepEqual(migrateRepairIdentity("Battery, Starting and Charging","Only front start"),
+  {category:"Battery, Starting and Charging",issue:"Rear start INOP"});
+ assert.deepEqual(migrateRepairIdentity("Battery, Starting and Charging","Only rear start"),
+  {category:"Battery, Starting and Charging",issue:"Front start INOP"});
+
+ // and a bus that only started from the front now reads as a dead rear start
+ const [startRecord]=normalizeDefects([{id:"s1",category:"Battery, Starting and Charging",issue:"Only front start",details:"",state:"open",operability:"down"}]);
+ assert.equal(startRecord.issue,"Rear start INOP");
+ assert.match(defectLabel(startRecord),/Rear start INOP/);
+
+ // a cause learned before the rename still comes back after it, because the
+ // memory key runs through the same migration
+ const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
+ assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
 test("the parking brake knob and the rear air valves are in the catalog",()=>{
  const controls=REPAIR_OPTIONS["Bus Controls"],air=REPAIR_OPTIONS["Air System"];
 
@@ -2925,14 +2979,14 @@ test("the parking brake knob and the rear air valves are in the catalog",()=>{
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
- const engine={category:"Engine",issue:"Check-engine diagnosis"};
+ const engine={category:"Engine",issue:"Check engine light"};
  let memory=learnFinding(EMPTY_FINDINGS_MEMORY,{...engine,finding:"throttle pedal reference circuit"},"2026-08-27T10:00:00.000Z");
- assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),["throttle pedal reference circuit"]);
+ assert.deepEqual(recallFindings(memory,"Engine","Check engine light").map(entry=>entry.finding),["throttle pedal reference circuit"]);
 
  // and nowhere else. Putting causes in the catalog would bury the twelve engine
  // choices a mechanic picks from under a hundred that each apply to one bus.
  assert.deepEqual(recallFindings(memory,"Engine","Oil leak"),[]);
- assert.deepEqual(recallFindings(memory,"Brakes","Check-engine diagnosis"),[]);
+ assert.deepEqual(recallFindings(memory,"Brakes","Check engine light"),[]);
  assert.deepEqual(recallFindings(memory,"Engine",""),[]);
  assert.equal(REPAIR_OPTIONS.Engine.includes("throttle pedal reference circuit"),false,"the picker never grows");
 
@@ -2940,7 +2994,7 @@ test("a diagnosed cause is learned under the symptom it was found beneath",async
  // as several different faults that each happened once.
  memory=learnFinding(memory,{...engine,finding:"Throttle Pedal Reference Circuit "},"2026-08-27T11:00:00.000Z");
  memory=learnFinding(memory,{...engine,finding:"throttle  pedal reference circuit."},"2026-08-27T12:00:00.000Z");
- const recalled=recallFindings(memory,"Engine","Check-engine diagnosis");
+ const recalled=recallFindings(memory,"Engine","Check engine light");
  assert.equal(recalled.length,1);
  assert.equal(recalled[0].uses,3);
  // the wording recorded first is the wording kept: a later spelling winning
@@ -2949,12 +3003,12 @@ test("a diagnosed cause is learned under the symptom it was found beneath",async
 
  // most-used first, so the answer that keeps turning out right sits at the front
  memory=learnFinding(memory,{...engine,finding:"EGR differential pressure sensor"},"2026-08-27T13:00:00.000Z");
- assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),
+ assert.deepEqual(recallFindings(memory,"Engine","Check engine light").map(entry=>entry.finding),
   ["throttle pedal reference circuit","EGR differential pressure sensor"]);
 
  // a guess can be taken back out
- memory=forgetFinding(memory,"Engine","Check-engine diagnosis","THROTTLE PEDAL REFERENCE CIRCUIT");
- assert.deepEqual(recallFindings(memory,"Engine","Check-engine diagnosis").map(entry=>entry.finding),["EGR differential pressure sensor"]);
+ memory=forgetFinding(memory,"Engine","Check engine light","THROTTLE PEDAL REFERENCE CIRCUIT");
+ assert.deepEqual(recallFindings(memory,"Engine","Check engine light").map(entry=>entry.finding),["EGR differential pressure sensor"]);
 
  // nothing to learn from is not an error
  assert.deepEqual(learnFinding(EMPTY_FINDINGS_MEMORY,{...engine,finding:"   "}).entries,[]);
@@ -3736,7 +3790,7 @@ test("both repair workflows offer a remembered part without imposing or blocking
 test("starting and charging covers crank-no-start and single-station starting",()=>{
  const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
  // the symptom cluster reads in diagnostic order next to the existing No crank
- const order=["No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging"];
+ const order=["No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Alternator / charging"];
  // solid and flashing are separate diagnostic paths, so they are separate options
  assert.ok(starting.includes("Solid battery light")&&starting.includes("Flashing battery light"));
  const at=starting.indexOf("No crank");
@@ -3744,7 +3798,7 @@ test("starting and charging covers crank-no-start and single-station starting",(
  assert.deepEqual(starting.slice(at,at+order.length),order);
  assert.equal(new Set(starting).size,starting.length,"no duplicated option in the category");
  // each new option survives a round trip through a saved defect
- for(const issue of ["Crank no start","Only front start","Only rear start"]){
+ for(const issue of ["Crank no start","Front start INOP","Rear start INOP"]){
   const [defect]=normalizeDefects([{id:"d-"+issue,category:"Battery, Starting and Charging",issue,details:"",state:"open",operability:"down"}]);
   assert.equal(defect.issue,issue);
   assert.ok(defectLabel(defect).includes(issue));

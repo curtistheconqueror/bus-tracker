@@ -10,7 +10,7 @@ import {migrateRepairIdentity,normalizeFinding} from "./repair-catalog.ts";
 
    So a cause is learned where it was found and offered nowhere else. Diagnose a
    check-engine light as a throttle pedal reference circuit, and the next person
-   who picks Check-engine diagnosis is offered it. Somebody picking Brake light
+   who picks Check engine light is offered it. Somebody picking Brake light
    on never sees it. The main catalog does not grow at all.
 
    The point is not saving typing, it is stopping the same fault being written

@@ -73,13 +73,13 @@ export type StructuredDefect={
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check-engine diagnosis","Misfire","Loss of power","Stop engine light","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
+ "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
- "Transmission and Drivetrain":["Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
+ "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
- "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
+ "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Door, Ramp and Kneeler Failures - Front door will not open","Door, Ramp and Kneeler Failures - Front door will not close","Door, Ramp and Kneeler Failures - Front door opens / closes slowly","Door, Ramp and Kneeler Failures - Rear door will not open","Door, Ramp and Kneeler Failures - Rear door will not close","Door, Ramp and Kneeler Failures - Rear door opens / closes slowly","Door, Ramp and Kneeler Failures - Ramp not working","Door, Ramp and Kneeler Failures - Ramp no power","Door, Ramp and Kneeler Failures - Kneeler not functioning correctly","Door, Ramp and Kneeler Failures - Kneeler sits too high","Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
@@ -277,7 +277,14 @@ export function findingLabel(finding:unknown){
  return text?"found: "+text:"";
 }
 
-export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Stop engine light"] as const;
+export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power"] as const;
+
+/* The three dash-light entries that carry the symptom picker. Kept as a list so
+   a fourth cannot be added to the catalog and quietly lose its symptoms. */
+export const CHECK_ENGINE_ISSUES=["Check engine light","Stop engine light","Check engine and stop engine light"] as const;
+export function isCheckEngineIssue(category:unknown,issue:unknown){
+ return String(category??"")==="Engine"&&(CHECK_ENGINE_ISSUES as readonly string[]).includes(String(issue??""));
+}
 
 function normalizedSymptoms(value:unknown){
  if(!Array.isArray(value))return [];
@@ -373,6 +380,20 @@ const NO_START_ISSUE_MOVES:Record<string,string>={
    Fixtures is a swap the mechanic does; a mirror in Bodywork is the body shop's
    job. The wording now says which, so the two stop looking like duplicates. */
 const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
+ "Engine":{
+  /* The light on the dash is what gets reported. "Diagnosis" described what the
+     shop then does about it, which is not the same thing and is not what a
+     driver hands in. */
+  "Check-engine diagnosis":"Check engine light",
+ },
+ "Battery, Starting and Charging":{
+  /* Crossed on purpose, and this is the whole reason the rename needed care.
+     "Only front start" said which half still worked, so the broken half is the
+     REAR one. Mapping each old name to the same-sounding new one would silently
+     invert every record already logged. */
+  "Only front start":"Rear start INOP",
+  "Only rear start":"Front start INOP",
+ },
  "Lights and Fixtures":{
   /* The lamps, not the stalk. Bus Controls owns the turn signal switches. */
   "Turn signals":"Turn signal lamps",
