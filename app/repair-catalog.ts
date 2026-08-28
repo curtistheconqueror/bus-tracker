@@ -92,7 +92,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
- "Miscellaneous":["Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
+ "Miscellaneous":["Missing road hazard triangles (3 required)","Fire extinguisher missing","Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
 
 export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
@@ -153,16 +153,20 @@ export function repairIssuePlaceholder(category:string,group:string){
    moving or rewriting anything. Stored values remain plain text, so existing
    records keep reading the same in feeds, exports, and Down Sheet lines. */
 export const ADA_MARK="♿ ";
+export const ADA_MECHANICAL_MARK="♿ ⚙️ ";
 const ADA_GROUPS=new Set(["Door, Ramp and Kneeler Failures","Ramp, Lift and Kneeler","Wheelchair Securement"]);
 const ADA_ISSUE=/wheelchair|kneeler|q'straint|securement|\bramp\b/i;
+const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"🧯 "};
 
 export function repairGroupDisplayLabel(group:string){
+ if(group==="Door, Ramp and Kneeler Failures")return ADA_MECHANICAL_MARK+group;
  return ADA_GROUPS.has(group)?ADA_MARK+group:group;
 }
 /* Inside a group that already carries the mark every option would repeat it, so
    the group speaks for its contents and the options stay clean. */
 export function repairIssueDisplayLabel(issue:string,group=""){
  if(ADA_GROUPS.has(group))return issue;
+ if(ISSUE_DISPLAY_MARKS[issue])return ISSUE_DISPLAY_MARKS[issue]+issue;
  return ADA_ISSUE.test(issue)?ADA_MARK+issue:issue;
 }
 

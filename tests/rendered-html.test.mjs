@@ -1268,6 +1268,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - Kneeler button"));
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Front dash damage"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
+  assert.ok(REPAIR_OPTIONS.Miscellaneous.includes("Missing road hazard triangles (3 required)"));
+  assert.ok(REPAIR_OPTIONS.Miscellaneous.includes("Fire extinguisher missing"));
+  assert.equal(repairIssueDisplayLabel("Fire extinguisher missing"),"🧯 Fire extinguisher missing");
   assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration"]);
@@ -3875,7 +3878,7 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  // the two wheelchair groups carry the mark for everything inside them
  assert.equal(repairGroupDisplayLabel("Wheelchair Securement"),"♿ Wheelchair Securement");
  assert.equal(repairGroupDisplayLabel("Ramp, Lift and Kneeler"),"♿ Ramp, Lift and Kneeler");
- assert.equal(repairGroupDisplayLabel("Door, Ramp and Kneeler Failures"),"♿ Door, Ramp and Kneeler Failures");
+ assert.equal(repairGroupDisplayLabel("Door, Ramp and Kneeler Failures"),"♿ ⚙️ Door, Ramp and Kneeler Failures");
  assert.equal(repairGroupDisplayLabel("Doors"),"Doors");
  assert.equal(repairGroupDisplayLabel("Driver Seat"),"Driver Seat");
 
