@@ -310,3 +310,9 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
 .learned-finding button i{margin-left:5px;color:var(--log-muted,#62748d);font-style:normal;font-size:8px;font-weight:900}
 .learned-finding.selected{border-color:#0b64bd;background:color-mix(in srgb,#0b64bd 14%,var(--log-surface,#fff));box-shadow:inset 0 0 0 1px #0b64bd}
 .log-form .learned-finding .forget-finding{min-width:32px;border-left:1px solid #cbd6e6;padding:0;color:var(--log-muted,#8496ad);font-size:12px;text-align:center}
+
+/* A note on the defect just chosen. Amber rather than red: this is something to
+   do, not something wrong, and it must not read like the duplicate warning
+   sitting next to it. */
+.defect-note{grid-column:1/-1;display:grid;gap:3px;margin:0;border:1px solid #d8bd7c;border-left-width:4px;border-radius:7px;background:#fdf6e6;padding:8px 10px;color:#7a5600;font-size:9px;line-height:1.45}
+.defect-note b{font-size:7px;font-weight:900;letter-spacing:.5px}

@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectNote, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2991,7 +2991,7 @@ test("the parking brake knob and the rear air valves are in the catalog",()=>{
  }
 });
 
-test("the Amerex panel is two systems, and the states that down a bus say so",()=>{
+test("the Amerex panel is two systems, and the states that down a bus say so",async()=>{
  const amerex=REPAIR_OPTIONS.Amerex;
 
  // Fire Suppression is four heat sensors at the rear where the CNG lines run. It
@@ -3029,6 +3029,30 @@ test("the Amerex panel is two systems, and the states that down a bus say so",()
  // and it is not left in two places: Fuel Delivery held it only inside this same
  // unpublished release, so no record can exist under that identity
  assert.equal(REPAIR_OPTIONS["Fuel Delivery"].includes("Check CNG valves light"),false);
+
+ // The balloon test exists to find something, and there was nowhere to record
+ // finding it. A confirmed leak from a pressure relief device is a gas leak.
+ assert.ok(amerex.includes("CNG - PRD leaking"));
+ assert.equal(defaultDefectOperability("Amerex","CNG - PRD leaking"),"down");
+ assert.equal(defaultDefectOperability("Amerex","CNG - PRD cap missing"),"service");
+
+ // A missing cap is not a cap to replace, it is a reason to test for a leak,
+ // and that has to reach whoever is standing at the bus rather than living in
+ // one person's head.
+ assert.match(defectNote("Amerex","CNG - PRD cap missing"),/balloon/i);
+ assert.match(defectNote("Amerex","CNG - PRD cap missing"),/PRD leaking/,"and it says where to record a positive test");
+ assert.match(defectNote("Amerex","Gas Concentration - Significant Leak"),/Relay Reset/);
+ assert.equal(defectNote("Amerex","Fire Suppression - Trouble Mod 1 Roof 1"),"","most entries carry none");
+ assert.equal(defectNote("Engine","Check engine light"),"");
+ assert.equal(defectNote(null,undefined),"");
+ // notes follow a renamed identity, so one written for an entry that later moves
+ // does not quietly stop appearing
+ assert.equal(defectNote("Engine","Check-engine diagnosis"),defectNote("Engine","Check engine light"));
+
+ // shown where the choice was just made, not behind Advanced Details
+ const notePage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.ok(notePage.indexOf("defect-note")<notePage.indexOf("advanced-defect-details"));
+ assert.ok(notePage.indexOf('QUICK SELECT')<notePage.indexOf("defect-note"));
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
