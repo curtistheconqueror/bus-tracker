@@ -76,7 +76,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
- "Suspension and Steering":["Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
+ "Suspension and Steering":["NVH (noise, vibration, harshness)","Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
@@ -177,6 +177,9 @@ const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"ðŸ
    the obvious repair is not the whole job, or where what looks like a fix is
    really a way of moving the bus. */
 const DEFECT_NOTES:Record<string,Record<string,string>>={
+ "Suspension and Steering":{
+  "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
+ },
  "Amerex":{
   "CNG - PRD cap missing":"Check for a leak before you close this out. Fit a balloon over the vent and watch whether it inflates: the cap being gone can mean gas has been venting past it. If it inflates, log PRD leaking as well.",
   "CNG - PRD leaking":"Confirmed gas escaping from a pressure relief device. This starts as Remove From Service.",

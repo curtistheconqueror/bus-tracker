@@ -3942,7 +3942,17 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
  const steering=REPAIR_OPTIONS["Suspension and Steering"];
  assert.ok(steering.includes("Loose steering"));
  assert.ok(steering.indexOf("Loose steering")<steering.indexOf("Steering pull"));
- assert.equal(steering.length,19);
+ // A count here breaks on every legitimate addition and proves nothing. What
+ // the merge actually had to guarantee is that nothing arrived twice.
+ assert.equal(new Set(steering).size,steering.length,"no duplicated option after the merge");
+
+ // NVH is one entry, not a dropdown of every combination of front, rear,
+ // turning, straight and speed. Those are the description, and the note asks
+ // for them so they arrive in a shape the next person can act on.
+ assert.equal(steering[0],"NVH (noise, vibration, harshness)");
+ assert.equal(steering.filter(issue=>/noise|vibration|harshness/i.test(issue)).length,1);
+ assert.match(defectNote("Suspension and Steering","NVH (noise, vibration, harshness)"),/front or rear/i);
+ assert.match(defectNote("Suspension and Steering","NVH (noise, vibration, harshness)"),/speed/i);
  // grease fittings live only here: the inspection walk that marks off missing
  // fittings covers the whole underside, driveshaft included
  assert.ok(steering.includes("Missing grease fitting (Zerk)"));
