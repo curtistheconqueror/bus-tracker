@@ -11,27 +11,27 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `b152d59` — everything after it is documentation only |
+| Last code-bearing commit | `0d76171` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 113, `6d44097` |
-| Code commits in this release | 5 (`fe38bd9`, `ba3919e`, `acdd54d`, `702e33e`, `b152d59`) |
+| Code commits in this release | 6 (`fe38bd9`, `ba3919e`, `acdd54d`, `702e33e`, `b152d59`, `0d76171`) |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
 release commit. The tip is named rather than hard-coded because this handoff
 cannot contain the hash of the commit that adds it; confirm with
-`git log --oneline b152d59..origin/main` that nothing but `docs/` changed after
-`b152d59`, and publish the tip.
+`git log --oneline 0d76171..origin/main` that nothing but `docs/` changed after
+`0d76171`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed, so `origin/main` fast-forwards cleanly from Version 113.
 
-Gate at `b152d59`: 111 tests passing, ESLint clean, production build succeeds.
+Gate at `0d76171`: 112 tests passing, ESLint clean, production build succeeds.
 The documentation commits after it change no application code.
 
 ## What is in it
 
-Five commits, oldest first.
+Six commits, oldest first.
 
 **`fe38bd9` — Billable and diagnostic time on a repair.**
 Repair hours and diagnostic hours in decimal, saved with a fixed repair. They
@@ -64,6 +64,14 @@ that kept them blank. Includes a settings migration described below.
 A stamped recommendation, separate from Down Sheet membership, plus a
 "Recommended for Down Sheet" Quick Filter whose drawer copies and shares the
 list like every other filter.
+
+**`0d76171` — Fleet Campaigns paste no longer mines a bus number out of a
+farebox ID.** `\b` treats a hyphen as a word boundary, so a row reading
+`FB-2201  SOUTH  17549  BYPASS` recorded bus 2201, left `FB-` behind as a cell
+and filed the real number as data. A row with no bus on it invented one the same
+way. Bus numbers must now stand clear of any word character or hyphen, and
+punctuation wrapped around the number is removed with it. Commas stay untouched
+so columns cannot run together. Parsing only; nothing already stored changes.
 
 ## The one migration in this release
 
@@ -99,6 +107,9 @@ Check these five things on the live site, in this order:
    its drawer's COPY LIST produces a shareable list.
 5. **Fleet Campaigns → Work Time** totals a person's day across both campaign
    rows and Defect Log repairs.
+6. **Fleet Campaigns paste box** — paste a farebox report row such as
+   `SOUTH  17549  FB-2201  08/14/26 06:12  BYPASS` and confirm the bus reads
+   17549 with the farebox ID intact in its own column.
 
 Expect existing buses to start showing DUE / OVERDUE / CRITICAL where they
 previously showed INTERVAL NOT SET. That is the tracking switching on, not a
@@ -114,5 +125,5 @@ data change.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 114 | Live | <published tip hash> | Billable and diagnostic repair time totalled per person per day, Inspected/Diagnosed/Parts-on-order work states with findings that follow the repair everywhere, shipped Cummins engine-hour service intervals, and a shareable Down Sheet recommendation filter |
+| 114 | Live | <published tip hash> | Billable and diagnostic repair time totalled per person per day, Inspected/Diagnosed/Parts-on-order work states with findings that follow the repair everywhere, shipped Cummins engine-hour service intervals, a shareable Down Sheet recommendation filter, and a Fleet Campaigns paste fix that stops farebox IDs being read as bus numbers |
 ```
