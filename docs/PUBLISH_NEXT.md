@@ -38,14 +38,30 @@ Curtis identified these directly from field photos. Bodywork now has separate cu
 
 Doors, Ramp and ADA → Stop Request now distinguishes a broken stop-request pull cord / line on the curbside from one on the roadside. Existing chime/tone and general stop-request choices remain unchanged.
 
+### Dash lights named as reported, start faults named as faults
+
+**Engine** now opens with the three reports a driver actually hands in, replacing *Check-engine diagnosis*, which described what the shop does rather than what came in:
+
+- Check engine light
+- Stop engine light
+- Check engine and stop engine light
+
+**Transmission and Drivetrain** gains *Check transmission light*, which had no entry at all.
+
+**Battery, Starting and Charging**: *Only front start* / *Only rear start* become **Front start INOP** / **Rear start INOP**. Every other entry names the fault rather than the half that still works, and the catalog already reads INOP on the fuel gauge.
+
+> **This rename is crossed, and it matters.** *Only front start* meant the front half worked, so the broken half is the rear one. It migrates to **Rear start INOP**, not Front start INOP. Mapping each old name to the similar-sounding new one would have silently inverted every record already logged. A test holds both directions.
+
+Also in this change: *Stop engine light* leaves the check-engine symptom tick boxes, now that it is an entry of its own and half of the combined entry. The symptom picker follows all three dash-light entries rather than only one, so choosing the combined entry does not drop symptoms already ticked. The Down Sheet time estimate matches all three plus the old wording.
+
 ## Migration and data safety
 
-No LocalStorage key is renamed and normal application storage is not rewritten. Backup export/import expands backward-compatibly to payload version 5, while all repair choices are additive catalog entries. Existing version 3 backups and all stored repair records remain readable.
+No LocalStorage key is renamed and no stored record is rewritten. The catalog renames are read-time only, through the same `migrateRepairIdentity` path the earlier category merges use: an existing *Only front start* record opens as *Rear start INOP*, and an existing *Check-engine diagnosis* record as *Check engine light*, without either being written back. Both were confirmed in a browser against seeded old records. Backup export/import expands backward-compatibly to payload version 5, while all repair choices are additive catalog entries. Existing version 3 backups and all stored repair records remain readable.
 
 ## Validation
 
 - Production build passed
-- All 114 regression tests passed
+- All 115 regression tests passed
 - ESLint passed
 - `git diff --check` passed
 
@@ -64,3 +80,10 @@ No LocalStorage key is renamed and normal application storage is not rewritten. 
 Claude browser-verified the learned-cause, parking-brake-knob, and air-valve flows before pushing them. The field-photo additions are covered by the shared catalog regression tests and remain for live verification after publication.
 
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicitly approves the release, including the shorthand **publishing approved**.
+
+### Checks added by the catalog wording changes
+
+8. Under **Engine**, confirm the first three choices are *Check engine light*, *Stop engine light*, *Check engine and stop engine light*, and that picking any of the three still offers the Misfire / Loss of power symptom boxes.
+9. Under **Transmission and Drivetrain**, confirm *Check transmission light* is first.
+10. Under **Battery, Starting and Charging**, confirm *Front start INOP* and *Rear start INOP*, with no *Only ...* entries left.
+11. Open any bus that already had an *Only front start* defect and confirm it now reads **Rear start INOP**. If it reads *Front start INOP*, the migration is inverted and the release must be pulled.
