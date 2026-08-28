@@ -81,7 +81,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","No crank","Crank no start","Intermittent no start","Only front start","Only rear start","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Bus Controls":["Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
+ "Bus Controls":["Door, Ramp and Kneeler Failures - Front door will not open","Door, Ramp and Kneeler Failures - Front door will not close","Door, Ramp and Kneeler Failures - Front door opens / closes slowly","Door, Ramp and Kneeler Failures - Rear door will not open","Door, Ramp and Kneeler Failures - Rear door will not close","Door, Ramp and Kneeler Failures - Rear door opens / closes slowly","Door, Ramp and Kneeler Failures - Ramp not working","Door, Ramp and Kneeler Failures - Ramp no power","Door, Ramp and Kneeler Failures - Kneeler not functioning correctly","Door, Ramp and Kneeler Failures - Kneeler sits too high","Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  "Amerex":["Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
@@ -146,14 +146,14 @@ export function repairIssuePlaceholder(category:string,group:string){
  return category==="Amerex"?"Choose an Amerex status or code":"Choose a defect in "+group;
 }
 
-/* ADA equipment is spread across more than one category on purpose: the ramp is
-   in Doors, Ramp and ADA, the switch that runs it is in Bus Controls where the
-   operator reaches it. The chair mark restores the connection at a glance
-   without moving anything. It is display only. Stored values keep their plain
-   text, so nothing already logged has to be rewritten to gain the mark, and a
-   record still reads the same in the feed, an export, or a Down Sheet line. */
+/* ADA equipment is available through more than one operator path on purpose:
+   Doors, Ramp and ADA remains its full equipment home, while Bus Controls leads
+   with the frequent whole-system door, ramp, and kneeler failures and keeps the
+   switches separate. The chair mark restores the connection at a glance without
+   moving or rewriting anything. Stored values remain plain text, so existing
+   records keep reading the same in feeds, exports, and Down Sheet lines. */
 export const ADA_MARK="♿ ";
-const ADA_GROUPS=new Set(["Ramp, Lift and Kneeler","Wheelchair Securement"]);
+const ADA_GROUPS=new Set(["Door, Ramp and Kneeler Failures","Ramp, Lift and Kneeler","Wheelchair Securement"]);
 const ADA_ISSUE=/wheelchair|kneeler|q'straint|securement|\bramp\b/i;
 
 export function repairGroupDisplayLabel(group:string){
@@ -282,6 +282,7 @@ function normalizedSymptoms(value:unknown){
 
 export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
  "Bus Controls":{
+  "Door, Ramp and Kneeler Failures":["Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Ramp not working","Ramp no power","Kneeler not functioning correctly","Kneeler sits too high"],
   "Driver Seat":["Seat belt","Leaking air","Will not lock","Adjustment / locking bar","Controls / buttons"],
   "Gauges and Dash":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement"],
   "System Switches":["Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","HVAC / heat controls","A/C control panel","Blower control","Floor heat switch","Interior light controls"],

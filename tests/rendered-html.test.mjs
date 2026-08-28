@@ -1244,6 +1244,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
+  assert.equal(Object.keys(REPAIR_OPTION_GROUPS["Bus Controls"])[0], "Door, Ramp and Kneeler Failures");
+  assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Controls"]["Door, Ramp and Kneeler Failures"], ["Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Ramp not working","Ramp no power","Kneeler not functioning correctly","Kneeler sits too high"]);
+  assert.equal(REPAIR_OPTIONS["Bus Controls"][0], "Door, Ramp and Kneeler Failures - Front door will not open");
   assert.ok(REPAIR_OPTIONS["Doors, Ramp and ADA"].includes("Ramp, Lift and Kneeler - Kneeler"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
@@ -1279,7 +1282,7 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(repairIssueStepLabel("Amerex"), "CHOOSE THE STATUS OR CODE");
   assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose an Amerex status or code");
   assert.equal(repairGroupStepLabel("Bus Controls"), "CHOOSE THE GROUP");
-  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 4 groups");
+  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 5 groups");
   assert.equal(repairIssueStepLabel("Bus Controls"), "CHOOSE THE DEFECT");
   assert.equal(repairIssuePlaceholder("Bus Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
   // An ungrouped category never reaches step 2, but the helper must not throw.
@@ -3872,6 +3875,7 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  // the two wheelchair groups carry the mark for everything inside them
  assert.equal(repairGroupDisplayLabel("Wheelchair Securement"),"♿ Wheelchair Securement");
  assert.equal(repairGroupDisplayLabel("Ramp, Lift and Kneeler"),"♿ Ramp, Lift and Kneeler");
+ assert.equal(repairGroupDisplayLabel("Door, Ramp and Kneeler Failures"),"♿ Door, Ramp and Kneeler Failures");
  assert.equal(repairGroupDisplayLabel("Doors"),"Doors");
  assert.equal(repairGroupDisplayLabel("Driver Seat"),"Driver Seat");
 
