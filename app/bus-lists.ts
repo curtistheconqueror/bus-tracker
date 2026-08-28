@@ -71,10 +71,21 @@ export const BUS_LIST_TEMPLATE_LIMIT=30;
 function clean(value:unknown){return String(value??"").trim()}
 function collapse(value:string){return value.replace(/\s+/g," ").trim()}
 
-/* A bus number as this fleet writes them: four or five digits. Long enough to
-   avoid catching a farebox ID's neighbours by accident when a whole row of a
-   report is pasted in. */
-const BUS_NUMBER=/\b(\d{4,5})\b/;
+/* A bus number as this fleet writes them: four or five digits, standing on its
+   own rather than buried inside something else.
+
+   Length alone was not enough. \b treats a hyphen as a word boundary, so a
+   farebox ID of FB-2201 handed over 2201 as the bus number and left FB- behind
+   as a cell, while the real number further along the row ended up as data. A
+   row with no bus on it at all invented one the same way. The farebox report is
+   exactly the sheet this feature exists for, and its ID column is exactly the
+   shape that broke it.
+
+   So the digits must not touch a word character or a hyphen on either side.
+   That also rules out 2026-08-14 and FB2201 while still allowing #17549,
+   (17549) and a trailing full stop. No lookbehind: this runs on whatever iPad
+   is in the shop. */
+const BUS_NUMBER=/(?:^|[^\w-])(\d{4,5})(?![\w-])/;
 
 /* How a pasted row is cut into cells. Tabs and commas are exact, so they win.
    Two or more spaces is how a printed or copied table lines up. A row separated
@@ -127,8 +138,19 @@ export function parseBusListInput(text:unknown):{busNumber:string;cells:string[]
   const match=line.match(BUS_NUMBER);
   if(!match){found.push({busNumber:"",cells:splitCells(row)});continue}
   const busNumber=match[1];
-  const at=match.index||0;
-  const remainder=line.slice(0,at)+" ".repeat(busNumber.length)+line.slice(at+busNumber.length);
+  /* The match consumes the character in front of the digits, so the digits
+     start that much further along. Taking match.index directly would blank out
+     the delimiter and the first digit and leave the last one behind. */
+  const at=(match.index||0)+match[0].length-busNumber.length;
+  /* Take the punctuation wrapped around the number with it. Blanking the digits
+     alone turned #17549 into a cell containing just "#", and (17568) into two
+     of them, which is the same stray-cell junk that made a shared list look
+     wrong. Commas and semicolons are deliberately not in either set: those
+     separate cells, and swallowing one would run two columns together. */
+  let start=at,end=at+busNumber.length;
+  while(start>0&&"#([".includes(line[start-1]))start-=1;
+  while(end<line.length&&")].".includes(line[end]))end+=1;
+  const remainder=line.slice(0,start)+" ".repeat(end-start)+line.slice(end);
   const cells=splitCells(remainder).filter(cell=>cell!=="");
   found.push({busNumber,cells});
  }

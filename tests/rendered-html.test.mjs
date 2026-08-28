@@ -2566,6 +2566,44 @@ test("bus list input accepts typed numbers and pasted report rows alike",()=>{
  list=addBusListEntries(list,"17503\n17503\n17504","a");
  assert.equal(busListCounts(list).total,2);
 });
+test("a pasted row never mines a bus number out of a farebox ID",()=>{
+ // The farebox report is the sheet this feature exists for, and its ID column
+ // was the shape that broke it: \b treats a hyphen as a word boundary, so
+ // FB-2201 handed over 2201 as the bus and left FB- behind as a cell, while the
+ // real number further along the row ended up as data.
+ const [outOfOrder]=parseBusListInput("FB-2201  SOUTH  17549  BYPASS");
+ assert.equal(outOfOrder.busNumber,"17549");
+ assert.deepEqual(outOfOrder.cells,["FB-2201","SOUTH","BYPASS"]);
+
+ // a row carrying no bus at all must not invent one
+ const [noBus]=parseBusListInput("SOUTH  FB-9999  UNKNOWN UNIT");
+ assert.equal(noBus.busNumber,"");
+ assert.deepEqual(noBus.cells,["SOUTH FB-9999 UNKNOWN UNIT"],"and nothing pasted is thrown away");
+
+ // digits glued to anything else are not a bus number
+ assert.equal(parseBusListInput("SOUTH  17549  2026-08-14  BYPASS")[0].cells.includes("2026-08-14"),true);
+ assert.equal(parseBusListInput("SOUTH  FB2201  17549  BYPASS")[0].busNumber,"17549");
+
+ // punctuation wrapped around the number goes with it. Blanking the digits
+ // alone left a cell containing just "#", which is the same stray-cell junk
+ // that made a shared list look wrong.
+ assert.deepEqual(parseBusListInput("#17549  FB-2201")[0].cells,["FB-2201"]);
+ assert.deepEqual(parseBusListInput("(17568)  FB-2214")[0].cells,["FB-2214"]);
+ assert.deepEqual(parseBusListInput("17563.  FB-2215")[0].cells,["FB-2215"]);
+ assert.equal(parseBusListInput("#17549  FB-2201")[0].busNumber,"17549");
+
+ // but a comma is a cell boundary, never swallowed, or two columns would run
+ // together and every value after them would shift a column left
+ const [commas]=parseBusListInput("17549,FB-2201,Bypass");
+ assert.equal(commas.busNumber,"17549");
+ assert.deepEqual(commas.cells,["FB-2201","Bypass"]);
+
+ // a whole pasted report still reads straight across
+ const rows=parseBusListInput(`SOUTH    17549   FB-2201   08/14/26 06:12   BYPASS
+SOUTH    17568   FB-2214   08/14/26 07:40   OK`);
+ assert.deepEqual(rows.map(entry=>entry.busNumber),["17549","17568"]);
+ assert.deepEqual(rows[0].cells,["SOUTH","FB-2201","08/14/26 06:12","BYPASS"]);
+});
 
 test("the list export is written to be read by someone without the app",()=>{
  const now="2026-08-27T14:00:00.000Z";
