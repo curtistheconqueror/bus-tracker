@@ -12,45 +12,35 @@
 
 ### Fleet Campaigns are now included in the full backup
 
-`EXPORT / SHARE BACKUP` previously captured the buses, settings, Down Sheet, and learned parts but omitted `pace-bus-lists-v1` and `pace-bus-list-templates-v1`. Version 116 adds every Fleet Campaign, completed row, initials, timestamps, and billable hours to the full backup so Work Time history is not lost with the lists.
+`EXPORT / SHARE BACKUP` previously captured buses, settings, the Down Sheet, and learned parts but omitted `pace-bus-lists-v1` and `pace-bus-list-templates-v1`. Version 116 adds every Fleet Campaign, completed row, initials, timestamp, and billable hour to the full backup so Work Time history is not lost with the lists.
 
 Import restores both campaign keys through the same normalizers used by Fleet Campaigns. Importing an older backup that predates a key leaves the device's existing campaigns in place instead of clearing them.
 
-### Learned causes, remembered under the symptom they were found beneath
+### Learned causes, remembered under the symptom where they were found
 
-The picker can only ever list symptoms. A check-engine light is one entry, but the things behind it are endless and specific — a throttle pedal reference circuit, a chafed pin, an EGR differential pressure sensor. Putting those in the catalog would bury the twelve engine choices a mechanic actually picks from under a hundred causes that each apply to one bus on one day.
+A cause typed into WHAT WAS FOUND is learned under that exact defect issue and offered nowhere else. Diagnose a check-engine light as a throttle-pedal reference-circuit fault, and the next check-engine diagnosis offers it as a chip; a brake defect does not.
 
-So a cause typed into WHAT WAS FOUND is learned where it was found and offered nowhere else. Diagnose a check-engine light as a throttle pedal reference circuit, and the next person who picks Check-engine diagnosis is offered it as a chip under that field; somebody picking Brake light on never sees it. **The repair catalog itself does not grow at all.**
+- Matching ignores case, spacing, and trailing punctuation.
+- The first recorded wording is retained.
+- Defect Log and Fixed Repairs both learn and offer causes.
+- Each chip can fill the field or be forgotten.
+- New storage key `pace-findings-memory-v1`, capped at 600 least-recently-used entries.
 
-- Matching ignores case, spacing and trailing punctuation, so one fault is not written five ways. The wording recorded first is the wording kept.
-- Learned on any save carrying a finding, not only one marked Diagnosed, and Fixed Repairs learns and offers them too.
-- Each chip can be tapped to fill the field, or forgotten with its ×.
-- New storage key `pace-findings-memory-v1`, capped at 600 entries, least recently used first.
+Backup payload version 3 becomes version 5: campaigns, campaign templates, and learned causes. Older payloads stay readable.
 
-Backup payload version 3 becomes version 5: campaigns, campaign templates and learned causes. Older payloads stay readable.
+### Parking-brake knob and rear air valves (added by Claude Code)
 
-### Parking brake knob and the rear air valves
+Bus Controls → Operating Controls gains four separate yellow parking-brake-knob failures beside the existing red-air-valve choice. Air System gains the treadle valve, R-12 relay valve (C/S rear), and R-14 relay valve (R/S rear). Brakes keeps its separate Parking brake entry for the brake itself.
 
-**Bus Controls → Operating Controls** gains the yellow diamond knob that was not in the catalog at all, placed directly beside *Red air valve hard to turn* because that is where the two sit on the dash:
+### Interior body, seating, grab hardware, and stop-request pull cords (added by Codex)
 
-- Parking brake knob will not pull up (apply)
-- Parking brake knob will not push down (release)
-- Parking brake knob hard to pull or push
-- Parking brake knob pops out while driving
+Curtis identified these directly from field photos. Bodywork now has separate curbside and roadside choices for an interior advertising panel / ad card rack that is loose or hanging. It also adds passenger seats that are loose, missing, or damaged; a loose or broken passenger assist handle / hanging strap; and a loose or damaged passenger grab rail / stanchion.
 
-Brakes keeps its separate *Parking brake* entry for the brake itself; the knob is the dash control.
-
-**Air System** gains three every bus has, named by the side they are on the way the catalog already writes C/S and R/S:
-
-- Treadle valve (brake pedal)
-- R-12 relay valve (C/S rear)
-- R-14 relay valve (R/S rear)
-
-Additive catalog entries only. Nothing stored is renamed or rewritten.
+Doors, Ramp and ADA → Stop Request now distinguishes a broken stop-request pull cord / line on the curbside from one on the roadside. Existing chime/tone and general stop-request choices remain unchanged.
 
 ## Migration and data safety
 
-No LocalStorage key is renamed and normal application storage is not rewritten. The change only expands full-board export/import. Existing version 3 backups remain readable.
+No LocalStorage key is renamed and normal application storage is not rewritten. Backup export/import expands backward-compatibly to payload version 5, while all repair choices are additive catalog entries. Existing version 3 backups and all stored repair records remain readable.
 
 ## Validation
 
@@ -61,20 +51,16 @@ No LocalStorage key is renamed and normal application storage is not rewritten. 
 
 ## After it is live
 
-1. In Administrative Settings, export a full backup.
-2. Confirm the file uses backup version 4 and contains `busLists` and `busListTemplates`.
-3. Verify an import round trip restores a campaign with its initials and hours.
+1. Export a full backup and confirm version 5 contains `busLists`, `busListTemplates`, and `findingsMemory`.
+2. Verify an import round trip restores a campaign with its initials and hours.
+3. Save a cause under one check-engine diagnosis and confirm it appears as a chip on another check-engine diagnosis.
+4. Open a brake defect and confirm the learned check-engine cause does not appear.
+5. Confirm the Engine quick-select list remains unchanged.
+6. Under Bus Controls, confirm four Parking brake knob choices follow Red air valve hard to turn.
+7. Under Air System, confirm the treadle valve plus R-12 C/S and R-14 R/S relay valves.
+8. Under Bodywork, confirm advertising-panel choices for C/S and R/S plus the passenger-seat and grab-hardware choices.
+9. Under Doors, Ramp and ADA → Stop Request, confirm broken pull-cord / line choices for curbside and roadside.
+
+Claude browser-verified the learned-cause, parking-brake-knob, and air-valve flows before pushing them. The field-photo additions are covered by the shared catalog regression tests and remain for live verification after publication.
 
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` and publish only after Curtis explicitly approves the release, including the shorthand **publishing approved**.
-
-### Checks added by the learned catalog
-
-1. In the Defect Log, diagnose a check-engine light on one bus: type a cause into **WHAT WAS FOUND** and save.
-2. Open a *different* bus's check-engine light. The cause should appear as a chip under that field, labelled FOUND BEFORE ON CHECK-ENGINE DIAGNOSIS. Tapping it fills the field.
-3. Open a brake defect and confirm no chips appear — causes never leak to a symptom they were not found under.
-4. Confirm the Engine quick-select list is unchanged and does not contain the cause.
-5. Export a backup and confirm `"version": 5` with a `findingsMemory` key.
-6. Under **Bus Controls**, confirm *Parking brake knob* appears four times in Operating Controls, immediately after *Red air valve hard to turn*.
-7. Under **Air System**, confirm *Treadle valve (brake pedal)*, *R-12 relay valve (C/S rear)* and *R-14 relay valve (R/S rear)*. All six were confirmed present in the real picker before the change was pushed.
-
-This loop was verified in a browser before the change was pushed, including the count reaching ×2 and the picker still listing its original fourteen engine choices.
