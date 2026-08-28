@@ -2879,6 +2879,49 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
+test("the parking brake knob and the rear air valves are in the catalog",()=>{
+ const controls=REPAIR_OPTIONS["Bus Controls"],air=REPAIR_OPTIONS["Air System"];
+
+ // The yellow diamond knob you pull up to set and push down to release. It sits
+ // beside the red air valve on the dash, so it sits beside it in the list too.
+ const knob=controls.filter(issue=>issue.includes("Parking brake knob"));
+ assert.equal(knob.length,4);
+ assert.ok(knob.every(issue=>issue.startsWith("Operating Controls - ")));
+ assert.equal(controls.indexOf("Operating Controls - Red air valve hard to turn")+1,
+  controls.indexOf("Operating Controls - Parking brake knob will not pull up (apply)"));
+ // both directions are separate faults: a knob that will not set and one that
+ // will not release are different repairs on different days
+ assert.ok(controls.includes("Operating Controls - Parking brake knob will not push down (release)"));
+ assert.ok(controls.includes("Operating Controls - Parking brake knob pops out while driving"));
+
+ // Brakes keeps its own Parking brake entry for the brake itself. The knob is
+ // the dash control, and confusing the two would file a dragging brake as a
+ // broken knob.
+ assert.ok(REPAIR_OPTIONS.Brakes.includes("Parking brake"));
+ assert.equal(REPAIR_OPTIONS.Brakes.some(issue=>issue.includes("knob")),false);
+
+ // Every bus has these three, and none of them were listed.
+ assert.ok(air.includes("Treadle valve (brake pedal)"));
+ // Named by the side they are on, the way the catalog already writes C/S and
+ // R/S, so nobody has to remember which valve is which end of the bus.
+ assert.ok(air.includes("R-12 relay valve (C/S rear)"));
+ assert.ok(air.includes("R-14 relay valve (R/S rear)"));
+
+ // Bus Controls is a grouped category: the picker renders REPAIR_OPTION_GROUPS
+ // while the stored identity comes from REPAIR_OPTIONS. An entry added to one
+ // and not the other is storable and invisible, which is how this nearly went in.
+ for(const [group,items] of Object.entries(REPAIR_OPTION_GROUPS["Bus Controls"])){
+  for(const item of items){
+   assert.ok(controls.includes(group+" - "+item),group+" - "+item+" is missing from REPAIR_OPTIONS");
+  }
+ }
+ for(const issue of controls){
+  const [group,...rest]=issue.split(" - ");
+  const item=rest.join(" - ");
+  assert.ok(REPAIR_OPTION_GROUPS["Bus Controls"][group]?.includes(item),issue+" is missing from REPAIR_OPTION_GROUPS");
+ }
+});
+
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
  const engine={category:"Engine",issue:"Check-engine diagnosis"};
  let memory=learnFinding(EMPTY_FINDINGS_MEMORY,{...engine,finding:"throttle pedal reference circuit"},"2026-08-27T10:00:00.000Z");
