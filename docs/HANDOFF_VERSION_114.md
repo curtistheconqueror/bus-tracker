@@ -10,16 +10,24 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Release commit | `b152d59` |
+| Release source | the current tip of `origin/main` |
+| Last code-bearing commit | `b152d59` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 113, `6d44097` |
-| Commits in this release | 5 (`fe38bd9`, `ba3919e`, `acdd54d`, `702e33e`, `b152d59`) |
+| Code commits in this release | 5 (`fe38bd9`, `ba3919e`, `acdd54d`, `702e33e`, `b152d59`) |
+
+Resolve `origin/main` to a hash at publish time and record that hash as the
+release commit. The tip is named rather than hard-coded because this handoff
+cannot contain the hash of the commit that adds it; confirm with
+`git log --oneline b152d59..origin/main` that nothing but `docs/` changed after
+`b152d59`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed, so `origin/main` fast-forwards cleanly from Version 113.
 
 Gate at `b152d59`: 111 tests passing, ESLint clean, production build succeeds.
+The documentation commits after it change no application code.
 
 ## What is in it
 
@@ -106,5 +114,5 @@ data change.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 114 | Live | b152d59 | Billable and diagnostic repair time totalled per person per day, Inspected/Diagnosed/Parts-on-order work states with findings that follow the repair everywhere, shipped Cummins engine-hour service intervals, and a shareable Down Sheet recommendation filter |
+| 114 | Live | <published tip hash> | Billable and diagnostic repair time totalled per person per day, Inspected/Diagnosed/Parts-on-order work states with findings that follow the repair everywhere, shipped Cummins engine-hour service intervals, and a shareable Down Sheet recommendation filter |
 ```
