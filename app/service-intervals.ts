@@ -13,10 +13,18 @@ import {latestEngineHourReading,normalizeEngineHourReadings,latestMaintenanceEve
    months, so a calendar limit is tracked alongside the hour limit. A bus that
    sits reaches 18 months before it reaches 1,500 hours.
 
-   Both limits are fleet policy Curtis supplies in Administrative Settings;
-   nothing here invents one. With nothing saved a service still reports hours
-   since its last completion and withholds the overdue verdict. Inspections are
-   unaffected and continue to run on mileage. */
+   The limits ship as defaults: 1,500 hours or 18 months on plugs, 2,000 hours
+   or 24 months on valves, confirmed the same for the L9N as for the ISL G. They
+   were deliberately blank while the L9N valve figure was still contested between
+   1,000 and 2,000 hours, because a number the app asserts as fact had better be
+   one. That question is settled, and staying blank only meant retyping the same
+   four figures on every phone and tablet, since these settings live on the
+   device rather than on a server.
+
+   Administrative Settings still owns them. Anything saved there wins, a limit
+   cleared on purpose stays cleared, and with no limit a service still reports
+   hours since its last completion and withholds the overdue verdict.
+   Inspections are unaffected and continue to run on mileage. */
 export type ServiceKind=Exclude<MaintenanceEventKind,"inspection">;
 export type ServiceIntervals={
  sparkPlugs:number|null;
@@ -25,11 +33,35 @@ export type ServiceIntervals={
  valveAdjustmentMonths:number|null;
 };
 
-export const DEFAULT_SERVICE_INTERVALS:ServiceIntervals={sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null};
+export const DEFAULT_SERVICE_INTERVALS:ServiceIntervals={sparkPlugs:1500,valveAdjustment:2000,sparkPlugsMonths:18,valveAdjustmentMonths:24};
 /* Version 108 briefly stored these same property names as mileage limits. The
    unit marker prevents an older mileage value from being silently treated as
-   engine hours after the service model changed. */
-export const SERVICE_INTERVALS_UNIT="engine-hours-v1";
+   engine hours after the service model changed.
+
+   v2 marks the release where the limits gained defaults. It is needed because
+   the board rewrites its whole settings blob on almost every change, so a
+   device that never had the limits typed in is not holding an empty record but
+   an explicit four nulls, and those nulls would beat any default that shipped
+   later. Under v1 a blank meant "never set" and takes the default; under v2 a
+   blank means "cleared on purpose" and stays blank. Anything actually entered
+   survives either way. */
+export const SERVICE_INTERVALS_UNIT="engine-hours-v2";
+export const LEGACY_SERVICE_INTERVALS_UNIT="engine-hours-v1";
+
+/* The single place that decides what a stored settings blob means. Both the
+   board's own hydrate and its backup import go through it, so an imported
+   backup and a device that has been running all along read the same way. */
+export function readSavedServiceIntervals(unit:unknown,value:unknown):ServiceIntervals{
+ if(unit===SERVICE_INTERVALS_UNIT)return normalizeServiceIntervals(value);
+ if(unit!==LEGACY_SERVICE_INTERVALS_UNIT)return {...DEFAULT_SERVICE_INTERVALS};
+ const saved=normalizeServiceIntervals(value);
+ return {
+  sparkPlugs:saved.sparkPlugs??DEFAULT_SERVICE_INTERVALS.sparkPlugs,
+  valveAdjustment:saved.valveAdjustment??DEFAULT_SERVICE_INTERVALS.valveAdjustment,
+  sparkPlugsMonths:saved.sparkPlugsMonths??DEFAULT_SERVICE_INTERVALS.sparkPlugsMonths,
+  valveAdjustmentMonths:saved.valveAdjustmentMonths??DEFAULT_SERVICE_INTERVALS.valveAdjustmentMonths,
+ };
+}
 /* Roughly a week of running on a busy bus: enough warning to plan the work
    without flagging so early that the badge stops meaning anything. */
 export const SERVICE_DUE_SOON_HOURS=50;

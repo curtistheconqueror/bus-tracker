@@ -19,7 +19,7 @@ import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceC
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
 import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
-import { DEFAULT_SERVICE_INTERVALS, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -1365,7 +1365,7 @@ test("confirmation prompts are per-device settings that default to on", async ()
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
   assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}\)\)/);
   assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
-  assert.match(page, /if\(saved\.serviceIntervalsUnit===SERVICE_INTERVALS_UNIT\)setServiceIntervals\(normalizeServiceIntervals\(saved\.serviceIntervals\)\)/);
+  assert.match(page, /setServiceIntervals\(readSavedServiceIntervals\(saved\.serviceIntervalsUnit,saved\.serviceIntervals\)\)/);
   assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
   // Replacing the whole board must always ask, regardless of preferences.
   assert.match(page, /confirm\("Import this backup\?/);
@@ -2401,8 +2401,34 @@ test("Bus Controls leads with both turn-signal defects",()=>{
  assert.equal(defectLabel({category:"Bus Controls",issue:"Operating Controls - Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
 });
 
+test("the shipped intervals reach a device that has been running all along",()=>{
+ // The board rewrites its whole settings blob on almost every change, so a
+ // device that never had these typed in is not holding an empty record: it is
+ // holding an explicit four nulls under the v1 marker, and those nulls beat any
+ // default that ships later. Changing the defaults alone would have done
+ // nothing at all on the one device that matters.
+ const neverTyped={sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null};
+ assert.deepEqual(readSavedServiceIntervals(LEGACY_SERVICE_INTERVALS_UNIT,neverTyped),DEFAULT_SERVICE_INTERVALS);
+
+ // but a figure somebody actually entered under v1 is never overwritten by one
+ // that shipped later, even where the rest of the record is blank
+ assert.deepEqual(readSavedServiceIntervals(LEGACY_SERVICE_INTERVALS_UNIT,{sparkPlugs:1200}),
+  {sparkPlugs:1200,valveAdjustment:2000,sparkPlugsMonths:18,valveAdjustmentMonths:24});
+
+ // Under v2 a blank is a deliberate clear and stays blank. Once the defaults
+ // have been offered, turning one off has to be possible and has to stick.
+ assert.deepEqual(readSavedServiceIntervals(SERVICE_INTERVALS_UNIT,{sparkPlugs:1500,valveAdjustment:null,sparkPlugsMonths:18,valveAdjustmentMonths:null}),
+  {sparkPlugs:1500,valveAdjustment:null,sparkPlugsMonths:18,valveAdjustmentMonths:null});
+
+ // a device with no marker, or Version 108 mileage values under no marker,
+ // starts from the defaults rather than reading miles as hours
+ assert.deepEqual(readSavedServiceIntervals(undefined,undefined),DEFAULT_SERVICE_INTERVALS);
+ assert.deepEqual(readSavedServiceIntervals("miles",{sparkPlugs:60000}),DEFAULT_SERVICE_INTERVALS);
+});
+
 test("spark-plug and valve-adjustment tracking counts engine hours, not miles",()=>{
- assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
+ // Cummins figures for this fleet, the same on the L9N as on the ISL G
+ assert.deepEqual(DEFAULT_SERVICE_INTERVALS,{sparkPlugs:1500,valveAdjustment:2000,sparkPlugsMonths:18,valveAdjustmentMonths:24});
  assert.deepEqual(SERVICE_KINDS.map(service=>service.kind),["spark-plugs","valve-adjustment"]);
  assert.deepEqual(normalizeServiceIntervals(undefined),{sparkPlugs:null,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
  assert.deepEqual(normalizeServiceIntervals({sparkPlugs:"1500",valveAdjustment:0}),{sparkPlugs:1500,valveAdjustment:null,sparkPlugsMonths:null,valveAdjustmentMonths:null});
@@ -3290,7 +3316,7 @@ test("Curtis's two real buses show why miles cannot decide these services",()=>{
  }
 });
 
-test("Fleet Tracker records every maintenance type and never invents a service interval",async()=>{
+test("Fleet Tracker records every maintenance type and never invents a mileage service interval",async()=>{
  const [page,css,intervals]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
@@ -3314,8 +3340,12 @@ test("Fleet Tracker records every maintenance type and never invents a service i
  assert.match(css,/\.service-interval-settings input\{width:120px;min-height:44px/);
  assert.match(css,/\.maintenance-entry select\{min-height:44px\}/);
 
- // no guessed mileage interval may be baked into the source
- assert.match(intervals,/sparkPlugs:null,valveAdjustment:null/);
+ // The defaults are the confirmed Cummins hour and month figures. What must
+ // never be baked in is a mileage interval: this fleet runs 6.98 to 24.41 miles
+ // per engine hour, so any single mileage number is wrong for most of it. A
+ // cleared interval still has to read as not set rather than as zero.
+ assert.match(intervals,/sparkPlugs:1500,valveAdjustment:2000,sparkPlugsMonths:18,valveAdjustmentMonths:24/);
+ assert.equal(/sparkPlugs:\s*\d{4,}\d/.test(intervals),false,"nothing five digits or longer, which would be miles");
  assert.equal(/(SPARK_PLUG|VALVE)[A-Z_]*_(MILE|INTERVAL)[A-Z_]*\s*=\s*\d/.test(intervals),false);
  assert.equal(/\b(15000|18000|20000|24000|30000|36000|50000)\b/.test(intervals),false);
 });
@@ -3798,10 +3828,13 @@ test("release safety keeps interval units and learned parts attached to the righ
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
  ]);
- assert.equal(SERVICE_INTERVALS_UNIT,"engine-hours-v1");
- assert.match(page,/ui\.serviceIntervalsUnit===SERVICE_INTERVALS_UNIT\?normalizeServiceIntervals\(ui\.serviceIntervals\):DEFAULT_SERVICE_INTERVALS/);
+ assert.equal(SERVICE_INTERVALS_UNIT,"engine-hours-v2");
+ assert.equal(LEGACY_SERVICE_INTERVALS_UNIT,"engine-hours-v1");
+ // Both read paths go through the one migration, so an imported backup and a
+ // device that has been running all along read a stored blob the same way.
+ assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)\)/);
+ assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(saved\.serviceIntervalsUnit,saved\.serviceIntervals\)\)/);
  assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
- assert.match(page,/saved\.serviceIntervalsUnit===SERVICE_INTERVALS_UNIT/);
  assert.match(backup,/version:3/);
  assert.match(backup,/partsMemory:readSavedValue\(storage,PARTS_MEMORY_STORAGE_KEY\)/);
  assert.match(page,/writePartsMemory\(localStorage,normalizePartsMemory\(parsed\.partsMemory\)\)/);
