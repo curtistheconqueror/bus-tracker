@@ -1,3 +1,4 @@
+import {normalizeFinding, normalizeRepairHours} from "../repair-catalog.ts";
 import {
   normalizeRepairTimeEstimate,
   repairTimeTotal,
@@ -11,6 +12,13 @@ export type DownSheetRepairItem = {
   details: string;
   estimateEnabled: boolean;
   timeEstimate: RepairTimeEstimate;
+  /* What was done, per repair rather than per entry. Hours especially: an entry
+     with three repairs and two hours recorded once would bill those two hours
+     three times over as each repair became its own record. */
+  actionTaken?: string;
+  finding?: string;
+  repairHours?: number;
+  diagnosticHours?: number;
 };
 
 export function isQuarantineEntry(entry: {
@@ -54,6 +62,10 @@ export function normalizeRepairItems(
         details: typeof source.details === "string" ? source.details : "",
         estimateEnabled: source.estimateEnabled !== false,
         timeEstimate: normalizeRepairTimeEstimate(source.timeEstimate, category, repair),
+        actionTaken: typeof source.actionTaken === "string" ? source.actionTaken : "",
+        finding: normalizeFinding(source.finding),
+        repairHours: normalizeRepairHours(source.repairHours),
+        diagnosticHours: normalizeRepairHours(source.diagnosticHours),
       };
     });
   }

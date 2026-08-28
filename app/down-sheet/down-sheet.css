@@ -219,3 +219,26 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .completion-block small{color:#3d6b52;font-size:8px;font-weight:700;line-height:1.4}
 .completion-block .learned-finding button{min-height:38px;border:0;background:transparent;padding:6px 9px;color:#12457e;font-size:10px;font-weight:800;text-align:left;cursor:pointer}
 @media(max-width:760px){.completion-block{grid-template-columns:1fr}}
+
+/* The estimate is one line until somebody asks for the breakdown. Seven buckets
+   under every repair made an entry with three repairs a page nobody would read,
+   and six of them are almost always zero. */
+.estimate-simple{display:grid;gap:4px;padding:10px 10px 0}
+.estimate-simple input{min-height:44px;width:110px;border:1px solid #cbbb84;border-radius:7px;padding:0 10px;font-size:16px;font-weight:900;text-align:right}
+.estimate-simple small{color:#7a5600;font-size:8px;font-weight:800}
+/* .repair-form label stacks every label into a column, and it outranks a bare
+   class, so this has to be scoped to sit the tick beside its words. */
+.repair-form .estimate-advanced-toggle{display:flex;flex-direction:row;align-items:center;gap:8px;min-height:44px;margin:0 10px 8px;padding:4px 0;cursor:pointer;touch-action:manipulation}
+.estimate-advanced-toggle input[type=checkbox]{width:22px;height:22px;min-height:22px;margin:0}
+.estimate-advanced-toggle span{font-size:8px;font-weight:900;letter-spacing:.4px;color:#7a5600}
+
+/* What was done, per repair. Entry-level hours would bill the same hours once
+   for every repair on the entry. */
+.item-completion{display:grid;gap:8px;margin:0 10px 10px;border:1px solid #8fbfa3;border-radius:8px;background:#f3fbf6;padding:10px}
+.item-completion>b{font-size:7px;font-weight:900;letter-spacing:.5px;color:#0a5c39}
+.item-completion label{display:grid;gap:3px;font-size:8px;font-weight:900;letter-spacing:.4px;color:#3d5a72}
+.item-completion input,.item-completion textarea{min-height:44px;border:1px solid #b7c4d7;border-radius:7px;padding:8px 10px;font-size:16px;background:#fff}
+.item-completion textarea{min-height:62px;resize:vertical}
+.item-completion small{color:#3d6b52;font-size:8px;font-weight:700}
+.item-completion .learned-finding button{min-height:38px;border:0;background:transparent;padding:6px 9px;color:#12457e;font-size:10px;font-weight:800;text-align:left;cursor:pointer}
+.completion-signoff input{min-height:44px;border:1px solid #b7c4d7;border-radius:7px;padding:0 10px;font-size:16px}
