@@ -292,3 +292,9 @@ body.defect-editor-open{overflow:hidden;overscroll-behavior:none}.log-editor{max
  .defect-log-app .parts-remembered{flex-wrap:wrap}
  .defect-log-app .parts-remembered button{min-height:44px;width:100%}
 }
+
+/* Amber, and not the blue or green of the work states: a recommendation is a
+   request rather than something done, and the two must not read alike at a
+   glance in a list somebody is about to act on. */
+.work-state-badge.down-sheet-recommended{border-color:#d09a3c;background:#fdf1dd;color:#8a4c00}
+.downsheet-recommend-check b{color:#8a4c00}

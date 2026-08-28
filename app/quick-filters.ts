@@ -1,6 +1,6 @@
-import {isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
+import {isDownSheetRecommended,isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
 
-export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"not-duplicated";
+export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"not-duplicated"|"down-sheet-recommended";
 export type QuickFilterBus={
  id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];
 };
@@ -15,6 +15,11 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
  {key:"leak",label:"Leaks",shortLabel:"Leaks"},
  {key:"add-oil",label:"Add Oil",shortLabel:"Oil"},
  {key:"not-duplicated",label:"Defect / Condition Not Duplicated",shortLabel:"Not Duplicated"},
+ /* First in the list is tempting and wrong: the others answer "what is broken",
+    this one answers "what am I asking somebody to schedule". It sits at the end
+    where a foreman looks for it deliberately rather than falling onto it while
+    reaching for Check Engine. */
+ {key:"down-sheet-recommended",label:"Recommended for Down Sheet",shortLabel:"DS Rec"},
 ];
 
 function quickFilterTextMatch(text:string,key:QuickFilterKey){
@@ -25,7 +30,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  if(key==="farebox")return /\bfare\s*box\b|\bfarebox\b/i.test(text);
  if(key==="ibs-ventra")return /\b(?:ibs|ventra)\b/i.test(text);
  if(key==="leak")return /\b(?:leak|leaks|leaking|seep|seeping)\b/i.test(text);
- if(key==="not-duplicated")return false;
+ if(key==="not-duplicated"||key==="down-sheet-recommended")return false;
  return /\b(?:add(?:ed|ing)?|needs?|low)\s+(?:(?:\d+(?:\.\d+)?\s*)?(?:qt|qts|quart|quarts)\s+(?:of\s+)?)?(?:engine\s+)?oil\b|\b(?:engine\s+)?oil\s+(?:low|needed|required)\b/i.test(text);
 }
 
@@ -34,7 +39,13 @@ function defectText(defect:StructuredDefect){
 }
 
 export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey){
- const normalized=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id),matches=normalized.filter(defect=>key==="not-duplicated"?Boolean(defect.conditionNotDuplicated):isUnresolved(defect)&&quickFilterTextMatch(defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
+ const normalized=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id),matches=normalized.filter(defect=>
+  key==="not-duplicated"?Boolean(defect.conditionNotDuplicated)
+  /* Only repairs still outstanding. A recommendation on a repair that has since
+     been fixed is a job nobody needs scheduled, and leaving it in the list is
+     how a shared list stops being trusted. */
+  :key==="down-sheet-recommended"?isUnresolved(defect)&&isDownSheetRecommended(defect)
+  :isUnresolved(defect)&&quickFilterTextMatch(defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
  if(matches.length||normalized.length||!legacy||!quickFilterTextMatch(legacy,key))return matches;
  return [{id:bus.id+"-quick-filter-legacy",category:"Miscellaneous",issue:"Manual entry",details:legacy,operability:"service",state:"open"} as StructuredDefect];
 }
@@ -59,6 +70,7 @@ export function quickFilterFallbackLabel(key:QuickFilterKey){
   leak:"Leak tracker flag",
   "add-oil":"Add-oil tracker flag",
   "not-duplicated":"Defect / condition not duplicated",
+  "down-sheet-recommended":"Recommended for the Down Sheet",
  } as Record<QuickFilterKey,string>)[key];
 }
 

@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_SYMPTOMS, WORK_STATES, migrateRepairIdentity, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_SYMPTOMS, WORK_STATES, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, defaultDefectOperability, defectFromDraft, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -427,7 +427,7 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
     {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,9);
+  assert.equal(QUICK_FILTERS.length,10);
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
@@ -2834,6 +2834,57 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
+test("a repair can be put forward for the Down Sheet without being put on it",async()=>{
+ const base={id:"d1",category:"Engine",issue:"Check engine light",details:"",operability:"service",state:"open"};
+
+ // recommending stamps who asked, which is the point: the list gets handed to
+ // somebody else, and an unsigned recommendation is a job nobody can ask about
+ const asked=setDownSheetRecommendation(base,true,"2026-08-27T15:00:00.000Z","CJ");
+ assert.equal(isDownSheetRecommended(asked),true);
+ assert.equal(asked.downSheetRecommendation.by,"CJ");
+ assert.equal(isDownSheetRecommended(base),false);
+
+ // clearing removes the stamp outright rather than leaving a false behind
+ const withdrawn=setDownSheetRecommendation(asked,false,"2026-08-27T16:00:00.000Z","CJ");
+ assert.equal("downSheetRecommendation" in withdrawn,false);
+
+ // the shared stamp normalizer takes a bare true from a hand-edited backup
+ assert.deepEqual(normalizeWorkStateStamp(true),{});
+ assert.deepEqual(normalizeWorkStateStamp({by:" CJ ",at:"x"}),{at:"x",by:"CJ"});
+ assert.equal(normalizeWorkStateStamp(false),undefined);
+ assert.equal(normalizeWorkStateStamp(null),undefined);
+
+ // it survives a stored read, and a record without one reads as not asked
+ const [read]=normalizeDefects([asked],"","bus");
+ assert.equal(read.downSheetRecommendation.by,"CJ");
+ assert.equal(normalizeDefects([base],"","bus")[0].downSheetRecommendation,undefined);
+
+ // the filter, and the rule that keeps a shared list trustworthy: a repair
+ // that has since been fixed is not a job anybody needs scheduled
+ const bus={id:"a",n:"17549",defects:[
+  {...asked,id:"open-and-asked"},
+  {...asked,id:"fixed-and-asked",state:"completed",completedAt:"2026-08-27T18:00:00.000Z",completedBy:"CJ"},
+  {...base,id:"open-not-asked"},
+ ]};
+ assert.deepEqual(quickFilterDefects(bus,"down-sheet-recommended").map(defect=>defect.id),["open-and-asked"]);
+ assert.equal(quickFilterMatch(bus,"down-sheet-recommended"),true);
+ assert.deepEqual(quickFilterBusIds([bus,{id:"b",n:"17568",defects:[base]}],"down-sheet-recommended"),["a"]);
+
+ // it is a real filter entry, so the drawer's COPY LIST and SHARE come with it
+ const entry=QUICK_FILTERS.find(item=>item.key==="down-sheet-recommended");
+ assert.equal(entry.label,"Recommended for Down Sheet");
+ assert.equal(QUICK_FILTERS.at(-1).key,"down-sheet-recommended","last: it answers a different question from the rest");
+
+ // A recommendation must never quietly become membership, and membership must
+ // never clear the recommendation. Separate fields, and adjacent rows in the
+ // editor so nobody reaches for the wrong one.
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/downsheet-recommend-check/);
+ const recommend=page.indexOf("downsheet-recommend-check"),escalate=page.indexOf("checked={value.onDownSheet}");
+ assert.ok(recommend<escalate&&escalate-recommend<900,"the two rows sit next to each other");
+ assert.equal(/onDownSheet:[^,}]*downSheetRecommendation|downSheetRecommendation[^;]{0,80}onDownSheet:/.test(page),false,"neither writes the other");
+ assert.match(page,/before recommending this for the Down Sheet/,"held to the same initials rule");
+});
 test("a day's work time covers Defect Log repairs as well as campaign sweeps",()=>{
  const yesterday="2026-08-26T15:00:00.000Z",today="2026-08-27T15:00:00.000Z";
  let farebox=createBusList("Farebox","rep",today,"s");

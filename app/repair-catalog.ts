@@ -53,6 +53,10 @@ export type StructuredDefect={
  /* An absent key means not ticked. The stamp carries who and when, filled in
     where the settings ask for initials and left empty where they do not. */
  workStates?:Partial<Record<WorkStateKey,WorkStateStamp>>;
+ /* Present means somebody has put this repair forward for the Down Sheet.
+    Separate from actual Down Sheet membership, which lives in the Down Sheet's
+    own records: this is the ask, not the answer. */
+ downSheetRecommendation?:WorkStateStamp;
  /* What the diagnosis actually turned up, in the mechanic's own words, when
     the cause is not something the picker could ever have listed: a throttle
     pedal reference circuit, a chafed pin. Free text on purpose, and it travels
@@ -185,32 +189,56 @@ export function isDiagnosticDefect(category:unknown,issue:unknown){
 /* Anything that is not one of the three known keys is dropped, and anything
    that is becomes a stamp even if it arrived as a bare `true` from an older
    record or a hand-edited backup. */
+export function normalizeWorkStateStamp(value:unknown):WorkStateStamp|undefined{
+ if(value===undefined||value===null||value===false)return undefined;
+ const stamp=value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
+ const at=String(stamp.at??"").trim(),by=String(stamp.by??"").trim();
+ return {...(at?{at}:{}),...(by?{by}:{})};
+}
+
 export function normalizeWorkStates(value:unknown):Partial<Record<WorkStateKey,WorkStateStamp>>|undefined{
  if(!value||typeof value!=="object"||Array.isArray(value))return undefined;
  const source=value as Record<string,unknown>,states:Partial<Record<WorkStateKey,WorkStateStamp>>={};
  let found=false;
  for(const key of WORK_STATE_KEYS){
-  const entry=source[key];
-  if(entry===undefined||entry===null||entry===false)continue;
-  const stamp=entry&&typeof entry==="object"?entry as Record<string,unknown>:{};
-  const at=String(stamp.at??"").trim(),by=String(stamp.by??"").trim();
-  states[key]={...(at?{at}:{}),...(by?{by}:{})};
+  const stamp=normalizeWorkStateStamp(source[key]);
+  if(!stamp)continue;
+  states[key]=stamp;
   found=true;
  }
  return found?states:undefined;
+}
+
+/* Stamping a tick, or clearing the whole stamp with it. Shared by the work
+   states and the Down Sheet recommendation so a tick means the same thing and
+   leaves the same trace wherever it is offered. */
+function stampFor(on:boolean,at:string,by:string):WorkStateStamp|undefined{
+ if(!on)return undefined;
+ const person=by.trim();
+ return {...(at?{at}:{}),...(person?{by:person}:{})};
 }
 
 /* Ticking a state stamps it; unticking removes the key outright rather than
    leaving a false behind, so a stamp can never outlive the tick that made it
    and read as work somebody did not do. */
 export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:boolean,at:string,by=""):StructuredDefect{
- const states={...(defect.workStates||{})};
- if(on){
-  const person=by.trim();
-  states[key]={...(at?{at}:{}),...(person?{by:person}:{})};
- }else delete states[key];
+ const states={...(defect.workStates||{})},stamp=stampFor(on,at,by);
+ if(stamp)states[key]=stamp;else delete states[key];
  const next={...defect,workStates:Object.keys(states).length?states:undefined};
  if(!next.workStates)delete next.workStates;
+ return next;
+}
+
+/* Recommending a repair for the Down Sheet is not putting it on the Down Sheet.
+   It is one person saying this one belongs there, so that somebody else can be
+   handed the list and decide. The two are deliberately separate fields: a
+   recommendation that quietly became membership would put buses on the sheet
+   nobody agreed to, and membership that cleared the recommendation would erase
+   the record of who asked for it. */
+export function isDownSheetRecommended(defect:StructuredDefect){return Boolean(defect.downSheetRecommendation)}
+export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
+ const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
+ if(!stamp)delete next.downSheetRecommendation;
  return next;
 }
 
@@ -387,7 +415,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
    const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),finding:normalizeFinding(defect.finding)} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding)} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
