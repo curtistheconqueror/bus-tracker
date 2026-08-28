@@ -27,21 +27,21 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `e554edb` — everything after it is documentation only |
+| Last code-bearing commit | `fde39c2` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 116, `54b5322` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
 release commit. The tip is named rather than hard-coded because this handoff
 cannot contain the hash of the commit that adds it; confirm with
-`git log --oneline e554edb..origin/main` that nothing but `docs/` changed after
-`e554edb`, and publish the tip.
+`git log --oneline fde39c2..origin/main` that nothing but `docs/` changed after
+`fde39c2`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed, so `origin/main` fast-forwards cleanly from Version 116.
 
-Gate: 116 tests passing, ESLint clean, production build succeeds.
+Gate: 117 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -71,17 +71,39 @@ with a duplicate check. The count broke on this addition and proved nothing abou
 the category merge it was written for — what that merge had to guarantee is that
 no option arrived twice.
 
+### The Down Sheet editor is usable on a phone
+
+Curtis reported that scrolling the editor moved the page behind it, that the touch quality was poor, and that the repairs section sat in its own cramped window. Those were one problem with five causes, all found by measuring the page on a simulated iPhone rather than reading the CSS.
+
+| Fault | Before | After |
+| --- | --- | --- |
+| Page scrolled behind the open editor | 610px of bleed | none |
+| **Defect Log had the same bug** | 2,462px of bleed | none |
+| Repairs box width on a 390px phone | 153px (43% of the form) | 318px (90%) |
+| Form columns on a phone | 2, never collapsed at any width | 1 below 760px |
+| Repairs box height | collapsed to a 20px sliver once widened | renders in full |
+| Add Repair button | 34px | 44px |
+| Estimate tick | 17px, pinned by an 18px grid track | 22px in a 22px track |
+
+**The scroll lock never worked anywhere.** `<html>` is the scrolling element in this app, and both editors put `overflow:hidden` on `<body>`. The Defect Log has carried that dead rule since it was built. Both now share `app/scroll-lock.ts`, which classes both elements and restores the scroll position on close so a foreman does not lose their place in a long sheet.
+
+**Two latent bugs surfaced on the way.** The repairs box is a `<fieldset>` and the span rule read `label.wide`, so it never spanned. Widening it then collapsed it: a `<fieldset>` with `overflow:hidden` is a scroll container, and a grid item that is a scroll container contributes no height, so the grid gave it a 20px row and clipped 577px of repairs inside. It had only ever rendered because the cell beside it propped the row open. The clipping existed to round the header, so the header rounds itself now.
+
+The phone breakpoint moved from 600px to the 760px the rest of the app uses. 760 stays below an iPad's 768, and both iPad widths were checked: two columns intact, repairs box at 95–96% of the form.
+
+**Not changed:** no path from the Down Sheet to Fixed Repairs, and no fix details captured at completion. That is the next piece of work and is still open.
+
 ## Migration and data safety
 
 No storage migration, no LocalStorage key change, and no stored record rewritten.
-This is one additive catalog entry and one additive note. Existing defects,
+This is one additive catalog entry, one additive note, and layout-only changes to the Down Sheet editor. Existing defects,
 parts associations, filters, locations, Down Sheet records and user data are
 untouched, and a Version 116 backup imports unchanged.
 
 ## Validation
 
 - Production build passed
-- All 116 regression tests passed
+- All 117 regression tests passed
 - ESLint passed
 - Verified in a real browser at phone width: NVH is first in the category, the
   note renders directly under the picker at 436px in a 647px form, and a
@@ -94,6 +116,10 @@ untouched, and a Version 116 backup imports unchanged.
 3. Confirm an amber note appears directly under the picker asking for front or
    rear, turning or straight, and speed.
 4. Choose *Air bag* and confirm no note appears — most entries carry none.
+5. Open the **Down Sheet** on a phone and tap ADD DOWN BUS. Scroll inside the editor and confirm the page behind it does **not** move. Close it and confirm you are back where you were in the sheet.
+6. Confirm the form is a single column, that REPAIRS & ESTIMATES fills the width, and that SPECIFIC REPAIR reads *Select category first* in full rather than being cut off.
+7. Do the same in the **Defect Log** editor — its scroll lock was broken too and is now fixed.
+8. On an iPad, confirm the Down Sheet editor is still two columns.
 
 ## Publishing constraints that still apply
 
@@ -106,5 +132,5 @@ untouched, and a Version 116 backup imports unchanged.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 117 | Live | <published tip hash> | NVH added to Suspension and Steering as a single symptom entry, with a defect note asking for the location, condition and speed that make it actionable |
+| 117 | Live | <published tip hash> | NVH added to Suspension and Steering with a defect note asking for the details that make it actionable, and a phone-usable Down Sheet editor: working scroll locks on both editors, a single-column form, and a repairs section that fills the width instead of collapsing |
 ```
