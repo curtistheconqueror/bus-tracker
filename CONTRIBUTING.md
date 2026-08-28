@@ -34,6 +34,6 @@ Claude Code contributions use the persistent `claude-contributions` branch and m
 
 ## Releases
 
-A successful local build is not permission to publish. Save and deploy only through the existing Sites project after explicit user approval. Follow docs/SITES_PUBLISHING_RUNBOOK.md for the granular, resumable save/deploy/status lifecycle and remote-checkout recovery. Record the resulting Sites version and commit in docs/RELEASES.md.
+A successful local build is not permission to publish. Save and deploy only through the existing Sites project after explicit user approval. Follow docs/SITES_PUBLISHING_RUNBOOK.md for the granular, resumable save/deploy/status lifecycle and remote-checkout recovery. What to publish is in docs/PUBLISH_NEXT.md, which always describes the next unpublished release. Record the resulting Sites version and commit in docs/RELEASES.md and reset docs/PUBLISH_NEXT.md to STATUS: NONE PENDING.
 
 Claude Code pushes its validated contribution branch and then fast-forwards `main` to that same commit, so completed work is visible to the next publish rather than waiting unnoticed on a branch. It stops there. It must not use Sites credentials, edit `.openai/hosting.json`, deploy, tag, or mark a version live. Code on `main` is not published until Codex deploys it with Curtis's approval.

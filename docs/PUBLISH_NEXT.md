@@ -1,10 +1,26 @@
-# Publish handoff — Sites Version 114
+# Publish next
 
-Prepared for Codex. Curtis has approved this release.
+**STATUS: PENDING — Sites Version 114 is approved and not yet published.**
+
+This file always describes the next unpublished release, and it lives at this
+exact path on `main` so nobody has to be told where to look. Curtis approves a
+release by pointing Codex at this file rather than pasting a summary out of a
+chat window.
+
+- **Claude Code** keeps this file current with every push to `main`: the source
+  commit, what changed, any migration, and what to check once it is live. Claude
+  Code never publishes and never marks a version live.
+- **Codex** publishes from here, then in the same follow-up commit updates
+  `docs/RELEASES.md` and `PROJECT_HANDOFF.md` and resets this file to
+  `STATUS: NONE PENDING`.
+- **STATUS: NONE PENDING** means everything on `main` is already live and there
+  is nothing to publish. Read the status line before anything else.
 
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
 
 ## Source
 

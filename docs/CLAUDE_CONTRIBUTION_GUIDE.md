@@ -4,7 +4,7 @@ This is the shared handoff for Claude Code, Codex, and Curtis. The live applicat
 
 ## Start here every time
 
-1. Read `README.md`, `PROJECT_HANDOFF.md`, `CONTRIBUTING.md`, this file, `docs/RELEASES.md`, and `docs/SITES_PUBLISHING_RUNBOOK.md` completely.
+1. Read `README.md`, `PROJECT_HANDOFF.md`, `CONTRIBUTING.md`, this file, `docs/RELEASES.md`, `docs/PUBLISH_NEXT.md`, and `docs/SITES_PUBLISHING_RUNBOOK.md` completely.
 2. Fetch the repository and confirm that `main` contains the current live release.
 3. Work only on `claude-contributions`, starting from the latest `main` unless Curtis or Codex gives a narrower branch or commit.
 4. Preserve unrelated work and never force-push, rewrite published history, or create a replacement Sites project.
@@ -16,6 +16,7 @@ This is the shared handoff for Claude Code, Codex, and Curtis. The live applicat
 - Claude Code may inspect, implement, test, commit, and push to `claude-contributions`.
 - Once the gates pass, Claude Code also fast-forwards `main` to that validated commit and pushes it, so finished work is visible to the next publish instead of waiting unnoticed on a branch. Curtis set this rule after Stage 5 sat on the branch unpublished and its catalog additions could not be found in the live app. Only a clean fast-forward qualifies: if `main` carries commits the contribution branch does not, stop and hand off instead of merging.
 - Claude Code must not edit `.openai/hosting.json`, use Sites credentials, save or deploy a Sites version, create release tags, or mark a version live. Reaching `main` is not publishing.
+- Every push to `main` must leave `docs/PUBLISH_NEXT.md` accurate: its `STATUS` line, the last code-bearing commit, what changed, any migration, and what to check once live. That file is how Codex learns what to publish, so Curtis no longer has to paste a summary out of a chat window; a push that does not update it leaves work invisible in exactly the way this rule exists to prevent.
 - Codex reviews the contribution against the last released commit, checks invariants and mobile behavior, and publishes only after Curtis approves production.
 - `main` and the `sites-vNN` tags remain the authoritative release history.
 

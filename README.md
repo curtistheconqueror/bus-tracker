@@ -70,6 +70,7 @@ The private GitHub origin is the code backup. The sites remote belongs to the ex
 
 - Current live release: Sites Version 113
 - Current live feature checkpoint: commit 6d44097
+- What is waiting to be published: docs/PUBLISH_NEXT.md
 - Release reference: docs/RELEASES.md
 - Publishing and recovery runbook: docs/SITES_PUBLISHING_RUNBOOK.md
 

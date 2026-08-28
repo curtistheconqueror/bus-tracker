@@ -127,8 +127,8 @@ Before every release:
 5. Run npm run lint and separate legacy warnings from new failures.
 6. Run git diff --check.
 7. Commit only intended files.
-8. Follow docs/SITES_PUBLISHING_RUNBOOK.md and save/publish through the existing Sites project only after user approval.
-9. Record the live Sites version and source commit in docs/RELEASES.md and this handoff.
+8. Read docs/PUBLISH_NEXT.md first: it always names the next unpublished release and what to check once it is live, and its STATUS line says whether anything is pending. Then follow docs/SITES_PUBLISHING_RUNBOOK.md and save/publish through the existing Sites project only after user approval.
+9. Record the live Sites version and source commit in docs/RELEASES.md and this handoff, and reset docs/PUBLISH_NEXT.md to STATUS: NONE PENDING in the same commit.
 
 Do not create a new hosting project. Do not publish merely because a commit or build succeeded.
 
@@ -154,4 +154,4 @@ The future operator-facing defect-card replacement is documented at docs/roadmap
 
 ## Safe continuation prompt
 
-Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, docs/RELEASES.md, and docs/SITES_PUBLISHING_RUNBOOK.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.
+Open C:\Users\curti\pace-south-bus-tracker and read README.md, PROJECT_HANDOFF.md, CONTRIBUTING.md, docs/PUBLISH_NEXT.md, docs/RELEASES.md, and docs/SITES_PUBLISHING_RUNBOOK.md completely before acting. Inspect git status and recent commits. Preserve LocalStorage migrations, fleet identity, facility slot IDs, capacity-safe swaps, touch behavior, linked repair records, and all user data. Work in small stages, add focused tests, run npm test and git diff --check, and commit only the requested change. Never create a new hosting project or publish without explicit approval.

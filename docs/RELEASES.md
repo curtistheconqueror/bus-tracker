@@ -30,4 +30,4 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
-When a release is published, update this table and PROJECT_HANDOFF.md in the same follow-up commit.
+When a release is published, update this table and PROJECT_HANDOFF.md in the same follow-up commit, and reset `docs/PUBLISH_NEXT.md` to STATUS: NONE PENDING.

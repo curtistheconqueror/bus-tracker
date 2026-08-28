@@ -2,6 +2,8 @@
 
 This runbook is the durable recovery path for publishing the Pace South Bus Tracker. Use it together with `README.md`, `PROJECT_HANDOFF.md`, `CONTRIBUTING.md`, and `docs/RELEASES.md`.
 
+**Start at `docs/PUBLISH_NEXT.md`.** It always describes the next unpublished release — the source commit, what changed, any migration, and what to check once live — and its `STATUS` line says whether anything is pending at all. This runbook covers how to publish; that file covers what.
+
 ## Fixed project identity
 
 - Canonical computer checkout: `C:\Users\curti\pace-south-bus-tracker`
