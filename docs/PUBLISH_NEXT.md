@@ -1,6 +1,8 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 117 is validated and awaiting publication approval.**
+**STATUS: NONE PENDING**
+
+Sites Version 117 was published from commit `ff62fa3` on 2026-08-28. Replace this file with the next complete pending-release handoff in the same push as the next contribution to `main`.
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
@@ -26,10 +28,10 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Release source | the current tip of `origin/main` |
+| Last published source | `ff62fa3` |
 | Last code-bearing commit | `fde39c2` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
-| Previous live | Version 116, `54b5322` |
+| Current live | Version 117, `ff62fa3` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
 release commit. The tip is named rather than hard-coded because this handoff
