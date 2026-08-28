@@ -1,8 +1,6 @@
 # Publish next
 
-**STATUS: NONE PENDING**
-
-Sites Version 117 was published from commit `ff62fa3` on 2026-08-28. Replace this file with the next complete pending-release handoff in the same push as the next contribution to `main`.
+**STATUS: PENDING — Sites Version 118 is validated and awaiting publication approval.**
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
@@ -28,100 +26,109 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Last published source | `ff62fa3` |
-| Last code-bearing commit | `fde39c2` — everything after it is documentation only |
+| Release source | the current tip of `origin/main` |
+| Last code-bearing commit | `4beac6b` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
-| Current live | Version 117, `ff62fa3` |
+| Previous live | Version 117, `ff62fa3` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. The tip is named rather than hard-coded because this handoff
-cannot contain the hash of the commit that adds it; confirm with
-`git log --oneline fde39c2..origin/main` that nothing but `docs/` changed after
-`fde39c2`, and publish the tip.
+release commit. Confirm with `git log --oneline 4beac6b..origin/main` that
+nothing but `docs/` changed after `4beac6b`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
-pushed, so `origin/main` fast-forwards cleanly from Version 116.
+pushed.
 
-Gate: 117 tests passing, ESLint clean, production build succeeds.
+Gate: 118 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
-### NVH added to Suspension and Steering
+### A Down Sheet entry now reaches Fixed Repairs with the repair on it
 
-Noise, vibration and harshness is now the first choice in **Suspension and
-Steering**, ahead of the components, because it is the complaint that arrives
-before anyone knows which part is at fault — the same reason the dash lights lead
-Engine and Transmission.
+The Defect Log has a straight path to Fixed Repairs through SAVE AS FIXED. The
+Down Sheet had none. Flipping workflow to **Completed** set the state and a
+timestamp and wrote nothing else, so a scheduled repair arrived in Fixed Repairs
+as an empty shell — no technician, no fix, no time, no cause.
 
-**One entry, not a dropdown of every combination.** Front, rear, curbside,
-roadside, turning, straight and speed would swamp the category, and they are what
-the description field is for. So the entry carries a defect note asking for them
-at the moment the defect is chosen, which is the only moment somebody still
-remembers:
+Choosing Completed now opens the same fields the Defect Log completion uses:
 
-> Say where and when in the description: front or rear, curbside or roadside,
-> turning or straight, and at what speed. A vibration at 45 straight and a clunk
-> on a left turn are different repairs, and the noise itself is rarely where the
-> fault is.
+- FIX / STEPS TAKEN
+- WHAT WAS FOUND, with the learned-cause chips
+- FIXED BY
+- REPAIR HOURS and DIAGNOSTIC HOURS
 
-Left to itself, "NVH" is a record nobody can act on later. This is the sixth
-entry in the catalog to carry a note; the mechanism shipped in Version 116.
+**Every field is optional**, and a test holds that none is required. A foreman
+closing out ten buses at end of shift must not be made to fill in a form to move
+a dropdown.
 
-Also in this change: a hardcoded option count in the suspension test was replaced
-with a duplicate check. The count broke on this addition and proved nothing about
-the category merge it was written for — what that merge had to guarantee is that
-no option arrived twice.
+**The assigned mechanic now stands in for FIXED BY.** This was the worst of it:
+the sheet already knew who had the bus, in the very field it schedules work
+with, and dropped it, so every completed entry was unattributed. A **vendor**
+does not stand in — their name in that field would read as somebody in this shop
+having done the work.
 
-### The Down Sheet editor is usable on a phone
+The cause is learned into the same memory the other two surfaces feed, so a Down
+Sheet diagnosis teaches the catalog exactly as a Defect Log one does.
 
-Curtis reported that scrolling the editor moved the page behind it, that the touch quality was poor, and that the repairs section sat in its own cramped window. Those were one problem with five causes, all found by measuring the page on a simulated iPhone rather than reading the CSS.
+### Diagnostic time starts at one hour
 
-| Fault | Before | After |
-| --- | --- | --- |
-| Page scrolled behind the open editor | 610px of bleed | none |
-| **Defect Log had the same bug** | 2,462px of bleed | none |
-| Repairs box width on a 390px phone | 153px (43% of the form) | 318px (90%) |
-| Form columns on a phone | 2, never collapsed at any width | 1 below 760px |
-| Repairs box height | collapsed to a 20px sliver once widened | renders in full |
-| Add Repair button | 34px | 44px |
-| Estimate tick | 17px, pinned by an 18px grid track | 22px in a 22px track |
+Shop policy: finding a fault takes an hour before it takes anything else, and a
+fifteen-minute figure is somebody guessing rather than reading a meter. Typing
+`0.25` now yields `1`. Applied in all three editors where time is typed, and
+deliberately **not** inside `normalizeDefects` — running it there would round
+every historical half-hour up and rewrite what those repairs say they cost.
+Blank still means no time recorded, not one hour.
 
-**The scroll lock never worked anywhere.** `<html>` is the scrolling element in this app, and both editors put `overflow:hidden` on `<body>`. The Defect Log has carried that dead rule since it was built. Both now share `app/scroll-lock.ts`, which classes both elements and restores the scroll position on close so a foreman does not lose their place in a long sheet.
+### A doubled repair line in Fixed Repairs
 
-**Two latent bugs surfaced on the way.** The repairs box is a `<fieldset>` and the span rule read `label.wide`, so it never spanned. Widening it then collapsed it: a `<fieldset>` with `overflow:hidden` is a scroll container, and a grid item that is a scroll container contributes no height, so the grid gave it a 20px row and clipped 577px of repairs inside. It had only ever rendered because the cell beside it propped the row open. The clipping existed to round the header, so the header rounds itself now.
+One repair on an entry produced a reason of "Brakes — Air brake fault", which
+became the defect's details and read back as that phrase twice over. A single
+repair's details are now just its details; the category and issue already say
+the rest.
 
-The phone breakpoint moved from 600px to the 760px the rest of the app uses. 760 stays below an iPad's 768, and both iPad widths were checked: two columns intact, repairs box at 95–96% of the form.
+## Still open, and worth knowing
 
-**Not changed:** no path from the Down Sheet to Fixed Repairs, and no fix details captured at completion. That is the next piece of work and is still open.
+**A Down Sheet entry with several repairs still collapses into one defect.** The
+entry keeps its repair cards, but the fleet write takes the **first** card's
+category and repair and joins the rest into the details string. A bus scheduled
+for brakes, A/C and a door arrives in Fixed Repairs as one record categorised as
+brakes. Those repairs cannot be filtered, counted, or given their own parts and
+time. Fixing it means one entry writing several linked defects, which is a real
+data-model change and is not in this release.
 
 ## Migration and data safety
 
-No storage migration, no LocalStorage key change, and no stored record rewritten.
-This is one additive catalog entry, one additive note, and layout-only changes to the Down Sheet editor. Existing defects,
-parts associations, filters, locations, Down Sheet records and user data are
-untouched, and a Version 116 backup imports unchanged.
+No LocalStorage key renamed and no stored record rewritten. The Down Sheet entry
+gains five optional fields (`completedBy`, `actionTaken`, `finding`,
+`repairHours`, `diagnosticHours`); an entry saved before this release simply has
+none of them and reads exactly as it did. The one-hour diagnostic floor is
+applied at entry only, never on read.
 
 ## Validation
 
 - Production build passed
-- All 117 regression tests passed
+- All 118 regression tests passed
 - ESLint passed
-- Verified in a real browser at phone width: NVH is first in the category, the
-  note renders directly under the picker at 436px in a 647px form, and a
-  neighbouring entry shows no note
+- Verified end to end in a browser at phone width: scheduled a brake repair,
+  assigned CJ, set workflow to Completed, confirmed FIXED BY prefilled with CJ,
+  typed `0.25` diagnostic hours and watched it become `1`, saved, and confirmed
+  the bus record carried state, completedBy, actionTaken, finding, repairHours
+  and diagnosticHours, that the cause was learned, and that Fixed Repairs showed
+  the fix and the technician with no doubled line
 
 ## After it is live
 
-1. Open the Defect Log and choose **Suspension and Steering**.
-2. Confirm **NVH (noise, vibration, harshness)** is the first choice.
-3. Confirm an amber note appears directly under the picker asking for front or
-   rear, turning or straight, and speed.
-4. Choose *Air bag* and confirm no note appears — most entries carry none.
-5. Open the **Down Sheet** on a phone and tap ADD DOWN BUS. Scroll inside the editor and confirm the page behind it does **not** move. Close it and confirm you are back where you were in the sheet.
-6. Confirm the form is a single column, that REPAIRS & ESTIMATES fills the width, and that SPECIFIC REPAIR reads *Select category first* in full rather than being cut off.
-7. Do the same in the **Defect Log** editor — its scroll lock was broken too and is now fixed.
-8. On an iPad, confirm the Down Sheet editor is still two columns.
+1. On the **Down Sheet**, open an entry, assign a mechanic, and set REPAIR
+   WORKFLOW to **Completed**. A green WHAT WAS DONE block should appear.
+2. Confirm **FIXED BY** is already filled with the assigned mechanic, and that
+   changing ASSIGNMENT TYPE to Vendor leaves it blank instead.
+3. Type `0.25` into DIAGNOSTIC HOURS and confirm it becomes `1`.
+4. Save with the block left completely empty and confirm it still saves — none
+   of those fields may be required.
+5. Open **Fixed Repairs** and confirm the entry shows FIX / STEPS TAKEN, FIXED
+   BY, and the finding, with the repair line reading once rather than twice.
+6. Log a different bus with the same repair in the **Defect Log** and confirm
+   the cause learned from the Down Sheet is offered as a chip.
 
 ## Publishing constraints that still apply
 
@@ -134,5 +141,5 @@ untouched, and a Version 116 backup imports unchanged.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 117 | Live | <published tip hash> | NVH added to Suspension and Steering with a defect note asking for the details that make it actionable, and a phone-usable Down Sheet editor: working scroll locks on both editors, a single-column form, and a repairs section that fills the width instead of collapsing |
+| 118 | Live | <published tip hash> | Down Sheet entries now close out into Fixed Repairs with the fix, finding, hours and technician on them, defaulting to the assigned mechanic; diagnostic time starts at one hour |
 ```
