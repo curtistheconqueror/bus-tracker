@@ -1,12 +1,14 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 116 is validated and awaiting publication approval.**
+**STATUS: NONE PENDING**
+
+Sites Version 116 was published from commit `54b5322` on 2026-08-27. Replace this file with the next complete pending-release handoff in the same push as the next contribution to `main`.
 
 ## Source
 
 - Branch: `main`
-- Release source: the current tip of `main`
-- Previous live release: Sites Version 115 at `d0189f9`
+- Last published source: `54b5322`
+- Current live release: Sites Version 116
 
 ## What changed
 

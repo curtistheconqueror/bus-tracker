@@ -4,8 +4,8 @@ Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 115
-Live feature checkpoint: commit d0189f9
+Live release: Sites Version 116
+Live feature checkpoint: commit 54b5322
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 115 is the current user-approved live release. Its validated source checkpoint is commit d0189f9. Bus Controls now begins with a clearly marked ♿ ⚙️ Door, Ramp and Kneeler Failures group that separates whole-system failures from the existing operator-switch choices. It adds distinct front and rear door open, close, and slow-operation reports; ramp not-working and no-power reports; kneeler malfunction and excessive-height reports; and Miscellaneous choices for three required road-hazard triangles and a missing fire extinguisher. The added marks are display-only and the catalog additions do not rewrite stored defects. It preserves all Version 114 behavior and user data.
+Version 116 is the current user-approved live release. Its validated source checkpoint is commit 54b5322. Full backups now include Fleet Campaigns, campaign templates, and learned diagnostic causes; causes are remembered only under the exact defect issue where they were found. The repair catalog adds parking-brake-knob and rear-air-valve failures, curbside/roadside interior advertising panels and stop-request cords, passenger seating and grab hardware, field-accurate dash-light and start-fault wording, and separated Amerex Fire Suppression, Gas Concentration, and CNG groups. Safety-critical Amerex/CNG choices default to Remove From Service, and rare defect notes expose essential diagnostic or movement cautions. All changes preserve existing LocalStorage keys and use backward-compatible read-time migration where wording changed.
 
 - Fixed Repairs has visible navigation back to Facility Map, Down Sheet, and Defect Log, full-record editing, Undo Fix, confirmed deletion, and a quiet Undo Last control.
 - Fixed Repairs now contains its header, four navigation tabs, summaries, and card actions without inheriting the Facility Map's global element positioning. Add/Edit Fix Details, Undo Fix, and Delete remain in one streamlined phone row.
@@ -73,7 +73,7 @@ Version 115 is the current user-approved live release. Its validated source chec
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 115 production build, lint gate, and all 112 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-27.
+The Version 116 production build, lint gate, and all 116 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-27.
 
 ## Repository and remotes
 
