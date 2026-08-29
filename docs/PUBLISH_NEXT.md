@@ -1,6 +1,8 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 119 is validated and awaiting publication approval.**
+**STATUS: NONE PENDING**
+
+Sites Version 119 was published from commit `b40741f` on 2026-08-29. Replace this file with the next complete pending-release handoff in the same push as the next contribution to `main`.
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
@@ -26,10 +28,10 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Release source | the current tip of `origin/main` |
+| Last published source | `b40741f` |
 | Last code-bearing commit | `7cdc0f1` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
-| Previous live | Version 118, `6f45d14` |
+| Current live | Version 119, `b40741f` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
 release commit. Confirm with `git log --oneline 7cdc0f1..origin/main` that
