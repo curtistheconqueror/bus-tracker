@@ -2952,6 +2952,11 @@ test("dash lights are named as reported, and the start rename does not invert hi
 test("belts, pulley alignment and air bags are catalog repairs, and a counted repair carries its number",async()=>{
  // Engine owns the belts that drive its accessories. Cooling System keeps the
  // pump itself, so the belt and the pump stay separate repairs.
+ // Overheating is reported as an engine complaint before anybody knows it is a
+ // cooling fault, so it sits near the top of Engine. Cooling System keeps its
+ // own, deliberately: the two are the same words about different moments.
+ assert.ok(REPAIR_OPTIONS.Engine.indexOf("Overheating")<REPAIR_OPTIONS.Engine.indexOf("Misfire"));
+ assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Overheating"));
  assert.ok(REPAIR_OPTIONS.Engine.includes("Water pump belt"));
  assert.ok(REPAIR_OPTIONS.Engine.includes("Alternator belt"));
  assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Water pump"));
