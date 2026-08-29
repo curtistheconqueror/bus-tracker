@@ -1,25 +1,26 @@
 # Publish next
 
-**STATUS: NONE PENDING**
+**STATUS: PENDING**
 
-Sites Version 120 was published from commit 791b357 on 2026-08-29. Replace this file with the next complete pending-release handoff in the same push as the next contribution to main.
+Curtis approved automatic validation and live publication for this small, clearly scoped catalog correction.
 
 ## Source
 
 - Branch: main
-- Last published source: 791b357
-- Last code-bearing commit: fdb1c06
-- Current live release: Sites Version 120 at 791b357
+- Source commit: e4a6b8c79f9ac4eaa0fcca8abb1bc93f35f3c048
+- Intended release: Sites Version 121
+- Current live release: Sites Version 120
 
 ## What changed
 
-The Quick Filter previously displayed **Potential No Cabin Heat** in its menu and **No Heat** after selection. Both labels now consistently read **No Heat Buses**. The surge-tank field note uses the same wording.
+The vague **Air bag** choice under **Suspension and Steering** was retired from new entries and replaced with two clear choices:
 
-Curtis explicitly approved automatic validation and live publication for small, clearly scoped wording or catalog corrections. The publishing runbook records that standing rule without extending it to behavioral, storage, backend, or destructive changes.
+- **Front air bag leak**
+- **Rear air bag leak**
 
 ## Migration and data safety
 
-Display wording only. The stable filter key remains no-cabin-heat; its matching logic, LocalStorage, fleet records, repairs, locations, and user data are unchanged.
+No LocalStorage keys or stored records are changed. Existing defects already saved as **Air bag** retain that exact wording and remain readable and editable through the established historical-option fallback.
 
 ## Validation
 
@@ -30,6 +31,7 @@ Display wording only. The stable filter key remains no-cabin-heat; its matching 
 
 ## After it is live
 
-1. Open QUICK FILTERS and confirm the menu says **No Heat Buses**.
-2. Select it and confirm the active filter also says **No Heat Buses**.
-3. Confirm it still returns heating-side or both-sides surge-tank defects and Heater / defroster defects, without adding overheating buses.
+1. Open the Defect Log and start a new defect.
+2. Choose **Suspension and Steering**.
+3. Confirm **Front air bag leak** and **Rear air bag leak** are available.
+4. Confirm the vague **Air bag** choice is not offered for new entries.
