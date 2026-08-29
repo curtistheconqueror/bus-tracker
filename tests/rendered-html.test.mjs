@@ -4326,6 +4326,9 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
 
  // loose steering is a distinct driver complaint, not "steering pull"
  const steering=REPAIR_OPTIONS["Suspension and Steering"];
+ assert.ok(steering.includes("Front air bag leak"));
+ assert.ok(steering.includes("Rear air bag leak"));
+ assert.equal(steering.includes("Air bag"),false,"the vague legacy choice is retired from new entries");
  assert.ok(steering.includes("Loose steering"));
  assert.ok(steering.indexOf("Loose steering")<steering.indexOf("Steering pull"));
  // A count here breaks on every legitimate addition and proves nothing. What
