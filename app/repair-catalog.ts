@@ -72,8 +72,8 @@ export type StructuredDefect={
 };
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
- "A/C and HVAC":["No cooling","Compressor","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
+ "A/C and HVAC":["No cooling","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
+ "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
@@ -88,7 +88,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Doors, Ramp and ADA":["Doors - Front door","Doors - Rear door","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request (wheelchair area)","Stop Request - Stop request (curbside)","Stop Request - Stop request (roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
- "Air System":["Air leak","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 relay valve (C/S rear)","R-14 relay valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
+ "Air System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 relay valve (C/S rear)","R-14 relay valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
@@ -177,6 +177,9 @@ const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"ðŸ
    the obvious repair is not the whole job, or where what looks like a fix is
    really a way of moving the bus. */
 const DEFECT_NOTES:Record<string,Record<string,string>>={
+ "A/C and HVAC":{
+  "A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
+ },
  "Suspension and Steering":{
   "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
  },
@@ -191,6 +194,43 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
 export function defectNote(category:unknown,issue:unknown){
  const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
  return DEFECT_NOTES[moved.category]?.[moved.issue]||"";
+}
+
+/* A number that belongs to the repair itself rather than to its description.
+   Radiator fans are reported as a count still out; air bags are recorded as a
+   count replaced, because the leak shows at one corner while the bags come off
+   in pairs, and "how many went on" is the fact nobody can reconstruct later
+   from the words.
+
+   Kept as a table so a counted repair is declared beside the defect it belongs
+   to, rather than hard-coded into each of the three forms that have to draw the
+   field. The ceiling is the axle's, not the bus's: two across the front and
+   four across the rear. */
+export type DefectCountField={label:string;unit:string;max:number;required:boolean;prompt:string};
+const airBagCount=(max:number):DefectCountField=>({label:"AIR BAGS REPLACED",unit:"replaced",max,required:false,prompt:"Optional â€” how many went on"});
+const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
+ "Cooling System":{
+  "Radiator fan(s) out":{label:"FANS OUT",unit:"fans",max:8,required:true,prompt:"Select 1 through 8"},
+ },
+ "Air System":{
+  "Leaking air bag - Front C/S":airBagCount(2),
+  "Leaking air bag - Front R/S":airBagCount(2),
+  "Leaking air bag - Rear":airBagCount(4),
+ },
+};
+export function defectCountField(category:unknown,issue:unknown){
+ const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
+ return DEFECT_COUNT_FIELDS[moved.category]?.[moved.issue];
+}
+/* A whole positive count on a repair that is counted, and nothing anywhere
+   else, so a number left over from a repair retyped as something uncounted
+   cannot follow it. The ceiling shapes the picker but is not enforced here: a
+   count already recorded must not disappear because the table later says the
+   axle holds fewer. */
+export function normalizeRepairCount(value:unknown,category:unknown,issue:unknown){
+ if(!defectCountField(category,issue))return undefined;
+ const count=Math.round(Number(value));
+ return Number.isFinite(count)&&count>0?count:undefined;
 }
 
 export function repairGroupDisplayLabel(group:string){
@@ -523,7 +563,11 @@ export function defectSupportingDetails(defect:StructuredDefect){
 }
 export function defectLabel(defect:StructuredDefect){
  if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();
- const quantity=typeof defect.quantity==="number"&&defect.quantity>0?defect.quantity+" "+(defect.unit||"quarts"):"";
+ /* The stored unit wins, then the one the catalog declares for this repair, and
+    only then quarts. Without the middle step a count saved on a record whose
+    unit never got written reads as "2 quarts" of air bag. */
+ const unit=defect.unit||defectCountField(defect.category,defect.issue)?.unit||"quarts";
+ const quantity=typeof defect.quantity==="number"&&defect.quantity>0?defect.quantity+" "+unit:"";
  /* The finding sits ahead of the reported symptoms: once the cause is known it
     is the more useful half of the line, and on a Down Sheet that is often all
     anyone reads before deciding what the bus needs. */

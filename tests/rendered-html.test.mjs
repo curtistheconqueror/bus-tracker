@@ -11,7 +11,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectFromDraft, defectNote, normalizeDiagnosticHours, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2138,9 +2138,12 @@ test("Bus Controls and Cooling System expose field-ready defect choices", async 
   assert.match(catalog,/"Radiator fan diagnostic light"/);
   assert.match(catalog,/"Radiator fans constantly running on high"/);
   assert.match(catalog,/"Radiator leak"/);
-  assert.match(page,/fanCountMode=value\.defect\.category==="Cooling System"/);
-  assert.match(page,/Array\.from\(\{length:8\}/);
-  assert.match(page,/Select how many radiator fans are out \(1 through 8\)/);
+  /* The fan count is no longer a category test written into the form. It is one
+     row of the catalog's count table, which is the only reason air bags could
+     be added without a second copy of the same code. */
+  assert.match(page,/countField=defectCountField\(value\.defect\.category,value\.quickIssue\)/);
+  assert.match(page,/Array\.from\(\{length:countField\.max\}/);
+  assert.match(catalog,/"Radiator fan\(s\) out":\{label:"FANS OUT",unit:"fans",max:8,required:true/);
   assert.match(page,/save-log-middle[\s\S]*downsheet-check/);
   assert.match(page,/advanced-defect-details/);
 });
@@ -2944,6 +2947,64 @@ test("dash lights are named as reported, and the start rename does not invert hi
  // memory key runs through the same migration
  const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
+test("belts, pulley alignment and air bags are catalog repairs, and a counted repair carries its number",async()=>{
+ // Engine owns the belts that drive its accessories. Cooling System keeps the
+ // pump itself, so the belt and the pump stay separate repairs.
+ assert.ok(REPAIR_OPTIONS.Engine.includes("Water pump belt"));
+ assert.ok(REPAIR_OPTIONS.Engine.includes("Alternator belt"));
+ assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Water pump"));
+ assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
+ assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
+ assert.deepEqual(REPAIR_OPTIONS["Air System"].slice(0,4),
+  ["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear"]);
+
+ // A belt fitted to a pulley out of line comes back, so the note says to check
+ // it with a straight edge before the belt is ordered.
+ assert.match(defectNote("A/C and HVAC","A/C compressor pulley misaligned"),/straight edge/i);
+
+ // The ceiling is the axle's: two across the front, four across the rear.
+ assert.equal(defectCountField("Air System","Leaking air bag - Front C/S").max,2);
+ assert.equal(defectCountField("Air System","Leaking air bag - Front R/S").max,2);
+ assert.equal(defectCountField("Air System","Leaking air bag - Rear").max,4);
+ // Counted, but never blocking a report: the number is known when the bags go
+ // on, not when the leak is found.
+ assert.equal(defectCountField("Air System","Leaking air bag - Rear").required,false);
+ assert.equal(defectCountField("Cooling System","Radiator fan(s) out").required,true);
+ assert.equal(defectCountField("Air System","Air leak"),undefined);
+
+ // Quarts is the fallback the oil entry taught the label. Without the catalog
+ // between them, an air bag count read as "2 quarts".
+ const bag={id:"d1",category:"Air System",issue:"Leaking air bag - Front C/S",details:"",operability:"service",state:"completed",quantity:2};
+ assert.match(defectLabel(bag),/2 replaced/);
+ assert.doesNotMatch(defectLabel(bag),/quarts/);
+ assert.match(defectLabel({...bag,category:"Preventive Maintenance",issue:"Add engine oil",quantity:10,unit:"quarts"}),/10 quarts/);
+
+ // A count cannot follow a repair retyped as something that is not counted.
+ assert.equal(normalizeRepairCount(2,"Air System","Leaking air bag - Rear"),2);
+ assert.equal(normalizeRepairCount(3,"Air System","Air compressor"),undefined);
+ assert.equal(normalizeRepairCount("",'Air System',"Leaking air bag - Rear"),undefined);
+ // Already recorded and above today's ceiling: kept, because a table that later
+ // says the axle holds fewer must not delete work somebody did.
+ assert.equal(normalizeRepairCount(6,"Air System","Leaking air bag - Rear"),6);
+
+ // The count reaches Fixed Repairs from the Down Sheet with its unit attached.
+ const [synced]=applyDownEntryToFleet([{id:"a",l:"bay-3",s:"defect",defects:[],pendingRepair:""}],
+  {id:"e9",busId:"a",category:"Air System",repair:"Leaking air bag - Rear",customReason:"",
+   assignmentType:"Mechanic",assignedTo:"cj",workflow:"Completed",operationalStatus:"out",
+   repairItems:[{id:"i1",category:"Air System",repair:"Leaking air bag - Rear",details:"",done:true,quantity:4,repairHours:3}]},
+  "2026-08-29T15:00:00.000Z");
+ assert.equal(synced.defects[0].quantity,4);
+ assert.equal(synced.defects[0].unit,"replaced");
+ assert.match(defectLabel(synced.defects[0]),/4 replaced/);
+
+ // The card keeps the count across a save, and drops one left on a repair that
+ // does not carry a number.
+ const [kept]=normalizeRepairItems([{id:"i1",category:"Air System",repair:"Leaking air bag - Front R/S",details:"",quantity:2}],{});
+ assert.equal(kept.quantity,2);
+ const [dropped]=normalizeRepairItems([{id:"i1",category:"Air System",repair:"Air dryer",details:"",quantity:2}],{});
+ assert.equal(dropped.quantity,undefined);
 });
 
 test("one repair on the sheet is one defect on the bus",async()=>{

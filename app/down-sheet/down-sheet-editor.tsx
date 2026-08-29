@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect, useMemo, useState} from "react";
-import {MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "../findings-memory";
 import {lockPageScroll} from "../scroll-lock";
 import {
@@ -134,9 +134,15 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
               <div className="repair-item-fields">
-                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
-                <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
+                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
+                <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,quantity:undefined,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
                 <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
+                {/* Sits with the repair, not inside the completion block: a fan
+                    count is what was reported and an air bag count is what the
+                    job will take, and both are known before the tick. */}
+                {defectCountField(item.category,item.repair)&&(()=>{const field=defectCountField(item.category,item.repair)!;
+                 return <label className="repair-item-count">{field.label}<select value={item.quantity===undefined?"":String(item.quantity)} onChange={event=>updateItem(item.id,current=>({...current,quantity:event.target.value?Number(event.target.value):undefined}))}><option value="">{field.prompt}</option>{Array.from({length:field.max},(_,count)=>count+1).map(count=><option value={String(count)} key={count}>{count}</option>)}</select></label>;
+                })()}
                 {item.done&&<div className="wide item-completion">
                  <b>WHAT WAS DONE — GOES TO FIXED REPAIRS</b>
                  <label className="wide">FIX / STEPS TAKEN<textarea value={item.actionTaken||""} onChange={event=>updateItem(item.id,current=>({...current,actionTaken:event.target.value}))} placeholder="What was repaired, adjusted, replaced or reset?"/></label>

@@ -1,4 +1,4 @@
-import {normalizeFinding, normalizeRepairHours} from "../repair-catalog.ts";
+import {normalizeFinding, normalizeRepairCount, normalizeRepairHours} from "../repair-catalog.ts";
 import {
   normalizeRepairTimeEstimate,
   repairTimeTotal,
@@ -21,6 +21,9 @@ export type DownSheetRepairItem = {
      three times over as each repair became its own record. */
   actionTaken?: string;
   finding?: string;
+  /* How many, where the repair is counted rather than described: air bags
+     replaced, radiator fans out. The catalog says which repairs carry one. */
+  quantity?: number;
   repairHours?: number;
   diagnosticHours?: number;
 };
@@ -71,6 +74,7 @@ export function normalizeRepairItems(
         done: source.done === true || legacy.entryCompleted === true,
         actionTaken: typeof source.actionTaken === "string" ? source.actionTaken : "",
         finding: normalizeFinding(source.finding),
+        quantity: normalizeRepairCount(source.quantity, category, repair),
         repairHours: normalizeRepairHours(source.repairHours),
         diagnosticHours: normalizeRepairHours(source.diagnosticHours),
       };

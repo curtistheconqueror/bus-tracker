@@ -1,4 +1,4 @@
-import {defectSummary,normalizeDefects,normalizeFinding,normalizeRepairHours,type StructuredDefect} from "../repair-catalog.ts";
+import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../repair-catalog.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 import {statusForLocation} from "../smart-status.ts";
 
@@ -25,6 +25,7 @@ export type SyncRepairItem={
  done?:boolean;
  actionTaken?:string;
  finding?:string;
+ quantity?:number;
  repairHours?:number;
  diagnosticHours?:number;
 };
@@ -77,7 +78,7 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  const items=(entry.repairItems||[]).filter(item=>clean(item.category)||clean(item.repair)||clean(item.details));
  const legacyIds=[clean(entry.defectId),"downsheet-"+entryKey(entry),"downsheet-"+entry.busId].filter(Boolean);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
- if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,repairHours:undefined,diagnosticHours:undefined}];
+ if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined}];
  const taken=new Set<string>();
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
@@ -85,7 +86,7 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
   const id=adopts?legacy.id:own;
   taken.add(id);
   return {id,category:item.category,repair:item.repair,details:item.details,done:item.done===true,
-   actionTaken:item.actionTaken,finding:item.finding,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
+   actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
  });
 }
 
@@ -122,6 +123,11 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
     completedBy:completed?(clean(entry.completedBy)||linked?.completedBy||assignedMechanic(entry)):linked?.completedBy,
     actionTaken:clean(target.actionTaken)||linked?.actionTaken,
     finding:normalizeFinding(target.finding)||linked?.finding,
+    /* The unit travels with the count. Written from the catalog rather than
+       carried on the card, so the record reads "2 replaced" and never falls
+       back to the quarts the oil entry taught the label. */
+    quantity:normalizeRepairCount(target.quantity,target.category,target.repair)??linked?.quantity,
+    unit:defectCountField(target.category,target.repair)?.unit||linked?.unit,
     repairHours:normalizeRepairHours(target.repairHours)??linked?.repairHours,
     diagnosticHours:normalizeRepairHours(target.diagnosticHours)??linked?.diagnosticHours,
     source:linked?.source||"down-sheet"};
