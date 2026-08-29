@@ -31,6 +31,7 @@ The recurring timeout did not indicate a failed build, a bad public-site configu
 Publishing is an external production change.
 
 - Obtain explicit user approval for the exact release.
+- Curtis's direct request for a small, clearly scoped wording or catalog correction includes approval to validate and publish that correction live without asking a second time. This standing approval does not cover broader behavioral, storage, backend, or destructive changes.
 - Confirm whether the existing site is public, shared, or owner-only immediately before deployment.
 - For this public site, use the public deployment operation only after approval.
 - A prior successful build or commit is not publishing approval.

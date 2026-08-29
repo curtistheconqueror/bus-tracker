@@ -18,7 +18,7 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
     of a split surge tank can sit empty all summer without anybody noticing,
     because nothing about the bus is wrong until the first cold morning, and by
     then the list is a queue rather than a plan. */
- {key:"no-cabin-heat",label:"Potential No Cabin Heat",shortLabel:"No Heat"},
+ {key:"no-cabin-heat",label:"No Heat Buses",shortLabel:"No Heat Buses"},
  {key:"not-duplicated",label:"Defect / Condition Not Duplicated",shortLabel:"Not Duplicated"},
  /* First in the list is tempting and wrong: the others answer "what is broken",
     this one answers "what am I asking somebody to schedule". It sits at the end

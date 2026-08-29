@@ -184,7 +184,7 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
     talk to each other. Somebody who does not know that tops up the side they
     can see and walks away from a bus that will have no heat in December. */
  "Cooling System":{
-  "Surge tank - heating side low":"This side feeds cabin heat only, and it is independent of the engine side — a full engine side says nothing about this one. Empty here means no cabin heat when the weather turns. The winter list is QUICK FILTERS → Potential No Cabin Heat.",
+  "Surge tank - heating side low":"This side feeds cabin heat only, and it is independent of the engine side — a full engine side says nothing about this one. Empty here means no cabin heat when the weather turns. The winter list is QUICK FILTERS → No Heat Buses.",
   "Surge tank - both sides low":"Two halves that cannot drain into each other went down together, which points at a leak somewhere they share rather than two separate ones. Worth finding before either side is topped up again.",
  },
  "Suspension and Steering":{

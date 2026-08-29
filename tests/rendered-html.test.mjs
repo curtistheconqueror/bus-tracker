@@ -2999,7 +2999,7 @@ test("the split surge tank is two independent sides, and the empty one builds th
 
  // The filter reaches every surface that renders the menu, and carries a label
  // for the share text, which is how the list gets handed to somebody else.
- assert.ok(QUICK_FILTERS.some(item=>item.key==="no-cabin-heat"&&item.label==="Potential No Cabin Heat"));
+ assert.ok(QUICK_FILTERS.some(item=>item.key==="no-cabin-heat"&&item.label==="No Heat Buses"&&item.shortLabel==="No Heat Buses"));
  assert.equal(typeof quickFilterFallbackLabel("no-cabin-heat"),"string");
  assert.ok(quickFilterFallbackLabel("no-cabin-heat").length>0);
 });
