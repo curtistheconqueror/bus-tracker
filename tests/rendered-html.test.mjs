@@ -2973,6 +2973,28 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  assert.ok(REPAIR_OPTIONS.Engine.indexOf("Coolant leak")<REPAIR_OPTIONS.Engine.indexOf("Misfire"));
  assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Coolant leak"));
 
+ // Heat reads as one scale in the order it climbs, and each end carries its own
+ // number so nobody has to be told what counts as hot.
+ assert.deepEqual(REPAIR_OPTIONS.Engine.slice(
+  REPAIR_OPTIONS.Engine.indexOf("Engine runs hot (207F+)"),
+  REPAIR_OPTIONS.Engine.indexOf("Engine runs hot (207F+)")+3),
+  ["Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)"]);
+ // Eight or ten over finishes the day; an engine that shut itself down has
+ // already taken the bus off the road, so the picker must not open on service.
+ assert.equal(defaultDefectOperability("Engine","Engine runs hot (207F+)"),"service");
+ assert.equal(defaultDefectOperability("Engine","Overheating"),"service");
+ assert.equal(defaultDefectOperability("Engine","Overheat shutdown (235-240F)"),"down");
+
+ // The Facility Map picker used to consult that table for Interior Cleaning
+ // alone, so every downing repair added since opened there on May Stay In
+ // Service. It reads the table for whatever category is picked now.
+ // There are two of these pickers, and the narrow test was copied into both,
+ // so the count is asserted: fixing one and leaving the other is the failure
+ // this catches.
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.equal(map.match(/if\(newDefect\.issue\)setNewDefect\(current=>\(\{\.\.\.current,operability:defaultDefectOperability\(current\.category,current\.issue\)\}\)\)/g)?.length,2);
+ assert.doesNotMatch(map,/newDefect\.category==="Interior Cleaning"&&newDefect\.issue/);
+
  // Both live above the no-start symptoms, because they fail often enough that
  // burying them under the whole list costs somebody a scroll every time.
  const charging=REPAIR_OPTIONS["Battery, Starting and Charging"];

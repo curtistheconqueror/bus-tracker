@@ -73,7 +73,7 @@ export type StructuredDefect={
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
- "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Overheating","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
+ "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
@@ -426,6 +426,10 @@ export function defectFromDraft(draft:Omit<StructuredDefect,"id">,mode:"select"|
    These two states take the bus off the road on their own, so the picker starts
    them as Remove From Service rather than leaving a mechanic to remember. */
 const DOWNING_ISSUES:Record<string,readonly string[]>={
+ /* The engine has already taken itself off the road at this point, so the
+    picker must not open on May Stay In Service. Running hot is the opposite
+    case and stays in service on purpose: eight or ten over finishes the day. */
+ "Engine":["Overheat shutdown (235-240F)"],
  "Interior Cleaning":["Cleaning Required"],
  "Amerex":["Gas Concentration - Significant Leak","Fire Suppression - FIRE alarm (system discharged)","CNG - PRD leaking"],
 };
