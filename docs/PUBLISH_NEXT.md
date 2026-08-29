@@ -27,13 +27,13 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `63f5b93` — everything after it is documentation only |
+| Last code-bearing commit | `db6d27b` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 63f5b93..origin/main` that
-nothing but `docs/` changed after `63f5b93`, and publish the tip.
+release commit. Confirm with `git log --oneline db6d27b..origin/main` that
+nothing but `docs/` changed after `db6d27b`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
@@ -67,9 +67,18 @@ the sheet for.
 
 ### Belts, pulley alignment, and air bags that get counted
 
-Three additions to the picker, and one of them needed a number to go with it.
+Four additions to the picker, and one of them needed a number to go with it.
 
-**Engine** gains **Water pump belt** and **Alternator belt**. Cooling System
+**Engine** gains **Overheating**, directly under the three dash lights.
+Overheating is what gets reported before anybody knows whether it is a fan, a
+thermostat or the pump, and it gets reported as an engine problem. Cooling
+System keeps its own **Overheating** deliberately — the two are the same word
+about different moments, the complaint that came in and the system the fault
+turned out to be in — and no stored record is remapped between them. Causes
+stay free text for now; the learned catalog offers back whatever this shop
+actually finds under it.
+
+**Engine** also gains **Water pump belt** and **Alternator belt**. Cooling System
 keeps the pump itself, so the belt and the pump stay separate jobs rather than
 one entry that could mean either.
 
@@ -159,6 +168,8 @@ publish.
     and still refuses to save without one.
 12. Pick **A/C and HVAC → A/C compressor pulley misaligned** and confirm the
     straight-edge note appears under the picker.
+13. Confirm **Engine** lists **Overheating** just under the three dash lights,
+    and that **Cooling System** still lists its own.
 
 ## Publishing constraints that still apply
 
@@ -171,5 +182,5 @@ publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; water pump, alternator and A/C belts, A/C compressor pulley misalignment, and leaking air bags front and rear with a count of how many were replaced |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine overheating, water pump, alternator and A/C belts, A/C compressor pulley misalignment, and leaking air bags front and rear with a count of how many were replaced |
 ```
