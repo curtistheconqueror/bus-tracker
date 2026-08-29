@@ -27,13 +27,13 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `b5a14b5` — everything after it is documentation only |
+| Last code-bearing commit | `d5c89ce` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline b5a14b5..origin/main` that
-nothing but `docs/` changed after `b5a14b5`, and publish the tip.
+release commit. Confirm with `git log --oneline d5c89ce..origin/main` that
+nothing but `docs/` changed after `d5c89ce`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
@@ -110,9 +110,18 @@ could mean any of them.
 **Battery, Starting and Charging** gains **Voltage regulator** and **Alternator
 failure**, placed fourth and fifth — above the no-start symptoms — because they
 fail often and burying a frequent failure under the whole list costs a scroll
-every time. **Alternator / charging** is deliberately left in place: renaming it
-would restate every record already logged under it as a confirmed failure, which
-is a diagnosis nobody made.
+every time.
+
+The old **Alternator / charging** is **retired from the picker**. Two alternator
+entries in one dropdown is a coin flip for somebody standing at a bus, and once
+those two exist it has no job left that "Starting / charging diagnosis" and
+"Other starting or charging repair" are not already doing. It is dropped rather
+than pointed at Alternator failure: a rename would restate every record already
+logged under it as a confirmed failure, and nobody made that call. **Records
+keep the exact words they were saved with**, and every picker offers the stored
+value back as logged — including the Down Sheet repair card, which had no such
+option and would have rendered an empty select on an entry carrying a retired
+name, which is how somebody ends up picking something else over the top of it.
 
 **A/C and HVAC** gains **A/C belt** and **A/C compressor pulley misaligned**.
 The second is why the first keeps coming back: a compressor pulley out of line
@@ -229,7 +238,12 @@ publish.
     pulley, Tensioner pulley, Fan drive pulley** as five consecutive entries.
 17. Confirm **Battery, Starting and Charging** lists **Voltage regulator** then
     **Alternator failure** fourth and fifth, above **No crank**, and that
-    **Alternator / charging** is still in the list further down.
+    **Alternator / charging** is no longer offered as a fresh choice.
+18. **Open a repair already logged as "Alternator / charging"** — on the Down
+    Sheet, in the Defect Log, and in Fixed Repairs — and confirm each one still
+    shows those exact words rather than an empty picker, and that saving it
+    without editing leaves the record unchanged. This is the one thing worth
+    checking first, because it is what retiring an entry could break.
 
 ## Publishing constraints that still apply
 
@@ -242,5 +256,5 @@ publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine heat as a scale from runs hot at 207F to an overheat shutdown that removes the bus from service, engine coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure, and leaking air bags front and rear with a count of how many were replaced |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine heat as a scale from runs hot at 207F to an overheat shutdown that removes the bus from service, engine coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure replacing the vaguer alternator entry, and leaking air bags front and rear with a count of how many were replaced |
 ```
