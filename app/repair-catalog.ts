@@ -74,7 +74,7 @@ export type StructuredDefect={
 export const REPAIR_OPTIONS:Record<string,string[]>={
  "A/C and HVAC":["No cooling","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Blower motor","Refrigerant leak","Controls / electrical","Heater / defroster","Other A/C repair"],
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
- "Cooling System":["Overheating","Coolant leak","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
+ "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
@@ -180,6 +180,13 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
  "A/C and HVAC":{
   "A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
  },
+ /* The surge tank on the 17s, 18s and 20s is split, and the two halves do not
+    talk to each other. Somebody who does not know that tops up the side they
+    can see and walks away from a bus that will have no heat in December. */
+ "Cooling System":{
+  "Surge tank - heating side low":"This side feeds cabin heat only, and it is independent of the engine side — a full engine side says nothing about this one. Empty here means no cabin heat when the weather turns. The winter list is QUICK FILTERS → Potential No Cabin Heat.",
+  "Surge tank - both sides low":"Two halves that cannot drain into each other went down together, which points at a leak somewhere they share rather than two separate ones. Worth finding before either side is topped up again.",
+ },
  "Suspension and Steering":{
   "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
  },
@@ -208,9 +215,16 @@ export function defectNote(category:unknown,issue:unknown){
    four across the rear. */
 export type DefectCountField={label:string;unit:string;max:number;required:boolean;prompt:string};
 const airBagCount=(max:number):DefectCountField=>({label:"AIR BAGS REPLACED",unit:"replaced",max,required:false,prompt:"Optional — how many went on"});
+const coolantAdded:DefectCountField={label:"COOLANT ADDED",unit:"quarts",max:12,required:false,prompt:"Optional — quarts added"};
 const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
  "Cooling System":{
   "Radiator fan(s) out":{label:"FANS OUT",unit:"fans",max:8,required:true,prompt:"Select 1 through 8"},
+  /* How much a tank drinks is the only measure of how fast it is losing it.
+     Two quarts on Monday and two more on Thursday is a leak; one quart once is
+     a top-up, and the words alone cannot tell those apart a month later. */
+  "Surge tank - engine side low":coolantAdded,
+  "Surge tank - heating side low":coolantAdded,
+  "Surge tank - both sides low":coolantAdded,
  },
  "Air System":{
   "Leaking air bag - Front C/S":airBagCount(2),

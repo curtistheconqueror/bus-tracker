@@ -31,7 +31,7 @@ import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-she
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
-import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterMatch } from "../app/quick-filters.ts";
+import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterMatch } from "../app/quick-filters.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -428,7 +428,10 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
     {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,10);
+  assert.equal(QUICK_FILTERS.length,11);
+  /* Recommended for Down Sheet stays last on purpose: the others answer "what
+     is broken" and it answers "what am I asking somebody to schedule". */
+  assert.equal(QUICK_FILTERS.at(-1).key,"down-sheet-recommended");
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
@@ -2947,6 +2950,58 @@ test("dash lights are named as reported, and the start rename does not invert hi
  // memory key runs through the same migration
  const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
+test("the split surge tank is two independent sides, and the empty one builds the winter list",async()=>{
+ const cooling=REPAIR_OPTIONS["Cooling System"];
+ assert.deepEqual(cooling.slice(cooling.indexOf("Coolant leak"),cooling.indexOf("Coolant leak")+4),
+  ["Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low"]);
+
+ // How much a tank drinks is the only measure of how fast it is losing it, so
+ // every side carries the amount. None of them blocks a report for it.
+ for(const side of ["engine side","heating side","both sides"]){
+  const field=defectCountField("Cooling System","Surge tank - "+side+" low");
+  assert.equal(field.label,"COOLANT ADDED");
+  assert.equal(field.unit,"quarts");
+  assert.equal(field.required,false);
+ }
+ const topped={id:"d1",category:"Cooling System",issue:"Surge tank - engine side low",details:"",operability:"service",state:"open",quantity:2};
+ assert.match(defectLabel(topped),/2 quarts/);
+
+ // A mechanic who does not know the tank is split tops up the side he can see
+ // and walks away from a bus that will have no heat in December.
+ assert.match(defectNote("Cooling System","Surge tank - heating side low"),/independent of the engine side/i);
+ assert.match(defectNote("Cooling System","Surge tank - both sides low"),/leak somewhere they share/i);
+ assert.equal(defectNote("Cooling System","Surge tank - engine side low"),"");
+
+ const bus=defects=>({id:"b",n:"17549",defects:defects.map((issue,index)=>({
+  id:"d"+index,category:"Cooling System",issue,details:"",operability:"service",state:"open"}))});
+ assert.ok(quickFilterMatch(bus(["Surge tank - heating side low"]),"no-cabin-heat"));
+ assert.ok(quickFilterMatch(bus(["Surge tank - both sides low"]),"no-cabin-heat"));
+ // The engine side says nothing about the cabin, which is the whole point of
+ // the two being separate.
+ assert.ok(!quickFilterMatch(bus(["Surge tank - engine side low"]),"no-cabin-heat"));
+ // A heater defect is the other way a bus arrives at winter with no heat.
+ assert.ok(quickFilterMatch({id:"b",defects:[{id:"d",category:"A/C and HVAC",issue:"Heater / defroster",details:"",operability:"service",state:"open"}]},"no-cabin-heat"));
+
+ // Matching the word "heat" would have pulled in all of these. A winter list
+ // that returns an overheating bus is one somebody checks once and abandons.
+ for(const wrong of [
+  {category:"Engine",issue:"Overheating"},
+  {category:"Engine",issue:"Overheat shutdown (235-240F)"},
+  {category:"Amerex",issue:"Fire Suppression - Heat sensor communication fault"},
+  {category:"Cooling System",issue:"Radiator leak",details:"heat soaked the hose"},
+ ]) assert.ok(!quickFilterMatch({id:"b",defects:[{id:"d",details:"",operability:"service",state:"open",...wrong}]},"no-cabin-heat"),
+  wrong.issue+" must not reach the winter list");
+
+ // A bus already fixed is off the list, the same rule every other filter uses.
+ assert.ok(!quickFilterMatch({id:"b",defects:[{id:"d",category:"Cooling System",issue:"Surge tank - heating side low",details:"",operability:"service",state:"completed"}]},"no-cabin-heat"));
+
+ // The filter reaches every surface that renders the menu, and carries a label
+ // for the share text, which is how the list gets handed to somebody else.
+ assert.ok(QUICK_FILTERS.some(item=>item.key==="no-cabin-heat"&&item.label==="Potential No Cabin Heat"));
+ assert.equal(typeof quickFilterFallbackLabel("no-cabin-heat"),"string");
+ assert.ok(quickFilterFallbackLabel("no-cabin-heat").length>0);
 });
 
 test("belts, pulley alignment and air bags are catalog repairs, and a counted repair carries its number",async()=>{

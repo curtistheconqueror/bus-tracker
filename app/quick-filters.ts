@@ -1,6 +1,6 @@
 import {isDownSheetRecommended,isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
 
-export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"not-duplicated"|"down-sheet-recommended";
+export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended";
 export type QuickFilterBus={
  id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];
 };
@@ -14,6 +14,11 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
  {key:"ibs-ventra",label:"IBS & Ventra",shortLabel:"IBS/Ventra"},
  {key:"leak",label:"Leaks",shortLabel:"Leaks"},
  {key:"add-oil",label:"Add Oil",shortLabel:"Oil"},
+ /* The winter list. It is built in the warm months on purpose: the heating side
+    of a split surge tank can sit empty all summer without anybody noticing,
+    because nothing about the bus is wrong until the first cold morning, and by
+    then the list is a queue rather than a plan. */
+ {key:"no-cabin-heat",label:"Potential No Cabin Heat",shortLabel:"No Heat"},
  {key:"not-duplicated",label:"Defect / Condition Not Duplicated",shortLabel:"Not Duplicated"},
  /* First in the list is tempting and wrong: the others answer "what is broken",
     this one answers "what am I asking somebody to schedule". It sits at the end
@@ -30,6 +35,11 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  if(key==="farebox")return /\bfare\s*box\b|\bfarebox\b/i.test(text);
  if(key==="ibs-ventra")return /\b(?:ibs|ventra)\b/i.test(text);
  if(key==="leak")return /\b(?:leak|leaks|leaking|seep|seeping)\b/i.test(text);
+ /* Matched on the repair rather than on the word "heat", which appears in
+    Amerex heat sensors, in Overheating, and in half the estimate notes in the
+    fleet. A winter list that pulls in an overheating bus is a list somebody
+    checks once and then stops trusting. */
+ if(key==="no-cabin-heat")return /\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)||/\bheater\s*\/\s*defroster\b/i.test(text);
  if(key==="not-duplicated"||key==="down-sheet-recommended")return false;
  return /\b(?:add(?:ed|ing)?|needs?|low)\s+(?:(?:\d+(?:\.\d+)?\s*)?(?:qt|qts|quart|quarts)\s+(?:of\s+)?)?(?:engine\s+)?oil\b|\b(?:engine\s+)?oil\s+(?:low|needed|required)\b/i.test(text);
 }
@@ -69,6 +79,7 @@ export function quickFilterFallbackLabel(key:QuickFilterKey){
   "ibs-ventra":"IBS / Ventra tracker flag",
   leak:"Leak tracker flag",
   "add-oil":"Add-oil tracker flag",
+  "no-cabin-heat":"Cabin-heat tracker flag",
   "not-duplicated":"Defect / condition not duplicated",
   "down-sheet-recommended":"Recommended for the Down Sheet",
  } as Record<QuickFilterKey,string>)[key];
