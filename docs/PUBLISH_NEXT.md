@@ -27,19 +27,19 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `4a307f0` — everything after it is documentation only |
+| Last code-bearing commit | `63f5b93` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 4a307f0..origin/main` that
-nothing but `docs/` changed after `4a307f0`, and publish the tip.
+release commit. Confirm with `git log --oneline 63f5b93..origin/main` that
+nothing but `docs/` changed after `63f5b93`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed.
 
-Gate: 119 tests passing, ESLint clean, production build succeeds.
+Gate: 120 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -65,18 +65,60 @@ The sheet row reads **1 OF 2 DONE**. Without it a bus with half its work finishe
 looked exactly like one nobody had touched, which is the thing a foreman scans
 the sheet for.
 
+### Belts, pulley alignment, and air bags that get counted
+
+Three additions to the picker, and one of them needed a number to go with it.
+
+**Engine** gains **Water pump belt** and **Alternator belt**. Cooling System
+keeps the pump itself, so the belt and the pump stay separate jobs rather than
+one entry that could mean either.
+
+**A/C and HVAC** gains **A/C belt** and **A/C compressor pulley misaligned**.
+The second is why the first keeps coming back: a compressor pulley out of line
+with the crank pulley eats belts, so a belt fitted without checking it is a
+repeat repair. Picking it shows a note to lay a straight edge across the two
+before ordering one.
+
+**Air System** gains **Leaking air bag - Front C/S**, **Front R/S** and
+**Rear**, and these are counted. The leak shows at one corner while the bags
+come off in pairs, so how many actually went on is a fact nobody can
+reconstruct from the words later. The picker offers up to two on the front axle
+and four on the rear — the ceiling belongs to the axle, not the bus — and it is
+optional, because the number is known when the bags go on rather than when the
+leak is found. It records on all three surfaces: the Defect Log, the Down Sheet
+repair card, and the Fixed Repairs editor, which is often where the number is
+known because the bus is only back together at that point.
+
+The count is not new machinery. Radiator fans were already counted, by a
+category test written into the Defect Log form; air bags would have been a
+second copy of it in three places. That test is now one row of a table in the
+catalog, so every form reads the field from the same place. Fans keep their
+1-8 picker and stay required.
+
 ## Migration and data safety
 
 No LocalStorage key renamed and no stored record rewritten. Each repair card
-gains one optional field (`done`). **An entry saved before this release reads as
-all repairs done wherever its workflow was already Completed**, so publishing
-does not reopen every finished repair on the sheet — that is the one behaviour
-worth confirming first after publish.
+gains one optional field (`done`), and a second (`quantity`) for the repairs
+that carry a count.
+
+Two ways a count could have read wrong are closed, both at read time:
+
+- The defect label fell back to **quarts** where a record carried no unit, a
+  fallback the engine-oil entry left behind. Two air bags would have read as
+  "2 quarts". It now asks the catalog for the repair's own unit first.
+- A count no longer follows a repair **retyped** as something uncounted — "2
+  replaced" left on an air dryer is a lie — while an engine-oil quantity, which
+  no count field governs, is left exactly as the Defect Log wrote it.
+
+**An entry saved before this release reads as all repairs done wherever its
+workflow was already Completed**, so publishing does not reopen every finished
+repair on the sheet — that is the one behaviour worth confirming first after
+publish.
 
 ## Validation
 
 - Production build passed
-- All 119 regression tests passed, including a two-day case: one repair finished
+- All 120 regression tests passed, including a two-day case: one repair finished
   Monday keeps Monday's completion date after the second finishes on Wednesday
 - ESLint passed
 - Verified end to end in a browser at phone width: two repairs on one entry,
@@ -84,6 +126,13 @@ worth confirming first after publish.
   confirmed the brake defect completed with CJ and 2 hours while the A/C stayed
   open and the bus stayed down; then ticked the second and watched the workflow
   roll up to Completed and the bus come off
+- Verified the new repairs in a browser at phone width: logged **Leaking air bag
+  - Rear** with **4** replaced and confirmed the card reads "Air System —
+  Leaking air bag - Rear — 4 replaced", not "4 quarts"; scheduled **Front C/S**
+  on a Down Sheet entry, confirmed its picker offered only 1 and 2, ticked it
+  finished and watched it reach Fixed Repairs reading "2 replaced"; confirmed an
+  engine-oil record keeps its 10 quarts across an edit and shows no count field;
+  and confirmed retyping an air bag record as an air dryer drops the count
 
 ## After it is live
 
@@ -101,6 +150,15 @@ worth confirming first after publish.
 7. Untick one and confirm the entry reopens as **In Progress**.
 8. On a different entry, set REPAIR WORKFLOW straight to **Completed** and
    confirm every repair on it is marked finished in one move.
+9. In the Defect Log, pick **Air System → Leaking air bag - Rear** and confirm
+   **AIR BAGS REPLACED** offers 1 through 4, then **Front C/S** and confirm it
+   offers only 1 and 2.
+10. Save one with a count and confirm the card reads **"— 2 replaced"** and not
+    "2 quarts". A record reading quarts means the unit fallback is wrong.
+11. Confirm **Cooling System → Radiator fan(s) out** still offers 1 through 8
+    and still refuses to save without one.
+12. Pick **A/C and HVAC → A/C compressor pulley misaligned** and confirm the
+    straight-edge note appears under the picker.
 
 ## Publishing constraints that still apply
 
@@ -113,5 +171,5 @@ worth confirming first after publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date; the entry's workflow rolls up from its repairs and the row shows how many are done |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; water pump, alternator and A/C belts, A/C compressor pulley misalignment, and leaking air bags front and rear with a count of how many were replaced |
 ```
