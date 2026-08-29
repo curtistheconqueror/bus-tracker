@@ -2960,6 +2960,28 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  assert.ok(REPAIR_OPTIONS.Engine.includes("Water pump belt"));
  assert.ok(REPAIR_OPTIONS.Engine.includes("Alternator belt"));
  assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Water pump"));
+
+ // The accessory drive reads as one block: what turns the pulleys, then the
+ // pulleys themselves. A pulley listed away from its belt is a pulley nobody
+ // scrolls to while they are already looking at the belt.
+ assert.deepEqual(REPAIR_OPTIONS.Engine.slice(
+  REPAIR_OPTIONS.Engine.indexOf("Water pump belt"),
+  REPAIR_OPTIONS.Engine.indexOf("Water pump belt")+5),
+  ["Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley"]);
+ // Reported as an engine complaint, the same way Overheating is, and Cooling
+ // System keeps its own for the leak that turns out to be the radiator.
+ assert.ok(REPAIR_OPTIONS.Engine.indexOf("Coolant leak")<REPAIR_OPTIONS.Engine.indexOf("Misfire"));
+ assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Coolant leak"));
+
+ // Both live above the no-start symptoms, because they fail often enough that
+ // burying them under the whole list costs somebody a scroll every time.
+ const charging=REPAIR_OPTIONS["Battery, Starting and Charging"];
+ assert.ok(charging.indexOf("Voltage regulator")<charging.indexOf("No crank"));
+ assert.ok(charging.indexOf("Alternator failure")<charging.indexOf("No crank"));
+ assert.equal(charging.indexOf("Alternator failure"),charging.indexOf("Voltage regulator")+1);
+ // The old catch-all is untouched, so no record already logged under it is
+ // silently restated as a confirmed alternator failure.
+ assert.ok(charging.includes("Alternator / charging"));
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
  assert.deepEqual(REPAIR_OPTIONS["Air System"].slice(0,4),
