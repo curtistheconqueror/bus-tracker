@@ -27,13 +27,13 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `5c3c88a` — everything after it is documentation only |
+| Last code-bearing commit | `b5a14b5` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 5c3c88a..origin/main` that
-nothing but `docs/` changed after `5c3c88a`, and publish the tip.
+release commit. Confirm with `git log --oneline b5a14b5..origin/main` that
+nothing but `docs/` changed after `b5a14b5`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
@@ -69,13 +69,29 @@ the sheet for.
 
 A round of catalog additions, and one of them needed a number to go with it.
 
-**Engine** gains **Overheating**, directly under the three dash lights.
-Overheating is what gets reported before anybody knows whether it is a fan, a
-thermostat or the pump, and it gets reported as an engine problem. Cooling
-System keeps its own **Overheating** deliberately — the two are the same word
-about different moments, the complaint that came in and the system the fault
-turned out to be in — and no stored record is remapped between them. Causes
-stay free text for now; the learned catalog offers back whatever this shop
+**Engine** gains heat as a scale, directly under the three dash lights, in the
+order it climbs:
+
+```
+Engine runs hot (207F+)
+Overheating
+Overheat shutdown (235-240F)
+```
+
+One entry could not tell a bus running eight over from one whose engine shut
+itself down on the road, and those are different jobs with the same words. The
+numbers live in the labels rather than in a temperature field, because a field
+records what somebody already knew while a label teaches the threshold to
+whoever is picking — which is the half that narrows the diagnosis.
+
+**The shutdown starts as Remove From Service**; the engine has already taken the
+bus off the road at that point. Running hot and Overheating stay in service on
+purpose, because eight or ten over finishes the day.
+
+Cooling System keeps its own **Overheating** deliberately — the two are the same
+word about different moments, the complaint that came in and the system the
+fault turned out to be in — and no stored record is remapped between them.
+Causes stay free text; the learned catalog offers back whatever this shop
 actually finds under it.
 
 **Engine** also gains **Coolant leak**, directly under Overheating, for the same
@@ -135,6 +151,20 @@ Two ways a count could have read wrong are closed, both at read time:
   replaced" left on an air dryer is a lie — while an engine-oil quantity, which
   no count field governs, is left exactly as the Defect Log wrote it.
 
+### A fix that goes beyond the new entries
+
+Both Facility Map defect pickers tested for **Interior Cleaning by name** before
+consulting the catalog's downing table. That was written when cleaning was the
+only row in it, and stayed narrow as the Amerex entries were added in an earlier
+release — so on that surface a **Significant Leak** or a discharged fire
+suppression system has been opening on *May Stay In Service* while the Defect
+Log had it right. Both pickers now read the table for whatever category is
+picked, which is also what makes the new overheat shutdown work there.
+
+Worth knowing because it changes behaviour for repairs that already shipped, not
+only the new ones. A defect already saved is untouched; only what the picker
+*opens on* changes, and a choice made after picking is still left alone.
+
 **An entry saved before this release reads as all repairs done wherever its
 workflow was already Completed**, so publishing does not reopen every finished
 repair on the sheet — that is the one behaviour worth confirming first after
@@ -184,11 +214,20 @@ publish.
     and still refuses to save without one.
 12. Pick **A/C and HVAC → A/C compressor pulley misaligned** and confirm the
     straight-edge note appears under the picker.
-13. Confirm **Engine** lists **Overheating** then **Coolant leak** just under the
-    three dash lights, and that **Cooling System** still lists its own of each.
-14. Confirm **Engine** runs **Water pump belt, Alternator belt, Water pump
+13. Confirm **Engine** lists **Engine runs hot (207F+)**, **Overheating**,
+    **Overheat shutdown (235-240F)** then **Coolant leak** just under the three
+    dash lights, and that **Cooling System** still lists its own Overheating
+    and Coolant leak.
+14. Pick **Overheat shutdown (235-240F)** and confirm BUS AVAILABILITY opens on
+    **Remove From Service**, then pick **Engine runs hot (207F+)** and confirm it
+    opens on **May Stay In Service**. Do this in the Defect Log *and* in the
+    Facility Map defect picker, which is the surface the fix above changes.
+15. In the Facility Map picker, pick **Amerex - Gas Concentration - Significant
+    Leak** and confirm it now opens on **Remove From Service**. Before this
+    release it opened on May Stay In Service there.
+16. Confirm **Engine** runs **Water pump belt, Alternator belt, Water pump
     pulley, Tensioner pulley, Fan drive pulley** as five consecutive entries.
-15. Confirm **Battery, Starting and Charging** lists **Voltage regulator** then
+17. Confirm **Battery, Starting and Charging** lists **Voltage regulator** then
     **Alternator failure** fourth and fifth, above **No crank**, and that
     **Alternator / charging** is still in the list further down.
 
@@ -203,5 +242,5 @@ publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine overheating and coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure, and leaking air bags front and rear with a count of how many were replaced |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine heat as a scale from runs hot at 207F to an overheat shutdown that removes the bus from service, engine coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure, and leaking air bags front and rear with a count of how many were replaced |
 ```
