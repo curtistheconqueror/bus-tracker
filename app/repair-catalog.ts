@@ -79,7 +79,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Air bag","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
- "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Alternator / charging","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
+ "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Bus Controls":["Door, Ramp and Kneeler Failures - Front door will not open","Door, Ramp and Kneeler Failures - Front door will not close","Door, Ramp and Kneeler Failures - Front door opens / closes slowly","Door, Ramp and Kneeler Failures - Rear door will not open","Door, Ramp and Kneeler Failures - Rear door will not close","Door, Ramp and Kneeler Failures - Rear door opens / closes slowly","Door, Ramp and Kneeler Failures - Ramp not working","Door, Ramp and Kneeler Failures - Ramp no power","Door, Ramp and Kneeler Failures - Kneeler not functioning correctly","Door, Ramp and Kneeler Failures - Kneeler sits too high","Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
@@ -436,6 +436,22 @@ const DOWNING_ISSUES:Record<string,readonly string[]>={
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{
  return DOWNING_ISSUES[category]?.includes(issue)?"down":"service";
 }
+/* Retired from the picker, still readable on every record that carries it.
+
+   "Alternator / charging" said one of two different things depending on who
+   typed it, and once Voltage regulator and Alternator failure existed it had no
+   job left that "Starting / charging diagnosis" and "Other starting or charging
+   repair" were not already doing. Two alternator entries in one dropdown is a
+   coin flip for somebody standing at a bus.
+
+   It is dropped rather than renamed on purpose. Pointing it at Alternator
+   failure would restate every record already logged under it as a confirmed
+   failure, and nobody made that call. Stored records keep the exact words they
+   were saved with, and every picker offers them back as logged. */
+export const RETIRED_ISSUES:Record<string,readonly string[]>={
+ "Battery, Starting and Charging":["Alternator / charging"],
+};
+
 /* Categories and options that were merged away. Records are never dropped or
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and

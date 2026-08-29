@@ -3001,9 +3001,20 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  assert.ok(charging.indexOf("Voltage regulator")<charging.indexOf("No crank"));
  assert.ok(charging.indexOf("Alternator failure")<charging.indexOf("No crank"));
  assert.equal(charging.indexOf("Alternator failure"),charging.indexOf("Voltage regulator")+1);
- // The old catch-all is untouched, so no record already logged under it is
- // silently restated as a confirmed alternator failure.
- assert.ok(charging.includes("Alternator / charging"));
+
+ // Two alternator entries in one dropdown is a coin flip, so the vague one is
+ // off the picker. It is dropped rather than pointed at Alternator failure: a
+ // rename would restate every record logged under it as a confirmed failure.
+ assert.ok(!charging.includes("Alternator / charging"));
+ assert.ok(charging.includes("Starting / charging diagnosis"));
+ assert.ok(charging.includes("Other starting or charging repair"));
+ assert.deepEqual(migrateRepairIdentity("Battery, Starting and Charging","Alternator / charging"),
+  {category:"Battery, Starting and Charging",issue:"Alternator / charging"});
+ // A retired repair still reads back on the record that carries it, in every
+ // picker. The Down Sheet card was the one with no such option, so a retired
+ // entry would have rendered there as an empty select.
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ assert.match(editor,/item\.repair&&!repairs\.includes\(item\.repair\)&&<option value=\{item\.repair\}>\{item\.repair\} \(as logged\)<\/option>/);
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
  assert.deepEqual(REPAIR_OPTIONS["Air System"].slice(0,4),
@@ -4183,7 +4194,10 @@ test("both repair workflows offer a remembered part without imposing or blocking
 test("starting and charging covers crank-no-start and single-station starting",()=>{
  const starting=REPAIR_OPTIONS["Battery, Starting and Charging"];
  // the symptom cluster reads in diagnostic order next to the existing No crank
- const order=["No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Alternator / charging"];
+ // "Alternator / charging" used to close this run and is retired from the
+ // picker; Alternator failure and Voltage regulator carry that work now, from
+ // the top of the category where they get found.
+ const order=["No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis"];
  // solid and flashing are separate diagnostic paths, so they are separate options
  assert.ok(starting.includes("Solid battery light")&&starting.includes("Flashing battery light"));
  const at=starting.indexOf("No crank");
@@ -4191,7 +4205,8 @@ test("starting and charging covers crank-no-start and single-station starting",(
  assert.deepEqual(starting.slice(at,at+order.length),order);
  assert.equal(new Set(starting).size,starting.length,"no duplicated option in the category");
  // each new option survives a round trip through a saved defect
- for(const issue of ["Crank no start","Front start INOP","Rear start INOP"]){
+ // the retired one included: taking it off the picker must not touch a record
+ for(const issue of ["Crank no start","Front start INOP","Rear start INOP","Voltage regulator","Alternator failure","Alternator / charging"]){
   const [defect]=normalizeDefects([{id:"d-"+issue,category:"Battery, Starting and Charging",issue,details:"",state:"open",operability:"down"}]);
   assert.equal(defect.issue,issue);
   assert.ok(defectLabel(defect).includes(issue));
