@@ -27,19 +27,19 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `d5c89ce` — everything after it is documentation only |
+| Last code-bearing commit | `7cdc0f1` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline d5c89ce..origin/main` that
-nothing but `docs/` changed after `d5c89ce`, and publish the tip.
+release commit. Confirm with `git log --oneline 7cdc0f1..origin/main` that
+nothing but `docs/` changed after `7cdc0f1`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed.
 
-Gate: 120 tests passing, ESLint clean, production build succeeds.
+Gate: 121 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -123,6 +123,42 @@ value back as logged — including the Down Sheet repair card, which had no such
 option and would have rendered an empty select on an entry carrying a retired
 name, which is how somebody ends up picking something else over the top of it.
 
+### The split surge tank, and a winter list built in the warm months
+
+The 17s, 18s and 20s carry a split coolant surge tank: an **engine side** and a
+**heating side** that feeds cabin heat, and the two do not drain into each other.
+One entry could not say which half was empty, so **Cooling System** now carries
+three, directly under Coolant leak:
+
+```
+Surge tank - engine side low
+Surge tank - heating side low
+Surge tank - both sides low
+```
+
+Picking the **heating side** shows a note saying the two halves are independent,
+because a mechanic who does not know that tops up the side he can see and walks
+away from a bus that will have no heat in December. **Both sides low** carries
+its own note: two halves that cannot drain into each other going down together
+points at a leak somewhere they share, which is a different job from two
+top-ups. Where those shared points are is not modelled yet, pending confirmation.
+
+Each side records **COOLANT ADDED** in quarts, optional, on all three surfaces.
+Two quarts on Monday and two more on Thursday is a leak; one quart once is a
+top-up, and the words alone cannot tell those apart a month later.
+
+**QUICK FILTERS gains "Potential No Cabin Heat"**, which is the point of the
+distinction. The heating side can sit empty all summer without anything about
+the bus being wrong, and the first cold morning turns that into a queue rather
+than a plan. The list copies and shares like the others, so it hands off to
+whoever schedules the work.
+
+It matches the **repair**, not the word "heat" — which also appears in Amerex
+heat sensors, in Overheating, and in half the estimate notes in the fleet. A
+winter list that returns an overheating bus is one somebody checks once and then
+stops trusting. It returns heating-side and both-sides tanks plus **Heater /
+defroster**, and nothing else.
+
 **A/C and HVAC** gains **A/C belt** and **A/C compressor pulley misaligned**.
 The second is why the first keeps coming back: a compressor pulley out of line
 with the crank pulley eats belts, so a belt fitted without checking it is a
@@ -182,7 +218,7 @@ publish.
 ## Validation
 
 - Production build passed
-- All 120 regression tests passed, including a two-day case: one repair finished
+- All 121 regression tests passed, including a two-day case: one repair finished
   Monday keeps Monday's completion date after the second finishes on Wednesday
 - ESLint passed
 - Verified end to end in a browser at phone width: two repairs on one entry,
@@ -244,6 +280,13 @@ publish.
     shows those exact words rather than an empty picker, and that saving it
     without editing leaves the record unchanged. This is the one thing worth
     checking first, because it is what retiring an entry could break.
+19. In **Cooling System**, confirm the three **Surge tank** entries sit directly
+    under Coolant leak, that picking **heating side** or **both sides** shows its
+    note, and that each offers **COOLANT ADDED** in quarts.
+20. Open **QUICK FILTERS → Potential No Cabin Heat** on a real fleet and read the
+    list. It should hold buses with a heating-side or both-sides tank and buses
+    with a Heater / defroster defect — **and no overheating buses**. If an
+    overheating bus appears, the filter is matching the wrong thing.
 
 ## Publishing constraints that still apply
 
@@ -256,5 +299,5 @@ publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine heat as a scale from runs hot at 207F to an overheat shutdown that removes the bus from service, engine coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure replacing the vaguer alternator entry, and leaking air bags front and rear with a count of how many were replaced |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine heat as a scale from runs hot at 207F to an overheat shutdown that removes the bus from service, engine coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure replacing the vaguer alternator entry, leaking air bags front and rear with a count of how many were replaced, and the split coolant surge tank as two independent sides with a Potential No Cabin Heat quick filter for the winter list |
 ```
