@@ -27,13 +27,13 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `db6d27b` — everything after it is documentation only |
+| Last code-bearing commit | `5c3c88a` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 118, `6f45d14` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline db6d27b..origin/main` that
-nothing but `docs/` changed after `db6d27b`, and publish the tip.
+release commit. Confirm with `git log --oneline 5c3c88a..origin/main` that
+nothing but `docs/` changed after `5c3c88a`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
@@ -67,7 +67,7 @@ the sheet for.
 
 ### Belts, pulley alignment, and air bags that get counted
 
-Four additions to the picker, and one of them needed a number to go with it.
+A round of catalog additions, and one of them needed a number to go with it.
 
 **Engine** gains **Overheating**, directly under the three dash lights.
 Overheating is what gets reported before anybody knows whether it is a fan, a
@@ -78,9 +78,25 @@ turned out to be in — and no stored record is remapped between them. Causes
 stay free text for now; the learned catalog offers back whatever this shop
 actually finds under it.
 
-**Engine** also gains **Water pump belt** and **Alternator belt**. Cooling System
-keeps the pump itself, so the belt and the pump stay separate jobs rather than
-one entry that could mean either.
+**Engine** also gains **Coolant leak**, directly under Overheating, for the same
+reason and with the same deliberate overlap: a seal or a freeze plug is reported
+as an engine problem, a radiator or a hose as a cooling one.
+
+**Engine** also gains the accessory drive as one block — **Water pump belt**,
+**Alternator belt**, **Water pump pulley**, **Tensioner pulley**, **Fan drive
+pulley**, in that order. A pulley listed away from its belt is a pulley nobody
+scrolls to while already looking at the belt. The fan drive pulley fails often
+enough to deserve its own line instead of arriving as "Other engine repair",
+where nothing can count it. Cooling System keeps the water pump itself, so the
+belt, the pulley and the pump stay separate jobs rather than one entry that
+could mean any of them.
+
+**Battery, Starting and Charging** gains **Voltage regulator** and **Alternator
+failure**, placed fourth and fifth — above the no-start symptoms — because they
+fail often and burying a frequent failure under the whole list costs a scroll
+every time. **Alternator / charging** is deliberately left in place: renaming it
+would restate every record already logged under it as a confirmed failure, which
+is a diagnosis nobody made.
 
 **A/C and HVAC** gains **A/C belt** and **A/C compressor pulley misaligned**.
 The second is why the first keeps coming back: a compressor pulley out of line
@@ -168,8 +184,13 @@ publish.
     and still refuses to save without one.
 12. Pick **A/C and HVAC → A/C compressor pulley misaligned** and confirm the
     straight-edge note appears under the picker.
-13. Confirm **Engine** lists **Overheating** just under the three dash lights,
-    and that **Cooling System** still lists its own.
+13. Confirm **Engine** lists **Overheating** then **Coolant leak** just under the
+    three dash lights, and that **Cooling System** still lists its own of each.
+14. Confirm **Engine** runs **Water pump belt, Alternator belt, Water pump
+    pulley, Tensioner pulley, Fan drive pulley** as five consecutive entries.
+15. Confirm **Battery, Starting and Charging** lists **Voltage regulator** then
+    **Alternator failure** fourth and fifth, above **No crank**, and that
+    **Alternator / charging** is still in the list further down.
 
 ## Publishing constraints that still apply
 
@@ -182,5 +203,5 @@ publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine overheating, water pump, alternator and A/C belts, A/C compressor pulley misalignment, and leaking air bags front and rear with a count of how many were replaced |
+| 119 | Live | <published tip hash> | Each Down Sheet repair finishes on its own day with its own fix, hours and completion date, and the row shows how many are done; engine overheating and coolant leak, the accessory drive belts and pulleys, A/C belt and compressor pulley misalignment, voltage regulator and alternator failure, and leaking air bags front and rear with a count of how many were replaced |
 ```
