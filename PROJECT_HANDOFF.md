@@ -4,8 +4,8 @@ Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 119
-Live feature checkpoint: commit b40741f
+Live release: Sites Version 120
+Live feature checkpoint: commit 791b357
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 119 is the current user-approved live release. Its validated source checkpoint is commit b40741f. Down Sheet repair cards now finish independently with their own completion dates, fix details, and hours while the entry rolls up automatically and shows partial progress. The repair catalog adds an engine-temperature severity scale, coolant leak, accessory-drive belts and pulleys, A/C belt and compressor-pulley alignment, voltage-regulator and alternator-failure choices, counted front/rear air-bag replacements, and independent engine/heating surge-tank sides with coolant-added quantities. Potential No Cabin Heat provides a winter-planning quick filter. Existing completed entries remain completed, retired picker wording remains readable, and no LocalStorage key or stored record was rewritten.
+Version 120 is the current user-approved live release. Its validated source checkpoint is commit 791b357. The winter-planning Quick Filter now consistently reads No Heat Buses in both the menu and selected-filter control, and the heating-side surge-tank note uses the same wording. The stable no-cabin-heat filter key and matching logic are unchanged, so no LocalStorage key, fleet record, repair, location, or user data was rewritten.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 119 production build, lint gate, and all 121 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
+The Version 120 production build, lint gate, and all 121 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
 
 ## Repository and remotes
 

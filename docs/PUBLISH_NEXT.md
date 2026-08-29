@@ -1,13 +1,15 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 120 is validated and approved for automatic publication as a small wording correction.**
+**STATUS: NONE PENDING**
+
+Sites Version 120 was published from commit 791b357 on 2026-08-29. Replace this file with the next complete pending-release handoff in the same push as the next contribution to main.
 
 ## Source
 
 - Branch: main
-- Release source: the current tip of origin/main
+- Last published source: 791b357
 - Last code-bearing commit: fdb1c06
-- Previous live release: Sites Version 119 at b40741f
+- Current live release: Sites Version 120 at 791b357
 
 ## What changed
 
