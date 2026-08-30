@@ -27,20 +27,20 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `07d55bb` — everything after it is documentation only |
+| Last code-bearing commit | `ae12728` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 122, `cd6b649` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 07d55bb..origin/main` that
-nothing but `docs/` changed after `07d55bb`, and publish the tip.
+release commit. Confirm with `git log --oneline ae12728..origin/main` that
+nothing but `docs/` changed after `ae12728`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed. This work was written before Version 122 landed and was replayed on top
 of it rather than merged over it, so nothing published is disturbed.
 
-Gate: 126 tests passing, ESLint clean, production build succeeds.
+Gate: 127 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -124,6 +124,24 @@ and fixed against it, both reproduced in a browser:
   normalizer hydration uses, so an entry without a `timeEstimate` **crashed the
   page** and the import took nothing at all.
 
+### The service detail area was hidden on a phone
+
+Reported off a phone: **SERVICE DETAIL AREA was not on the map.** It was there
+the whole time — **IN SERVICE / ON ROAD** is absolutely positioned into the map's
+right-hand column with `z-index:3`, which is right on a wide screen and wrong the
+moment the sections stack. It stayed pinned to the top right and landed squarely
+on top of the service area. Not missing, underneath.
+
+Measured on a 390px screen before the fix:
+
+```
+SERVICE DETAIL   x=16  y=494  w=374  h=284   static
+ON ROAD          x=0   y=494  w=374  h=440   absolute, z-index 3
+```
+
+Below 760px the road panel joins the flow and stacks with everything else.
+Nothing changes above that, where the map really does have a column for it.
+
 ### The backup reminder is one card, and the shop sets its cadence
 
 The banner was a heading and a button side by side in two colours, and on any
@@ -169,7 +187,7 @@ and were both checked in a browser.
 ## Validation
 
 - Production build passed
-- All 126 regression tests passed, including a new one asserting that each of the
+- All 127 regression tests passed, including a new one asserting that each of the
   three report buttons says REPORT, that none of them says BACKUP, that each
   carries the shared hint, and that the Facility Map backup button is unchanged
 - ESLint passed
@@ -188,6 +206,9 @@ and were both checked in a browser.
   one of its own defects and gaining a bus it had never seen. Both halves matched
   afterwards, which is the whole point of the feature
 - Confirmed a Fleet Map file dropped on the Defect Log importer says so by name
+- Swept the map at 320, 360, 390, 414, 430, 500, 560, 600, 650, 700, 750, 760,
+  761, 780, 800, 900, 1024, 1100, 1200 and 1440px: no overlap at any width, both
+  the service and road sections visible at all of them, and no sideways scroll
 - Drove the new setting in a browser: raising it to 50 with 25 defects logged
   hid the banner, lowering it to 5 brought it straight back, the choice survived
   a reload, and a junk value written into storage fell back to 20
@@ -222,6 +243,10 @@ and were both checked in a browser.
    release should be pulled.
 10. On a device with an empty sheet, import a Down Sheet from another device and
     confirm the entries land, the rows render, and the buses pick up the badge.
+11. **On the phone**, open the Facility Map and confirm **SERVICE DETAIL AREA**
+    is visible with its spaces, and that **IN SERVICE / ON ROAD** now sits below
+    it rather than over it. Check the map still looks right on the computer,
+    where the road panel should be unchanged in its right-hand column.
 
 ## Publishing constraints that still apply
 
@@ -234,5 +259,5 @@ and were both checked in a browser.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 123 | Live | <published tip hash> | Per-section export and import so the Defect Log, Down Sheet and Fleet Map move between devices independently and merge rather than replace; the whole-app pair renamed to ALL DATA; the three reports renamed so only restorable files read like backups; and the backup reminder rebuilt as one card with a settable cadence |
+| 123 | Live | <published tip hash> | The service detail area no longer hidden behind the road panel on a phone; per-section export and import so the Defect Log, Down Sheet and Fleet Map move between devices independently and merge rather than replace; the whole-app pair renamed to ALL DATA; the three reports renamed so only restorable files read like backups; and the backup reminder rebuilt as one card with a settable cadence |
 ```
