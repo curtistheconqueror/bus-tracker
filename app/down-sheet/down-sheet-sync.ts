@@ -1,6 +1,6 @@
 import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../repair-catalog.ts";
 import {stampOperationalChange} from "../operational-time.ts";
-import {statusForLocation} from "../smart-status.ts";
+import {hasRequiredInteriorCleaning,hasUnresolvedDefects} from "../smart-status.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "../facility-areas.ts";
 
 export type SyncFleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -158,7 +158,34 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
    if(at>=0)defects[at]=nextDefect;else defects.push(nextDefect);
   }
   const repairAware={...bus,defects,pendingRepair:defectSummary(defects)};
-  const status=statusForLocation(bus.l,entry.operationalStatus,repairAware);
+  /* The status a person chose on the sheet stands, whether or not the bus has
+     been driven anywhere yet.
+
+     It used to be recomputed from the parking space on every save, which meant
+     a bus in a CNG lot read "out of service" no matter what was picked — mark a
+     bus back in service, get sidetracked before anyone physically moves it, and
+     the board still said out of service with nothing to show the work was done.
+     The paperwork changes before the bus does, and the sheet is the paperwork.
+
+     Location still governs MOVEMENT: dragging a bus on the map, or using MOVE
+     BUS TO above, re-derives the status from where it lands. So a bus parked
+     into a CNG lot still goes out of service on its own; it is only being told
+     so from the sheet that no longer overrides a person.
+
+     Two rules survive, because they describe the CONDITION of the bus rather
+     than a fact about where it is parked, and both were bundled into the
+     location check only by accident of where they were written:
+
+       - a bus that needs interior cleaning is in the shop;
+       - a bus with unresolved defects is not plainly "in service", it is in
+         service WITH DEFECTS. The status exists precisely to say that, and a
+         board reading "In Service" for a bus carrying an open fault would be
+         the same class of lie this change is meant to remove. */
+  const chosen=entry.operationalStatus;
+  const status=chosen==="decommissioned"?chosen
+   :hasRequiredInteriorCleaning(repairAware)?"shop"
+   :chosen==="service"&&hasUnresolvedDefects(repairAware)?"defect"
+   :chosen;
   const next={...repairAware,s:status,
    down:!targets.every(target=>target.done||entryCompleted)&&entry.operationalStatus!=="decommissioned",
    mechanic:entry.assignmentType==="Mechanic"&&entry.assignedTo.trim()?entry.assignedTo.trim():bus.mechanic} as T;

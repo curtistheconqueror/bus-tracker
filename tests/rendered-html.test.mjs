@@ -1089,7 +1089,12 @@ test("down sheet synchronization changes repairs and status without moving the b
     operationalStatus: "shop",
   });
   assert.equal(updated[0].l, "east-4");
-  assert.equal(updated[0].s, "out");
+  // The chosen status stands even though the bus is still sitting in a CNG lot.
+  // This expectation used to be "out": the parking space overrode the person,
+  // so marking a bus back in service did nothing until somebody physically
+  // moved it, and the Defect Log went on showing the old status meanwhile.
+  // Location still governs MOVEMENT — see moveOrSwapBuses — just not the sheet.
+  assert.equal(updated[0].s, "shop");
   assert.equal(updated[0].down, true);
   assert.equal(updated[0].mechanic, "JD");
   assert.match(updated[0].pendingRepair, /Brakes.*ABS warning.*Intermittent warning light/);
@@ -1108,7 +1113,10 @@ test("down sheet synchronization changes repairs and status without moving the b
     operationalStatus: "service",
   });
   assert.equal(completed[0].l, "east-4");
-  assert.equal(completed[0].s, "out");
+  // The repair is finished and nothing is left open, so "In Service" is exactly
+  // what was chosen and exactly what is stored. Previously the CNG lot forced
+  // this back to "out" and the completed work never showed anywhere.
+  assert.equal(completed[0].s, "service");
   assert.equal(completed[0].down, false);
   assert.equal(completed[0].pendingRepair, "");
   assert.equal(completed[0].defects.length, 1);
@@ -1795,7 +1803,11 @@ test("down-sheet completion updates only its linked repair and recalculates trac
     operationalStatus: "out",
   }, "2026-08-09T10:00:00.000Z");
   assert.equal(active[0].l, "garage-4");
-  assert.equal(active[0].s, "defect");
+  // "Out of Service" was chosen deliberately and now sticks. This used to read
+  // "defect", because the garage rule recomputed from the bus's open defects —
+  // which meant a foreman could not mark a bus in the garage out of service at
+  // all, however plainly he said so.
+  assert.equal(active[0].s, "out");
   assert.equal(active[0].defects.length, 2);
   assert.equal(active[0].defects.find(defect => defect.id === "manual-1").state, "open");
 
@@ -1817,7 +1829,11 @@ test("down-sheet completion updates only its linked repair and recalculates trac
   assert.equal(completed[0].defects.find(defect => defect.id === "downsheet-repair-1").state, "completed");
   assert.match(completed[0].pendingRepair, /No cooling/);
   assert.doesNotMatch(completed[0].pendingRepair, /Air brake fault/);
-  assert.equal(completed[0].lastStatusChangeAt, "2026-08-09T10:00:00.000Z");
+  // The status genuinely moved at this step — out of service, then in service
+  // with defects once the brake repair closed and only the A/C fault remained —
+  // so the stamp moves with it. It previously read 10:00 because the status was
+  // being recomputed to the same value both times and never actually changed.
+  assert.equal(completed[0].lastStatusChangeAt, "2026-08-09T12:00:00.000Z");
 
   const laterRepair = applyDownEntryToFleet(completed, {
     id: "repair-2",
@@ -5409,18 +5425,33 @@ test("the Down Sheet can move a bus, which is what makes a status change stick",
  const entry={id:"e1",busId:"b1",category:"Tech Services",repair:"Ventra",customReason:"",
   assignmentType:"Mechanic",assignedTo:"CJ",workflow:"Completed",operationalStatus:"defect"};
 
- // A bus takes the status its parking space implies, and the CNG lots are
- // out-of-service lots. So setting a status on the sheet without moving the bus
- // was silently overridden, and the Defect Log went on showing the old one.
+ // The paperwork changes before the bus does. Mark it in service with defects,
+ // get sidetracked before anyone drives it out of the lot, and the board says
+ // what you told it — green, still parked in CNG West — rather than reverting
+ // to out of service and hiding that the work was done.
  const stayed=applyDownEntryToFleet(fleet,entry,now);
  assert.equal(stayed[0].l,"west-3");
- assert.equal(stayed[0].s,"out");
+ assert.equal(stayed[0].s,"defect");
 
- // Moving it out of the lot is what a foreman putting a bus back in service
- // actually means, and the status then follows the space.
+ // And when the bus is actually moved, it goes where it was sent.
  const moved=applyDownEntryToFleet(fleet,{...entry,location:"MAIN GARAGE (BAYS 1-10)"},now);
  assert.ok(RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"].includes(moved[0].l));
- assert.notEqual(moved[0].s,"out");
+ assert.equal(moved[0].s,"defect");
+
+ // Location still governs MOVEMENT: a bus parked into a CNG lot still goes out
+ // of service on its own. The rule was never removed, only stopped from
+ // overruling a person who said otherwise on the sheet.
+ const { moveOrSwapBuses } = await import("../app/smart-status.ts");
+ const dragged=moveOrSwapBuses([{id:"b9",n:"20505",l:"garage-1",s:"service",defects:[],pendingRepair:""}],"b9","west-5",now);
+ assert.equal(dragged[0].s,"out");
+
+ // A bus carrying an open fault is never plainly "In Service". That rule is
+ // about the condition of the bus, not where it is parked, so it survives.
+ const withFault=[{id:"b1",n:"17554",l:"garage-2",s:"shop",
+  defects:[{id:"d9",category:"A/C and HVAC",issue:"No cooling",details:"",operability:"service",state:"open"}],
+  pendingRepair:"",down:true}];
+ const claimed=applyDownEntryToFleet(withFault,{...entry,operationalStatus:"service",workflow:"In Progress"},now);
+ assert.equal(claimed[0].s,"defect");
 
  // An area that does not exist, or one with no room, must not lose the repair.
  const unknown=applyDownEntryToFleet(fleet,{...entry,location:"NOWHERE AT ALL"},now);
