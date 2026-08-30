@@ -4,8 +4,8 @@ Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 121
-Live feature checkpoint: commit 8ce3e5b
+Live release: Sites Version 122
+Live feature checkpoint: commit cd6b649
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 121 is the current user-approved live release. Its validated source checkpoint is commit 8ce3e5b. Suspension and Steering now offers separate Front air bag leak and Rear air bag leak choices for new defects. Existing records saved as Air bag retain their original wording, and no LocalStorage key, fleet record, repair, location, or user data was rewritten.
+Version 122 is the current user-approved live release. Its validated source checkpoint is commit cd6b649. A/C and HVAC now distinguishes the operator blower; Bus Controls adds mirror heater and curbside adjuster switches. Confirmed leaking air bags have one counted home under Air System, while Suspension and Steering keeps C/S and R/S leaning symptoms with guidance to edit the same defect after diagnosis. Historical air-bag wording remains preserved, and no LocalStorage key or stored record was rewritten.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 121 production build, lint gate, and all 121 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
+The Version 122 production build, lint gate, and all 122 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
 
 ## Repository and remotes
 

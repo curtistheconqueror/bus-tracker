@@ -18,7 +18,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 101 | Previous live | f730ecd | Dated actual odometer readings on every bus, append-only reading history, current-reading summary, and phone-friendly entry controls |
 | 102 | Previous live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
 | 103 | Previous live | f4628f7 | Estimated operating mileage at 275 miles per day, pause/resume checkpoints, and inspection readiness at 3,000 miles or 10 days |
-| 121 | Live | 8ce3e5b | Replaced the vague Suspension and Steering Air bag choice with separate Front air bag leak and Rear air bag leak options while preserving historical records |
+| 122 | Live | cd6b649 | Operator A/C blower and mirror switches added; confirmed air-bag repairs consolidated under Air System with counted replacements and leaning-diagnosis guidance |
+| 121 | Previous live | 8ce3e5b | Replaced the vague Suspension and Steering Air bag choice with separate Front air bag leak and Rear air bag leak options while preserving historical records |
 | 120 | Previous live | 791b357 | Renamed the winter-planning Quick Filter consistently to No Heat Buses without changing its stable key or matching logic |
 | 119 | Previous live | b40741f | Per-repair Down Sheet completion dates and partial-progress rollups; expanded engine, charging, belt, pulley and counted air-bag repairs; split surge-tank sides and a Potential No Cabin Heat winter filter |
 | 118 | Previous live | 6f45d14 | Each Down Sheet repair is now its own defect and Fixed Repairs record with its own completion details and hours; estimates collapse to one true total, and entered diagnostic time starts at one hour |
