@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-27
+Updated: 2026-08-30
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 126
-Live feature checkpoint: commit 8e68f69
+Live release: Sites Version 127
+Live feature checkpoint: commit 831b753
 
 ## Read this first
 
@@ -49,11 +49,11 @@ Preserve these rules through refactors and backend migration:
 - A finding is what the shop found, not what the driver reported, and it renders through defectLabel so every surface shows it. Anything that builds its own defect line must go through that function rather than reassembling category and issue, or the finding silently stops reaching the Down Sheet.
 - Defect Log totals count direct Defect Log records only. Down Sheet or tracker records may display for continuity but do not inflate that count.
 - A reviewed photo import is authoritative for the Down Sheet only: it replaces every prior Down Sheet row, reconciles every DS badge, lists buses coming off before approval, and remains undoable. It must never delete or complete Defect Log records.
-- Export and import remain the recovery path until shared persistence is live.
+- Export and import remain the durable recovery path while Shop Cloud is introduced, configured, and verified across devices.
 
 ## Current release state
 
-Version 126 is the current user-approved live release. Its validated source checkpoint is commit 8e68f69. The Defect Log now separates complete bus groups with stronger borders, spacing, expanded-group shading, and nested defect cards across phone, iPad, and desktop. Bus Group Separation in Defect Log Settings can switch between the new Strong default and the prior Standard treatment. No fleet record or LocalStorage key changed.
+Version 127 is the current user-approved live release. Its validated source checkpoint is commit 831b753. It adds the offline-first Shop Cloud client for Facility Map, Defect Log, and Down Sheet data; direct drag-and-drop onto expanded or collapsed Facility Map title strips; and a separate Mystery Bus location control in the Defect Log. Cloud configuration is optional and per device, the board still opens from LocalStorage without a sign-in gate, and relocation preserves defects and Down Sheet membership. Version 126's stronger Defect Log bus-group separation remains in place.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 126 production build, lint gate, and all 133 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-30.
+The Version 127 production build, lint gate, all 141 regression tests, and fresh local route checks passed before publication. Sites reported the production deployment successful on 2026-08-30.
 
 ## Repository and remotes
 
@@ -88,6 +88,8 @@ The history is intentionally linear. Do not rewrite published commits, force-pus
 
 - app/page.tsx — Facility Map orchestration and device persistence
 - app/facility-layout.ts — facility sections, slots, capacities, and migrations
+- app/facility-areas.ts — shared Facility Map and Defect Log section membership plus first-open-space relocation
+- app/cloud-client.ts, app/cloud-sync.ts, and app/cloud-sync-control.tsx — optional Supabase sign-in, row synchronization, merge controls, and device status
 - app/smart-status.ts — destination-aware status rules
 - app/operator-engine.ts and app/operator-batch.ts — AI Operator parsing and atomic actions
 - app/down-sheet/ — Down Sheet route, editor, estimates, scan review, and two-way synchronization
@@ -111,6 +113,9 @@ Primary stores are versioned browser records:
 - pace-bus-list-templates-v1 — reusable custom Bus List report formats
 - pace-board-recovery-v1 — last-known-good fleet payload for device-local recovery
 - pace-board-backup-reminder-v1 — device-local count baseline for 20-entry export reminders
+- pace-cloud-config-v1 — per-device Shop Cloud project, account, initials, and device-label settings
+- pace-cloud-state-v1 and pace-cloud-sent-v1 — per-device sync status and successfully sent row fingerprints
+- pace-cloud-auth-v1 — Supabase's persisted per-device shop session
 
 Undo snapshots exist for destructive Down Sheet actions. Backup export includes the fleet, connected Down Sheet state, and interface settings. Treat real exported backups as operational data and never commit them.
 
@@ -136,19 +141,11 @@ Do not create a new hosting project. Do not publish merely because a commit or b
 
 ## Shared backend phase
 
-The next major phase is immediate phone/iPad synchronization without losing offline operation. The recommended implementation is offline-first:
+The shared backend phase is now underway. Version 127 provides an optional Supabase client for Facility Map, Defect Log, and Down Sheet rows while keeping LocalStorage as the immediate offline store.
 
-1. Freeze and document the current LocalStorage schemas and migration rules.
-2. Define durable IDs for buses, defects, Down Sheet entries, movements, notes, and audit events.
-3. Add authenticated server persistence and role-aware access.
-4. Keep a local cache plus an ordered offline mutation queue.
-5. Apply local changes immediately, then synchronize when connectivity returns.
-6. Use server timestamps, record revisions, idempotency keys, and explicit conflict handling.
-7. Subscribe devices to real-time updates and reconcile without duplicating repairs or movement events.
-8. Import one trusted current backup as the initial shared dataset.
-9. Run dual-write and rollback validation before making the backend authoritative.
-
-The first backend milestone should synchronize fleet location and bus status between two test devices while preserving the current offline behavior. Down Sheet, Defect Log, and Fixed Repairs completion details follow after the identity, revision, and conflict model is proven.
+- A connected device checks for its own changed rows every 45 seconds while the app is visible and retries rows whose push did not complete.
+- Bringing the shop copy onto a device is currently an explicit Settings action. It reuses the existing section-transfer merge rules and refuses destructive fleet writes.
+- Shop Cloud must be configured and signed in separately on each phone or iPad. Fleet Campaigns, learned parts/findings, Fixed Repairs-specific details, realtime subscriptions, and server-authoritative conflict resolution remain future milestones.
 
 ## Product roadmaps
 

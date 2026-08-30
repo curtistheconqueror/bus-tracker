@@ -1,15 +1,15 @@
 # Publish next
 
-**STATUS: PENDING**
+**STATUS: NONE PENDING**
 
-Publish the combined Version 127 source to the existing Pace South Bus Tracker Site. Curtis has explicitly approved this release. Do not create a new Site, repository, or URL.
+Sites Version 127 was published from commit `831b7533819c426b93c137dfd93e312f1e8ab07f` on 2026-08-30. Replace this file with the next complete pending-release handoff in the same push as the next contribution to main.
 
 ## Source
 
 - Branch: main
-- Code-bearing source commit: `29cecc8f9242a82f0b4a9df7175ebeac9d612393`
-- Last published source: `8e68f698460726042b32fd412aabf9bf31f6bb2d` (Sites Version 126)
-- Existing live Site: `https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site`
+- Last published source: `831b7533819c426b93c137dfd93e312f1e8ab07f`
+- Last code-bearing commit: `29cecc8f9242a82f0b4a9df7175ebeac9d612393`
+- Current live release: Sites Version 127 at `831b753`
 
 ## What changed
 
@@ -34,10 +34,6 @@ Publish the combined Version 127 source to the existing Pace South Bus Tracker S
 - `git diff --check` passed
 - Fresh local server returned HTTP 200 for both `/` and `/defect-log`
 
-## Live checks
+## Live verification
 
-1. Confirm the existing app opens normally before Shop Cloud is configured.
-2. In Settings, confirm `CONNECT TO SHOP CLOUD` is visible and the existing board is not gated by sign-in.
-3. On a phone, drag a bus onto a collapsed Facility Map title strip; confirm the strip highlights and the bus lands in the first open space.
-4. In Defect Log -> Mystery Buses, tap `MOVE / LOCATION`, select a section, and confirm the bus moves while its defect count and Down Sheet badge remain unchanged.
-5. Confirm the live Site remains the existing Pace South URL.
+Sites Version 127 deployed successfully to the existing live site on 2026-08-30.
