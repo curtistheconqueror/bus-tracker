@@ -38,7 +38,7 @@ import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } fro
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
-import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
+import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
 
 function memoryStorage(initial={}){
  const values=new Map(Object.entries(initial));
@@ -2950,6 +2950,47 @@ test("dash lights are named as reported, and the start rename does not invert hi
  // memory key runs through the same migration
  const learned=learnFinding(EMPTY_FINDINGS_MEMORY,{category:"Engine",issue:"Check-engine diagnosis",finding:"chafed pin 3"},"2026-08-27T10:00:00.000Z");
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
+});
+
+test("the backup reminder is one card the shop sets the cadence of",async()=>{
+ const buses=count=>Array.from({length:count},(_,index)=>({id:"b"+index,defects:[
+  {id:"d"+index,category:"Miscellaneous",issue:"Driver-reported defect",details:"",operability:"service",state:"open",source:"defect-log"}]}));
+ const empty={getItem:()=>null};
+
+ // Twenty was fixed, and twenty is either a nag or a stranger depending on how
+ // busy the shop is. It is the default now rather than the rule.
+ assert.equal(FLEET_BACKUP_INTERVAL,20);
+ assert.equal(fleetBackupDue(empty,buses(19)).due,false);
+ assert.equal(fleetBackupDue(empty,buses(20)).due,true);
+ assert.equal(fleetBackupDue(empty,buses(6),5).due,true);
+ assert.equal(fleetBackupDue(empty,buses(6),50).due,false);
+ assert.equal(fleetBackupDue(empty,buses(60),50).due,true);
+
+ // Anything not offered falls back rather than being honoured. A zero or a
+ // negative would make the banner permanent; a huge one would silence it.
+ for(const choice of FLEET_BACKUP_INTERVAL_CHOICES)assert.equal(normalizeFleetBackupInterval(choice),choice);
+ for(const junk of [0,-7,"",null,undefined,"abc",7,99999,1.5])assert.equal(normalizeFleetBackupInterval(junk),FLEET_BACKUP_INTERVAL,String(junk)+" should fall back");
+ assert.ok(!FLEET_BACKUP_INTERVAL_CHOICES.includes(0),"there is no never - the loosest setting still asks");
+
+ /* globals.css styles a bare `aside` as a fixed 255px panel pinned top right,
+    and absolutely positions any button directly inside one into its corner.
+    That is written for the map's floating panel, and this banner inherited it
+    purely by being an <aside> - which is what threw EXPORT FULL BACKUP on top
+    of the sentence it belongs under. The reset is load-bearing, not tidiness. */
+ const [css,tsx]=await Promise.all([
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
+ ]);
+ const card=css.match(/\.offline-backup-reminder\{[^}]*\}/)[0];
+ for(const reset of ["position:static","width:auto","top:auto","right:auto"])assert.ok(card.includes(reset),"the card must undo the global aside rule: "+reset);
+ assert.match(css,/\.offline-backup-reminder>button\{position:static;[^}]*width:100%/);
+ // one card, read top to bottom, not a heading and a button side by side
+ assert.match(card,/display:grid/);
+ assert.ok(!/flex-direction|align-items:center/.test(card),"the card must not lay out in a row again");
+ assert.match(tsx,/<b>OFFLINE BACKUP DUE<\/b>[\s\S]*<small>[\s\S]*<button/,"heading, then text, then the button");
+ // and the interval reaches it, so changing the setting re-asks straight away
+ assert.match(tsx,/fleetBackupDue\(localStorage,buses,interval\)/);
+ assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
 test("only the button that writes a restorable file is called a backup",async()=>{

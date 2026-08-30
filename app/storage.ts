@@ -8,6 +8,14 @@ export const DEFECT_LOG_SETTINGS_STORAGE_KEY="pace-defect-log-settings-v1";
 export const FLEET_RECOVERY_STORAGE_KEY="pace-board-recovery-v1";
 export const FLEET_BACKUP_REMINDER_STORAGE_KEY="pace-board-backup-reminder-v1";
 export const FLEET_BACKUP_INTERVAL=20;
+/* What the reminder may be set to. A backup nobody is ever nudged towards is
+   the failure this whole banner exists to prevent, so there is no "never": the
+   loosest setting still asks, just rarely. */
+export const FLEET_BACKUP_INTERVAL_CHOICES=[5,10,20,30,50,100] as const;
+export function normalizeFleetBackupInterval(value:unknown){
+ const interval=Math.round(Number(value));
+ return (FLEET_BACKUP_INTERVAL_CHOICES as readonly number[]).includes(interval)?interval:FLEET_BACKUP_INTERVAL;
+}
 
 type JsonRecord=Record<string,unknown>;
 type StorageReader=Pick<Storage,"getItem">;
@@ -79,7 +87,7 @@ function busDefects(bus:unknown){
 export function fleetDefectCount(buses:unknown[]){return buses.reduce((count,bus)=>count+busDefects(bus).length,0)}
 
 export function fleetDefectLogCount(buses:unknown[]){
- return buses.reduce((count,bus)=>count+busDefects(bus).filter(defect=>defect.source==="defect-log").length,0);
+ return buses.reduce<number>((count,bus)=>count+busDefects(bus).filter(defect=>defect.source==="defect-log").length,0);
 }
 
 export function readFleetRecoverySnapshot(raw:string|null):FleetRecoverySnapshot|null{

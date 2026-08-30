@@ -126,7 +126,10 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 @supports(height:100svh){@media(max-width:760px){.log-editor{height:100svh;max-height:100svh}}}
 
 /* Mid-form phone save and optional advanced repair details. */
-.defect-count-field,.save-log-middle-actions,.advanced-defect-details{grid-column:1/-1;min-width:0}.save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
+.defect-count-field,.save-log-middle-actions,.advanced-defect-details{grid-column:1/-1;min-width:0}
+.backup-interval-field{display:grid;gap:4px;min-width:0}
+.backup-interval-field select{min-height:44px}
+.backup-interval-field small{color:var(--log-muted,#62748d);font-size:8px;font-weight:750;line-height:1.35}.save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
 .advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:hidden}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
 .advanced-defect-details:not([open]) .advanced-defect-grid{display:none}
 
@@ -212,12 +215,24 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 }
 
 /* Device-local backup reminder after each 20 new Defect Log entries. */
-.offline-backup-reminder{display:flex;align-items:center;gap:14px;margin:0 14px 10px;padding:12px 14px;border:2px solid #c78a15;border-radius:9px;background:#fff7dc;color:#593b00;box-shadow:0 3px 10px #4a35001a}
-.offline-backup-reminder span{display:grid;gap:3px;min-width:0;flex:1}
+/* One block, one colour, read top to bottom: what happened, then the thing to
+   press. The heading and the button used to sit side by side, the button in its
+   own darker box, which on any screen wide enough to put them on one line read
+   as a second popup shoved on top of the first. The button keeps the darker
+   colour because it is the action, but it now sits inside the same card at the
+   bottom, full width, where a button belongs. */
+/* Everything up to z-index undoes globals.css, which styles a bare `aside` as a
+   fixed 255px panel pinned to the top right and absolutely positions any button
+   directly inside one into its corner — written for the map's floating panel,
+   and inherited by this banner purely because it is also an <aside>. That rule
+   is what threw EXPORT FULL BACKUP on top of the sentence it belongs under. */
+.offline-backup-reminder{position:static;top:auto;right:auto;width:auto;z-index:auto;
+ display:grid;gap:8px;margin:0 14px 10px;padding:12px 14px;border:2px solid #c78a15;border-radius:9px;background:#fff7dc;color:#593b00;box-shadow:0 3px 10px #4a35001a}
+.offline-backup-reminder>b{color:#593b00}
 .offline-backup-reminder b{font-size:11px;font-weight:1000;letter-spacing:.4px}
 .offline-backup-reminder small{font-size:9px;font-weight:750;line-height:1.35}
-.offline-backup-reminder button{min-height:44px;border:0;border-radius:7px;background:#8b5d00;color:#fff;padding:0 16px;font-size:9px;font-weight:1000;white-space:nowrap}
-@media(max-width:760px){.offline-backup-reminder{margin:0 8px 8px;align-items:stretch;flex-direction:column}.offline-backup-reminder button{min-height:52px;width:100%;font-size:10px}}
+.offline-backup-reminder>button{position:static;right:auto;top:auto;width:100%;min-height:44px;border:0;border-radius:7px;background:#8b5d00;color:#fff;padding:0 16px;font-size:10px;font-weight:1000;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+@media(max-width:760px){.offline-backup-reminder{margin:0 8px 8px}.offline-backup-reminder button{min-height:52px}}
 /* Focus opens one bus card for reading at arm's length. The control is a sibling
    of the card's expand button, never nested inside it, so a tap can only ever do
    one thing. The header reserves the corner so long repair text cannot run under it. */
