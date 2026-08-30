@@ -183,7 +183,12 @@ export function mergeFleetMap<T extends TransferBus>(local:T[],payload:TransferP
      Writing them back unconditionally set `pendingRepair` to undefined on any
      bus that had never had one, and the Facility Map calls .trim() on it while
      filtering — so importing a map crashed the page rather than moving a bus. */
-  next[at]={...current,...mapFields,...pick(current,MAP_EXCLUDED)} as T;
+  /* The local id is kept, always. `mapFields` carries the sending device's id,
+     and letting it through re-keyed the bus — which orphaned the RECEIVING
+     device's own Down Sheet entries, since those point at the id it had before
+     the import, and its buses silently lost their badges. A transfer moves
+     what a record says, never what it is called here. */
+  next[at]={...current,...mapFields,id:current.id,...pick(current,MAP_EXCLUDED)} as T;
   report.updated++;
  }
  return {buses:next,report};
@@ -191,8 +196,22 @@ export function mergeFleetMap<T extends TransferBus>(local:T[],payload:TransferP
 
 /* Entries merge by id, incoming wins, and an entry only this device has stays
    on the sheet. A bus scheduled here and not there is still scheduled here. */
-export function mergeDownSheet<T extends {id?:string}>(local:T[],payload:TransferPayload){
- const incoming=Array.isArray(payload?.entries)?payload.entries as T[]:[];
+export function mergeDownSheet<T extends {id?:string}>(local:T[],payload:TransferPayload,buses:TransferBus[]=[]){
+ /* An entry points at a bus by the SENDING device's id, and the receiving
+    device may call that bus something else — two devices set up separately give
+    the same bus different ids. Reconciliation matches on id, so an entry
+    arriving with a foreign one put no badge on anything.
+
+    Re-pointed here by fleet number, which is the one name both devices agree
+    on. This is also what makes the order of the transfers stop mattering: the
+    sheet finds its buses whether or not the map came first. */
+ const byNumber=new Map(buses.map(bus=>[String(bus?.n??"").trim().toLowerCase(),String(bus?.id??"")]).filter(([number,id])=>number&&id));
+ const repoint=(entry:T)=>{
+  const number=String((entry as {busNumber?:unknown})?.busNumber??"").trim().toLowerCase();
+  const localId=number?byNumber.get(number):undefined;
+  return localId&&localId!==(entry as {busId?:unknown}).busId?{...entry,busId:localId}:entry;
+ };
+ const incoming=(Array.isArray(payload?.entries)?payload.entries as T[]:[]).map(repoint);
  const next=local.slice();
  const positions=new Map(local.map((entry,position)=>[String(entry?.id??""),position]));
  const report:MergeReport={updated:0,added:0,unmatched:[]};

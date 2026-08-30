@@ -31,6 +31,7 @@ import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-she
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
+import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterMatch } from "../app/quick-filters.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
@@ -2992,6 +2993,47 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  // and the interval reaches it, so changing the setting re-asks straight away
  assert.match(tsx,/fleetBackupDue\(localStorage,buses,interval\)/);
  assert.match(tsx,/\},\[buses,interval\]\)/);
+});
+
+test("it does not matter which section is moved first",()=>{
+ /* Curtis asked whether moving the map before the Down Sheet still lands right,
+    or whether the order is only a recommendation. It should not matter, and it
+    did — because of identity, in two ways that both dropped a badge. */
+ const isActive=e=>e.workflow!=="Completed";
+ const applySheet=(buses,entries,file)=>{const m=mergeDownSheet(entries,file,buses);
+  return {buses:reconcileDS(buses,m.entries.filter(isActive).map(e=>e.busId)),entries:m.entries}};
+ const applyMap=(buses,entries,file)=>({buses:mergeFleetMap(buses,file).buses,entries});
+ const bus=(id,n,l,down)=>({id,n,l,s:down?"out":"service",down,onDownSheet:down,defects:[],pendingRepair:""});
+
+ for(const [label,sender,receiver] of [["same ids",["a","b"],["a","b"]],["different ids",["p1","p2"],["i1","i2"]]]){
+  const from=[bus(sender[0],"17549","west-4",true),bus(sender[1],"18122","garage-2",false)];
+  const mapFile=exportFleetMapPayload(from);
+  const sheetFile=exportDownSheetPayload([{id:"e1",busId:sender[0],busNumber:"17549",workflow:"Scheduled"}]);
+  const start=()=>[bus(receiver[0],"17549","bay-3",false),bus(receiver[1],"18122","bay-4",false)];
+  let a={buses:start(),entries:[]}; a=applySheet(a.buses,a.entries,sheetFile); a=applyMap(a.buses,a.entries,mapFile);
+  let c={buses:start(),entries:[]}; c=applyMap(c.buses,c.entries,mapFile); c=applySheet(c.buses,c.entries,sheetFile);
+  const show=x=>x.buses.map(z=>z.n+"@"+z.l+(z.down?" DOWN":"")).join(" ");
+  assert.equal(show(a),show(c),label+": the order of the two transfers changed the result");
+  assert.match(show(a),/17549@west-4 DOWN/,label+": the bus should have moved and kept its badge");
+ }
+
+ /* And a transfer never re-keys the receiving device's own records. The map
+    payload carries the sending device's id, and letting it through orphaned
+    the receiver's OWN Down Sheet entries — they point at the id it had before
+    the import — so its buses silently lost their badges. */
+ const localBuses=[bus("i1","17549","bay-3",true)];
+ const localEntries=[{id:"e-local",busId:"i1",busNumber:"17549",workflow:"Scheduled"}];
+ const after=mergeFleetMap(localBuses,exportFleetMapPayload([bus("p1","17549","west-4",false)])).buses;
+ assert.equal(after[0].id,"i1","a transfer must not re-key a bus the receiving device already had");
+ assert.equal(after[0].l,"west-4","it still takes the incoming position");
+ assert.equal(reconcileDS(after,localEntries.map(e=>e.busId))[0].down,true,"the device's own Down Sheet must still find its bus");
+
+ // an entry arriving with a foreign id is re-pointed by fleet number
+ const repointed=mergeDownSheet([],exportDownSheetPayload([{id:"e9",busId:"p1",busNumber:"17549",workflow:"Scheduled"}]),[bus("i1","17549","bay-3",false)]);
+ assert.equal(repointed.entries[0].busId,"i1");
+ // and one for a bus this device does not have is left exactly as it came
+ const untouched=mergeDownSheet([],exportDownSheetPayload([{id:"e8",busId:"p9",busNumber:"99999",workflow:"Scheduled"}]),[bus("i1","17549","bay-3",false)]);
+ assert.equal(untouched.entries[0].busId,"p9");
 });
 
 test("the road panel stops covering the service detail area once the map stacks",async()=>{
