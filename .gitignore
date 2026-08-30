@@ -48,3 +48,10 @@ dev-server.*.log
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Wrangler local secrets. This is a Wrangler project and .env* is already
+# ignored, but .dev.vars is the file Wrangler itself uses for local Worker
+# secrets and was not covered. Nothing in the repo creates it today; the point
+# is that nothing can commit one by accident later either.
+.dev.vars
+.dev.vars.*

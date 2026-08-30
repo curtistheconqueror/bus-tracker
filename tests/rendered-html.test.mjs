@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, writeCloudConfig } from "../app/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
@@ -5123,4 +5124,166 @@ test("a phone token reserves room for the badges instead of letting them cover t
  assert.ok(Number(garagePad[1]) < Number(generalPad[1]),
   "the garage reservation is smaller than the general one");
  assert.match(phone, /\.grow \.downsheet-ready-badge\{[^}]*font-size:\d+px/);
+});
+
+test("a cloud bus row carries the map's fields and none of the Down Sheet's",async()=>{
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"cj",deviceLabel:"CJ phone"});
+ const now="2026-08-30T12:00:00.000Z";
+ const bus={id:"local-1",n:"17549",l:"BAY 12",s:"shop",mechanic:"RM",bay12Watch:true,
+  lastLocationChangeAt:"2026-08-30T09:00:00.000Z",lastStatusChangeAt:"2026-08-30T11:00:00.000Z",
+  defects:[{id:"d1",category:"Engine",issue:"Overheating",state:"open"}],
+  down:true,onDownSheet:true,downSheetReady:true,pendingRepair:"belt"};
+ const row=busRow(bus,config,now);
+ // The map may not assert whether a bus is down. The buses table has no column
+ // for it either, so this is the same rule enforced twice.
+ for(const held of ["down","onDownSheet","downSheetReady","defects","pendingRepair"]){
+  assert.ok(!(held in row),held+" must not be a column on a bus row");
+  assert.ok(!(held in row.map_fields),held+" must not ride along in map_fields");
+ }
+ // The local id is this device's name for the bus and means nothing elsewhere.
+ assert.ok(!("id" in row.map_fields));
+ assert.equal(row.fleet_number,"17549");
+ assert.equal(row.map_fields.mechanic,"RM");
+ assert.equal(row.map_fields.bay12Watch,true);
+ // Initials are shouted everywhere in this app, so they are stored shouted.
+ assert.equal(row.updated_by,"CJ");
+ // A bus carries no updatedAt of its own. Sending "now" would mean the last
+ // device to sync always wins, even holding week-old data, so the newest stamp
+ // the record does keep is used instead.
+ assert.equal(row.updated_at,"2026-08-30T11:00:00.000Z");
+ assert.equal(busUpdatedAt({},"2026-01-01T00:00:00.000Z"),"2026-01-01T00:00:00.000Z");
+ assert.equal(busRow({n:"  "},config,now),null);
+ // A status outside the table's check constraint would be rejected by the
+ // database; it becomes unknown here rather than failing the whole push.
+ assert.equal(busRow({n:"1",s:"parked"},config,now).status,"unknown");
+});
+
+test("cloud rows come back as transfer payloads so the shipped merge rules apply unchanged",async()=>{
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"CJ",deviceLabel:"CJ phone"});
+ const now="2026-08-30T12:00:00.000Z";
+ const cloudBus={id:"sender-1",n:"17549",l:"BAY 12",s:"shop",mechanic:"RM",
+  lastStatusChangeAt:"2026-08-30T11:00:00.000Z",defects:[],down:false,onDownSheet:false,downSheetReady:false};
+ const cloudDefect={id:"d1",category:"Engine",issue:"Overheating",state:"open",operability:"service",details:"runs hot",repairHours:1.5};
+ const cloudEntry={id:"e1",busId:"SENDER-ID",busNumber:"17549",category:"Engine",repair:"Overheating",
+  workflow:"Scheduled",priority:"High",updatedAt:"2026-08-30T10:00:00.000Z",timeEstimate:{repairMinutes:60}};
+
+ // The receiving device knows this bus by a different id, has it somewhere
+ // else, has its own defect on it, and has it on its own Down Sheet.
+ const local=[{id:"other-1",n:"17549",l:"SOUTH LOT",s:"service",
+  defects:[{id:"mine",category:"Air Leak",issue:"Leaking air bag - rear",state:"open"}],
+  down:true,onDownSheet:true,downSheetReady:true,pendingRepair:""}];
+
+ const afterMap=mergeFleetMap(local,fleetMapPayload([busRow(cloudBus,config,now)],now));
+ const merged=afterMap.buses[0];
+ assert.equal(merged.l,"BAY 12");
+ // A cloud map arriving stale must not strip a badge off a bus whose Down Sheet
+ // entry is sitting right there. This is the bug that cost a session once.
+ assert.equal(merged.down,true);
+ assert.equal(merged.downSheetReady,true);
+ // Re-keying the bus would orphan the receiving device's own sheet entries.
+ assert.equal(merged.id,"other-1");
+ // Sending a map must never be a way of quietly clearing somebody's Defect Log.
+ assert.equal(merged.defects.length,1);
+
+ const afterDefects=mergeDefectLog(afterMap.buses,defectLogPayload([defectRow(cloudDefect,"17549",config,now)],now));
+ const both=afterDefects.buses[0].defects;
+ assert.deepEqual(both.map(defect=>defect.id).sort(),["d1","mine"]);
+ // Fields with no column of their own ride in `detail` and come back intact,
+ // so a defect gaining a field next month needs no database migration.
+ assert.equal(both.find(defect=>defect.id==="d1").repairHours,1.5);
+
+ const afterSheet=mergeDownSheet([],downSheetPayload([downSheetRow(cloudEntry,config,now)],now),afterDefects.buses);
+ // The entry arrived carrying the SENDING device's busId, which means nothing
+ // here; it is re-pointed by fleet number, the one name both devices agree on.
+ assert.equal(afterSheet.entries[0].busId,"other-1");
+ assert.equal(afterSheet.entries[0].busNumber,"17549");
+ assert.deepEqual(afterSheet.entries[0].timeEstimate,{repairMinutes:60});
+});
+
+test("only rows that actually changed are sent again",async()=>{
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"CJ",deviceLabel:"iPad"});
+ const now="2026-08-30T12:00:00.000Z";
+ const bus={n:"17549",l:"BAY 12",s:"shop",lastStatusChangeAt:now};
+ const first=changedRows([busRow(bus,config,now)],"fleet_number",{});
+ assert.equal(first.changed.length,1);
+ // A quiet shop costs one request that finds nothing, not a whole board upload.
+ assert.equal(changedRows([busRow(bus,config,now)],"fleet_number",first.fingerprints).changed.length,0);
+ const moved=changedRows([busRow({...bus,l:"WASH RACK"},config,now)],"fleet_number",first.fingerprints);
+ assert.equal(moved.changed.length,1);
+ // A row with no key cannot be upserted, so it is dropped rather than sent.
+ assert.equal(changedRows([{location:"BAY 1"}],"fleet_number",{}).changed.length,0);
+});
+
+test("the shop cloud reports what happened and never offers a switch",async()=>{
+ assert.equal(cloudStatusLabel({phase:"unconfigured",lastSyncedAt:"",lastError:"",pending:0}),"Not connected");
+ assert.equal(cloudStatusLabel({phase:"offline",lastSyncedAt:"",lastError:"",pending:12}),"Offline — 12 changes waiting");
+ assert.equal(cloudStatusLabel({phase:"offline",lastSyncedAt:"",lastError:"",pending:1}),"Offline — 1 change waiting");
+ assert.equal(cloudStatusLabel({phase:"idle",lastSyncedAt:"",lastError:"",pending:0}),"Connected");
+ // A dead network is normal and self-correcting; a broken query needs a person.
+ // They are told apart so the words and the behaviour can differ.
+ assert.equal(cloudFailurePhase(new Error("TypeError: Failed to fetch")),"offline");
+ assert.equal(cloudFailurePhase(new Error("Network request timed out")),"offline");
+ assert.equal(cloudFailurePhase(new Error("JWT expired")),"signed-out");
+ assert.equal(cloudFailurePhase(new Error("Invalid login credentials")),"signed-out");
+ assert.equal(cloudFailurePhase(new Error('column "x" does not exist')),"error");
+
+ // Both files explain in prose why navigator.onLine is the wrong signal, so the
+ // check must be that it is never CALLED, not that the words never appear.
+ const code=text=>text.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1");
+ const [source,control]=await Promise.all([
+  readFile(new URL("../app/cloud-sync.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
+ ]);
+ // It only says the wifi is associated. Shop wifi that is up but with no route
+ // to the internet reports true, and a sync built on it insists it is online
+ // while every push fails.
+ assert.doesNotMatch(code(source),/navigator\.onLine/);
+ assert.doesNotMatch(code(control),/navigator\.onLine/);
+ // Nothing in this app may make signing in a condition of seeing the board.
+ assert.doesNotMatch(code(control),/OFFLINE\s*\/\s*ONLINE/i);
+});
+
+test("connection details are checked where the message can name the field",async()=>{
+ const good={url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"CJ",deviceLabel:"iPad"};
+ assert.equal(cloudConfigProblem(normalizeCloudConfig(good)),"");
+ assert.match(cloudConfigProblem(normalizeCloudConfig({...good,url:"https://supabase.com/dashboard"})),/Supabase Project URL/);
+ assert.match(cloudConfigProblem(normalizeCloudConfig({...good,anonKey:"short"})),/too short/);
+ assert.match(cloudConfigProblem(normalizeCloudConfig({...good,email:"nope"})),/sign-in email/);
+ // A shared login means the database cannot say who changed a bus, so the row
+ // has to. Attribution nobody filled in is worse than none: it looks answered.
+ assert.match(cloudConfigProblem(normalizeCloudConfig({...good,initials:""})),/initials/);
+ // A trailing slash on the project URL is the ordinary paste mistake.
+ assert.equal(normalizeCloudConfig({...good,url:"https://demo.supabase.co/"}).url,"https://demo.supabase.co");
+
+ const store=memoryStorage();
+ assert.equal(writeCloudConfig(store,normalizeCloudConfig(good)),true);
+ assert.equal(readCloudConfig(store).initials,"CJ");
+ // A corrupt or absent store must never throw into the board.
+ assert.equal(readCloudConfig(memoryStorage({"pace-cloud-config-v1":"{not json"})).url,"");
+ assert.equal(readCloudConfig(memoryStorage()).url,"");
+ assert.deepEqual(readSentFingerprints(memoryStorage({"pace-cloud-sent-v1":"[]"})),{});
+});
+
+test("the shop cloud never becomes a condition of using the board",async()=>{
+ const [control,page,css]=await Promise.all([
+  readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+ // It lives in Settings, mounted beside the other self-contained controls —
+ // never in front of the map.
+ assert.match(page,/<section className="settings-group cloud-sync-settings">/);
+ assert.match(page,/<CloudSyncControl\/>/);
+ assert.match(css,/\.cloud-status\{/);
+ // Pushing reads what is ON DISK, not what the page is holding. writeFleetStorage
+ // refuses writes it considers destructive and the board's save effect discards
+ // that boolean, so pushing from React state would upload changes the device
+ // itself declined to keep.
+ assert.match(control,/readFleetStorage<.*>\(localStorage\)/);
+ assert.doesNotMatch(control,/props\.buses|\{buses\}:/);
+ // A pull merges; it never replaces.
+ assert.match(control,/mergeFleetMap\(/);
+ assert.match(control,/mergeDefectLog\(/);
+ assert.match(control,/mergeDownSheet\(/);
+ assert.doesNotMatch(control,/localStorage\.clear\(\)/);
 });

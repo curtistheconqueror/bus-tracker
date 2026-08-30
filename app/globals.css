@@ -140,6 +140,29 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .board-data small{display:block;margin-top:8px;color:#687791;font-size:9px}
 .board-data>.board-recovery{width:100%;display:grid;grid-template-columns:minmax(190px,auto) minmax(0,1fr);align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #d7e1f0}.board-data>.board-recovery small{margin:0;line-height:1.35}.board-data>.board-recovery button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){.board-data>.board-recovery{grid-template-columns:1fr}.board-data>.board-recovery button{min-height:50px}.board-data>.board-recovery small{margin-top:7px}}
+/* Shop cloud. The status line is the whole interface most days: it reports what
+   sync is doing and offers nothing to flip, because a mechanic cannot make the
+   wifi work by pressing something and a control implying he can is a lie. */
+.cloud-sync{display:grid;gap:9px;margin-top:4px}
+.cloud-status{display:grid;gap:3px;margin:0;padding:9px 10px;border:1px solid #cbd6e8;border-left:4px solid #6d7b96;border-radius:6px;background:#f6f9ff}
+.cloud-status>b{font-size:12px;color:#12295a}
+.cloud-status>small{font-size:10px;line-height:1.35;color:#5b6883}
+.cloud-status.cloud-idle{border-left-color:#008345}
+.cloud-status.cloud-syncing{border-left-color:#0969d9}
+.cloud-status.cloud-offline{border-left-color:#c07a00;background:#fff8ec}
+.cloud-status.cloud-error,.cloud-status.cloud-signed-out{border-left-color:#b71922;background:#fff4f4}
+.cloud-actions{display:flex;flex-wrap:wrap;gap:7px}
+.cloud-actions button{border:1px solid #aeb8cc;border-radius:4px;background:#fff;color:#16264a;padding:9px 13px;font-size:10px;font-weight:900}
+.cloud-actions button:disabled{opacity:.5;cursor:not-allowed}
+.cloud-actions .cloud-signout{color:#b71922;border-color:#e1a1a4}
+.cloud-fields{display:grid;gap:9px;padding-top:9px;border-top:1px solid #d7e1f0}
+.cloud-fields label{display:flex;flex-direction:column;gap:4px;font-size:9px;font-weight:900;color:#506080}
+.cloud-fields input{border:1px solid #b9c3d7;border-radius:5px;padding:9px;background:#fff;color:#172858;font-size:12px}
+.cloud-fields>small{font-size:10px;line-height:1.4;color:#5b6883}
+.cloud-field-actions{display:flex;flex-wrap:wrap;gap:7px}
+.cloud-field-actions button{border:1px solid #aeb8cc;border-radius:4px;background:#fff;padding:9px 13px;font-size:10px;font-weight:900}
+.cloud-field-actions .cloud-signin{background:#0867d5;border-color:#0867d5;color:#fff}
+@media(max-width:760px){.cloud-actions button,.cloud-field-actions button{flex:1 1 100%;min-height:50px}.cloud-fields input{min-height:44px;font-size:16px}}
 .theme-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .theme-grid button{min-height:57px;border:1px solid #c6d0e2;border-radius:7px;background:#f7f9fd;color:#294066;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:9px;cursor:pointer}
 .theme-grid button i{width:34px;height:17px;border:3px solid;border-radius:4px;box-shadow:inset 0 0 0 2px #ffffff44}
