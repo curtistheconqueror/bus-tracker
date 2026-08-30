@@ -11,7 +11,8 @@ purpose.
 | Files | `supabase/migrations/0001_cloud_backup.sql`, `supabase/migrations/0002_shared_records.sql`, `supabase/tests/schema.test.sql`, `supabase/run-tests.sh` |
 | Verify locally | `./supabase/run-tests.sh` — builds a throwaway cluster, applies every migration twice, runs 12 checks. No network, no Supabase account. |
 | How it was applied | Pasted into the Supabase **SQL Editor** in the browser. That needs no MCP connector and no database password, and it is the route to use again. Do not wait on the connector, which reported `connected: true` with `enabledInChat: false` and never exposed a single tool. |
-| Next | The client. **Nothing in the app reads or writes Supabase yet** — the tables are empty and the app is unchanged. |
+| Client | **Built.** `app/cloud-sync.ts` (pure logic), `app/cloud-client.ts` (the Supabase calls), `app/cloud-sync-control.tsx` (Settings → SHOP CLOUD). Syncs the map, the Defect Log and the Down Sheet. |
+| Next | Each device is connected once by pasting its Project URL, anon key, sign-in email and the person's initials into Settings. Campaigns and the learned parts/findings have tables waiting but are not synced yet. |
 
 ### Verified in the live project on 2026-08-30
 
@@ -161,15 +162,36 @@ select (select count(*) from buses)+(select count(*) from bus_defects)+(select c
 
 ## First steps for the next session
 
-The database is done. The work left is the client, and none of it has started.
+The database and the client are both done. What is left is turning it on and
+watching it, which needs a person.
 
-1. Run Supabase's own linter on the project and fix anything it flags.
-2. Build sign-in, in **Settings**, next to the export controls, as a one-time
-   "CONNECT TO SHOP CLOUD". Read "Sign-in with no internet" above first — the
-   login must never gate the board, and there is no OFFLINE/ONLINE switch.
-3. Push on save, with a status line that reports rather than asks. Prove push
-   before writing pull.
-4. Pull and merge after that, reusing the merge rules already shipped in
-   Versions 123 and 124 rather than inventing new ones.
+1. **Create the shop login.** Supabase → Authentication → Users → Add user. One
+   email and password for the whole shop, email confirmation off. Nobody outside
+   the shop gets it.
+2. **Connect the first two devices.** Settings → SHOP CLOUD → CONNECT TO SHOP
+   CLOUD, then paste the Project URL and the anon public key (Supabase →
+   Settings → API), the sign-in email, and that person's initials. Sign in once
+   **on wifi**; after that the device opens the same with no signal.
+3. **Watch one bus move between them.** Move a bus on device A, wait for the
+   status line to read "Synced", then GET THE SHOP'S COPY on device B. The bus
+   should move. Then confirm a bus on the Down Sheet keeps its DS badge on B.
+4. **Then run Supabase's own linter** and fix anything it flags.
+
+Only after that is worth doing: syncing Fleet Campaigns and the learned
+parts/findings (tables already exist), and live updates if still wanted.
+
+### Things not to undo
+
+- The login does not gate the board, and there is no OFFLINE/ONLINE switch.
+  Tests assert both. See "Sign-in with no internet" above for why.
+- Push reads LocalStorage, not React state. `writeFleetStorage` refuses writes
+  it judges destructive and the map's save effect discards that boolean, so
+  pushing from state would upload work the device itself declined to keep.
+- Pull builds a transfer-file payload and reuses `mergeFleetMap`,
+  `mergeDefectLog` and `mergeDownSheet`. Do not write cloud-specific merge
+  rules; two sets that must agree forever will not.
+- Connection details are typed into Settings, never baked into the build. A
+  client-side `process.env` read that was not inlined throws a ReferenceError
+  rather than returning undefined, so an unset build value is a white screen.
 
 Nothing here touches the publishing flow. Codex publishes; Claude does not.
