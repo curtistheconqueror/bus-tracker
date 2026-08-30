@@ -27,20 +27,20 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `925bf91` — everything after it is documentation only |
+| Last code-bearing commit | `38186c2` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 123, `f154686` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 925bf91..origin/main` that
-nothing but `docs/` changed after `925bf91`, and publish the tip.
+release commit. Confirm with `git log --oneline 38186c2..origin/main` that
+nothing but `docs/` changed after `38186c2`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed. This was written while Version 123 was being published and was replayed
 on top of it rather than merged over it.
 
-Gate: 130 tests passing, ESLint clean, production build succeeds.
+Gate: 131 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -96,9 +96,33 @@ width, one row, FIXED TODAY in the fifth column. The phone keeps its own design 
 two columns with the last tile spanning the final row — but in flow now rather
 than floating.
 
+### The command bar fits across the bottom again
+
+It needed scrolling. Down Sheet, Defect Log, Fixed Repairs and Fleet Campaigns
+sat in the bar as four separate buttons beside the locator, quick filters, badge
+view, refresh, settings and the operator — **ten controls** — and it wrapped onto
+a second row at every width measured, from an iPad to a 1440px desktop. On an
+iPad held upright it reached **four rows and 208px**.
+
+The four are now one **PAGES** trigger, built to the same shape as QUICK FILTERS
+beside it so the pattern is learned once. The counts come with them — on the
+trigger as a total, and on each row — because the reason to glance at this bar is
+to see whether anything is waiting elsewhere.
+
+```
+iPad landscape 1024    one row, 53px, everything visible
+iPad upright 768       three rows, 158px  (was four rows, 208px)
+```
+
+Two things surfaced while measuring. The trigger rendered **0px wide at 820px**,
+where the bar is tightest — `min-width:0`, copied from the control beside it, let
+the flex row squeeze it to nothing. And on a narrow screen refresh held columns
+1-2 and settings 3-4, filling that row and pushing the operator onto a fourth row
+alone; all three share a row now.
+
 ## Migration and data safety
 
-Delivery and layout only. No LocalStorage key, stored record, file format or
+Delivery, layout and navigation only. No LocalStorage key, stored record, file format or
 payload changed. A file exported by Version 123 imports into Version 124 unchanged, and
 the reverse is also true — this changes how a file leaves the device, not what
 is in it.
@@ -106,7 +130,7 @@ is in it.
 ## Validation
 
 - Production build passed
-- All 130 regression tests passed, including a new one asserting every export
+- All 131 regression tests passed, including a new one asserting every export
   uses the shared helper and that none of them builds its own download link or
   blob URL, so a fifth copy cannot appear
 - ESLint passed
@@ -115,6 +139,10 @@ is in it.
   bytes — and **zero blob links are clicked**, so nothing is left to strand on
   another device. With no share sheet the download still happens as before
 - Re-ran the two-device transfer checks from Version 123: still unaffected
+- Measured the command bar at 1440, 1366, 1180, 1024, 820, 768 and 390 before and
+  after, and drove the menu in a browser at both iPad orientations: the trigger
+  reads PAGES with the waiting count, the popover opens on screen above the bar
+  with four 44px rows, and tapping DEFECT LOG lands on `/defect-log`
 - Measured the Defect Log summary tiles at 1366, 1180, 1024, 820, 768 and 390:
   before the fix FIXED TODAY was at the full viewport width on the same row as
   the other four at every iPad size; after, all five are equal width in one row
@@ -133,6 +161,9 @@ is in it.
    row at the same size, and that FIXED TODAY no longer lies across the screen or
    needs moving out of the way. Check the phone still shows it as the full-width
    tile on its own last row.
+5. **On the iPad, look at the bottom bar of the Facility Map.** It should fit
+   without scrolling. Tap **PAGES** and confirm all four pages are listed with
+   their counts, and that tapping one opens it. Check both orientations.
 
 ## Publishing constraints that still apply
 
@@ -145,5 +176,5 @@ is in it.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 124 | Live | <published tip hash> | Every export delivered through the share sheet so a phone sends a real file instead of a blob link that opens "not found" on the receiving device, and the FIXED TODAY tile returned to the summary row instead of floating across the screen |
+| 124 | Live | <published tip hash> | Every export delivered through the share sheet so a phone sends a real file instead of a blob link that opens "not found" on the receiving device, the FIXED TODAY tile returned to the summary row instead of floating across the screen, and the four page buttons collapsed into one PAGES menu so the command bar fits across the bottom without scrolling |
 ```
