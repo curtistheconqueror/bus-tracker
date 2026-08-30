@@ -654,3 +654,31 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 @media(max-width:760px){
  .road{position:static;top:auto;right:auto;width:auto;height:auto;margin-top:7px}
 }
+
+/* PAGES: the four other surfaces behind one trigger, styled to match the quick
+   filter control beside it so the command bar reads as one row of one kind of
+   thing. Four separate buttons wrapped that bar onto a second row at every
+   width from an iPad to a 1440px desktop, and onto four rows on an iPad held
+   upright. */
+/* Never shrinks: min-width:0 let the flex row squeeze it to nothing at 820px,
+   where the bar is at its tightest and this is the one control that has to be
+   reachable. */
+.page-menu-control{display:inline-flex;flex:none}
+.page-menu-trigger{display:inline-flex;align-items:center;gap:6px;min-height:33px;border:1px solid color-mix(in srgb,var(--command-text) 34%,transparent);border-radius:6px;background:color-mix(in srgb,var(--command-text) 10%,transparent);color:var(--command-text);padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.4px;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.page-menu-trigger .page-menu-waiting{border-radius:999px;background:color-mix(in srgb,var(--command-text) 22%,transparent);padding:1px 6px;font-size:9px}
+.page-menu-popover{position:fixed;z-index:60;width:244px;max-width:calc(100vw - 16px);border:1px solid #b9c7da;border-radius:9px;background:#fff;box-shadow:0 14px 38px #16233d40;overflow:hidden}
+.page-menu-popover header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dde5f0;background:#f4f7fc;padding:8px 11px;color:#3d5a72;font-size:8px;font-weight:900;letter-spacing:.5px}
+.page-menu-popover>div{display:grid;padding:5px}
+.page-menu-popover>div button{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;border:0;border-radius:6px;background:transparent;color:#1d3457;padding:0 9px;font-size:10px;font-weight:900;letter-spacing:.3px;text-align:left;cursor:pointer;touch-action:manipulation}
+.page-menu-popover>div button:hover{background:#eef3fb}
+.page-menu-popover>div button b{border-radius:999px;background:#e7eefa;padding:2px 8px;color:#0b3d7a;font-size:10px}
+
+/* The narrow command bar fits in three rows, not four. Refresh took columns 1-2
+   and settings 3-4, which filled the row and pushed the operator onto a fourth
+   row on its own — 208px of an iPad held upright, spent on one button that had
+   company available. All three share a row now. */
+@media(max-width:800px){
+ .command-bar>.refresh-command{grid-column:1/2}
+ .command-bar>.settings-command{grid-column:2/3}
+ .command-bar>.ai-operator-command{grid-column:3/5}
+}

@@ -231,7 +231,7 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /ON DOWN SHEET/);
   assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
   assert.match(page, /showDownSheetBadges\?downSheetBadgeViewBusIds/);
-  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<button className="downsheet-command"/);
+  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{\[/);
   assert.match(page, /<h3>DS BADGE<\/h3>/);
   assert.match(page, /<b>SHOW BADGE<\/b>/);
   assert.match(page, /visuals\.downSheetBadgeText/);
@@ -935,10 +935,12 @@ test("active Down Sheet rows reconcile every tracker checkbox exactly", () => {
 
 test("tracker uses one counted Down Sheet control and one counted Defect Log control", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.equal((page.match(/className="downsheet-command"/g) || []).length, 1);
-  assert.equal((page.match(/className="defectlog-command"/g) || []).length, 1);
-  assert.match(page, /DOWN SHEET <b>\{actualDownSet\.size\}<\/b>/);
-  assert.match(page, /DEFECT LOG <b>\{defectLogCount\}<\/b>/);
+  /* Both moved into the PAGES menu when four page buttons were wrapping the
+     command bar onto a second row. Still one of each, still counted. */
+  assert.equal((page.match(/label:"DOWN SHEET",count:actualDownSet\.size/g) || []).length, 1);
+  assert.equal((page.match(/label:"DEFECT LOG",count:defectLogCount/g) || []).length, 1);
+  assert.doesNotMatch(page, /className="downsheet-command"/);
+  assert.doesNotMatch(page, /className="defectlog-command"/);
   assert.match(page, /defectLogCount=activeDefectLogCount\(buses\)/);
 });
 test("down-sheet button shows a ratio only when tracker and sheet counts differ", () => {
@@ -2997,6 +2999,44 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
+test("the command bar carries the other pages behind one trigger",async()=>{
+ /* Four separate page buttons plus the locator, quick filters, badge view,
+    refresh, settings and the operator wrapped the bar onto a second row at every
+    width from an iPad to a 1440px desktop, and onto four rows — 208px — on an
+    iPad held upright. A bar you have to scroll has stopped being a bar. */
+ const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ const menu=await readFile(new URL("../app/page-menu.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+
+ // the four buttons are gone from the bar and live in the menu instead
+ for(const gone of ["downsheet-command","defectlog-command","fixed-repairs-command","lists-command"])
+  assert.ok(!page.includes('className="'+gone+'"'),gone+" should be inside the PAGES menu now");
+ assert.match(page,/<PageMenu pages=\{\[/);
+ for(const href of ["/down-sheet","/defect-log","/fixed-repairs","/lists"])
+  assert.ok(page.includes('href:"'+href+'"'),"the menu must still reach "+href);
+ // the counts come along: the reason to glance at the bar is to see what is waiting
+ assert.match(page,/count:actualDownSet\.size/);
+ assert.match(page,/count:defectLogCount/);
+ assert.match(page,/count:fixedRepairCount/);
+
+ // same shape as the quick filter control beside it, so the pattern is learned once
+ assert.match(menu,/aria-haspopup="menu"/);
+ assert.match(menu,/createPortal/);
+ assert.match(menu,/event\.key==="Escape"/);
+ // the trigger must never be squeezed away: min-width:0 collapsed it to 0px wide
+ // at 820px, where the bar is tightest and this is the control that has to work
+ assert.match(css,/\.page-menu-control\{display:inline-flex;flex:none\}/);
+ // and the menu items stay tappable
+ assert.match(css,/\.page-menu-popover>div button\{[^}]*min-height:44px/);
+
+ /* Three rows on a narrow screen, not four. Refresh took columns 1-2 and
+    settings 3-4, filling the row and pushing the operator onto a fourth row by
+    itself. */
+ assert.match(css,/\.command-bar>\.refresh-command\{grid-column:1\/2\}/);
+ assert.match(css,/\.command-bar>\.settings-command\{grid-column:2\/3\}/);
+ assert.match(css,/\.command-bar>\.ai-operator-command\{grid-column:3\/5\}/);
+});
+
 test("no class name collides with a Tailwind positioning utility",async()=>{
  /* The FIXED TODAY tile was className="fixed", and this project ships Tailwind,
     whose `.fixed` utility is position:fixed. On an iPad the tile was lifted out
@@ -4119,7 +4159,7 @@ test("every page offers the Fleet Campaigns tab without changing the lists route
  assert.match(listsPage,/<details className="list-columns">/);
  // the Facility Map hides its header nav on desktop and navigates from the
  // command bar, so without this button the page is unreachable there
- assert.match(pages[0],/className="lists-command"[\s\S]{0,90}?window\.location\.assign\("\/lists"\)/);
+ assert.match(pages[0],/\{href:"\/lists",label:"FLEET CAMPAIGNS"\}/);
 });
 
 test("the lists page neutralises the global aside and section styling",async()=>{
