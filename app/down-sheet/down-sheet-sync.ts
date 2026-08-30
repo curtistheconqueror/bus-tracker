@@ -1,6 +1,7 @@
 import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../repair-catalog.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 import {statusForLocation} from "../smart-status.ts";
+import {moveBusToArea,RELOCATION_AREAS} from "../facility-areas.ts";
 
 export type SyncFleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -43,6 +44,19 @@ export type SyncDownEntry={
  workflow:string;
  operationalStatus:SyncFleetStatus;
  completedBy?:string;
+ /* Where the bus should be parked, by area name, when the sheet is where
+    somebody is deciding that.
+
+    A bus's status is derived from where it sits — the CNG lots read out of
+    service, a shop bay reads work in progress — so setting a status on the
+    sheet without being able to move the bus meant the choice was silently
+    overridden and the Defect Log went on showing the old one. Rather than
+    weaken that rule, the sheet can now move the bus, which is what a foreman
+    putting a bus back in service means anyway: it is leaving the lot.
+
+    Absent means leave it where it is, which is what every entry written before
+    this existed says. */
+ location?:string;
 };
 
 function clean(value:unknown){return String(value??"").trim()}
@@ -91,7 +105,16 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
 }
 
 export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:SyncDownEntry,now=new Date().toISOString()):T[]{
- return fleet.map(bus=>{
+ /* Moved first, so everything below sees the space the bus is going to be in.
+    The status is derived from the location, so doing this the other way round
+    would compute the status for where the bus used to be and then move it.
+
+    moveBusToArea picks the first free slot in the area and swaps if it has to,
+    the same as dragging a bus on the map. An area with no room leaves the bus
+    where it is rather than failing the whole save — the repair details are
+    worth more than the move. */
+ const relocated=entry.location?moveBusToArea(fleet,entry.busId,entry.location,RELOCATION_AREAS,now).fleet:fleet;
+ return relocated.map(bus=>{
   if(bus.id!==entry.busId)return bus;
   const entryCompleted=entry.workflow==="Completed";
   /* The entry's workflow still describes the bus. A repair carries its own,

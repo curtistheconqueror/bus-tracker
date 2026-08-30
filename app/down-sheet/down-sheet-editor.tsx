@@ -14,6 +14,7 @@ import {
   type DownSheetRepairItem,
 } from "./down-sheet-repair-items";
 import {formatRepairTime, repairTimeTotal, resetCoreRepairEstimate, type RepairTimeEstimate} from "./repair-time-estimates";
+import {RELOCATION_AREAS, sectionForLocation} from "../facility-areas";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -30,6 +31,9 @@ export type DownSheetRecord={
   workflow:Workflow;operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";
   timeEstimate:RepairTimeEstimate;
   createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
+  /* Which area to park the bus in when this is saved, by name. Absent means
+     leave it where it is, which is what every entry written before this said. */
+  location?:string;
 };
 
 const SECTIONS:RepairSection[]=["Pending","Accident","Scheduled Repair","Inspection","Vendor Repair","Roadcall","Other"];
@@ -50,6 +54,9 @@ function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
+  /* Named so the "leave it" option can say where that actually is. A foreman
+     deciding whether to move a bus needs to know where it is sitting now. */
+  const currentArea=sectionForLocation(fleet.find(bus=>bus.id===draft.busId)?.l||"");
   const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
   const updateItem=(id:string,change:(item:DownSheetRepairItem)=>DownSheetRepairItem)=>setDraft(current=>({...current,repairItems:current.repairItems.map(item=>item.id===id?change(item):item)}));
   const updateEstimateHours=(id:string,key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>updateItem(id,item=>({...item,timeEstimate:{...item.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
@@ -184,7 +191,8 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
         <label>{draft.assignmentType.toUpperCase()} ASSIGNED<input value={draft.assignedTo} onChange={event=>update("assignedTo",event.target.value)} placeholder={draft.assignmentType==="Vendor"?"Vendor or company":"Mechanic name or initials"}/></label>
         <label>SCHEDULED SHIFT<select value={draft.shift} onChange={event=>update("shift",event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
         <label>REPAIR WORKFLOW<select value={draft.workflow} onChange={event=>setWorkflow(event.target.value as Workflow)}>{WORKFLOWS.map(value=><option key={value}>{value}</option>)}</select></label>
-        <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>Status only; location stays unchanged.</small></label>
+        <label>BUS STATUS ON TRACKER<select value={draft.operationalStatus} onChange={event=>update("operationalStatus",event.target.value as FleetStatus)}>{STATUS_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select><small>{draft.location?"Saving will also move this bus, and the status follows where it parks.":"A bus keeps the status its parking space implies. Move it below to change that."}</small></label>
+        <label>MOVE BUS TO<select value={draft.location||""} onChange={event=>update("location",event.target.value||undefined)}><option value="">Leave where it is{currentArea?" - "+currentArea:""}</option>{Object.keys(RELOCATION_AREAS).map(area=><option value={area} key={area}>{area}</option>)}</select><small>The CNG lots always read out of service and a shop bay always reads work in progress, so a bus going back in service has to leave the lot.</small></label>
         {repairItemsProgress(draft.repairItems).done>0&&<label className="wide completion-signoff">FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy||assignedMechanic} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/><small>{assignedMechanic?"Starts from the assigned mechanic. What was done goes on each repair above.":"Who closed this entry out. What was done goes on each repair above."}</small></label>}
         <label>PRIORITY<select value={draft.priority} onChange={event=>update("priority",event.target.value as DownSheetRecord["priority"])}><option>Routine</option><option>High</option><option>Critical</option></select></label>
         <label className="operator-initials">UPDATED BY - INITIALS<input required maxLength={6} autoCapitalize="characters" value={initials} onChange={event=>setInitials(event.target.value.replace(/[^a-z0-9]/gi,""))} placeholder="Initials"/><small>Required.</small></label>

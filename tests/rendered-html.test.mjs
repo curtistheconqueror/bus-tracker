@@ -5400,3 +5400,60 @@ test("a pull reads past one page and signing out is local to the device",async()
  assert.match(client,/signOut\(\{scope:"local"\}\)/);
  assert.doesNotMatch(client,/auth\.signOut\(\)/);
 });
+
+test("the Down Sheet can move a bus, which is what makes a status change stick",async()=>{
+ const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+ const { RELOCATION_AREAS } = await import("../app/facility-areas.ts");
+ const now="2026-08-30T12:00:00.000Z";
+ const fleet=[{id:"b1",n:"17554",l:"west-3",s:"out",defects:[],pendingRepair:"",down:true}];
+ const entry={id:"e1",busId:"b1",category:"Tech Services",repair:"Ventra",customReason:"",
+  assignmentType:"Mechanic",assignedTo:"CJ",workflow:"Completed",operationalStatus:"defect"};
+
+ // A bus takes the status its parking space implies, and the CNG lots are
+ // out-of-service lots. So setting a status on the sheet without moving the bus
+ // was silently overridden, and the Defect Log went on showing the old one.
+ const stayed=applyDownEntryToFleet(fleet,entry,now);
+ assert.equal(stayed[0].l,"west-3");
+ assert.equal(stayed[0].s,"out");
+
+ // Moving it out of the lot is what a foreman putting a bus back in service
+ // actually means, and the status then follows the space.
+ const moved=applyDownEntryToFleet(fleet,{...entry,location:"MAIN GARAGE (BAYS 1-10)"},now);
+ assert.ok(RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"].includes(moved[0].l));
+ assert.notEqual(moved[0].s,"out");
+
+ // An area that does not exist, or one with no room, must not lose the repair.
+ const unknown=applyDownEntryToFleet(fleet,{...entry,location:"NOWHERE AT ALL"},now);
+ assert.equal(unknown[0].l,"west-3");
+ assert.equal(unknown[0].defects.length,1);
+
+ // The move is an instruction, not a property of the repair: left on the entry
+ // it would re-run on every later save and drag the bus back from wherever
+ // somebody had since parked it.
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/next=\{\.\.\.next,location:undefined\}/);
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ assert.match(editor,/MOVE BUS TO/);
+ assert.doesNotMatch(editor,/Status only; location stays unchanged/);
+});
+
+test("the Defect Log can show the tracker's status colours, off by default",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ // Off by default: more colour on a long list should be a choice, not something
+ // that happens to people.
+ assert.match(page,/statusColor:false/);
+ assert.match(page,/statusColor=saved\.statusColor===true/);
+ assert.match(page,/data-status-color=\{settings\.statusColor\?"on":"off"\}/);
+ assert.match(page,/SHOW STATUS COLOR/);
+ assert.match(page,/<span className="log-bus-number" data-status=\{group\.bus\.s\}>/);
+ // The tracker's own status colours, so the two pages say the same thing about
+ // the same bus. Green is a bus in service with defects, which is the case that
+ // prompted this.
+ assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="defect"\] strong\{color:#159447\}/);
+ assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="out"\] strong\{color:#c91f27\}/);
+ assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="shop"\] strong\{color:#efa400\}/);
+ assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="service"\] strong\{color:#1764d8\}/);
+});

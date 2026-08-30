@@ -349,3 +349,29 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    sitting next to it. */
 .defect-note{grid-column:1/-1;display:grid;gap:3px;margin:0;border:1px solid #d8bd7c;border-left-width:4px;border-radius:7px;background:#fdf6e6;padding:8px 10px;color:#7a5600;font-size:9px;line-height:1.45}
 .defect-note b{font-size:7px;font-weight:900;letter-spacing:.5px}
+
+/* Show status color.
+
+   The bus number already turned red for an out-of-service bus, which is honest
+   but only answers one question. With this on it carries the tracker's own
+   status colour, so the Defect Log and the Facility Map say the same thing
+   about the same bus without anybody switching pages to check.
+
+   The colours are the tracker's defaults, written out here rather than read
+   from a variable, because those variables are set on the Facility Map's root
+   and this is a different page. A shop that recolours its statuses will not see
+   it reflected here; that is the trade for not coupling the two pages, and it
+   can be revisited if anybody actually changes them.
+
+   Off by default. It is more colour on a long list, and that should be a
+   choice rather than something that happens to people. */
+.feed-status-color{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:9px;font-weight:900;letter-spacing:.4px;color:var(--log-muted,#5b6883);white-space:nowrap}
+.feed-status-color input{width:16px;height:16px;flex:none;accent-color:#0867d5;cursor:pointer}
+@media(max-width:620px){.feed-status-color{width:100%;min-height:44px;padding:6px 2px}.feed-status-color input{width:20px;height:20px}}
+
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="service"] strong{color:#1764d8}
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="defect"] strong{color:#159447}
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="shop"] strong{color:#efa400}
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="out"] strong{color:#c91f27}
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="decommissioned"] strong{color:#343a40}
+.defect-log-app[data-status-color="on"] .log-bus-number[data-status="unknown"] strong{color:#777}
