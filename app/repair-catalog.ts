@@ -76,7 +76,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
- "Suspension and Steering":["NVH (noise, vibration, harshness)","Front air bag leak","Rear air bag leak","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
+ "Suspension and Steering":["NVH (noise, vibration, harshness)","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
@@ -189,6 +189,8 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
  },
  "Suspension and Steering":{
   "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
+  "Bus leaning - C/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
+  "Bus leaning - R/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
  },
  "Amerex":{
   "CNG - PRD cap missing":"Check for a leak before you close this out. Fit a balloon over the vent and watch whether it inflates: the cap being gone can mean gas has been venting past it. If it inflates, log PRD leaking as well.",
@@ -467,7 +469,7 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
    were saved with, and every picker offers them back as logged. */
 export const RETIRED_ISSUES:Record<string,readonly string[]>={
  "Battery, Starting and Charging":["Alternator / charging"],
- "Suspension and Steering":["Air bag"],
+ "Suspension and Steering":["Air bag","Front air bag leak","Rear air bag leak"],
 };
 
 /* Categories and options that were merged away. Records are never dropped or

@@ -4350,9 +4350,17 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
 
  // loose steering is a distinct driver complaint, not "steering pull"
  const steering=REPAIR_OPTIONS["Suspension and Steering"];
- assert.ok(steering.includes("Front air bag leak"));
- assert.ok(steering.includes("Rear air bag leak"));
+ assert.equal(steering.includes("Front air bag leak"),false,"Air System owns confirmed air-bag leaks");
+ assert.equal(steering.includes("Rear air bag leak"),false,"Air System owns confirmed air-bag leaks");
  assert.equal(steering.includes("Air bag"),false,"the vague legacy choice is retired from new entries");
+ for(const side of ["C/S","R/S"]){
+  const note=defectNote("Suspension and Steering","Bus leaning - "+side);
+  assert.match(note,/leaking air bag or a leveling-valve fault/i);
+  assert.match(note,/edit this same defect/i);
+  assert.match(note,/Air System/i);
+ }
+ const historical=normalizeDefects([{id:"old-front",category:"Suspension and Steering",issue:"Front air bag leak",state:"open",operability:"service"}]);
+ assert.equal(historical[0].issue,"Front air bag leak","retiring the duplicate picker choice does not rewrite history");
  assert.ok(steering.includes("Loose steering"));
  assert.ok(steering.indexOf("Loose steering")<steering.indexOf("Steering pull"));
  // A count here breaks on every legitimate addition and proves nothing. What
