@@ -1927,6 +1927,14 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
+  assert.match(page,/type LogGroupContrast="standard"\|"strong"/);
+  assert.match(page,/groupContrast:"strong"/);
+  assert.match(page,/saved\.groupContrast==="standard"\?"standard":"strong"/);
+  assert.match(page,/data-group-contrast=\{settings\.groupContrast\}/);
+  assert.match(page,/BUS GROUP SEPARATION/);
+  assert.match(css,/data-group-contrast="strong"\]\s+\.log-list\{gap:16px;padding:10px\}/);
+  assert.match(css,/data-group-contrast="strong"\]\s+\.log-card-group\{[^}]*border-bottom-width:3px[^}]*border-left-width:7px/);
+  assert.match(css,/@media\(max-width:760px\)\{\.defect-log-app\[data-group-contrast="strong"\][^}]*\.log-list\{gap:14px/);
   // <html> is the scrolling element here, so a rule on <body> alone stopped
   // nothing: this lock existed for months and the page still dragged 2,462px.
   assert.match(css,/html\.defect-editor-open,body\.defect-editor-open\{overflow:hidden;overscroll-behavior:none\}/);
