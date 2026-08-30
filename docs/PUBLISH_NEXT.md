@@ -27,20 +27,20 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `8acf8f1` — everything after it is documentation only |
+| Last code-bearing commit | `2ea327f` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 122, `cd6b649` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 8acf8f1..origin/main` that
-nothing but `docs/` changed after `8acf8f1`, and publish the tip.
+release commit. Confirm with `git log --oneline 2ea327f..origin/main` that
+nothing but `docs/` changed after `2ea327f`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed. This work was written before Version 122 landed and was replayed on top
 of it rather than merged over it, so nothing published is disturbed.
 
-Gate: 124 tests passing, ESLint clean, production build succeeds.
+Gate: 125 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -57,7 +57,8 @@ EXPORT LOG            ->  EXPORT LOG REPORT        (Defect Log settings)
 EXPORT FIXED HISTORY  ->  EXPORT HISTORY REPORT    (Fixed Repairs)
 DOWNLOAD .TXT         ->  DOWNLOAD REPORT (.TXT)   (Fleet Campaigns)
 
-EXPORT / SHARE BACKUP     unchanged — still the only restorable file
+EXPORT / SHARE BACKUP ->  EXPORT ALL DATA          (Facility Map settings)
+IMPORT BACKUP         ->  IMPORT ALL DATA          (Facility Map settings)
 ```
 
 Each report also carries the long version as a tooltip, drawn from one shared
@@ -68,6 +69,40 @@ The files themselves are unchanged and the reports stay useful — a report is h
 the log reaches another device, or somebody else's hands to read. Restoring is
 the only thing it cannot do, and the import already refuses one safely with
 **"This file is not a valid fleet board backup. No changes were made."**
+
+### A section can move between devices on its own
+
+The full backup is all or nothing, which is the wrong shape for what actually
+happens: a phone holding today's Defect Log and last week's map, an iPad holding
+today's map and last week's log. Importing either whole backup throws away the
+half the other device did better, so in practice neither ever gets imported and
+both devices drift. That is the position the shop is in today.
+
+Each section now exports and imports on its own:
+
+```
+Defect Log settings     EXPORT / IMPORT DEFECT LOG
+Down Sheet settings     EXPORT / IMPORT DOWN SHEET
+Facility Map settings   EXPORT / IMPORT FLEET MAP
+```
+
+The Defect Log and the Fleet Map are **not separate stores** — they are
+different fields on the same bus record — so "send me only the defects" merges
+field-wise into records the other device already has rather than replacing a
+file. Nothing replaces wholesale:
+
+- Defects merge by their own id; incoming wins where both have the same one, and
+  a defect only the receiving device has is **kept**.
+- Sending a map never touches defects. Sending defects never moves a bus.
+- A bus the receiving device has never seen is **added** by a map transfer,
+  which carries a location, and **reported** by a defect transfer, which does
+  not — guessing a parking space that may be full is not its call.
+- Buses match on **fleet number** first, because two devices seeded separately
+  give the same bus different ids.
+
+A wrong file now names the right page instead of "not valid": a Fleet Map file
+on the Defect Log says to import it on the Fleet Map, a report says it is a
+report, and a full backup points at IMPORT ALL DATA.
 
 ### The backup reminder is one card, and the shop sets its cadence
 
@@ -96,7 +131,8 @@ just rarely. Anything not on the list falls back to twenty.
 
 ## Migration and data safety
 
-Label text, one layout fix, and one new optional setting. No LocalStorage key renamed, no stored record touched, no export payload
+One new optional setting, one layout fix, label text, and a new pair of buttons
+per section that write and read their own file kind. No LocalStorage key renamed, no stored record touched, no export payload
 altered, and no catalog entry added, renamed or retired. A file written by the
 previous version imports exactly as it did before.
 
@@ -104,10 +140,15 @@ The Defect Log settings record gains one optional field, `backupInterval`. A
 device that has never seen it reads as twenty, which is the interval it has been
 using all along, so nobody's reminder changes cadence on publish.
 
+The section transfers add three new file kinds and read nothing that already
+exists on disk differently. **An import merges; it never truncates.** The one
+way it could have gone wrong — a map import clearing the receiving device's
+Defect Log — is covered by a test and was checked in a browser.
+
 ## Validation
 
 - Production build passed
-- All 124 regression tests passed, including a new one asserting that each of the
+- All 125 regression tests passed, including a new one asserting that each of the
   three report buttons says REPORT, that none of them says BACKUP, that each
   carries the shared hint, and that the Facility Map backup button is unchanged
 - ESLint passed
@@ -120,6 +161,12 @@ using all along, so nobody's reminder changes cadence on publish.
 - Measured the reminder at 390, 768, 1024 and 1440: the card fills its column at
   every width and the button sits below the text with no overlap. **Before the
   fix all four widths overlapped**, which is the defect this release closes
+- Ran the transfer as **two devices** end to end: a phone exported its Defect
+  Log, the iPad imported it and kept its own map and mechanic; the iPad exported
+  its Fleet Map, the phone imported it and took the positions while keeping every
+  one of its own defects and gaining a bus it had never seen. Both halves matched
+  afterwards, which is the whole point of the feature
+- Confirmed a Fleet Map file dropped on the Defect Log importer says so by name
 - Drove the new setting in a browser: raising it to 50 with 25 defects logged
   hid the banner, lowering it to 5 brought it straight back, the choice survived
   a reload, and a junk value written into storage fell back to 20
@@ -131,15 +178,22 @@ using all along, so nobody's reminder changes cadence on publish.
 2. Confirm **Fixed Repairs** reads **EXPORT HISTORY REPORT**, and **Fleet
    Campaigns** with a list open reads **DOWNLOAD REPORT (.TXT)**.
 3. Confirm none of the three is clipped on a phone.
-4. Confirm **Facility Map → ⚙ settings** still reads **EXPORT / SHARE BACKUP**
-   and still exports and imports normally. That is the only real backup and
-   nothing in this release should have touched it.
+4. Confirm **Facility Map → ⚙ settings** reads **EXPORT ALL DATA** and
+   **IMPORT ALL DATA**, and still exports and imports the whole board.
 5. **On the iPad**, where the overlap was reported: log enough defects to raise
    the OFFLINE BACKUP DUE banner and confirm it is one full-width card with
    EXPORT FULL BACKUP sitting below the sentence, not across it.
 6. In **Defect Log → ⚙ settings**, set **REMIND ME TO BACK UP EVERY** to a
    smaller number and confirm the banner appears without needing another save,
    then to a larger one and confirm it goes away.
+7. **The transfer, on the two devices that actually differ.** From the phone,
+   EXPORT DEFECT LOG and import it on the iPad; confirm the iPad's bus positions
+   did **not** move and its defects now match the phone's. Then from the iPad,
+   EXPORT FLEET MAP and import it on the phone; confirm the phone's positions
+   now match the iPad's and **its defects are still there**. A defect list that
+   empties after a map import is the one failure worth pulling the release for.
+8. Import a Fleet Map file on the Defect Log page and confirm it says to import
+   it on the Fleet Map page rather than "not valid".
 
 ## Publishing constraints that still apply
 
@@ -152,5 +206,5 @@ using all along, so nobody's reminder changes cadence on publish.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 123 | Live | <published tip hash> | The three export reports renamed so only the restorable backup reads like a backup, and the offline backup reminder rebuilt as one card with its cadence set in Defect Log settings |
+| 123 | Live | <published tip hash> | Per-section export and import so the Defect Log, Down Sheet and Fleet Map move between devices independently and merge rather than replace; the whole-app pair renamed to ALL DATA; the three reports renamed so only restorable files read like backups; and the backup reminder rebuilt as one card with a settable cadence |
 ```
