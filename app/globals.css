@@ -521,7 +521,36 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
  .spot>.token{width:100%;min-width:0;max-width:100%;justify-content:center;gap:2px;padding:3px 2px;overflow:hidden}
  .spot>.token>.bus{width:15px;height:13px}
  .spot>.token .token-number{min-width:0;max-width:100%;overflow:hidden;text-overflow:clip;font-size:9px;letter-spacing:-.2px;white-space:nowrap}
- .downsheet-ready-badge{position:absolute}
+ /* Both indicators hang off the token's corner at top:-5px, deliberately, so
+    they do not crowd the number. That works everywhere the token does not clip.
+    On a phone it gained overflow:hidden just above, to stop a five-digit fleet
+    number spilling out of a narrow space — and it clipped its own badges.
+    Measured on a 390px screen: 41% of the DS badge survived and 25% of the
+    roadcall dot, both sliced across two sides, and the sliver that was left sat
+    on the parking space's own border line rather than inside it.
+    So on a phone they come inside the token instead. The token is full width
+    with the number centred, so both ends are empty and nothing has to move over
+    for them; they stay absolutely positioned so the number keeps its centre. */
+ .downsheet-ready-badge{top:50%;left:3px;transform:translateY(-50%);min-width:20px;height:14px;padding:0 4px;font-size:8px;letter-spacing:.2px}
+ .roadcall-dot{top:50%;right:3px;transform:translateY(-50%);width:11px;height:11px}
+ /* Bringing the badges inside means the icon and number have to move over for
+    them, or the badge simply lands on top of the bus. In a 64px garage slot it
+    covered the icon completely — you could see the wheels underneath it and
+    nothing else. Both indicators are absolutely positioned, so the room is
+    reserved with padding on the token instead. */
+ .spot>.token:has(.downsheet-ready-badge){padding-left:26px}
+ .spot>.token:has(.roadcall-dot){padding-right:17px}
+ /* The garage row is the tightest space on the board at 64px, and a badge, an
+    icon and a five-digit fleet number will not all fit there at full size. The
+    badge gives up the least by shrinking: it is two letters and still reads. */
+ .grow .spot>.token:has(.downsheet-ready-badge){padding-left:18px}
+ .grow .downsheet-ready-badge{left:2px;min-width:15px;height:12px;padding:0 2px;font-size:7px;letter-spacing:0}
+ /* The pulse animates transform, which would otherwise drop the centring. */
+ @keyframes roadcall-dot-pulse{0%,100%{transform:translateY(-50%) scale(.82);box-shadow:0 0 0 1px #8f3700,0 0 0 0 color-mix(in srgb,var(--roadcall-color) 70%,transparent)}50%{transform:translateY(-50%) scale(1.2);box-shadow:0 0 0 1px #8f3700,0 0 0 5px color-mix(in srgb,var(--roadcall-color) 15%,transparent)}}
+ /* A desktop-era nudge for the pit, brake and foreman spots. On a phone those
+    sections lay out completely differently and it only pushed every token 2px
+    off centre, poking past the left border line with a 3px gap on the right. */
+ .vertical .token{transform:none}
  .facility .title{height:auto!important;min-height:52px!important;display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start!important;gap:5px!important;padding:5px 128px 5px 7px!important;text-align:left!important}
  .facility .title>span:first-child{max-width:100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:3px 6px;font-size:10px;line-height:1.15;white-space:normal}
  .facility .section-count{min-width:25px;height:22px;padding:0 7px;font-size:9px}

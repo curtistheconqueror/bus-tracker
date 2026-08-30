@@ -5029,3 +5029,90 @@ test("release safety keeps interval units and learned parts attached to the righ
  assert.doesNotMatch(logCss,/(?:\n|,)\.parts-(?:used|remembered)/);
  assert.doesNotMatch(fixedCss,/(?:\n|,)\.parts-(?:used|remembered)/);
 });
+test("on a phone the DS badge and roadcall dot sit inside the token that clips them", async () => {
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ // Pull out the phone block by brace counting rather than by regex, so the
+ // assertions below cannot accidentally read a desktop rule of the same name.
+ // There is more than one 620px block in this stylesheet, so take the one that
+ // actually styles the parking-space tokens.
+ const block = (from) => {
+  let depth = 0;
+  for (let i = css.indexOf("{", from); i < css.length; i++) {
+   if (css[i] === "{") depth++;
+   else if (css[i] === "}" && --depth === 0) return css.slice(from, i);
+  }
+  return "";
+ };
+ let phone = "";
+ for (let at = css.indexOf("@media(max-width:620px){"); at >= 0;
+      at = css.indexOf("@media(max-width:620px){", at + 1)) {
+  const candidate = block(at);
+  if (candidate.includes(".spot>.token")) { phone = candidate; break; }
+ }
+ assert.ok(phone, "a 620px block styling the parking-space tokens should exist");
+
+ // The precondition. The badges only need moving because the token clips, and
+ // if that ever stops being true this test is testing nothing.
+ assert.match(phone, /\.spot>\.token\{[^}]*overflow:hidden/,
+  "the phone token still clips its contents");
+
+ // Both indicators are positioned from inside the token, never from outside it.
+ // A negative offset is exactly what put 59% of the DS badge and 75% of the
+ // roadcall dot outside the clipping box and on top of the parking space line.
+ const ds = phone.match(/\.downsheet-ready-badge\{([^}]*)\}/);
+ assert.ok(ds, "the phone block sets the DS badge");
+ assert.doesNotMatch(ds[1], /(?:top|left|right|bottom):-/,
+  "the DS badge must not be offset outside the token it lives in");
+ const dsFont = Number((ds[1].match(/font-size:(\d+)px/) || [])[1]);
+ assert.ok(dsFont >= 8, "the DS badge is at least 8px on a phone, was " + dsFont);
+
+ const dot = phone.match(/\.roadcall-dot\{([^}]*)\}/);
+ assert.ok(dot, "the phone block sets the roadcall dot");
+ assert.doesNotMatch(dot[1], /(?:top|left|right|bottom):-/,
+  "the roadcall dot must not be offset outside the token it lives in");
+
+ // The dot's pulse animates transform, so its keyframes have to carry the
+ // centring or the animation throws it away on the first frame.
+ const frames = phone.match(/@keyframes roadcall-dot-pulse\{([^@]*?)\}\s*\n/);
+ assert.ok(frames, "the phone block redefines the pulse keyframes");
+ assert.ok(!/transform:scale/.test(frames[1]),
+  "the pulse keyframes keep the vertical centring instead of replacing it");
+
+ // And the desktop nudge for the pit, brake and foreman spots is cancelled,
+ // which is what pushed those tokens 2px off centre inside their own space.
+ assert.match(phone, /\.vertical \.token\{transform:none\}/);
+});
+
+test("a phone token reserves room for the badges instead of letting them cover the bus", async () => {
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ const block = (from) => {
+  let depth = 0;
+  for (let i = css.indexOf("{", from); i < css.length; i++) {
+   if (css[i] === "{") depth++;
+   else if (css[i] === "}" && --depth === 0) return css.slice(from, i);
+  }
+  return "";
+ };
+ let phone = "";
+ for (let at = css.indexOf("@media(max-width:620px){"); at >= 0;
+      at = css.indexOf("@media(max-width:620px){", at + 1)) {
+  const candidate = block(at);
+  if (candidate.includes(".spot>.token")) { phone = candidate; break; }
+ }
+ assert.ok(phone, "a 620px block styling the parking-space tokens should exist");
+
+ // Both indicators are absolutely positioned, so without reserved room they
+ // simply land on the bus. In a 64px garage slot the DS badge covered the whole
+ // icon and only the wheels showed underneath.
+ assert.match(phone, /\.spot>\.token:has\(\.downsheet-ready-badge\)\{padding-left:\d+px\}/);
+ assert.match(phone, /\.spot>\.token:has\(\.roadcall-dot\)\{padding-right:\d+px\}/);
+
+ // The garage row is the tightest space on the board and cannot spare the full
+ // reservation, so its badge shrinks rather than its bus disappearing.
+ const garagePad = phone.match(/\.grow \.spot>\.token:has\(\.downsheet-ready-badge\)\{padding-left:(\d+)px\}/);
+ const generalPad = phone.match(/(?<!\.grow )\.spot>\.token:has\(\.downsheet-ready-badge\)\{padding-left:(\d+)px\}/);
+ assert.ok(garagePad, "the garage row sets its own badge reservation");
+ assert.ok(Number(garagePad[1]) < Number(generalPad[1]),
+  "the garage reservation is smaller than the general one");
+ assert.match(phone, /\.grow \.downsheet-ready-badge\{[^}]*font-size:\d+px/);
+});
