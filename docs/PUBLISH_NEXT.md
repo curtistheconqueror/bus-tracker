@@ -1,26 +1,26 @@
 # Publish next
 
-**STATUS: NONE PENDING**
+**STATUS: PENDING**
 
-Sites Version 125 was published from commit 135a49a on 2026-08-30. Replace this file with the next complete pending-release handoff in the same push as the next contribution to main.
+Version 126 is approved for the existing public Fleet Tracker site. Publish the validated Defect Log visual-hierarchy update through the existing `.openai/hosting.json` binding only.
 
 ## Source
 
 - Branch: main
+- Validated feature commit: 19da041e1e0308f81338cd5ba2947f30a4884016
 - Last published source: 135a49a
-- Last code-bearing commit: 8b7bfe3
 - Current live release: Sites Version 125 at 135a49a
 
 ## What changed
 
-- Bus Controls now names both curbside mirror switches precisely: Mirror heater switch - C/S and Mirror adjuster switch - C/S.
-- Earlier mirror-switch wording reads as the new wording without rewriting stored records.
-- On phones, DS badges and roadcall dots remain fully visible inside bus markers.
-- Tight garage markers reserve room for their badge, and pit, brake, and foreman markers remain centered inside their spaces.
+- Defect Log bus groups now have stronger outer borders, larger gaps, and a subtle shadow so one bus is visibly separate from the next.
+- Expanded buses receive a distinct header and container shade; individual defects remain lighter nested cards inside that bus.
+- The treatment applies across desktop, iPad, and phone, with a compact phone adjustment below 760px.
+- Defect Log Settings now offers Bus Group Separation: Strong (recommended) or Standard, making the change immediately reversible on each device.
 
 ## Migration and data safety
 
-No LocalStorage key or stored record changed. The phone layout change is stylesheet-only; catalog normalization preserves earlier mirror-switch records.
+No LocalStorage key or fleet record changed. The existing `pace-defect-log-settings-v1` payload gains one optional display preference. Older settings without it load as Strong; selecting Standard restores the previous spacing and border treatment. Filters, badges, repair records, bus status, and Down Sheet membership are untouched.
 
 ## Validation
 
@@ -31,4 +31,6 @@ No LocalStorage key or stored record changed. The phone layout change is stylesh
 
 ## Live verification
 
-Sites Version 125 deployed successfully to the existing live site on 2026-08-30.
+- On a phone, expand two adjacent buses and confirm each complete bus group has a clear end before the next bus begins.
+- On an iPad, confirm the same hierarchy without changing the tablet layout.
+- In Defect Log Settings, switch Bus Group Separation between Strong and Standard and confirm only presentation changes.
