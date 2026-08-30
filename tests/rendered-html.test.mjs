@@ -1343,7 +1343,9 @@ test("Defect Log keeps multiple check-engine symptoms inside one defect record",
   assert.match(css,/\.engine-symptom-picker/);
   assert.match(css,/Phone-only header containment and in-flow summary\/filter layout/);
   assert.match(css,/\.log-settings-button\{position:static;grid-column:2;grid-row:2/);
-  assert.match(css,/\.log-summary \.fixed\{position:static;z-index:auto;grid-column:1\/-1\}/);
+  /* The position reset is gone because the collision is gone: the tile was
+     className="fixed", which Tailwind owns, and no longer is. */
+  assert.match(css,/\.log-summary \.fixed-today\{grid-column:1\/-1\}/);
 });
 test("bus marker display toggles between icons and large number tiles per device", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -2028,7 +2030,7 @@ test("phone layouts keep Defect Log actions large and Down Sheet tabs unobstruct
   assert.ok(logCss.includes(".log-repair>b{font-size:max(var(--log-repair-category-size,9px),10px)"));
   assert.ok(logCss.includes(".log-repair>strong{font-size:max(var(--log-repair-details-size,11px),12px)"));
   assert.ok(logCss.includes(".quick-filter-defects>section>div>strong{font-size:11px}"));
-  assert.match(logCss, /\.log-summary \.fixed\{[^}]*grid-column:1\/-1/);
+  assert.match(logCss, /\.log-summary \.fixed-today\{[^}]*grid-column:1\/-1/);
   assert.match(logCss, /\.log-controls \.log-search-wrap\{[^}]*grid-column:1\/-1;grid-row:3/);
   assert.match(downCss, /Phone-only header containment/);
   assert.match(downCss, /\.down-header\{height:auto;min-height:78px/);
@@ -2993,6 +2995,36 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  // and the interval reaches it, so changing the setting re-asks straight away
  assert.match(tsx,/fleetBackupDue\(localStorage,buses,interval\)/);
  assert.match(tsx,/\},\[buses,interval\]\)/);
+});
+
+test("no class name collides with a Tailwind positioning utility",async()=>{
+ /* The FIXED TODAY tile was className="fixed", and this project ships Tailwind,
+    whose `.fixed` utility is position:fixed. On an iPad the tile was lifted out
+    of the summary grid and floated across the whole viewport on top of the other
+    four. The reset that would have stopped it existed but sat inside
+    @media(max-width:760px), so it only ever protected phones — the computer had
+    it too, just less obviously.
+
+    Renamed rather than fought: a class the framework already owns will keep
+    winning, and the next person to add one would not know to look. */
+ const files=["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx",
+  "../app/fixed-repairs/page.tsx","../app/lists/page.tsx","../app/section-transfer-controls.tsx",
+  "../app/defect-log/offline-backup-reminder.tsx","../app/down-sheet/down-sheet-editor.tsx",
+  "../app/down-sheet/down-sheet-settings.tsx","../app/down-sheet/down-sheet-scanner.tsx"];
+ const utilities=new Set(["fixed","static","absolute","relative","sticky","block","inline","flex","grid",
+  "hidden","table","container","visible","invisible","border","italic","underline","truncate","isolate","contents"]);
+ for(const file of files){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  for(const match of source.matchAll(/className="([^"{]*)"/g))
+   for(const name of match[1].split(/\s+/).filter(Boolean))
+    assert.ok(!utilities.has(name),file+' uses className="'+name+'", which Tailwind also defines as a utility - rename it');
+ }
+ // and the tile keeps its own name and no longer needs a position reset to exist
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(page,/className="fixed-today"><strong>\{stats\.fixedToday\}/);
+ assert.match(css,/\.log-summary \.fixed-today\{grid-column:1\/-1\}/);
+ assert.ok(!/\.log-summary \.fixed\{/.test(css),"the old colliding selector must be gone, not merely overridden");
 });
 
 test("no export hands the phone a link instead of a file",async()=>{
