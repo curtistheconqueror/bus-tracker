@@ -2994,6 +2994,27 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
+test("the road panel stops covering the service detail area once the map stacks",async()=>{
+ /* Reported off a phone: SERVICE DETAIL AREA was not on the map. It was there —
+    IN SERVICE / ON ROAD is absolutely positioned into the map's right-hand
+    column with z-index 3, and once the sections stack it stayed pinned to the
+    top right and landed squarely on top of it. The service area was not
+    missing, it was underneath. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ // it is still pinned where the map really has a column for it
+ assert.match(css,/\.road\{position:absolute;top:0;right:8px/);
+ // and it joins the flow where the map stacks, or it covers what stacked above
+ const narrow=css.match(/@media\(max-width:760px\)\{\s*\.road\{([^}]*)\}/);
+ assert.ok(narrow,"a narrow-width rule must return the road panel to the flow");
+ for(const property of ["position:static","width:auto","height:auto","right:auto","top:auto"])
+  assert.ok(narrow[1].includes(property),"the road panel must undo "+property.split(":")[0]+" when it stacks");
+ // the section itself is still defined, so nothing about this is a phone-only
+ // rendering decision — it is one section that was being painted over
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(map,/"SERVICE DETAIL AREA \(SINGLE FILE\)":slots\("service",8\)/);
+ assert.match(map,/IN SERVICE \/ ON ROAD/);
+});
+
 test("the Down Sheet is the only thing that decides whether a bus is down",async()=>{
  /* Curtis's rule, and the app's: active Down Sheet rows are the source of truth
     for the DS badge. Entries get there off a photographed sheet or typed by

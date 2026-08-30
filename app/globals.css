@@ -642,3 +642,15 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .section-transfer button+button{background:#fff;color:#0b3d7a}
 .section-transfer small{color:#5a6d89;font-size:8px;font-weight:750;line-height:1.35}
 @media(min-width:761px){.section-transfer{grid-template-columns:1fr 1fr}.section-transfer small{grid-column:1/-1}}
+
+/* IN SERVICE / ON ROAD is absolutely positioned into the right-hand column of
+   the map, which is right on a wide screen and wrong the moment the map stacks.
+   Below this width the sections flow one under another, but the road panel
+   stayed pinned to the top right with z-index 3 — landing squarely on top of
+   SERVICE DETAIL AREA and hiding it completely. On a phone the service area was
+   not missing, it was underneath.
+
+   It joins the flow here instead, so it stacks with everything else. */
+@media(max-width:760px){
+ .road{position:static;top:auto;right:auto;width:auto;height:auto;margin-top:7px}
+}
