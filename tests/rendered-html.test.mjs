@@ -2952,6 +2952,30 @@ test("dash lights are named as reported, and the start rename does not invert hi
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
 });
 
+test("the operator blower and the mirror switches land in both structures a grouped category needs",()=>{
+ // The driver's own blower is not the cabin one, and "Blower motor" could not
+ // say which was out.
+ const ac=REPAIR_OPTIONS["A/C and HVAC"];
+ assert.equal(ac.indexOf("Operator A/C blower"),ac.indexOf("Blower motor")+1);
+
+ // Bus Controls is grouped, which means the entry has to exist twice: once
+ // prefixed in REPAIR_OPTIONS, which is what gets stored, and once bare in
+ // REPAIR_OPTION_GROUPS, which is what the picker draws. Adding it to one and
+ // not the other is the failure this catches.
+ for(const switchName of ["Mirror heater switch","C/S adjuster switch"]){
+  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - "+switchName),switchName+" missing from REPAIR_OPTIONS");
+  assert.ok(REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"].includes(switchName),switchName+" missing from REPAIR_OPTION_GROUPS");
+  // and it survives a round trip through a saved defect under its stored name
+  const [defect]=normalizeDefects([{id:"d",category:"Bus Controls",issue:"System Switches - "+switchName,details:"",state:"open",operability:"service"}]);
+  assert.equal(defect.issue,"System Switches - "+switchName);
+ }
+ // The mirror switches read as a pair rather than being split by the group.
+ const switches=REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"];
+ assert.equal(switches.indexOf("C/S adjuster switch"),switches.indexOf("Mirror heater switch")+1);
+ // Lights and Fixtures still owns the mirrors themselves; only the switch moved.
+ assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
+});
+
 test("the split surge tank is two independent sides, and the empty one builds the winter list",async()=>{
  const cooling=REPAIR_OPTIONS["Cooling System"];
  assert.deepEqual(cooling.slice(cooling.indexOf("Coolant leak"),cooling.indexOf("Coolant leak")+4),
