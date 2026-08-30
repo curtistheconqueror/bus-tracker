@@ -53,6 +53,7 @@
 .title>span:first-child{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
 .section-count{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:18px;padding:0 6px;border:1px solid #9badd0;border-radius:10px;background:#edf3fc;color:#173e73;font-size:9px;line-height:1}
 .title-actions button{width:19px;height:19px;padding:0;border:1px solid #9eabc4;border-radius:4px;background:#fff;color:#24385d;font-size:13px;font-weight:900;line-height:17px;opacity:.78;cursor:pointer}
+.title.section-drop-ready{outline:3px solid #16a05d;outline-offset:2px;background:color-mix(in srgb,#16a05d 22%,var(--panel-bg,#fff))!important;box-shadow:0 0 0 4px #16a05d33,0 5px 16px #0b5d3840;position:relative;z-index:6}
 .title-actions button:hover,.title-actions button:focus-visible{opacity:1;background:#edf4ff;border-color:#5878ae}
 .title-actions .remove-space{color:#aa1d26}
 .title-actions .more-section{font-size:9px;letter-spacing:-1px}

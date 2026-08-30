@@ -21,6 +21,7 @@ import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forge
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
 import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
+import { moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../app/facility-areas.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -580,10 +581,11 @@ test("removes prospective customer branding from visible app titles", async () =
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
-  const [page, css, backup] = await Promise.all([
+  const [page, css, backup, areas] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/fleet-backup.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8"),
   ]);
 
   for (const theme of ["Default", "Terminal", "Black / Dark", "Midnight", "Tactical"]) {
@@ -610,7 +612,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
   assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,8,6,4,2,9,7,5,3,1\]/);
-  assert.match(page, /"SHOP BAYS \(DIAGONAL\)":slots\("bay",9,1\)/);
+  assert.match(areas, /"SHOP BAYS \(DIAGONAL\)":facilitySlots\("bay",9,1\)/);
   assert.match(page, /roadcallSolid:boolean;roadcallLocation:string/);
   assert.match(page, /SOLID ORANGE BUS \(NO FLASHING DOT\)/);
   assert.match(page, /ROADCALL LOCATION/);
@@ -697,13 +699,13 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.app\.highlight-status-out/);
   assert.equal(ROAD_CAPACITY, 75);
   assert.equal(WEST_CAPACITY, 40);
-  assert.match(page, /"PIT":slots\("pit",2\)/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
-  assert.match(page, /"TOW \/ STAGING":slots\("tow",4\)/);
-  assert.match(page, /"FOREMAN OFFICE":slots\("office",3\)/);
+  assert.match(areas, /"PIT":facilitySlots\("pit",2\)/);
+  assert.match(areas, /"BRAKE TEST":facilitySlots\("brake",3\)/);
+  assert.match(areas, /"TOW \/ STAGING":facilitySlots\("tow",4\)/);
+  assert.match(areas, /"FOREMAN OFFICE":facilitySlots\("office",3\)/);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
-  assert.ok(page.includes('const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
+  assert.ok(areas.includes('export const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(15/);
   assert.match(css, /\.westgrid\{[^}]*grid-template-rows:repeat\(5/);
@@ -758,9 +760,9 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{addToDownSheet\}[\s\S]*?DOWN SHEET/);
   assert.match(page, /Choose Defect Log, Down Sheet, or both/);
   assert.match(page, /CLEAR MAP-ONLY DEFECTS/);
-  assert.match(page, /\["MAIN GARAGE \(BAYS 1-10\)",GARAGE_STANDARD_SLOTS\]/);
-  assert.match(page, /\["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS\]/);
-  assert.match(page, /\["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS\]/);
+  assert.match(areas, /\["MAIN GARAGE \(BAYS 1-10\)",GARAGE_STANDARD_SLOTS\]/);
+  assert.match(areas, /\["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS\]/);
+  assert.match(areas, /\["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS\]/);
   assert.match(css, /\.multi-bulk-actions\{/);
   assert.match(css, /\.bulk-defect-panel\{/);
   assert.match(page, /NOT ENOUGH SPACE/);
@@ -1246,6 +1248,41 @@ test("manual defect drafts are captured when the main editor is saved", () => {
   assert.equal(defectLabel(draft), "Driver reports intermittent rattle");
   assert.equal(defectSummary([draft]), "Driver reports intermittent rattle");
 });
+
+test("a bus can be dropped on a collapsed section banner without displacing another bus", async () => {
+  const defect={id:"d1",category:"A/C and HVAC",issue:"No cooling",details:"",operability:"service",state:"open"};
+  const fleet=[
+    {id:"moving",l:"road-0",s:"defect",parkedAt:"old",defects:[defect],down:true},
+    {id:"occupied",l:"west-0",s:"out",parkedAt:"old-2",defects:[]},
+  ];
+  const moved=moveBusToArea(fleet,"moving","CNG WEST LOT",SECTION_SLOTS,"now");
+  assert.equal(moved.error,undefined);
+  assert.equal(moved.target,"west-1");
+  assert.equal(moved.fleet.find(bus=>bus.id==="moving").s,"out");
+  assert.equal(moved.fleet.find(bus=>bus.id==="moving").down,true);
+  assert.deepEqual(moved.fleet.find(bus=>bus.id==="moving").defects,[defect]);
+  assert.equal(moved.fleet.find(bus=>bus.id==="occupied").l,"west-0");
+  const full=moveBusToArea(fleet,"moving","ONE SPACE",{"ONE SPACE":["west-0"]},"later");
+  assert.equal(full.error,"insufficient-space");
+  assert.equal(full.fleet,fleet);
+  const [page,css]=await Promise.all([readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),readFile(new URL("../app/globals.css",import.meta.url),"utf8")]);
+  assert.match(page,/data-drop-section=\{name\}/);
+  assert.match(page,/\.title\[data-drop-section\]/);
+  assert.match(page,/drop=\{moveToSection\}/);
+  assert.match(css,/\.title\.section-drop-ready/);
+});
+
+test("Mystery Buses can change facility location without changing defects or Down Sheet membership", async () => {
+  const defect={id:"d2",category:"Farebox",issue:"Farebox won't lock",details:"",operability:"service",state:"open"},bus={id:"mystery",n:"15511",l:"wall-0",s:"out",parkedAt:"old",defects:[defect],down:true};
+  const moved=moveBusToArea([bus],bus.id,"MAIN GARAGE (BAYS 1-10)",RELOCATION_AREAS,"now");
+  assert.equal(moved.target,"garage-0");
+  assert.equal(moved.fleet[0].down,true);
+  assert.deepEqual(moved.fleet[0].defects,[defect]);
+  const [page,css]=await Promise.all([readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8")]);
+  assert.match(page,/MOVE \/ LOCATION/);
+  assert.match(page,/defects and Down Sheet membership are not changed/);
+  assert.match(css,/\.mystery-move\{[^}]*min-height:44px/);
+});
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
@@ -1404,15 +1441,16 @@ test("confirmation prompts are per-device settings that default to on", async ()
 test("every facility section can collapse independently while global controls remain", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const areas = await readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8");
   assert.match(page, /aria-expanded=\{!collapsed\}/);
   assert.match(page, /setCollapsedSections\(new Set\(Object\.keys\(SECTION_SLOTS\)\)\)/);
   assert.match(page, /sectionClass\("IN SERVICE \/ ON ROAD","road"\)/);
   assert.match(page, /sectionClass\("MAIN GARAGE \(BAYS 1-12\)","garage panel"\)/);
   assert.match(css, /\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
   assert.match(css, /\.title-actions \.toggle-section/);
-  assert.match(page, /"BRAKE TEST":slots\("brake",3\)/);
-  assert.match(page, /"TOW \/ STAGING":slots\("tow",4\)/);
-  assert.match(page, /"FOREMAN OFFICE":slots\("office",3\)/);
+  assert.match(areas, /"BRAKE TEST":facilitySlots\("brake",3\)/);
+  assert.match(areas, /"TOW \/ STAGING":facilitySlots\("tow",4\)/);
+  assert.match(areas, /"FOREMAN OFFICE":facilitySlots\("office",3\)/);
   assert.match(page, /\["BRAKE TEST","brake",3\]/);
   assert.match(page, /\["TOW \/ STAGING","tow",4\]/);
   assert.match(css, /\.foreman-office\{grid-column:1\/-1/);
@@ -3169,7 +3207,8 @@ test("the road panel stops covering the service detail area once the map stacks"
  // the section itself is still defined, so nothing about this is a phone-only
  // rendering decision — it is one section that was being painted over
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- assert.match(map,/"SERVICE DETAIL AREA \(SINGLE FILE\)":slots\("service",8\)/);
+ const areas=await readFile(new URL("../app/facility-areas.ts",import.meta.url),"utf8");
+ assert.match(areas,/"SERVICE DETAIL AREA \(SINGLE FILE\)":facilitySlots\("service",SINGLE_FILE_CAPACITY\)/);
  assert.match(map,/IN SERVICE \/ ON ROAD/);
 });
 
@@ -4844,12 +4883,12 @@ test("no element in the Defect Log relies on the global bare header and footer s
  // modal, floated over the page and swallowed clicks; the grouped defect list
  // wore the dark banner. Every one of them now carries a class.
  assert.equal(/<header>|<footer>/.test(logPage),false,"no bare header or footer may come back");
- for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions"])
+ for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions"])
   assert.ok(logPage.includes('className="'+className+'"'),className+" must be applied in the markup");
 
  // the element selectors still match these tags, so the global properties are
  // neutralised before each one is styled deliberately
- const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions\{([^}]*)\}/);
+ const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions,\.mystery-move-head,\.mystery-move-actions\{([^}]*)\}/);
  assert.ok(reset,"the reset block must exist");
  for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
   assert.ok(reset[1].includes(property),"the reset must clear "+property);

@@ -37,7 +37,7 @@ export function statusForLocation(location:string,current:FleetStatus,bus:Repair
  return current;
 }
 
-export type MovableRepairBus=RepairAwareBus&{id:string;l:string;s:FleetStatus;parkedAt:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string};
+export type MovableRepairBus=RepairAwareBus&{id:string;l:string;s:FleetStatus;parkedAt?:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string};
 
 export function moveOrSwapBuses<T extends MovableRepairBus>(fleet:T[],id:string,targetLocation:string,now=new Date().toISOString()):T[]{
  const moving=fleet.find(bus=>bus.id===id);
