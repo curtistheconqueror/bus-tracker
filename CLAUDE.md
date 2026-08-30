@@ -30,6 +30,14 @@ Claude pushes to `main` and mirrors the same tree to `claude-contributions`:
 git checkout claude-contributions && git read-tree --reset -u main
 ```
 
+## Agent budget
+
+**Never run more than 10 subagents at a time, on any model, under any effort
+setting — including ultracode.** Curtis set this after a review workflow ran 88
+agents and spent 5.9 million tokens verifying one module. Ten agents on eight
+different problems beats eighty agents on one. Prefer a small fan-out, or do the
+work directly.
+
 ## Things that will get you in trouble
 
 - **Never force-push or rewrite published history.** Only clean fast-forwards of

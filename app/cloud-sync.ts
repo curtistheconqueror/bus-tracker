@@ -218,9 +218,15 @@ export type CloudRow=Record<string,unknown>;
 export function busUpdatedAt(bus:SyncBus,fallback:string):string{
  const stamps=[bus.lastLocationChangeAt,bus.lastStatusChangeAt,bus.parkedAt]
   .map(value=>clean(value))
-  .filter(value=>!Number.isNaN(new Date(value).getTime())&&value!=="");
+  .filter(value=>value!==""&&!Number.isNaN(new Date(value).getTime()));
  if(!stamps.length)return fallback;
- return stamps.reduce((latest,value)=>Date.parse(value)>Date.parse(latest)?value:latest);
+ const latest=stamps.reduce((best,value)=>Date.parse(value)>Date.parse(best)?value:best);
+ /* Never later than now. updated_at is what the database compares to drop an
+    out-of-order push, so a phone whose clock is a year fast would stamp every
+    bus a year ahead and every other device's work would be silently discarded
+    from then on — with nothing on any screen to say why. A wrong clock should
+    cost that one device its ordering, not lock the whole shop out. */
+ return Date.parse(latest)>Date.parse(fallback)?fallback:latest;
 }
 
 function signature(config:CloudConfig){
@@ -274,8 +280,13 @@ export function defectRow(defect:StructuredDefect,fleetNumber:string,config:Clou
  };
 }
 
+/* `updatedBy` is deliberately NOT in this list, so it rides in `detail` and
+   survives a round trip. The row's own `updated_by` column names the device
+   that last PUSHED the entry, which is a different fact from who last worked
+   on the repair, and overwriting one with the other would quietly reassign
+   somebody's work to whoever synced last. */
 const ENTRY_COLUMNS=["id","busId","busNumber","category","repair","section","workflow","shift","priority",
- "operationalStatus","assignmentType","assignedTo","createdAt","completedAt","updatedAt","updatedBy"];
+ "operationalStatus","assignmentType","assignedTo","createdAt","completedAt","updatedAt"];
 
 export type SyncEntry={id?:string;busNumber?:string;[key:string]:unknown};
 
@@ -316,8 +327,27 @@ export function downSheetRow(entry:SyncEntry,config:CloudConfig,now:string):Clou
    FNV-1a over the row's own JSON: small, stable, and it does not need to be
    cryptographic — it is answering "did this change since I last sent it", where
    a collision costs one skipped update and never corrupts anything. */
+/* Sorted DEEPLY and by hand, not by handing the key list to JSON.stringify.
+
+   That shortcut looks like it only orders keys. It does not: an array replacer
+   is a recursive property allowlist, so every nested object gets filtered
+   against the TOP-LEVEL key names and `map_fields` and `detail` both serialize
+   as `{}`. Everything a mechanic changes without moving the bus lives in
+   map_fields — the assigned mechanic, check engine, no horn, the odometer
+   reading — so two rows differing only in that work hashed identically, the
+   change was never sent, and the status line said "Synced" with nothing
+   waiting. Work that is only on a phone while the app says it is safe is the
+   worst failure this module can have. */
+function stable(value:unknown):unknown{
+ if(Array.isArray(value))return value.map(stable);
+ if(value&&typeof value==="object")
+  return Object.keys(value as Record<string,unknown>).sort()
+   .map(key=>[key,stable((value as Record<string,unknown>)[key])]);
+ return value;
+}
+
 export function rowFingerprint(row:CloudRow):string{
- const text=JSON.stringify(row,Object.keys(row).sort());
+ const text=JSON.stringify(stable(row));
  let hash=0x811c9dc5;
  for(let index=0;index<text.length;index++){
   hash^=text.charCodeAt(index);
@@ -375,6 +405,12 @@ export function fleetMapPayload(rows:CloudRow[],exportedAt:string){
   exportedAt,
   buses:rows.map(row=>({
    ...(row.map_fields&&typeof row.map_fields==="object"?row.map_fields as Record<string,unknown>:{}),
+   /* A bus the receiving device has never seen is ADDED by mergeFleetMap, and
+      it needs a name of its own: a record with no id cannot be edited, moved or
+      pointed at by a Down Sheet entry. Derived from the fleet number so a
+      second pull cannot mint a second id for the same bus. A device that
+      already has this bus keeps its own id — the merge holds it deliberately. */
+   id:"cloud-"+String(row.fleet_number??""),
    n:String(row.fleet_number??""),
    l:String(row.location??""),
    s:String(row.status??"unknown"),
@@ -440,7 +476,9 @@ export function downSheetPayload(rows:CloudRow[],exportedAt:string){
     createdAt:row.entry_created_at?String(row.entry_created_at):"",
     completedAt:row.completed_at?String(row.completed_at):"",
     updatedAt:String(row.updated_at??""),
-    updatedBy:String(row.updated_by??""),
+    /* The entry's own author, kept in detail, wins over the device that pushed
+       it. Falls back to the pusher only for a row written before this was. */
+    updatedBy:String(detail.updatedBy??row.updated_by??""),
    };
   }),
  };

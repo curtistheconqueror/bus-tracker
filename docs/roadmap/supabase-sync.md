@@ -28,6 +28,24 @@ Re-run those checks with the queries in "Checking the live project" at the end
 of this file. A table can exist with the wrong columns and `create table if not
 exists` will never correct it, so counting tables is not enough — check shapes.
 
+### The MCP connector points somewhere else — do not apply anything through it
+
+When the Supabase MCP tools finally became reachable on 2026-08-30, they showed
+exactly one organization and one project, both named **keydenza**, containing
+`profiles`, `pvp_matches`, `pvp_match_players`, `pvp_stats`, `pvp_rooms` and
+`pvp_queue` — a different application entirely. **None of the bus-tracker tables
+are in it.**
+
+The bus tracker's own database is real and verified; it is simply not the
+project this token can see. Curtis applied the migrations through the SQL Editor
+while signed in to the account that holds it.
+
+So: **never run `apply_migration` or any DDL through the MCP connector without
+first calling `list_tables` and confirming the bus-tracker tables are the ones
+there.** A session told to "finish the Supabase migration" that trusts the
+connector will quietly install a fleet-maintenance schema into an unrelated
+project. Use the SQL Editor, signed in as the account that owns the bus tracker.
+
 ### A warning worth keeping
 
 Two Claude sessions were working on this at once and both wrote a schema. One of

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, writeCloudConfig } from "../app/cloud-sync.ts";
+import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../app/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
@@ -5325,4 +5325,78 @@ test("the shop cloud never becomes a condition of using the board",async()=>{
  assert.match(control,/mergeDefectLog\(/);
  assert.match(control,/mergeDownSheet\(/);
  assert.doesNotMatch(control,/localStorage\.clear\(\)/);
+});
+
+test("work done without moving a bus is still detected and sent",async()=>{
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"CJ",deviceLabel:"CJ phone"});
+ const now="2026-08-30T12:00:00.000Z";
+ const parked={n:"17549",l:"BAY 12",s:"shop",lastStatusChangeAt:"2026-08-30T09:00:00.000Z"};
+ // Assigning a mechanic, ticking CHECK ENGINE and NO HORN and recording an
+ // odometer reading changes none of the timestamps, because the bus never
+ // moved and never changed status. All of it lives in map_fields.
+ const worked={...parked,mechanic:"CJ",checkEngine:true,noHorn:true,
+  odometerReadings:[{id:"o1",miles:412233,recordedAt:now,source:"manual"}]};
+ const before=busRow(parked,config,now),after=busRow(worked,config,now);
+ assert.equal(before.updated_at,after.updated_at);
+ // Handing the key list to JSON.stringify as a replacer is a RECURSIVE property
+ // allowlist, not a key ordering, so map_fields serialized as {} and an
+ // afternoon's work hashed identically to no work at all — never sent, while
+ // the status line read "Synced" with nothing waiting.
+ assert.notEqual(rowFingerprint(before),rowFingerprint(after));
+ const sent=changedRows([before],"fleet_number",{}).fingerprints;
+ assert.equal(changedRows([after],"fleet_number",sent).changed.length,1);
+ assert.equal(changedRows([before],"fleet_number",sent).changed.length,0);
+ // Two rows holding the same data written in a different order must still
+ // match, or every sweep would resend the whole board.
+ const reordered=busRow({s:"shop",noHorn:true,n:"17549",checkEngine:true,mechanic:"CJ",l:"BAY 12",
+  lastStatusChangeAt:"2026-08-30T09:00:00.000Z",
+  odometerReadings:[{recordedAt:now,id:"o1",source:"manual",miles:412233}]},config,now);
+ assert.equal(rowFingerprint(after),rowFingerprint(reordered));
+});
+
+test("one wrong clock cannot lock the shop out of its own rows",async()=>{
+ const now="2026-08-30T12:00:00.000Z";
+ // updated_at is what the database compares to drop an out-of-order push, so a
+ // phone a year fast would stamp every bus a year ahead and silently discard
+ // everyone else's work from then on, with nothing on screen to say why.
+ assert.equal(busUpdatedAt({lastStatusChangeAt:"2027-08-30T12:00:00.000Z"},now),now);
+ assert.equal(busUpdatedAt({lastStatusChangeAt:"2026-08-30T09:00:00.000Z"},now),"2026-08-30T09:00:00.000Z");
+ assert.equal(busUpdatedAt({lastStatusChangeAt:"not a date"},now),now);
+ assert.equal(busUpdatedAt({},now),now);
+});
+
+test("a bus that arrives from the cloud is a usable record, and its author survives",async()=>{
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pace.com",initials:"CJ",deviceLabel:"CJ phone"});
+ const now="2026-08-30T12:00:00.000Z";
+ // A bus the receiving device has never seen is added by mergeFleetMap. Without
+ // an id it cannot be edited, moved, or pointed at by a Down Sheet entry.
+ const added=mergeFleetMap([],fleetMapPayload([{fleet_number:"20505",location:"SOUTH LOT",
+  status:"service",map_fields:{mechanic:"RM"}}],now));
+ assert.equal(added.buses.length,1);
+ assert.ok(added.buses[0].id,"a bus arriving from the cloud needs an id of its own");
+ assert.equal(added.buses[0].n,"20505");
+ assert.equal(added.buses[0].mechanic,"RM");
+ // Derived from the fleet number, so a second pull cannot mint a second id.
+ assert.equal(added.buses[0].id,fleetMapPayload([{fleet_number:"20505"}],now).buses[0].id);
+
+ // The row's updated_by names the device that last PUSHED the entry. Who last
+ // worked the repair is a different fact, and overwriting one with the other
+ // quietly reassigns somebody's work to whoever synced last.
+ const entry={id:"e1",busId:"x",busNumber:"17549",category:"Engine",repair:"Overheating",updatedAt:now,updatedBy:"RM"};
+ const row=downSheetRow(entry,config,now);
+ assert.equal(row.updated_by,"CJ");
+ assert.equal(downSheetPayload([row],now).entries[0].updatedBy,"RM");
+});
+
+test("a pull reads past one page and signing out is local to the device",async()=>{
+ const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ // PostgREST caps rows per request and the cap is silent — the response looks
+ // complete. This fleet plus its defects can reach it in ordinary use.
+ assert.match(client,/\.range\(/);
+ assert.match(client,/page\.length<PAGE/);
+ // The library default for signOut is global, which revokes every refresh token
+ // on the account. The whole shop shares one login, so one person signing out
+ // of one iPad would sign out every phone with no explanation on any of them.
+ assert.match(client,/signOut\(\{scope:"local"\}\)/);
+ assert.doesNotMatch(client,/auth\.signOut\(\)/);
 });

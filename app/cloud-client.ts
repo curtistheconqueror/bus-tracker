@@ -28,14 +28,34 @@ import {
 type SupabaseLike={
  auth:{
   signInWithPassword(credentials:{email:string;password:string}):Promise<{data:unknown;error:{message:string}|null}>;
-  signOut():Promise<{error:{message:string}|null}>;
+  signOut(options?:{scope:"local"|"global"}):Promise<{error:{message:string}|null}>;
   getSession():Promise<{data:{session:unknown|null};error:{message:string}|null}>;
  };
  from(table:string):{
   upsert(rows:CloudRow[],options:{onConflict:string}):Promise<{error:{message:string}|null}>;
-  select(columns:string):{is(column:string,value:null):Promise<{data:CloudRow[]|null;error:{message:string}|null}>};
+  select(columns:string):{is(column:string,value:null):{
+   range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>;
+  }};
  };
 };
+
+/* PostgREST caps how many rows one request may return, and the cap is silent:
+   the response looks complete. This fleet is around four hundred buses and a
+   bus can carry several defects, so the cap is reachable in ordinary use, and a
+   truncated pull would leave records quietly un-updated on every device that
+   pulled. Read in pages until a short page says that was the end. */
+const PAGE=1000;
+
+async function readAll(supabase:SupabaseLike,table:string){
+ const rows:CloudRow[]=[];
+ for(let from=0;;from+=PAGE){
+  const {data,error}=await supabase.from(table).select("*").is("deleted_at",null).range(from,from+PAGE-1);
+  if(error)return {rows:[],error};
+  const page=data||[];
+  rows.push(...page);
+  if(page.length<PAGE)return {rows,error:null};
+ }
+}
 
 let client:SupabaseLike|null=null;
 let clientKey="";
@@ -80,7 +100,12 @@ export async function cloudSignIn(config:CloudConfig,password:string):Promise<Cl
 export async function cloudSignOut(config:CloudConfig):Promise<CloudOutcome>{
  try{
   const supabase=await cloudClient(config);
-  if(supabase)await supabase.auth.signOut();
+  /* Local scope, explicitly. The library's default is global, which revokes
+     every refresh token on the account — and the whole shop shares one login,
+     so one person signing out of one iPad would sign out all forty phones and
+     none of them would know why. This device forgets its own session and
+     nobody else's. */
+  if(supabase)await supabase.auth.signOut({scope:"local"});
  }catch{/* signing out locally matters more than telling the server */}
  forgetCloudClient();
  return {ok:true,phase:"signed-out",message:""};
@@ -171,17 +196,17 @@ export async function cloudPull(config:CloudConfig,now:string):Promise<PullResul
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",...empty};
   const [busRes,defectRes,entryRes]=await Promise.all([
-   supabase.from("buses").select("*").is("deleted_at",null),
-   supabase.from("bus_defects").select("*").is("deleted_at",null),
-   supabase.from("down_sheet_entries").select("*").is("deleted_at",null),
+   readAll(supabase,"buses"),
+   readAll(supabase,"bus_defects"),
+   readAll(supabase,"down_sheet_entries"),
   ]);
   const firstError=busRes.error||defectRes.error||entryRes.error;
   if(firstError)return {...failed(new Error(firstError.message)),...empty};
   return {
    ok:true,phase:"idle",message:"",
-   map:fleetMapPayload(busRes.data||[],now),
-   defects:defectLogPayload(defectRes.data||[],now),
-   sheet:downSheetPayload(entryRes.data||[],now),
+   map:fleetMapPayload(busRes.rows,now),
+   defects:defectLogPayload(defectRes.rows,now),
+   sheet:downSheetPayload(entryRes.rows,now),
   };
  }catch(error){return {...failed(error),...empty}}
 }

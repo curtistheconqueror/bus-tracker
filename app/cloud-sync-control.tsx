@@ -101,15 +101,19 @@ export default function CloudSyncControl(){
 
  /* A sweep rather than a hook into every save. Each pass sends only what
     changed, so a quiet shop costs one request that finds nothing. */
+ /* Depends on a boolean, not on the config object. Depending on the object
+    re-subscribed the interval and fired a push on every keystroke in the
+    settings fields, because typing replaces the object each time. */
+ const ready=!cloudConfigProblem(config);
  useEffect(()=>{
-  if(cloudConfigProblem(config))return;
+  if(!ready)return;
   const tick=()=>{if(document.visibilityState==="visible")push(true)};
   const timer=window.setInterval(tick,SWEEP_MS);
   document.addEventListener("visibilitychange",tick);
   window.addEventListener("online",tick);
   tick();
   return()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",tick);window.removeEventListener("online",tick)};
- },[config,push]);
+ },[ready,push]);
 
  const save=()=>{
   const problem=cloudConfigProblem(config);
@@ -157,10 +161,18 @@ export default function CloudSyncControl(){
    return;
   }
   const fleet=readFleetStorage<Record<string,unknown>>(localStorage);
-  if(!fleet.valid){alert("This device's board could not be read, so nothing was merged.");return}
+  /* Every abandoned path below puts the phase back. Returning while it still
+     says "syncing" leaves that written to storage, and the status line then
+     reads "Syncing…" forever — on a device that is not syncing at all. */
+  if(!fleet.valid){
+   remember({...state,phase:"error",lastError:"This device's board could not be read"});
+   alert("This device's board could not be read, so nothing was merged.");
+   return;
+  }
   const afterMap=mergeFleetMap(fleet.buses,result.map);
   const afterDefects=mergeDefectLog(afterMap.buses,result.defects);
   if(!writeFleetStorage(localStorage,afterDefects.buses,{allowBulkDefectLoss:false})){
+   remember({...state,phase:"error",lastError:"The merged board could not be saved"});
    alert("The merged board could not be saved, so nothing changed on this device.");
    return;
   }
