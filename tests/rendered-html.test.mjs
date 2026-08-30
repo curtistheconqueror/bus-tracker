@@ -5488,3 +5488,26 @@ test("the Defect Log can show the tracker's status colours, off by default",asyn
  assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="shop"\] strong\{color:#efa400\}/);
  assert.match(css,/\[data-status-color="on"\][^{]*\[data-status="service"\] strong\{color:#1764d8\}/);
 });
+
+test("locating a bus opens the section it is hiding in",async()=>{
+ const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ // A collapsed section keeps its tokens in the document and hides them with
+ // display:none, so the bus was found and scrolled to and nothing happened —
+ // an element with no box has nowhere to scroll. Searching for a bus in a
+ // collapsed section gave no answer and no error; the box just cleared.
+ assert.match(page,/const sectionOfLocation=/);
+ assert.match(page,/setCollapsedSections\(current=>\{[\s\S]{0,240}next\.delete\(name\)/);
+ // Waiting for a real BOX rather than for the node is the load-bearing part:
+ // the node is present the whole time, so checking only for it would scroll to
+ // the hidden one on the first frame and never look again.
+ assert.match(page,/getBoundingClientRect\(\)\.height>0/);
+ assert.match(page,/requestAnimationFrame\(\(\)=>scroll\(attempt\+1\)\)/);
+ // Keyed on SECTION_SLOTS, which is what the collapse state is keyed on.
+ // RELOCATION_AREAS splits the main garage into three and would miss.
+ assert.match(page,/sectionOfLocation=\(location:string\)=>Object\.entries\(SECTION_SLOTS\)/);
+
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ // If collapsing ever stops using display:none this test is checking a bug
+ // that no longer exists, so pin the mechanism it is built on.
+ assert.match(css,/\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
+});

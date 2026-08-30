@@ -188,7 +188,36 @@ const switchFromEditor=(next:B,otherId:string,destination:string)=>{const {acIss
 const createBus=(rawNumber:string,status:S,area:string)=>{const number=rawNumber.trim();if(!number){alert("A bus number is required.");return false}if(!/^\d+$/.test(number)){alert("Bus numbers may contain numbers only.");return false}if(buses.some(bus=>bus.n===number)){alert("Bus "+number+" already exists. No bus was created.");return false}const target=RELOCATION_AREAS[area]?.find(slot=>!buses.some(bus=>bus.l===slot));if(!target){alert(area?area+" no longer has an open space. Choose another area.":"Choose an initial area.");return false}const id="bus-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),now=new Date().toISOString(),base:B={id,n:number,s:status,l:target,mechanic:"",foreman:"",shift:"Day",priority:"Normal",safe:status!=="out"&&status!=="decommissioned",down:false,notes:"",pendingRepair:"",defects:[],odometerReadings:[],roadcall:false,roadcallSolid:false,roadcallLocation:"",towInProgress:false,checkEngine:false,checkTransmission:false,noHorn:false,badRampKneeler:false,farebox:false,ibsVentra:false,parkedAt:now,lastLocationChangeAt:now,lastStatusChangeAt:now,outReason:status==="out"?"Unscheduled":""},bus={...base,s:statusForLocation(target,status,base) as S};setBuses(current=>current.some(existing=>existing.n===number||existing.l===target)?current:[...current,bus]);alert("Bus "+number+" was created in "+area+".");return true};
 const renameBus=(id:string,nextNumber:string)=>{const number=nextNumber.trim(),existing=buses.find(bus=>bus.id===id);if(!/^\d+$/.test(number)){alert("Enter a numeric bus number.");return false}if(hasBusNumberConflict(buses,id,existing?.n||"",number)){alert("Bus "+number+" already exists. No change was made.");return false}setBuses(current=>current.map(bus=>bus.id===id?{...bus,n:number}:bus));return true};
 const applyTheme=(name:string)=>{const preset=THEMES[name];if(!preset)return;setThemeName(name);setVisuals({...preset.visuals,sections:{...preset.visuals.sections}});setColors({...preset.colors})};
-const revealLocatedBuses=(matches:B[])=>{const targets=matches.map(bus=>{const token=document.querySelector<HTMLElement>('[data-bus-id="'+bus.id+'"]');return token?.closest<HTMLElement>(".spot")||token}).filter(Boolean) as HTMLElement[];targets[0]?.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})};
+/* Which collapsed section a bus is hiding in. Keyed on SECTION_SLOTS because
+   that is what the collapse state is keyed on; RELOCATION_AREAS splits the main
+   garage into three and would miss. */
+const sectionOfLocation=(location:string)=>Object.entries(SECTION_SLOTS).find(([,slots])=>slots.includes(location))?.[0]||"";
+const revealLocatedBuses=(matches:B[])=>{
+ /* A collapsed section still has its tokens in the document — it hides them
+    with display:none — so the bus was found and then scrolled to, and nothing
+    happened, because an element with no box has nowhere to scroll. Searching
+    for a bus parked in a collapsed section gave no answer and no error; the box
+    just cleared. So open the sections holding the matches first.
+
+    The wait then has to be for a real BOX, not for the node: the node is there
+    the whole time, and checking only for it would scroll to the hidden one on
+    the first frame and never look again. Buses in sections that were already
+    open measure a box immediately and go straight there. */
+ const sections=new Set(matches.map(bus=>sectionOfLocation(bus.l)).filter(Boolean));
+ if(sections.size)setCollapsedSections(current=>{
+  const next=new Set(current);
+  let opened=false;
+  sections.forEach(name=>{if(next.delete(name))opened=true});
+  return opened?next:current;
+ });
+ const scroll=(attempt:number)=>{
+  const shown=matches.map(bus=>{const token=document.querySelector<HTMLElement>('[data-bus-id="'+bus.id+'"]');return token?.closest<HTMLElement>(".spot")||token})
+   .find(node=>node&&node.getBoundingClientRect().height>0);
+  if(shown){shown.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});return}
+  if(attempt<10)requestAnimationFrame(()=>scroll(attempt+1));
+ };
+ requestAnimationFrame(()=>scroll(0));
+};
 const locateBus=(event:React.FormEvent)=>{event.preventDefault();const needle=locateNumber.trim();if(!needle)return;const resolution=resolveBusNumber(buses,needle);if(resolution.kind==="invalid"){alert("Enter the complete bus number or exactly two ending digits.");return}if(resolution.kind==="not-found"){alert("No bus matches "+needle+".");return}if(resolution.kind==="ambiguous"){setLocatedBusIds([]);setMultiLocateIds(resolution.matches.map(bus=>bus.id));revealLocatedBuses(resolution.matches);const candidates=candidateBusNumbers(resolution.matches);alert(resolution.matchType==="exact"?"Bus "+needle+" appears in multiple tracker records. All duplicate records are highlighted; correct them in Settings.":needle+" matches "+resolution.matches.length+" buses: "+candidates.join(", ")+". All matches are highlighted.");return}setMultiLocateIds([]);setLocatedBusIds([resolution.bus.id]);revealLocatedBuses([resolution.bus])};
 const planOperator=(command:string,context:OperatorSelectionContext|null)=>planOperatorCommand(command,buses,OPERATOR_AREAS,context);
 const executeOperator=(plan:OperatorPlan):{ok:boolean;message:string}=>{
