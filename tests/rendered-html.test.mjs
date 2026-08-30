@@ -31,6 +31,7 @@ import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-she
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
+import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterMatch } from "../app/quick-filters.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
@@ -831,8 +832,8 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
   assert.ok(modalZ > commandZ, `Bus editor layer ${modalZ} must exceed command strip ${commandZ}`);
   assert.match(backup, /pace-south-fleet-board-backup/);
-  assert.match(page, /EXPORT \/ SHARE BACKUP/);
-  assert.match(page, /IMPORT BACKUP/);
+  assert.match(page, /EXPORT ALL DATA/);
+  assert.match(page, /IMPORT ALL DATA/);
   assert.match(page, /registration\?\.update\(\)/);
   assert.match(page, /window\.location\.reload\(\)/);
   assert.match(page, /It will replace the board and settings currently stored on this device/);
@@ -2993,6 +2994,96 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
+test("a section moves between devices without dragging the rest of the app with it",()=>{
+ /* The situation this exists for: the phone has today's Defect Log and last
+    week's map, the iPad has today's map and last week's log. Importing either
+    whole backup throws away the half the other device did better. */
+ const defect=(id,issue)=>({id,category:"Engine",issue,details:"",operability:"service",state:"open",source:"defect-log"});
+ const phone=[
+  {id:"p1",n:"17549",l:"bay-3",s:"defect",mechanic:"CJ",defects:[defect("d1","Overheating"),defect("d2","Misfire")]},
+  {id:"p2",n:"18122",l:"road-1",s:"service",mechanic:"",defects:[defect("d3","Oil leak")]}];
+ const ipad=[
+  {id:"i1",n:"17549",l:"west-4",s:"service",mechanic:"RM",defects:[defect("d9","Coolant leak")]},
+  {id:"i2",n:"18122",l:"garage-2",s:"shop",mechanic:"",defects:[]},
+  {id:"i3",n:"20077",l:"east-1",s:"service",mechanic:"",defects:[]}];
+
+ // The phone sends its Defect Log. The iPad's map must not move an inch.
+ const log=exportDefectLogPayload(phone);
+ assert.equal(log.kind,TRANSFER_KINDS["defect-log"].payloadKind);
+ assert.ok(log.buses.every(bus=>!("l" in bus)&&!("s" in bus)),"a Defect Log transfer must not carry map fields");
+ const afterLog=mergeDefectLog(ipad,log);
+ assert.deepEqual(afterLog.buses.map(bus=>bus.l),["west-4","garage-2","east-1"],"the map stayed put");
+ assert.deepEqual(afterLog.buses.map(bus=>bus.mechanic),["RM","",""],"map fields stayed put");
+ // the phone's defects arrived and the iPad's own were kept, not replaced
+ assert.deepEqual(afterLog.buses[0].defects.map(d=>d.id).sort(),["d1","d2","d9"]);
+ assert.deepEqual(afterLog.buses[1].defects.map(d=>d.id),["d3"]);
+ assert.equal(afterLog.report.updated,2);
+
+ // The iPad sends its map back. The phone's Defect Log must survive whole.
+ const map=exportFleetMapPayload(ipad);
+ assert.ok(map.buses.every(bus=>!("defects" in bus)),"a Fleet Map transfer must not carry defects");
+ const afterMap=mergeFleetMap(phone,map);
+ assert.deepEqual(afterMap.buses.slice(0,2).map(bus=>bus.l),["west-4","garage-2"],"the phone took the iPad's positions");
+ assert.deepEqual(afterMap.buses[0].defects.map(d=>d.id),["d1","d2"],"sending a map must never clear a Defect Log");
+ // a bus the phone has never seen arrives with the map, because the map is
+ // where a bus lives, and it arrives with no defects of its own
+ assert.equal(afterMap.report.added,1);
+ assert.equal(afterMap.buses[2].n,"20077");
+ assert.deepEqual(afterMap.buses[2].defects,[]);
+
+ // A defect for a bus the receiving device does not have is reported, never
+ // invented: giving it a place on the map is the map transfer's job.
+ const stranger=mergeDefectLog([ipad[0]],exportDefectLogPayload([{id:"x",n:"99999",defects:[defect("d5","Misfire")]}]));
+ assert.deepEqual(stranger.report.unmatched,["99999"]);
+ assert.equal(stranger.buses.length,1);
+
+ // Matching is by fleet number, because two devices seeded separately give the
+ // same bus different ids and 17549 is what a person means.
+ const renumbered=mergeDefectLog([{id:"totally-different",n:"17549",l:"pit-1",defects:[]}],log);
+ assert.equal(renumbered.report.updated,1);
+ assert.equal(renumbered.buses[0].l,"pit-1");
+
+ // The Down Sheet is its own store, so it merges by entry and keeps local ones.
+ const sheet=mergeDownSheet([{id:"e1",busNumber:"17549",workflow:"Scheduled"},{id:"e2",busNumber:"18122",workflow:"Scheduled"}],
+  exportDownSheetPayload([{id:"e1",busNumber:"17549",workflow:"Completed"},{id:"e3",busNumber:"20077",workflow:"Scheduled"}]));
+ assert.equal(sheet.entries.find(e=>e.id==="e1").workflow,"Completed","incoming wins where both have it");
+ assert.ok(sheet.entries.find(e=>e.id==="e2"),"an entry only this device has stays on the sheet");
+ assert.equal(sheet.report.added,1);
+
+ /* Wrong file on the wrong page names the right page, rather than the flat
+    "not valid" that a whole-backup import gave every one of these. */
+ const wrong=readTransferPayload(JSON.stringify(exportFleetMapPayload(ipad)),"defect-log");
+ assert.equal(wrong.ok,false);
+ assert.match(wrong.error,/Fleet Map file\. Import it on the Fleet Map page/);
+ const report=readTransferPayload(JSON.stringify({kind:"fleet-real-time-defect-log",records:[]}),"defect-log");
+ assert.match(report.error,/report, not a transfer/);
+ const full=readTransferPayload(JSON.stringify({kind:"pace-south-fleet-board-backup"}),"down-sheet");
+ assert.match(full.error,/IMPORT ALL DATA/);
+ assert.equal(readTransferPayload("not json at all","defect-log").ok,false);
+ assert.equal(readTransferPayload(JSON.stringify(log),"defect-log").ok,true);
+ assert.match(transferFilename("fleet-map",new Date("2026-08-30T00:00:00Z")),/^pace-fleet-map-2026-08-30\.json$/);
+
+ /* A merge must not invent keys. Writing the local defect fields back
+    unconditionally set pendingRepair to undefined on a bus that had never had
+    one, and the Facility Map calls .trim() on it while filtering — so importing
+    a map crashed the page instead of moving a bus. The fixtures above all
+    happened to carry the field, which is exactly why only a real browser found
+    it; these are deliberately sparse. */
+ const sparse=[{id:"s1",n:"17549",l:"bay-3",s:"defect"}];
+ const merged=mergeFleetMap(sparse,exportFleetMapPayload([{id:"o1",n:"17549",l:"west-4",s:"service"}]));
+ assert.equal(merged.buses[0].l,"west-4");
+ assert.ok(!("pendingRepair" in merged.buses[0]),"a key the bus never had must not be created as undefined");
+ assert.ok(!("defects" in merged.buses[0]),"the same for defects");
+ // and a bus arriving on the map with no defect fields at all gets usable ones
+ const fresh=mergeFleetMap([],exportFleetMapPayload([{id:"o2",n:"20077",l:"east-1",s:"service"}]));
+ assert.deepEqual(fresh.buses[0].defects,[]);
+ assert.equal(fresh.buses[0].pendingRepair,"");
+ // the same shape through the Defect Log side
+ const sparseLog=mergeDefectLog([{id:"s2",n:"18122",l:"bay-4"}],exportDefectLogPayload([{id:"o3",n:"18122",defects:[defect("d7","Misfire")]}]));
+ assert.deepEqual(sparseLog.buses[0].defects.map(d=>d.id),["d7"]);
+ assert.equal(sparseLog.buses[0].l,"bay-4");
+});
+
 test("only the button that writes a restorable file is called a backup",async()=>{
  /* Four buttons in this app write a file and only one of them can be read back
     in. They used to read as variations on the same idea — EXPORT LOG next to
@@ -3018,10 +3109,19 @@ test("only the button that writes a restorable file is called a backup",async()=
   // can never drift into describing the same limitation three different ways
   assert.match(source,new RegExp("onClick=\\{"+handler+"\\}[^>]*title=\\{REPORT_EXPORT_HINT\\}"),name+" is missing the shared hint");
  }
- assert.match(backup,/REPORT_EXPORT_HINT="Report only[^"]*cannot be imported back/);
+ /* The hint sends people somewhere, so it has to name a button that is really
+    there. It pointed at EXPORT / SHARE BACKUP, which no longer exists. */
+ const hint=backup.match(/REPORT_EXPORT_HINT="([^"]*)"/)[1];
+ assert.match(hint,/Report only[\s\S]*cannot be imported back/);
+ assert.match(hint,/EXPORT ALL DATA in Facility Map settings/);
+ assert.ok(!/SHARE BACKUP/.test(hint),"the hint must not send anybody to a label that no longer exists");
 
  // The real one keeps the word, and it is the only button that has it.
- assert.match(map,/onClick=\{exportBoard\}>EXPORT \/ SHARE BACKUP</);
+ // The whole-app pair says ALL DATA now, because it is no longer the only
+ // thing that can be imported — it is the one that replaces everything.
+ assert.match(map,/onClick=\{exportBoard\}>EXPORT ALL DATA</);
+ assert.match(map,/IMPORT ALL DATA<input type="file"/);
+ assert.match(map,/All data replaces everything on the destination device/);
  assert.equal((log+fixed+lists).match(/>[^<]*BACKUP[^<]*<\/button>/gi),null);
 });
 

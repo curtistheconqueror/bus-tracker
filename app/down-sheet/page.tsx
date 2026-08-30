@@ -4,6 +4,8 @@ import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetSettings from "./down-sheet-settings";
+import SectionTransferControls from "../section-transfer-controls";
+import {exportDownSheetPayload,mergeDownSheet,mergeSummary} from "../section-transfer";
 import DownSheetScanner from "./down-sheet-scanner";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {learnFinding,readFindingsMemory,writeFindingsMemory} from "../findings-memory";
@@ -245,7 +247,7 @@ export default function DownSheet(){
   </section>
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
   {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
-  {settingsOpen&&<DownSheetSettings defaultInitials={defaultInitials} setDefaultInitials={setDefaultInitials} defaultShift={defaultShift} setDefaultShift={setDefaultShift} showCompleted={showCompleted} setShowCompleted={setShowCompleted} display={displaySettings} setDisplay={setDisplaySettings} onClose={()=>setSettingsOpen(false)}/>}
+  {settingsOpen&&<DownSheetSettings transfer={<SectionTransferControls kind="down-sheet" buildPayload={()=>exportDownSheetPayload(entries)} applyPayload={payload=>{const {entries:merged,report}=mergeDownSheet(entries,payload);setEntries(merged);return mergeSummary("down-sheet",report)}}/>} defaultInitials={defaultInitials} setDefaultInitials={setDefaultInitials} defaultShift={defaultShift} setDefaultShift={setDefaultShift} showCompleted={showCompleted} setShowCompleted={setShowCompleted} display={displaySettings} setDisplay={setDisplaySettings} onClose={()=>setSettingsOpen(false)}/>}
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
  </main>;
 }

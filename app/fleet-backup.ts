@@ -12,7 +12,7 @@ import {FINDINGS_MEMORY_STORAGE_KEY} from "./findings-memory.ts";
    The word REPORT in every one of those three labels is what carries that, and
    this hint is the long version behind them. It lives beside the backup itself
    so the two can never be described inconsistently. */
-export const REPORT_EXPORT_HINT="Report only — a snapshot to read or send to somebody. This file cannot be imported back into the app. To back the app up, use EXPORT / SHARE BACKUP in Facility Map settings.";
+export const REPORT_EXPORT_HINT="Report only — a snapshot to read or send to somebody. This file cannot be imported back into the app. To move this section to another device use the transfer above it; to back the whole app up use EXPORT ALL DATA in Facility Map settings.";
 
 function readSavedValue(storage:Pick<Storage,"getItem">,key:string){
  try{return JSON.parse(storage.getItem(key)||"null")}catch{return null}

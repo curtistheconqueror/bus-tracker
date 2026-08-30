@@ -7,6 +7,8 @@ import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogC
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
+import SectionTransferControls from "../section-transfer-controls";
+import {exportDefectLogPayload,mergeDefectLog,mergeSummary} from "../section-transfer";
 import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,type QuickFilterKey} from "../quick-filters";
 import {lockPageScroll} from "../scroll-lock";
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
@@ -257,7 +259,7 @@ function ShopNotesEditor({record,label,save}:{record:DefectLogRecord;label:strin
  </label>;
 }
 
-function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog:()=>void}){
+function LogSettingsModal({settings,setSettings,close,exportLog,transfer}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog:()=>void;transfer:React.ReactNode}){
  const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
  const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
  const setDisplayLabel=(key:keyof DefectLogLabels,value:string)=>setSettings({...settings,display:{...settings.display,labels:{...settings.display.labels,[key]:value}}});
@@ -283,6 +285,10 @@ function LogSettingsModal({settings,setSettings,close,exportLog}:{settings:LogSe
     </select>
     <small>Counts Defect Log entries saved since the last full backup. The banner appears on the Defect Log when the count is reached.</small>
    </label>
+   {/* Above the report on purpose: sending the log to another device is the
+       thing somebody comes in here to do, and the report is the thing they
+       press by mistake while looking for it. */}
+   {transfer}
    <button className="export-log" onClick={exportLog} title={REPORT_EXPORT_HINT}>EXPORT LOG REPORT</button>
    <p>Repair records are included with the board backup because they stay attached to each bus.</p>
   </div>
@@ -424,6 +430,6 @@ export default function DefectLog(){
    </section>
   </div>}
   {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
-  {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog}/>}
+  {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog} transfer={<SectionTransferControls kind="defect-log" buildPayload={()=>exportDefectLogPayload(fleet)} applyPayload={payload=>{const {buses,report}=mergeDefectLog(fleet,payload);persist(buses as DefectLogFleetBus[],downEntries);return mergeSummary("defect-log",report)}}/>}/>}
  </main>;
 }
