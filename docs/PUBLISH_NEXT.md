@@ -1,15 +1,15 @@
 # Publish next
 
-**STATUS: PENDING**
+**STATUS: NONE PENDING**
 
-Version 126 is approved for the existing public Fleet Tracker site. Publish the validated Defect Log visual-hierarchy update through the existing `.openai/hosting.json` binding only.
+Sites Version 126 was published from commit 8e68f698460726042b32fd412aabf9bf31f6bb2d on 2026-08-30. Replace this file with the next complete pending-release handoff in the same push as the next contribution to main.
 
 ## Source
 
 - Branch: main
-- Validated feature commit: 19da041e1e0308f81338cd5ba2947f30a4884016
-- Last published source: 135a49a
-- Current live release: Sites Version 125 at 135a49a
+- Last published source: 8e68f698460726042b32fd412aabf9bf31f6bb2d
+- Last code-bearing commit: 19da041e1e0308f81338cd5ba2947f30a4884016
+- Current live release: Sites Version 126 at 8e68f69
 
 ## What changed
 
@@ -31,6 +31,4 @@ No LocalStorage key or fleet record changed. The existing `pace-defect-log-setti
 
 ## Live verification
 
-- On a phone, expand two adjacent buses and confirm each complete bus group has a clear end before the next bus begins.
-- On an iPad, confirm the same hierarchy without changing the tablet layout.
-- In Defect Log Settings, switch Bus Group Separation between Strong and Standard and confirm only presentation changes.
+Sites Version 126 deployed successfully to the existing live site on 2026-08-30.
