@@ -27,20 +27,20 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `ae12728` — everything after it is documentation only |
+| Last code-bearing commit | `0dcb9cd` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 122, `cd6b649` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline ae12728..origin/main` that
-nothing but `docs/` changed after `ae12728`, and publish the tip.
+release commit. Confirm with `git log --oneline 0dcb9cd..origin/main` that
+nothing but `docs/` changed after `0dcb9cd`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed. This work was written before Version 122 landed and was replayed on top
 of it rather than merged over it, so nothing published is disturbed.
 
-Gate: 127 tests passing, ESLint clean, production build succeeds.
+Gate: 128 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -113,8 +113,12 @@ way in, so an older or hand-edited file cannot assert one. A bus arriving with a
 map lands not-down and gets its badge when a Down Sheet transfer brings the
 entry.
 
-This is the single most important behaviour in the release. Two bugs were found
-and fixed against it, both reproduced in a browser:
+**The order of the transfers does not matter.** Sending the map first or the
+sheet first reaches the same state. That was not true at first, and getting it
+right found two more bugs — see below.
+
+This is the single most important behaviour in the release. Four bugs were found
+and fixed against it:
 
 - A map exported **before** a bus went on the sheet said `down:false`, and
   importing it stripped the badge off a bus whose Down Sheet entry was sitting
@@ -123,6 +127,16 @@ and fixed against it, both reproduced in a browser:
 - Imported Down Sheet entries went into state raw rather than through the
   normalizer hydration uses, so an entry without a `timeEstimate` **crashed the
   page** and the import took nothing at all.
+- A Down Sheet entry points at a bus by the **sending** device's id, and two
+  devices set up separately give the same bus different ids. Reconciliation
+  matches on id, so an entry arriving with a foreign one put a badge on nothing.
+  Entries are now re-pointed to the local bus by **fleet number**, the one name
+  both devices agree on; an entry for a bus this device does not have is left
+  exactly as it came.
+- A map import **re-keyed buses the receiving device already had**, which
+  orphaned that device's OWN Down Sheet entries — they point at the id it had
+  before the import — and its buses silently lost their badges. A transfer now
+  moves what a record says, never what it is called here.
 
 ### The service detail area was hidden on a phone
 
@@ -187,7 +201,7 @@ and were both checked in a browser.
 ## Validation
 
 - Production build passed
-- All 127 regression tests passed, including a new one asserting that each of the
+- All 128 regression tests passed, including a new one asserting that each of the
   three report buttons says REPORT, that none of them says BACKUP, that each
   carries the shared hint, and that the Facility Map backup button is unchanged
 - ESLint passed
@@ -243,7 +257,10 @@ and were both checked in a browser.
    release should be pulled.
 10. On a device with an empty sheet, import a Down Sheet from another device and
     confirm the entries land, the rows render, and the buses pick up the badge.
-11. **On the phone**, open the Facility Map and confirm **SERVICE DETAIL AREA**
+11. Move both sections between two devices **in each order** — map then sheet on
+    one pair, sheet then map on another — and confirm both end up the same, with
+    the buses in the right places and the right ones badged.
+12. **On the phone**, open the Facility Map and confirm **SERVICE DETAIL AREA**
     is visible with its spaces, and that **IN SERVICE / ON ROAD** now sits below
     it rather than over it. Check the map still looks right on the computer,
     where the road panel should be unchanged in its right-hand column.
