@@ -3345,7 +3345,7 @@ test("the operator blower and the mirror switches land in both structures a grou
  // prefixed in REPAIR_OPTIONS, which is what gets stored, and once bare in
  // REPAIR_OPTION_GROUPS, which is what the picker draws. Adding it to one and
  // not the other is the failure this catches.
- for(const switchName of ["Mirror heater switch","C/S adjuster switch"]){
+ for(const switchName of ["Mirror heater switch - C/S","Mirror adjuster switch - C/S"]){
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - "+switchName),switchName+" missing from REPAIR_OPTIONS");
   assert.ok(REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"].includes(switchName),switchName+" missing from REPAIR_OPTION_GROUPS");
   // and it survives a round trip through a saved defect under its stored name
@@ -3354,7 +3354,13 @@ test("the operator blower and the mirror switches land in both structures a grou
  }
  // The mirror switches read as a pair rather than being split by the group.
  const switches=REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"];
- assert.equal(switches.indexOf("C/S adjuster switch"),switches.indexOf("Mirror heater switch")+1);
+ assert.equal(switches.indexOf("Mirror adjuster switch - C/S"),switches.indexOf("Mirror heater switch - C/S")+1);
+ /* Both are curbside, and the adjuster now says what it adjusts. A record saved
+    under either first wording reads as the new one. */
+ assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - C/S adjuster switch"),
+  {category:"Bus Controls",issue:"System Switches - Mirror adjuster switch - C/S"});
+ assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - Mirror heater switch"),
+  {category:"Bus Controls",issue:"System Switches - Mirror heater switch - C/S"});
  // Lights and Fixtures still owns the mirrors themselves; only the switch moved.
  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
 });
