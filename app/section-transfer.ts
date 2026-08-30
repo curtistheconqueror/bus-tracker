@@ -31,6 +31,23 @@ export const TRANSFER_KINDS:Record<TransferKind,{payloadKind:string;label:string
    overwriting each other when both are sent. */
 const DEFECT_FIELDS=["defects","pendingRepair"] as const;
 
+/* And what belongs to the Down Sheet, which no transfer may assert.
+
+   The Down Sheet is the source of truth for whether a bus is down. Entries get
+   there off a photographed sheet or typed in by hand, and the map reads that
+   membership back rather than deciding it: `reconcileDownSheetMembership` sets
+   `down` from the active entries every time they change.
+
+   A Fleet Map file carrying these fields breaks that. A map exported before a
+   bus went on the sheet says down:false, and importing it stripped the badge
+   off a bus whose Down Sheet entry was sitting right there untouched — the map
+   page only re-reconciles when the entries change, and an import does not
+   change them. So the map transfer does not carry them at all, and a merge
+   keeps whatever the receiving device's own Down Sheet says. To move down
+   status, move the Down Sheet. */
+const DOWN_SHEET_FIELDS=["down","onDownSheet","downSheetReady"] as const;
+const MAP_EXCLUDED=[...DEFECT_FIELDS,...DOWN_SHEET_FIELDS];
+
 export type TransferBus={id?:string;n?:string;[key:string]:unknown};
 export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[]};
 
@@ -77,7 +94,7 @@ export function exportDefectLogPayload(buses:TransferBus[],now?:string){
  return envelope("defect-log",{buses:buses.map(bus=>({id:bus.id,n:bus.n,...pick(bus,DEFECT_FIELDS)}))},now);
 }
 export function exportFleetMapPayload(buses:TransferBus[],now?:string){
- return envelope("fleet-map",{buses:buses.map(bus=>omit(bus,DEFECT_FIELDS))},now);
+ return envelope("fleet-map",{buses:buses.map(bus=>omit(bus,MAP_EXCLUDED))},now);
 }
 export function exportDownSheetPayload(entries:unknown[],now?:string){
  return envelope("down-sheet",{entries},now);
@@ -143,12 +160,17 @@ export function mergeFleetMap<T extends TransferBus>(local:T[],payload:TransferP
  const report:MergeReport={updated:0,added:0,unmatched:[]};
  for(const bus of incoming){
   const at=matchIndex(index,bus);
-  const mapFields=omit(bus,DEFECT_FIELDS);
+  /* Stripped on the way in as well as on the way out, so a file written by an
+     older version, or edited by hand, still cannot assert down status. */
+  const mapFields=omit(bus,MAP_EXCLUDED);
   if(at<0){
    /* pendingRepair is a defect field, so a map transfer never carries one. A
       bus arriving without it needs the empty string rather than nothing, for
       the same reason. */
-   next.push({...mapFields,defects:[],pendingRepair:""} as unknown as T);
+   /* A bus arriving with the map is not on this device's Down Sheet, because
+      this device's Down Sheet has never heard of it. It gets its badge when a
+      Down Sheet transfer brings the entry. */
+   next.push({...mapFields,defects:[],pendingRepair:"",down:false,onDownSheet:false} as unknown as T);
    index.set(busKey(bus),next.length-1);
    report.added++;
    continue;
@@ -161,7 +183,7 @@ export function mergeFleetMap<T extends TransferBus>(local:T[],payload:TransferP
      Writing them back unconditionally set `pendingRepair` to undefined on any
      bus that had never had one, and the Facility Map calls .trim() on it while
      filtering — so importing a map crashed the page rather than moving a bus. */
-  next[at]={...current,...mapFields,...pick(current,DEFECT_FIELDS)} as T;
+  next[at]={...current,...mapFields,...pick(current,MAP_EXCLUDED)} as T;
   report.updated++;
  }
  return {buses:next,report};

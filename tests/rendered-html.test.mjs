@@ -2994,6 +2994,46 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
+test("the Down Sheet is the only thing that decides whether a bus is down",async()=>{
+ /* Curtis's rule, and the app's: active Down Sheet rows are the source of truth
+    for the DS badge. Entries get there off a photographed sheet or typed by
+    hand, and the map READS that membership rather than deciding it.
+
+    A Fleet Map transfer nearly broke it. A map exported before a bus went on
+    the sheet says down:false, and importing it stripped the badge off a bus
+    whose Down Sheet entry was sitting right there — the map page reconciles
+    only when the entries change, and an import does not change them. */
+ const withDown=(down)=>({id:"a",n:"17549",l:"bay-3",s:down?"out":"service",down,onDownSheet:down,downSheetReady:false,defects:[],pendingRepair:""});
+
+ // A map transfer carries no opinion about down status, in either direction.
+ const payload=exportFleetMapPayload([withDown(false)]);
+ for(const field of ["down","onDownSheet","downSheetReady"])
+  assert.ok(!(field in payload.buses[0]),"a Fleet Map transfer must not carry "+field);
+ assert.ok("l" in payload.buses[0]&&"s" in payload.buses[0],"it still carries the map itself");
+
+ // and a receiving device keeps its own answer even when the file asserts one
+ const forged={...payload,buses:[{id:"a",n:"17549",l:"west-9",s:"service",down:false,onDownSheet:false}]};
+ const kept=mergeFleetMap([withDown(true)],forged);
+ assert.equal(kept.buses[0].l,"west-9","the map still moved");
+ assert.equal(kept.buses[0].down,true,"a hand-edited or older file still cannot clear the badge");
+ assert.equal(kept.buses[0].onDownSheet,true);
+
+ // a bus arriving with the map is not on this device's sheet, so it is not down
+ const arrived=mergeFleetMap([],{...payload,buses:[{id:"z",n:"20077",l:"east-1",s:"service"}]});
+ assert.equal(arrived.buses[0].down,false);
+ assert.equal(arrived.buses[0].onDownSheet,false);
+
+ // The map page's reconciliation is what asserts it, and it reads the entries.
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(map,/reconcileDownSheetMembership\(current,activeDownIds\)/);
+ const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(sheet,/Active Down Sheet rows are the single source of truth/);
+ /* An imported entry goes through the same normalizer hydration uses. One
+    arriving without a timeEstimate crashed the sheet, because a row asks it for
+    repairMinutes without checking, so the import took nothing at all. */
+ assert.match(sheet,/setEntries\(merged\.map\(\(entry,index\)=>normalizeEntry\(entry,index\)\)\)/);
+});
+
 test("a section moves between devices without dragging the rest of the app with it",()=>{
  /* The situation this exists for: the phone has today's Defect Log and last
     week's map, the iPad has today's map and last week's log. Importing either
