@@ -27,20 +27,20 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Last code-bearing commit | `2ea327f` — everything after it is documentation only |
+| Last code-bearing commit | `07d55bb` — everything after it is documentation only |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 122, `cd6b649` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 2ea327f..origin/main` that
-nothing but `docs/` changed after `2ea327f`, and publish the tip.
+release commit. Confirm with `git log --oneline 07d55bb..origin/main` that
+nothing but `docs/` changed after `07d55bb`, and publish the tip.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
 pushed. This work was written before Version 122 landed and was replayed on top
 of it rather than merged over it, so nothing published is disturbed.
 
-Gate: 125 tests passing, ESLint clean, production build succeeds.
+Gate: 126 tests passing, ESLint clean, production build succeeds.
 
 ## What changed
 
@@ -104,6 +104,26 @@ A wrong file now names the right page instead of "not valid": a Fleet Map file
 on the Defect Log says to import it on the Fleet Map, a report says it is a
 report, and a full backup points at IMPORT ALL DATA.
 
+**The Down Sheet keeps deciding what is down.** Active Down Sheet rows are the
+source of truth for the DS badge — entries arrive off a photographed sheet or
+typed by hand, and the map reads that membership rather than deciding it. A
+Fleet Map transfer therefore carries **no** opinion about down status: `down`,
+`onDownSheet` and `downSheetReady` are stripped on the way out and again on the
+way in, so an older or hand-edited file cannot assert one. A bus arriving with a
+map lands not-down and gets its badge when a Down Sheet transfer brings the
+entry.
+
+This is the single most important behaviour in the release. Two bugs were found
+and fixed against it, both reproduced in a browser:
+
+- A map exported **before** a bus went on the sheet said `down:false`, and
+  importing it stripped the badge off a bus whose Down Sheet entry was sitting
+  right there — the map reconciles only when entries change, and an import does
+  not change them.
+- Imported Down Sheet entries went into state raw rather than through the
+  normalizer hydration uses, so an entry without a `timeEstimate` **crashed the
+  page** and the import took nothing at all.
+
 ### The backup reminder is one card, and the shop sets its cadence
 
 The banner was a heading and a button side by side in two colours, and on any
@@ -141,14 +161,15 @@ device that has never seen it reads as twenty, which is the interval it has been
 using all along, so nobody's reminder changes cadence on publish.
 
 The section transfers add three new file kinds and read nothing that already
-exists on disk differently. **An import merges; it never truncates.** The one
-way it could have gone wrong — a map import clearing the receiving device's
-Defect Log — is covered by a test and was checked in a browser.
+exists on disk differently. **An import merges; it never truncates.** The two
+ways it could have gone wrong — a map import clearing the receiving device's
+Defect Log, and a map import clearing its DS badges — are both covered by tests
+and were both checked in a browser.
 
 ## Validation
 
 - Production build passed
-- All 125 regression tests passed, including a new one asserting that each of the
+- All 126 regression tests passed, including a new one asserting that each of the
   three report buttons says REPORT, that none of them says BACKUP, that each
   carries the shared hint, and that the Facility Map backup button is unchanged
 - ESLint passed
@@ -194,6 +215,13 @@ Defect Log — is covered by a test and was checked in a browser.
    empties after a map import is the one failure worth pulling the release for.
 8. Import a Fleet Map file on the Defect Log page and confirm it says to import
    it on the Fleet Map page rather than "not valid".
+9. **The Down Sheet rule, which matters more than the rest of this release.**
+   Put a bus on the Down Sheet. Then import an older Fleet Map taken before it
+   went on. Confirm the bus **moves to its new spot and keeps its DS badge**. A
+   badge that disappears here means the map is overruling the sheet and the
+   release should be pulled.
+10. On a device with an empty sheet, import a Down Sheet from another device and
+    confirm the entries land, the rows render, and the buses pick up the badge.
 
 ## Publishing constraints that still apply
 
