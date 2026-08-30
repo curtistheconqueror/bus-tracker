@@ -32,11 +32,13 @@ what to check once it is live.
 | Previous live | Version 124, `39a7275` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. Confirm with `git log --oneline 8b7bfe3..origin/main` that nothing
-but `docs/` and `supabase/` changed after `8b7bfe3`, and publish the tip.
+release commit. Confirm with `git log --oneline --name-only 8b7bfe3..origin/main`
+that nothing outside `docs/`, `supabase/` and `CLAUDE.md` changed after
+`8b7bfe3`, and publish the tip.
 
-`supabase/` holds unapplied database migrations for work that has not started.
-It ships no application code and changes nothing about the site.
+Those three are not application code and change nothing about the site:
+`supabase/` holds database migrations that have not been applied to any
+database, and `CLAUDE.md` is repository orientation for future sessions.
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
 point at identical trees. No history was rewritten and no branch was force
