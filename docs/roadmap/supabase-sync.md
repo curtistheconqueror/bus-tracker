@@ -7,11 +7,37 @@ purpose.
 
 | | |
 | --- | --- |
-| Schema | Written, applied and tested against a real Postgres 16. Nothing has touched Curtis's actual Supabase project. |
+| Schema | **APPLIED to the live Supabase project on 2026-08-30** and verified there. Also tested against a real Postgres 16. |
 | Files | `supabase/migrations/0001_cloud_backup.sql`, `supabase/migrations/0002_shared_records.sql`, `supabase/tests/schema.test.sql`, `supabase/run-tests.sh` |
-| Verify | `./supabase/run-tests.sh` — builds a throwaway cluster, applies every migration twice, runs 12 checks. No network, no Supabase account. |
-| Blocked on | The Supabase MCP connector. It reports `connected: true` but `enabledInChat: false`, and no Supabase tools appear. Two re-toggles did not fix it. **A fresh session is needed before anything can be applied.** |
-| Curtis has | Made a "bus tracker" organization in Supabase. The project itself still needs creating, or its connection details reading. |
+| Verify locally | `./supabase/run-tests.sh` — builds a throwaway cluster, applies every migration twice, runs 12 checks. No network, no Supabase account. |
+| How it was applied | Pasted into the Supabase **SQL Editor** in the browser. That needs no MCP connector and no database password, and it is the route to use again. Do not wait on the connector, which reported `connected: true` with `enabledInChat: false` and never exposed a single tool. |
+| Next | The client. **Nothing in the app reads or writes Supabase yet** — the tables are empty and the app is unchanged. |
+
+### Verified in the live project on 2026-08-30
+
+| Check | Result |
+| --- | --- |
+| All 8 tables present with the expected column counts | pass |
+| Rows in every table | 0 |
+| RLS policies | 23 — select/insert on `fleet_snapshots`, select/insert/update on the other seven, **no delete anywhere** |
+| `keep_newest_write` triggers | 7, one per syncing table |
+| `down` / `on_down_sheet` / `down_sheet_ready` on `buses` | absent, as designed |
+
+Re-run those checks with the queries in "Checking the live project" at the end
+of this file. A table can exist with the wrong columns and `create table if not
+exists` will never correct it, so counting tables is not enough — check shapes.
+
+### A warning worth keeping
+
+Two Claude sessions were working on this at once and both wrote a schema. One of
+them misread the other's commits as Codex's, and part of the schema was applied
+from each. It came out consistent, but only because both were the same file, and
+it was verified rather than assumed.
+
+**Codex has not pushed to `main` since `8228c65` on 2026-08-29.** Check
+`git log --format="%h %an %s"` before believing otherwise; every commit after
+that one is Claude's. If a second session is active, agree who is writing to the
+database before either of you runs DDL.
 
 ## The decisions already made
 
@@ -115,16 +141,35 @@ The recovery snapshot (`pace-board-recovery-v1`) also stays local. It exists to
 undo the last bad write on *that* device within seconds; a network round trip is
 both slower and less reliable than the thing it protects against.
 
+## Checking the live project
+
+Paste into the Supabase SQL Editor. All read-only. Run each on its own — the
+editor shows the result of the last statement only, so two at once loses the
+first one's answer.
+
+Shapes, not just names. One row, expecting `ALL 8 TABLES MATCH`:
+
+```sql
+with expected(t,n) as (values ('fleet_snapshots',7),('buses',10),('bus_defects',17),('down_sheet_entries',20),('bus_lists',11),('bus_list_entries',14),('bus_list_templates',9),('shop_memory',12)), actual as (select table_name t, count(*) n from information_schema.columns where table_schema='public' group by table_name) select coalesce(string_agg(e.t||': expected '||e.n||' columns, found '||coalesce(a.n,0), '; '), 'ALL 8 TABLES MATCH') as result from expected e left join actual a on a.t=e.t where coalesce(a.n,0) <> e.n;
+```
+
+Emptiness, policies and triggers. One row, expecting `0`, `23`, `7`:
+
+```sql
+select (select count(*) from buses)+(select count(*) from bus_defects)+(select count(*) from down_sheet_entries)+(select count(*) from bus_lists)+(select count(*) from bus_list_entries)+(select count(*) from bus_list_templates)+(select count(*) from shop_memory)+(select count(*) from fleet_snapshots) as total_rows, (select count(*) from pg_policies where schemaname='public') as policies, (select count(*) from pg_trigger where tgname like '%keep_newest%') as triggers;
+```
+
 ## First steps for the next session
 
-1. Confirm the Supabase MCP tools are actually available before promising
-   anything — check that a Supabase tool appears, not just that the connector
-   says "connected".
-2. Read the project's connection details. Do not create a second project.
-3. Apply `0001` and `0002`, in order. Both are safe to run twice.
-4. Run Supabase's own linter and fix anything it flags before writing client
-   code.
-5. Only then start the client: sign-in in Settings, push on save, status line.
-   Pull comes after push is proven.
+The database is done. The work left is the client, and none of it has started.
+
+1. Run Supabase's own linter on the project and fix anything it flags.
+2. Build sign-in, in **Settings**, next to the export controls, as a one-time
+   "CONNECT TO SHOP CLOUD". Read "Sign-in with no internet" above first — the
+   login must never gate the board, and there is no OFFLINE/ONLINE switch.
+3. Push on save, with a status line that reports rather than asks. Prove push
+   before writing pull.
+4. Pull and merge after that, reusing the merge rules already shipped in
+   Versions 123 and 124 rather than inventing new ones.
 
 Nothing here touches the publishing flow. Codex publishes; Claude does not.
