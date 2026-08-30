@@ -2995,6 +2995,41 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
  assert.match(tsx,/\},\[buses,interval\]\)/);
 });
 
+test("no export hands the phone a link instead of a file",async()=>{
+ /* Reported off a phone: the Defect Log export "said blob", and the link shared
+    to the iPad came back not found. It was a bare anchor download — on iOS
+    Safari, and a Home Screen app especially, clicking a blob link is navigation
+    rather than a download. The page opens with blob:https://<site>/<uuid> in the
+    address bar, sharing it shares the URL rather than the file, and a blob URL
+    is scoped to the session that made it, so on the other device it resolves to
+    https://<site>/<uuid> and 404s. It could never have worked. */
+ const helper=await readFile(new URL("../app/share-file.ts",import.meta.url),"utf8");
+ // the share sheet first, guarded, because share() with files it will not take
+ // is its own failure
+ assert.match(helper,/navigator\.canShare\?\.\(\{files:\[file\]\}\)/);
+ assert.match(helper,/await navigator\.share\(\{title,files:\[file\]\}\)/);
+ // dismissing the sheet is a decision, not a reason to download instead
+ assert.match(helper,/AbortError.*return "cancelled"/);
+ // and the fallback anchor is in the document before it is clicked
+ assert.match(helper,/document\.body\.appendChild\(link\);\s*link\.click\(\)/);
+
+ /* Every export goes through it. Four hand-rolled copies of this existed and
+    only two of them had the share sheet, which is how one section worked on a
+    phone and the next one did not. */
+ const sources=await Promise.all([
+  ["Defect Log report","../app/defect-log/page.tsx"],
+  ["Fixed Repairs report","../app/fixed-repairs/page.tsx"],
+  ["Fleet Campaigns report","../app/lists/page.tsx"],
+  ["full backup","../app/fleet-backup.ts"],
+  ["section transfers","../app/section-transfer-controls.tsx"],
+ ].map(async([label,path])=>[label,await readFile(new URL(path,import.meta.url),"utf8")]));
+ for(const [label,source] of sources){
+  assert.match(source,/shareOrDownloadFile/,label+" must deliver its file through the shared helper");
+  assert.ok(!/link\.download=/.test(source),label+" must not build its own download link: that is the bug");
+  assert.ok(!/createObjectURL\(blob\)/.test(source),label+" must not make its own blob URL");
+ }
+});
+
 test("it does not matter which section is moved first",()=>{
  /* Curtis asked whether moving the map before the Down Sheet still lands right,
     or whether the order is only a recommendation. It should not matter, and it

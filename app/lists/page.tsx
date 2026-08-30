@@ -6,6 +6,7 @@ import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
 import type {WorkTimeBus} from "../work-time";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
+import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
@@ -128,10 +129,7 @@ export default function Lists(){
  const downloadList=()=>{
   if(!open)return;
   const blob=new Blob([exportText],{type:"text/plain;charset=utf-8"});
-  const url=URL.createObjectURL(blob),link=document.createElement("a");
-  link.href=url;link.download=open.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".txt";
-  document.body.appendChild(link);link.click();link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  void shareOrDownloadFile(blob,open.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".txt",open.name+" report");
  };
 
  return <main className="lists-app">
