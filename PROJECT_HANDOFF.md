@@ -4,8 +4,8 @@ Updated: 2026-08-27
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 123
-Live feature checkpoint: commit f154686
+Live release: Sites Version 124
+Live feature checkpoint: commit 39a7275
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 123 is the current user-approved live release. Its validated source checkpoint is commit f154686. The Defect Log, Down Sheet, and Fleet Map can now transfer independently between devices and merge without replacing unrelated sections; transfer order no longer affects DS badges. Whole-board controls now read ALL DATA, non-restorable exports are labeled as reports, the backup reminder is one card with a settable cadence, and the phone Facility Map keeps SERVICE DETAIL AREA visible above IN SERVICE / ON ROAD. Existing LocalStorage keys and stored records remain compatible.
+Version 124 is the current user-approved live release. Its validated source checkpoint is commit 39a7275. Every export now sends a real file through the device share sheet instead of exposing a temporary blob link; FIXED TODAY remains in the Defect Log summary grid at all widths; and the Facility Map command bar consolidates the four destinations into an on-screen PAGES menu with 44px rows. These were functional defects at computer widths as well as phone and iPad widths. No LocalStorage key, stored record, file format, or payload changed.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 123 production build, lint gate, and all 128 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
+The Version 124 production build, lint gate, and all 131 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-29.
 
 ## Repository and remotes
 
