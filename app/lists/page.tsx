@@ -5,6 +5,7 @@ import "./lists.css";
 import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
 import type {WorkTimeBus} from "../work-time";
+import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
@@ -249,7 +250,7 @@ export default function Lists(){
      <pre className="list-export-preview" aria-label="Export preview">{exportText}</pre>
      <div className="list-export-actions">
       <button type="button" className="copy-list" onClick={copyList}>{copyStatus||"COPY"}</button>
-      <button type="button" onClick={downloadList}>DOWNLOAD .TXT</button>
+      <button type="button" onClick={downloadList} title={REPORT_EXPORT_HINT}>DOWNLOAD REPORT (.TXT)</button>
      </div>
     </div>
    </div>:<div className="list-detail placeholder"><p>Pick a list on the left, or create one.</p></div>}

@@ -2952,6 +2952,38 @@ test("dash lights are named as reported, and the start rename does not invert hi
  assert.deepEqual(recallFindings(learned,"Engine","Check engine light").map(entry=>entry.finding),["chafed pin 3"]);
 });
 
+test("only the button that writes a restorable file is called a backup",async()=>{
+ /* Four buttons in this app write a file and only one of them can be read back
+    in. They used to read as variations on the same idea — EXPORT LOG next to
+    EXPORT / SHARE BACKUP — and the difference only surfaces on the day somebody
+    tries to restore a phone from the wrong one. */
+ const [log,fixed,lists,map,backup]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+ ]);
+
+ // Each report says REPORT on its face, and none of them says BACKUP.
+ assert.match(log,/onClick=\{exportLog\}[^>]*>EXPORT LOG REPORT</);
+ assert.match(fixed,/onClick=\{exportHistory\}[^>]*>EXPORT HISTORY REPORT</);
+ assert.match(lists,/onClick=\{downloadList\}[^>]*>DOWNLOAD REPORT \(\.TXT\)</);
+ for(const [name,source,handler] of [["Defect Log",log,"exportLog"],["Fixed Repairs",fixed,"exportHistory"],["Fleet Campaigns",lists,"downloadList"]]){
+  const label=source.match(new RegExp("onClick=\\{"+handler+"\\}[^>]*>([^<]+)<"))[1];
+  assert.ok(/REPORT/.test(label),name+" export must say REPORT: "+label);
+  assert.ok(!/BACKUP/i.test(label),name+" export must not say BACKUP: "+label);
+  // and each carries the long version, from one shared string so the three
+  // can never drift into describing the same limitation three different ways
+  assert.match(source,new RegExp("onClick=\\{"+handler+"\\}[^>]*title=\\{REPORT_EXPORT_HINT\\}"),name+" is missing the shared hint");
+ }
+ assert.match(backup,/REPORT_EXPORT_HINT="Report only[^"]*cannot be imported back/);
+
+ // The real one keeps the word, and it is the only button that has it.
+ assert.match(map,/onClick=\{exportBoard\}>EXPORT \/ SHARE BACKUP</);
+ assert.equal((log+fixed+lists).match(/>[^<]*BACKUP[^<]*<\/button>/gi),null);
+});
+
 test("the operator blower and the mirror switches land in both structures a grouped category needs",()=>{
  // The driver's own blower is not the cabin one, and "Blower motor" could not
  // say which was out.
