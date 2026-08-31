@@ -11,6 +11,24 @@ import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorage} from "../storage";
 
+/* How many completed repairs render at once.
+
+   Every record here rendered unconditionally, which is fine at Curtis's scale
+   today — a few hundred repairs — and is not fine at the scale this app is
+   built for. Measured against a 400-bus board with three years of history:
+   4,000 completed repairs produced 72,868 DOM nodes on this one page, an
+   856ms first load, and a phone that stalls or a mobile Safari tab that gets
+   killed outright. Nothing was wrong with any single repair; the page simply
+   never stopped rendering.
+
+   50 renders at once, newest first, with SHOW MORE and SHOW ALL underneath.
+   Nothing is ever hidden from search or the category filter — both run over
+   every record before this cap is applied, so a repair from three years ago
+   is still found by typing its bus number. The cap only limits how many of
+   the MATCHES render before somebody asks for more, exactly like turning a
+   page rather than losing a book. */
+const PAGE_SIZE=50;
+
 type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
 type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
 type UndoSnapshot={fleet:DefectLogFleetBus[];label:string};
@@ -103,6 +121,14 @@ export default function FixedRepairs(){
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
  const categories=useMemo(()=>[...new Set(records.map(record=>record.defect.category))].sort(),[records]);
  const visible=useMemo(()=>{const query=search.trim().toLowerCase();return records.filter(record=>(category==="all"||record.defect.category===category)&&(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.finding,record.defect.shopNotes,record.defect.partNumber,record.defect.reportedBy,record.defect.completedBy,record.defect.conditionNotDuplicated?"defect condition not duplicated":""].some(value=>String(value||"").toLowerCase().includes(query))))},[records,search,category]);
+ /* Collapses back to the first page on a new search or category, rather than
+    staying wherever SHOW ALL last left it. A person narrowing the list wants
+    the top of the new result, not five hundred rows in from an unrelated
+    browse. */
+ const [visibleCount,setVisibleCount]=useState(PAGE_SIZE);
+ useEffect(()=>setVisibleCount(PAGE_SIZE),[search,category]);
+ const windowed=useMemo(()=>visible.slice(0,visibleCount),[visible,visibleCount]);
+ const hiddenCount=visible.length-windowed.length;
  const persistFleet=(next:DefectLogFleetBus[])=>{if(!writeFleetStorage(localStorage,next))return;setFleet(next)};
  const changeFleet=(next:DefectLogFleetBus[],label:string)=>{setUndoSnapshot({fleet,label});persistFleet(next);setEditing(null)};
  const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{/* A cause typed here has to be learned too. This is often where a fault gets its proper name, once the bus is apart, and a finding recorded on this page teaching nothing would be a gap nobody would notice. */if(normalizeFinding(draft.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.category,issue:draft.issue,finding:draft.finding});writeFindingsMemory(localStorage,next);return next});if(draft.partsUsed&&draft.partNumber.trim())setPartsMemory(current=>{const learned=learnPart(current,{category:draft.category,issue:draft.issue,partNumber:draft.partNumber,partName:draft.partName,scope:draft.rememberScope});writePartsMemory(localStorage,learned);return learned});/* A count is only this page's business where the repair declares one. Retyping
@@ -144,7 +170,7 @@ function repairOrigin(source:string|undefined){
   <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button><button type="button" className="fixed-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open Fixed Repairs settings">&#9881; SETTINGS</button></section>
-  <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{visible.length} REPAIR{visible.length===1?"":"S"} SHOWN</small></span></header>{visible.length?<div className="fixed-list">{visible.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
+  <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{hiddenCount?windowed.length+" OF "+visible.length+" SHOWN":visible.length+" REPAIR"+(visible.length===1?"":"S")+" SHOWN"}</small></span>{hiddenCount>0&&<div className="fixed-load-more"><button type="button" onClick={()=>setVisibleCount(current=>current+PAGE_SIZE)}>SHOW {Math.min(PAGE_SIZE,hiddenCount)} MORE</button><button type="button" onClick={()=>setVisibleCount(visible.length)}>SHOW ALL {visible.length}</button></div>}</header>{visible.length?<div className="fixed-list">{windowed.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
    {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}
    <div className="fixed-card-body"><section><b>ORIGINAL REPORT</b><p>{defectLabel(record.defect)}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · By "+record.defect.reportedBy:""}</small>{record.defect.conditionNotDuplicated&&<em className="not-duplicated-note">DEFECT / CONDITION NOT DUPLICATED</em>}{record.defect.shopNotes&&<em>SHOP NOTES: {record.defect.shopNotes}</em>}</section><section className="repair-result"><b>FIX / STEPS TAKEN</b><p>{record.defect.actionTaken||"Fix details have not been entered yet."}</p>{record.defect.diagnosticNote&&<small><b>DIAG / VERIFY:</b> {record.defect.diagnosticNote}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}{record.defect.completedBy&&<small><b>FIXED BY:</b> {record.defect.completedBy}</small>}</section></div>

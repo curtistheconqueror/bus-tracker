@@ -6197,3 +6197,62 @@ test("a stored outline colour cannot inject anything into the style attribute",a
   assert.equal(safeBorderColor(bad),"","must reject "+String(bad));
  assert.equal(safeBorderColor("  #9ea6b4  "),"#9ea6b4","surrounding space is trimmed, not rejected");
 });
+
+test("Fixed Repairs windows the render instead of drawing every completed repair at once",async()=>{
+ const [fixedPage,fixedCss]=await Promise.all([
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+
+ // THE PROBLEM, measured rather than assumed. A 400-bus board with three
+ // years of history — the same worst case this project already measures
+ // elsewhere — puts 4,000 completed repairs on this one page. Rendered
+ // unconditionally that was 120,068 DOM nodes and 6.7 seconds to hydrate,
+ // measured against this exact codebase before this change, not estimated.
+ assert.match(fixedPage,/const PAGE_SIZE=50;/);
+
+ // The cap is on RENDERING, never on what a search or a category filter can
+ // find. `visible` is the full filtered set; `windowed` is what actually
+ // draws. Rendering `visible` directly anywhere would put the 120k-node
+ // failure right back — the whole point of the constant above.
+ assert.doesNotMatch(fixedPage,/visible\.map\(record=></);
+ assert.match(fixedPage,/const windowed=useMemo\(\(\)=>visible\.slice\(0,visibleCount\)/);
+ assert.match(fixedPage,/windowed\.map\(record=></);
+
+ // A new search or category collapses back to the first page rather than
+ // staying wherever a previous SHOW ALL left it — a person narrowing the list
+ // wants the top of the new result, not five hundred rows into an old browse.
+ assert.match(fixedPage,/useEffect\(\(\)=>setVisibleCount\(PAGE_SIZE\),\[search,category\]\)/);
+
+ // The count line is honest about what is capped and what is not: it says
+ // "OF" only once something is actually hidden, and reads as a plain count
+ // otherwise — the exact wording used before this change, on an unwindowed
+ // board, so a small fleet sees nothing different.
+ assert.match(fixedPage,/hiddenCount\?windowed\.length\+" OF "\+visible\.length\+" SHOWN"/);
+ assert.match(fixedPage,/visible\.length\+" REPAIR"\+\(visible\.length===1\?"":"S"\)\+" SHOWN"/);
+
+ // SHOW MORE advances by one page; SHOW ALL reveals everything rather than
+ // some safer-looking partial amount — nothing is ever unreachable, only
+ // deferred until asked for.
+ assert.match(fixedPage,/setVisibleCount\(current=>current\+PAGE_SIZE\)/);
+ assert.match(fixedPage,/setVisibleCount\(visible\.length\)/);
+ assert.match(fixedPage,/SHOW \{Math\.min\(PAGE_SIZE,hiddenCount\)\} MORE/);
+ assert.match(fixedPage,/SHOW ALL \{visible\.length\}/);
+
+ // Stats, the category dropdown and the export all read from the full
+ // `records`, never from the windowed slice — a rendering cap must not
+ // quietly become a reporting cap.
+ assert.match(fixedPage,/stats=\{total:records\.length/);
+ assert.match(fixedPage,/const categories=useMemo\(\(\)=>\[\.\.\.new Set\(records\.map/);
+ assert.match(fixedPage,/records:records\.map\(\(\{bus,defect\}\)=>/);
+
+ // THE REGRESSION THIS FILE EXISTS TO CATCH. globals.css gives every bare
+ // <header> a fixed height:38px — the same shape of bug already found once
+ // this session in the Defect Log's part-prompt. min-height alone only
+ // clamps that up as a floor: the box stayed a FIXED length, and the second
+ // row from SHOW MORE / SHOW ALL wrapping overflowed silently below it
+ // instead of growing it, measured directly — the header reported exactly
+ // 54px tall with a button row rendering 37.5px past its own bottom edge.
+ // height:auto is what lets flex-wrap size the box to its real content.
+ assert.match(fixedCss,/\.fixed-feed>header\{height:auto;min-height:54px;[^}]*flex-wrap:wrap/);
+});
