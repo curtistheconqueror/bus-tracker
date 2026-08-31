@@ -18,7 +18,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 101 | Previous live | f730ecd | Dated actual odometer readings on every bus, append-only reading history, current-reading summary, and phone-friendly entry controls |
 | 102 | Previous live | 4f0315b | Bulk-loss safety stops for defects and bus records, a last-known-good device recovery copy, and full-board export reminders after every 20 new Defect Log entries |
 | 103 | Previous live | f4628f7 | Estimated operating mileage at 275 miles per day, pause/resume checkpoints, and inspection readiness at 3,000 miles or 10 days |
-| 127 | Live | 831b753 | Offline-first Shop Cloud sync for map, defects, and Down Sheet; direct section-title drops; and Mystery Bus location controls that preserve repair and membership data |
+| 128 | Live | c1101bd | Six Shop Cloud fixes including reliable nested-field change detection; OFF PROPERTY, Down Sheet relocation, persistent selected status, collapsed-section locating, Completed Today, Fixed Repair origin bands, and optional Defect Log status colour |
+| 127 | Previous live | 831b753 | Offline-first Shop Cloud sync for map, defects, and Down Sheet; direct section-title drops; and Mystery Bus location controls that preserve repair and membership data |
 | 126 | Previous live | 8e68f69 | Stronger Defect Log bus-group boundaries, expanded-group shading, clearer nested repairs, and a reversible Standard or Strong separation setting across phone, iPad, and desktop |
 | 125 | Previous live | 135a49a | Both curbside mirror switches are named precisely; phone DS badges and roadcall dots stay visible inside centered bus markers |
 | 124 | Previous live | 39a7275 | Exports share real files instead of temporary blob links; FIXED TODAY stays in the summary grid; four destinations move into an on-screen PAGES menu |

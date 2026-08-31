@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 128 is validated and awaiting publication approval.**
+**STATUS: NONE PENDING — Sites Version 128 was published from c1101bdab9d201602329297bcca6b3f2610c1263 on 2026-08-31.**
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
