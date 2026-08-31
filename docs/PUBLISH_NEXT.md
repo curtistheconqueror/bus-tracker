@@ -490,17 +490,28 @@ Suggested `docs/RELEASES.md` row:
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 130, published from `5fc8436` |
 
-Everything this release contains:
+The application change is two files:
 
 ```
-git diff --name-only 5fc8436 d1d2e76
+git diff --name-only 5fc8436 d1d2e76 -- app tests package.json package-lock.json public supabase
 ```
-
-Two files:
 
 ```
 app/repair-catalog.ts
 tests/rendered-html.test.mjs
+```
+
+The unfiltered range also lists `PROJECT_HANDOFF.md`, `README.md`,
+`docs/RELEASES.md` and this file. Those are **Codex's own Version 129 release
+record** (`3f45b10`) plus the Version 130 handoff (`7dc9d89`), which sit between
+the two SHAs because 130 was written before 129 was published. They ship
+nothing. The three commits in the range are:
+
+```
+git log --oneline 5fc8436..d1d2e76
+d1d2e76 Bus Accessories for the bike rack, and name which start button is broken
+3f45b10 Record Sites Version 129 release
+7dc9d89 Queue the Version 130 handoff behind 129
 ```
 
 Gate: 156 tests passing, ESLint clean, production build succeeds.
