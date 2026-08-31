@@ -1,11 +1,24 @@
 # Publish next
 
-**STATUS: PENDING — Sites Version 129, two changes on `main` since Version 128.**
+**STATUS: PENDING — two releases are queued, each frozen to its own SHA.**
 
-This file always describes the next unpublished release, and it lives at this
-exact path on `main` so nobody has to be told where to look. Curtis approves a
-release by pointing Codex at this file rather than pasting a summary out of a
-chat window.
+| Order | Version | Publish from | What it is |
+| --- | --- | --- | --- |
+| 1st | **129** | `24a02a9` | Send-before-receive in the shop cloud; readable shared filter lists |
+| 2nd | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
+
+**Publish 129 first, then 130.** They are independent and 130 contains 129, so
+publishing 130 alone would also be correct — but 129 is already approved and its
+sync fix is the urgent one. Do not merge them into a single version number.
+
+Both sections below are complete handoffs. Version 129 is unchanged from the one
+already approved; Version 130 was added afterwards and is what all the extra
+commits on `main` are.
+
+This file always describes the unpublished releases, and it lives at this exact
+path on `main` so nobody has to be told where to look. Curtis approves a release
+by pointing Codex at this file rather than pasting a summary out of a chat
+window.
 
 - **Claude Code** keeps this file current with every push to `main`: the source
   commit, what changed, any migration, and what to check once it is live. Claude
@@ -49,10 +62,9 @@ what to check once it is live.
 > git log --oneline 24a02a9..origin/main
 > ```
 >
-> Documentation-only commits after `24a02a9` change nothing that ships. If that
-> range contains anything under `app/`, `public/`, `supabase/` or
-> `package.json`, it belongs to **Version 130**, which will arrive with its own
-> handoff — publish `24a02a9` and leave it.
+> Documentation-only commits after `24a02a9` change nothing that ships. The
+> application code in that range belongs to **Version 130**, whose handoff is
+> the second half of this file — publish `24a02a9` for 129 and leave it.
 
 Confirm what this release contains — every command pinned to the two SHAs, so
 the answers do not change as `main` moves:
@@ -195,9 +207,9 @@ Change 2 collapses identical lines *in a shared list*. It does not touch stored
 records, and the underlying duplicates still inflate defect counts on the board.
 
 Fixing it at the source — scan matching recognising a repair it has already
-seen — **is authorised and is being built now, for Version 130.** It touches
-repair records, so it gets its own release, its own validation and its own
-checks rather than riding along under a handoff already approved for
+seen — **is Version 130, whose handoff is the second half of this file.** It
+touches repair records, so it gets its own release, its own validation and its
+own checks rather than riding along under a handoff already approved for
 publication.
 
 Publishing 129 neither helps nor worsens this, and does not need to wait for it.
@@ -268,4 +280,194 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 129 | Live | <published tip hash> | GET THE SHOP'S COPY now sends this device's work before merging the shop's copy in, and refuses to merge if that send failed; shared Quick Filter lists collapse repeated defect lines, space each bus apart and carry its location, and can be sent as a self-contained page that renders offline |
+```
+
+---
+---
+
+# Version 130 — One repair, one record
+
+**Publish this SECOND, after Version 129 is live.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`5fc8436`** |
+| Last code-bearing commit | `5fc8436` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 129, published from `24a02a9` |
+
+Frozen to a SHA for the same reason 129 is: work continues on `main` while a
+release waits for approval, and a handoff that says "the current tip" stops
+being true the moment the next commit lands.
+
+Everything this release contains:
+
+```
+git diff --name-only 24a02a9 5fc8436
+```
+
+Nine application files plus this handoff:
+
+```
+app/cloud-client.ts            app/defect-log/page.tsx
+app/cloud-sync-control.tsx     app/down-sheet/down-sheet-sync.ts
+app/cloud-sync.ts              app/down-sheet/page.tsx
+app/defect-log/defect-log.css  app/duplicate-defects.ts   (new)
+tests/rendered-html.test.mjs
+```
+
+Gate: 155 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**No database migration.** `supabase/` and both package files are untouched:
+
+```
+git diff --name-only 24a02a9 5fc8436 -- supabase package.json package-lock.json   # returns nothing
+```
+
+**One new LocalStorage key**, additive: `pace-cloud-merged-v1`. Nothing existing
+is renamed, removed or rewritten. See Data safety.
+
+## What changed
+
+### One repair is recorded once — `5fc8436`
+
+**The problem, measured rather than assumed.** The shop's live board carries 328
+open defects, and **25 of them say nothing the record beside them does not
+already say**, across **21 buses**. Confirmed by querying the live database on
+31 August: three Down Sheet photos, taken on 22, 23 and 27 August.
+
+**The cause is identity.** A defect is keyed on the sheet entry that carried it
+in, and a rescan of the same paper sheet mints a fresh entry id from the clock.
+A bus that comes off the sheet and back on — or is simply photographed again
+days later — arrives under an id nothing on the bus matches, so the identical
+fault is recorded again. Two of the 21 are not scans at all: they were typed
+into the Defect Log by hand, days apart, past the 48-hour duplicate guard.
+
+This is not cosmetic. Defect counts drive what a foreman looks at first, the
+shared lists that go out to the crew, and every "how many are down" number.
+
+**Prevention — the half that matters most.** A scan now looks for an unresolved
+record on that bus saying exactly the same thing, and writes to it instead of
+minting a second. Every one of the 25 would have been prevented by this. Only
+exact repeats match — same category, symptom and details — so a genuinely
+different fault on the same bus is still its own record.
+
+**Cleanup for what is already there.** A **MERGE DUPES** button in the Defect
+Log action bar, carrying a count, so a tidy board says so without being pressed
+and the button is disabled when there is nothing to do. It is explicit and
+pressed by a person, never automatic on load: everything else that runs at read
+time rearranges what is *shown*, while this changes stored repair records. It
+lands on **UNDO LAST** like every other change there.
+
+**Nothing is lost.** Every field a copy holds and the survivor does not is folded
+in, symptoms are unioned, the **earliest** creation stamp wins because that is
+when the fault was first seen, and the **most severe** operability wins so a
+merge can never quietly put a bus back in service. Records that say nothing at
+all are deliberately left alone: two untyped defects are indistinguishable, but
+that is not evidence they are the same fault.
+
+### Two failure modes found by testing, not by reading
+
+Both would have made the cleanup visibly useless, and both are worth knowing
+about because they explain why this release touches the sync client.
+
+**1. The sheet would have re-created the duplicates.** Replaying all 21 groups
+against the live board showed **11 buses** where an entry still open on the
+sheet regenerates the record on its next save: the entry names no defect, so it
+mints one from its own id, and the same sentence lands under a new id within a
+shift. Those entries are now pointed at the survivor. For the same reason,
+survivor choice is not simply "keep the oldest" — where an entry is still on the
+sheet, the record *it* regenerates has to be the one kept, which on four buses
+is the newest copy.
+
+**2. The shop cloud would have undone all of it on the next sync.** A push only
+sends what a bus still carries, so a folded record is not deleted anywhere: it
+stays live on the server, the next **GET THE SHOP'S COPY** reads it back, and
+the merge takes incoming records it does not have. All 25 would have returned,
+on the very device that ran the cleanup. There is now a ledger of what was
+merged away — this device refuses those records on the way in, and tombstones
+them on the way out so other devices stop being sent them.
+
+## Known limitation
+
+**The cleanup does not propagate to other devices by itself.** Tombstoning
+removes the records from the server, so no device is *sent* them again, but a
+second device that already holds its own copies keeps showing them until
+somebody presses MERGE DUPES there too. The button carries a count on every
+device, so it is visible rather than hidden.
+
+This is a property of the existing sync design — it has never propagated
+removals of any kind — not something this release introduces. Prevention means
+no new duplicates are created on any device, so this is a one-time tidy per
+device rather than an ongoing chore.
+
+## Data safety
+
+- **Nothing is deleted.** Duplicates are folded into one record that keeps every
+  field any copy held.
+- **No LocalStorage key renamed or removed.** One new additive key,
+  `pace-cloud-merged-v1`, holding the ids this device merged away and when.
+  Absent on a device that has never merged, and the code treats absent as empty.
+- **A record the board still carries is never tombstoned**, whatever the ledger
+  says. That is what keeps UNDO LAST safe, and it means a stale ledger entry can
+  never delete a live repair.
+- **The merge never crosses buses**, and never folds a completed record into an
+  open one.
+- **The scan adoption is exact-match only.** It will not attach a scan to a
+  differently-worded record.
+
+## Validation
+
+- 155 regression tests passed, up from 153 at Version 129
+- ESLint passed; production build passed
+- **Replayed against the live board**: all 21 duplicate groups reconstructed
+  from the shop's database with their real Down Sheet entries. Result: **25
+  records merged across 21 buses, 4 groups anchored by the sheet, 0 resurrected
+  when every still-active entry was replayed** — matching what Postgres reports
+  independently for the same board
+- The 11-bus resurrection bug and the sync-resurrection bug were each caught by
+  that replay, reproduced, fixed, and pinned with their own regression tests
+- Measured in Chromium at 390px and 1440px: the count renders and the button
+  disables when the board is clean, the action bar wraps without overlap on a
+  phone, the survivor keeps its first-seen date and severity, UNDO LAST arms
+  with the right label, and the ledger is written to storage
+
+## After it is live
+
+1. **Defect Log** — confirm a **MERGE DUPES** button sits beside CLEAN UP. On
+   Curtis's board it should read **MERGE DUPES (25)**.
+2. Press it. The confirmation should name 25 records on 21 buses. Accept, and
+   confirm the button goes grey and reads **MERGE DUPES** with no count.
+3. Spot-check **bus 17543**: it should now show its overheat once, and the
+   record should still be dated **22 August**, not today.
+4. Spot-check **bus 17504, 17541, 17562 or 17567** — each had three copies and
+   is still on the Down Sheet. Confirm one record remains and the bus still
+   reads Out of Service.
+5. Press **UNDO LAST** and confirm the duplicates come back, then press MERGE
+   DUPES again.
+6. **Open the Down Sheet and save any entry for one of those buses.** Confirm no
+   duplicate reappears — this is the check that the sheet is pointed at the
+   surviving record.
+7. **Settings → SHOP CLOUD → SEND MY CHANGES**, then **GET THE SHOP'S COPY**.
+   Confirm the merged records do **not** come back. This is the check that
+   matters most; without it the cleanup would silently undo itself.
+8. On a second connected device, confirm MERGE DUPES shows its own count and
+   works there too.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 130 | Live | <published tip hash> | One repair is recorded once: sheet photo scans write to the record a bus already carries instead of minting a second, and a MERGE DUPES action folds existing exact repeats together keeping every field, the earliest reported date and the most severe status; merged records are tombstoned so the shop cloud cannot resurrect them |
 ```
