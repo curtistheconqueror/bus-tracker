@@ -76,7 +76,7 @@ export default function CloudSyncControl(){
     from it cannot send refused work. */
  const push=useCallback(async(quiet:boolean)=>{
   const saved=readCloudConfig(localStorage);
-  if(cloudConfigProblem(saved)||running.current)return;
+  if(cloudConfigProblem(saved)||running.current)return false;
   running.current=true;
   if(!quiet)remember({...readCloudState(localStorage),phase:"syncing",lastError:""});
   const fleet=readFleetStorage<Record<string,unknown>>(localStorage);
@@ -97,6 +97,7 @@ export default function CloudSyncControl(){
    pending:result.pending,
   });
   running.current=false;
+  return result.ok;
  },[]);
 
  /* A sweep rather than a hook into every save. Each pass sends only what
@@ -153,6 +154,26 @@ export default function CloudSyncControl(){
   if(!confirm("Bring down the shop's copy and merge it into this device? Nothing on this device is deleted."))return;
   setBusy(true);
   remember({...state,phase:"syncing",lastError:""});
+  /* Send before receiving, and do not receive if sending failed.
+
+     A merge takes the incoming copy for a bus both devices know. So a person
+     who moves five buses and presses this inside the 45-second window before
+     their own sweep has run would have had the server's older copy laid over
+     the top of their work — and the next sweep would then have pushed that
+     overwritten version up as though it were the truth. Five moves gone, with
+     nothing on screen to say so.
+
+     Pushing first means the server already holds those moves, stamped later
+     than anything else, so what comes back down includes them. It is what
+     makes "work as long as you like, then refresh, and you are caught up"
+     actually true rather than nearly true. */
+  if(!await push(true)){
+   setBusy(false);
+   /* push has already written the offline or error phase, so the status line
+      is telling the truth and there is nothing to restore here. */
+   alert("This device's own changes could not be sent, so nothing was brought down. Bringing the shop's copy in now could overwrite work that has not left this device yet. Try again when it reconnects.");
+   return;
+  }
   const result=await cloudPull(saved,new Date().toISOString());
   setBusy(false);
   if(!result.ok||!result.map||!result.defects||!result.sheet){

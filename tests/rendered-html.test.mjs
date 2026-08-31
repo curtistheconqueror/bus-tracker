@@ -5598,3 +5598,30 @@ test("OFF PROPERTY holds buses away at a vendor and nobody is stranded by it",as
   assert.ok(!at.startsWith("offsite-"),id+" was reclassified as being at a vendor");
  }
 });
+
+test("bringing the shop's copy down sends this device's work first",async()=>{
+ const control=await readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8");
+ const pull=control.slice(control.indexOf("const pull=async"),control.indexOf("const set=(key:keyof CloudConfig)"));
+ assert.ok(pull,"the pull handler should be findable");
+
+ // A merge takes the incoming copy for a bus both devices know. Move five buses
+ // and press this inside the 45-second window before the sweep has run, and the
+ // server's older copy would be laid over the top of that work — then the next
+ // sweep would push the overwritten version up as though it were the truth.
+ // Pushing first means the server already holds those moves, stamped later than
+ // anything else, so what comes back down includes them.
+ const sendAt=pull.indexOf("await push(true)");
+ const receiveAt=pull.indexOf("await cloudPull(");
+ assert.ok(sendAt>=0,"pull must send this device's changes first");
+ assert.ok(receiveAt>=0,"pull must then receive");
+ assert.ok(sendAt<receiveAt,"the send has to happen before the receive, not after");
+
+ // And it must not receive at all if the send failed, or the merge would
+ // overwrite work that never left this device.
+ assert.match(pull,/if\(!await push\(true\)\)\{[\s\S]{0,400}?return;\s*\}/);
+
+ // push reports whether the work is safely up rather than returning nothing.
+ const push=control.slice(control.indexOf("const push=useCallback"),control.indexOf("const pull=async"));
+ assert.match(push,/return result\.ok;/);
+ assert.match(push,/running\.current\)return false;/);
+});
