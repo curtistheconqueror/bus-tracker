@@ -1364,7 +1364,10 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose a Fire Suppression status or defect");
   assert.equal(repairIssuePlaceholder("Amerex", "CNG"), "Choose a CNG status or defect");
   assert.equal(repairGroupStepLabel("Bus Controls"), "CHOOSE THE GROUP");
-  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 5 groups");
+  // Six since Bus Accessories was added for the bike rack; this counted five
+  // before. The placeholder is generated from the group list rather than
+  // written out, so the number moving is exactly what the assertion is for.
+  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 6 groups");
   assert.equal(repairIssueStepLabel("Bus Controls"), "CHOOSE THE DEFECT");
   assert.equal(repairIssuePlaceholder("Bus Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
   // An ungrouped category never reaches step 2, but the helper must not throw.
@@ -5881,4 +5884,73 @@ test("a merge survives the shop cloud instead of being undone by it",async()=>{
   issue:"Overheating",details:"",state:"open",operability:"down",detail:{}}],"2026-08-31T12:00:00.000Z");
  assert.ok(Array.isArray(payload.buses),"the pull payload must expose buses for the filter to walk");
  assert.equal(withoutMergedAway(payload,{d1:"2026-08-31T12:00:00.000Z"}).buses[0].defects.length,0);
+});
+
+test("bus accessories and the two start buttons land in both catalog structures",()=>{
+ // THE GENERAL INVARIANT, which until now was only spot-checked on the two
+ // mirror switches. A grouped category stores "Group - Issue" in REPAIR_OPTIONS
+ // and draws the bare issue from REPAIR_OPTION_GROUPS. Adding an entry to one
+ // and not the other gives a picker option that stores something the catalog
+ // does not know, or a stored value nobody can choose — and neither shows up
+ // until somebody is standing at a bus. Adding a whole new group is exactly
+ // when this breaks, so it is asserted for every grouped category rather than
+ // for the entries this change happens to add.
+ for(const [category,groups] of Object.entries(REPAIR_OPTION_GROUPS)){
+  const expected=Object.entries(groups).flatMap(([group,items])=>items.map(issue=>group+" - "+issue));
+  assert.deepEqual(REPAIR_OPTIONS[category],expected,
+   category+": REPAIR_OPTIONS must be exactly the grouped entries, in the same order");
+ }
+
+ const controls=REPAIR_OPTION_GROUPS["Bus Controls"];
+
+ // A rack that comes back loose or missing an arm is a defect on a piece of
+ // equipment, not body work and not scheduled maintenance.
+ assert.deepEqual(controls["Bus Accessories"],
+  ["Bike rack - arm replacement","Bike rack - loose / pivots"]);
+ // The group is last, so the existing groups keep the order the shop knows.
+ const groupNames=Object.keys(controls);
+ assert.equal(groupNames[0],"Door, Ramp and Kneeler Failures");
+ assert.equal(groupNames[groupNames.length-1],"Bus Accessories");
+
+ // The two places a bike rack was already filed stay where they are: a bent
+ // rack really is the body shop's job, and the PM line really is scheduled
+ // work. This adds the reported-fault case rather than moving the other two.
+ assert.ok(REPAIR_OPTIONS["Bodywork"].includes("Bike rack - bent / replacement"));
+ assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
+
+ // Two buttons start the bus, so the picker names the station.
+ const operating=controls["Operating Controls"];
+ assert.ok(operating.includes("Front start button"));
+ assert.ok(operating.includes("Rear start button"));
+ assert.equal(operating.indexOf("Rear start button"),operating.indexOf("Front start button")+1);
+ // The ambiguous one is retired rather than renamed: nothing can say which
+ // button an old record meant, and guessing would relabel somebody's work.
+ assert.ok(!operating.includes("Start button"));
+
+ // Kept apart from the starting-system entries on purpose. Those say the bus
+ // will not start from that station; these say the button is broken while the
+ // other one still starts it.
+ const battery=REPAIR_OPTIONS["Battery, Starting and Charging"];
+ assert.ok(battery.includes("Front start INOP"));
+ assert.ok(battery.includes("Rear start INOP"));
+
+ // Neither downs a bus. A bus with one working start button still runs, and a
+ // loose bike rack is not a road failure.
+ for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button",
+                     "Bus Accessories - Bike rack - arm replacement","Bus Accessories - Bike rack - loose / pivots"])
+  assert.equal(defaultDefectOperability("Bus Controls",issue),"service",issue+" must not down a bus");
+
+ // Every new entry survives a round trip under its stored name.
+ for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button",
+                     "Bus Accessories - Bike rack - arm replacement","Bus Accessories - Bike rack - loose / pivots"]){
+  const [defect]=normalizeDefects([{id:"d",category:"Bus Controls",issue,details:"",state:"open",operability:"service"}]);
+  assert.equal(defect.issue,issue,issue+" must not be rewritten on read");
+ }
+
+ // A record already logged under the retired wording still reads as itself —
+ // including the very old bare form, which still lands in its group.
+ const [old]=normalizeDefects([{id:"d",category:"Bus Controls",issue:"Operating Controls - Start button",details:"",state:"open",operability:"service"}]);
+ assert.equal(old.issue,"Operating Controls - Start button");
+ const [bare]=migrateRepairIdentity("Bus Controls","Start button")?[{issue:migrateRepairIdentity("Bus Controls","Start button").issue}]:[];
+ assert.equal(bare.issue,"Operating Controls - Start button");
 });
