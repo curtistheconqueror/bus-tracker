@@ -5,12 +5,12 @@
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | 1st | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
-| 2nd | **131** | `8858e3f` | Three defects named: bike rack, which start button, and the IntelligAIRE III panel |
+| 2nd | **131** | `7fd647a` | Three defects named, four equal save buttons, and a part number asked for at the fix |
 
 **Version 129 was published from `24a02a9` on 2026-08-31.** Publish **130** next
-from `5fc8436`, then **131** from `8858e3f`.
+from `5fc8436`, then **131** from `7fd647a`.
 
-131 contains 130, so publishing `8858e3f` alone would deliver both correctly —
+131 contains 130, so publishing `7fd647a` alone would deliver both correctly —
 but they are separate releases with separate checks, and 130 carries the change
 that touches stored repair records. Do not merge them into one version number.
 
@@ -477,7 +477,7 @@ Suggested `docs/RELEASES.md` row:
 ---
 ---
 
-# Version 131 — Three defects that were hiding inside vaguer ones
+# Version 131 — Defects that were hiding inside vaguer ones, and a part number asked for at the fix
 
 **Publish this THIRD, after Version 130 is live.**
 
@@ -485,19 +485,21 @@ Suggested `docs/RELEASES.md` row:
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`8858e3f`** |
-| Last code-bearing commit | `8858e3f` — the release source is this commit |
+| **Release source** | **`7fd647a`** |
+| Last code-bearing commit | `7fd647a` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 130, published from `5fc8436` |
 
-The application change is two files:
+The application change is seven files:
 
 ```
-git diff --name-only 5fc8436 8858e3f -- app tests package.json package-lock.json public supabase
+git diff --name-only 5fc8436 7fd647a -- app tests package.json package-lock.json public supabase
 ```
 
 ```
-app/repair-catalog.ts
+app/cloud-sync.ts                    app/defect-log/page.tsx
+app/defect-log/defect-log.css        app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx           app/repair-catalog.ts
 tests/rendered-html.test.mjs
 ```
 
@@ -508,7 +510,9 @@ SHAs because 130 was written before 129 was published. They ship nothing. The
 commits in the range are:
 
 ```
-git log --oneline 5fc8436..8858e3f
+git log --oneline 5fc8436..7fd647a
+7fd647a Four equal buttons, and a part number asked for at the moment of the fix
+bad623b Fold the IntelligAIRE III entry into Version 131
 8858e3f Name the IntelligAIRE III panel in the A/C list
 d4ea70a Correct the Version 131 file list
 e9922c4 Queue the Version 131 handoff behind 130
@@ -517,7 +521,7 @@ d1d2e76 Bus Accessories for the bike rack, and name which start button is broken
 7dc9d89 Queue the Version 130 handoff behind 129
 ```
 
-Gate: 157 tests passing, ESLint clean, production build succeeds.
+Gate: 158 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -525,7 +529,7 @@ Gate: 157 tests passing, ESLint clean, production build succeeds.
 record rewritten.**
 
 ```
-git diff --name-only 5fc8436 8858e3f -- supabase package.json package-lock.json   # returns nothing
+git diff --name-only 5fc8436 7fd647a -- supabase package.json package-lock.json   # returns nothing
 ```
 
 This release only adds choices to the repair catalog. Every existing defect
@@ -615,7 +619,39 @@ only. Adding a `REPAIR_OPTION_GROUPS` entry would turn the whole category into a
 two-step picker for every other A/C defect; that is now asserted rather than
 left to be rediscovered.
 
-### 4. The catalog invariant is now asserted, not spot-checked
+### 4. Four equal save buttons, and a part number asked for at the fix
+
+**The button row is now a 2×2 with every button the same size.** SAVE UPDATE
+used to span the whole row on a phone while CLOSE and SAVE AS FIXED shared the
+one below it — which made the biggest, easiest target the button pressed least
+often, and put the one that *discards* where a thumb lands reaching for the one
+that *saves*. The order is **SAVE UPDATE, SAVE AS FIXED, SAVE FIXED W/ PART,
+CLOSE**, so CLOSE is the bottom right at every width. DOM order is tab order, so
+the keyboard walks them the same way.
+
+**SAVE FIXED W/ PART** is the new third button. It asks one question before
+saving, and offers two ways forward:
+
+- **SAVE WITH THIS PART** — the number is recorded, and remembered for next time
+  the same defect comes up, exactly as the PARTS USED field already does.
+- **ENTER LATER** — the repair still saves as fixed, recorded as *a part went on
+  and the number is outstanding*.
+
+Forcing a number would get a made-up one or an abandoned save. A mechanic often
+has the part in his hand with the number on the box, and sometimes the box is in
+the parts room and he is not walking back for it right now.
+
+**A repair saved that way carries `MISSING PART #` on its Fixed Repairs card**,
+in solid orange, until somebody fills the number in.
+
+**No new stored field.** PARTS USED ticked with the number left blank has always
+meant exactly this — the PART NUMBER box already says *"Leave blank if the number
+is unknown"* — but nothing ever surfaced it, so those records simply looked
+finished. One shared helper names the state so both pages agree, and it reads
+correctly on records written long before there was a button for it. **Not ticked
+still means no part was used**, which is a different fact and is never flagged.
+
+### 5. The catalog invariant is now asserted, not spot-checked
 
 A grouped category carries every entry twice: prefixed in `REPAIR_OPTIONS`,
 which is what gets **stored**, and bare in `REPAIR_OPTION_GROUPS`, which is what
@@ -633,10 +669,16 @@ It already held everywhere, order included.
 - **No record is orphaned.** The one retired picker entry has zero records on the
   live board, and any that exist elsewhere still read as logged.
 - **The bike rack entries in Bodywork and Preventive Maintenance are untouched.**
+- **No new field is stored for the part flow.** It uses `partsUsed` and
+  `partNumber`, both of which already exist, so existing records read correctly
+  and older builds ignore nothing.
+- **Existing records may start showing `MISSING PART #`** where PARTS USED was
+  ticked with the number left blank. That is not a change to the record — it is
+  the app finally saying what the record has always meant.
 
 ## Validation
 
-- 157 regression tests passed, up from 155 at Version 130
+- 158 regression tests passed, up from 155 at Version 130
 - ESLint passed; production build passed
 - The live board was queried before deciding how to treat the ambiguous entry:
   zero records use `Operating Controls - Start button`, and one open record uses
@@ -648,6 +690,18 @@ It already held everywhere, order included.
 - Also measured at 390px: the IntelligAIRE III entry draws in the flat A/C list
   in the right position, stores under its own name, and its label fits the
   control without clipping or pushing the page sideways
+- Measured at 390px and 1440px for the part flow: all four buttons render
+  179×56 in a 2×2 with CLOSE bottom right and no page overflow; the prompt opens
+  with its field focused and SAVE disabled until something is typed; ENTER LATER
+  stores `partsUsed` with an empty number and state `completed`; and the Fixed
+  Repairs card shows the orange badge without colliding with the card actions
+- Three defects were caught by the tests and the browser rather than by reading:
+  a bare `<header>` in the prompt that `globals.css` renders as a dark banner
+  (caught by the existing test for that exact failure), two footer badges
+  fighting over `margin-right:auto` and leaving a gap down the middle, and a
+  badge that shipped the same pale fill as the one beside it — where the first
+  correction changed only the text colour, because the phone breakpoint sets
+  that fill at equal specificity and wins on source order
 
 ## After it is live
 
@@ -670,6 +724,16 @@ It already held everywhere, order included.
    confirm it does not take the bus out of service.
 7. The same lists appear on the Down Sheet editor; confirm the new entries are
    there too.
+8. **Open any defect in the Defect Log.** Confirm the button block under BUS
+   AVAILABILITY is a 2×2 of equal buttons — SAVE, SAVE AS FIXED, SAVE FIXED W/
+   PART, CLOSE — with **CLOSE bottom right**.
+9. Press **SAVE FIXED W/ PART**. Confirm a prompt appears with the field already
+   focused and **SAVE WITH THIS PART** greyed out until something is typed.
+10. Press **ENTER LATER**. Confirm the repair saves as fixed, and that its card
+    on **Fixed Repairs** carries an orange **MISSING PART #**.
+11. Repeat with a number typed in, and confirm that card carries **no** badge.
+12. On a repair that has no part at all, confirm no badge appears — an untouched
+    PARTS USED must never be flagged.
 
 ## Publishing constraints that still apply
 
@@ -682,5 +746,5 @@ It already held everywhere, order included.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault; and the IntelligAIRE III control panel named in the A/C list so a blank screen stops being logged as generic control wiring |
+| 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault; the IntelligAIRE III control panel named in the A/C list so a blank screen stops being logged as generic control wiring; and a 2x2 of equal save buttons with a new SAVE FIXED W/ PART that asks for the part number or records it as outstanding, flagged MISSING PART # on Fixed Repairs until it is entered |
 ```
