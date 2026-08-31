@@ -6256,3 +6256,21 @@ test("Fixed Repairs windows the render instead of drawing every completed repair
  // height:auto is what lets flex-wrap size the box to its real content.
  assert.match(fixedCss,/\.fixed-feed>header\{height:auto;min-height:54px;[^}]*flex-wrap:wrap/);
 });
+
+test("the DS badge sits beside the defect-count badge instead of overlapping the repair text",async()=>{
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ // THE BUG, measured rather than assumed. The bus-number column is 64-72px
+ // wide on a phone; a five-digit number plus the badge needed about 77px. The
+ // badge spilled past its own column and landed on the repair description in
+ // the next one — measured on bus 17530, an actual 4px overlap onto the text,
+ // not a near miss.
+ assert.doesNotMatch(logPage,/<strong>\{group\.bus\.n\}<\/strong>\{busOnDownSheet&&<b className="inline-ds-badge">/,
+  "DS must not be back inside the cramped bus-number column");
+
+ // It now lands in the meta column, immediately before the defect-count
+ // badge — the "other purple badge" it was asked to sit beside — so both
+ // read as one pair of counts rather than two badges scattered across the
+ // card.
+ assert.match(logPage,/<span className="log-meta">\{busOnDownSheet&&<b className="inline-ds-badge">DS<\/b>\}\{group\.records\.length>1&&<b className="defect-count-badge">/);
+});
