@@ -38,6 +38,18 @@ agents and spent 5.9 million tokens verifying one module. Ten agents on eight
 different problems beats eighty agents on one. Prefer a small fan-out, or do the
 work directly.
 
+## Skills in this repo
+
+`.claude/skills/` holds skills that travel with the repository rather than the
+machine, because these sessions run in containers that are thrown away.
+
+- **`connector-reach`** — what to do when a connector listing comes back empty
+  or short. An empty enumeration is evidence about the enumeration, not about
+  access. Written after a session spent an hour concluding a Supabase project
+  was unreachable; the token could reach it the whole time and `list_projects`
+  simply had not enumerated it. Read it before telling Curtis anything is
+  inaccessible.
+
 ## Things that will get you in trouble
 
 - **Never force-push or rewrite published history.** Only clean fast-forwards of
