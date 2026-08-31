@@ -1,19 +1,14 @@
 # Publish next
 
-**STATUS: PENDING — two releases are queued, each frozen to its own SHA.**
+**STATUS: PENDING — Version 130 is queued and frozen to its exact SHA. Version 129 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| 1st | **129** | `24a02a9` | Send-before-receive in the shop cloud; readable shared filter lists |
-| 2nd | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
+| Next | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
 
-**Publish 129 first, then 130.** They are independent and 130 contains 129, so
-publishing 130 alone would also be correct — but 129 is already approved and its
-sync fix is the urgent one. Do not merge them into a single version number.
+**Version 129 was published from `24a02a9` on 2026-08-31. Publish Version 130 next from `5fc8436`.**
 
-Both sections below are complete handoffs. Version 129 is unchanged from the one
-already approved; Version 130 was added afterwards and is what all the extra
-commits on `main` are.
+The Version 130 section below is the current complete handoff. The earlier Version 129 section is retained as the published release record.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
