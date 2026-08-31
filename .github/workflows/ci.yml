@@ -1,0 +1,59 @@
+# Every push to main and every pull request runs the same gate a person would
+# run by hand: lint, build, and the full suite.
+#
+# The suite is the reason this exists. There are 161 tests covering the things
+# this app must never get wrong — a board that refuses to save, a merge that
+# resurrects records, a defect written under an id nothing can read back — and
+# until now they only ran when somebody remembered to run them. A repository
+# where the checks are optional has checks nobody can rely on.
+name: CI
+
+on:
+  push:
+    # main only. claude-contributions mirrors main commit for commit with an
+    # identical tree, so running both would double every run to learn nothing.
+    branches: [main]
+  pull_request:
+
+# Least privilege: this reads the repository and writes nothing.
+permissions:
+  contents: read
+
+# A second push while the first is still running makes the first answer stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Lint, build and test
+    runs-on: ubuntu-latest
+    # The suite runs in about a second and the build in a few; ten minutes is a
+    # hung job, not a slow one.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # package.json asks for >=22.13.0. Pinned to the major rather than
+          # "latest" so a new Node release cannot turn a green repository red
+          # overnight without anybody choosing it.
+          node-version: 22
+          cache: npm
+
+      # ci, not install: it installs exactly what the lockfile pins and fails if
+      # the lockfile and package.json disagree, which is the point of running it
+      # somewhere other than the machine that wrote them.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # npm test runs the production build first and several tests import its
+      # output, so this covers the build as well. Running node --test without
+      # the build gives five failures that are about the missing build and
+      # nothing else — a trap worth naming here rather than rediscovering.
+      - name: Build and test
+        run: npm test
