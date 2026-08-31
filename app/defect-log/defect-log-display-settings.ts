@@ -33,3 +33,18 @@ export function normalizeDefectLogDisplay(value:unknown):DefectLogDisplaySetting
  const styles=Object.fromEntries(Object.entries(DEFAULT_DEFECT_LOG_DISPLAY.styles).map(([key,fallback])=>{const candidate=savedStyles[key as DefectLogStyleKey];return [key,{color:color(candidate?.color,fallback.color),fontSize:size(candidate?.fontSize,fallback.fontSize)}]})) as Record<DefectLogStyleKey,DefectLogTextStyle>;
  return {labels,styles};
 }
+
+/* The bus-group outline colour, accepted only as a plain six-digit hex.
+
+   It ends up in an inline style on the app root, and a settings blob is a file
+   somebody can hand-edit and a sync can carry between devices, so it is checked
+   rather than trusted. Anything else returns empty, which is the signal to fall
+   back to the theme-derived default.
+
+   Lives here rather than in the page because a validator that cannot be
+   imported cannot be tested — the first version of this had to be reconstructed
+   from source with a regular expression, which broke immediately. */
+export function safeBorderColor(value:unknown){
+ const text=String(value??"").trim();
+ return /^#[0-9a-f]{6}$/i.test(text)?text:"";
+}

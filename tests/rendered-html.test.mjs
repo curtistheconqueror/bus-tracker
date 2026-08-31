@@ -6152,3 +6152,48 @@ test("a board that did not save says so instead of failing silently",async()=>{
  // Absent when there is nothing wrong, so a healthy board shows no chrome.
  assert.match(alert,/if\(!reason\)return null/);
 });
+
+test("the bus group outline is darker than every other border, and can be recolored",async()=>{
+ const [logCss,logPage]=await Promise.all([
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+ ]);
+
+ // Its own variable, deliberately heavier than the general border. 22% is what
+ // every other border here uses; the group outline is the boundary between one
+ // bus and the next and was the same weight as a divider inside a panel.
+ assert.match(logCss,/--log-card-border:color-mix\(in srgb,var\(--log-text\) 42%,var\(--log-surface\)\)/);
+ assert.match(logCss,/--log-border:color-mix\(in srgb,var\(--log-text\) 22%,var\(--log-surface\)\)/);
+ assert.match(logCss,/\.log-card\{position:relative;[^}]*border:1px solid var\(--log-card-border/);
+
+ // THE REGRESSION THIS EXISTS FOR. A later rule themed every panel border at
+ // once and included .log-card, so the card silently took the general border
+ // however it was styled above — the variable was set correctly and changed
+ // nothing on screen. The card must not be in that list.
+ const themed=logCss.match(/^[^\n]*\{border-color:var\(--log-border\);background:var\(--log-surface\)\}/m);
+ assert.ok(themed,"the shared panel theming rule must still exist");
+ assert.equal(/[.,]log-card[,{]/.test(themed[0]),false,
+  ".log-card must not be themed with the general border, or its own colour is ignored");
+ assert.match(logCss,/\.log-card\{border-color:var\(--log-card-border\);background:var\(--log-surface\)\}/);
+
+ // Derived, not fixed, so it follows the theme: on Dark it resolves lighter
+ // than the card instead of leaving a light-theme grey on a near-black surface.
+ assert.equal(/--log-card-border:#/.test(logCss),false,"the default must be derived from the theme");
+
+ // A chosen colour is applied as an inline variable, and only when one is set,
+ // so leaving it alone keeps the theme-aware default.
+ assert.match(logPage,/\.\.\.\(settings\.groupBorder\?\{"--log-card-border":settings\.groupBorder\}:\{\}\)/);
+ assert.match(logPage,/groupBorder:safeBorderColor\(saved\.groupBorder\)/);
+ assert.ok(logPage.includes("USE THEME COLOR"),"there must be a way back to the theme colour");
+});
+
+test("a stored outline colour cannot inject anything into the style attribute",async()=>{
+ // The value lands in an inline style, and a settings blob is a file somebody
+ // can hand-edit and a sync can carry between devices, so it is validated
+ // rather than trusted.
+ const {safeBorderColor}=await import("../app/defect-log/defect-log-display-settings.ts");
+ for(const good of ["#9ea6b4","#B3261E","#000000"]) assert.equal(safeBorderColor(good),good);
+ for(const bad of ["red","red;background:url(x)","#fff","","javascript:alert(1)",null,undefined,42,{}])
+  assert.equal(safeBorderColor(bad),"","must reject "+String(bad));
+ assert.equal(safeBorderColor("  #9ea6b4  "),"#9ea6b4","surrounding space is trimmed, not rejected");
+});
