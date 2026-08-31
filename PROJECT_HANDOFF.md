@@ -4,8 +4,8 @@ Updated: 2026-08-31
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 129
-Live feature checkpoint: commit 24a02a9
+Live release: Sites Version 131
+Live feature checkpoint: commit 8858e3f
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 129 is the current user-approved live release. Its validated source checkpoint is commit 24a02a9. GET THE SHOP'S COPY now sends this device's work before it receives the shared copy and refuses to pull if that send fails. Shared Quick Filter lists are readable, carry locations, collapse repeated displayed lines, and can be shared as self-contained offline pages. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store. Version 130 remains queued in docs/PUBLISH_NEXT.md.
+Version 131 is the current user-approved live release. Version 130 shipped from commit 5fc8436 and prevents exact duplicate defects from being created by repeated Down Sheet scans; its explicit MERGE DUPES action folds existing repeats without losing repair facts and tombstones merged cloud records so they do not return. Version 131 shipped from commit 8858e3f and adds distinct Bus Accessories bike-rack faults, separate front and rear start-button choices, and an IntelligAIRE III blank-screen choice under A/C and HVAC. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
@@ -75,7 +75,7 @@ Known responsive follow-up: an iPad audit found 15 editor controls below the 44p
 - Inspection readiness uses the latest completed inspection baseline and flags 3,000 miles or 10 days, whichever arrives first. Existing buses without a completed inspection show Baseline Needed until one is recorded. Date-only completions reset the 10-day clock but cannot establish a new 3,000-mile due point.
 - Approved photo imports replace every Down Sheet row and reconcile DS badges from the new reviewed list. The review names every prior bus coming off before approval, and Undo Import restores the prior Down Sheet and fleet snapshot.
 - Photo replacement never deletes or completes Defect Log records and never relocates buses. Omitted inspection buses return to service according to unresolved defects; an unrelated safety-critical downing defect still keeps the bus out of service.
-The Version 129 production build, lint gate, and all 153 regression tests passed before publication. Sites reported the production deployment successful on 2026-08-31.
+Version 130 passed 155 regression tests, ESLint, and the production build. Version 131 passed 157 regression tests, ESLint, and the production build. Sites reported both production deployments successful in order on 2026-08-31.
 
 ## Repository and remotes
 
