@@ -1,21 +1,24 @@
 # Publish next
 
-**STATUS: PENDING — two releases are queued, each frozen to its exact SHA. Version 129 is live.**
+**STATUS: PENDING — three releases are queued, each frozen to its exact SHA. Version 129 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | 1st | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
 | 2nd | **131** | `7fd647a` | Three defects named, four equal save buttons, and a part number asked for at the fix |
+| 3rd | **132** | `c1deca3` | A board that did not save now says so, CI runs on every push, and Fixed Repairs stops rendering every record at once |
 
 **Version 129 was published from `24a02a9` on 2026-08-31.** Publish **130** next
-from `5fc8436`, then **131** from `7fd647a`.
+from `5fc8436`, then **131** from `7fd647a`, then **132** from `c1deca3`.
 
-131 contains 130, so publishing `7fd647a` alone would deliver both correctly —
-but they are separate releases with separate checks, and 130 carries the change
-that touches stored repair records. Do not merge them into one version number.
+Each later version contains every one before it, so publishing `c1deca3` alone
+would deliver all three correctly — but they are separate releases with
+separate checks, and 130 carries the change that touches stored repair records.
+Do not merge them into one version number.
 
-The Version 130 and Version 131 sections below are complete handoffs. The
-earlier Version 129 section is retained as the published release record.
+The Version 130, Version 131 and Version 132 sections below are complete
+handoffs. The earlier Version 129 section is retained as the published release
+record.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -747,4 +750,240 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault; the IntelligAIRE III control panel named in the A/C list so a blank screen stops being logged as generic control wiring; and a 2x2 of equal save buttons with a new SAVE FIXED W/ PART that asks for the part number or records it as outstanding, flagged MISSING PART # on Fixed Repairs until it is entered |
+```
+
+---
+---
+
+# Version 132 — A board that did not save now says so
+
+**Publish this FOURTH, after Version 131 is live.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`c1deca3`** |
+| Last code-bearing commit | `c1deca3` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 131, published from `7fd647a` |
+
+Everything this release contains:
+
+```
+git diff --name-only 7fd647a c1deca3
+```
+
+Thirteen files in the raw diff. Twelve are this release; the thirteenth,
+`docs/PUBLISH_NEXT.md`, is this file's own prior revision — the commit that
+re-froze Version 131's handoff to `7fd647a` after that code landed — and ships
+nothing, the same way earlier documentation-only commits have in every prior
+section of this file.
+
+```
+app/defect-log/defect-log-display-settings.ts   app/globals.css
+app/defect-log/defect-log.css                   app/page.tsx
+app/defect-log/page.tsx                          app/save-alert.tsx   (new)
+app/down-sheet/page.tsx                          app/storage.ts
+app/fixed-repairs/fixed-repairs.css              tests/rendered-html.test.mjs
+app/fixed-repairs/page.tsx
+.github/workflows/ci.yml   — repository tooling; does not ship, see below
+```
+
+The application change is confirmed with the deps/supabase filter, which
+returns nothing:
+
+```
+git diff --name-only 7fd647a c1deca3 -- supabase package.json package-lock.json   # returns nothing
+```
+
+The commits in the range — seven, not six; the handoff-freeze commit for
+Version 131 is what accounts for `docs/PUBLISH_NEXT.md` above:
+
+```
+git log --oneline 7fd647a..c1deca3
+c1deca3 Stage 3: window Fixed Repairs instead of rendering every completed repair
+dad40af Move CI onto actions that are not deprecated
+6e4e48f Stage 2: run the gate on every push and pull request
+e8e218b Darker bus-group outline, and a colour for it
+cb2884d Stage 1: a board that did not save now says so
+4463b5a Make the part prompt behave like every other layer here
+c64e3e3 Fold the part-number flow into Version 131
+```
+
+Gate: 162 tests passing, ESLint clean, production build succeeds — verified
+from a clean tree (`npm ci`, then lint, then test) matching what CI itself now
+runs on every push.
+
+## Migrations
+
+**No database migration, no dependency change.** `supabase/`, `package.json`
+and `package-lock.json` are untouched across the whole range.
+
+**One new LocalStorage field, additive.** The Defect Log's settings blob gains
+`groupBorder`, an optional hex colour string defaulting to `""`. Absent means
+"follow the theme," which is what every device already does today — nothing
+changes on a device that never opens the new colour picker. A value is only
+ever accepted if it matches `/^#[0-9a-f]{6}$/i`; anything else — a corrupt
+blob, a hand-edited file, a future field a sync carried in — is treated as
+absent rather than written into a style attribute.
+
+**No other stored field changed.** The save-reporting work in this release
+changes what a refused write is *reported as*, never what a successful write
+stores.
+
+## What changed
+
+Five changes, in the order that matters most first.
+
+### 1. A board that did not save now says so — `cb2884d`
+
+**The reason to publish rather than wait.** Measured before touching anything:
+a 400-bus board with three years of history serializes to about 9.6 MB against
+a LocalStorage cap of roughly 5 MB. Curtis is at 0.4 MB today — this is a road
+the app is on, not a cliff it is at — but every one of the four ways a write
+could be refused looked exactly like success, and a search of the entire
+codebase for any message about a failed save returned nothing.
+
+The realistic failure: a foreman moves buses all afternoon on a phone that has
+been full since lunchtime. The board moves on screen every time. Nothing
+reaches storage. He closes the app having lost the day, with nothing on any
+screen having said so.
+
+Writes now report **why** they were refused, because the answers differ: a
+full device needs room; a board this build cannot read must not be
+overwritten and needs the newer device; the safety stop is working as
+designed and needs the recovery copy. A red banner — not a dismissible alert,
+which a busy person clears and then keeps working on a board that silently
+is not saving — stays on screen until a save succeeds, names the reason in
+plain words, and offers **EXPORT A BACKUP NOW**, because the work is still on
+screen and still in memory; a file is the difference between losing the day
+and not.
+
+Filling a real device during testing found something worse than the original
+silent failure. Several surfaces called `localStorage.setItem` directly, and
+on a full device that does not fail quietly — it **throws**, out of a React
+effect or a click handler. Saving a bus left the Facility Map editor stuck
+open with an uncaught `QuotaExceededError` and no way forward. Every such call
+now goes through a writer that cannot throw; a test walks all three boards to
+keep raw calls from coming back.
+
+### 2. Fixed Repairs stops rendering every completed record at once — `c1deca3`
+
+Measured on the same 400-bus, three-year board: 4,000 completed repairs
+rendered unconditionally produced **120,068 DOM nodes and 6.7 seconds to
+hydrate**. Nothing was wrong with any single card; the page simply never
+stopped rendering.
+
+It now renders 50 at a time, newest first, with **SHOW 50 MORE** and **SHOW
+ALL** underneath. The cap is on *rendering* only — search and the category
+filter run over every record before it applies, so a repair from three years
+ago is still found by its bus number, and the count line says so honestly
+("50 OF 4000 SHOWN" only once something is actually hidden). Stats, the
+category list and the export report all read from the full record set, never
+the windowed slice. **Measured after:** 494ms and 1,571 nodes for the default
+view — 13× faster, 76× fewer nodes — and SHOW ALL still renders every one of
+the 4,000 exactly as before, so nothing is ever unreachable, only deferred.
+
+### 3. Continuous integration runs the gate on every push — `6e4e48f`, `dad40af`
+
+**Repository tooling. Ships nothing to the site.** Until this release there
+were 162 tests and no CI at all, so every change from any tool or any person
+shipped unverified unless somebody happened to run the suite by hand. A GitHub
+Actions workflow now runs `npm ci`, lint, and the full build-and-test sequence
+on every push to `main` and every pull request — the same commands a person
+would run, verified from a clean tree before this was ever pushed. This
+release itself is the proof: Stage 3 was pushed after CI existed, and CI's own
+run confirms it passed independently.
+
+### 4. A darker bus-group outline, with a colour option — `e8e218b`
+
+The boundary between one bus card and the next was a fixed `#c4cedd`, almost
+the same shade as the surface behind it. It is now derived at 42% of the text
+colour against the surface — `#9ea6b4` on the light theme — roughly double the
+22% every other border in the Defect Log uses, and because it is derived
+rather than fixed it comes out *lighter* than the surface on the dark themes
+instead of drawing a light-theme grey around a near-black card. A colour
+picker in **Settings → BUS GROUP SEPARATION** can fix it for every theme on
+that device; left alone it keeps following the theme.
+
+### 5. The SAVE FIXED W/ PART prompt behaves like every other layer here — `4463b5a`
+
+A refinement to the prompt introduced in Version 131, which has not shipped
+yet — the two ship together. It was a box floating in the middle of the
+screen with no way out but a button; every other layer in this app is a sheet
+from the bottom on a phone, which is also where the thumb already is. It now
+matches, and Escape closes it without closing the editor underneath.
+
+## Data safety
+
+- **No LocalStorage key renamed or removed.**
+- **One new additive field**, `groupBorder` on the Defect Log settings blob —
+  see Migrations above.
+- **Nothing already stored is rewritten.** The save-reporting change in #1
+  alters what a *refused* write reports, never what a successful one stores.
+- **Change #1 strictly reduces the chance of data loss.** Its failure mode is
+  refusing to save and saying so in a banner that does not go away, which
+  leaves the device exactly as it was.
+- **Change #2 never hides a record.** Search and filtering always run over the
+  complete set before the render cap applies; SHOW ALL reaches every one.
+- **The CI workflow is read-only against the repository** (`permissions:
+  contents: read`) and cannot write to `main`, tag a release, or touch the
+  live site.
+
+## Validation
+
+- 162 regression tests passed, up from 158 at Version 131
+- ESLint passed; production build passed
+- Verified from a clean tree — `dist` and `.next` removed, then `npm ci`,
+  `npm run lint`, `npm test` — matching exactly what CI now runs
+- **The save-alert path was verified on a genuinely full device**, not a
+  stub: filled with decreasing chunk sizes until a 2 KB probe failed, then a
+  real save attempted. The banner appeared reading THIS DEVICE IS FULL, the
+  editor closed cleanly where it previously threw an uncaught error, EXPORT A
+  BACKUP NOW produced a real file, and freeing space and saving again cleared
+  the banner on its own
+- **The Fixed Repairs windowing was measured, not estimated**, on the same
+  400-bus/4,000-repair board before and after: 6,694ms/120,068 nodes against
+  494ms/1,571 nodes. A bus buried at position ~3,999 was confirmed reachable
+  by search despite the cap
+- **The CI workflow itself was watched running on GitHub**, not just written:
+  two runs recorded (one catching a Node-20 deprecation warning on the actions
+  used, fixed in the next commit and reverified), and a third run — this
+  release's own commit — completed with every step green in 34 seconds
+
+## After it is live
+
+1. **On any board** — confirm nothing changed for a healthy device: no banner,
+   boards save silently exactly as before.
+2. **Fill a phone's storage** (or use a device already near its limit), move a
+   bus, and confirm a red banner appears naming why the save did not happen,
+   with an **EXPORT A BACKUP NOW** button that produces a file.
+3. **Fixed Repairs** — confirm the header reads **"50 OF `<n>` SHOWN"** on a
+   board with more than 50 completed repairs, with **SHOW 50 MORE** and
+   **SHOW ALL** underneath. Press SHOW ALL and confirm every repair renders.
+   Search for an old repair and confirm it is found even though it was not in
+   the first 50.
+4. **Defect Log → Settings → BUS GROUP SEPARATION** — confirm an **OUTLINE
+   COLOR** picker exists, that the bus-card outline is visibly darker than
+   before by default, and that choosing a colour and pressing **USE THEME
+   COLOR** both work as expected.
+5. **Defect Log, on a phone** — open any repair, press **SAVE FIXED W/ PART**,
+   and confirm the prompt now rises from the bottom of the screen rather than
+   floating centred, and that pressing Escape closes only the prompt.
+6. **On GitHub**, confirm the CI badge/checks are green on `main` and that a
+   future pull request shows the same checks running automatically.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 132 | Live | <published tip hash> | Storage writes now report why they were refused, with a banner and one-tap backup export so a full device can never lose a day's work silently; Fixed Repairs renders 50 records at a time instead of every completed repair at once (measured 13x faster, 76x fewer DOM nodes on a 4,000-repair board) with search and export still covering everything; the bus-group outline is darker by default with a colour option; the SAVE FIXED W/ PART prompt is a bottom sheet with Escape to close; and CI now runs lint, build and the full test suite on every push and pull request |
 ```
