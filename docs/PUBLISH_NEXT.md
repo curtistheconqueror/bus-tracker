@@ -5,12 +5,12 @@
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | 1st | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
-| 2nd | **131** | `d1d2e76` | Bus Accessories for the bike rack, and naming which start button is broken |
+| 2nd | **131** | `8858e3f` | Three defects named: bike rack, which start button, and the IntelligAIRE III panel |
 
 **Version 129 was published from `24a02a9` on 2026-08-31.** Publish **130** next
-from `5fc8436`, then **131** from `d1d2e76`.
+from `5fc8436`, then **131** from `8858e3f`.
 
-131 contains 130, so publishing `d1d2e76` alone would deliver both correctly —
+131 contains 130, so publishing `8858e3f` alone would deliver both correctly —
 but they are separate releases with separate checks, and 130 carries the change
 that touches stored repair records. Do not merge them into one version number.
 
@@ -477,7 +477,7 @@ Suggested `docs/RELEASES.md` row:
 ---
 ---
 
-# Version 131 — Bus Accessories, and which start button is broken
+# Version 131 — Three defects that were hiding inside vaguer ones
 
 **Publish this THIRD, after Version 130 is live.**
 
@@ -485,15 +485,15 @@ Suggested `docs/RELEASES.md` row:
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`d1d2e76`** |
-| Last code-bearing commit | `d1d2e76` — the release source is this commit |
+| **Release source** | **`8858e3f`** |
+| Last code-bearing commit | `8858e3f` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 130, published from `5fc8436` |
 
 The application change is two files:
 
 ```
-git diff --name-only 5fc8436 d1d2e76 -- app tests package.json package-lock.json public supabase
+git diff --name-only 5fc8436 8858e3f -- app tests package.json package-lock.json public supabase
 ```
 
 ```
@@ -503,18 +503,21 @@ tests/rendered-html.test.mjs
 
 The unfiltered range also lists `PROJECT_HANDOFF.md`, `README.md`,
 `docs/RELEASES.md` and this file. Those are **Codex's own Version 129 release
-record** (`3f45b10`) plus the Version 130 handoff (`7dc9d89`), which sit between
-the two SHAs because 130 was written before 129 was published. They ship
-nothing. The three commits in the range are:
+record** (`3f45b10`) plus this file's own handoffs, which sit between the two
+SHAs because 130 was written before 129 was published. They ship nothing. The
+commits in the range are:
 
 ```
-git log --oneline 5fc8436..d1d2e76
+git log --oneline 5fc8436..8858e3f
+8858e3f Name the IntelligAIRE III panel in the A/C list
+d4ea70a Correct the Version 131 file list
+e9922c4 Queue the Version 131 handoff behind 130
 d1d2e76 Bus Accessories for the bike rack, and name which start button is broken
 3f45b10 Record Sites Version 129 release
 7dc9d89 Queue the Version 130 handoff behind 129
 ```
 
-Gate: 156 tests passing, ESLint clean, production build succeeds.
+Gate: 157 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -522,7 +525,7 @@ Gate: 156 tests passing, ESLint clean, production build succeeds.
 record rewritten.**
 
 ```
-git diff --name-only 5fc8436 d1d2e76 -- supabase package.json package-lock.json   # returns nothing
+git diff --name-only 5fc8436 8858e3f -- supabase package.json package-lock.json   # returns nothing
 ```
 
 This release only adds choices to the repair catalog. Every existing defect
@@ -530,8 +533,9 @@ record reads back exactly as it was logged.
 
 ## What changed
 
-Both changes come from the same complaint: work was being filed under a heading
-that made it look like something it is not.
+All three come from the same complaint: work was being filed under a heading
+that made it look like something it is not, or said nothing about what it
+actually was.
 
 ### 1. A Bus Accessories group, for the bike rack
 
@@ -584,7 +588,34 @@ work. The live board carries none of these — checked before deciding rather th
 assumed — and any record that does still reads exactly as logged, because the
 editor already offers an off-catalog issue back as **"(as logged)"**.
 
-### 3. The catalog invariant is now asserted, not spot-checked
+### 3. The IntelligAIRE III panel is named in the A/C list
+
+**A/C and HVAC** gains one entry:
+
+- `IntelligAIRE III control panel - screen blank / black`
+
+The Thermo King panel on the bulkhead has a screen that goes black often enough
+to be worth logging as its own fault. The only place for it was **"Controls /
+electrical"**, which covers the whole A/C control side and says nothing about
+*which* control — so a recurring, recognisable failure arrived on the board
+indistinguishable from a wiring fault, and there was no way to count how often
+the panel does it.
+
+Naming the panel is the point: *IntelligAIRE III* is what is printed on the
+label, so it is what somebody standing at the bus reads off and what somebody
+searching the Defect Log later will type.
+
+It sits directly after "Controls / electrical", because that is where a person
+looking for a control fault is already looking. **The vague entry stays** — the
+A/C control side has faults that are not this panel. A blank display does not
+down a bus, so it defaults to May Stay In Service like the rest of the category.
+
+A/C and HVAC is an **ungrouped** category, so this belongs in `REPAIR_OPTIONS`
+only. Adding a `REPAIR_OPTION_GROUPS` entry would turn the whole category into a
+two-step picker for every other A/C defect; that is now asserted rather than
+left to be rediscovered.
+
+### 4. The catalog invariant is now asserted, not spot-checked
 
 A grouped category carries every entry twice: prefixed in `REPAIR_OPTIONS`,
 which is what gets **stored**, and bare in `REPAIR_OPTION_GROUPS`, which is what
@@ -605,7 +636,7 @@ It already held everywhere, order included.
 
 ## Validation
 
-- 156 regression tests passed, up from 155 at Version 130
+- 157 regression tests passed, up from 155 at Version 130
 - ESLint passed; production build passed
 - The live board was queried before deciding how to treat the ambiguous entry:
   zero records use `Operating Controls - Start button`, and one open record uses
@@ -614,6 +645,9 @@ It already held everywhere, order included.
   bike rack entries, **Operating Controls** offers both start buttons, and
   choosing a bike rack fault stores
   `Bus Accessories - Bike rack - arm replacement`
+- Also measured at 390px: the IntelligAIRE III entry draws in the flat A/C list
+  in the right position, stores under its own name, and its label fits the
+  control without clipping or pushing the page sideways
 
 ## After it is live
 
@@ -630,7 +664,11 @@ It already held everywhere, order included.
    adjustment** — those are meant to stay.
 5. Confirm **Battery, Starting and Charging** still offers **Front start INOP**
    and **Rear start INOP**.
-6. The same list appears on the Down Sheet editor; confirm the new entries are
+6. **Category A/C and HVAC** — confirm the list offers **IntelligAIRE III
+   control panel - screen blank / black**, directly under **Controls /
+   electrical**, and that **Controls / electrical** is still there. Log one and
+   confirm it does not take the bus out of service.
+7. The same lists appear on the Down Sheet editor; confirm the new entries are
    there too.
 
 ## Publishing constraints that still apply
@@ -644,5 +682,5 @@ It already held everywhere, order included.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault |
+| 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault; and the IntelligAIRE III control panel named in the A/C list so a blank screen stops being logged as generic control wiring |
 ```
