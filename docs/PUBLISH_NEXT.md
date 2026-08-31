@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 128 was published from c1101bdab9d201602329297bcca6b3f2610c1263 on 2026-08-31.**
+**STATUS: PENDING — Sites Version 129, two changes on `main` since Version 128.**
 
 This file always describes the next unpublished release, and it lives at this
 exact path on `main` so nobody has to be told where to look. Curtis approves a
@@ -27,36 +27,44 @@ what to check once it is live.
 | Field | Value |
 | --- | --- |
 | Release source | the current tip of `origin/main` |
-| Tip at the time of writing | `6d523e6` |
-| Last code-bearing commit | `5a445c8` |
+| Tip at the time of writing | `24a02a9` |
+| Last code-bearing commit | `24a02a9` |
 | Branch | `main` on the private `origin` remote |
-| Previous live | Version 127, published from `831b753` |
+| Previous live | Version 128, published from `c1101bd` |
 
 Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit.
+release commit. At the time of writing the tip is itself the last code-bearing
+commit, so there is no tooling-only tail to discount.
 
-Everything after `5a445c8` is repository tooling, not application code. Confirm
-with:
-
-```
-git diff --name-only 5a445c8..origin/main
-```
-
-which should list only `CLAUDE.md`, `.claude/skills/connector-reach/SKILL.md`
-and this file. The first two are notes for future sessions; none of the three
-ship anything to the site.
-
-If you would rather assert it mechanically, this returns nothing:
+Confirm what moved with:
 
 ```
-git diff --name-only 5a445c8..origin/main -- app tests package.json package-lock.json public supabase
+git diff --name-only c1101bd..origin/main
+```
+
+which should list exactly eight files: three under `app/`, one under `tests/`,
+and four documentation files (`PROJECT_HANDOFF.md`, `README.md`,
+`docs/RELEASES.md` and this one). The documentation four are Codex's own
+Version 128 release record plus this handoff; they ship nothing.
+
+The application change is these four:
+
+```
+git diff --name-only c1101bd..origin/main -- app tests package.json package-lock.json public supabase
+```
+
+```
+app/cloud-sync-control.tsx
+app/defect-log/page.tsx
+app/defect-log/quick-filter-share.ts
+tests/rendered-html.test.mjs
 ```
 
 Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
-point at identical trees. No history was rewritten and no branch was force
-pushed.
+point at identical trees (`91a96f2`). No history was rewritten and no branch was
+force pushed.
 
-Gate: 151 tests passing, ESLint clean, production build succeeds.
+Gate: 153 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -67,167 +75,163 @@ Version 127:
 git diff --name-only 831b753..origin/main -- supabase     # returns nothing
 ```
 
-Those files shipped in 127 and have already been applied by Curtis to the live
-Supabase project, verified there on 31 August: 8 tables, 23 RLS policies, 7
-triggers, 0 rows. Nothing needs running at publish time.
+Those files were applied to the live Supabase project by Curtis and verified
+there on 31 August. Since then the project has been **populated and is in
+active use** — see Live exposure below. Nothing needs running at publish time,
+and nothing in this release touches the schema.
 
 **No dependency changes:**
 
 ```
-git diff 831b753..origin/main -- package.json             # returns nothing
+git diff c1101bd..origin/main -- package.json package-lock.json   # returns nothing
 ```
 
-`@supabase/supabase-js` was added in 127 and is unchanged.
+**No local data migration.** Version 128 carried one (the waiting-area
+renumbering); this release carries none. No LocalStorage key is added, renamed
+or removed, and nothing already stored is rewritten.
 
-**One LOCAL data migration**, described under Data safety. It runs in the browser
-when the board is read and requires nothing of the publisher.
+## Live exposure — read this before deciding to wait
+
+Version 128's handoff could say exposure was nil because no device had been
+connected to the shop cloud. **That is no longer true.** The Supabase project is
+live and one device — "Phone (CM)" — is connected and syncing, holding 108
+buses, 334 defects and 52 Down Sheet entries. A second device is being set up.
+
+Change 1 below is a data-loss fix in exactly that path. It is the reason to
+publish now rather than bundle this with later work.
 
 ## What changed
 
-Six user-visible changes, oldest first.
+Two user-visible changes, oldest first.
 
-### 1. Six defects in the shop cloud, one of them silent data loss — `3b7ecf2`
+### 1. GET THE SHOP'S COPY sends before it receives — `9361f94`
 
-**This is the reason to publish rather than wait.** The sync client itself went
-live in Version 127. An adversarial review afterwards found six defects in it,
-each reproduced against the real modules before being fixed.
+**This is the reason to publish.** A merge takes the incoming copy for a bus
+that both devices know about. Sending was automatic on a 45-second sweep, but
+pulling was manual, and nothing tied the two together.
 
-The serious one: the row fingerprint used `JSON.stringify(row, keys.sort())`,
-which looks like it orders keys but is a recursive property filter, so everything
-in `map_fields` serialized as `{}`. Assign a mechanic to a parked bus, tick two
-dash lights, record an odometer reading — the bus never moves, so no timestamp
-changes, so the row hashed identically to no work at all. The change would never
-have been sent, and the status line would have read "Synced".
+So a person who moved five buses and pressed **GET THE SHOP'S COPY** inside that
+window — before their own sweep had run — had the server's older copy laid over
+the top of their work. The next sweep then pushed that overwritten version up as
+though it were the truth. Five moves gone, on every device, with nothing on any
+screen to say so.
 
-The other five: `signOut` used global scope, so one person signing out would have
-signed out every device on the shared login; a pull issued one unbounded select
-that PostgREST truncates silently; a bus arriving from the cloud got no id; an
-unclamped `updated_at` let one wrong device clock permanently lock every shared
-row; and a Down Sheet entry's author was overwritten by whoever synced last.
+The button now pushes this device's work first. The server then already holds
+those moves, stamped later than anything else, and the database's last-write-wins
+trigger keeps them, so what comes back down includes this device's work instead
+of erasing it.
 
-**Live exposure to date is nil.** The shop cloud does nothing until somebody
-enters connection details, and no device has been connected. Publishing before
-anyone connects means nobody meets the bug.
+It also **refuses to pull when the push failed**, and says why in plain words.
+Merging onto a device whose work has not left it is precisely how that work
+disappears; "this device's own changes could not be sent, so nothing was brought
+down" is a far better outcome than a silent overwrite.
 
-### 2. The Down Sheet can move a bus; the Defect Log can show status colour — `2fc7af9`
+This is what makes the rule Curtis asked for actually hold: *work as long as you
+like, move as many buses as you like, and whenever you press refresh you are
+caught up.* Before this fix that was true only if you happened to wait out the
+sweep first, which is not something anybody should have to know.
 
-A bus takes the status its parking space implies, so setting a status on the
-sheet without being able to move the bus was silently overridden. A **MOVE BUS
-TO** picker now sits under the status field, defaulting to "Leave where it is"
-and naming the area the bus is currently in. An unknown or full area leaves the
-bus where it is rather than failing the save, and the instruction is cleared once
-carried out so it cannot re-run on a later edit.
+### 2. A shared filter list is readable, and can go as a page — `24a02a9`
 
-Separately, a **SHOW STATUS COLOR** checkbox at the top of the Defect Log gives
-bus numbers the tracker's own status colours. Off by default, per device.
+Sharing a Quick Filter produced a wall of run-on text, and bus 17543 said the
+same sentence twice. Three separate things, and the first is not what it looked
+like.
 
-### 3. A chosen status stands until the bus is moved — `3bf9d2a`
+- **The share was never dumping unrelated defects.** It already filtered to the
+  ones that matched, the same as the cards on screen. Nothing changed there.
+- **Identical defect lines now collapse to one.** Bus 17543 genuinely carries the
+  same overheat three times (see Known issue), and a person reading a shared list
+  cannot tell whether the same sentence twice means two problems. It means one.
+  Two genuinely *different* faults still print as two lines — this suppresses
+  repeats, never a second real fault.
+- **A blank line between buses**, defects indented under the number, and the
+  location moved up onto the bus line. Where to walk is the thing somebody acts
+  on, and the text version was the only place it was missing.
 
-The Down Sheet no longer recomputes a bus's status from its parking space. The
-paperwork changes before the bus does: mark a bus back in service, get
-sidetracked before anyone drives it out of the lot, and the board now says what
-you told it rather than reverting.
+And a third button, **SHARE PAGE**, next to COPY LIST and SHARE. It sends the
+same list as a self-contained HTML file that opens looking like the cards on
+screen. Everything is inlined — no fonts, no scripts, no network of any kind —
+because this gets opened from a text message on a phone that may be standing in
+a garage with no signal, and a page that has to fetch something is a page that
+shows nothing. A file rather than a link also means nobody needs an account, and
+it still reads a year from now. It states on its face that it is a snapshot and
+does not update, because a stale list that looks live is worse than one that
+admits it.
 
-Location still governs **movement** — dragging a bus, or MOVE BUS TO, re-derives
-the status from where it lands, so a bus parked into a CNG lot still goes out of
-service on its own. Two rules survive because they describe the condition of the
-bus rather than where it sits: a bus needing interior cleaning reads in-shop, and
-a bus with unresolved defects is never plainly "In Service".
+Everything a person typed is HTML-escaped, so a note containing a bracket stays
+a note rather than becoming markup. The file goes out through
+`shareOrDownloadFile`, the same path the Defect Log export already uses, so it
+uses the share sheet where there is one and falls back to a download where there
+is not.
 
-A side effect worth knowing: it was previously impossible to mark a bus in the
-Main Garage "Out of Service", because the garage rule silently rewrote it from
-the bus's open defects. That is now possible.
+## Known issue this release does not fix
 
-### 4. Locating a bus opens the section it is hiding in — `248020f`
+**Duplicate defect records from photo scans.** A repair photographed off the
+Down Sheet on different days mints a fresh id from the clock each time, so the
+same fault is stored more than once. Measured against the live board on 31
+August: **328 open defects, 150 of them scan-sourced, and 21 buses carrying 25
+redundant records.**
 
-Searching for a bus in a collapsed section did nothing — no answer, no error, the
-box just cleared. The search was succeeding: a collapsed section keeps its tokens
-in the document and hides them with `display:none`, so the scroll had no box to
-scroll to. Locate now opens the sections holding the matches, and only those.
+Change 2 collapses identical lines *in a shared list*. It does not touch stored
+records, and the underlying duplicates still inflate defect counts on the board.
+Fixing it at the source — scan matching recognising a repair it has already
+seen — is separate work that has not been authorised, and it touches repair
+records, which are never merged or deleted without Curtis saying so explicitly.
 
-### 5. COMPLETED TODAY is a view; fixed repairs name their origin — `265a0e6`
-
-The **COMPLETED TODAY** tile counted correctly and did nothing when pressed. It
-is now a button showing only the repairs completed today — Down Sheet work by
-definition, since the counter reads the sheet's own entries. Pressing again
-restores the live sheet; with nothing completed today there is nothing to press.
-
-Every **Fixed Repairs** card now carries a band naming where the repair came
-from: green for a bus cleared off the Down Sheet, orange for the Defect Log, grey
-for the map or the AI Operator. The source was already stored on each record.
-
-### 6. OFF PROPERTY — `5a445c8`
-
-A new facility-map section for buses away at a vendor. **28 spaces**, the same
-count on every device, taken from the waiting area, which drops from 98 to 70.
-28 is two full rows on the shop computer; a fixed count rather than "two rows"
-because that grid is 14 across on a computer, 10 on an iPad and 3 on a phone. A
-bus parked there reads Out of Service, the same way the CNG lots work.
+Publishing 129 neither helps nor worsens this. It is recorded here so nobody
+reads the collapsed share list as evidence the duplicates are gone.
 
 ## Data safety
 
-No LocalStorage key was renamed or removed, and nothing already stored is
-rewritten. The cloud keys (`pace-cloud-config-v1`, `pace-cloud-state-v1`,
-`pace-cloud-sent-v1`, `pace-cloud-auth-v1`) shipped in 127 and are unchanged.
-
-**One local migration runs automatically.** The waiting area lost its LAST 28
-slots to OFF PROPERTY. Any bus parked in `waiting-70` through `waiting-97` is
-relocated into a free waiting space at read time by `migrateReducedCapacity` —
-the same helper this project already uses whenever a section shrinks. Two
-deliberate properties:
-
-- **Nobody is stranded** in a slot that no longer exists.
-- **No bus is relabelled as being at a vendor.** Where a real bus physically is
-  cannot be inferred from a renumbering, and guessing would put a bus at Bus &
-  Truck that is sitting in the yard. OFF PROPERTY starts empty.
-
-**New optional record fields**, both additive and ignored by older data:
-
-- `location` on a Down Sheet entry — the MOVE BUS TO instruction, cleared once
-  carried out
-- `statusColor` in the Defect Log settings blob, defaulting to off
-
-**One behaviour change with no storage effect:** the Down Sheet stores the status
-a person picked rather than one derived from the parking space. Existing records
-are untouched; the difference appears on the next save.
+- No LocalStorage key added, renamed or removed. The cloud keys
+  (`pace-cloud-config-v1`, `pace-cloud-state-v1`, `pace-cloud-sent-v1`,
+  `pace-cloud-auth-v1`) shipped in 127 and are unchanged.
+- No stored record is rewritten, and no record shape changed.
+- No repair, defect or Down Sheet record is deleted or merged by this release.
+- The duplicate collapse in change 2 is presentation only, applied when a list is
+  shared. The board keeps every record it had.
+- Change 1 strictly *reduces* the chance of data loss. Its failure mode is
+  refusing to merge and saying so, which leaves the device exactly as it was.
 
 ## Validation
 
-- Production build passed
-- 151 regression tests passed, up from 141 at Version 127
+- 153 regression tests passed, up from 151 at Version 128
 - ESLint passed
-- Each of the six sync defects was reproduced against the real modules before
-  being fixed, and re-run after
-- The sync row mappers were executed against a real PostgreSQL 16 running the
-  exact production schema: upserts accepted, idempotent on replay, and a stale
-  push from a second device correctly ignored while a newer one landed
-- Measured in Chromium at 390px, 430px, 820px and 1440px across the Facility
-  Map, Down Sheet, Defect Log and Fixed Repairs changes
+- Production build passed
+- The pull-order fix was reproduced before it was fixed: a device with unsent
+  moves pulling inside the sweep window lost them, and does not after
+- The share output was checked against a real filtered board, including the
+  bus 17543 duplicate that prompted it, and against an empty filter
+- **The generated page was rendered in Chromium at 390px with every non-`file://`
+  request aborted.** It attempted **zero** network requests, so there is nothing
+  for a dead signal to fail: heading, per-bus cards, locations and footer all
+  present, and no horizontal overflow
+- **Escaping was verified by a real HTML parser, not a regex.** A defect note
+  containing `<img src=x onerror="document.title='PWNED'">`, quotes, an
+  apostrophe and an ampersand, on a bus numbered `1<b>9`, produced
+  `document.images.length === 0`, `document.scripts.length === 0`, no page
+  errors, and a title still reading `Farebox — Pace South`. The markup renders
+  as visible text
 
 ## After it is live
 
-1. **Facility Map** — confirm an **OFF PROPERTY** section appears above the
-   Waiting Area with 28 spaces, and the Waiting Area now shows 70. If any bus had
-   been parked in the last two rows of the old waiting area, confirm it is still
-   on the board, in a waiting space, and **not** in OFF PROPERTY.
-2. Drag a bus into OFF PROPERTY and confirm it reads **Out of Service**; drag it
-   back to the garage and confirm the status recovers.
-3. **Collapse all sections**, then locate a bus by number. Its section should
-   open and the bus scroll into view. The other sections should stay collapsed.
-4. **Down Sheet** — open any entry and confirm a **MOVE BUS TO** picker sits
-   under BUS STATUS ON TRACKER, defaulting to "Leave where it is" and naming the
-   area the bus is actually in.
-5. Set a bus in a CNG lot to **In Service with Defects** without moving it, save,
-   and confirm the Defect Log shows that status rather than Out of Service.
-6. Press **COMPLETED TODAY** and confirm the sheet shows only today's completed
-   repairs; press again and confirm the live sheet returns.
-7. **Defect Log** — tick **SHOW STATUS COLOR** and confirm bus numbers take the
-   tracker's colours; confirm it is off by default on a device that has not
-   ticked it.
-8. **Fixed Repairs** — confirm each card carries a coloured band naming its
-   origin, green for the Down Sheet and orange for the Defect Log.
-9. **Settings → SHOP CLOUD** — confirm the status line reads **Not connected**,
-   and that nothing anywhere asks for a sign-in before the board renders.
+1. **Defect Log → any Quick Filter → COPY LIST.** Confirm there is a blank line
+   between buses, the location sits on the bus line beside the number, and the
+   defects are indented under it.
+2. Open the **Farebox** filter and confirm bus 17543 lists its overheat **once**,
+   not twice.
+3. Press **SHARE PAGE**. Confirm a file arrives, opens as cards rather than a
+   paragraph, and shows the heading, the bus count and the time it was taken.
+   Turn the phone to airplane mode and open the file again — it must render
+   identically.
+4. **Settings → SHOP CLOUD, on a connected device.** Move two or three buses,
+   then press **GET THE SHOP'S COPY** straight away without waiting. Confirm the
+   buses you just moved are still where you put them after the reload.
+5. With the device offline, press **GET THE SHOP'S COPY** and confirm it says
+   this device's changes could not be sent and nothing was brought down — and
+   that the board is unchanged afterwards.
+6. Confirm the status line still reads correctly after that failure, rather than
+   sticking on "Syncing…".
 
 ## Publishing constraints that still apply
 
@@ -240,5 +244,5 @@ are untouched; the difference appears on the next save.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 128 | Live | <published tip hash> | Six shop-cloud defects fixed including a silent change-detection failure; the Down Sheet can move a bus and the status you choose now stands until it does; locate opens collapsed sections; COMPLETED TODAY became a view and fixed repairs name their origin; new OFF PROPERTY section for buses away at a vendor |
+| 129 | Live | <published tip hash> | GET THE SHOP'S COPY now sends this device's work before merging the shop's copy in, and refuses to merge if that send failed; shared Quick Filter lists collapse repeated defect lines, space each bus apart and carry its location, and can be sent as a self-contained page that renders offline |
 ```
