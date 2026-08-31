@@ -1,14 +1,21 @@
 # Publish next
 
-**STATUS: PENDING — Version 130 is queued and frozen to its exact SHA. Version 129 is live.**
+**STATUS: PENDING — two releases are queued, each frozen to its exact SHA. Version 129 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
+| 1st | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
+| 2nd | **131** | `d1d2e76` | Bus Accessories for the bike rack, and naming which start button is broken |
 
-**Version 129 was published from `24a02a9` on 2026-08-31. Publish Version 130 next from `5fc8436`.**
+**Version 129 was published from `24a02a9` on 2026-08-31.** Publish **130** next
+from `5fc8436`, then **131** from `d1d2e76`.
 
-The Version 130 section below is the current complete handoff. The earlier Version 129 section is retained as the published release record.
+131 contains 130, so publishing `d1d2e76` alone would deliver both correctly —
+but they are separate releases with separate checks, and 130 carries the change
+that touches stored repair records. Do not merge them into one version number.
+
+The Version 130 and Version 131 sections below are complete handoffs. The
+earlier Version 129 section is retained as the published release record.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -465,4 +472,166 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 130 | Live | <published tip hash> | One repair is recorded once: sheet photo scans write to the record a bus already carries instead of minting a second, and a MERGE DUPES action folds existing exact repeats together keeping every field, the earliest reported date and the most severe status; merged records are tombstoned so the shop cloud cannot resurrect them |
+```
+
+---
+---
+
+# Version 131 — Bus Accessories, and which start button is broken
+
+**Publish this THIRD, after Version 130 is live.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`d1d2e76`** |
+| Last code-bearing commit | `d1d2e76` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 130, published from `5fc8436` |
+
+Everything this release contains:
+
+```
+git diff --name-only 5fc8436 d1d2e76
+```
+
+Two files:
+
+```
+app/repair-catalog.ts
+tests/rendered-html.test.mjs
+```
+
+Gate: 156 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**No database migration, no dependency change, no new storage key, and no
+record rewritten.**
+
+```
+git diff --name-only 5fc8436 d1d2e76 -- supabase package.json package-lock.json   # returns nothing
+```
+
+This release only adds choices to the repair catalog. Every existing defect
+record reads back exactly as it was logged.
+
+## What changed
+
+Both changes come from the same complaint: work was being filed under a heading
+that made it look like something it is not.
+
+### 1. A Bus Accessories group, for the bike rack
+
+The bike rack lived in two places and neither fitted a **reported fault**:
+
+- **Bodywork — "Bike rack - bent / replacement"**, correct when the rack has
+  been hit and it really is the body shop's job.
+- **Preventive Maintenance — "Bike rack - arms / pivot adjustment"**, which is
+  scheduled work, not something a driver hands in.
+
+A rack that comes back **loose**, or **missing an arm**, is neither. It is a
+defect on a piece of equipment, and filing simple bolt-up work as body work put
+it in front of the body shop on every count and every shared list.
+
+**Bus Controls gains a "Bus Accessories" group** with the two faults as they
+actually get reported:
+
+- `Bike rack - arm replacement`
+- `Bike rack - loose / pivots`
+
+**Both existing entries stay exactly where they are.** A bent rack really is
+body work and the PM line really is scheduled maintenance; this adds the third
+case rather than moving the other two. The group is deliberately named for
+accessories rather than for the bike rack, so the next thing bolted to a bus has
+somewhere to go.
+
+### 2. The start buttons are named by station
+
+Two separate buttons start this bus, and Bus Controls offered a single entry
+called **"Start button"** that said neither. It is now:
+
+- `Front start button`
+- `Rear start button`
+
+**This is not the same as the starting-system entries, and both pairs are kept
+on purpose.** "Front start INOP" and "Rear start INOP" in *Battery, Starting and
+Charging* say the bus will not start from that station, which points at the
+starting and charging system. A button that does not work **while the other
+button still starts the bus** is a bad switch. Conflating them puts simple
+switch work in front of a charging diagnosis.
+
+Neither new entry takes a bus out of service, because a bus with one working
+start button still runs.
+
+**The ambiguous entry is retired from the picker rather than renamed.** Nothing
+can say which button an old record meant, and the precedent in this file is the
+crossed "Only front start" rename that had to be mapped *backwards* to avoid
+inverting every record already logged. Guessing would silently relabel somebody's
+work. The live board carries none of these — checked before deciding rather than
+assumed — and any record that does still reads exactly as logged, because the
+editor already offers an off-catalog issue back as **"(as logged)"**.
+
+### 3. The catalog invariant is now asserted, not spot-checked
+
+A grouped category carries every entry twice: prefixed in `REPAIR_OPTIONS`,
+which is what gets **stored**, and bare in `REPAIR_OPTION_GROUPS`, which is what
+the picker **draws**. Adding to one and not the other gives either a picker
+option that stores something the catalog does not know, or a stored value nobody
+can choose — and neither surfaces until somebody is standing at a bus.
+
+It was only ever spot-checked on two mirror switches. It is now asserted for
+every grouped category, which is the check that adding a whole new group needed.
+It already held everywhere, order included.
+
+## Data safety
+
+- **Nothing is renamed, moved or rewritten.** Additions only.
+- **No record is orphaned.** The one retired picker entry has zero records on the
+  live board, and any that exist elsewhere still read as logged.
+- **The bike rack entries in Bodywork and Preventive Maintenance are untouched.**
+
+## Validation
+
+- 156 regression tests passed, up from 155 at Version 130
+- ESLint passed; production build passed
+- The live board was queried before deciding how to treat the ambiguous entry:
+  zero records use `Operating Controls - Start button`, and one open record uses
+  `Front start INOP`, which stays where it is
+- Measured in Chromium at 390px: the **Bus Accessories** group draws with both
+  bike rack entries, **Operating Controls** offers both start buttons, and
+  choosing a bike rack fault stores
+  `Bus Accessories - Bike rack - arm replacement`
+
+## After it is live
+
+1. **Defect Log → + LOG DEFECT → category Bus Controls.** Confirm the QUICK
+   SELECT list ends with a **Bus Accessories** group holding **Bike rack - arm
+   replacement** and **Bike rack - loose / pivots**.
+2. In the same list, under **Operating Controls**, confirm **Front start button**
+   and **Rear start button** appear next to each other, and that the old plain
+   **Start button** is gone.
+3. Log a bike rack fault on any bus and confirm it saves, appears on the Defect
+   Log card, and does **not** take the bus out of service.
+4. Confirm **Bodywork** still offers **Bike rack - bent / replacement** and
+   **Preventive Maintenance** still offers **Bike rack - arms / pivot
+   adjustment** — those are meant to stay.
+5. Confirm **Battery, Starting and Charging** still offers **Front start INOP**
+   and **Rear start INOP**.
+6. The same list appears on the Down Sheet editor; confirm the new entries are
+   there too.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 131 | Live | <published tip hash> | A Bus Accessories group under Bus Controls for bike rack arm replacement and loose pivots, kept apart from body-shop and scheduled-maintenance bike rack work; front and rear start buttons named separately from the starting-system entries so a bad switch is not filed as a charging fault |
 ```
