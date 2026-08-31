@@ -5886,6 +5886,38 @@ test("a merge survives the shop cloud instead of being undone by it",async()=>{
  assert.equal(withoutMergedAway(payload,{d1:"2026-08-31T12:00:00.000Z"}).buses[0].defects.length,0);
 });
 
+test("the IntelligAIRE III panel is named in the A/C list",()=>{
+ const ac=REPAIR_OPTIONS["A/C and HVAC"];
+ const entry="IntelligAIRE III control panel - screen blank / black";
+
+ // The Thermo King panel on the bulkhead is called IntelligAIRE III, and the
+ // screen going black is a fault in its own right. Until now the only place for
+ // it was "Controls / electrical", which covers the whole A/C control side and
+ // says nothing about which control — so a recurring, recognisable failure
+ // arrived on the board indistinguishable from a wiring fault. Naming the panel
+ // is the point: it is what somebody standing at the bus reads off the label.
+ assert.ok(ac.includes(entry));
+ // Sits with the other control entry rather than at the end of the list, since
+ // that is where somebody looking for a control fault will already be.
+ assert.equal(ac.indexOf(entry),ac.indexOf("Controls / electrical")+1);
+
+ // A/C and HVAC is an ungrouped category, so the entry belongs in REPAIR_OPTIONS
+ // only. Adding a REPAIR_OPTION_GROUPS entry would turn the whole category into
+ // a two-step picker for every other A/C defect.
+ assert.equal(REPAIR_OPTION_GROUPS["A/C and HVAC"],undefined);
+
+ // A blank display is not a road failure: the bus still runs.
+ assert.equal(defaultDefectOperability("A/C and HVAC",entry),"service");
+
+ // Survives a round trip under its stored name.
+ const [defect]=normalizeDefects([{id:"d",category:"A/C and HVAC",issue:entry,details:"",state:"open",operability:"service"}]);
+ assert.equal(defect.issue,entry);
+
+ // The vague entry it was hiding inside stays, because the A/C control side has
+ // faults that are not this panel.
+ assert.ok(ac.includes("Controls / electrical"));
+});
+
 test("bus accessories and the two start buttons land in both catalog structures",()=>{
  // THE GENERAL INVARIANT, which until now was only spot-checked on the two
  // mirror switches. A grouped category stores "Group - Issue" in REPAIR_OPTIONS
