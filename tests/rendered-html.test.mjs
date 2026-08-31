@@ -448,15 +448,22 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
   const mixed={id:"mixed",n:"8",defects:[buses[0].defects[0],buses[7].defects[0]]};
   assert.deepEqual(quickFilterDefects(mixed,"ac").map(defect=>defect.issue),["No cooling"]);
-  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\nBus 8 — A/C and HVAC — No cooling");
-  assert.equal(quickFilterShareText("Farebox",[{id:"flag",n:"9",farebox:true,defects:[buses[7].defects[0]]}],"farebox"),"Farebox — 1 bus\nBus 9 — Farebox tracker flag");
-  assert.equal(quickFilterShareText("IBS & Ventra",[{id:"legacy",n:"10",pendingRepair:"Ventra reader blank",defects:[]}],"ibs-ventra"),"IBS & Ventra — 1 bus\nBus 10 — Ventra reader blank");
+  // A blank line between buses and the defects indented under the number. This
+  // gets read on a phone in a garage, where fourteen buses of run-on text is a
+  // wall the eye slides off. A bus with no location simply omits it.
+  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\n\nBus 8\n   A/C and HVAC — No cooling");
+  assert.equal(quickFilterShareText("Farebox",[{id:"flag",n:"9",farebox:true,defects:[buses[7].defects[0]]}],"farebox"),"Farebox — 1 bus\n\nBus 9\n   Farebox tracker flag");
+  assert.equal(quickFilterShareText("IBS & Ventra",[{id:"legacy",n:"10",pendingRepair:"Ventra reader blank",defects:[]}],"ibs-ventra"),"IBS & Ventra — 1 bus\n\nBus 10\n   Ventra reader blank");
   const fifteen=Array.from({length:15},(_,index)=>({id:"fare-"+index,n:String(17500+index),defects:[{id:"farebox-"+index,category:"Tech Services",issue:"Farebox",details:"Reader offline",state:"open"},{id:"ac-"+index,category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]}));
   const fifteenFarebox=quickFilterShareText("Farebox",fifteen,"farebox");
   assert.equal(quickFilterBusIds(fifteen,"farebox").length,15);
-  assert.equal(fifteenFarebox.split("\n").length,16);
+  // One block per bus, each separated by a blank line. Asserting the structure
+  // rather than a line count, because the count moves whenever the layout does
+  // and tells nobody what actually broke.
+  assert.equal(fifteenFarebox.split("\n\n").length,16);
+  assert.equal((fifteenFarebox.match(/^Bus /gm)||[]).length,15);
   assert.doesNotMatch(fifteenFarebox,/No cooling/);
-  assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\nBus 8 — Electrical / Multiplex — Intermittent electrical — Reported cutting out");
+  assert.equal(quickFilterShareText("Defect / Condition Not Duplicated",[buses[9]],"not-duplicated"),"Defect / Condition Not Duplicated — 1 bus\n\nBus 8\n   Electrical / Multiplex — Intermittent electrical — Reported cutting out");
 });
 
 test("server-renders the live fleet command dashboard", async () => {
@@ -5624,4 +5631,56 @@ test("bringing the shop's copy down sends this device's work first",async()=>{
  const push=control.slice(control.indexOf("const push=useCallback"),control.indexOf("const pull=async"));
  assert.match(push,/return result\.ok;/);
  assert.match(push,/running\.current\)return false;/);
+});
+
+test("a shared filter list collapses repeats and can go as a page",async()=>{
+ const { quickFilterShareText, quickFilterShareHtml, quickFilterShareFilename, shareAreaLabel } =
+  await import("../app/defect-log/quick-filter-share.ts");
+ const defect=(id,category,issue,details)=>({id,category,issue,details,operability:"service",state:"open",source:"defect-log"});
+
+ // Bus 17543 as it actually is on the shop's board: the same overheat
+ // photographed off the Down Sheet on three different days, each scan minting a
+ // fresh id from the clock, two of them word-for-word identical and both
+ // mentioning a farebox in the note. The shared list printed that sentence
+ // twice, and a person reading it cannot tell whether that is two problems.
+ const scanned={id:"c",n:"17543",l:"west-9",defects:[
+  defect("s1","Cooling System","Overheating","R/C Overheats/ Farebox Won't Lock/ Rear End Shifted"),
+  defect("s2","Cooling System","Overheating","R/C Overheats/ Farebox Won't Lock/ Rear End Shifted"),
+ ]};
+ const text=quickFilterShareText("Farebox",[scanned],"farebox");
+ assert.equal(text.match(/Rear End Shifted/g).length,1,"the identical line should appear once");
+
+ // Two genuinely different farebox faults are two lines. Collapsing is about
+ // repeats, never about hiding a second real problem.
+ const two={id:"b",n:"17533",l:"garage-2",defects:[
+  defect("d2","Tech Services","Farebox",""),
+  defect("d3","Tech Services","Farebox won't lock",""),
+ ]};
+ assert.equal(quickFilterShareText("Farebox",[two],"farebox").match(/Tech Services/g).length,2);
+
+ // Where to walk is the thing somebody acts on, so it rides with the number.
+ assert.match(text,/Bus 17543 {2}· {2}CNG West/);
+ assert.equal(shareAreaLabel("offsite-3"),"Off Property");
+ assert.equal(shareAreaLabel(""),"");
+ assert.equal(shareAreaLabel(undefined),"");
+
+ // The page version has to survive being opened from a text message on a phone
+ // sitting in a garage with no signal, so it reaches for nothing at all.
+ const html=quickFilterShareHtml("Farebox",[scanned,two],"farebox","Aug 31, 2026, 10:40 PM");
+ assert.doesNotMatch(html,/https?:\/\//,"the shared page must not fetch anything");
+ assert.doesNotMatch(html,/<script/i,"no scripts — some mail and message clients strip or block them");
+ assert.match(html,/17543/);
+ assert.match(html,/CNG West/);
+ assert.match(html,/Farebox — 2 buses/);
+ // A snapshot that quietly goes stale is worse than one that says it has.
+ assert.match(html,/does not update/);
+
+ // Anything typed by a person is escaped; a bus note containing a bracket must
+ // not become markup.
+ const risky={id:"x",n:"1<b>9",l:"road-1",defects:[defect("r","Tech Services","Farebox","<img src=x onerror=alert(1)>")]};
+ const escaped=quickFilterShareHtml("Farebox",[risky],"farebox","now");
+ assert.doesNotMatch(escaped,/<img src=x/);
+ assert.match(escaped,/&lt;img src=x/);
+
+ assert.equal(quickFilterShareFilename("A/C Buses",new Date("2026-08-31T00:00:00Z")),"pace-a-c-buses-2026-08-31.html");
 });
