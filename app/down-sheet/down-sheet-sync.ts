@@ -88,9 +88,33 @@ function entryKey(entry:SyncDownEntry){return clean(entry.id)||entry.busId}
    bus, which keeps every live record's history and stays stable across those
    regenerated ids. Every other card keys on its own id, which is persisted the
    moment a second card is added. */
+function carriedItems(entry:SyncDownEntry){
+ return (entry.repairItems||[]).filter(item=>clean(item.category)||clean(item.repair)||clean(item.details));
+}
+
+function legacyDefectIds(entry:SyncDownEntry){
+ return [clean(entry.defectId),"downsheet-"+entryKey(entry),"downsheet-"+entry.busId].filter(Boolean);
+}
+
+/* Every defect id this entry can write to or adopt, worked out without needing
+   the bus.
+
+   Exported because the duplicate cleanup has to know which of several identical
+   records an entry still on the sheet would go on re-creating. Choosing any
+   other record as the survivor deletes the one thing that regenerates, so the
+   duplicate returns on the next save — which looks exactly like the cleanup
+   never having worked.
+
+   It lives here, beside the function that does the writing, rather than being
+   restated next to the cleanup, because two copies of this rule would drift and
+   the symptom would be silent: duplicates quietly coming back days later. */
+export function downSheetDefectIdCandidates(entry:SyncDownEntry){
+ return [...legacyDefectIds(entry),...carriedItems(entry).map(item=>"downsheet-"+entryKey(entry)+"-"+item.id)];
+}
+
 function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
- const items=(entry.repairItems||[]).filter(item=>clean(item.category)||clean(item.repair)||clean(item.details));
- const legacyIds=[clean(entry.defectId),"downsheet-"+entryKey(entry),"downsheet-"+entry.busId].filter(Boolean);
+ const items=carriedItems(entry);
+ const legacyIds=legacyDefectIds(entry);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
  if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined}];
  const taken=new Set<string>();

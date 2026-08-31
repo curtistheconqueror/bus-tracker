@@ -375,6 +375,72 @@ export function writeSentFingerprints(storage:StorageWriter,fingerprints:SentFin
  catch{return false}
 }
 
+/* Defect records this device folded into another, and when.
+
+   A push only ever sends what a bus still carries, so a record merged away is
+   simply not sent — it is not removed anywhere. The row stays live on the
+   server, the next GET THE SHOP'S COPY reads it back, and the merge takes
+   incoming records it does not have, so all of it returns. The cleanup would
+   undo itself on the very next sync, on the device that ran it.
+
+   Hence a ledger. It does two jobs, and both are needed: this device stops
+   accepting those records back, and the server is told they are gone, so the
+   other devices stop being sent them. It is kept rather than cleared once
+   pushed, because a device that is offline for a week will still hand back the
+   records it has when it reconnects, and this is what refuses them. */
+export const CLOUD_MERGED_STORAGE_KEY="pace-cloud-merged-v1";
+
+export type MergedAwayDefects=Record<string,string>;
+
+export function readMergedAway(storage:StorageReader):MergedAwayDefects{
+ try{
+  const raw=storage.getItem(CLOUD_MERGED_STORAGE_KEY);
+  const parsed=raw?JSON.parse(raw):null;
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))return {};
+  const out:MergedAwayDefects={};
+  for(const [key,value] of Object.entries(parsed as Record<string,unknown>))
+   if(typeof value==="string")out[key]=value;
+  return out;
+ }catch{return {}}
+}
+
+export function writeMergedAway(storage:StorageWriter,merged:MergedAwayDefects){
+ try{storage.setItem(CLOUD_MERGED_STORAGE_KEY,JSON.stringify(merged));return true}
+ catch{return false}
+}
+
+/* Tombstones for the records this device merged away.
+
+   Only the key, the tombstone and the signature. Writing the record's own
+   fields back while deleting it would let a stale copy of a repair overwrite
+   the version that survived. */
+export function mergedAwayRows(merged:MergedAwayDefects,config:CloudConfig,now:string):CloudRow[]{
+ return Object.entries(merged).map(([defectId,at])=>({
+  defect_id:defectId,
+  deleted_at:at||now,
+  updated_at:at||now,
+  ...signature(config),
+ }));
+}
+
+/* An incoming payload with the merged-away records taken out.
+
+   The tombstone push handles the server, but not a second device that still
+   holds its own copy and pushes it back before anybody presses MERGE DUPES
+   there. This is the belt to that braces: whatever arrives, a record this
+   device has already folded away does not come back. */
+export function withoutMergedAway<T extends {defects?:unknown}>(
+ payload:{buses?:T[]}|null|undefined,merged:MergedAwayDefects
+){
+ if(!payload||!Array.isArray(payload.buses)||!Object.keys(merged).length)return payload;
+ return {...payload,buses:payload.buses.map(bus=>{
+  const defects=Array.isArray(bus?.defects)?bus.defects as {id?:string}[]:null;
+  if(!defects)return bus;
+  const kept=defects.filter(defect=>!merged[String(defect?.id??"")]);
+  return kept.length===defects.length?bus:{...bus,defects:kept};
+ })};
+}
+
 export function changedRows(rows:CloudRow[],key:string,sent:SentFingerprints){
  const next:SentFingerprints={},changed:CloudRow[]=[];
  for(const row of rows){

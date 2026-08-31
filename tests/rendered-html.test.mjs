@@ -5684,3 +5684,201 @@ test("a shared filter list collapses repeats and can go as a page",async()=>{
 
  assert.equal(quickFilterShareFilename("A/C Buses",new Date("2026-08-31T00:00:00Z")),"pace-a-c-buses-2026-08-31.html");
 });
+
+test("duplicate defects merge into one record without losing anything",async()=>{
+ const { mergeDuplicateDefects, matchingUnresolvedDefectId, defectFingerprint } =
+  await import("../app/duplicate-defects.ts");
+ const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+
+ const defect=(id,extra={})=>({id,category:"Cooling System",issue:"Overheating",
+  details:"R/C Overheats/ Farebox Won't Lock/ Rear End Shifted",
+  operability:"service",state:"open",source:"down-sheet",...extra});
+ const bus=(id,n,defects)=>({id,n,l:"west-9",s:"defect",defects,pendingRepair:""});
+
+ // Bus 17543 as the shop's live board actually holds it: the same overheat
+ // photographed off the Down Sheet on two different days. Each scan minted an
+ // entry id from the clock, so each produced a defect id nothing on the bus
+ // matched, and the fault is stored twice.
+ const twice=[bus("c","17543",[
+  defect("downsheet-repair-scan-1787409639286-18",{createdAt:"2026-08-22T10:00:00.000Z"}),
+  defect("downsheet-repair-scan-1787516955962-16",{createdAt:"2026-08-23T10:00:00.000Z"}),
+ ])];
+ const merged=mergeDuplicateDefects(twice,[],"2026-08-31T12:00:00.000Z");
+ assert.equal(merged.removed,1);
+ assert.equal(merged.busesAffected,1);
+ assert.equal(merged.buses[0].defects.length,1);
+ // Nothing anchors this group, so the oldest survives and keeps the date the
+ // fault was actually first seen rather than the date of the latest photo.
+ assert.equal(merged.buses[0].defects[0].id,"downsheet-repair-scan-1787409639286-18");
+ assert.equal(merged.buses[0].defects[0].createdAt,"2026-08-22T10:00:00.000Z");
+
+ // THE ANCHOR RULE. On 17504 the NEWEST copy is the one an entry still on the
+ // sheet regenerates. Keeping the oldest would delete the only record that
+ // comes back, and the duplicate would reappear on the next save — a cleanup
+ // that visibly undoes itself. The entry's copy has to win.
+ const anchored=[bus("d","17504",[
+  defect("downsheet-repair-scan-1787409639286-10",{createdAt:"2026-08-22T10:00:00.000Z"}),
+  defect("downsheet-repair-scan-1787881978072-6", {createdAt:"2026-08-27T10:00:00.000Z"}),
+ ])];
+ const entry={id:"repair-scan-1787881978072-6",busId:"d",category:"Cooling System",
+  repair:"Overheating",customReason:"R/C Overheats/ Farebox Won't Lock/ Rear End Shifted",
+  assignmentType:"Mechanic",assignedTo:"",workflow:"Scheduled",operationalStatus:"defect"};
+ const kept=mergeDuplicateDefects(anchored,[entry],"2026-08-31T12:00:00.000Z");
+ assert.equal(kept.removed,1);
+ assert.equal(kept.buses[0].defects[0].id,"downsheet-repair-scan-1787881978072-6");
+ assert.equal(kept.groups[0].anchored,true);
+ // And prove it stays merged: replaying the sheet entry must not resurrect the
+ // record that was folded away.
+ const replayed=applyDownEntryToFleet(kept.buses,kept.entries[0],"2026-08-31T12:05:00.000Z");
+ assert.equal(replayed[0].defects.length,1,"a sheet replay must not re-create the duplicate");
+
+ // NOTHING IS LOST. Fields living on the copy move to the survivor, the most
+ // severe operability wins so a merge can never put a bus back in service, and
+ // the further-along state is kept.
+ const rich=[bus("e","17541",[
+  defect("a",{createdAt:"2026-08-22T10:00:00.000Z",operability:"service",state:"open"}),
+  defect("b",{createdAt:"2026-08-23T10:00:00.000Z",operability:"down",state:"in-progress",
+   actionTaken:"Replaced thermostat",shopNotes:"Waiting on a hose",repairHours:2.5,
+   symptoms:["Steam from rear"],partNumber:"HX-99"}),
+ ])];
+ const folded=mergeDuplicateDefects(rich,[],"2026-08-31T12:00:00.000Z").buses[0].defects[0];
+ assert.equal(folded.id,"a");
+ assert.equal(folded.operability,"down","severity must never soften through a merge");
+ assert.equal(folded.state,"in-progress");
+ assert.equal(folded.actionTaken,"Replaced thermostat");
+ assert.equal(folded.shopNotes,"Waiting on a hose");
+ assert.equal(folded.repairHours,2.5);
+ assert.equal(folded.partNumber,"HX-99");
+ assert.deepEqual(folded.symptoms,["Steam from rear"]);
+
+ // ONLY EXACT REPEATS. Two genuinely different faults on one bus are two
+ // faults, and a completed record is never folded into an open one.
+ const distinct=[bus("f","17533",[
+  {id:"g",category:"Tech Services",issue:"Farebox",details:"",operability:"service",state:"open"},
+  {id:"h",category:"Tech Services",issue:"Farebox won't lock",details:"",operability:"service",state:"open"},
+  {...defect("i"),state:"completed"},
+  defect("j"),
+ ])];
+ const careful=mergeDuplicateDefects(distinct,[],"2026-08-31T12:00:00.000Z");
+ assert.equal(careful.removed,0,"different issues and a completed record are all left alone");
+
+ // Records carrying nothing in any compared field are not duplicates of each
+ // other — they make no claim to compare, and grouping on empty would destroy
+ // unrelated rows.
+ const blanks=[bus("k","17510",[
+  {id:"m",category:"",issue:"",details:"",operability:"service",state:"open"},
+  {id:"n",category:"",issue:"",details:"",operability:"service",state:"open"},
+ ])];
+ assert.equal(mergeDuplicateDefects(blanks,[],"2026-08-31T12:00:00.000Z").removed,0);
+
+ // Nothing is ever merged across buses.
+ const twoBuses=[bus("p","17507",[defect("q")]),bus("r","17509",[defect("s")])];
+ assert.equal(mergeDuplicateDefects(twoBuses,[],"2026-08-31T12:00:00.000Z").removed,0);
+
+ // PREVENTION — the half that stops it happening again. A rescan of the same
+ // paper finds the record already on the bus instead of minting a second.
+ const already=bus("t","17543",[defect("downsheet-repair-scan-1787409639286-18")]);
+ assert.equal(
+  matchingUnresolvedDefectId(already,{category:"Cooling System",repair:"Overheating",
+   reason:"R/C Overheats/ Farebox Won't Lock/ Rear End Shifted"}),
+  "downsheet-repair-scan-1787409639286-18");
+ // A different fault on the same bus is not adopted.
+ assert.equal(matchingUnresolvedDefectId(already,{category:"Brakes",repair:"ABS warning",reason:""}),undefined);
+ // Whitespace and case are not a new defect.
+ assert.equal(defectFingerprint({category:"Cooling  System",issue:"OVERHEATING",details:" x "}),
+              defectFingerprint({category:"cooling system",issue:"overheating",details:"x"}));
+
+ // End to end: import the same scanned row twice, the second time with the
+ // entry no longer on the sheet, which is exactly how the live duplicates were
+ // made. Adopting the existing record keeps it at one.
+ const fresh=[bus("u","17562",[])];
+ const scan=(entryId)=>({id:entryId,busId:"u",category:"Transmission and Drivetrain",
+  repair:"Will not shift",customReason:"Dragging on S/S / High Trans Temp / Stuck in 3rd Gear",
+  assignmentType:"Mechanic",assignedTo:"",workflow:"Scheduled",operationalStatus:"defect"});
+ const first=applyDownEntryToFleet(fresh,scan("repair-scan-1787409639286-13"),"2026-08-22T10:00:00.000Z");
+ assert.equal(first[0].defects.length,1);
+ const adopted=matchingUnresolvedDefectId(first[0],{category:"Transmission and Drivetrain",
+  repair:"Will not shift",reason:"Dragging on S/S / High Trans Temp / Stuck in 3rd Gear"});
+ const second=applyDownEntryToFleet(first,{...scan("repair-scan-1787516955962-12"),defectId:adopted},"2026-08-23T10:00:00.000Z");
+ assert.equal(second[0].defects.length,1,"a rescan must update the record, not add a second");
+ assert.equal(second[0].defects[0].id,"downsheet-repair-scan-1787409639286-13");
+
+ // A cleanup that undoes itself is not a cleanup. An entry still on the sheet
+ // that names no defect, but says exactly what the survivor says, mints its
+ // defect id from its OWN entry id — so the next save writes a second record
+ // with a different id and the same sentence, and the duplicate is back within
+ // a shift. Replaying the live board caught this on 11 of the 21 buses.
+ const lingering=[bus("v","15504",[
+  defect("downsheet-repair-scan-1787409639286-20",{createdAt:"2026-08-22T14:40:39Z"}),
+  defect("downsheet-repair-scan-1787516955962-18",{createdAt:"2026-08-23T20:29:15Z"}),
+ ])];
+ const stillOnSheet={id:"repair-scan-1787881978072-41",busId:"v",category:"Cooling System",
+  repair:"Overheating",customReason:"R/C Overheats/ Farebox Won't Lock/ Rear End Shifted",
+  assignmentType:"Mechanic",assignedTo:"",workflow:"Scheduled",operationalStatus:"defect"};
+ const tidied=mergeDuplicateDefects(lingering,[stillOnSheet],"2026-08-31T12:00:00.000Z");
+ assert.equal(tidied.removed,1);
+ assert.equal(tidied.relinkedEntries,1,"the entry must be pointed at the record that survived");
+ assert.equal(tidied.entries[0].defectId,"downsheet-repair-scan-1787409639286-20");
+ const afterSave=applyDownEntryToFleet(tidied.buses,tidied.entries[0],"2026-08-31T12:05:00.000Z");
+ assert.equal(afterSave[0].defects.length,1,"saving that entry must update, not duplicate");
+});
+
+test("a merge survives the shop cloud instead of being undone by it",async()=>{
+ const { mergedAwayRows, withoutMergedAway, readMergedAway, writeMergedAway,
+         defectLogPayload, changedRows } = await import("../app/cloud-sync.ts");
+
+ // A push only ever sends what a bus still carries, so a record folded into
+ // another is not deleted anywhere by merging alone. It stays live on the
+ // server, the next pull reads it back, and mergeDefectLog takes incoming
+ // records it does not have — so all 25 would return, on the very device that
+ // ran the cleanup. Two things stop that, and both are tested here.
+ const config={url:"https://x.supabase.co",anonKey:"k",email:"a@b.c",initials:"CM",deviceLabel:"Phone (CM)"};
+ const merged={"downsheet-repair-scan-1787516955962-16":"2026-08-31T12:00:00.000Z"};
+
+ // 1. The server is told the record is gone.
+ const rows=mergedAwayRows(merged,config,"2026-08-31T12:00:00.000Z");
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].defect_id,"downsheet-repair-scan-1787516955962-16");
+ assert.equal(rows[0].deleted_at,"2026-08-31T12:00:00.000Z");
+ // A tombstone carries no repair fields: writing them back while deleting the
+ // row would let a stale copy overwrite the version that survived.
+ assert.equal(rows[0].category,undefined);
+ assert.equal(rows[0].issue,undefined);
+ assert.equal(rows[0].details,undefined);
+ // It still signs itself, so the board can say which device did it.
+ assert.equal(rows[0].device_label,"Phone (CM)");
+
+ // 2. And whatever arrives, this device refuses the record back — which covers
+ // the second device that has not run the cleanup yet and keeps pushing its
+ // own copy.
+ const incoming={buses:[{n:"17543",defects:[
+  {id:"downsheet-repair-scan-1787409639286-18"},
+  {id:"downsheet-repair-scan-1787516955962-16"},
+ ]}]};
+ const filtered=withoutMergedAway(incoming,merged);
+ assert.deepEqual(filtered.buses[0].defects.map(d=>d.id),["downsheet-repair-scan-1787409639286-18"]);
+ // Nothing merged away means the payload is handed back untouched.
+ assert.equal(withoutMergedAway(incoming,{}),incoming);
+ assert.equal(withoutMergedAway(null,merged),null);
+
+ // The ledger round-trips through storage, and survives junk.
+ const store=new Map();
+ const storage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v)};
+ writeMergedAway(storage,merged);
+ assert.deepEqual(readMergedAway(storage),merged);
+ store.set("pace-cloud-merged-v1","not json");
+ assert.deepEqual(readMergedAway(storage),{});
+
+ // A tombstone is a change like any other, so it is sent once and then stops
+ // being sent — a merged board does not re-upload 25 deletions every sweep.
+ const first=changedRows(rows,"defect_id",{});
+ assert.equal(first.changed.length,1);
+ assert.equal(changedRows(rows,"defect_id",first.fingerprints).changed.length,0);
+
+ // And the pull payload builder is what the filter is applied to, so the shape
+ // the filter expects is the shape it actually gets.
+ const payload=defectLogPayload([{defect_id:"d1",fleet_number:"17543",category:"Cooling System",
+  issue:"Overheating",details:"",state:"open",operability:"down",detail:{}}],"2026-08-31T12:00:00.000Z");
+ assert.ok(Array.isArray(payload.buses),"the pull payload must expose buses for the filter to walk");
+ assert.equal(withoutMergedAway(payload,{d1:"2026-08-31T12:00:00.000Z"}).buses[0].defects.length,0);
+});

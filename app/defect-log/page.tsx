@@ -14,6 +14,8 @@ import {lockPageScroll} from "../scroll-lock";
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "./quick-filter-share";
+import {mergeDuplicateDefects} from "../duplicate-defects";
+import {readMergedAway,writeMergedAway} from "../cloud-sync";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
@@ -29,7 +31,10 @@ type LogFontFamily="clean"|"condensed"|"classic";
 type LogGroupContrast="standard"|"strong";
 type LogAppearance={page:string;surface:string;text:string;muted:string;header:string;headerText:string;accent:string};
 type LogSettings={defaultInitials:string;requireInitials:boolean;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;groupContrast:LogGroupContrast;statusColor:boolean;appearance:LogAppearance;display:DefectLogDisplaySettings;backupInterval:number};
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string};
+/* mergedAway is the ledger as it stood BEFORE the change, so undoing a merge
+   also stops this device tombstoning records it has just put back. Absent on
+   every other kind of change, which leaves the ledger alone. */
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;mergedAway?:Record<string,string>};
 
 const SETTINGS_KEY="pace-defect-log-settings-v1";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
@@ -363,6 +368,12 @@ export default function DefectLog(){
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
+ /* How many open repairs are recorded more than once, from the same function
+    that does the merging — so the number on the button is by construction the
+    number the button will act on, rather than a second count that can disagree
+    with it. */
+ const duplicateCount=useMemo(()=>mergeDuplicateDefects(fleet,downEntries).removed,[fleet,downEntries]);
+
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{if(!writeFleetStorage(localStorage,nextFleet))return;setFleet(nextFleet);setDownEntries(nextDown);writeDownSheetStorage(localStorage,nextDown)};
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
@@ -370,7 +381,35 @@ export default function DefectLog(){
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
- const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
+ /* Fold exact repeats into one record each.
+
+    Explicit, and pressed by a person. Never automatic on load: everything else
+    that runs at read time in this app rearranges what is SHOWN, while this
+    changes stored repair records, and a board that silently rewrites those the
+    moment it opens is one nobody can audit. It lands on UNDO LAST like every
+    other change here, so the way back is the way back from anything else. */
+ const mergeDuplicates=()=>{
+  /* Recomputed rather than read off the badge. The badge is a render behind
+     whatever just changed, and this decides what gets written. */
+  const preview=mergeDuplicateDefects(fleet,downEntries);
+  if(!preview.removed){alert("No duplicate defects were found. Every open repair on this board is recorded once.");return}
+  const buses=preview.busesAffected;
+  if(!confirm("Merge "+preview.removed+" duplicate record"+(preview.removed===1?"":"s")+" on "+buses+" bus"+(buses===1?"":"es")+"?\n\nOnly exact repeats are merged — same category, same symptom, same details. Everything written on the copies is kept on the record that stays, along with the earliest reported date. Nothing is merged across buses, and UNDO LAST reverses it."))return;
+  const now=new Date().toISOString();
+  const result=mergeDuplicateDefects(fleet,downEntries,now);
+  const before=readMergedAway(localStorage);
+  setUndoSnapshot({fleet,downEntries,mergedAway:before,label:"Merged "+result.removed+" duplicate record"+(result.removed===1?"":"s")});
+  persist(result.buses,result.entries);
+  /* A push only sends what a bus still carries, so a folded record is not
+     removed anywhere by merging alone: it stays live on the server, comes back
+     on the next GET THE SHOP'S COPY, and the merge undoes itself. Writing the
+     ids down is what makes the cleanup survive a sync — this device refuses
+     them on the way in, and tombstones them on the way out. */
+  writeMergedAway(localStorage,{...before,
+   ...Object.fromEntries(result.groups.flatMap(group=>group.droppedIds.map(id=>[id,now])))});
+  alert(result.removed+" duplicate record"+(result.removed===1?"":"s")+" merged on "+result.busesAffected+" bus"+(result.busesAffected===1?"":"es")+". Nothing was deleted — each fault is now on one record.");
+ };
+ const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);if(undoSnapshot.mergedAway)writeMergedAway(localStorage,undoSnapshot.mergedAway);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
@@ -423,7 +462,7 @@ export default function DefectLog(){
    </article>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>)}
   </section>
   <section className="log-feed">
-   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · ");return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>

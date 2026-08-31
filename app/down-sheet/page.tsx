@@ -8,6 +8,7 @@ import SectionTransferControls from "../section-transfer-controls";
 import {exportDownSheetPayload,mergeDownSheet,mergeSummary} from "../section-transfer";
 import DownSheetScanner from "./down-sheet-scanner";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
+import {matchingUnresolvedDefectId} from "../duplicate-defects";
 import {learnFinding,readFindingsMemory,writeFindingsMemory} from "../findings-memory";
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "./down-sheet-clear";
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "../repair-catalog";
@@ -180,7 +181,22 @@ export default function DownSheet(){
   const now=new Date().toISOString(),incomingIds=new Set(records.map(record=>record.busId)),removed=scannedSheetRemovals(entries,incomingIds),baseFleet=prepareFleetForScannedReplacement(fleet,removed,now);
   const imported=records.map((record,index)=>{
    const prior=entries.find(entry=>isActive(entry)&&entry.busId===record.busId),assignmentType:AssignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic",workflow:Workflow=record.operationalStatus==="shop"?"In Progress":"Scheduled";
-   return normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index);
+   /* Write to the record the bus already has, rather than minting a second one.
+
+      A defect is keyed on the entry that carried it in, and a rescan of the same
+      paper sheet makes a new entry id out of the clock. A bus that comes off the
+      sheet and back on — or is simply photographed again on a later day — then
+      arrives with an id nothing on the bus matches, and the identical fault is
+      recorded twice. That is how 21 buses came to carry 25 records saying
+      nothing the record beside them did not already say.
+
+      Naming the existing record here is enough: the sheet already adopts an
+      entry's stated defectId ahead of any id it would generate, so the scan
+      updates that record instead of adding to it. Only an EXACT repeat matches —
+      same category, symptom and details — so a genuinely different fault on the
+      same bus still becomes its own record. */
+   const defectId=prior?.defectId||matchingUnresolvedDefectId(fleet.find(bus=>bus.id===record.busId),record);
+   return normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,...(defectId?{defectId}:{}),busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index);
   });
   const nextEntries=[...imported];
   if(nextEntries.filter(isActive).length>MAX_ENTRIES){alert("This import would exceed the 98-bus Down Sheet capacity. Deselect some rows and try again.");return}

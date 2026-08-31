@@ -17,6 +17,9 @@ import {
  downSheetRow,
  fleetMapPayload,
  busRow,
+ mergedAwayRows,
+ withoutMergedAway,
+ type MergedAwayDefects,
  type CloudConfig,
  type CloudRow,
  type CloudState,
@@ -128,6 +131,9 @@ export type PushInput={
  config:CloudConfig;
  now:string;
  sent:SentFingerprints;
+ /* Records this device folded into another. Optional so a caller that has
+    never merged anything is unchanged. */
+ merged?:MergedAwayDefects;
 };
 
 export type PushResult=CloudOutcome&{sent:SentFingerprints;pushed:number;pending:number};
@@ -143,9 +149,18 @@ export async function cloudPush(input:PushInput):Promise<PushResult>{
   return defects.map(defect=>defectRow(defect,fleetNumber,config,now)).filter(Boolean) as CloudRow[];
  });
  const entryRows=entries.map(entry=>downSheetRow(entry,config,now)).filter(Boolean) as CloudRow[];
+ /* Records this device merged into another go up as tombstones. Without them
+    the server keeps handing the duplicates back and the cleanup undoes itself
+    on the next pull.
+
+    A record the board still carries is never tombstoned, whatever the ledger
+    says. That is what makes UNDO LAST safe even in the window before the ledger
+    is cleared, and it means a stale entry can never delete a live repair. */
+ const tombstones=mergedAwayRows(input.merged||{},config,now)
+  .filter(row=>!defectRows.some(live=>live.defect_id===row.defect_id));
 
  const busChange=changedRows(busRows,"fleet_number",sent);
- const defectChange=changedRows(defectRows,"defect_id",sent);
+ const defectChange=changedRows([...defectRows,...tombstones],"defect_id",sent);
  const entryChange=changedRows(entryRows,"entry_id",sent);
  const outstanding=busChange.changed.length+defectChange.changed.length+entryChange.changed.length;
  const fingerprints={...busChange.fingerprints,...defectChange.fingerprints,...entryChange.fingerprints};
@@ -190,7 +205,7 @@ export type PullResult=CloudOutcome&{
 
 /* Everything not tombstoned, handed back in the same shape a transfer FILE has
    so the caller can use the merge rules that already shipped. */
-export async function cloudPull(config:CloudConfig,now:string):Promise<PullResult>{
+export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={}):Promise<PullResult>{
  const empty={map:null,defects:null,sheet:null};
  try{
   const supabase=await cloudClient(config);
@@ -205,7 +220,11 @@ export async function cloudPull(config:CloudConfig,now:string):Promise<PullResul
   return {
    ok:true,phase:"idle",message:"",
    map:fleetMapPayload(busRes.rows,now),
-   defects:defectLogPayload(defectRes.rows,now),
+   /* Minus anything this device has already folded into another record. The
+      tombstones above clean the server, but a second device that has not run
+      the cleanup yet will go on pushing its own copies, and those would arrive
+      here and undo the merge. */
+   defects:withoutMergedAway(defectLogPayload(defectRes.rows,now),merged),
    sheet:downSheetPayload(entryRes.rows,now),
   };
  }catch(error){return {...failed(error),...empty}}

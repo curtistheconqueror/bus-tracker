@@ -23,6 +23,7 @@ import {
  EMPTY_CLOUD_CONFIG,
  readCloudConfig,
  readCloudState,
+ readMergedAway,
  readSentFingerprints,
  writeCloudConfig,
  writeCloudState,
@@ -87,6 +88,9 @@ export default function CloudSyncControl(){
    config:saved,
    now:new Date().toISOString(),
    sent:readSentFingerprints(localStorage),
+   /* Tombstones for anything this device folded into another record, so the
+      server stops handing the duplicates back to everyone. */
+   merged:readMergedAway(localStorage),
   });
   if(result.ok)writeSentFingerprints(localStorage,result.sent);
   const previous=readCloudState(localStorage);
@@ -174,7 +178,7 @@ export default function CloudSyncControl(){
    alert("This device's own changes could not be sent, so nothing was brought down. Bringing the shop's copy in now could overwrite work that has not left this device yet. Try again when it reconnects.");
    return;
   }
-  const result=await cloudPull(saved,new Date().toISOString());
+  const result=await cloudPull(saved,new Date().toISOString(),readMergedAway(localStorage));
   setBusy(false);
   if(!result.ok||!result.map||!result.defects||!result.sheet){
    remember({...state,phase:result.phase,lastError:result.message});
