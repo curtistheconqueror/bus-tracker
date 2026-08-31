@@ -520,10 +520,17 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.equal((east.match(/class="spot"/g) ?? []).length, 18);
   const road = section(html, '<section class="road">', '<section class="wall">');
   assert.equal((road.match(/class="spot"/g) ?? []).length, 75);
-  const west = section(html, '<section class="west lot panel">', '<section class="waiting panel">');
+  const west = section(html, '<section class="west lot panel">', '<section class="offsite panel">');
   assert.equal((west.match(/class="spot"/g) ?? []).length, 40);
+  // Buses away at a vendor. Two rows taken off the waiting area, so the yard
+  // count stops including buses that are not in the yard.
+  const offsite = section(html, '<section class="offsite panel">', '<section class="waiting panel">');
+  assert.equal((offsite.match(/class="spot"/g) ?? []).length, 28);
+  assert.match(offsite, /OFF PROPERTY/);
+  assert.match(offsite, /AWAY AT A VENDOR/);
   const waiting = section(html, '<section class="waiting panel">', '<footer class="command-bar">');
-  assert.equal((waiting.match(/class="spot"/g) ?? []).length, 98);
+  // 98 before OFF PROPERTY took its last 28 slots.
+  assert.equal((waiting.match(/class="spot"/g) ?? []).length, 70);
   assert.match(waiting, /WAITING AREA/);
 
 });
@@ -5553,4 +5560,41 @@ test("a fixed repair says which surface it came off",async()=>{
  assert.match(css,/\.fixed-origin\{[^}]*border-left:5px solid transparent/);
  assert.match(css,/\.fixed-origin\.from-down-sheet\{border-left-color:#087347/);
  assert.match(css,/\.fixed-origin\.from-defect-log\{border-left-color:#c07a00/);
+});
+
+test("OFF PROPERTY holds buses away at a vendor and nobody is stranded by it",async()=>{
+ const { OFF_PROPERTY_CAPACITY, WAITING_CAPACITY, SECTION_SLOTS, RELOCATION_AREAS, sectionForLocation } = await import("../app/facility-areas.ts");
+ const { statusForLocation } = await import("../app/smart-status.ts");
+ const { migrateReducedCapacity } = await import("../app/facility-layout.ts");
+
+ // A fixed count, not "two rows". The waiting grid is 14 across on a computer,
+ // 10 on an iPad and 3 on a phone, so "two rows" would have meant 28, 20 or 6
+ // spaces depending on what somebody happened to be holding.
+ assert.equal(OFF_PROPERTY_CAPACITY,28);
+ assert.equal(WAITING_CAPACITY,70);
+ assert.equal(SECTION_SLOTS["OFF PROPERTY"].length,28);
+ assert.equal(SECTION_SLOTS["OFF PROPERTY"][0],"offsite-0");
+ // It has to be a relocation target, or a bus could never be sent there.
+ assert.ok(RELOCATION_AREAS["OFF PROPERTY"]);
+ assert.equal(sectionForLocation("offsite-3"),"OFF PROPERTY");
+
+ // A bus that is not on the property cannot run.
+ const clean={defects:[],pendingRepair:""};
+ assert.equal(statusForLocation("offsite-0","service",clean),"out");
+ assert.equal(statusForLocation("offsite-27","shop",clean),"out");
+ // Except decommissioned, which outranks every location rule.
+ assert.equal(statusForLocation("offsite-0","decommissioned",clean),"decommissioned");
+
+ // The waiting area gave up its LAST 28 slots. A bus parked in one of them is
+ // moved up into a free waiting space rather than stranded — and is never
+ // quietly reclassified as being at a vendor, which is a claim about a real bus
+ // in the real world that the app has no way to know.
+ const fleet=[{id:"a",l:"waiting-0"},{id:"b",l:"waiting-97"},{id:"c",l:"waiting-70"}];
+ const moved=migrateReducedCapacity(fleet,"waiting",WAITING_CAPACITY);
+ assert.equal(moved.find(bus=>bus.id==="a").l,"waiting-0");
+ for(const id of ["b","c"]){
+  const at=moved.find(bus=>bus.id===id).l;
+  assert.ok(SECTION_SLOTS["WAITING AREA"].includes(at),id+" landed outside the waiting area at "+at);
+  assert.ok(!at.startsWith("offsite-"),id+" was reclassified as being at a vendor");
+ }
 });

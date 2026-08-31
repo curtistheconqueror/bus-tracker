@@ -735,3 +735,12 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
  .command-bar>.settings-command{grid-column:2/3}
  .command-bar>.ai-operator-command{grid-column:3/5}
 }
+
+/* OFF PROPERTY: buses away at a vendor. Two rows taken off the waiting area,
+   given their own frame so the yard count stops including buses that are not
+   in the yard. Amber rather than the waiting area's neutral, because a bus
+   somebody else has is a different kind of absent from one parked out back. */
+.offsite{border-color:#c78a2a}
+.offsite .title{color:#8a5600}
+.offsite-grid{max-height:96px}
+.offsite .spot{border-color:#dcc08a;background:color-mix(in srgb,var(--slot-bg) 88%,#f6e2bd)}

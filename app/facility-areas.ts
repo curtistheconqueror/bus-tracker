@@ -2,7 +2,17 @@ import {ROAD_CAPACITY,WEST_CAPACITY} from "./facility-layout.ts";
 import {moveOrSwapBuses,type MovableRepairBus} from "./smart-status.ts";
 
 export const SINGLE_FILE_CAPACITY=8;
-export const WAITING_CAPACITY=98;
+/* Two rows of the waiting area, given over to buses that are away at a vendor —
+   Bus & Truck and the like. They are not on this property at all, so they are
+   not "waiting" for anything here, and counting them in the holding area made
+   the yard look fuller than it was.
+
+   Twenty-eight because that is two full rows on the shop computer. It is a
+   fixed count rather than "two rows" on purpose: the waiting grid is 14 across
+   on a computer, 10 on an iPad and 3 on a phone, so "two rows" would have meant
+   28, 20 or 6 spaces depending on what somebody happened to be holding. */
+export const OFF_PROPERTY_CAPACITY=28;
+export const WAITING_CAPACITY=70;
 export const facilitySlots=(prefix:string,count:number,start=0)=>Array.from({length:count},(_,index)=>prefix+"-"+(index+start));
 export const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();
 export const SECTION_SLOTS:Record<string,string[]>={
@@ -20,6 +30,7 @@ export const SECTION_SLOTS:Record<string,string[]>={
  "SHOP WALL (SINGLE FILE)":facilitySlots("wall",SINGLE_FILE_CAPACITY),
  "MAIN GARAGE (BAYS 1-12)":facilitySlots("garage",84),
  "CNG WEST LOT":facilitySlots("west",WEST_CAPACITY),
+ "OFF PROPERTY":facilitySlots("offsite",OFF_PROPERTY_CAPACITY),
  "WAITING AREA":facilitySlots("waiting",WAITING_CAPACITY),
 };
 

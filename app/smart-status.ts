@@ -29,6 +29,10 @@ export function garageServiceStatus(bus:RepairAwareBus):FleetStatus{
 
 export function statusForLocation(location:string,current:FleetStatus,bus:RepairAwareBus):FleetStatus{
  if(current==="decommissioned")return current;
+ /* Away at a vendor. A bus that is not on the property cannot run, so parking
+    it here says so, the same way the CNG lots do. A foreman can still override
+    it on the Down Sheet, and that choice now stands until the bus is moved. */
+ if(location.startsWith("offsite-"))return "out";
  if(location.startsWith("east-")||location.startsWith("west-"))return "out";
  if(hasRequiredInteriorCleaning(bus))return "shop";
  if(location.startsWith("bay-")||location.startsWith("body-"))return "shop";
