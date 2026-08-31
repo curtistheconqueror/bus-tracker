@@ -6042,6 +6042,17 @@ test("saving fixed with a part asks for the number and flags it when left for la
  // the defect behind the prompt.
  assert.ok(logPage.indexOf("{partPrompt&&<PartNumberPrompt")<logPage.indexOf('<form className="log-editor"'));
 
+ // It behaves like every other layer in this app: a sheet from the bottom on a
+ // phone rather than a box floating in the middle, and Escape closes it.
+ assert.match(logCss,/@media\(max-width:760px\)\{\s*\.part-prompt-shade\{align-items:flex-end;padding:0\}/);
+ assert.match(logCss,/\.part-prompt\{width:100%;max-height:92dvh;border-radius:14px 14px 0 0/);
+ assert.match(logPage,/event\.key==="Escape"/);
+ // Escape must not also close the editor behind it, so the handler stops the
+ // event rather than letting it fall through to whatever else is listening.
+ assert.match(logPage,/event\.stopPropagation\(\);close\(\)/);
+ // The shade uses the same ink as every other overlay here.
+ assert.match(logCss,/\.part-prompt-shade\{[^}]*background:#03132dcc/);
+
  // THE FLAG on Fixed Repairs, in its own colour, beside the amber one it can
  // appear next to.
  assert.ok(fixedPage.includes("partNumberMissing(record.defect)&&"));

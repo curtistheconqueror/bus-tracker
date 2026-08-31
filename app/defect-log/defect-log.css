@@ -396,7 +396,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    field cannot submit the defect behind it. Its own scroll container, because a
    phone keyboard takes half the screen and the two actions must stay reachable
    without dismissing it. */
-.part-prompt-shade{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(9,20,38,.62);padding:16px}
+.part-prompt-shade{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:#03132dcc;padding:14px}
 .part-prompt{width:min(430px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;border-radius:12px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:16px}
 .part-prompt-head{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
 .part-prompt-head small{color:var(--log-muted,#62748d);font-size:8px;font-weight:900;letter-spacing:1px}
@@ -415,4 +415,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .part-prompt-note{margin:0;color:var(--log-muted,#62748d);font-size:9px;font-weight:700;line-height:1.4}
 .part-prompt-note b{color:#8a5a10}
 .part-prompt-cancel{min-height:44px;border:1px solid var(--log-border,#c7d1df);border-radius:8px;background:var(--log-surface,#fff);color:var(--log-muted,#62748d);font-family:inherit;font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer}
-@media(max-width:760px){.part-prompt{width:100%}.part-prompt-actions{grid-template-columns:1fr}}
+/* A sheet from the bottom on a phone, which is what every other layer in this
+   app does — the editor behind it, the settings panel, the move panel. A box
+   floating in the middle of the screen is the odd one out, and it puts the
+   two actions further from the thumb than they need to be. */
+@media(max-width:760px){
+ .part-prompt-shade{align-items:flex-end;padding:0}
+ .part-prompt{width:100%;max-height:92dvh;border-radius:14px 14px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+ .part-prompt-actions{grid-template-columns:1fr}
+}

@@ -110,6 +110,14 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
 }){
  const [number,setNumber]=useState(initial);
  const typed=number.trim();
+ /* Escape closes it, the same as the page menu and the phone command panel.
+    A layer that traps somebody because the only way out is a button they have
+    to find is the one thing a person in a hurry will remember about it. */
+ useEffect(()=>{
+  const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){event.stopPropagation();close()}};
+  window.addEventListener("keydown",escape,true);
+  return()=>window.removeEventListener("keydown",escape,true);
+ },[close]);
  return <div className="part-prompt-shade" role="dialog" aria-modal="true" aria-label="Part number"
   onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   <div className="part-prompt">
