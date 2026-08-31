@@ -32,9 +32,14 @@ jobs:
     # hung job, not a slow one.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # v5, not v4. The first run of this workflow passed but warned that v4
+      # targets Node 20, which GitHub has deprecated and is already force-running
+      # on Node 24 — a warning today and a broken workflow whenever that prop is
+      # removed. Exactly the overnight breakage the pinned node-version below
+      # exists to prevent, so it gets the same treatment.
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # package.json asks for >=22.13.0. Pinned to the major rather than
           # "latest" so a new Node release cannot turn a green repository red
