@@ -11,7 +11,7 @@ button,input,select,textarea{font:inherit}
 .down-header nav a{min-width:108px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #81a9dc;border-radius:6px;color:#eaf3ff;text-decoration:none;font-size:10px;font-weight:900}
 .down-header nav a.active{background:#fff;color:var(--down-navy);border-color:#fff}
 .down-summary{margin:12px 14px 8px;display:grid;grid-template-columns:1.25fr repeat(7,1fr);gap:7px}
-.down-summary>div{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #c3cde0;border-radius:7px;background:#fff;box-shadow:0 2px 6px #17376115}
+.down-summary>div,.down-summary>button{min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #c3cde0;border-radius:7px;background:#fff;box-shadow:0 2px 6px #17376115}
 .down-summary strong{font-size:24px;line-height:1;color:#11396d}
 .down-summary strong small{font-size:11px;color:#7787a2}
 .down-summary span{margin-top:5px;font-size:8px;font-weight:900;letter-spacing:.55px;color:#657590}
@@ -250,3 +250,15 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .repair-item-done span{font-size:9px;font-weight:900;letter-spacing:.4px;color:#3d5a72}
 .repair-form .repair-item-done:has(input:checked){border-color:#8fbfa3;background:#eef8f2}
 .repair-form .repair-item-done:has(input:checked) span{color:#0a5c39}
+
+/* COMPLETED TODAY is the one tile you can press: it answers "what did we
+   actually finish today" without turning on SHOW COMPLETED and reading past
+   the whole live sheet. It looks like the tiles beside it until it is pressed,
+   because it is still a count first. */
+.completed-today-tile{font:inherit;color:inherit;text-align:center;cursor:pointer;padding:0}
+.completed-today-tile:not(:disabled):hover{border-color:#0867d5;box-shadow:0 2px 10px #0867d533}
+.completed-today-tile:disabled{cursor:default;opacity:.55}
+.completed-today-tile.active{border-color:#087347!important;background:#e8f8ef!important;box-shadow:inset 0 0 0 1px #087347}
+.completed-today-tile.active strong{color:#065c39}
+.completed-today-tile.active span::after{content:" · SHOWING";font-weight:900;color:#087347}
+@media(max-width:760px){.completed-today-tile{min-height:64px}}

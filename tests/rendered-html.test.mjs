@@ -5511,3 +5511,46 @@ test("locating a bus opens the section it is hiding in",async()=>{
  // that no longer exists, so pin the mechanism it is built on.
  assert.match(css,/\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
 });
+
+test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+ // It counted the right thing and did nothing when pressed, so "what did we
+ // actually finish today" could only be reached by turning on SHOW COMPLETED
+ // and reading past the whole live sheet.
+ assert.match(page,/<button type="button" className=\{"completed-today-tile"/);
+ assert.match(page,/aria-pressed=\{fixedToday\}/);
+ // Pressing replaces the view rather than adding to it: completed, and today.
+ // A repair finished last week is not what the tile counts and must not appear.
+ assert.match(page,/fixedToday\?entry\.workflow==="Completed"&&isToday\(entry\.completedAt\)/);
+ // The shift filter and the search still apply on top of it.
+ assert.match(page,/fixedToday\?[^;]*\)&&\(filter==="All"\|\|entry\.shift===filter\)&&matchesDownSheetSearch/);
+ // Nothing to show and not already showing it means nothing to press.
+ assert.match(page,/disabled=\{!counters\.completedToday&&!fixedToday\}/);
+ // The tile has to keep looking like the tiles beside it, which are divs.
+ assert.match(css,/\.down-summary>div,\.down-summary>button\{min-height:64px/);
+ assert.match(css,/\.completed-today-tile\.active\{/);
+});
+
+test("a fixed repair says which surface it came off",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+ // Fixed Repairs collects from every surface and a card gave no clue which.
+ // The two that matter to a foreman scanning the list are a bus cleared off the
+ // Down Sheet and the Defect Log's smaller day-to-day work.
+ assert.match(page,/"down-sheet":\{className:"from-down-sheet",label:"CLEARED FROM THE DOWN SHEET"\}/);
+ assert.match(page,/"defect-log":\{className:"from-defect-log",label:"FIXED FROM THE DEFECT LOG"\}/);
+ // The other three origins are named rather than folded into one of those two.
+ // A repair logged on the map is not a Down Sheet clearance, and saying it was
+ // would be a small lie that compounds every time somebody counts.
+ for(const source of ["tracker","operator","scan"])assert.match(page,new RegExp(source+":\\{className:"));
+ assert.match(page,/repairOrigin\(record\.defect\.source\)/);
+ // Scanned down the left edge, so the colour has to be on that edge.
+ assert.match(css,/\.fixed-origin\{[^}]*border-left:5px solid transparent/);
+ assert.match(css,/\.fixed-origin\.from-down-sheet\{border-left-color:#087347/);
+ assert.match(css,/\.fixed-origin\.from-defect-log\{border-left-color:#c07a00/);
+});

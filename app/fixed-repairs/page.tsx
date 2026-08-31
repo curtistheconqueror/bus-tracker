@@ -117,6 +117,28 @@ const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime
  const deleteRepair=(record:FixedRecord)=>{if(!confirm("Delete this repair record for Bus "+record.bus.n+"? You can immediately undo this action."))return;const next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.id!==record.defect.id)});changeFleet(next,"Deleted Bus "+record.bus.n+" repair")};
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null)};
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
+/* Where a completed repair came from, said plainly.
+
+   Fixed Repairs collects from every surface, and until now a card gave no clue
+   which. The two that matter to a foreman reading the list are the Down Sheet —
+   a bus that was formally down and has been cleared — and the Defect Log, which
+   is the smaller day-to-day work. They are coloured apart rather than worded
+   apart because this list is scanned, not read.
+
+   The others are named rather than folded into one of those two. A repair
+   logged on the map is not a Down Sheet clearance, and saying so would be a
+   small lie that compounds every time somebody counts. */
+const REPAIR_ORIGINS={
+ "down-sheet":{className:"from-down-sheet",label:"CLEARED FROM THE DOWN SHEET"},
+ "defect-log":{className:"from-defect-log",label:"FIXED FROM THE DEFECT LOG"},
+ tracker:{className:"from-tracker",label:"LOGGED ON THE FACILITY MAP"},
+ operator:{className:"from-tracker",label:"LOGGED BY THE AI OPERATOR"},
+ scan:{className:"from-tracker",label:"IMPORTED FROM A SCANNED SHEET"},
+} as const;
+function repairOrigin(source:string|undefined){
+ return REPAIR_ORIGINS[source as keyof typeof REPAIR_ORIGINS]||null;
+}
+
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
  return <main className="fixed-repairs-app" style={appearanceStyle}>
   <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav></header>
@@ -124,6 +146,7 @@ const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button><button type="button" className="fixed-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open Fixed Repairs settings">&#9881; SETTINGS</button></section>
   <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{visible.length} REPAIR{visible.length===1?"":"S"} SHOWN</small></span></header>{visible.length?<div className="fixed-list">{visible.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
+   {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}
    <div className="fixed-card-body"><section><b>ORIGINAL REPORT</b><p>{defectLabel(record.defect)}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · By "+record.defect.reportedBy:""}</small>{record.defect.conditionNotDuplicated&&<em className="not-duplicated-note">DEFECT / CONDITION NOT DUPLICATED</em>}{record.defect.shopNotes&&<em>SHOP NOTES: {record.defect.shopNotes}</em>}</section><section className="repair-result"><b>FIX / STEPS TAKEN</b><p>{record.defect.actionTaken||"Fix details have not been entered yet."}</p>{record.defect.diagnosticNote&&<small><b>DIAG / VERIFY:</b> {record.defect.diagnosticNote}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}{record.defect.completedBy&&<small><b>FIXED BY:</b> {record.defect.completedBy}</small>}</section></div>
    <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button><button type="button" className="reopen-repair" onClick={()=>reopenRepair(record)}>UNDO FIX</button><button type="button" className="delete-repair" onClick={()=>deleteRepair(record)}>DELETE</button></div></footer>
   </article>)}</div>:<div className="fixed-empty"><b>No fixed repairs match this view.</b><span>Completed repairs will flow here automatically from the Defect Log, Down Sheet, and Fleet Tracker.</span></div>}</section>
