@@ -26,31 +26,50 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| Release source | the current tip of `origin/main` |
-| Tip at the time of writing | `24a02a9` |
-| Last code-bearing commit | `24a02a9` |
+| **Release source** | **`24a02a9`** |
+| Last code-bearing commit | `24a02a9` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous live | Version 128, published from `c1101bd` |
 
-Resolve `origin/main` to a hash at publish time and record that hash as the
-release commit. At the time of writing the tip is itself the last code-bearing
-commit, so there is no tooling-only tail to discount.
+> **Publish from `24a02a9`, not from whatever `main`'s tip is when you read
+> this.** This release is frozen to that SHA on purpose.
+>
+> Earlier handoffs said "the current tip of `origin/main`", which is only true
+> until the next commit lands. Work on the next release continues on `main`
+> while this one waits for approval, so a tip read at publish time can contain
+> code this handoff has never described or validated — and a publisher who
+> notices that correctly refuses to publish. Naming the SHA removes the race:
+> what is documented here and what gets published are the same tree no matter
+> how long approval takes.
+>
+> If `main` has moved when you read this, that is expected and is not a reason
+> to hold. Check what moved:
+>
+> ```
+> git log --oneline 24a02a9..origin/main
+> ```
+>
+> Documentation-only commits after `24a02a9` change nothing that ships. If that
+> range contains anything under `app/`, `public/`, `supabase/` or
+> `package.json`, it belongs to **Version 130**, which will arrive with its own
+> handoff — publish `24a02a9` and leave it.
 
-Confirm what moved with:
+Confirm what this release contains — every command pinned to the two SHAs, so
+the answers do not change as `main` moves:
 
 ```
-git diff --name-only c1101bd..origin/main
+git diff --name-only c1101bd 24a02a9
 ```
 
-which should list exactly eight files: three under `app/`, one under `tests/`,
-and four documentation files (`PROJECT_HANDOFF.md`, `README.md`,
-`docs/RELEASES.md` and this one). The documentation four are Codex's own
-Version 128 release record plus this handoff; they ship nothing.
+which lists exactly eight files: three under `app/`, one under `tests/`, and
+four documentation files (`PROJECT_HANDOFF.md`, `README.md`,
+`docs/RELEASES.md` and an earlier revision of this one). The documentation four
+are Codex's own Version 128 release record plus this handoff; they ship nothing.
 
 The application change is these four:
 
 ```
-git diff --name-only c1101bd..origin/main -- app tests package.json package-lock.json public supabase
+git diff --name-only c1101bd 24a02a9 -- app tests package.json package-lock.json public supabase
 ```
 
 ```
@@ -60,9 +79,9 @@ app/defect-log/quick-filter-share.ts
 tests/rendered-html.test.mjs
 ```
 
-Nothing is uncommitted and nothing is stashed. `main` and `claude-contributions`
-point at identical trees (`91a96f2`). No history was rewritten and no branch was
-force pushed.
+Nothing was uncommitted or stashed when `24a02a9` was pushed, and
+`claude-contributions` carries the same tree. No history was rewritten and no
+branch was force pushed.
 
 Gate: 153 tests passing, ESLint clean, production build succeeds.
 
@@ -72,7 +91,7 @@ Gate: 153 tests passing, ESLint clean, production build succeeds.
 Version 127:
 
 ```
-git diff --name-only 831b753..origin/main -- supabase     # returns nothing
+git diff --name-only 831b753 24a02a9 -- supabase     # returns nothing
 ```
 
 Those files were applied to the live Supabase project by Curtis and verified
@@ -83,7 +102,7 @@ and nothing in this release touches the schema.
 **No dependency changes:**
 
 ```
-git diff c1101bd..origin/main -- package.json package-lock.json   # returns nothing
+git diff c1101bd 24a02a9 -- package.json package-lock.json   # returns nothing
 ```
 
 **No local data migration.** Version 128 carried one (the waiting-area
@@ -174,12 +193,16 @@ redundant records.**
 
 Change 2 collapses identical lines *in a shared list*. It does not touch stored
 records, and the underlying duplicates still inflate defect counts on the board.
-Fixing it at the source — scan matching recognising a repair it has already
-seen — is separate work that has not been authorised, and it touches repair
-records, which are never merged or deleted without Curtis saying so explicitly.
 
-Publishing 129 neither helps nor worsens this. It is recorded here so nobody
-reads the collapsed share list as evidence the duplicates are gone.
+Fixing it at the source — scan matching recognising a repair it has already
+seen — **is authorised and is being built now, for Version 130.** It touches
+repair records, so it gets its own release, its own validation and its own
+checks rather than riding along under a handoff already approved for
+publication.
+
+Publishing 129 neither helps nor worsens this, and does not need to wait for it.
+It is recorded here so nobody reads the collapsed share list as evidence the
+duplicates are gone.
 
 ## Data safety
 
