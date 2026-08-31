@@ -744,3 +744,19 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .offsite .title{color:#8a5600}
 .offsite-grid{max-height:96px}
 .offsite .spot{border-color:#dcc08a;background:color-mix(in srgb,var(--slot-bg) 88%,#f6e2bd)}
+
+/* The not-saved banner. Lives in globals because all four surfaces have their
+   own stylesheet and this must look identical on every one of them.
+
+   Sticky rather than fixed so it sits under whatever header the surface has
+   instead of covering it, and high enough to stay above the boards themselves
+   without competing with the modals, which legitimately sit on top of it. */
+.save-alert{position:sticky;top:0;z-index:900;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+ border-bottom:2px solid #7f1d1d;background:#8c1d1d;color:#fff;padding:10px 14px}
+.save-alert-text{display:flex;flex-direction:column;gap:3px;flex:1 1 260px;min-width:0}
+.save-alert-text b{font-size:11px;font-weight:900;letter-spacing:.7px}
+.save-alert-text small{font-size:10px;font-weight:600;line-height:1.4;opacity:.95}
+.save-alert button{flex:none;min-height:42px;border:1px solid #fff;border-radius:7px;background:#fff;
+ color:#8c1d1d;padding:0 14px;font-family:inherit;font-size:10px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+.save-alert button:disabled{opacity:.6;cursor:not-allowed}
+@media(max-width:760px){.save-alert{padding:9px 11px}.save-alert button{width:100%}}

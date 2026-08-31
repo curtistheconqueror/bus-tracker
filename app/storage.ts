@@ -100,9 +100,15 @@ export function readFleetRecoverySnapshot(raw:string|null):FleetRecoverySnapshot
  }catch{return null}
 }
 
-function saveFleetRecoverySnapshot(storage:StorageWriter,raw:string,buses:unknown[]){
+/* Reports WHY it could not write, because the caller refuses the real save when
+   the recovery copy fails and would otherwise blame the snapshot. On a full
+   device the snapshot is simply the first write to hit the wall, and telling
+   somebody "the recovery copy could not be written" sends them looking for a
+   corrupt store when what they need is room. */
+function saveFleetRecoverySnapshot(storage:StorageWriter,raw:string,buses:unknown[]):StorageWriteResult{
  const snapshot:FleetRecoverySnapshot={version:1,savedAt:new Date().toISOString(),busCount:buses.length,defectCount:fleetDefectCount(buses),raw};
- try{storage.setItem(FLEET_RECOVERY_STORAGE_KEY,JSON.stringify(snapshot));return true}catch{return false}
+ try{storage.setItem(FLEET_RECOVERY_STORAGE_KEY,JSON.stringify(snapshot));return OK}
+ catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"no-snapshot"}}
 }
 
 function warnBulkLoss(currentDefects:number,nextDefects:number,currentBuses:number,nextBuses:number){
@@ -111,20 +117,86 @@ function warnBulkLoss(currentDefects:number,nextDefects:number,currentBuses:numb
  window.setTimeout(()=>window.alert("SAFETY STOP: This change would remove "+loss+" at once. Nothing was overwritten. Reload the page, then export or restore the last-known-good copy from Fleet Tracker Settings."),0);
 }
 
-export function writeFleetStorage<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}){
+/* WHY a write did not happen, not just that it did not.
+
+   Every one of these returned a bare false, and the Facility Map's save effect
+   threw the boolean away, so a refused write looked exactly like a successful
+   one: the board moved on screen and nothing reached storage. A person can move
+   buses all afternoon, close the app, and lose the day with nothing on any
+   screen having said so.
+
+   The reason has to travel with the failure because the answers are different.
+   A full disk needs a backup taken and space made. A board this build cannot
+   read must not be overwritten and needs the newer device. The safety stop is
+   working as designed and needs the recovery copy. "Could not save" alone tells
+   somebody standing at a bus nothing they can act on. */
+export type FleetWriteReason=
+ |"unreadable"    /* what is stored is corrupt, or written by a newer build */
+ |"bulk-loss"     /* the safety stop refused a change that drops records */
+ |"no-snapshot"   /* the recovery copy could not be written, so neither is this */
+ |"storage-full"  /* the device is out of room */
+ |"failed";       /* the write threw for some other reason */
+
+export type StorageWriteResult={ok:boolean;reason?:FleetWriteReason};
+
+const OK:StorageWriteResult={ok:true};
+
+/* Browsers disagree on how they say "full": a name in Chrome, a different name
+   in Firefox, and legacy numeric codes in Safari. Getting this wrong only makes
+   the message less specific, never the write less safe. */
+function isQuotaError(error:unknown){
+ const raised=error as {name?:string;code?:number}|null;
+ return raised?.name==="QuotaExceededError"
+  ||raised?.name==="NS_ERROR_DOM_QUOTA_REACHED"
+  ||raised?.code===22||raised?.code===1014;
+}
+
+export function writeFleetStorageResult<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}):StorageWriteResult{
  const raw=storage.getItem(FLEET_STORAGE_KEY),current=readFleetPayload<T>(raw);
- if(raw!==null&&(!current.valid||!current.supported))return false;
+ if(raw!==null&&(!current.valid||!current.supported))return {ok:false,reason:"unreadable"};
  const currentDefects=fleetDefectCount(current.buses),nextDefects=fleetDefectCount(buses),bulkLoss=currentDefects-nextDefects>=5||current.buses.length-buses.length>=5;
- if(raw!==null&&bulkLoss&&!options.allowBulkDefectLoss){saveFleetRecoverySnapshot(storage,raw,current.buses);warnBulkLoss(currentDefects,nextDefects,current.buses.length,buses.length);return false}
- if(raw!==null&&!options.skipRecoverySnapshot&&!saveFleetRecoverySnapshot(storage,raw,current.buses))return false;
- try{storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));return true}catch{return false}
+ if(raw!==null&&bulkLoss&&!options.allowBulkDefectLoss){saveFleetRecoverySnapshot(storage,raw,current.buses);warnBulkLoss(currentDefects,nextDefects,current.buses.length,buses.length);return {ok:false,reason:"bulk-loss"}}
+ if(raw!==null&&!options.skipRecoverySnapshot){
+  const snapshot=saveFleetRecoverySnapshot(storage,raw,current.buses);
+  if(!snapshot.ok)return snapshot;
+ }
+ try{storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));return OK}
+ catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
+}
+
+/* Kept returning a plain boolean so every existing caller and test is unchanged.
+   Callers that can show the reason use the result form above. */
+export function writeFleetStorage<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}){
+ return writeFleetStorageResult(storage,buses,options).ok;
+}
+
+/* Any other write, reported rather than thrown.
+
+   Settings, collapsed sections and undo snapshots all called setItem directly.
+   On a full device that does not fail quietly — it THROWS, out of a React
+   effect or a click handler, and takes the interaction with it. Filling a real
+   device and saving a bus left the editor stuck open with a QuotaExceededError
+   on the console and no way forward, which is worse than losing the save.
+
+   Nothing here may throw. A lost UI preference is a shrug; a board that stops
+   responding while somebody is standing at a bus is not. */
+export function writeSetting(storage:StorageWriter,key:string,value:string):StorageWriteResult{
+ try{storage.setItem(key,value);return OK}
+ catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
+}
+
+export function writeDownSheetStorageResult<T>(storage:StorageWriter,entries:T[]):StorageWriteResult{
+ const raw=storage.getItem(DOWN_SHEET_STORAGE_KEY),current=readDownSheetPayload<T>(raw);
+ if(raw!==null&&(!current.valid||!current.supported))return {ok:false,reason:"unreadable"};
+ /* This setItem was not wrapped at all, which is worse than a silent failure: a
+    full device threw out of the Down Sheet's save effect and took the render
+    with it. */
+ try{storage.setItem(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload(entries,current.envelope));return OK}
+ catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
 }
 
 export function writeDownSheetStorage<T>(storage:StorageWriter,entries:T[]){
- const raw=storage.getItem(DOWN_SHEET_STORAGE_KEY),current=readDownSheetPayload<T>(raw);
- if(raw!==null&&(!current.valid||!current.supported))return false;
- storage.setItem(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload(entries,current.envelope));
- return true;
+ return writeDownSheetStorageResult(storage,entries).ok;
 }
 
 export function readFleetStorage<T=unknown>(storage:StorageReader){

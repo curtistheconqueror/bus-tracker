@@ -6079,3 +6079,76 @@ test("saving fixed with a part asks for the number and flags it when left for la
  assert.equal(partNumberMissing({partsUsed:false,partNumber:""}),false);
  assert.equal(partNumberMissing({}),false);
 });
+
+test("a board that did not save says so instead of failing silently",async()=>{
+ const {writeFleetStorageResult,writeDownSheetStorageResult,writeSetting,writeFleetStorage}=
+  await import("../app/storage.ts");
+ const [mapPage,downPage,logPage,alert]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/save-alert.tsx",import.meta.url),"utf8"),
+ ]);
+
+ const store=(seed={})=>{const map=new Map(Object.entries(seed));
+  return {map,getItem:k=>map.has(k)?map.get(k):null,setItem:(k,v)=>map.set(k,v)}};
+ const board=JSON.stringify({version:3,buses:[{id:"a",n:"1",defects:[]}]});
+ const quota=()=>{const error=new Error("full");error.name="QuotaExceededError";throw error};
+
+ // A healthy write is unchanged.
+ assert.deepEqual(writeFleetStorageResult(store(),[{id:"a",n:"1",defects:[]}]),{ok:true});
+
+ // WHY it failed has to travel with the failure, because the answers differ:
+ // a full device needs room, an unreadable board must not be overwritten.
+ const full={getItem:()=>board,setItem:quota};
+ assert.equal(writeFleetStorageResult(full,[{id:"a",n:"1",defects:[]}]).reason,"storage-full");
+ // The recovery snapshot is the FIRST write to hit a full device, so without
+ // propagating the real cause this reported "no recovery copy" and sent
+ // somebody looking for a corrupt store when what they needed was space.
+ assert.notEqual(writeFleetStorageResult(full,[{id:"a",n:"1",defects:[]}]).reason,"no-snapshot");
+ const unreadable={getItem:()=>"not json at all",setItem:()=>{}};
+ assert.equal(writeFleetStorageResult(unreadable,[{id:"a",n:"1",defects:[]}]).reason,"unreadable");
+ // A snapshot refused for its own reasons still blocks the write and says so.
+ const snapshotOnly={getItem:()=>board,setItem:k=>{if(String(k).includes("recovery"))throw new Error("no")}};
+ assert.equal(writeFleetStorageResult(snapshotOnly,[{id:"a",n:"1",defects:[]}]).reason,"no-snapshot");
+
+ // The boolean form every existing caller uses is untouched.
+ assert.equal(writeFleetStorage(store(),[{id:"a",n:"1",defects:[]}]),true);
+ assert.equal(writeFleetStorage(full,[{id:"a",n:"1",defects:[]}]),false);
+
+ // NOTHING MAY THROW. The Down Sheet's setItem was not wrapped at all, so a
+ // full device threw out of its save effect and took the render with it.
+ // Its own empty store, because `full` holds a FLEET payload and handing that
+ // to the sheet reader correctly reports "unreadable" rather than "full".
+ const fullSheet={getItem:()=>null,setItem:quota};
+ assert.doesNotThrow(()=>writeDownSheetStorageResult(fullSheet,[]));
+ assert.equal(writeDownSheetStorageResult(fullSheet,[]).reason,"storage-full");
+ // And a sheet written by a newer build is refused rather than overwritten.
+ assert.equal(writeDownSheetStorageResult({getItem:()=>"not json",setItem:()=>{}},[]).reason,"unreadable");
+ assert.doesNotThrow(()=>writeSetting(full,"anything","x"));
+ assert.equal(writeSetting(full,"anything","x").reason,"storage-full");
+ assert.deepEqual(writeSetting(store(),"k","v"),{ok:true});
+
+ // No surface may call setItem straight any more, EXCEPT inside a try that
+ // already reports the failure. A raw call is how the editor got stuck open.
+ for(const [name,source] of [["map",mapPage],["down sheet",downPage],["defect log",logPage]])
+  for(const line of source.split("\n"))
+   if(line.includes("localStorage.setItem(")&&!line.includes("try{"))
+    assert.fail(name+" still writes storage unguarded: "+line.trim().slice(0,80));
+
+ // The Facility Map's save effect discarded the result entirely — the specific
+ // bug that let a full device look exactly like a successful save.
+ assert.match(mapPage,/setSaveProblem\(writeFleetStorageResult\(localStorage,buses\)\.reason\|\|""\)/);
+ // All three boards show the banner.
+ for(const [name,source] of [["map",mapPage],["down sheet",downPage],["defect log",logPage]])
+  assert.ok(source.includes("<SaveAlert reason={saveProblem}"),name+" must render the banner");
+
+ // It is a banner, not an alert: an alert is dismissed by somebody busy, who
+ // then keeps working on a board that is not being saved.
+ assert.equal(/window\.alert|[^.]\balert\(/.test(alert),false,"the save alert must not use alert()");
+ // It names an answer rather than an error code, and offers the way out.
+ assert.ok(alert.includes("EXPORT A BACKUP NOW"));
+ assert.match(alert,/THIS DEVICE IS FULL/);
+ // Absent when there is nothing wrong, so a healthy board shows no chrome.
+ assert.match(alert,/if\(!reason\)return null/);
+});

@@ -20,7 +20,9 @@ import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,write
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
-import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_BACKUP_INTERVAL,FLEET_BACKUP_INTERVAL_CHOICES,FLEET_STORAGE_KEY as FLEET_KEY,normalizeFleetBackupInterval,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeFleetStorage} from "../storage";
+import SaveAlert from "../save-alert";
+import {exportFleetBoardBackup} from "../fleet-backup";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_BACKUP_INTERVAL,FLEET_BACKUP_INTERVAL_CHOICES,FLEET_STORAGE_KEY as FLEET_KEY,normalizeFleetBackupInterval,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteReason,writeSetting} from "../storage";
 
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "../facility-areas";
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
@@ -396,11 +398,12 @@ export default function DefectLog(){
  const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
+ const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
 
  useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
- useEffect(()=>{if(hydrated)localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
- useEffect(()=>{if(hydrated)localStorage.setItem(MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
@@ -436,7 +439,17 @@ export default function DefectLog(){
     with it. */
  const duplicateCount=useMemo(()=>mergeDuplicateDefects(fleet,downEntries).removed,[fleet,downEntries]);
 
- const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{if(!writeFleetStorage(localStorage,nextFleet))return;setFleet(nextFleet);setDownEntries(nextDown);writeDownSheetStorage(localStorage,nextDown)};
+ /* Reports why nothing was kept instead of returning in silence. The state is
+    not advanced on a refusal, on purpose — the screen keeps showing what is
+    actually stored rather than a change that did not land. */
+ const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{
+  const written=writeFleetStorageResult(localStorage,nextFleet);
+  setSaveProblem(written.reason||"");
+  if(!written.ok)return;
+  setFleet(nextFleet);setDownEntries(nextDown);
+  const sheet=writeDownSheetStorageResult(localStorage,nextDown);
+  if(!sheet.ok)setSaveProblem(sheet.reason||"");
+ };
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
  const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last 48 hours. Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
@@ -499,7 +512,7 @@ export default function DefectLog(){
  const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:allRecords.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Defect Log report")};
  const appStyle={"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
 
- return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}>
+ return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/>
   <header className="log-header">
    <div><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a className="active" href="/defect-log" aria-current="page">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav>
