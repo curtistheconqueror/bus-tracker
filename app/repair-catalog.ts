@@ -636,6 +636,20 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
 }
 
 export function isUnresolved(defect:StructuredDefect){return defect.state!=="completed"}
+/* A part went on the bus and nobody has written down which one.
+
+   This is not a new field. PARTS USED ticked with the number left blank has
+   always meant exactly this — the PART NUMBER box says "Leave blank if the
+   number is unknown" — but nothing ever surfaced it, so the record just looked
+   finished. Naming the state lets the Fixed Repairs card say what is still
+   outstanding, and it reads correctly on records logged long before there was a
+   button for it.
+
+   Ticked with a number is complete. Not ticked means no part was used, which is
+   a different thing from an unknown one and must never be flagged. */
+export function partNumberMissing(defect:{partsUsed?:boolean;partNumber?:string}){
+ return defect.partsUsed===true&&!String(defect.partNumber??"").trim();
+}
 export function defectSupportingDetails(defect:StructuredDefect){
  const symptoms=normalizedSymptoms(defect.symptoms).filter(symptom=>symptom.toLowerCase()!==defect.issue.trim().toLowerCase()).join(", ");
  return [symptoms,defect.details.trim()].filter(Boolean).join(" — ");

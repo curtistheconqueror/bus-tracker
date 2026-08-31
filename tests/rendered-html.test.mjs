@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel } from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2014,7 +2014,7 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(css,/\.log-form\{flex:1;min-height:0;overscroll-behavior:contain;touch-action:pan-y/);
   assert.match(css,/@media\(max-width:760px\)\{\.log-shade\{align-items:stretch\}\.log-editor\{width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh/);
   assert.match(css,/\.defect-log-app\{[^}]*overflow-anchor:none/);
-  assert.match(css,/\.save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
+  assert.match(css,/\.save-log-middle-actions\{[^}]*grid-template-columns:repeat\(2/);
   assert.match(css,/\.log-form,\.log-form>\*\{min-width:0\}/);
   assert.doesNotMatch(css,/\.log-header-save/);
   assert.match(css,/@supports\(height:100svh\)/);
@@ -2276,7 +2276,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/completedBy/);
   assert.match(defectPage,/DEFECT \/ CONDITION NOT DUPLICATED/);
   assert.match(defectPage,/updateDefect\("conditionNotDuplicated",event\.target\.checked\)/);
-  assert.match(defectCss,/save-log-middle-actions\{[^}]*grid-template-columns:repeat\(3/);
+  assert.match(defectCss,/save-log-middle-actions\{[^}]*grid-template-columns:repeat\(2/);
   assert.match(fixedPage,/state==="completed"/);
   assert.match(fixedPage,/EDIT THE FULL REPAIR RECORD/);
   assert.match(fixedPage,/ORIGINAL DESCRIPTION/);
@@ -4916,12 +4916,12 @@ test("no element in the Defect Log relies on the global bare header and footer s
  // modal, floated over the page and swallowed clicks; the grouped defect list
  // wore the dark banner. Every one of them now carries a class.
  assert.equal(/<header>|<footer>/.test(logPage),false,"no bare header or footer may come back");
- for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions"])
+ for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions","part-prompt-head"])
   assert.ok(logPage.includes('className="'+className+'"'),className+" must be applied in the markup");
 
  // the element selectors still match these tags, so the global properties are
  // neutralised before each one is styled deliberately
- const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions,\.mystery-move-head,\.mystery-move-actions\{([^}]*)\}/);
+ const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions,\.mystery-move-head,\.mystery-move-actions,\.part-prompt-head\{([^}]*)\}/);
  assert.ok(reset,"the reset block must exist");
  for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
   assert.ok(reset[1].includes(property),"the reset must clear "+property);
@@ -5985,4 +5985,86 @@ test("bus accessories and the two start buttons land in both catalog structures"
  assert.equal(old.issue,"Operating Controls - Start button");
  const [bare]=migrateRepairIdentity("Bus Controls","Start button")?[{issue:migrateRepairIdentity("Bus Controls","Start button").issue}]:[];
  assert.equal(bare.issue,"Operating Controls - Start button");
+});
+
+test("saving fixed with a part asks for the number and flags it when left for later",async()=>{
+ const [logPage,logCss,fixedPage,fixedCss]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+
+ // FOUR EQUAL BUTTONS. SAVE UPDATE used to span the full row on a phone, which
+ // made the biggest, easiest target the one pressed least often. All four are
+ // now one grid cell each, in a 2x2, at every width — so CLOSE, the one that
+ // discards, is always the bottom right and never under a thumb reaching for
+ // SAVE. Asserted outside any media block as well as inside, because styling a
+ // layout for phones only is how this file's earlier desktop bug happened.
+ const topLevel=(()=>{let out="",depth=0,index=0;
+  while(index<logCss.length){
+   if(logCss.startsWith("@media",index)){const open=logCss.indexOf("{",index);depth=1;index=open+1;
+    while(index<logCss.length&&depth>0){if(logCss[index]==="{")depth++;else if(logCss[index]==="}")depth--;index++}
+    continue}
+   out+=logCss[index];index++}
+  return out})();
+ assert.match(topLevel,/\.save-log-middle-actions\{[^}]*grid-template-columns:repeat\(2/);
+ // Nothing may span the row any more; that rule is what made them unequal.
+ assert.equal(/\.save-log-middle\{grid-column:1\/-1\}/.test(logCss),false,
+  "no action button may span the full row");
+
+ // Order is what puts CLOSE bottom right in a 2x2: save, fixed, fixed-with-part,
+ // close. DOM order is also tab order, so this is the keyboard order too.
+ const middle=logPage.match(/<div className="save-log-middle-actions"[\s\S]*?<\/div>/)[0];
+ const order=[...middle.matchAll(/className="(save-log-middle|save-fixed-middle|save-fixed-part-middle|close-log-middle)"/g)].map(m=>m[1]);
+ assert.deepEqual(order,["save-log-middle","save-fixed-middle","save-fixed-part-middle","close-log-middle"]);
+ // The sticky bar at the bottom carries the same four in the same order, so a
+ // person who scrolled past the middle one is not offered a different set.
+ const footer=logPage.match(/<footer className="log-editor-actions">[\s\S]*?<\/footer>/)[0];
+ assert.ok(footer.includes("SAVE FIXED W/ PART"));
+ assert.ok(footer.lastIndexOf("CLOSE")>footer.indexOf("SAVE FIXED W/ PART"),"CLOSE comes last");
+
+ // THE PROMPT. Both ways forward save the repair; only CANCEL does not.
+ assert.ok(logPage.includes("function PartNumberPrompt("));
+ assert.ok(logPage.includes("SAVE WITH THIS PART"));
+ assert.ok(logPage.includes("ENTER LATER"));
+ // ENTER LATER records that a part went on with no number, which is a different
+ // fact from no part at all.
+ assert.match(logPage,/confirm\(""\)/);
+ assert.match(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/);
+
+ // The patch is passed INTO the save rather than set on state first. Setting it
+ // and then saving would write the defect as it was a render earlier, dropping
+ // the number on the very save that asked for it.
+ assert.match(logPage,/const validateAndSave=\(complete:boolean,patch:Partial<StructuredDefect>=\{\}\)=>\{const defect=\{\.\.\.value\.defect,\.\.\.patch\}/);
+
+ // It renders OUTSIDE the form. Inside it, Enter in the part field would submit
+ // the defect behind the prompt.
+ assert.ok(logPage.indexOf("{partPrompt&&<PartNumberPrompt")<logPage.indexOf('<form className="log-editor"'));
+
+ // THE FLAG on Fixed Repairs, in its own colour, beside the amber one it can
+ // appear next to.
+ assert.ok(fixedPage.includes("partNumberMissing(record.defect)&&"));
+ assert.ok(fixedPage.includes("MISSING PART #"));
+ // Filled orange, not another pale pill: NEEDS FIX DETAILS sits beside it on
+ // #fff1e0 already, and the first attempt used that same background, which made
+ // two different outstanding jobs look like one.
+ assert.match(fixedCss,/\.missing-part-number\{[^}]*background:#b35509/);
+ // Must out-specify the phone breakpoint's pale fill on every footer badge,
+ // which otherwise wins on source order and leaves white text on pale amber.
+ assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer>b\.missing-part-number\{/);
+ assert.equal(/\.missing-part-number\{[^}]*background:#fff1e0/.test(fixedCss),false);
+ // Two badges must not fight over the space: the actions are pushed right
+ // instead of each badge pushing with a margin of its own.
+ assert.equal(/\.fixed-card>footer>b\{margin-right:auto/.test(fixedCss),false);
+ assert.match(fixedCss,/\.fixed-card>footer \.fixed-card-actions\{margin-left:auto\}/);
+
+ // WHAT THE FLAG MEANS. Ticked with no number is the missing case; not ticked
+ // means no part was used, which must never be flagged; and a record written
+ // before any of this existed reads correctly.
+ assert.equal(partNumberMissing({partsUsed:true,partNumber:""}),true);
+ assert.equal(partNumberMissing({partsUsed:true,partNumber:"   "}),true);
+ assert.equal(partNumberMissing({partsUsed:true,partNumber:"HX-99"}),false);
+ assert.equal(partNumberMissing({partsUsed:false,partNumber:""}),false);
+ assert.equal(partNumberMissing({}),false);
 });

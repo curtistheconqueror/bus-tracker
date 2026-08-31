@@ -429,16 +429,16 @@ export function mergedAwayRows(merged:MergedAwayDefects,config:CloudConfig,now:s
    holds its own copy and pushes it back before anybody presses MERGE DUPES
    there. This is the belt to that braces: whatever arrives, a record this
    device has already folded away does not come back. */
-export function withoutMergedAway<T extends {defects?:unknown}>(
- payload:{buses?:T[]}|null|undefined,merged:MergedAwayDefects
-){
+export function withoutMergedAway<P extends {buses?:{defects?:unknown}[]}|null|undefined>(
+ payload:P,merged:MergedAwayDefects
+):P{
  if(!payload||!Array.isArray(payload.buses)||!Object.keys(merged).length)return payload;
  return {...payload,buses:payload.buses.map(bus=>{
   const defects=Array.isArray(bus?.defects)?bus.defects as {id?:string}[]:null;
   if(!defects)return bus;
   const kept=defects.filter(defect=>!merged[String(defect?.id??"")]);
   return kept.length===defects.length?bus:{...bus,defects:kept};
- })};
+ })} as P;
 }
 
 export function changedRows(rows:CloudRow[],key:string,sent:SentFingerprints){

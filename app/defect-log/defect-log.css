@@ -9,7 +9,7 @@ button,input,select,textarea{font:inherit}
    rules below then style each one deliberately. Without this the editor's action
    bar detaches from the modal and sits over the page swallowing clicks, and the
    grouped defect list wears a dark blue banner nobody asked for. */
-.log-editor-head,.log-settings-head,.quick-filter-head,.mystery-head,.grouped-defect-head,.log-editor-actions,.mystery-move-head,.mystery-move-actions{
+.log-editor-head,.log-settings-head,.quick-filter-head,.mystery-head,.grouped-defect-head,.log-editor-actions,.mystery-move-head,.mystery-move-actions,.part-prompt-head{
  position:static;height:auto;min-height:0;left:auto;right:auto;bottom:auto;transform:none;
  background:none;color:inherit;font-size:inherit;font-weight:inherit;letter-spacing:normal;
  text-shadow:none;border-radius:0;box-shadow:none;white-space:normal;padding:0;z-index:auto}
@@ -153,7 +153,11 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-count-field,.save-log-middle-actions,.advanced-defect-details{grid-column:1/-1;min-width:0}
 .backup-interval-field{display:grid;gap:4px;min-width:0}
 .backup-interval-field select{min-height:44px}
-.backup-interval-field small{color:var(--log-muted,#62748d);font-size:8px;font-weight:750;line-height:1.35}.save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
+.backup-interval-field small{color:var(--log-muted,#62748d);font-size:8px;font-weight:750;line-height:1.35}/* Four equal buttons in a 2x2, at every width, so the one that discards is
+   always the bottom right and never where a thumb lands reaching for SAVE.
+   It used to be three across with SAVE spanning the full row on a phone,
+   which made the biggest, easiest target the one you press least. */
+.save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
 .advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:hidden}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
 .advanced-defect-details:not([open]) .advanced-defect-grid{display:none}
 
@@ -217,9 +221,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-editor-actions button:disabled{opacity:.55;cursor:not-allowed}
 .log-editor-actions .save-log{border-color:#08733f;background:#08733f;color:#fff}
 .log-editor-actions .save-log:hover:not(:disabled),.log-editor-actions .save-log:focus-visible{background:#0a8b4c}
-.save-fixed-middle,.save-fixed-bottom{min-width:0;min-height:50px;border:0;border-radius:8px;background:#075f52;color:#fff;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.25px;cursor:pointer}.save-fixed-middle:disabled,.save-fixed-bottom:disabled{opacity:.45;cursor:not-allowed}.log-editor-actions .save-fixed-bottom{border-color:#075f52;background:#075f52;color:#fff}
+.save-fixed-middle,.save-fixed-bottom,.save-fixed-part-middle,.save-fixed-part-bottom{min-width:0;min-height:50px;border:0;border-radius:8px;background:#075f52;color:#fff;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.25px;cursor:pointer}.save-fixed-middle:disabled,.save-fixed-bottom:disabled,.save-fixed-part-middle:disabled,.save-fixed-part-bottom:disabled{opacity:.45;cursor:not-allowed}/* The same family as SAVE AS FIXED because it does the same thing, one shade
+   apart because it asks a question first. */
+.save-fixed-part-middle,.save-fixed-part-bottom{background:#0a4f6b}
+.save-fixed-part-middle:hover:not(:disabled),.save-fixed-part-bottom:hover:not(:disabled),.save-fixed-part-middle:focus-visible,.save-fixed-part-bottom:focus-visible{background:#0c6389}
+.log-editor-actions .save-fixed-bottom{border-color:#075f52;background:#075f52;color:#fff}
 .log-form .condition-not-duplicated-check{border-color:#d5a33d;background:#fff8e8}.condition-not-duplicated-check b{color:#855100}.condition-not-duplicated-check small{color:#715e3d}
-@media(max-width:760px){.log-header nav{grid-template-columns:repeat(4,minmax(0,1fr))}.log-header nav a{padding-left:2px;padding-right:2px;font-size:9px}.log-form,.log-form>*{min-width:0}.log-form label{max-width:100%}.log-form input,.log-form select,.log-form textarea{min-width:0;max-width:100%}.save-log-middle-actions{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.save-log-middle{grid-column:1/-1}.save-log-middle,.close-log-middle,.save-fixed-middle{min-height:56px;padding:0 8px;font-size:10px;line-height:1.15;white-space:normal}.advanced-defect-grid{grid-template-columns:1fr}.advanced-defect-details summary{min-height:48px;padding:5px 10px}.advanced-defect-details summary b{font-size:10px}.advanced-defect-details summary small{font-size:8px}.advanced-defect-details summary em{font-size:7px}.log-editor-actions{position:sticky;z-index:4;bottom:0;display:flex;align-items:center;justify-content:center;gap:8px;flex:none;flex-wrap:wrap;border-top:1px solid var(--log-border,#c7d1df);background:var(--log-surface,#fff);padding:10px 14px}.log-editor-actions .save-log{grid-column:1/-1}.log-editor-actions button{width:100%;min-width:0;height:50px;padding:0 6px;font-size:10px;line-height:1.15;white-space:normal}}
+@media(max-width:760px){.log-header nav{grid-template-columns:repeat(4,minmax(0,1fr))}.log-header nav a{padding-left:2px;padding-right:2px;font-size:9px}.log-form,.log-form>*{min-width:0}.log-form label{max-width:100%}.log-form input,.log-form select,.log-form textarea{min-width:0;max-width:100%}.save-log-middle-actions{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.save-log-middle,.close-log-middle,.save-fixed-middle,.save-fixed-part-middle{min-height:56px;padding:0 8px;font-size:10px;line-height:1.15;white-space:normal}.advanced-defect-grid{grid-template-columns:1fr}.advanced-defect-details summary{min-height:48px;padding:5px 10px}.advanced-defect-details summary b{font-size:10px}.advanced-defect-details summary small{font-size:8px}.advanced-defect-details summary em{font-size:7px}.log-editor-actions{position:sticky;z-index:4;bottom:0;display:flex;align-items:center;justify-content:center;gap:8px;flex:none;flex-wrap:wrap;border-top:1px solid var(--log-border,#c7d1df);background:var(--log-surface,#fff);padding:10px 14px}.log-editor-actions .save-log{grid-column:1/-1}.log-editor-actions button{width:100%;min-width:0;height:50px;padding:0 6px;font-size:10px;line-height:1.15;white-space:normal}}
 
 /* Reversible entry actions stay visible without covering the page. */
 .log-undo{display:flex;align-items:center;gap:10px;margin:0 14px 9px;padding:9px 10px;border:1px solid #d3a441;border-radius:8px;background:#fff7df;color:#684500}.log-undo span{min-width:0;flex:1;font-size:9px;font-weight:900}.log-undo button{min-height:40px;border:0;border-radius:6px;background:#785000;color:#fff;padding:0 12px;font-size:8px;font-weight:900}.log-undo .dismiss-undo{width:40px;padding:0;background:transparent;color:#684500;font-size:20px}
@@ -381,3 +389,30 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app[data-status-color="on"] .log-bus-number[data-status="out"] strong{color:#c91f27}
 .defect-log-app[data-status-color="on"] .log-bus-number[data-status="decommissioned"] strong{color:#343a40}
 .defect-log-app[data-status-color="on"] .log-bus-number[data-status="unknown"] strong{color:#777}
+
+/* The part prompt.
+
+   Sits above the editor rather than inside the form, so pressing Enter in its
+   field cannot submit the defect behind it. Its own scroll container, because a
+   phone keyboard takes half the screen and the two actions must stay reachable
+   without dismissing it. */
+.part-prompt-shade{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(9,20,38,.62);padding:16px}
+.part-prompt{width:min(430px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px;border-radius:12px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:16px}
+.part-prompt-head{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.part-prompt-head small{color:var(--log-muted,#62748d);font-size:8px;font-weight:900;letter-spacing:1px}
+.part-prompt-head b{font-size:15px;font-weight:900}
+.part-prompt label{display:flex;flex-direction:column;gap:5px;color:#455a79;font-size:8px;font-weight:900;letter-spacing:.6px}
+.part-prompt input{min-height:52px;border:1px solid var(--log-border,#c7d1df);border-radius:8px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 12px;font-family:inherit;font-size:17px;font-weight:800}
+.part-prompt-suggestion{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px;border:1px dashed #7aa7c9;border-radius:8px;background:#f2f8fc;color:#14415e;padding:6px 11px;font-family:inherit;cursor:pointer}
+.part-prompt-suggestion span{display:flex;flex-direction:column;gap:2px;text-align:left;font-size:13px;font-weight:900}
+.part-prompt-suggestion b{font-size:8px;font-weight:900;letter-spacing:.8px;color:#4a6c85}
+.part-prompt-suggestion em{font-size:9px;font-weight:900;font-style:normal;letter-spacing:.5px}
+.part-prompt-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.part-prompt-actions button{min-height:56px;border:0;border-radius:8px;padding:0 10px;font-family:inherit;font-size:10px;font-weight:900;letter-spacing:.3px;line-height:1.15;white-space:normal;cursor:pointer}
+.part-prompt-save{background:#075f52;color:#fff}
+.part-prompt-save:disabled{opacity:.45;cursor:not-allowed}
+.part-prompt-later{border:1px solid #c8892a!important;background:#fff4e0;color:#7a4d05}
+.part-prompt-note{margin:0;color:var(--log-muted,#62748d);font-size:9px;font-weight:700;line-height:1.4}
+.part-prompt-note b{color:#8a5a10}
+.part-prompt-cancel{min-height:44px;border:1px solid var(--log-border,#c7d1df);border-radius:8px;background:var(--log-surface,#fff);color:var(--log-muted,#62748d);font-family:inherit;font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+@media(max-width:760px){.part-prompt{width:100%}.part-prompt-actions{grid-template-columns:1fr}}

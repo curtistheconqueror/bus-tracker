@@ -93,6 +93,45 @@ function MysteryMoveModal({bus,fleet,move,close}:{bus:DefectLogFleetBus;fleet:De
  return <div className="shade mystery-move-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><form className="mystery-move-modal" onSubmit={submit}><header className="mystery-move-head"><span><small>MYSTERY BUS</small><h2>Move Bus {bus.n}</h2></span><button type="button" onClick={close} aria-label="Close location editor">×</button></header><div><p><b>CURRENT LOCATION</b><span>{locationLabel(bus.l)}</span></p><label>NEW FACILITY LOCATION<select autoFocus required value={area} onChange={event=>setArea(event.target.value)}><option value="">Choose a section</option>{choices.map(choice=><option value={choice.name} disabled={!choice.current&&!choice.open} key={choice.name}>{choice.name+(choice.current?" — CURRENT":choice.open?" — "+choice.open+" OPEN":" — FULL")}</option>)}</select></label><small>The bus moves to the first open space in that section. Its defects and Down Sheet membership are not changed.</small></div><footer className="mystery-move-actions"><button type="button" onClick={close}>CANCEL</button><button type="submit" disabled={!area||area===currentArea}>MOVE BUS</button></footer></form></div>;
 }
 
+/* Asked at the moment a repair is closed out with a part on it.
+
+   Two ways forward on purpose, and neither of them is "cancel". A mechanic
+   standing at a bus often has the part in his hand and the number on the box,
+   and sometimes the box is in the parts room and he is not walking back for it
+   right now. Forcing a number would get a made-up one or an abandoned save;
+   offering ENTER LATER records the truth — a part went on, the number is still
+   outstanding — and the Fixed Repairs card says so until somebody fills it in.
+
+   The number is handed back to the caller rather than written to the record
+   here, because the save has to be validated as a whole. */
+function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
+ busNumber:string;suggestion:string;initial:string;
+ confirm:(partNumber:string)=>void;close:()=>void;
+}){
+ const [number,setNumber]=useState(initial);
+ const typed=number.trim();
+ return <div className="part-prompt-shade" role="dialog" aria-modal="true" aria-label="Part number"
+  onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
+  <div className="part-prompt">
+   <header className="part-prompt-head"><small>SAVING AS FIXED{busNumber?" · BUS "+busNumber:""}</small><b>WHAT PART WENT ON?</b></header>
+   <label>PART NUMBER
+    <input value={number} autoFocus inputMode="text" autoComplete="off" spellCheck={false}
+     placeholder="Type or scan the number"
+     onChange={event=>setNumber(event.target.value)}
+     onKeyDown={event=>{if(event.key==="Enter"&&typed){event.preventDefault();confirm(typed)}}}/>
+   </label>
+   {suggestion&&suggestion!==typed&&<button type="button" className="part-prompt-suggestion" onClick={()=>setNumber(suggestion)}>
+    <span><b>LAST TIME</b>{suggestion}</span><em>USE THIS</em></button>}
+   <div className="part-prompt-actions">
+    <button type="button" className="part-prompt-save" disabled={!typed} onClick={()=>confirm(typed)}>SAVE WITH THIS PART</button>
+    <button type="button" className="part-prompt-later" onClick={()=>confirm("")}>ENTER LATER</button>
+   </div>
+   <p className="part-prompt-note">ENTER LATER still saves the repair as fixed. It is marked <b>MISSING PART #</b> on the Fixed Repairs page until the number is added.</p>
+   <button type="button" className="part-prompt-cancel" onClick={close}>CANCEL — DO NOT SAVE YET</button>
+  </div>
+ </div>;
+}
+
 function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
  const [value,setValue]=useState(draft);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
@@ -100,6 +139,9 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     about it and the section simply never opened. Held in state instead, seeded
     once from the record, so it opens when there is something to see and the
     mechanic can still collapse it. */
+ /* Open only while the part prompt is up. Held here rather than as a separate
+    route so closing the editor cannot strand it. */
+ const [partPrompt,setPartPrompt]=useState(false);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
@@ -165,9 +207,20 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
  const recentDuplicate=selectedBus&&value.quickIssue?recentDefectDuplicate(selectedBus,value.defect):null;
- const validateAndSave=(complete:boolean)=>{const completed=complete||value.defect.state==="completed";const initials=(value.defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(value.defect.completedBy||defaultInitials).trim().toUpperCase(),details=value.defect.details.trim(),issue=value.quickIssue||value.defect.issue,count=value.defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!value.defect.category){alert("Select a repair category.");return}if(countField?.required&&(!count||count<1||count>countField.max)){alert("Select "+countField.label.toLowerCase()+" (1 through "+countField.max+").");return}if(completed&&requireInitials&&!completedBy){alert("Put your initials or name in FIXED BY before saving this as fixed. This is required by the Defect Log setting; turn it off there to make it optional again.");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after 48 hours.");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...value.defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:value.defect.completedBy,state:completed?"completed":value.defect.state,completedAt:completed?(value.defect.completedAt||now):""}};(completed?saveFixed:save)(finalDraft)};
+ /* Takes an optional patch because the part prompt decides what to store at the
+    moment it is confirmed. Setting that on state and then calling this would
+    save the defect as it was one render ago — React has not applied the update
+    yet — so the part number would be dropped on the very save that asked for
+    it. Passing it through means what is validated is what is written. */
+ const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={})=>{const defect={...value.defect,...patch};const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!defect.category){alert("Select a repair category.");return}if(countField?.required&&(!count||count<1||count>countField.max)){alert("Select "+countField.label.toLowerCase()+" (1 through "+countField.max+").");return}if(completed&&requireInitials&&!completedBy){alert("Put your initials or name in FIXED BY before saving this as fixed. This is required by the Defect Log setting; turn it off there to make it optional again.");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after 48 hours.");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):""}};(completed?saveFixed:save)(finalDraft)};
  const submit=(event:React.FormEvent)=>{event.preventDefault();validateAndSave(false)};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
+  {partPrompt&&<PartNumberPrompt
+   busNumber={selectedBus?.n||""}
+   suggestion={remembered?.partNumber||""}
+   initial={value.defect.partNumber||""}
+   close={()=>setPartPrompt(false)}
+   confirm={number=>{setPartPrompt(false);validateAndSave(true,{partsUsed:true,partNumber:number});}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    <div className="log-form">
@@ -222,8 +275,9 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
     <div className="save-log-middle-actions" aria-label="Defect form actions">
      <button type="submit" className="save-log-middle" disabled={Boolean(recentDuplicate)}>{saveLabel}</button>
-     <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
      <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
+     <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
+     <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
     </div>
     <details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
@@ -259,7 +313,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Mark when the reported condition could not be reproduced during inspection or testing.</small></span></label>
 
    </div>
-   <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" onClick={close}>CLOSE</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button></footer>
+   <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
   </form>
  </div>;
 }
