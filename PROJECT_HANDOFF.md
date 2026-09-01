@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-08-31
+Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 129
-Live feature checkpoint: commit 24a02a9
+Live release: Sites Version 134
+Live feature checkpoint: commit 43ddeae
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 129 is the current user-approved live release. Its validated source checkpoint is commit 24a02a9. GET THE SHOP'S COPY now sends this device's work before it receives the shared copy and refuses to pull if that send fails. Shared Quick Filter lists are readable, carry locations, collapse repeated displayed lines, and can be shared as self-contained offline pages. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store. Version 130 remains queued in docs/PUBLISH_NEXT.md.
+Version 134 is the current user-approved live release. Its reconciled source checkpoint is commit 43ddeae: it includes the frozen Version 130 through Version 133 work from `0258c34`, while preserving the already-live Bodywork choice `IBS screen pole - broken`. DEFERRED now records a Bay 12 hold without creating Down Sheet membership, provides its own map badge, filter, alert and evening review, and remembers unresolved repairs returned to service. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

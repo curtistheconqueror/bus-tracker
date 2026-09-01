@@ -4,6 +4,11 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 134 | Live | 43ddeae | Reconciled the frozen Version 130–133 work with the existing live catalog correction: duplicate-repair merging, the expanded repair catalog and part-number completion flow, resilient storage-save reporting and windowed Fixed Repairs, plus DEFERRED Bay 12 holds with a timed alert, evening review, return-to-service history, and the Bodywork IBS screen-pole defect |
+| 133 | Previous live | 5c257d3 | Preserved the Bodywork IBS screen-pole defect while reconciling the prior Sites source history |
+| 132 | Previous live | 3b55d96 | Saved and deployed the validated Fixed Repairs windowing and storage-save reporting source during the Sites-history reconciliation |
+| 131 | Previous live | 8858e3f | IntelligAIRE III panel catalog wording |
+| 130 | Previous live | 5fc8436 | One repair, one record: duplicate defects merged and protected from Shop Cloud resurrection |
 | 85 | Historical | 14a80e9 | Refined Defect Log workflow controls and the approved three-surface application before the mobile grouping update |
 | 86 | Historical | 7d62809 | Mobile Defect Log grouping, defect counts, generation filters, typed bus entry, hidden phone Shop Notes, and organized project documentation |
 | 92 | Previous live | be6ab31 | Multi-symptom Check Engine defects, contained phone layouts, collapsible Mystery search, shared Quick Filter bus lists, and stable full-height phone editor saving |
