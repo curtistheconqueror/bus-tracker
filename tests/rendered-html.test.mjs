@@ -1337,6 +1337,8 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - Kneeler button"));
   assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Front dash damage"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
+  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("IBS Screen"));
+  assert.ok(REPAIR_OPTIONS.Bodywork.includes("IBS screen pole - broken"));
   for(const issue of ["Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged"])
     assert.ok(REPAIR_OPTIONS.Bodywork.includes(issue),issue);
   assert.ok(REPAIR_OPTIONS.Miscellaneous.includes("Missing road hazard triangles (3 required)"));
