@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2910,9 +2910,12 @@ test("work time totals per person, day by day, and says what it is not counting"
 test("a repair records how far it got, and what was found travels with it",async()=>{
  const base={id:"d1",category:"Engine",issue:"Check engine light",details:"",operability:"service",state:"open"};
 
- // three states and no more: a fourth invites two mechanics to tick different
- // boxes for the same job, and a state written onto records cannot be removed
- assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order"]);
+ /* The original three warned against a fourth, because a fourth invites two
+    mechanics to tick different boxes for the same job. Test driven and brake
+    test were added anyway, and the warning does not bite: it was about
+    OVERLAP, and unlike inspected-vs-diagnosed these are discrete physical
+    acts rather than judgements about how far the thinking has got. */
+ assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order","test-driven","brake-test"]);
 
  // ticking stamps who and when
  let defect=setDefectWorkState(base,"diagnosed",true,"2026-08-27T15:00:00.000Z","CJ");
@@ -6470,4 +6473,65 @@ test("DEFERRED cannot be ticked on a repair the Down Sheet already has, and a wr
  assert.doesNotMatch(catalog, /Math\.max\(0,\(now\.getTime\(\)-started\)\/60000\)/);
  const future = { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: "2099-01-01T00:00:00.000Z" };
  assert.ok(deferredMinutesElapsed(future, new Date("2026-09-01T00:00:00.000Z")) < 0, "the raw helper still reports a future stamp as negative");
+});
+
+test("a brake test records a result, and only the two it can mean", () => {
+ const base = { id: "d1", category: "Brakes", issue: "Brake inspection", details: "", operability: "service", state: "open" };
+
+ // Ticking without a result is a test with no outcome recorded yet.
+ let defect = setDefectWorkState(base, BRAKE_TEST_KEY, true, "2026-09-01T12:00:00.000Z", "CJ");
+ assert.equal(brakeTestResult(defect), undefined);
+ assert.equal(brakeTestFailed(defect), false);
+
+ // A result stamps alongside who and when.
+ defect = setDefectWorkState(defect, BRAKE_TEST_KEY, true, "2026-09-01T12:05:00.000Z", "CJ", "fail");
+ assert.equal(brakeTestResult(defect), "fail");
+ assert.equal(brakeTestFailed(defect), true);
+ assert.equal(defect.workStates[BRAKE_TEST_KEY].by, "CJ");
+ assert.ok(defect.workStates[BRAKE_TEST_KEY].at);
+
+ /* Re-stamping without a result keeps the one already recorded — re-signing a
+    brake test must not silently forget that it failed. */
+ const resigned = setDefectWorkState(defect, BRAKE_TEST_KEY, true, "2026-09-01T13:00:00.000Z", "RM");
+ assert.equal(brakeTestResult(resigned), "fail");
+ assert.equal(resigned.workStates[BRAKE_TEST_KEY].by, "RM");
+
+ // Unticking clears the stamp outright, result included.
+ const cleared = setDefectWorkState(resigned, BRAKE_TEST_KEY, false, "2026-09-01T14:00:00.000Z", "RM");
+ assert.equal(brakeTestResult(cleared), undefined);
+
+ // A result only ever survives a read if it is one of the two known values.
+ assert.equal(normalizeWorkStateStamp({ at: "x", result: "fail" }).result, "fail");
+ assert.equal(normalizeWorkStateStamp({ at: "x", result: "PASS" }).result, "pass");
+ assert.equal(normalizeWorkStateStamp({ at: "x", result: "maybe" }).result, undefined);
+ // and it survives a full stored round trip
+ const [read] = normalizeDefects([defect], "", "bus");
+ assert.equal(brakeTestResult(read), "fail");
+
+ // Other states never carry a result, even if one is passed.
+ const inspected = setDefectWorkState(base, "inspected", true, "2026-09-01T12:00:00.000Z", "CJ", "fail");
+ assert.equal(inspected.workStates.inspected.result, undefined);
+});
+
+test("a failed brake test takes the bus out of service, and MERGE DUPES cannot claim a save it did not make", async () => {
+ const logPage = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+
+ // Failing sets availability to down; passing deliberately leaves it alone.
+ assert.match(logPage, /const setBrakeTestResult=\(result:BrakeTestResult\)=>\{/);
+ assert.match(logPage, /result==="fail"\?\{\.\.\.defect,operability:"down"\}:defect/);
+ // One either/or, not two independent boxes — no pass-and-fail-at-once state.
+ assert.match(logPage, /\(\["pass","fail"\] as BrakeTestResult\[\]\)\.map/);
+
+ /* The merge bug, measured in a browser before it was fixed: 42 stored
+    defects before and 42 after, because the bulk-loss guard refuses any write
+    dropping five or more records — while the handler still showed "21
+    duplicate records merged" and wrote 21 cloud tombstones for records that
+    were never merged. */
+ assert.match(logPage, /const written=persist\(result\.buses,result\.entries,\{allowBulkDefectLoss:true\}\);/);
+ assert.match(logPage, /if\(!written\.ok\)return;/);
+ // The guard is lifted for the merge ONLY — persist defaults to the full check.
+ assert.match(logPage, /const persist=\(nextFleet:DefectLogFleetBus\[\],nextDown:DefectLogDownEntry\[\],options:FleetWriteOptions=\{\}\)/);
+ assert.match(logPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
+ // The recovery snapshot is NOT skipped, so the pre-merge board stays restorable.
+ assert.doesNotMatch(logPage, /allowBulkDefectLoss:true,\s*skipRecoverySnapshot/);
 });

@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -23,7 +23,7 @@ import {shareOrDownloadFile} from "../share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup} from "../fleet-backup";
-import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_BACKUP_INTERVAL,FLEET_BACKUP_INTERVAL_CHOICES,FLEET_STORAGE_KEY as FLEET_KEY,normalizeFleetBackupInterval,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteReason,writeSetting} from "../storage";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_BACKUP_INTERVAL,FLEET_BACKUP_INTERVAL_CHOICES,FLEET_STORAGE_KEY as FLEET_KEY,normalizeFleetBackupInterval,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "../storage";
 
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "../facility-areas";
 type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
@@ -198,6 +198,23 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   }
   setValue(current=>({...current,defect:setDefectWorkState(current.defect,key,on,new Date().toISOString(),by)}));
  };
+ /* A failed brake test takes the bus out of service on the spot.
+
+    The right default on a safety item: the alternative is a record saying the
+    brakes failed sitting beside an availability that still says the bus may
+    stay in service. The dropdown stays editable, so this is a decision made
+    FOR somebody rather than taken away from them — changing it back is
+    deliberate and visible.
+
+    Passing never touches availability. A good brake test is not a reason to
+    overrule a bus that is down for something else entirely. */
+ const setBrakeTestResult=(result:BrakeTestResult)=>{
+  const by=(value.defect.completedBy||defaultInitials).trim().toUpperCase();
+  setValue(current=>{
+   const defect=setDefectWorkState(current.defect,BRAKE_TEST_KEY,true,new Date().toISOString(),by,result);
+   return {...current,defect:result==="fail"?{...defect,operability:"down"}:defect};
+  });
+ };
  /* Held to the same initials rule as a work state. A recommendation is one
     person's judgement that a bus belongs on the sheet, and the list gets handed
     to somebody else, so an unsigned one is a job nobody can ask about. */
@@ -287,6 +304,23 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
        <span><b>{state.label}</b><small>{on&&who?who:state.hint}</small></span>
       </label>;
      })}</div>
+     {/* Shown only once BRAKE TEST is ticked, and offered as one either/or
+         rather than two checkboxes: three independent boxes would let
+         somebody record a pass and a fail at once, or a result with no test
+         behind it. Neither state is reachable here. */}
+     {Boolean(value.defect.workStates?.[BRAKE_TEST_KEY])&&<div className="brake-test-result" role="group" aria-label="Brake test result">
+      <b>BRAKE TEST RESULT</b>
+      <div>
+       {(["pass","fail"] as BrakeTestResult[]).map(result=>{
+        const picked=brakeTestResult(value.defect)===result;
+        return <button type="button" key={result} className={"brake-test-"+result+(picked?" selected":"")} aria-pressed={picked} onClick={()=>setBrakeTestResult(result)}>{result.toUpperCase()}</button>;
+       })}
+      </div>
+      {/* A pass never puts a bus back in service on its own — that stays a
+          deliberate act, including after a mis-tapped FAIL. Said out loud here
+          rather than left for somebody to notice later on the board. */}
+      <small>{brakeTestFailed(value.defect)?"Recorded as failed — BUS AVAILABILITY was set to Remove From Service. Change it below only if that is wrong.":brakeTestResult(value.defect)==="pass"?(value.defect.operability==="down"?"Recorded as passed. This bus is still set to Remove From Service — change BUS AVAILABILITY below to put it back in service.":"Recorded as passed. Availability is left as it is."):"Record whether it passed or failed. Anything more goes in the notes."}</small>
+     </div>}
      <label className="work-state-finding">WHAT WAS FOUND (OPTIONAL)
       <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
      </label>
@@ -483,13 +517,18 @@ export default function DefectLog(){
  /* Reports why nothing was kept instead of returning in silence. The state is
     not advanced on a refusal, on purpose — the screen keeps showing what is
     actually stored rather than a change that did not land. */
- const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[])=>{
-  const written=writeFleetStorageResult(localStorage,nextFleet);
+ /* Returns the fleet write's result so a caller can tell whether anything was
+    actually stored. Every caller but the merge below wants the default write,
+    guard and all; the merge is the one operation here whose whole purpose is
+    to end with fewer records than it started with. */
+ const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[],options:FleetWriteOptions={}):StorageWriteResult=>{
+  const written=writeFleetStorageResult(localStorage,nextFleet,options);
   setSaveProblem(written.reason||"");
-  if(!written.ok)return;
+  if(!written.ok)return written;
   setFleet(nextFleet);setDownEntries(nextDown);
   const sheet=writeDownSheetStorageResult(localStorage,nextDown);
   if(!sheet.ok)setSaveProblem(sheet.reason||"");
+  return written;
  };
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
@@ -514,8 +553,29 @@ export default function DefectLog(){
   const now=new Date().toISOString();
   const result=mergeDuplicateDefects(fleet,downEntries,now);
   const before=readMergedAway(localStorage);
+  /* allowBulkDefectLoss, and only here.
+
+     The safety stop refuses any write that drops five or more records, which
+     is exactly right for a sync or a bug and exactly wrong for this: folding
+     21 duplicates is a deliberate, confirmed cleanup whose entire point is to
+     end with fewer records, and the count was shown in the prompt before
+     anybody agreed to it. Left guarded, the merge silently did nothing — the
+     board kept all 42 records, the badge kept saying 21, and the alert below
+     still claimed success. Measured, not guessed: 42 defects before, 42
+     after, with the safety stop firing behind a success message.
+
+     The recovery snapshot is deliberately NOT skipped, so the pre-merge board
+     is still written to pace-board-recovery-v1 before anything changes. That
+     plus the confirm count, UNDO LAST, and merge rules that provably keep
+     every field is the safety net here — not the blanket record-count guard,
+     which cannot tell a cleanup from a catastrophe. */
+  const written=persist(result.buses,result.entries,{allowBulkDefectLoss:true});
+  /* Nothing below may run on a write that did not happen. Claiming a merge
+     that was refused is how somebody stops trusting the number, and the
+     tombstones are worse than cosmetic: they would tell the Shop Cloud to
+     drop records this device still holds. */
+  if(!written.ok)return;
   setUndoSnapshot({fleet,downEntries,mergedAway:before,label:"Merged "+result.removed+" duplicate record"+(result.removed===1?"":"s")});
-  persist(result.buses,result.entries);
   /* A push only sends what a bus still carries, so a folded record is not
      removed anywhere by merging alone: it stays live on the server, comes back
      on the next GET THE SHOP'S COPY, and the merge undoes itself. Writing the

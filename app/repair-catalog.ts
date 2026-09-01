@@ -6,18 +6,39 @@ export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
    only two things the record could say until now, and between them sits most
    of a shop week: a bus looked at, a fault found, a part waiting on the truck.
 
-   Three states and no more. A fourth invites two mechanics to tick different
-   boxes for the same job, and a state can be added later far more safely than
-   one already written onto records can be taken away. "Diagnosed" deliberately
-   covers a check-engine code and a multiplex fault alike: on the floor both
-   mean somebody found the cause and it is not fixed yet. */
-export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order";
-export type WorkStateStamp={at?:string;by?:string};
+   The original three were chosen with a warning attached: a fourth invites two
+   mechanics to tick different boxes for the same job, and a state can be added
+   later far more safely than one already written onto records can be taken
+   away. "Diagnosed" deliberately covers a check-engine code and a multiplex
+   fault alike: on the floor both mean somebody found the cause and it is not
+   fixed yet.
+
+   Two were added later, and the warning does not bite on either, because the
+   warning was about OVERLAP. Inspected and diagnosed can blur — both are
+   judgements about how far the thinking has got. Test driven and brake test
+   are neither judgements nor stages: they are discrete physical acts that
+   either happened or did not, and no second mechanic can reasonably record
+   the same work under a different one of these boxes.
+
+   Brake test is the only state that carries a RESULT. "Brake test: done" with
+   the outcome left to prose is exactly the ambiguity that costs most on a
+   safety item, and a failed brake test is the first thing anybody would want
+   to pull as a list — which free text cannot answer. */
+export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order"|"test-driven"|"brake-test";
+export type BrakeTestResult="pass"|"fail";
+/* result is only ever set on the brake-test key. Optional everywhere else so
+   one stamp shape still covers every state. */
+export type WorkStateStamp={at?:string;by?:string;result?:BrakeTestResult};
 export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string}[]=[
  {key:"inspected",label:"INSPECTED",short:"INSP",hint:"Looked at, nothing found yet"},
  {key:"diagnosed",label:"DIAGNOSED",short:"DIAG",hint:"Cause found, not fixed yet"},
  {key:"parts-on-order",label:"PARTS ON ORDER",short:"PARTS",hint:"Waiting on a part to arrive"},
+ {key:"test-driven",label:"TEST DRIVEN",short:"DRIVEN",hint:"Road tested, details in the notes"},
+ {key:"brake-test",label:"BRAKE TEST",short:"BRAKE",hint:"Record the result below"},
 ];
+export const BRAKE_TEST_KEY:WorkStateKey="brake-test";
+export function brakeTestResult(defect:StructuredDefect){return defect.workStates?.[BRAKE_TEST_KEY]?.result}
+export function brakeTestFailed(defect:StructuredDefect){return brakeTestResult(defect)==="fail"}
 export const WORK_STATE_KEYS=WORK_STATES.map(state=>state.key);
 
 export type StructuredDefect={
@@ -321,7 +342,12 @@ export function normalizeWorkStateStamp(value:unknown):WorkStateStamp|undefined{
  if(value===undefined||value===null||value===false)return undefined;
  const stamp=value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
  const at=String(stamp.at??"").trim(),by=String(stamp.by??"").trim();
- return {...(at?{at}:{}),...(by?{by}:{})};
+ /* Only the two values a brake test can mean. Anything else a hand-edited
+    file or a newer build put here is dropped rather than carried, so a result
+    can never be a value this app does not know how to show. */
+ const raw=String(stamp.result??"").trim().toLowerCase();
+ const result:BrakeTestResult|undefined=raw==="pass"||raw==="fail"?raw:undefined;
+ return {...(at?{at}:{}),...(by?{by}:{}),...(result?{result}:{})};
 }
 
 export function normalizeWorkStates(value:unknown):Partial<Record<WorkStateKey,WorkStateStamp>>|undefined{
@@ -340,17 +366,22 @@ export function normalizeWorkStates(value:unknown):Partial<Record<WorkStateKey,W
 /* Stamping a tick, or clearing the whole stamp with it. Shared by the work
    states and the Down Sheet recommendation so a tick means the same thing and
    leaves the same trace wherever it is offered. */
-function stampFor(on:boolean,at:string,by:string):WorkStateStamp|undefined{
+function stampFor(on:boolean,at:string,by:string,result?:BrakeTestResult):WorkStateStamp|undefined{
  if(!on)return undefined;
  const person=by.trim();
- return {...(at?{at}:{}),...(person?{by:person}:{})};
+ return {...(at?{at}:{}),...(person?{by:person}:{}),...(result?{result}:{})};
 }
 
 /* Ticking a state stamps it; unticking removes the key outright rather than
    leaving a false behind, so a stamp can never outlive the tick that made it
    and read as work somebody did not do. */
-export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:boolean,at:string,by=""):StructuredDefect{
- const states={...(defect.workStates||{})},stamp=stampFor(on,at,by);
+export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:boolean,at:string,by="",result?:BrakeTestResult):StructuredDefect{
+ const states={...(defect.workStates||{})};
+ /* A supplied result wins; otherwise the stamp keeps the one it already had,
+    so re-signing or re-stamping a brake test cannot silently forget whether
+    it passed. Unticking clears the whole stamp, result included. */
+ const carried=key===BRAKE_TEST_KEY?(result??states[key]?.result):undefined;
+ const stamp=stampFor(on,at,by,carried);
  if(stamp)states[key]=stamp;else delete states[key];
  const next={...defect,workStates:Object.keys(states).length?states:undefined};
  if(!next.workStates)delete next.workStates;

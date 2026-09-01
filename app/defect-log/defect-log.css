@@ -357,6 +357,19 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .deferred-history-note b{font-size:8px;font-weight:900;letter-spacing:.4px}
 .downsheet-recommend-check b{color:#8a4c00}
 .deferred-check{border-color:#a9d3dc;background:#eaf7fa}.deferred-check b{color:#0b6b80}
+/* Pass and fail read as opposites at a glance, because on a brake test that
+   is the entire point of the control. Unpicked they are outlines; picked, the
+   chosen one fills solid and the other stays quiet. */
+.brake-test-result{display:grid;gap:7px;padding:10px 11px;border:1px solid #c9d4e4;border-radius:7px;background:#f6f9fe}
+.brake-test-result>b{font-size:8px;font-weight:900;letter-spacing:.4px;color:#455a79}
+.brake-test-result>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.brake-test-result button{min-height:44px;border-radius:7px;border:2px solid #b7c3d5;background:#fff;font-size:11px;font-weight:900;letter-spacing:.6px;cursor:pointer;touch-action:manipulation}
+.brake-test-result .brake-test-pass{border-color:#12864f;color:#0a6b3e}
+.brake-test-result .brake-test-pass.selected{background:#12864f;color:#fff}
+.brake-test-result .brake-test-fail{border-color:#b3261e;color:#8f1d17}
+.brake-test-result .brake-test-fail.selected{background:#b3261e;color:#fff}
+.brake-test-result>small{font-size:8px;line-height:1.4;color:#5a6a86}
+@media(max-width:760px){.brake-test-result button{min-height:50px;font-size:13px}}
 .quick-filter-deferred-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 9px;border-top:1px solid var(--log-border);background:color-mix(in srgb,#0e7490 8%,var(--log-surface))}.quick-filter-deferred-row small{font-size:8px;font-weight:900;color:#0b6b80}.quick-filter-deferred-row small.deferred-overdue{color:#b3261e}.quick-filter-deferred-row .mystery-move{min-width:0;min-height:32px;font-size:7px}
 
 /* Causes learned under this symptom. Chips rather than a dropdown: on a phone a
