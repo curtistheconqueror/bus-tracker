@@ -1316,7 +1316,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTION_GROUPS["Operator/Driver Controls"])[0], "Driver Seat");
   // Doors moved to Bus Accessories when Bus Controls split, keeping the specific
   // symptom wording rather than the vaguer component names that were there.
-  assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Accessories"]["Doors"].slice(0,3), ["Front door will not open","Front door will not close","Front door opens / closes slowly"]);
+  // The general option leads, with the specific symptoms under it — that is the
+  // order a fault gets narrowed down in, and the general one is the most used.
+  assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Accessories"]["Doors"].slice(0,4), ["Front door","Front door will not open","Front door will not close","Front door opens / closes slowly"]);
+  /* One option was retired by the split and only one: the single wheelchair-area
+     stop request became one per side, and a record logged under it cannot be
+     given a side after the fact. It still reads back exactly as logged. */
+  assert.deepEqual(RETIRED_ISSUES["Bus Accessories"], ["Stop Request - Stop request (wheelchair area)"]);
   assert.equal(REPAIR_OPTIONS["Operator/Driver Controls"][0], "Driver Seat - Seat belt");
   assert.ok(REPAIR_OPTIONS["Bus Accessories"].includes("Ramp, Lift and Kneeler - Kneeler not functioning correctly"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
@@ -4901,14 +4907,11 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
   ["Wheelchair lift","Ramp, Lift and Kneeler - Wheelchair lift"],
  ]){
   assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift",issue),{category:"Bus Accessories",issue:expected},issue);
-  /* Four of these name a component where a specific symptom now exists on the
-     same group, so they were retired when Bus Controls split. A retired option
-     still migrates and still reads back exactly as logged — it is only dropped
-     from the picker — which is the whole point of retiring rather than
-     remapping it onto a symptom nobody recorded. */
-  const retired=(RETIRED_ISSUES["Bus Accessories"]||[]).includes(expected);
-  if(retired)assert.equal(ada.includes(expected),false,expected+" is retired and must not be pickable");
-  else assert.ok(ada.includes(expected),expected+" must be pickable");
+  /* All of these stay pickable. Four were nearly retired on the reasoning that
+     a specific symptom now covers each, until the live board showed they were
+     the most-used options in the category — nine of its ten records. They are
+     how a fault is logged when the door is known and the symptom is not. */
+  assert.ok(ada.includes(expected),expected+" must be pickable");
  }
  // the old category-wide catch-all has no single new home, so its wording stands
  assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift","Other accessibility repair"),
