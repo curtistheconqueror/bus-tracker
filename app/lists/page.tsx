@@ -6,6 +6,7 @@ import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
 import type {WorkTimeBus} from "../work-time";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
+import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
@@ -132,7 +133,7 @@ export default function Lists(){
   void shareOrDownloadFile(blob,open.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".txt",open.name+" report");
  };
 
- return <main className="lists-app">
+ return <main className="lists-app"><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">FLEET CAMPAIGNS</a></nav>
   </header>

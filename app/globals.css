@@ -187,6 +187,8 @@ nav{background:var(--panel-bg);color:var(--theme-text);border-color:var(--theme-
 .roadcall-dot{position:absolute;top:-5px;right:-5px;width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:var(--roadcall-color);box-shadow:0 0 0 1px #8f3700;z-index:4;animation:roadcall-dot-pulse .85s ease-in-out infinite}
 .downsheet-ready-badge{position:absolute;top:-5px;left:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:var(--downsheet-badge);color:var(--downsheet-badge-text);box-shadow:0 1px 3px #3a176d99;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
 .downsheet-ready-detail{border-left:3px solid var(--downsheet-badge);padding-left:7px;color:var(--theme-text)}.downsheet-ready-detail>b{background:var(--downsheet-badge);color:var(--downsheet-badge-text);border-radius:4px;padding:2px 4px}
+.deferred-held-badge{position:absolute;bottom:-5px;right:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:#0e7490;color:#fff;box-shadow:0 1px 3px #0b4a5799;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
+.deferred-held-detail{border-left:3px solid #0e7490;padding-left:7px;color:var(--theme-text)}.deferred-held-detail>b{background:#0e7490;color:#fff;border-radius:4px;padding:2px 4px}
 @keyframes roadcall-dot-pulse{0%,100%{transform:scale(.82);box-shadow:0 0 0 1px #8f3700,0 0 0 0 color-mix(in srgb,var(--roadcall-color) 70%,transparent)}50%{transform:scale(1.2);box-shadow:0 0 0 1px #8f3700,0 0 0 5px color-mix(in srgb,var(--roadcall-color) 15%,transparent)}}
 .roadcall-badge{background:var(--roadcall-color);color:#fff}
 .roadcall-location{border-left:3px solid var(--roadcall-color);padding-left:7px}
@@ -759,4 +761,29 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .save-alert button{flex:none;min-height:42px;border:1px solid #fff;border-radius:7px;background:#fff;
  color:#8c1d1d;padding:0 14px;font-family:inherit;font-size:10px;font-weight:900;letter-spacing:.4px;cursor:pointer}
 .save-alert button:disabled{opacity:.6;cursor:not-allowed}
+
+/* The B12 deferred-bus safety net: a pulsing nav badge and an evening review
+   modal, both shared across every page — see app/deferred-watch.tsx. */
+.deferred-nav-badge{position:fixed;top:10px;right:10px;z-index:2147483000;display:flex;align-items:center;gap:5px;background:#0e7490;color:#fff;border:2px solid #fff;border-radius:20px;padding:8px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:900;letter-spacing:.2px;text-decoration:none;box-shadow:0 4px 16px #0b465499;animation:deferred-badge-pulse 1.4s ease-in-out infinite}
+@keyframes deferred-badge-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.82}}
+@media(max-width:760px){.deferred-nav-badge{top:62px;right:6px;padding:7px 11px;font-size:9px}}
+.deferred-review-shade{z-index:2147483600}
+.deferred-review-modal{width:min(480px,100%)}
+.deferred-review-body{display:grid;gap:14px;padding:18px 20px}
+.deferred-review-summary{display:grid;gap:4px;margin:0;padding:11px;border:1px solid #cddaf0;border-radius:7px;background:#f2f6fc}
+.deferred-review-summary b{color:#0b64bd;font-size:10px}
+.deferred-review-summary span{font-size:12px;color:#172957;font-weight:700}
+.deferred-review-summary small{color:#0e7490;font-weight:900;font-size:10px}
+.deferred-review-choices{display:grid;gap:8px}
+.deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}
+.deferred-review-choices label.selected{border-color:#0e7490;background:#eaf7fa}
+.deferred-review-choices label input{width:18px;height:18px;flex:none}
+.deferred-review-choices label span{display:flex;flex-direction:column;gap:2px}
+.deferred-review-choices label b{font-size:11px;color:#172957}
+.deferred-review-choices label small{font-size:9px;color:#5a6a86}
+.deferred-review-time{width:100%;min-height:44px;border:1px solid #0e7490;border-radius:6px;padding:0 10px;font-size:16px;color:#172957}
+.deferred-review-location{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:900;color:#506080}
+.deferred-review-location select{min-height:44px;border:1px solid #b9c3d7;border-radius:6px;background:#fff;color:#172858;padding:0 10px}
+.deferred-review-actions{display:grid;grid-template-columns:auto 1fr auto}
+@media(max-width:760px){.deferred-review-actions{grid-template-columns:1fr 1fr}.deferred-review-actions span{display:none}}
 @media(max-width:760px){.save-alert{padding:9px 11px}.save-alert button{width:100%}}

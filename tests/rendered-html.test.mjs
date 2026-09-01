@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -432,10 +432,11 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
     {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,11);
-  /* Recommended for Down Sheet stays last on purpose: the others answer "what
-     is broken" and it answers "what am I asking somebody to schedule". */
-  assert.equal(QUICK_FILTERS.at(-1).key,"down-sheet-recommended");
+  assert.equal(QUICK_FILTERS.length,12);
+  /* Recommended for Down Sheet and Deferred stay last on purpose: the others
+     answer "what is broken" and these two answer "what needs a decision". */
+  assert.equal(QUICK_FILTERS.at(-2).key,"down-sheet-recommended");
+  assert.equal(QUICK_FILTERS.at(-1).key,"deferred");
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
@@ -4042,7 +4043,7 @@ test("a repair can be put forward for the Down Sheet without being put on it",as
  // it is a real filter entry, so the drawer's COPY LIST and SHARE come with it
  const entry=QUICK_FILTERS.find(item=>item.key==="down-sheet-recommended");
  assert.equal(entry.label,"Recommended for Down Sheet");
- assert.equal(QUICK_FILTERS.at(-1).key,"down-sheet-recommended","last: it answers a different question from the rest");
+ assert.equal(QUICK_FILTERS.at(-2).key,"down-sheet-recommended","second-to-last: it answers a different question from the rest");
 
  // A recommendation must never quietly become membership, and membership must
  // never clear the recommendation. Separate fields, and adjacent rows in the
@@ -6273,4 +6274,124 @@ test("the DS badge sits beside the defect-count badge instead of overlapping the
  // read as one pair of counts rather than two badges scattered across the
  // card.
  assert.match(logPage,/<span className="log-meta">\{busOnDownSheet&&<b className="inline-ds-badge">DS<\/b>\}\{group\.records\.length>1&&<b className="defect-count-badge">/);
+});
+
+test("a held-back DEFERRED bus is told apart from the Down Sheet's own Deferred workflow", () => {
+ // Both write state:"deferred" — the Down Sheet's own workflow always has an
+ // active entry, a B12 hold never does. isHeldDeferred is the one place that
+ // tells them apart, and every consumer (quick filter, nav badge, map
+ // overlay, evening prompt) goes through it rather than re-deriving the rule.
+ const held = { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: "2026-08-30T20:00:00.000Z" };
+ assert.equal(isHeldDeferred(held, false), true);
+ assert.equal(isHeldDeferred(held, true), false, "an active Down Sheet entry for this bus means it is not a quiet hold");
+ assert.equal(isHeldDeferred({ ...held, state: "open" }, false), false);
+
+ const now = new Date("2026-08-30T21:35:00.000Z");
+ assert.equal(deferredMinutesElapsed(held, now), 95);
+ assert.equal(deferredMinutesElapsed({ ...held, state: "open" }, now), null, "not deferred means no clock is running");
+ assert.equal(deferredMinutesElapsed({ ...held, deferredAt: undefined }, now), null, "deferred with no stamp cannot be timed");
+});
+
+test("the Deferred Quick Filter carries every currently-deferred repair, oldest-first is left to the caller", () => {
+ const bus = { id: "a", n: "17530", defects: [
+  { id: "still-deferred", category: "Bus Controls", issue: "Front start button", details: "", operability: "service", state: "deferred", deferredAt: "2026-08-30T18:00:00.000Z" },
+  { id: "fixed", category: "Engine", issue: "Oil leak", details: "", operability: "service", state: "completed" },
+ ] };
+ assert.equal(quickFilterMatch(bus, "deferred"), true);
+ assert.deepEqual(quickFilterDefects(bus, "deferred").map(defect => defect.id), ["still-deferred"]);
+ assert.deepEqual(quickFilterBusIds([bus, { id: "b", n: "1", defects: [] }], "deferred"), ["a"]);
+ assert.equal(quickFilterFallbackLabel("deferred"), "Deferred, held back from service");
+ // quick-filters.ts never sees the Down Sheet's own entries, so it cannot tell
+ // an on-sheet "Deferred" workflow apart from a genuine B12 hold — that
+ // narrowing is documented as the caller's job (isHeldDeferred), not this
+ // module's.
+});
+
+test("saving a repair through DEFERRED, a snooze, and every exit clears or stamps deferredAt correctly", () => {
+ const fleet = [{ id: "bus-1", n: "17530", s: "shop", l: "bay-1", defects: [] }];
+ const now1 = "2026-08-30T20:00:00.000Z";
+
+ // Entering DEFERRED stamps deferredAt, same as the editor's toggle does.
+ const entered = saveDefectLogRecord(fleet, [], "bus-1", { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: now1, source: "defect-log" }, false, now1);
+ assert.equal(entered.error, null);
+ const defectAfterEntry = entered.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(defectAfterEntry.state, "deferred");
+ assert.equal(defectAfterEntry.deferredAt, now1);
+ assert.equal(isHeldDeferred(defectAfterEntry, false), true);
+
+ // The evening prompt's "keep deferred until X": deferredAt stays put — the
+ // 90-minute clock keeps counting this same stay — only deferredUntil moves.
+ const snoozeUntil = "2026-08-31T02:00:00.000Z";
+ const kept = saveDefectLogRecord(entered.fleet, entered.downEntries, "bus-1", { ...defectAfterEntry, state: "deferred", deferredUntil: snoozeUntil }, false, "2026-08-30T21:40:00.000Z");
+ const defectAfterSnooze = kept.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(defectAfterSnooze.deferredAt, now1, "the original stay is not reset by a snooze");
+ assert.equal(defectAfterSnooze.deferredUntil, snoozeUntil);
+
+ // Exit 1: Put on Down Sheet — leaves DEFERRED, an active entry appears, and
+ // isHeldDeferred now correctly reports it is no longer a quiet hold.
+ const onSheet = saveDefectLogRecord(kept.fleet, kept.downEntries, "bus-1", { ...defectAfterSnooze, state: "open", deferredAt: undefined, deferredUntil: undefined }, true, "2026-08-30T21:45:00.000Z");
+ const defectOnSheet = onSheet.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(defectOnSheet.state, "open");
+ assert.equal(defectOnSheet.deferredAt, undefined);
+ assert.equal(onSheet.downEntries.some(entry => entry.busId === "bus-1" && entry.workflow !== "Completed"), true);
+ assert.equal(isHeldDeferred(defectOnSheet, true), false);
+
+ // Exit 2, from a fresh DEFERRED stay: Return to service with defects — the
+ // repair stays open and unresolved, but it is off the sheet and untimed.
+ const backOnRepair = { ...defectAfterEntry, id: "d2" };
+ const returned = saveDefectLogRecord(fleet, [], "bus-1", backOnRepair, false, now1);
+ const returnedAgain = saveDefectLogRecord(returned.fleet, returned.downEntries, "bus-1", { ...backOnRepair, state: "open", deferredAt: undefined, deferredUntil: undefined }, false, "2026-08-30T22:00:00.000Z");
+ const defectReturned = returnedAgain.fleet[0].defects.find(d => d.id === "d2");
+ assert.equal(defectReturned.state, "open");
+ assert.equal(isUnresolved(defectReturned), true);
+ assert.equal(defectReturned.deferredAt, undefined);
+
+ // Exit 3: marking a still-deferred repair Fixed must also clear the stamps —
+ // a completed record has no business carrying a stale deferred timer.
+ const fixed = saveDefectLogRecord(fleet, [], "bus-1", { ...defectAfterEntry, id: "d3", state: "completed", deferredAt: undefined, deferredUntil: undefined, completedAt: "2026-08-30T22:05:00.000Z", completedBy: "CJ" }, false, "2026-08-30T22:05:00.000Z");
+ const defectFixed = fixed.fleet[0].defects.find(d => d.id === "d3");
+ assert.equal(defectFixed.state, "completed");
+ assert.equal(defectFixed.deferredAt, undefined);
+});
+
+test("the Defect Log editor moves DEFERRED into its own toggle beside the Down Sheet boxes", async () => {
+ const logPage = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ // WORK STATUS no longer offers Deferred as a fourth diagnostic stage — it is
+ // a down-sheet-adjacent decision now, made beside RECOMMEND and DOWN SHEET.
+ assert.doesNotMatch(logPage, /<option value="deferred">Deferred<\/option>/);
+ assert.match(logPage, /<label>WORK STATUS<select value=\{deferred\?"open":value\.defect\.state\} disabled=\{deferred\}/);
+ assert.match(logPage, /<label className="wide downsheet-check deferred-check">/);
+ // Checking DOWN SHEET clears an active DEFERRED, and vice versa — a bus
+ // cannot be held back off the sheet and placed on it at the same time.
+ assert.match(logPage, /const toggleOnDownSheet=\(on:boolean\)=>\{/);
+ assert.match(logPage, /const toggleDeferred=\(on:boolean\)=>\{/);
+ assert.match(logPage, /onChange=\{event=>toggleOnDownSheet\(event\.target\.checked\)\}/);
+ assert.match(logPage, /onChange=\{event=>toggleDeferred\(event\.target\.checked\)\}/);
+});
+
+test("Facility Map bus tokens carry a DEF badge only for genuinely held-back buses", async () => {
+ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ // Excluded from actualDownSet the same way the map already excludes an
+ // on-sheet bus from the DS-ready badge computation.
+ assert.match(page, /const deferredHeldIds=quickFilterBusIds\(buses,"deferred"\)\.filter\(id=>!actualDownSet\.has\(id\)\)/);
+ assert.match(page, /deferredHeld:deferredHeldSet\.has\(bus\.id\)/);
+ assert.match(page, /\{bus\.deferredHeld&&<span className="deferred-held-badge" aria-hidden="true">DEF<\/span>\}/);
+ assert.match(css, /\.deferred-held-badge\{/);
+});
+
+test("the deferred nav badge only pulses past 90 minutes, and the evening prompt opens from 8:30pm for anything over 60", async () => {
+ const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
+ assert.match(watch, /const OVERDUE_MINUTES=90/);
+ assert.match(watch, /const REVIEW_MINUTES=60/);
+ assert.match(watch, /const REVIEW_HOUR=20,REVIEW_MINUTE=30/);
+ assert.match(watch, /minutes>=OVERDUE_MINUTES/);
+ assert.match(watch, /minutes<REVIEW_MINUTES/);
+ // Every page drops in both pieces, so the alert reaches wherever the app is
+ // actually open rather than only the page that happened to log the defect.
+ for (const file of ["../app/page.tsx", "../app/down-sheet/page.tsx", "../app/defect-log/page.tsx", "../app/fixed-repairs/page.tsx", "../app/lists/page.tsx"]) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(source, /<DeferredNavBadge\/>/, file + " is missing the deferred nav badge");
+  assert.match(source, /<DeferredReviewPrompt\/>/, file + " is missing the evening review prompt");
+ }
 });

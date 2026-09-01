@@ -7,6 +7,7 @@ import {defectCountField,defectLabel,defectWorkStates,isDiagnosticDefect,MINIMUM
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
+import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorage} from "../storage";
@@ -166,7 +167,7 @@ function repairOrigin(source:string|undefined){
 }
 
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
- return <main className="fixed-repairs-app" style={appearanceStyle}>
+ return <main className="fixed-repairs-app" style={appearanceStyle}><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button><button type="button" className="fixed-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open Fixed Repairs settings">&#9881; SETTINGS</button></section>

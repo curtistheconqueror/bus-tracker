@@ -1,6 +1,6 @@
 import {isDownSheetRecommended,isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
 
-export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended";
+export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred";
 export type QuickFilterBus={
  id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];
 };
@@ -25,6 +25,10 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
     where a foreman looks for it deliberately rather than falling onto it while
     reaching for Check Engine. */
  {key:"down-sheet-recommended",label:"Recommended for Down Sheet",shortLabel:"DS Rec"},
+ /* Held back from B12 without going on the Down Sheet yet. Sits last, next to
+    DS Rec, for the same reason: this answers "what am I about to forget",
+    not "what is broken". */
+ {key:"deferred",label:"Deferred (Held from Service)",shortLabel:"Deferred"},
 ];
 
 function quickFilterTextMatch(text:string,key:QuickFilterKey){
@@ -40,7 +44,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
     fleet. A winter list that pulls in an overheating bus is a list somebody
     checks once and then stops trusting. */
  if(key==="no-cabin-heat")return /\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)||/\bheater\s*\/\s*defroster\b/i.test(text);
- if(key==="not-duplicated"||key==="down-sheet-recommended")return false;
+ if(key==="not-duplicated"||key==="down-sheet-recommended"||key==="deferred")return false;
  return /\b(?:add(?:ed|ing)?|needs?|low)\s+(?:(?:\d+(?:\.\d+)?\s*)?(?:qt|qts|quart|quarts)\s+(?:of\s+)?)?(?:engine\s+)?oil\b|\b(?:engine\s+)?oil\s+(?:low|needed|required)\b/i.test(text);
 }
 
@@ -55,6 +59,11 @@ export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey){
      been fixed is a job nobody needs scheduled, and leaving it in the list is
      how a shared list stops being trusted. */
   :key==="down-sheet-recommended"?isUnresolved(defect)&&isDownSheetRecommended(defect)
+  /* Every currently-deferred defect, on or off the Down Sheet. The caller
+     narrows this to genuinely held-back buses — it has to, since telling the
+     two apart needs the Down Sheet's own entries, which this module never
+     sees. */
+  :key==="deferred"?isUnresolved(defect)&&defect.state==="deferred"
   :isUnresolved(defect)&&quickFilterTextMatch(defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
  if(matches.length||normalized.length||!legacy||!quickFilterTextMatch(legacy,key))return matches;
  return [{id:bus.id+"-quick-filter-legacy",category:"Miscellaneous",issue:"Manual entry",details:legacy,operability:"service",state:"open"} as StructuredDefect];
@@ -82,6 +91,7 @@ export function quickFilterFallbackLabel(key:QuickFilterKey){
   "no-cabin-heat":"Cabin-heat tracker flag",
   "not-duplicated":"Defect / condition not duplicated",
   "down-sheet-recommended":"Recommended for the Down Sheet",
+  deferred:"Deferred, held back from service",
  } as Record<QuickFilterKey,string>)[key];
 }
 

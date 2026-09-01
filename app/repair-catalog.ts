@@ -65,6 +65,18 @@ export type StructuredDefect={
  finding?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
+ /* Stamped the moment a repair is put into DEFERRED from the Defect Log's own
+    toggle — held back from service without going on the Down Sheet. The Down
+    Sheet's own "Deferred" workflow writes this same state without ever
+    touching this field, so a defect only counts as a held-back B12 bus when
+    the caller also confirms it carries no active Down Sheet entry; this field
+    alone cannot tell the two apart. Cleared the moment the repair leaves
+    DEFERRED, whichever way it leaves. */
+ deferredAt?:string;
+ /* Set by the evening review prompt when the choice is "keep deferred
+    longer" — the prompt will not ask about this bus again until this time
+    passes. Absent means no snooze in effect. Cleared alongside deferredAt. */
+ deferredUntil?:string;
  symptoms?:string[];
  quantity?:number;
  unit?:string;
@@ -636,6 +648,16 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
 }
 
 export function isUnresolved(defect:StructuredDefect){return defect.state!=="completed"}
+/* A bus genuinely held back from B12 without going on the Down Sheet, as
+   opposed to a Down Sheet entry whose own workflow happens to be "Deferred" —
+   both write state:"deferred", so the caller passes whether an active Down
+   Sheet entry exists for this bus. Only the former carries a timer. */
+export function isHeldDeferred(defect:StructuredDefect,onDownSheet:boolean){return defect.state==="deferred"&&!onDownSheet}
+export function deferredMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ if(defect.state!=="deferred"||!defect.deferredAt)return null;
+ const started=new Date(defect.deferredAt).getTime();
+ return Number.isFinite(started)?(now.getTime()-started)/60000:null;
+}
 /* A part went on the bus and nobody has written down which one.
 
    This is not a new field. PARTS USED ticked with the number left blank has
