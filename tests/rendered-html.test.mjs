@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../app/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
@@ -2323,7 +2323,19 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(4/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
-  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs"\]/);
+  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists"\]/);
+  /* Checked against the real route list rather than a second copy of it, so
+     adding a page and forgetting the service worker fails here instead of
+     going unnoticed until a phone loses signal in a bay and that page is
+     blank. Fleet Campaigns was missing exactly that way until Version 137. */
+  const precached=JSON.parse(worker.match(/CORE_PAGES = (\[[^\]]*\])/)[1]);
+  const routes=(await readdir(new URL("../app",import.meta.url),{withFileTypes:true})).filter(entry=>entry.isDirectory()).map(entry=>entry.name);
+  const served=(await Promise.all(routes.map(name=>readFile(new URL("../app/"+name+"/page.tsx",import.meta.url),"utf8").then(()=>"/"+name,()=>null)))).filter(Boolean);
+  assert.ok(served.length>1,"expected to find real page routes under app/");
+  for(const route of served)assert.ok(precached.includes(route),route+" is a real page but sw.js does not pre-cache it, so it is blank offline");
+  /* Changing CORE_PAGES without bumping the cache name leaves phones on the old
+     pre-cache: activate only purges caches whose name no longer matches. */
+  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v4"/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
