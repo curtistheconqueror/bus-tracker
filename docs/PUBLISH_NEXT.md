@@ -1,13 +1,12 @@
 # Publish next
 
-**STATUS: PENDING — one release is queued, frozen to its exact SHA. Version 134 is live.**
+**STATUS: NONE PENDING — Sites Version 135 was published from d3c05c34a3292083b95b36905e09b0f62cc0c2ec on 2026-09-01.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| 1st | **135** | `d3c05c3` | MERGE DUPES actually merges instead of silently doing nothing, and a repair can record that it was test driven and how its brake test went |
+| Published | **135** | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 134 is live from reconciled source `43ddeae`.** Publish **135** from
-`d3c05c3`.
+**Version 135 is live from `d3c05c3`.** The handoff remains below as the release record; there is nothing pending to publish.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release

@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 134 | Live | 43ddeae | Reconciled the frozen Version 130–133 work with the existing live catalog correction: duplicate-repair merging, the expanded repair catalog and part-number completion flow, resilient storage-save reporting and windowed Fixed Repairs, plus DEFERRED Bay 12 holds with a timed alert, evening review, return-to-service history, and the Bodywork IBS screen-pole defect |
+| 135 | Live | d3c05c3 | MERGE DUPES now writes its authorized cleanup and only tombstones records after a successful save; TEST DRIVEN and BRAKE TEST work states record an explicit pass or fail, with brake-test failures marking the bus Remove From Service |
+| 134 | Previous live | 43ddeae | Reconciled the frozen Version 130–133 work with the existing live catalog correction: duplicate-repair merging, the expanded repair catalog and part-number completion flow, resilient storage-save reporting and windowed Fixed Repairs, plus DEFERRED Bay 12 holds with a timed alert, evening review, return-to-service history, and the Bodywork IBS screen-pole defect |
 | 133 | Previous live | 5c257d3 | Preserved the Bodywork IBS screen-pole defect while reconciling the prior Sites source history |
 | 132 | Previous live | 3b55d96 | Saved and deployed the validated Fixed Repairs windowing and storage-save reporting source during the Sites-history reconciliation |
 | 131 | Previous live | 8858e3f | IntelligAIRE III panel catalog wording |
