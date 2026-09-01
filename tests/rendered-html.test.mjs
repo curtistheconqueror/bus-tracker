@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -6394,4 +6394,60 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
   assert.match(source, /<DeferredNavBadge\/>/, file + " is missing the deferred nav badge");
   assert.match(source, /<DeferredReviewPrompt\/>/, file + " is missing the evening review prompt");
  }
+});
+
+test("hasDeferredHistory remembers a repair that was deferred, returned to service, and is still open", () => {
+ const base = { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "open", deferredReturnedAt: "2026-08-29T22:00:00.000Z" };
+ assert.equal(hasDeferredHistory(base, false), true);
+ // Currently deferred again — the live DEF badge covers this, not the history note.
+ assert.equal(hasDeferredHistory({ ...base, state: "deferred" }, false), false);
+ // Fixed — a resolved repair carries no history note, deferred or not.
+ assert.equal(hasDeferredHistory({ ...base, state: "completed" }, false), false);
+ // Back on the Down Sheet — the sheet is now the record, so the note stands down.
+ assert.equal(hasDeferredHistory(base, true), false);
+ // No stamp at all — never deferred, nothing to remember.
+ assert.equal(hasDeferredHistory({ ...base, deferredReturnedAt: undefined }, false), false);
+});
+
+test("saving a repair through DEFERRED and back to service stamps a history note; the sheet and a fix both clear it", () => {
+ const fleet = [{ id: "bus-1", n: "17530", s: "shop", l: "bay-1", defects: [] }];
+ const enteredAt = "2026-08-29T20:00:00.000Z";
+
+ const entered = saveDefectLogRecord(fleet, [], "bus-1", { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: enteredAt, source: "defect-log" }, false, enteredAt);
+ // Returning to service without the sheet: the editor's toggleDeferred(false)
+ // and the evening prompt's "return" both do exactly this patch.
+ const returned = saveDefectLogRecord(entered.fleet, entered.downEntries, "bus-1", { ...entered.fleet[0].defects[0], state: "open", deferredAt: undefined, deferredUntil: undefined, deferredReturnedAt: "2026-08-29T22:00:00.000Z" }, false, "2026-08-29T22:00:00.000Z");
+ const afterReturn = returned.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(hasDeferredHistory(afterReturn, false), true);
+
+ // Next day, still open, gets put on the Down Sheet — that supersedes the note.
+ const onSheet = saveDefectLogRecord(returned.fleet, returned.downEntries, "bus-1", { ...afterReturn, state: "open", deferredReturnedAt: undefined }, true, "2026-08-30T14:00:00.000Z");
+ const afterSheet = onSheet.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(afterSheet.deferredReturnedAt, undefined);
+ assert.equal(hasDeferredHistory(afterSheet, true), false);
+
+ // A second cycle instead: fixed straight off, without ever going on the sheet.
+ const fixed = saveDefectLogRecord(returned.fleet, returned.downEntries, "bus-1", { ...afterReturn, state: "completed", deferredReturnedAt: undefined, completedAt: "2026-08-30T15:00:00.000Z", completedBy: "CJ" }, false, "2026-08-30T15:00:00.000Z");
+ const afterFix = fixed.fleet[0].defects.find(d => d.id === "d1");
+ assert.equal(afterFix.deferredReturnedAt, undefined);
+ assert.equal(hasDeferredHistory(afterFix, false), false);
+});
+
+test("the Defect Log surfaces a WAS DEFERRED history note in the editor, the card list, and the focus view", async () => {
+ const logPage = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ assert.match(logPage, /const hasHistory=hasDeferredHistory\(value\.defect,value\.onDownSheet\)/);
+ assert.match(logPage, /<p className="deferred-history-note" role="note">/);
+ assert.match(logPage, /groupHasDeferredHistory=group\.records\.some\(record=>hasDeferredHistory\(record\.defect,busOnDownSheet\)\)/);
+ assert.match(logPage, /<b className="inline-deferred-history-badge"/);
+ assert.match(logPage, /<b className="work-state-badge deferred-history"/);
+ assert.match(logPage, /HISTORY<\/b><span><i className="work-state-badge deferred-history">WAS DEFERRED/);
+});
+
+test("Facility Map bus tokens carry an outline ring, not a badge, for a bus once deferred and back in service", async () => {
+ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ assert.match(page, /const wasDeferredSet=new Set\(buses\.filter\(bus=>!actualDownSet\.has\(bus\.id\)&&normalizeDefects/);
+ assert.match(page, /wasDeferred:wasDeferredSet\.has\(bus\.id\)/);
+ assert.match(page, /data-was-deferred=\{Boolean\(bus\.wasDeferred\)\}/);
+ assert.match(css, /\.token\[data-was-deferred="true"\] \.bus\{outline:2px solid #0e7490/);
 });

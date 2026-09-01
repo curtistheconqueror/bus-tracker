@@ -180,7 +180,10 @@ export function DeferredReviewPrompt(){
   const moved=location?moveBusToArea(fleet,candidate.bus.id,location,RELOCATION_AREAS,stamp).fleet:fleet;
   const patch:Partial<StructuredDefect>=action==="keep"
    ?{state:"deferred",deferredUntil:keepUntilISO}
-   :{state:"open",deferredAt:undefined,deferredUntil:undefined};
+   /* "return" is the same "held back, back in service, still open" moment as
+      unchecking DEFERRED by hand — stamp it. "downsheet" invalidates it: the
+      Down Sheet is now the record of what happens to this repair. */
+   :{state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:action==="return"?stamp:undefined};
   const result=saveDefectLogRecord(moved,downEntries,candidate.bus.id,{...candidate.defect,...patch},action==="downsheet",stamp);
   if(result.error)return;
   writeFleetStorageResult(localStorage,result.fleet);

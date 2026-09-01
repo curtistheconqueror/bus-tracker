@@ -77,6 +77,14 @@ export type StructuredDefect={
     longer" — the prompt will not ask about this bus again until this time
     passes. Absent means no snooze in effect. Cleared alongside deferredAt. */
  deferredUntil?:string;
+ /* Stamped the moment a repair leaves DEFERRED by going back into service —
+    not fixed, not on the Down Sheet, just returned. A repair that sits open
+    for days after that is easy to lose track of once the teal DEF badge is
+    gone, so this keeps a quieter, separate memory of it: "this was held back
+    before and never got resolved." Cleared the moment that stops being true —
+    fixed, put on the Down Sheet, or deferred again — never carried forward
+    past whichever of those happens first. */
+ deferredReturnedAt?:string;
  symptoms?:string[];
  quantity?:number;
  unit?:string;
@@ -657,6 +665,15 @@ export function deferredMinutesElapsed(defect:StructuredDefect,now=new Date()){
  if(defect.state!=="deferred"||!defect.deferredAt)return null;
  const started=new Date(defect.deferredAt).getTime();
  return Number.isFinite(started)?(now.getTime()-started)/60000:null;
+}
+/* A repair that was deferred, went back into service, and is STILL open —
+   not currently deferred (that is isHeldDeferred's job), not fixed, and not
+   back under the Down Sheet's own tracking. Down Sheet membership invalidates
+   this the same way it invalidates a live hold: once a repair is on the
+   sheet, the sheet is the record of what happens to it, and a leftover "was
+   deferred" note would just be a second, stale trail for the same repair. */
+export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
+ return Boolean(defect.deferredReturnedAt)&&defect.state!=="deferred"&&isUnresolved(defect)&&!onDownSheet;
 }
 /* A part went on the bus and nobody has written down which one.
 
