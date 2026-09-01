@@ -1,11 +1,18 @@
 # Publish next
 
-**STATUS: VERSION 136 PENDING — publish from `dccf431`.**
+**STATUS: VERSIONS 136 AND 137 PENDING — publish 136 from `dccf431` first, then 137 from `d6f99d8`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
+| Then | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
+
+**These are two separate publishes, in order.** 136 is frozen at `dccf431` and
+its section below is unchanged; 137 sits on top of it and is described at the
+bottom of this file. Publishing 137 alone would carry 136 with it, since
+`d6f99d8` contains `dccf431` — that is fine if both are wanted at once, but the
+two sets of post-publish checks are separate and both need running.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -305,4 +312,122 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 136 | Live | <published tip hash> | Bus Controls splits into Operator/Driver Controls (switches, buttons, gauges, dash, driver seat) and Bus Accessories (doors, ramp, kneeler, wheelchair securement, stop request, bike rack), absorbing Doors, Ramp and ADA; the stop request becomes nine options named the way the floor names them, sided curbside and roadside including the wheelchair area; a ramp beyond repair is added to Bodywork as a complete replacement. Read-time rename only — nothing stored is rewritten, and all 35 affected live records were verified against the Shop Cloud to land on a live, re-pickable option |
+```
+
+---
+
+# Version 137 — Fleet Campaigns survives a dead bay
+
+**Publish this after Version 136.** It builds on it: `d6f99d8` contains
+`dccf431`, so publishing 137 carries 136 with it. Run both sets of checks.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`d6f99d8`** |
+| Last code-bearing commit | `d6f99d8` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 136, from `dccf431` |
+
+```
+git log --oneline dccf431..d6f99d8
+d6f99d8 Pre-cache Fleet Campaigns so it is not blank in a dead bay   <- the release
+a85f570 Queue Version 136                                            <- docs only
+```
+
+Two files of substance, and neither is application code:
+
+```
+git diff --name-only dccf431 d6f99d8
+docs/PUBLISH_NEXT.md
+public/sw.js
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI or `app/` change at all. The filter returns nothing:
+
+```
+git diff --name-only dccf431 d6f99d8 -- supabase package.json package-lock.json .github app   # returns nothing
+```
+
+Gate: 176 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None.** No database change, no dependency change, no LocalStorage key touched,
+nothing stored rewritten. This release changes only which files the service
+worker keeps on the phone.
+
+## What changed
+
+### Fleet Campaigns was never pre-cached
+
+`sw.js` pre-cached four of the app's five pages — the map, Down Sheet, Defect
+Log and Fixed Repairs. **`/lists` was missing.** It reached the phone only if
+somebody happened to open it while online, and the navigation handler cached it
+as a side effect. A phone that had never opened Fleet Campaigns got nothing when
+it lost signal in a bay, which is the one situation the service worker exists to
+prevent. It is now in the list.
+
+### The test that should have caught it agreed with it instead
+
+The old assertion pinned `CORE_PAGES` by matching a literal copy of the same
+four paths, so it confirmed the list matched itself and had nothing to say about
+the page that was missing. It now reads the real routes off disk and asserts
+every served page is pre-cached, so adding a page and forgetting the service
+worker fails the suite rather than surfacing on a mechanic's phone.
+
+**Forced, not assumed:** with `/lists` removed from `CORE_PAGES`, the suite goes
+to 175 passing / 1 failing, naming the route. Restored, 176 pass.
+
+### Cache name bumped to v4
+
+`activate` deletes only caches whose name no longer matches `CACHE_NAME`, so the
+bump is what makes the new pre-cache take effect promptly — and it is also the
+only thing that clears the **dead asset files every previous release left on the
+phone**. Every build renames every chunk by content hash, so a phone that has
+been through several releases is holding chunks nothing will ever request again.
+
+**Cost to be aware of:** the first launch after this update re-downloads the app
+shell, and it must be online to do it. That is one download of the pages and
+their assets, not fleet data — **no board, defect, down sheet or settings is
+stored in this cache and none of it is affected.** If the device is offline when
+it tries, the install fails, the previous service worker stays in control, and
+the app keeps working exactly as before until it next has signal.
+
+## Validation
+
+- 176 regression tests passing, ESLint clean, production build succeeds
+- **The new guard was driven to failure deliberately** — removing `/lists` from
+  `CORE_PAGES` fails the suite with the route named; restoring it passes
+- **The ancestry was verified, not assumed** — `git merge-base --is-ancestor
+  dccf431 d6f99d8` confirms 137 carries 136
+- **No `app/` file changed in this range**, confirmed by an empty path filter
+
+## After it is live
+
+1. **Open the app online once** and let it settle. This is the launch that
+   re-downloads the shell under the new cache name.
+2. **Then put the phone in airplane mode and open Fleet Campaigns.** It should
+   come up. Before this release, on a phone that had never visited it, it did
+   not.
+3. **Check the other four pages offline too** — the map, Down Sheet, Defect Log
+   and Fixed Repairs — to confirm the cache rebuilt rather than merely emptied.
+4. **Confirm the board is intact** after the re-download. It will be; the board
+   is in LocalStorage and this cache never held it. Worth one look the first
+   time regardless.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 137 | Live | <published tip hash> | Fleet Campaigns is pre-cached by the service worker, so it opens on a phone that has lost signal instead of coming up blank; the test that pinned the pre-cache list now reads the real routes off disk so a new page cannot be added without it; cache name bumped to v4, which clears the dead hashed chunks left by earlier builds at the cost of one online re-download of the app shell |
 ```
