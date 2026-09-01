@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -1312,11 +1312,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
-  assert.equal(Object.keys(REPAIR_OPTION_GROUPS["Bus Controls"])[0], "Door, Ramp and Kneeler Failures");
-  assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Controls"]["Door, Ramp and Kneeler Failures"], ["Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Ramp not working","Ramp no power","Kneeler not functioning correctly","Kneeler sits too high"]);
-  assert.equal(REPAIR_OPTIONS["Bus Controls"][0], "Door, Ramp and Kneeler Failures - Front door will not open");
-  assert.ok(REPAIR_OPTIONS["Doors, Ramp and ADA"].includes("Ramp, Lift and Kneeler - Kneeler"));
+  assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Operating Controls - Horn"));
+  assert.equal(Object.keys(REPAIR_OPTION_GROUPS["Operator/Driver Controls"])[0], "Driver Seat");
+  // Doors moved to Bus Accessories when Bus Controls split, keeping the specific
+  // symptom wording rather than the vaguer component names that were there.
+  assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Accessories"]["Doors"].slice(0,3), ["Front door will not open","Front door will not close","Front door opens / closes slowly"]);
+  assert.equal(REPAIR_OPTIONS["Operator/Driver Controls"][0], "Driver Seat - Seat belt");
+  assert.ok(REPAIR_OPTIONS["Bus Accessories"].includes("Ramp, Lift and Kneeler - Kneeler not functioning correctly"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Misfire"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Stop engine light"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Coolant level sensor"));
@@ -1333,9 +1335,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - R/S"));
   assert.equal(repairCategoryEmoji("Engine"), REPAIR_CATEGORY_EMOJI.Engine);
   assert.equal(repairCategoryLabel("Engine"), "⚙️ Engine");
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Fuel gauge INOP / false reading"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - Kneeler button"));
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Gauges and Dash - Front dash damage"));
+  assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Gauges and Dash - Fuel gauge INOP / false reading"));
+  assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("System Switches - Kneeler button"));
+  assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Gauges and Dash - Front dash damage"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("IBS Screen"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("IBS screen pole - broken"));
@@ -1366,13 +1368,13 @@ test("repair catalog exposes robust category and issue choices", () => {
   // missing PRD cap
   assert.equal(repairIssuePlaceholder("Amerex", "Fire Suppression"), "Choose a Fire Suppression status or defect");
   assert.equal(repairIssuePlaceholder("Amerex", "CNG"), "Choose a CNG status or defect");
-  assert.equal(repairGroupStepLabel("Bus Controls"), "CHOOSE THE GROUP");
+  assert.equal(repairGroupStepLabel("Operator/Driver Controls"), "CHOOSE THE GROUP");
   // Six since Bus Accessories was added for the bike rack; this counted five
   // before. The placeholder is generated from the group list rather than
   // written out, so the number moving is exactly what the assertion is for.
-  assert.equal(repairGroupPlaceholder("Bus Controls"), "Choose one of 6 groups");
-  assert.equal(repairIssueStepLabel("Bus Controls"), "CHOOSE THE DEFECT");
-  assert.equal(repairIssuePlaceholder("Bus Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
+  assert.equal(repairGroupPlaceholder("Operator/Driver Controls"), "Choose one of 4 groups");
+  assert.equal(repairIssueStepLabel("Operator/Driver Controls"), "CHOOSE THE DEFECT");
+  assert.equal(repairIssuePlaceholder("Operator/Driver Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
   // An ungrouped category never reaches step 2, but the helper must not throw.
   assert.equal(repairGroupPlaceholder("Engine"), "Choose one of 0 groups");
   assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required"]);
@@ -2509,13 +2511,13 @@ test("Fleet Tracker records completed inspections with phone rules scoped away f
 });
 
 test("Bus Controls leads with both turn-signal defects",()=>{
- const controls=REPAIR_OPTIONS["Bus Controls"];
+ const controls=REPAIR_OPTIONS["Operator/Driver Controls"];
  assert.ok(controls.includes("Operating Controls - Turn signals (steering column)"));
  assert.ok(controls.includes("Operating Controls - Turn signals (floor panel)"));
  assert.equal(new Set(controls).size,controls.length);
  assert.ok(controls.includes("Operating Controls - Horn"));
  assert.ok(controls.includes("Operating Controls - Other bus control defect"));
- assert.equal(defectLabel({category:"Bus Controls",issue:"Operating Controls - Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
+ assert.equal(defectLabel({category:"Operator/Driver Controls",issue:"Operating Controls - Turn signals (floor panel)",details:""}).includes("Turn signals (floor panel)"),true);
 });
 
 test("the shipped intervals reach a device that has been running all along",()=>{
@@ -3433,21 +3435,21 @@ test("the operator blower and the mirror switches land in both structures a grou
  // REPAIR_OPTION_GROUPS, which is what the picker draws. Adding it to one and
  // not the other is the failure this catches.
  for(const switchName of ["Mirror heater switch - C/S","Mirror adjuster switch - C/S"]){
-  assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("System Switches - "+switchName),switchName+" missing from REPAIR_OPTIONS");
-  assert.ok(REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"].includes(switchName),switchName+" missing from REPAIR_OPTION_GROUPS");
+  assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("System Switches - "+switchName),switchName+" missing from REPAIR_OPTIONS");
+  assert.ok(REPAIR_OPTION_GROUPS["Operator/Driver Controls"]["System Switches"].includes(switchName),switchName+" missing from REPAIR_OPTION_GROUPS");
   // and it survives a round trip through a saved defect under its stored name
   const [defect]=normalizeDefects([{id:"d",category:"Bus Controls",issue:"System Switches - "+switchName,details:"",state:"open",operability:"service"}]);
   assert.equal(defect.issue,"System Switches - "+switchName);
  }
  // The mirror switches read as a pair rather than being split by the group.
- const switches=REPAIR_OPTION_GROUPS["Bus Controls"]["System Switches"];
+ const switches=REPAIR_OPTION_GROUPS["Operator/Driver Controls"]["System Switches"];
  assert.equal(switches.indexOf("Mirror adjuster switch - C/S"),switches.indexOf("Mirror heater switch - C/S")+1);
  /* Both are curbside, and the adjuster now says what it adjusts. A record saved
     under either first wording reads as the new one. */
  assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - C/S adjuster switch"),
-  {category:"Bus Controls",issue:"System Switches - Mirror adjuster switch - C/S"});
+  {category:"Operator/Driver Controls",issue:"System Switches - Mirror adjuster switch - C/S"});
  assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - Mirror heater switch"),
-  {category:"Bus Controls",issue:"System Switches - Mirror heater switch - C/S"});
+  {category:"Operator/Driver Controls",issue:"System Switches - Mirror heater switch - C/S"});
  // Lights and Fixtures still owns the mirrors themselves; only the switch moved.
  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
 });
@@ -3827,7 +3829,7 @@ test("the Down Sheet editor holds the page still and fills a phone screen",async
 });
 
 test("the parking brake knob and the rear air valves are in the catalog",()=>{
- const controls=REPAIR_OPTIONS["Bus Controls"],air=REPAIR_OPTIONS["Air System"];
+ const controls=REPAIR_OPTIONS["Operator/Driver Controls"],air=REPAIR_OPTIONS["Air System"];
 
  // The yellow diamond knob you pull up to set and push down to release. It sits
  // beside the red air valve on the dash, so it sits beside it in the list too.
@@ -4685,7 +4687,9 @@ test("parts memory learns per defect issue and lets a category default be chosen
  assert.equal(learnPart(memory,{category:"",issue:"Horn",partNumber:"X-1"}).entries.length,memory.entries.length);
  assert.equal(normalizePartsMemory({entries:[{scope:"issue",category:"A",partNumber:"P"}]}).entries.length,0,"an issue mapping needs its issue");
  assert.equal(normalizePartsMemory({entries:[{scope:"category",category:"A",partNumber:"P",updatedAt:"nope"}]}).entries.length,1);
- assert.equal(partMemoryKey("category","Bus Controls"),"category::bus controls");
+ // The key normalises through migrateRepairIdentity, so a legacy category name
+ // resolves to the one the split left it under.
+ assert.equal(partMemoryKey("category","Bus Controls"),"category::operator/driver controls");
  assert.match(partMemoryLabel({scope:"category",category:"Bus Controls",partNumber:"X"}),/every defect/);
 
  // a runaway payload cannot fill device storage
@@ -4784,14 +4788,14 @@ test("merged categories move old records instead of losing them",()=>{
  // wording with no clean equivalent is preserved rather than guessed at
  assert.deepEqual(migrateRepairIdentity("No Start","Fuel-related no start"),{category:"Battery, Starting and Charging",issue:"Fuel-related no start"});
  // the earlier renames still apply
- assert.deepEqual(migrateRepairIdentity("Operator Controls","MDT Screen"),{category:"Bus Controls",issue:"IBS Screen"});
+ assert.deepEqual(migrateRepairIdentity("Operator Controls","MDT Screen"),{category:"Operator/Driver Controls",issue:"IBS Screen"});
  assert.deepEqual(migrateRepairIdentity("","" ),{category:"Miscellaneous",issue:"Driver-reported defect"});
 
  // Horn lived in two categories; it now resolves to one without changing its text
  assert.equal(REPAIR_OPTIONS["Electrical / Multiplex"].includes("Horn"),false);
- assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Horn"));
+ assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Operating Controls - Horn"));
  // Horn lands in Bus Controls and then in its picking group, in one step
- assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","Horn"),{category:"Bus Controls",issue:"Operating Controls - Horn"});
+ assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","Horn"),{category:"Operator/Driver Controls",issue:"Operating Controls - Horn"});
  assert.deepEqual(migrateRepairIdentity("Electrical / Multiplex","MOD light"),{category:"Electrical / Multiplex",issue:"MOD light"});
 
  // reading a stored record applies the move, and the No Horn quick filter still matches
@@ -4801,7 +4805,7 @@ test("merged categories move old records instead of losing them",()=>{
  assert.equal(moved.details,"Turns over, will not fire");
  assert.equal(moved.id,"legacy-1");
  const horn={id:"legacy-2",category:"Electrical / Multiplex",issue:"Horn",details:"",state:"open",operability:"service"};
- assert.equal(normalizeDefects([horn])[0].category,"Bus Controls");
+ assert.equal(normalizeDefects([horn])[0].category,"Operator/Driver Controls");
  assert.ok(quickFilterMatch({id:"bus-1",defects:[horn]},"no-horn"),"the No Horn filter matches on text, not category");
 });
 
@@ -4859,11 +4863,11 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
   "Suspension and Steering — Loose steering — Play in the wheel");
 });
 
-test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
- const ada=REPAIR_OPTIONS["Doors, Ramp and ADA"];
+test("ADA securement and stop request have a home in Bus Accessories",()=>{
+ const ada=REPAIR_OPTIONS["Bus Accessories"];
  assert.equal(REPAIR_OPTIONS["Doors, Ramp and Lift"],undefined);
- const groups=REPAIR_OPTION_GROUPS["Doors, Ramp and ADA"];
- assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request"]);
+ const groups=REPAIR_OPTION_GROUPS["Bus Accessories"];
+ assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request","Bike Rack"]);
 
  // the Q'STRAINT panel and the straps are separate units per side of the bus
  for(const side of ["curbside","roadside"]){
@@ -4872,8 +4876,12 @@ test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
   assert.ok(groups["Wheelchair Securement"].includes("Flip-up bench seat ("+side+")"),side+" bench");
  }
  // stop request existed nowhere in the catalog before
- assert.ok(groups["Stop Request"].includes("Stop request (wheelchair area)"));
- assert.ok(groups["Stop Request"].includes("Stop request (curbside)"));
+ /* The single wheelchair-area option became one per side, so a record logged
+     under the old one cannot be given a side and keeps its own wording. */
+ assert.ok(groups["Stop Request"].includes("Stop request INOP (wheelchair area - curbside)"));
+ assert.ok(groups["Stop Request"].includes("Stop request INOP (wheelchair area - roadside)"));
+ assert.equal(groups["Stop Request"].includes("Stop request (wheelchair area)"),false);
+ assert.ok(groups["Stop Request"].includes("Stop request INOP (curbside)"));
  assert.ok(groups["Stop Request"].includes("Stop request chime / tone"));
  assert.ok(groups["Stop Request"].includes("Stop request pull cord / line - broken (curbside)"));
  assert.ok(groups["Stop Request"].includes("Stop request pull cord / line - broken (roadside)"));
@@ -4892,23 +4900,30 @@ test("ADA securement and stop request have a home in Doors, Ramp and ADA",()=>{
   ["Kneeler","Ramp, Lift and Kneeler - Kneeler"],
   ["Wheelchair lift","Ramp, Lift and Kneeler - Wheelchair lift"],
  ]){
-  assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift",issue),{category:"Doors, Ramp and ADA",issue:expected},issue);
-  assert.ok(ada.includes(expected),expected+" must be pickable");
+  assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift",issue),{category:"Bus Accessories",issue:expected},issue);
+  /* Four of these name a component where a specific symptom now exists on the
+     same group, so they were retired when Bus Controls split. A retired option
+     still migrates and still reads back exactly as logged — it is only dropped
+     from the picker — which is the whole point of retiring rather than
+     remapping it onto a symptom nobody recorded. */
+  const retired=(RETIRED_ISSUES["Bus Accessories"]||[]).includes(expected);
+  if(retired)assert.equal(ada.includes(expected),false,expected+" is retired and must not be pickable");
+  else assert.ok(ada.includes(expected),expected+" must be pickable");
  }
  // the old category-wide catch-all has no single new home, so its wording stands
  assert.deepEqual(migrateRepairIdentity("Doors, Ramp and Lift","Other accessibility repair"),
-  {category:"Doors, Ramp and ADA",issue:"Other accessibility repair"});
+  {category:"Bus Accessories",issue:"Other accessibility repair"});
 
  // a stored record reads back under the new name with its details intact
  const [read]=normalizeDefects([{id:"ada-1",category:"Doors, Ramp and Lift",issue:"Kneeler",details:"Will not raise",state:"open",operability:"down"}]);
- assert.equal(read.category,"Doors, Ramp and ADA");
+ assert.equal(read.category,"Bus Accessories");
  assert.equal(read.issue,"Ramp, Lift and Kneeler - Kneeler");
  assert.equal(read.details,"Will not raise");
  assert.equal(read.id,"ada-1");
 
  // the ADA quick filter keys off wording, so grouped names must keep matching
  assert.ok(quickFilterMatch({id:"bus-1",defects:[read]},"bad-ramp"));
- assert.equal(repairCategoryEmoji("Doors, Ramp and ADA"),"♿");
+ assert.equal(repairCategoryEmoji("Bus Accessories"),"♿");
 });
 
 test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
@@ -4983,7 +4998,7 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  // so it sits with the other swap-out safety fixtures. Bus Controls is the
  // driver's station and must not collect devices the operator never touches.
  assert.ok(lights.includes("Back-up alarm"));
- assert.equal(REPAIR_OPTIONS["Bus Controls"].some(option=>/back-?up alarm/i.test(option)),false);
+ assert.equal(REPAIR_OPTIONS["Operator/Driver Controls"].some(option=>/back-?up alarm/i.test(option)),false);
  // it is not ADA equipment, so the chair mark must not land on it
  assert.equal(repairIssueDisplayLabel("Back-up alarm"),"Back-up alarm");
 
@@ -4999,8 +5014,8 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  // lamps, not the stalk: Bus Controls keeps the turn signal switches
  assert.ok(lights.includes("Turn signal lamps"));
  assert.equal(lights.includes("Turn signals"),false);
- assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Turn signals (steering column)"));
- assert.ok(REPAIR_OPTIONS["Bus Controls"].includes("Operating Controls - Turn signals (floor panel)"));
+ assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Operating Controls - Turn signals (steering column)"));
+ assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Operating Controls - Turn signals (floor panel)"));
 
  // renames are scoped to their category, so a word means one thing per place
  for(const [category,issue,expected] of [
@@ -5939,16 +5954,16 @@ test("bus accessories and the two start buttons land in both catalog structures"
    category+": REPAIR_OPTIONS must be exactly the grouped entries, in the same order");
  }
 
- const controls=REPAIR_OPTION_GROUPS["Bus Controls"];
+ const controls=REPAIR_OPTION_GROUPS["Operator/Driver Controls"];
 
  // A rack that comes back loose or missing an arm is a defect on a piece of
  // equipment, not body work and not scheduled maintenance.
- assert.deepEqual(controls["Bus Accessories"],
-  ["Bike rack - arm replacement","Bike rack - loose / pivots"]);
+ assert.deepEqual(REPAIR_OPTION_GROUPS["Bus Accessories"]["Bike Rack"],
+  ["Arm replacement","Loose / pivots"]);
  // The group is last, so the existing groups keep the order the shop knows.
  const groupNames=Object.keys(controls);
- assert.equal(groupNames[0],"Door, Ramp and Kneeler Failures");
- assert.equal(groupNames[groupNames.length-1],"Bus Accessories");
+ assert.equal(groupNames[0],"Driver Seat");
+ assert.equal(groupNames[groupNames.length-1],"Operating Controls");
 
  // The two places a bike rack was already filed stay where they are: a bent
  // rack really is the body shop's job, and the PM line really is scheduled
@@ -5974,15 +5989,24 @@ test("bus accessories and the two start buttons land in both catalog structures"
 
  // Neither downs a bus. A bus with one working start button still runs, and a
  // loose bike rack is not a road failure.
- for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button",
-                     "Bus Accessories - Bike rack - arm replacement","Bus Accessories - Bike rack - loose / pivots"])
-  assert.equal(defaultDefectOperability("Bus Controls",issue),"service",issue+" must not down a bus");
+ for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button"])
+  assert.equal(defaultDefectOperability("Operator/Driver Controls",issue),"service",issue+" must not down a bus");
+ for(const issue of ["Bike Rack - Arm replacement","Bike Rack - Loose / pivots"])
+  assert.equal(defaultDefectOperability("Bus Accessories",issue),"service",issue+" must not down a bus");
 
  // Every new entry survives a round trip under its stored name.
- for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button",
-                     "Bus Accessories - Bike rack - arm replacement","Bus Accessories - Bike rack - loose / pivots"]){
+ for(const issue of ["Operating Controls - Front start button","Operating Controls - Rear start button"]){
   const [defect]=normalizeDefects([{id:"d",category:"Bus Controls",issue,details:"",state:"open",operability:"service"}]);
   assert.equal(defect.issue,issue,issue+" must not be rewritten on read");
+  assert.equal(defect.category,"Operator/Driver Controls");
+ }
+ /* The bike rack moved categories when Bus Controls split, so unlike the start
+    buttons it IS rewritten on read — into the group that now owns it. */
+ for(const [stored,expected] of [["Bus Accessories - Bike rack - arm replacement","Bike Rack - Arm replacement"],
+                                 ["Bus Accessories - Bike rack - loose / pivots","Bike Rack - Loose / pivots"]]){
+  const [defect]=normalizeDefects([{id:"d",category:"Bus Controls",issue:stored,details:"",state:"open",operability:"service"}]);
+  assert.equal(defect.category,"Bus Accessories");
+  assert.equal(defect.issue,expected);
  }
 
  // A record already logged under the retired wording still reads as itself —

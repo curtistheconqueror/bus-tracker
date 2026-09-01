@@ -122,13 +122,13 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
- "Bus Controls":["Door, Ramp and Kneeler Failures - Front door will not open","Door, Ramp and Kneeler Failures - Front door will not close","Door, Ramp and Kneeler Failures - Front door opens / closes slowly","Door, Ramp and Kneeler Failures - Rear door will not open","Door, Ramp and Kneeler Failures - Rear door will not close","Door, Ramp and Kneeler Failures - Rear door opens / closes slowly","Door, Ramp and Kneeler Failures - Ramp not working","Door, Ramp and Kneeler Failures - Ramp no power","Door, Ramp and Kneeler Failures - Kneeler not functioning correctly","Door, Ramp and Kneeler Failures - Kneeler sits too high","Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","System Switches - Mirror heater switch - C/S","System Switches - Mirror adjuster switch - C/S","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Front start button","Operating Controls - Rear start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect","Bus Accessories - Bike rack - arm replacement","Bus Accessories - Bike rack - loose / pivots"],
+ "Operator/Driver Controls":["Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","System Switches - Mirror heater switch - C/S","System Switches - Mirror adjuster switch - C/S","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Front start button","Operating Controls - Rear start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
  "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
- "Doors, Ramp and ADA":["Doors - Front door","Doors - Rear door","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request (wheelchair area)","Stop Request - Stop request (curbside)","Stop Request - Stop request (roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect"],
+ "Bus Accessories":["Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
- "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
+ "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
  "Air System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 relay valve (C/S rear)","R-14 relay valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
@@ -149,7 +149,7 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  "Tires and Wheels":"🛞",
  "Battery, Starting and Charging":"🔋",
  "Electrical / Multiplex":"⚡",
- "Bus Controls":"🎛️",
+ "Bus Controls":"🎛️","Operator/Driver Controls":"🎛️","Bus Accessories":"♿",
  "Tech Services":"🖥️",
  Amerex:"🧯",
  "Fuel Delivery":"⛽",
@@ -447,56 +447,22 @@ function normalizedSymptoms(value:unknown){
 }
 
 export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
- "Bus Controls":{
-  "Door, Ramp and Kneeler Failures":["Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Ramp not working","Ramp no power","Kneeler not functioning correctly","Kneeler sits too high"],
+ "Operator/Driver Controls":{
   "Driver Seat":["Seat belt","Leaking air","Will not lock","Adjustment / locking bar","Controls / buttons"],
   "Gauges and Dash":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement"],
-  /* The switch lives here, the thing it switches lives with its own system.
-     Lights and Fixtures owns the mirrors themselves, the same way it owns the
-     turn signal lamps while the stalk that works them is an Operating Control. */
   "System Switches":["Kneeler button","Ramp power switch","Ramp deploy / stow switch","Front door open / close switch","Rear door open / close switch","HVAC / heat controls","A/C control panel","Blower control","Floor heat switch","Interior light controls","Mirror heater switch - C/S","Mirror adjuster switch - C/S"],
-  /* Two buttons start this bus, and which one is broken is the whole question.
-
-     "Start button" said neither, so it is retired from the picker in favour of
-     naming the station. It is NOT renamed to one of the two: there is no way to
-     know which button an old record meant, and guessing would silently relabel
-     somebody's work. Nothing on the shop's board carries it, and any record that
-     does still reads exactly as it was logged, offered back as "(as logged)".
-
-     These are not the same as "Front start INOP" and "Rear start INOP" over in
-     Battery, Starting and Charging, and both pairs are kept on purpose. Those
-     say the bus will not start from that station, which points at the starting
-     and charging system. These say the button itself is broken while the other
-     button still starts the bus — a bad switch, not a power problem. Filing one
-     as the other is what put simple switch work in front of a charging
-     diagnosis. Neither of these downs a bus, because a bus with one working
-     start button still runs. */
   "Operating Controls":["Turn signals (steering column)","Turn signals (floor panel)","Front start button","Rear start button","Horn","Horn / seat alarm will not stop","High beams stay on","Red air valve hard to turn","Parking brake knob will not pull up (apply)","Parking brake knob will not push down (release)","Parking brake knob hard to pull or push","Parking brake knob pops out while driving","Pedal adjuster","Steering wheel tilt / telescoping","Operator light","Switches broken / loose","Side control panel damage","Other bus control defect"],
-  /* Things bolted to the bus that a mechanic works on, rather than anything the
-     driver operates from the seat.
-
-     The bike rack lived in two places and neither was right for a reported
-     fault. Bodywork owns "bent / replacement", which is correct when the rack
-     has been hit and is the body shop's job. Preventive Maintenance owns
-     "arms / pivot adjustment", which is scheduled work, not something a driver
-     hands in. A rack that comes back loose, or missing an arm, is neither: it
-     is a defect on a piece of equipment, and filing it as body work made simple
-     bolt-up work look like a body shop job on every count and every list.
-
-     Both existing entries stay where they are — a genuinely bent rack really is
-     body work, and the PM line really is scheduled maintenance. This group is
-     for the fault as it gets reported. */
-  "Bus Accessories":["Bike rack - arm replacement","Bike rack - loose / pivots"],
  },
  /* Everything a rider touches or rides in. Bus Controls stays the driver's
     station; a strap or a stop request cord is not something the operator
     reaches from the seat, so it is found here instead. Curbside and roadside
     are called out because each side is a separate unit that fails on its own. */
- "Doors, Ramp and ADA":{
-  "Doors":["Front door","Rear door","Door controls","Interlock","Other door defect"],
-  "Ramp, Lift and Kneeler":["Wheelchair ramp","Ramp will not deploy","Ramp will not stow","Kneeler","Wheelchair lift","Other ramp, lift or kneeler defect"],
+ "Bus Accessories":{
+  "Doors":["Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Door controls","Interlock","Other door defect"],
+  "Ramp, Lift and Kneeler":["Ramp not working","Ramp no power","Ramp will not deploy","Ramp will not stow","Kneeler not functioning correctly","Kneeler sits too high","Wheelchair lift","Other ramp, lift or kneeler defect"],
   "Wheelchair Securement":["Q'STRAINT switch (curbside)","Q'STRAINT switch (roadside)","Securement straps / retractor (curbside)","Securement straps / retractor (roadside)","Flip-up bench seat (curbside)","Flip-up bench seat (roadside)","Occupant lap / shoulder belt","Other securement defect"],
-  "Stop Request":["Stop request (wheelchair area)","Stop request (curbside)","Stop request (roadside)","Stop request pull cord / line - broken (curbside)","Stop request pull cord / line - broken (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
+  "Stop Request":["Stop request INOP (curbside)","Stop request INOP (roadside)","Stop request INOP (wheelchair area - curbside)","Stop request INOP (wheelchair area - roadside)","Stop request pull cord / line - broken (curbside)","Stop request pull cord / line - broken (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
+  "Bike Rack":["Arm replacement","Loose / pivots"],
  },
  "Amerex":{
   "Fire Suppression":["FIRE alarm (system discharged)","Heat sensor communication fault","Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Control head no power","Other Fire Suppression Trouble"],
@@ -552,13 +518,17 @@ export function defaultDefectOperability(category:string,issue:string):DefectOpe
 export const RETIRED_ISSUES:Record<string,readonly string[]>={
  "Battery, Starting and Charging":["Alternator / charging"],
  "Suspension and Steering":["Air bag","Front air bag leak","Rear air bag leak"],
+ /* Dropped when Bus Controls split. The first four named a component where a
+    more specific symptom now exists on the same group; the fifth became two
+    options and cannot be assigned a side after the fact. */
+ "Bus Accessories":["Doors - Front door","Doors - Rear door","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Kneeler","Stop Request - Stop request (wheelchair area)"],
 };
 
 /* Categories and options that were merged away. Records are never dropped or
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Doors, Ramp and ADA","Transmission":"Transmission and Drivetrain"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -611,7 +581,11 @@ const NO_START_ISSUE_MOVES:Record<string,string>={
    Fixtures is a swap the mechanic does; a mirror in Bodywork is the body shop's
    job. The wording now says which, so the two stop looking like duplicates. */
 const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
- "Bus Controls":{
+ /* Keyed by the category the record has AFTER the split above has run, not the
+    one it was stored under. Keeping this as "Bus Controls" left both mirror
+    renames silently dead — the category was already "Operator/Driver Controls"
+    by the time this line was reached, so the lookup missed every time. */
+ "Operator/Driver Controls":{
   /* Both switches are curbside, and "C/S adjuster switch" did not say adjuster
      of WHAT. Named for the mirror they work, and for the side, so neither has
      to be guessed at a year from now. Records logged under the first wording
@@ -659,6 +633,44 @@ const DOOR_RAMP_ISSUE_GROUPS:Record<string,string>={
  "Wheelchair ramp":"Ramp, Lift and Kneeler - Wheelchair ramp",
 };
 
+/* Bus Controls became two categories: what a driver touches from the seat, and
+   the equipment the bus carries for passengers. Fifty-two options in one list
+   was more than anybody could scroll on a phone, and the doors and ramps in it
+   duplicated a Doors, Ramp and ADA category that already held the same gear.
+
+   A split cannot be a rename-map entry, because the category alone does not
+   say which half a record belongs to — the issue does. So it is a rule, and it
+   runs on read like every other migration here. Nothing on disk is rewritten. */
+const BUS_CONTROL_TO_ACCESSORY:Record<string,string>={
+ "Door, Ramp and Kneeler Failures - Front door will not open":"Doors - Front door will not open",
+ "Door, Ramp and Kneeler Failures - Front door will not close":"Doors - Front door will not close",
+ "Door, Ramp and Kneeler Failures - Front door opens / closes slowly":"Doors - Front door opens / closes slowly",
+ "Door, Ramp and Kneeler Failures - Rear door will not open":"Doors - Rear door will not open",
+ "Door, Ramp and Kneeler Failures - Rear door will not close":"Doors - Rear door will not close",
+ "Door, Ramp and Kneeler Failures - Rear door opens / closes slowly":"Doors - Rear door opens / closes slowly",
+ "Door, Ramp and Kneeler Failures - Ramp not working":"Ramp, Lift and Kneeler - Ramp not working",
+ "Door, Ramp and Kneeler Failures - Ramp no power":"Ramp, Lift and Kneeler - Ramp no power",
+ "Door, Ramp and Kneeler Failures - Kneeler not functioning correctly":"Ramp, Lift and Kneeler - Kneeler not functioning correctly",
+ "Door, Ramp and Kneeler Failures - Kneeler sits too high":"Ramp, Lift and Kneeler - Kneeler sits too high",
+ "Bus Accessories - Bike rack - arm replacement":"Bike Rack - Arm replacement",
+ "Bus Accessories - Bike rack - loose / pivots":"Bike Rack - Loose / pivots",
+};
+
+/* The old stop-request options named the side but never what was wrong with
+   it. INOP is what gets said on the floor when a cord is pulled and nothing
+   sounds, so that is what the option says now.
+
+   "Stop request (wheelchair area)" is deliberately NOT renamed. It became two
+   options, curbside and roadside, and a record logged under the single old one
+   does not say which. Guessing a side would put a fact into a record that
+   nobody established, so it is retired instead: dropped from the picker, kept
+   exactly as written on every record that already carries it, and offered back
+   as logged when one of those is opened. */
+const ACCESSORY_ISSUE_RENAMES:Record<string,string>={
+ "Stop Request - Stop request (curbside)":"Stop Request - Stop request INOP (curbside)",
+ "Stop Request - Stop request (roadside)":"Stop Request - Stop request INOP (roadside)",
+};
+
 export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  const startedIn=String(rawCategory||"");
  let issue=String(rawIssue||"")||"Driver-reported defect";
@@ -669,8 +681,16 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  if(category==="Electrical / Multiplex"&&issue==="Horn")category="Bus Controls";
  if(category==="Suspension and Steering"&&issue==="Other steering repair")issue="Other suspension or steering repair";
  if(category==="Suspension and Steering"&&issue==="Other suspension repair")issue="Other suspension or steering repair";
- if(category==="Bus Controls")issue=BUS_CONTROL_ISSUE_GROUPS[issue]||issue;
- if(category==="Doors, Ramp and ADA")issue=DOOR_RAMP_ISSUE_GROUPS[issue]||issue;
+ if(category==="Bus Controls"){
+  issue=BUS_CONTROL_ISSUE_GROUPS[issue]||issue;
+  const moved=BUS_CONTROL_TO_ACCESSORY[issue];
+  if(moved){category="Bus Accessories";issue=moved}
+  else category="Operator/Driver Controls";
+ }
+ if(category==="Bus Accessories"){
+  issue=DOOR_RAMP_ISSUE_GROUPS[issue]||issue;
+  issue=ACCESSORY_ISSUE_RENAMES[issue]||issue;
+ }
  issue=CATEGORY_ISSUE_RENAMES[category]?.[issue]||issue;
  return {category,issue};
 }
