@@ -49,6 +49,22 @@ machine, because these sessions run in containers that are thrown away.
   was unreachable; the token could reach it the whole time and `list_projects`
   simply had not enumerated it. Read it before telling Curtis anything is
   inaccessible.
+- **`fresh-context-review`** — review your own diff as if somebody else wrote
+  it, before pushing and before asserting anything in a handoff. Written after
+  three misses that a green test suite did not catch: a commit count quoted
+  instead of re-run, an invariant broken in the same change that introduced it,
+  and a handler that reported success over a write that had been refused.
+- **`browser-verification`** — how to check a UI change here: seeding
+  LocalStorage, waiting past the hydration race so you measure the real board
+  and not the seed one, measuring boxes rather than trusting screenshots, and
+  forcing the failure path on purpose. Read it before writing "verified"
+  anywhere. Most surprising browser results in this project have been a broken
+  fixture rather than a broken app.
+- **`cascade-check`** — find out what already styles an element before adding a
+  height, width or colour to it. `globals.css` gives every bare `<header>` a
+  fixed `height:38px`, which `min-height` cannot undo; that one cost two
+  separate debugging rounds. Also covers broader-selector overrides and
+  Tailwind class-name collisions.
 
 ## Things that will get you in trouble
 
