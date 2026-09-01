@@ -6451,3 +6451,21 @@ test("Facility Map bus tokens carry an outline ring, not a badge, for a bus once
  assert.match(page, /data-was-deferred=\{Boolean\(bus\.wasDeferred\)\}/);
  assert.match(css, /\.token\[data-was-deferred="true"\] \.bus\{outline:2px solid #0e7490/);
 });
+
+test("DEFERRED cannot be ticked on a repair the Down Sheet already has, and a wrong clock cannot print a negative wait", async () => {
+ const logPage = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ /* The Down Sheet has a "Deferred" workflow of its own that writes the same
+    state, so an on-sheet repair opened here used to show DEFERRED and DOWN
+    SHEET both ticked — a combination the form refuses to let anybody create.
+    Measured in a browser, not assumed: both boxes came back checked. */
+ assert.match(logPage, /disabled=\{value\.defect\.state==="completed"\|\|value\.onDownSheet\}/);
+ assert.match(logPage, /This repair is on the Down Sheet and the sheet has it deferred/);
+ // A deferredAt in the future rendered "DEFERRED -120M" before this floor.
+ assert.match(logPage, /return elapsed===null\?null:Math\.max\(0,elapsed\)/);
+ // The floor is display-only: the alert and the review still read the signed
+ // value, so a stay that has not started yet is ignored rather than counted.
+ const catalog = await readFile(new URL("../app/repair-catalog.ts", import.meta.url), "utf8");
+ assert.doesNotMatch(catalog, /Math\.max\(0,\(now\.getTime\(\)-started\)\/60000\)/);
+ const future = { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: "2099-01-01T00:00:00.000Z" };
+ assert.ok(deferredMinutesElapsed(future, new Date("2026-09-01T00:00:00.000Z")) < 0, "the raw helper still reports a future stamp as negative");
+});
