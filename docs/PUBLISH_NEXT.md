@@ -1,24 +1,26 @@
 # Publish next
 
-**STATUS: PENDING — three releases are queued, each frozen to its exact SHA. Version 129 is live.**
+**STATUS: PENDING — four releases are queued, each frozen to its exact SHA. Version 129 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | 1st | **130** | `5fc8436` | One repair, one record — duplicate defects merged, and no new ones made |
 | 2nd | **131** | `7fd647a` | Three defects named, four equal save buttons, and a part number asked for at the fix |
 | 3rd | **132** | `c1deca3` | A board that did not save now says so, CI runs on every push, and Fixed Repairs stops rendering every record at once |
+| 4th | **133** | `0258c34` | DEFERRED: buses held back from Bay 12 without going on the Down Sheet, with a timer, an evening review, and a memory of the ones that came back |
 
 **Version 129 was published from `24a02a9` on 2026-08-31.** Publish **130** next
-from `5fc8436`, then **131** from `7fd647a`, then **132** from `c1deca3`.
+from `5fc8436`, then **131** from `7fd647a`, then **132** from `c1deca3`, then
+**133** from `0258c34`.
 
-Each later version contains every one before it, so publishing `c1deca3` alone
-would deliver all three correctly — but they are separate releases with
+Each later version contains every one before it, so publishing `0258c34` alone
+would deliver all four correctly — but they are separate releases with
 separate checks, and 130 carries the change that touches stored repair records.
 Do not merge them into one version number.
 
-The Version 130, Version 131 and Version 132 sections below are complete
-handoffs. The earlier Version 129 section is retained as the published release
-record.
+The Version 130, Version 131, Version 132 and Version 133 sections below are
+complete handoffs. The earlier Version 129 section is retained as the published
+release record.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -986,4 +988,269 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 132 | Live | <published tip hash> | Storage writes now report why they were refused, with a banner and one-tap backup export so a full device can never lose a day's work silently; Fixed Repairs renders 50 records at a time instead of every completed repair at once (measured 13x faster, 76x fewer DOM nodes on a 4,000-repair board) with search and export still covering everything; the bus-group outline is darker by default with a colour option; the SAVE FIXED W/ PART prompt is a bottom sheet with Escape to close; and CI now runs lint, build and the full test suite on every push and pull request |
+```
+
+---
+
+# Version 133 — Buses held back from Bay 12, and the ones that quietly came back
+
+**Publish this FIFTH, after Version 132 is live.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`0258c34`** |
+| Last code-bearing commit | `0258c34` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 132, published from `c1deca3` |
+
+Everything this release contains:
+
+```
+git diff --name-only c1deca3 0258c34
+```
+
+Twelve files in the raw diff. Eleven are this release; the twelfth,
+`docs/PUBLISH_NEXT.md`, is this file's own prior revision — commit `0236b21`,
+which queued Version 132 behind 130 and 131 — and ships nothing, the same way
+earlier documentation-only commits have in every prior section of this file.
+That commit touches exactly one file, which is what accounts for it.
+
+```
+app/defect-log/defect-log.css     app/globals.css
+app/defect-log/page.tsx           app/lists/page.tsx
+app/deferred-watch.tsx   (new)    app/page.tsx
+app/down-sheet/page.tsx           app/quick-filters.ts
+app/fixed-repairs/page.tsx        app/repair-catalog.ts
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, or CI change. The filter returns nothing:
+
+```
+git diff --name-only c1deca3 0258c34 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+The commits in the range — five, the first of which is the handoff-freeze
+commit for Version 132 described above:
+
+```
+git log --oneline c1deca3..0258c34
+0258c34 Close two gaps smoke testing found in the deferred work
+84810dd Remember a repair once deferred and returned to service, still unresolved
+4120073 Add DEFERRED status, evening review prompt, and 90-minute pulsing alert
+19f5c9e Move the DS badge beside the other purple badge
+0236b21 Queue Version 132 behind 130 and 131
+```
+
+Gate: 174 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**No database migration, no dependency change.** `supabase/`, `package.json`
+and `package-lock.json` are untouched across the whole range.
+
+**Three new optional fields on a defect record, all additive.**
+
+| Field | Written when | Cleared when |
+| --- | --- | --- |
+| `deferredAt` | a repair enters DEFERRED from the Defect Log's own toggle | it leaves DEFERRED by any route |
+| `deferredUntil` | the evening review is answered "keep deferred until…" | it leaves DEFERRED by any route |
+| `deferredReturnedAt` | DEFERRED is turned off by returning the bus to service — not fixed, not sheeted | the repair is fixed, put on the Down Sheet, or deferred again |
+
+A record written by any earlier build has none of them. Verified against the
+real module rather than assumed: an older record reads back with its fields
+intact, the three new keys absent rather than invented, and registers as
+neither deferred nor previously-deferred. A record carrying them survives a
+read unchanged.
+
+**One new LocalStorage key, additive: `pace-deferred-review-dismissed-v1`.**
+A small map of defect id to date string, written only when somebody dismisses
+the evening review without answering it, so it does not reopen the same
+evening. Absent, unreadable, or corrupt is treated as empty — the worst case
+is one extra prompt, never a blocked one. Nothing reads it but the prompt.
+
+**The shared Quick Filter list grows from eleven entries to twelve.** The new
+`deferred` key is appended last; all eleven existing keys are unchanged and
+verified present.
+
+**No stored field is renamed, removed, or rewritten on read.**
+
+## What changed
+
+Four changes, in the order that matters most first.
+
+### 1. DEFERRED — a bus held back from Bay 12 without going on the Down Sheet — `4120073`
+
+**The reason to publish.** Bay 12 runs against pullout time. A bus can have a
+fault that needs a laptop on it — a check-engine code, a multiplex fault — that
+there is simply no time for before the bus has to go. The two things the board
+could say about it were both wrong: put it on the Down Sheet, which the
+operation actively avoids, or send it back out as though nothing were pending.
+So it went back out with nothing recorded, and by the next shift nobody
+remembered which buses those were.
+
+DEFERRED is the third answer: held back, not on the sheet, and *timed*.
+
+- **Its own toggle**, beside RECOMMEND FOR DOWN SHEET and DOWN SHEET in the
+  Defect Log editor, rather than a fourth option inside the WORK STATUS
+  dropdown where it previously sat unnoticed. Mutually exclusive with DOWN
+  SHEET — ticking one clears the other.
+- **A `DEF` badge on the Facility Map token**, so a held bus is visible where
+  buses are actually looked at.
+- **A Quick Filter, "Deferred (Held from Service)"**, sorted longest-waiting
+  first, showing each bus's elapsed time with a one-tap **MOVE / LOCATION**
+  picker beside it.
+- **A pulsing alert badge on all five pages** once any bus passes 90 minutes,
+  carrying the count and linking to the Defect Log.
+- **Teal, deliberately not purple.** Purple is already the Down Sheet's colour
+  on this board (`--downsheet-badge`, and the defect-count badge), and a second
+  purple thing meaning something else is how a badge stops being read.
+
+The Down Sheet has a **"Deferred" workflow of its own** that writes the same
+underlying state. These are different things and are kept apart everywhere: a
+repair only counts as a Bay 12 hold when the bus carries no active Down Sheet
+entry. One helper, `isHeldDeferred`, is the single place that rule lives.
+
+### 2. An evening review, so nobody has to remember — `4120073`
+
+Third shift starts at 22:00 and the down decisions get made between about 20:30
+and 21:00. From **20:30 onward**, any bus deferred more than **an hour** raises
+a prompt, one bus at a time, offering exactly three ways out:
+
+- **Keep deferred** until a chosen time. The original clock is *not* reset —
+  the 90-minute alert keeps measuring the same stay — only the snooze moves.
+- **Put on the Down Sheet.**
+- **Return to service with defects** — the repair stays open, the bus goes out.
+
+A **location picker rides along** with all three, since that is usually decided
+in the same breath. Answering removes the bus from the queue; dismissing it
+holds it until the next evening rather than reopening immediately.
+
+It only fires while a tab is open, which suits the case it was built for —
+somebody working Bay 12 through shift change.
+
+### 3. A memory of the buses that came back — `84810dd`
+
+A bus deferred, then returned to service without being fixed, is the one that
+gets lost: the teal badge is gone the next morning and the repair is still
+open. `deferredReturnedAt` remembers it, and it shows as a **deliberately
+different mark** — an outline, never the solid `DEF` badge, because the bus is
+not currently held back:
+
+- a teal **outline ring** on the Facility Map token;
+- **WAS DEF** on the Defect Log card, **WAS DEFERRED** on the individual
+  repair row, and a full sentence in the editor naming when it went back out.
+
+Two things retire it, both matching how the live hold already behaves: putting
+the repair on the Down Sheet, since the sheet becomes the record from that
+point, and marking it fixed. `hasDeferredHistory` is the single gate every
+surface reads, so the live badge and the history mark can never both show.
+
+### 4. The DS badge moved off the repair text — `19f5c9e`
+
+On a phone the bus-number column is 64–72px; a five-digit number plus the DS
+badge needed about 77px, so the badge spilled out of its own column and landed
+on the repair description in the next one — measured on bus 17530 as a real
+4px overlap, not a near miss. It now sits in the meta column beside the
+defect-count badge, reading as the pair of counts it always was.
+
+## Known issue this release does not fix
+
+**The alert and the review only run while a tab is open.** This is a
+LocalStorage app with no server, so nothing can wake a closed phone. A bus
+deferred at 19:00 on a device that is then locked until morning raises its
+alert when the app is next opened, not at 20:30. This matches the case it was
+designed for and is called out here so it is not discovered as a surprise.
+
+**A change made by the prompt does not live-update a different tab already
+open elsewhere.** It writes to LocalStorage; another open tab picks it up on
+its next read. Every page in this app already behaves this way; this release
+does not make it better or worse.
+
+## Data safety
+
+- **No LocalStorage key renamed or removed.**
+- **Three new additive fields and one new key** — see Migrations above, all
+  verified against the real modules rather than asserted.
+- **Nothing already stored is rewritten on read.** Loading any page writes
+  nothing; the prompt writes only when somebody answers it.
+- **A board with nothing deferred sees nothing new.** Verified: the filter
+  returns an empty list, no badge renders, no prompt appears.
+- **A pre-existing record already in the `deferred` state** — which the Down
+  Sheet's own workflow can produce — carries no timer, and is correctly
+  reported as having no clock rather than a false one, and is excluded from
+  the Bay 12 lists while its bus is on the sheet.
+- **A wrong device clock cannot print a nonsense wait.** A `deferredAt` in the
+  future is floored at zero for display; the 90-minute alert and the evening
+  review still read the real signed value, so a stay that has not started is
+  ignored rather than counted.
+- **Every write goes through the existing save path** (`saveDefectLogRecord`,
+  then `writeFleetStorageResult` / `writeDownSheetStorageResult`), so Version
+  132's refused-write reporting covers this release's writes unchanged.
+
+## Validation
+
+- 174 regression tests passed, up from 162 at Version 132
+- ESLint passed; production build passed
+- **Every surface was driven in a real browser, not only unit-tested**: the map
+  badge, the pulsing alert, the Quick Filter with its duration readout and MOVE
+  button, the editor toggle, and the mutual exclusivity with DOWN SHEET
+- **The evening prompt was exercised on a faked 21:00 clock** with a bus
+  deferred 90 minutes, and all three answers were followed through to what they
+  wrote: KEEP UNTIL left `deferredAt` untouched and set the snooze without
+  re-prompting; PUT ON DOWN SHEET cleared the timer, created the sheet entry,
+  moved the bus to the picked area, and correctly did *not* stamp "returned to
+  service"; RETURN TO SERVICE left the repair open and stamped the history
+- **All five pages were loaded at desktop and phone width** — no JavaScript
+  errors on any of them, the alert badge rendering on each, on-screen, and
+  covering nothing clickable
+- **Two bugs were found by that smoke pass and fixed in `0258c34`**, both
+  measured rather than reasoned about: a repair already on the Down Sheet
+  showed DEFERRED and DOWN SHEET *both ticked*, and a future-dated stamp
+  printed `DEFERRED -120M`
+
+**Not verified this round, and stated plainly:** unlike the Version 130
+duplicate-defect work, the live Supabase board was **not** queried — no
+database access was available in the session that prepared this release. The
+on-sheet "Deferred" case is handled correctly, but how many live records are
+currently in that state is unknown.
+
+## After it is live
+
+1. **On any board with nothing deferred** — confirm nothing changed: no badge,
+   no prompt, the Quick Filter list simply has one more entry reading 0.
+2. **Defect Log → open a repair** — confirm a **DEFERRED** checkbox now sits
+   below DOWN SHEET, that ticking it clears DOWN SHEET (and vice versa), and
+   that WORK STATUS greys out while it is ticked.
+3. **Tick DEFERRED and save.** On the Facility Map, confirm a small teal
+   **DEF** badge on that bus. In **QUICK FILTERS → Deferred (Held from
+   Service)**, confirm the bus is listed with an elapsed time and a **MOVE /
+   LOCATION** button that actually moves it.
+4. **Leave one deferred past 90 minutes** — confirm a pulsing **🚨 n DEFERRED**
+   badge appears, on every page, linking to the Defect Log.
+5. **After 20:30**, with a bus deferred more than an hour, confirm the review
+   prompt appears and that each of its three answers does what it says,
+   including the optional location change.
+6. **Untick DEFERRED on an open repair** to return it to service, then reload:
+   confirm a teal **outline ring** on the map token (not the solid DEF badge)
+   and a **WAS DEF** badge on the Defect Log card. Put that repair on the Down
+   Sheet and confirm the mark disappears; on another, mark it fixed and confirm
+   the same.
+7. **Defect Log on a phone** — confirm the purple **DS** badge now sits beside
+   the defect-count badge and no longer overlaps the repair description.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 133 | Live | <published tip hash> | DEFERRED status for buses held back from Bay 12 without going on the Down Sheet, with its own toggle beside the Down Sheet controls, a DEF badge on the Facility Map, a longest-waiting-first Quick Filter with a one-tap relocate, and a pulsing 90-minute alert on every page; an 8:30pm review prompt that asks about anything deferred over an hour and offers keep-until, put-on-Down-Sheet, or return-to-service with a location change in the same step; a separate outline mark remembering a repair that was deferred, returned to service and never resolved, retired by a fix or by the Down Sheet; and the phone DS badge moved off the repair description it was overlapping |
 ```
