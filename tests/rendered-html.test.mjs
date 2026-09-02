@@ -7079,3 +7079,24 @@ test("a repair fixed without a defect can be logged straight to Fixed Repairs", 
  /* And it lands on UNDO like every other change here. */
  assert.match(fixedPage,/changeFleet\(next,\(isNewRecord\?"Logged Bus ":"Edited Bus "\)\+record\.bus\.n\+" fixed repair"\)/);
 });
+
+test("SETTINGS keeps its place beside QUICK FILTERS and says what it is", async () => {
+ const [logPage,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ /* It belongs with the controls, not the stats: it is not a stat, and it must
+    not disappear when they collapse. Asserted by position in the markup — the
+    button sits inside .log-controls, which is outside the .daily-stats block. */
+ const controls=logPage.slice(logPage.indexOf('<section className="log-controls">'),logPage.indexOf('<section className="log-feed"'));
+ assert.ok(controls.includes('className="log-settings-button"'),"SETTINGS must live in the controls row");
+ const statsBlock=logPage.slice(logPage.indexOf('className={"daily-stats"'),logPage.indexOf('<section className="log-controls">'));
+ assert.ok(statsBlock.length>0&&statsBlock.includes("daily-stats-toggle"),"the stats block must be found for this check to mean anything");
+ assert.ok(!statsBlock.includes("log-settings-button"),"and never inside the collapsible stats");
+ /* A bare gear read as decoration beside two buttons that say what they do. */
+ assert.match(logPage,/<button className="log-settings-button".*?><span aria-hidden="true">&#9881;<\/span> SETTINGS<\/button>/);
+ /* Same height as the two buttons beside it, so the row is one set of controls. */
+ assert.match(css,/\.log-controls \.log-settings-button\{[^}]*height:44px;min-height:44px/);
+ assert.match(css,/\.log-controls \.log-undo-button\{height:44px;min-height:44px\}/);
+ assert.match(css,/\.log-controls \.quick-filter-trigger\{height:44px;min-height:44px\}/);
+});
