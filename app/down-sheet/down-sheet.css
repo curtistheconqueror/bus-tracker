@@ -262,3 +262,8 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .completed-today-tile.active strong{color:#065c39}
 .completed-today-tile.active span::after{content:" · SHOWING";font-weight:900;color:#087347}
 @media(max-width:760px){.completed-today-tile{min-height:64px}}
+
+/* ── Reading text, one step up ───────────────────────────────────────────────
+   The 7px lines under the bus number, in the assignment cell, the estimate
+   cell and the updated cell come up to 8px, in step with the other feeds. */
+.fleet-number small,.assignment small,.estimate-cell small,.updated small{font-size:8px}

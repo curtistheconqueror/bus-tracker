@@ -6328,7 +6328,7 @@ test("the DS badge sits beside the defect-count badge instead of overlapping the
  // badge — the "other purple badge" it was asked to sit beside — so both
  // read as one pair of counts rather than two badges scattered across the
  // card.
- assert.match(logPage,/<span className="log-meta">\{busOnDownSheet&&<b className="inline-ds-badge">DS<\/b>\}\{group\.records\.length>1&&<b className="defect-count-badge">/);
+ assert.match(logPage,/<span className="log-meta"><span className="log-badge-slot">\{busOnDownSheet&&<b className="inline-ds-badge">DS<\/b>\}\{group\.records\.length>1&&<b className="defect-count-badge">/);
 });
 
 test("a held-back DEFERRED bus is told apart from the Down Sheet's own Deferred workflow", () => {
@@ -6925,4 +6925,65 @@ test("the sweep scanner is its own door on the Defect Log and never touches the 
  assert.match(route,/a dash is a check, not a fault/);
  assert.match(route,/Never invent a bus, a mark, or a fault/);
  assert.match(route,/enum:\["ok","fault","blank","unclear"\]/);
+});
+
+test("every Defect Log card puts the same information at the same tab stop, at a readable size", async () => {
+ const [logPage,logCss,fixedCss,downCss]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Measured before this change, at 390 wide: OPEN began at x131 on a card with
+    DS and ×3, at x105 with ×4 alone, at x73 with no badges. After: x157 on all
+    four. The mechanism is a grid with named slots — an empty slot stays empty
+    instead of letting the next thing slide left into it. */
+ assert.match(logCss,/\.log-group-header \.log-meta\{display:grid;grid-template-columns:76px auto minmax\(0,1fr\);grid-template-areas:"badges state status" "time time view"/);
+ /* The two purple badges have fixed sub-slots, so ×N sits at the same x with
+    or without DS beside it. */
+ assert.match(logCss,/\.log-badge-slot\{display:grid;grid-template-columns:34px 38px/);
+ assert.match(logCss,/\.log-badge-slot \.inline-ds-badge\{grid-column:1\}/);
+ assert.match(logCss,/\.log-badge-slot \.defect-count-badge\{grid-column:2\}/);
+ assert.match(logPage,/<span className="log-meta"><span className="log-badge-slot">\{busOnDownSheet&&<b className="inline-ds-badge">DS<\/b>\}\{group\.records\.length>1&&<b className="defect-count-badge">×\{group\.records\.length\}<\/b>\}<\/span>/);
+ /* LATEST and VIEW hold the second row, one at each end. */
+ assert.match(logCss,/\.log-group-header \.log-meta>time\{grid-area:time;justify-self:start\}/);
+ assert.match(logCss,/\.log-group-header \.log-meta>\.group-toggle\{grid-area:view;justify-self:end/);
+ /* The status text is wrapped so WAS DEF can ride beside it without taking a
+    slot of its own. */
+ assert.match(logPage,/<span className="log-status-cell"><small>\{STATUS_LABELS\[group\.bus\.s\]\|\|group\.bus\.s\}<\/small>\{groupHasDeferredHistory&&/);
+
+ /* The title no longer carries the emoji the round icon already shows, so a
+    single-defect title starts where MULTIPLE DEFECTS starts. */
+ assert.match(logPage,/<b>\{group\.records\.length===1\?primary\.defect\.category:"MULTIPLE DEFECTS"\}<\/b>/);
+ assert.doesNotMatch(logPage,/<b>\{group\.records\.length===1\?repairCategoryLabel\(primary\.defect\.category\)/);
+
+ /* DS and ×N are a matched pair: same box, same type, same token. Before, DS
+    was 22×17 at 7px beside a ×N of 28×21 at 10px. */
+ assert.match(logCss,/\.log-meta \.inline-ds-badge,\.log-meta \.defect-count-badge\{display:inline-flex;min-width:34px;min-height:24px;height:auto;[^}]*background:var\(--downsheet-badge,#6b35bb\);color:var\(--downsheet-badge-text,#fff\);[^}]*font-size:11px/);
+
+ /* Reading text comes up one step, and the setting that scales it stays
+    monotonic above the new base. */
+ assert.match(logCss,/\.log-meta>small,\.log-meta \.log-status-cell>small\{font-size:10px/);
+ assert.match(logCss,/\.log-meta time\{font-size:9px/);
+ assert.match(logCss,/\.group-toggle\{color:var\(--log-accent\)!important;font-size:9px!important/);
+ assert.match(logCss,/\.log-repair>small\{font-size:9px\}/);
+ assert.match(logCss,/data-font-size="large"\] \.log-repair>small\{font-size:10px\}/);
+ assert.match(logCss,/data-font-size="extra"\] \.log-repair>small\{font-size:12px\}/);
+ assert.match(logCss,/data-font-size="large"\] \.log-meta em\{font-size:11px\}/);
+ assert.match(logCss,/data-font-size="extra"\] \.log-meta em\{font-size:12px\}/);
+ /* In an expanded row the time no longer trails the state pill. */
+ assert.match(logCss,/@media\(max-width:760px\)\{\.grouped-defect-main \.log-meta time\{flex-basis:100%\}\}/);
+
+ /* The same step on the other two feeds, so all three read at one size. */
+ assert.match(fixedCss,/\.fixed-card-head>span small\{font-size:8px\}/);
+ assert.match(fixedCss,/\.fixed-card-body section>b\{font-size:9px\}/);
+ assert.match(downCss,/\.fleet-number small,\.assignment small,\.estimate-cell small,\.updated small\{font-size:8px\}/);
+
+ /* Nothing on a reading surface is set below 8px any more. The rule lists in
+    each file are checked for the selectors this release raised. */
+ for(const [css,sel] of [[logCss,".log-bus small"],[logCss,".log-bus em"],[fixedCss,".fixed-card-head>span small"],[downCss,".updated small"]]){
+  const last=[...css.matchAll(new RegExp(sel.replace(/[.>*+?^${}()|[\]\\]/g,"\\$&")+"\\{[^}]*font-size:([0-9.]+)px","g"))].pop();
+  assert.ok(last&&parseFloat(last[1])>=8,sel+" must end up at 8px or larger (last rule wins)");
+ }
 });

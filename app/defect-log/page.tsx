@@ -692,7 +692,10 @@ export default function DefectLog(){
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
      <span className="log-icon" aria-hidden="true">{repairCategoryEmoji(primary.defect.category)}</span>
      <span className="log-bus"><small>BUS</small><span className="log-bus-number" data-status={group.bus.s}><strong>{group.bus.n}</strong></span><em>{locationLabel(group.bus.l)}</em></span>
-     <span className="log-repair"><b>{group.records.length===1?repairCategoryLabel(primary.defect.category):"MULTIPLE DEFECTS"}</b><strong>{preview}</strong>{group.records.length>2&&<small>+{group.records.length-2} more defect{group.records.length-2===1?"":"s"}</small>}</span>
+     {/* Plain text, no inline emoji: the round icon to the left already carries
+         the category glyph, and repeating it here made a single-defect title
+         start further right than "MULTIPLE DEFECTS" on the card above it. */}
+     <span className="log-repair"><b>{group.records.length===1?primary.defect.category:"MULTIPLE DEFECTS"}</b><strong>{preview}</strong>{group.records.length>2&&<small>+{group.records.length-2} more defect{group.records.length-2===1?"":"s"}</small>}</span>
      {/* DS used to sit inside the 64-72px bus-number column on a phone, where a
          five-digit number already fills the space. It spilled past its own
          column and landed on top of the repair description in the next one —
@@ -700,7 +703,15 @@ export default function DefectLog(){
          near miss. It now sits beside the other purple badge here in the meta
          column, which has the room and reads as the pair of counts it always
          was: how many defects, and whether one is already on the sheet. */}
-     <span className="log-meta">{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}{group.records.length>1&&<b className="defect-count-badge">×{group.records.length}</b>}{groupHasDeferredHistory&&<b className="inline-deferred-history-badge" title="Was deferred, returned to service, still open">WAS DEF</b>}<b className={"state "+groupState}>{STATE_LABELS[groupState]}</b><small>{STATUS_LABELS[group.bus.s]||group.bus.s}</small><time>LATEST {timeLabel(group.updatedAt)}</time><i className="group-toggle">{expanded?"CLOSE":"VIEW"}</i></span>
+     {/* Fixed tab stops. Measured before this: OPEN began at x131 on a card with
+         DS and ×3, x105 with ×4 alone, x73 with no badges — the same word at
+         three different places on three neighbouring cards, and LATEST wrapped
+         on two of the four. Each piece now has a slot it always occupies: the
+         two badges sit in their own fixed sub-slots (so ×N is at the same x
+         with or without DS), the state and status follow, and LATEST and VIEW
+         hold the second row at its two ends. An empty slot stays empty; nothing
+         slides into it. */}
+     <span className="log-meta"><span className="log-badge-slot">{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}{group.records.length>1&&<b className="defect-count-badge">×{group.records.length}</b>}</span><b className={"state "+groupState}>{STATE_LABELS[groupState]}</b><span className="log-status-cell"><small>{STATUS_LABELS[group.bus.s]||group.bus.s}</small>{groupHasDeferredHistory&&<b className="inline-deferred-history-badge" title="Was deferred, returned to service, still open">WAS DEF</b>}</span><time>LATEST {timeLabel(group.updatedAt)}</time><i className="group-toggle">{expanded?"CLOSE":"VIEW"}</i></span>
     </button>
     {expanded&&<div className="grouped-defect-list"><header className="grouped-defect-head"><span><b>BUS {group.bus.n}</b><small>{group.records.length} DEFECT{group.records.length===1?"":"S"}</small></span><button onClick={()=>setEditing({...newDraft(),busId:group.bus.id})}>+ ADD DEFECT</button></header>{group.records.map((record,index)=><section className="grouped-defect-row" key={record.defect.id}>
      <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>

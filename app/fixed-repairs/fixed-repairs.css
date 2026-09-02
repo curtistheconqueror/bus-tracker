@@ -151,3 +151,14 @@
 .fixed-origin.from-defect-log{border-left-color:#c07a00;background:#fff6e8;color:#8a5600}
 .fixed-origin.from-tracker{border-left-color:#5a6b8c;background:#f2f5fb;color:#3f4d68}
 @media(max-width:620px){.fixed-origin{font-size:9px;letter-spacing:.35px;padding:8px 10px;line-height:1.3}}
+
+/* ── Reading text, one step up ───────────────────────────────────────────────
+   The BUS eyebrow on a card head was 6px and the category, section titles and
+   the Logged line 7–8px. Same step as the Defect Log cards took in the same
+   release, so the two feeds read at the same size. */
+.fixed-card-head>span small{font-size:8px}
+.fixed-card-head>div b{font-size:9px}
+.fixed-card-head time{font-size:9px}
+.fixed-card-body section>b{font-size:9px}
+.fixed-card-body section>small{font-size:9px}
+.fixed-card-body .not-duplicated-note{font-size:9px}
