@@ -1371,18 +1371,14 @@ of watching a mechanic use the app for the first time.
 
 ```
 git log --oneline 9f1f73f..0153c09
-0153c09 Fix five defects a cold review of the queued releases found         <- this release
-198083b Give SETTINGS its name, and keep it with the controls it belongs to           <- this release
-19991fe Queue Version 145 behind 144                                                  <- docs only
+0153c09 Fix five defects a cold review of the queued releases found   <- this release
+8741bd2 Correct three facts in the Version 145 handoff   <- docs only
+eb2d508 Repoint the 145 handoff at the SETTINGS commit   <- docs only
+198083b Give SETTINGS its name, and keep it with the controls it belongs to   <- this release
+19991fe Queue Version 145 behind 144   <- docs only
 3890055 Open the Defect Log on its job, and let a repair be logged without a defect   <- this release
-2bcf1b0 Set the handoff status to Version 144 pending                                 <- docs only
-c7b86f6 Queue Version 144                                                             <- docs only
-
-git diff --name-only 2bcf1b0 0153c09 -- app
-app/defect-log/defect-log.css
-app/defect-log/page.tsx
-app/fixed-repairs/fixed-repairs.css
-app/fixed-repairs/page.tsx
+2bcf1b0 Set the handoff status to Version 144 pending   <- docs only
+c7b86f6 Queue Version 144   <- docs only
 ```
 
 No dependency, database, or CI change:
