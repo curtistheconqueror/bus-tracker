@@ -1,17 +1,18 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 140 was published from f0c7939 on 2026-09-01.**
+**STATUS: VERSION 141 PENDING — publish from `1ff1224`. Version 140 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
-| Then | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
+| Next | **141** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
+| Published | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
+| Published | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
 | Published | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
 | Published | **137** | `69deec5` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 138 is live from `0969840`.** Two remain, and they are separate publishes in order: `f0c7939` contains `a33ffab`, so **publishing 140 alone carries 139 with it**. Fine if both are wanted at once, but the two sets of post-publish checks are separate and both need running. The 136–138 handoffs are retained as release records.
+**Version 140 is live from `f0c7939`. Version 141 is next from `1ff1224`; its handoff is at the bottom of this file.** It carries Codex's `e99e06a` (the enlarged DS badge), which is on `main` but not yet live. The 136–140 handoffs are retained as release records.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -928,4 +929,160 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 140 | Live | <published tip hash> | SCAN SWEEP on the Defect Log photographs the farebox and Ventra check-off sheets and files what they found as Tech Services defects: the five mark columns map to catalog options, a written note names the faults the columns cannot and beats the column it explains, blank is read as not checked and never as working, findings already on the board arrive unticked, and buses ticked OK that the board still holds open are listed for a person rather than closed. Filing uses the same single-record save as LOG DEFECT with the 48-hour duplicate guard and one write, carries page and checker initials on each record, and is reversed by UNDO LAST. Uses the existing OPENROUTER_API_KEY; no new secret |
+```
+
+---
+
+# Version 141 — Every line on a card starts at the same tab stop
+
+**Publish this next, after Version 140.** Curtis asked for this to be built so
+it can be taken back if he does not like the new layout; the way back is at the
+end of this section.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`1ff1224`** |
+| Last code-bearing commit | `1ff1224` — the release source is this commit |
+| Also carried | `e99e06a` — Codex's enlarged DS badge, on `main` since 140 went live, not yet published |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 140, published from `f0c7939` |
+
+```
+git log --oneline f0c7939..1ff1224
+1ff1224 Give every card line a fixed tab stop, and bring the reading text up a step   <- this release
+e99e06a Enlarge Defect Log Down Sheet badge                                        <- Codex, carried
+6ca9f4f Record Sites Versions 139 and 140 releases                                 <- docs only
+
+git diff --name-only e99e06a 1ff1224 -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet.css
+app/fixed-repairs/fixed-repairs.css
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only e99e06a 1ff1224 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 187 tests passing (up from 186 at Version 140), ESLint clean, production
+build succeeds.
+
+## Migrations
+
+**None.** No storage change of any kind. Two files of markup and CSS on the
+Defect Log, and CSS only on Fixed Repairs and the Down Sheet. Nothing a record
+carries is different.
+
+## What changed, with the numbers
+
+### 1. The card's bottom row has fixed tab stops
+
+The same word landed in a different place on every card, because the optional
+purple badges sat in the same flowing row as the state and status. Measured at
+390 wide, four neighbouring cards:
+
+| | Version 140 | Version 141 |
+| --- | --- | --- |
+| Where OPEN begins (card with DS and ×3) | x131 | **x157** |
+| Where OPEN begins (card with ×4 alone) | x105 | **x157** |
+| Where OPEN begins (card with no badges) | x73 | **x157** |
+| Where LATEST begins | x73 or x209, wrapping on 2 of 4 | **x73, always on its own row** |
+| Where VIEW sits | wrapped, x73 or x153 | **flush right, always** |
+
+Same result at 360 and 430. The row is a grid with named slots: badges, state,
+status on the first row; LATEST at the left and VIEW at the right of the second.
+An empty slot stays empty; nothing slides left into it. DS and ×N have their own
+two fixed sub-slots, so ×N is at the same x whether or not DS is beside it.
+
+### 2. The title starts at the same place on every card
+
+A single-defect title used to lead with the category emoji; MULTIPLE DEFECTS
+did not, so the words began at different points. The emoji is gone from the
+title — the round icon on the left already carries it — and both titles start
+at x146 at 390 wide.
+
+### 3. DS and ×N are a matched pair
+
+| | Version 140 | Version 141 |
+| --- | --- | --- |
+| DS | 22 × 17, 7px | **34 × 24, 11px** |
+| ×N | 28 × 21, 10px | **38 × 24, 11px** |
+
+Both on the same colour token, so a Down Sheet badge colour set on the Facility
+Map recolours both here. Both carry the thin border Codex gave DS in `e99e06a`.
+
+### 4. Reading text comes up one step, on all three feeds
+
+| Surface | Before | After |
+| --- | --- | --- |
+| Defect Log card: status / LATEST / VIEW | 8 / 7 / 7 px | **10 / 9 / 9 px** |
+| Defect Log card: BUS eyebrow, location, "+N more" | 7 / 7 / 8 px | **8 / 8 / 9 px** |
+| Defect Log expanded rows: work-state badges, action labels, SAVED | 7 / 6.5 / 6 px | **9 / 8 / 8 px** |
+| Fixed Repairs: BUS eyebrow, category, section titles, Logged line | 6 / 7 / 7 / 8 px | **8 / 9 / 9 / 9 px** |
+| Down Sheet: the four small cell captions | 7 px | **8 px** |
+
+Labels inside editors and settings are left alone; those are label styling, not
+reading text. The Defect Log's own font-size setting still scales everything
+above the new base. In an expanded row the timestamp now starts a line of its
+own rather than trailing the state pill, so it no longer moves by a pill's width
+between OPEN and FIXED.
+
+## The way back
+
+**If Curtis does not like the new layout**, either is clean:
+
+- **Publish from `e99e06a`** instead. That is `main` as Codex left it, with the
+  enlarged DS badge and none of this.
+- Or revert on `main` and publish the revert: `git revert 1ff1224` produces one new
+  commit that removes exactly this release and nothing else. It is a single
+  code commit for that reason.
+
+## Validation
+
+- 187 regression tests passing, ESLint clean, production build succeeds
+- **Measured, not read**: bounding boxes of every card element at 360, 390, 430
+  and 1180, before and after, on four cards chosen to cover every badge
+  combination (DS + ×N, ×N alone, none, ×N with the longest status)
+- **Nothing clips**: the status text stays on one line at 360; the meta row stays
+  inside the card; the FOCUS button does not overlap it
+- **The other pages were audited the same way**: Fixed Repairs and the Down
+  Sheet already aligned by construction; the only drift found was a 1px
+  timestamp shift in expanded Defect Log rows, now fixed. After the size
+  changes, nothing on any of the three pages overflows its box, and no reading
+  text remains below 8px
+- Codex's `e99e06a` was brought underneath this work by fast-forward, not
+  merged over; its border and colour-token wiring are kept
+
+## After it is live
+
+1. **Defect Log, on a phone.** Look down four or five cards. OPEN, the status,
+   LATEST and VIEW should sit in the same place on every one, whether or not
+   the card has DS or a ×N badge.
+2. **A card with both badges.** DS and ×N should be the same height and type
+   size, side by side.
+3. **Change the Down Sheet badge colour** in Facility Map settings and return.
+   Both badges should take the new colour.
+4. **Expand a bus** and look at two rows with different states. The LOGGED and
+   UPDATED lines should start at the same x on both.
+5. **Fixed Repairs and the Down Sheet.** The small grey text should be readable
+   without leaning in; nothing should wrap where it did not before.
+6. **Set the Defect Log font size to Large** in its settings and confirm the
+   card text scales up, not down.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 141 | Live | <published tip hash> | Every line on a Defect Log card sits at a fixed tab stop regardless of which badges the bus carries — OPEN, status, LATEST and VIEW at the same place on every card, the title without the duplicated category emoji — with DS and ×N as a matched 24px pair on one colour token (carrying the enlarged, bordered DS badge from e99e06a); the small grey reading text comes up a step on the Defect Log, Fixed Repairs and Down Sheet feeds while editor and settings labels stay as they were. One code commit, reversible with a single revert |
 ```
