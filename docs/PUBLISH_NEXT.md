@@ -1,10 +1,11 @@
 # Publish next
 
-**STATUS: VERSION 144 PENDING — publish from `9f1f73f`. Version 143 is live.**
+**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `3890055`. Version 143 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
+| Then | **145** | `3890055` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
 | Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
@@ -1335,4 +1336,154 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 144 | Live | <published tip hash> | The four choices under the save buttons — recommend, down sheet, deferred, not duplicated — are readable on a phone at 11-12px with their explanations cut to one short line each, and the Defect Log's 7px grey FIND label becomes a black 11px SEARCH matching the Down Sheet's, which is brought to the same size; the Facility Map's LOCATE is left as it is because it jumps to a bus rather than searching a list |
+```
+
+---
+
+# Version 145 — The page opens on its job, and a repair can be logged without a defect
+
+**Publish this after Version 144.** It stacks on it: `3890055` contains
+`9f1f73f`, so publishing 145 carries 144. Stage two of a cleanup that came out
+of watching a mechanic use the app for the first time.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`3890055`** |
+| Last code-bearing commit | `3890055` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 144, from `9f1f73f` |
+
+```
+git log --oneline 9f1f73f..3890055
+3890055 Open the Defect Log on its job, and let a repair be logged without a defect   <- this release
+2bcf1b0 Set the handoff status to Version 144 pending                                 <- docs only
+c7b86f6 Queue Version 144                                                             <- docs only
+
+git diff --name-only 2bcf1b0 3890055 -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 2bcf1b0 3890055 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 190 tests passing (up from 188 at Version 144), ESLint clean, production
+build succeeds.
+
+## Migrations
+
+**No storage rewrite.** One new LocalStorage key, `pace-defect-log-stats-open-v1`,
+holding `"1"` or `"0"`. **Absent means closed**, so a device that has never
+opened the stats writes nothing and still behaves correctly.
+
+**No filter behaviour was removed.** Two buttons were, and that distinction
+matters — see below.
+
+## What changed on the Defect Log
+
+### 1. DAILY STATS, closed by default
+
+Five stat tiles were the first thing on the page, above the filters and above
+the button that logs a defect. They are now behind one bar carrying the three
+numbers worth a glance — *3 active · 2 buses · 1 fixed today* — and the open or
+closed choice is remembered per device, like the mystery board's.
+
+### 2. + LOG DEFECT is the first control
+
+It sat in the feed header, below the tiles, the filters and the mystery board.
+It is now the first thing under the page header, full width on a phone, and
+**no longer repeated** in the feed header — two buttons doing one job was part
+of what made the page feel busy. Measured at 390 wide: visible without
+scrolling, and present exactly once.
+
+### 3. Two filter buttons removed, no filter behaviour removed
+
+| Button | Why it went |
+| --- | --- |
+| OPEN | Differed from ALL only by hiding in-progress and today's fixes. A real distinction, but a fine one that reads as noise to somebody new. |
+| DOWN SHEET | Has its own page, and the DS badge on each card already says which buses are on it. |
+
+**Both keys still filter, and both are still choosable as a default view in
+settings.** Anybody whose saved default is OPEN or DOWN SHEET keeps exactly the
+view they had; only the button is gone. Verified by setting a saved default of
+`downsheet` and reloading — the filter still applied.
+
+### 4. Pressing the active filter clears it
+
+It used to stay stuck on, with no way back but pressing ALL. Pressing the lit
+one now returns to ALL. The quick-filter menu already behaved this way; only
+this row did not.
+
+## What changed on Fixed Repairs
+
+### + LOG A REPAIR
+
+Armon went to Fixed Repairs to add a fix and found only **ADD FIX DETAILS**,
+which edits a record that already exists. A repair done without a defect ever
+being logged — which is how it happens on the floor more often than not — had
+nowhere to go.
+
+The button opens **the same editor every other record uses**, so every field is
+already there: category, issue, description, fix, diagnosis, finding, parts,
+hours, who and when. The only thing a blank record lacks is the bus, so the
+editor asks for that at the top and nothing else about the form differs. It is
+disabled when the device has no buses, because there would be nothing to attach
+the repair to.
+
+**One real bug was fixed to make this work.** `saveCompletion` mapped over the
+bus's existing defects. A record that is not on the bus yet matches nothing, so
+mapping alone would have **written no record and reported success**. It now
+appends when the defect is absent, and the change lands on UNDO like every other
+change on that page.
+
+## Validation
+
+- 190 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a real browser at 390 wide.** Defect Log: stats closed on first
+  load, opened, remembered across a reload, closed again; LOG DEFECT visible
+  without scrolling and present exactly once; each filter pressed on and off
+  with the card count moving 3 → 1 → 3; a saved default view of a removed key
+  still filtering after a reload
+- **A repair logged end to end**: LOG A REPAIR → bus 15514 → Brakes → ABS
+  warning → fix text → initials → save. Storage went from 0 defects on that bus
+  to 1, the record reads `state: completed` with its fix, initials and
+  completion time, the editor closed, the record appeared in the feed, and UNDO
+  became available
+- No page errors in any run
+
+## After it is live
+
+1. **Open the Defect Log on a phone.** The first things should be DAILY STATS
+   closed, then + LOG DEFECT, then three filters.
+2. **Tap DAILY STATS.** The five tiles appear; leave and come back and it
+   should still be open. Close it and it should stay closed.
+3. **Tap a filter, then tap it again.** It should clear back to ALL.
+4. **If anybody had a saved default view of Open or Down Sheet** (Settings →
+   Default View), it still works. The button is gone; the view is not.
+5. **Fixed Repairs → + LOG A REPAIR.** Pick a bus, fill in the repair, save. It
+   should appear immediately as a completed record, with UNDO available.
+
+## The way back
+
+`git revert 3890055` — one commit. Or publish Version 144 from `9f1f73f`.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 145 | Live | <published tip hash> | The Defect Log opens on + LOG DEFECT instead of a scoreboard: the five stat tiles collapse into a DAILY STATS bar closed by default and remembered per device, the log button moves to the top and is no longer duplicated, and the OPEN and DOWN SHEET filter buttons are removed while both keys keep filtering so saved default views still work; pressing the active filter now clears it. Fixed Repairs gains + LOG A REPAIR for a repair done without a defect ever being logged, opening the existing editor with a bus picker, and the save path now appends a new record instead of silently writing nothing |
 ```
