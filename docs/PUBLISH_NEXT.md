@@ -1357,7 +1357,8 @@ of watching a mechanic use the app for the first time.
 
 ```
 git log --oneline 9f1f73f..198083b
-198083b Give SETTINGS its name, and keep it with the controls it belongs to        <- this release
+198083b Give SETTINGS its name, and keep it with the controls it belongs to           <- this release
+19991fe Queue Version 145 behind 144                                                  <- docs only
 3890055 Open the Defect Log on its job, and let a repair be logged without a defect   <- this release
 2bcf1b0 Set the handoff status to Version 144 pending                                 <- docs only
 c7b86f6 Queue Version 144                                                             <- docs only
@@ -1457,7 +1458,7 @@ change on that page.
 
 ## Validation
 
-- 190 regression tests passing, ESLint clean, production build succeeds
+- 191 regression tests passing, ESLint clean, production build succeeds
 - **Driven in a real browser at 390 wide.** Defect Log: stats closed on first
   load, opened, remembered across a reload, closed again; LOG DEFECT visible
   without scrolling and present exactly once; each filter pressed on and off
@@ -1486,7 +1487,11 @@ change on that page.
 
 ## The way back
 
-`git revert 198083b` takes back the SETTINGS change alone; `git revert 3890055` takes back the rest. Or publish Version 144 from `9f1f73f`.
+`git revert 198083b` takes back the SETTINGS change alone and applies cleanly.
+
+To take back the whole release, revert them newest first — `git revert 198083b`
+then `git revert 3890055`. Reverting `3890055` on its own conflicts, because
+`198083b` edits the same lines after it. Or publish Version 144 from `9f1f73f`.
 
 ## Publishing constraints that still apply
 
