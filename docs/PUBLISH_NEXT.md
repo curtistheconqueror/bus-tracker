@@ -1,11 +1,11 @@
 # Publish next
 
-**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `3890055`. Version 143 is live.**
+**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `198083b`. Version 143 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
-| Then | **145** | `3890055` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
+| Then | **145** | `198083b` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
 | Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
@@ -1350,18 +1350,19 @@ of watching a mechanic use the app for the first time.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`3890055`** |
-| Last code-bearing commit | `3890055` — the release source is this commit |
+| **Release source** | **`198083b`** |
+| Last code-bearing commit | `198083b` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 144, from `9f1f73f` |
 
 ```
-git log --oneline 9f1f73f..3890055
+git log --oneline 9f1f73f..198083b
+198083b Give SETTINGS its name, and keep it with the controls it belongs to        <- this release
 3890055 Open the Defect Log on its job, and let a repair be logged without a defect   <- this release
 2bcf1b0 Set the handoff status to Version 144 pending                                 <- docs only
 c7b86f6 Queue Version 144                                                             <- docs only
 
-git diff --name-only 2bcf1b0 3890055 -- app
+git diff --name-only 2bcf1b0 198083b -- app
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
 app/fixed-repairs/fixed-repairs.css
@@ -1371,10 +1372,10 @@ app/fixed-repairs/page.tsx
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 2bcf1b0 3890055 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 2bcf1b0 198083b -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: 190 tests passing (up from 188 at Version 144), ESLint clean, production
+Gate: 191 tests passing (up from 188 at Version 144), ESLint clean, production
 build succeeds.
 
 ## Migrations
@@ -1415,7 +1416,18 @@ settings.** Anybody whose saved default is OPEN or DOWN SHEET keeps exactly the
 view they had; only the button is gone. Verified by setting a saved default of
 `downsheet` and reloading — the filter still applied.
 
-### 4. Pressing the active filter clears it
+### 4. SETTINGS says what it is, and stays put
+
+The gear stays in the controls row beside QUICK FILTERS and UNDO LAST —
+**deliberately outside the collapsible stats**, because it is not a stat and
+must not vanish when they close. It was a square holding a bare glyph between
+two buttons that say what they do, so it read as decoration; it now carries its
+name and is shaped like its neighbours.
+
+All three controls in the row were brought to one height at the same time:
+settings and undo were 42px against quick filters' 44.
+
+### 5. Pressing the active filter clears it
 
 It used to stay stuck on, with no way back but pressing ALL. Pressing the lit
 one now returns to ALL. The quick-filter menu already behaved this way; only
@@ -1465,14 +1477,16 @@ change on that page.
 2. **Tap DAILY STATS.** The five tiles appear; leave and come back and it
    should still be open. Close it and it should stay closed.
 3. **Tap a filter, then tap it again.** It should clear back to ALL.
-4. **If anybody had a saved default view of Open or Down Sheet** (Settings →
+4. **Find SETTINGS.** It reads ⚙ SETTINGS beside QUICK FILTERS, the same height
+   as it, and it is still there whether DAILY STATS is open or closed.
+5. **If anybody had a saved default view of Open or Down Sheet** (Settings →
    Default View), it still works. The button is gone; the view is not.
-5. **Fixed Repairs → + LOG A REPAIR.** Pick a bus, fill in the repair, save. It
+6. **Fixed Repairs → + LOG A REPAIR.** Pick a bus, fill in the repair, save. It
    should appear immediately as a completed record, with UNDO available.
 
 ## The way back
 
-`git revert 3890055` — one commit. Or publish Version 144 from `9f1f73f`.
+`git revert 198083b` takes back the SETTINGS change alone; `git revert 3890055` takes back the rest. Or publish Version 144 from `9f1f73f`.
 
 ## Publishing constraints that still apply
 
