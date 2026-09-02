@@ -1,10 +1,11 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 142 was published from 1ff1224 on 2026-09-02.**
+**STATUS: VERSION 143 PENDING — publish from `f94608b`. Version 142 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
+| Next | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
+| Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
 | Published | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
 | Published | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
@@ -13,7 +14,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 141 is live from `e99e06a`. Version 142 is next from `1ff1224`; its handoff is at the bottom of this file.** The 136–140 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 142 is live from `1ff1224`. Version 143 is next from `f94608b`; its handoff is at the bottom of this file.** The 136–142 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -1083,4 +1084,114 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 142 | Live | <published tip hash> | Every line on a Defect Log card sits at a fixed tab stop regardless of which badges the bus carries — OPEN, status, LATEST and VIEW at the same place on every card, the title without the duplicated category emoji — with DS and ×N as a matched 24px pair on one colour token (one step above the Version 141 DS badge, keeping its border); the small grey reading text comes up a step on the Defect Log, Fixed Repairs and Down Sheet feeds while editor and settings labels stay as they were. One code commit, reversible with a single revert |
+```
+
+---
+
+# Version 143 — The bus card stops wearing one defect's badge
+
+**Publish this next, after Version 142.** A follow-on to 142's card polish,
+kept as its own commit so either can be taken back without the other.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`f94608b`** |
+| Last code-bearing commit | `f94608b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 142, published from `1ff1224` |
+
+Two commits since the live version; one of them is Codex's release record:
+
+```
+git log --oneline 1ff1224..f94608b
+f94608b Take the category glyph off the collapsed bus card      <- this release
+ebd4727 Record Sites Versions 141 and 142 releases           <- docs only
+
+git diff --name-only ebd4727 f94608b -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only ebd4727 f94608b -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 188 tests passing (up from 187 at Version 142), ESLint clean, production
+build succeeds.
+
+## Migrations
+
+**None.** Markup and CSS on one page. Nothing a record carries is different.
+
+## What changed
+
+### The collapsed bus card carries no category glyph
+
+The round icon at the left of a collapsed card showed the category of whichever
+defect happened to be first. On a MULTIPLE DEFECTS card that was one category's
+glyph standing in for a bus with three problems in three categories, and beside
+the emoji on every expanded row it read as one long run of defects.
+
+| Where | Version 142 | Version 143 |
+| --- | --- | --- |
+| Collapsed bus card | round category icon at left; title without emoji | **no glyph anywhere** |
+| Expanded defect rows | emoji on each row | emoji on each row — unchanged |
+| Fixed Repairs cards | emoji on each card | unchanged; each card is one defect |
+
+The icon's column is gone from the header grid at every width, so the bus
+number and everything after it move left by the same amount on every card. The
+tab stops from Version 142 hold, measured at 360, 390, 430 and 1180 on the same
+four test cards:
+
+| At 390 wide | Every card |
+| --- | --- |
+| Bus number begins | x34 |
+| Title begins | x107 |
+| OPEN begins | x118 |
+| LATEST begins | x34 — under the bus number, its own row |
+| VIEW | flush right |
+
+Nothing clips; the status text stays on one line at 360; the FOCUS button does
+not reach the meta row.
+
+## The way back
+
+`git revert f94608b` restores the icon and its column and nothing else. Or
+republish Version 142 from `1ff1224`.
+
+## Validation
+
+- 188 regression tests passing, ESLint clean, production build succeeds
+- **Measured, not read**, at four widths on four cards covering every badge
+  combination; the expanded rows were opened in the same run and each still
+  leads with its own emoji
+- A test now pins all three: no icon on the collapsed card, plain-text title,
+  and the emoji kept on each expanded row
+
+## After it is live
+
+1. **Defect Log, on a phone.** Collapsed cards show the bus number, the title
+   and the summary, with no picture at the left.
+2. **Expand a bus with more than one defect.** Each row still leads with its
+   category emoji.
+3. **Look down four or five cards.** The bus numbers, titles and OPEN pills
+   should still line up as they did in 142, just further left.
+4. **Fixed Repairs.** Unchanged; the card head still shows the category emoji.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 143 | Live | <published tip hash> | The collapsed Defect Log bus card no longer shows a category glyph — the round icon showed only the first defect's category, one category standing in for three on a multi-defect bus — while each expanded defect row and each Fixed Repairs card keeps its own emoji; the icon column is removed from the header grid so every card shifts equally and the 142 tab stops hold |
 ```
