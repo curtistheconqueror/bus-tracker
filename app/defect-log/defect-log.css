@@ -469,3 +469,27 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-settings-group .group-border-row input[type=color]{flex:none;width:54px;height:38px;padding:2px}
 .log-settings-group .group-border-row button{min-height:38px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer}
 .log-settings-group .group-border-row small{flex:1 1 100%;color:var(--log-muted);font-size:8px;font-weight:750;line-height:1.35}
+
+/* Mirrors .engine-symptom-picker, which is the other conditional picker in this
+   form, so the two read as the same kind of control. The lamp colours are the
+   panel's own — a yellow and a red that mean what they mean on the bus — rather
+   than the log's accent, so a glance at the form matches a glance at the unit. */
+.diag-light-picker{grid-column:1/-1;display:grid;gap:8px;margin:0;border:1px solid var(--log-border);border-radius:8px;background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface));padding:10px}
+.diag-light-picker legend{padding:0 5px;color:var(--log-accent);font-size:8px;font-weight:900;letter-spacing:.35px}
+.diag-light-choices{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 92px;gap:7px;align-items:stretch}
+.log-form .diag-light-picker label{min-height:46px;display:flex;align-items:center;flex-direction:row;gap:8px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);color:var(--log-text);padding:8px 10px;cursor:pointer;touch-action:manipulation}
+.log-form .diag-light-picker label span{font-size:10px;font-weight:900}
+.log-form .diag-light-picker input[type=checkbox]{width:19px;min-height:19px;margin:0}
+.log-form .diag-light-picker .diag-light-yellow input[type=checkbox]{accent-color:#b8860b}
+.log-form .diag-light-picker .diag-light-yellow.selected{border-color:#b8860b;background:color-mix(in srgb,#f2b705 20%,var(--log-surface));box-shadow:inset 0 0 0 1px #b8860b}
+.log-form .diag-light-picker .diag-light-red input[type=checkbox]{accent-color:#b3261e}
+.log-form .diag-light-picker .diag-light-red.selected{border-color:#b3261e;background:color-mix(in srgb,#b3261e 16%,var(--log-surface));box-shadow:inset 0 0 0 1px #b3261e}
+/* The alarm field is a label like the two lamps but stacks its caption above the
+   input, so the three cells still line up on one row. */
+.log-form .diag-light-picker .diag-alarm-code{flex-direction:column;align-items:stretch;gap:3px;justify-content:center;cursor:default;font-size:8px;font-weight:900;letter-spacing:.35px;color:var(--log-muted)}
+.log-form .diag-light-picker .diag-alarm-code input{width:100%;min-height:22px;border:1px solid var(--log-border);border-radius:5px;background:var(--log-surface);color:var(--log-text);text-align:center;font-size:15px;font-weight:900;letter-spacing:2px;padding:2px 4px}
+.diag-light-picker>small{color:var(--log-muted);font-size:8px;font-weight:800;line-height:1.35}
+@media(max-width:760px){.diag-light-choices{grid-template-columns:minmax(0,1fr) minmax(0,1fr);row-gap:8px}.log-form .diag-light-picker label{min-height:50px}.log-form .diag-light-picker .diag-alarm-code{grid-column:1/-1}.diag-light-picker label span{font-size:11px}}
+/* The one-digit warning. Amber rather than red: the entry is incomplete, not
+   wrong, and a mechanic mid-typing should not be shouted at. */
+.diag-light-picker>small.diag-alarm-warning{color:#8a5a00;font-weight:900}

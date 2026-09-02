@@ -84,6 +84,16 @@ export type StructuredDefect={
     into the label, so the Down Sheet and Fixed Repairs read the finding and
     not only the symptom that was reported. */
  finding?:string;
+ /* The HVAC control panel's own diagnostic lamp, and the alarm number it is
+    showing. Yellow and red are the two states the panel has and it cannot show
+    both, so this is one value rather than two flags — a record can never claim
+    a lamp that does not exist. Absent means no lamp was showing, or nobody
+    looked; the two are deliberately not distinguished, because a mechanic who
+    did not check should not be made to say so. */
+ diagLight?:DiagLight;
+ /* The two-digit alarm number off that panel, kept as text because 04 and 4
+    are different alarms and a number would lose the leading zero. */
+ alarmCode?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
  /* Stamped the moment a repair is put into DEFERRED from the Defect Log's own
@@ -113,7 +123,13 @@ export type StructuredDefect={
 };
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
- "A/C and HVAC":["No cooling","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Blower motor","Operator A/C blower","Refrigerant leak","Controls / electrical","IntelligAIRE III control panel - screen blank / black","Heater / defroster","Other A/C repair"],
+ /* Condenser and evaporator fans are counted, not just described. One fan down
+    and both fans down are different jobs — the first still cools badly and
+    limps, the second does not cool at all — and a single "fan INOP" option
+    loses that the moment it is saved. "Semi cold air" sits between No cooling
+    and nothing at all: the unit runs, the air is not cold enough, and that is
+    what a driver actually reports. */
+ "A/C and HVAC":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Blower motor","Operator A/C blower","Refrigerant / Freon leak","Bad connection / wiring","Controls / electrical","IntelligAIRE III control panel - screen blank / black","Heater / defroster","Other A/C repair"],
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
@@ -432,6 +448,35 @@ export function findingLabel(finding:unknown){
  return text?"found: "+text:"";
 }
 
+/* The HVAC panel's diagnostic lamp. Yellow is a fault the unit is still running
+   with; red is one it has shut down for. Both carry a two-digit alarm number,
+   which is the part that actually tells a technician where to start. */
+export type DiagLight="yellow"|"red";
+export const DIAG_LIGHTS:readonly DiagLight[]=["yellow","red"];
+export const DIAG_LIGHT_LABELS:Record<DiagLight,string>={yellow:"YELLOW DIAG LIGHT",red:"RED DIAG LIGHT"};
+/* Offered on the whole A/C category rather than a list of specific repairs.
+   Any HVAC fault can put the lamp up, and a whitelist here would be one more
+   thing to remember to extend every time an option is added. */
+export function hasDiagLightField(category:unknown){return String(category??"").trim()==="A/C and HVAC"}
+export function normalizeDiagLight(value:unknown):DiagLight|undefined{
+ const text=String(value??"").trim().toLowerCase();
+ return (DIAG_LIGHTS as readonly string[]).includes(text)?text as DiagLight:undefined;
+}
+/* Digits only, and never more than two. A panel showing 07 must not read back
+   as 7, so the text is kept exactly as typed rather than parsed to a number,
+   and anything a hand-edited file or an older build put here that is not two
+   digits is dropped rather than displayed as an alarm that does not exist. */
+export function normalizeAlarmCode(value:unknown){
+ const digits=String(value??"").replace(/\D/g,"").slice(0,2);
+ return digits.length===2?digits:"";
+}
+export function diagLightLabel(defect:{diagLight?:DiagLight;alarmCode?:string}){
+ const light=normalizeDiagLight(defect.diagLight);
+ if(!light)return "";
+ const code=normalizeAlarmCode(defect.alarmCode);
+ return DIAG_LIGHT_LABELS[light]+(code?" alarm "+code:"");
+}
+
 export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power"] as const;
 
 /* The three dash-light entries that carry the symptom picker. Kept as a list so
@@ -600,6 +645,13 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
   "System Switches - Mirror heater switch":"System Switches - Mirror heater switch - C/S",
   "System Switches - C/S adjuster switch":"System Switches - Mirror adjuster switch - C/S",
  },
+ /* The floor says Freon, the catalog said Refrigerant, and somebody searching
+    the Defect Log for "freon" found nothing. Both words are in the wording now
+    so either search hits it. Records logged under the old name read as the new
+    one; nothing stored is rewritten. */
+ "A/C and HVAC":{
+  "Refrigerant leak":"Refrigerant / Freon leak",
+ },
  "Engine":{
   /* The light on the dash is what gets reported. "Diagnosis" described what the
      shop then does about it, which is not the same thing and is not what a
@@ -707,7 +759,13 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
   const defect=item as Partial<StructuredDefect>;
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
    const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding)} as StructuredDefect;
+  /* Read from the MIGRATED category, not the stored one, so a record moved by a
+     rename is judged by where it now lives. The lamp survives only on a
+     category that has one, and the alarm number survives only alongside a lamp:
+     a number on its own has nothing to belong to and would sit in storage where
+     no screen ever displays it. */
+  const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
@@ -749,7 +807,10 @@ export function partNumberMissing(defect:{partsUsed?:boolean;partNumber?:string}
 }
 export function defectSupportingDetails(defect:StructuredDefect){
  const symptoms=normalizedSymptoms(defect.symptoms).filter(symptom=>symptom.toLowerCase()!==defect.issue.trim().toLowerCase()).join(", ");
- return [symptoms,defect.details.trim()].filter(Boolean).join(" — ");
+ /* The lamp and its alarm number lead, ahead of the free text. On a Down Sheet
+    "RED DIAG LIGHT alarm 32" is the line that decides what the bus needs, and
+    it is no use to anybody sitting in a notes field nobody scrolls to. */
+ return [diagLightLabel(defect),symptoms,defect.details.trim()].filter(Boolean).join(" — ");
 }
 export function defectLabel(defect:StructuredDefect){
  if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();

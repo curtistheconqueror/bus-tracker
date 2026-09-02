@@ -12,7 +12,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -6573,4 +6573,117 @@ test("a failed brake test takes the bus out of service, and MERGE DUPES cannot c
  assert.match(logPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
  // The recovery snapshot is NOT skipped, so the pre-merge board stays restorable.
  assert.doesNotMatch(logPage, /allowBulkDefectLoss:true,\s*skipRecoverySnapshot/);
+});
+
+test("the HVAC diag lamp records one light and a two-digit alarm, and only on A/C repairs", async () => {
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* One lamp, never two. The panel cannot show yellow and red at once, so the
+    stored shape is a single value rather than two independent flags. */
+ assert.equal(normalizeDiagLight("yellow"),"yellow");
+ assert.equal(normalizeDiagLight("RED"),"red");
+ assert.equal(normalizeDiagLight("green"),undefined,"a lamp the panel does not have must not be stored");
+ assert.equal(normalizeDiagLight(""),undefined);
+ assert.equal(normalizeDiagLight(undefined),undefined);
+
+ /* Two digits, kept as text. 04 must not read back as 4 — they are different
+    alarms — and anything that is not exactly two digits is dropped rather than
+    shown as an alarm number that does not exist. */
+ assert.equal(normalizeAlarmCode("04"),"04","a leading zero must survive");
+ assert.equal(normalizeAlarmCode(4),"","a single digit is not a two-digit alarm");
+ assert.equal(normalizeAlarmCode("327"),"32","longer input is cut to two digits");
+ assert.equal(normalizeAlarmCode("a7b"),"","letters alone leave nothing");
+ assert.equal(normalizeAlarmCode("1a2"),"12","digits are kept, anything else dropped");
+ assert.equal(normalizeAlarmCode(undefined),"");
+
+ /* Offered on the whole A/C category, and nowhere else. */
+ assert.equal(hasDiagLightField("A/C and HVAC"),true);
+ assert.equal(hasDiagLightField("Engine"),false);
+ assert.equal(hasDiagLightField("Brakes"),false);
+ assert.equal(hasDiagLightField(undefined),false);
+
+ /* A record carrying a lamp on a non-A/C category — a hand-edited file, or a
+    defect recategorised after the lamp was recorded — drops it on read rather
+    than showing an HVAC alarm against a brake job. */
+ const [acDefect,movedDefect]=normalizeDefects([
+  {id:"ac",category:"A/C and HVAC",issue:"Semi cold air",details:"warm at the back",operability:"service",state:"open",diagLight:"red",alarmCode:"32"},
+  {id:"moved",category:"Brakes",issue:"Other brake repair",details:"",operability:"service",state:"open",diagLight:"red",alarmCode:"32"},
+ ],"","bus-diag");
+ assert.equal(acDefect.diagLight,"red");
+ assert.equal(acDefect.alarmCode,"32");
+ assert.equal(movedDefect.diagLight,undefined,"a lamp must not survive on a category that has no lamp");
+ assert.equal(movedDefect.alarmCode,undefined);
+
+ /* The lamp leads the supporting details, so it reaches the Down Sheet line
+    rather than sitting in a notes field nobody scrolls to. */
+ assert.equal(diagLightLabel(acDefect),"RED DIAG LIGHT alarm 32");
+ assert.match(defectLabel(acDefect),/RED DIAG LIGHT alarm 32/);
+ assert.ok(defectSupportingDetails(acDefect).startsWith("RED DIAG LIGHT alarm 32"),"the lamp must lead the supporting details");
+ /* A lamp with no alarm number still reads; a number with no lamp says nothing,
+    because the number belongs to the lamp. */
+ assert.equal(diagLightLabel({diagLight:"yellow"}),"YELLOW DIAG LIGHT");
+ assert.equal(diagLightLabel({alarmCode:"32"}),"");
+
+ /* The editor renders it only for A/C, ticking the lit lamp clears it, and the
+    field cannot take more than two digits. */
+ assert.match(logPage,/const diagLightMode=hasDiagLightField\(value\.defect\.category\)/);
+ assert.match(logPage,/\{diagLightMode&&<fieldset className="wide diag-light-picker">/);
+ assert.match(logPage,/normalizeDiagLight\(current\.defect\.diagLight\)===light\?undefined:light/);
+ assert.match(logPage,/maxLength=\{2\}/);
+ assert.match(logPage,/replace\(\/\\D\/g,""\)\.slice\(0,2\)/);
+});
+
+test("the A/C catalog counts fans, names Freon, and keeps every old wording readable", async () => {
+ const options=REPAIR_OPTIONS["A/C and HVAC"];
+
+ /* One fan down and both fans down are different jobs and must stay separable. */
+ for(const issue of ["Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Semi cold air","Bad connection / wiring"]){
+  assert.ok(options.includes(issue),issue+" must be pickable in A/C and HVAC");
+ }
+
+ /* The floor says Freon. Records logged under the old wording read as the new
+    one — nothing stored is rewritten — and the old wording is gone from the
+    picker so it cannot be chosen again. */
+ assert.ok(options.includes("Refrigerant / Freon leak"));
+ assert.ok(!options.includes("Refrigerant leak"),"the old wording must not still be pickable");
+ assert.deepEqual(migrateRepairIdentity("A/C and HVAC","Refrigerant leak"),{category:"A/C and HVAC",issue:"Refrigerant / Freon leak"});
+
+ /* Every A/C option a previous build could have written still lands on
+    something pickable, so nothing already on the board is orphaned. */
+ for(const issue of ["No cooling","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Blower motor","Operator A/C blower","Refrigerant leak","Controls / electrical","IntelligAIRE III control panel - screen blank / black","Heater / defroster","Other A/C repair"]){
+  const moved=migrateRepairIdentity("A/C and HVAC",issue);
+  assert.ok(REPAIR_OPTIONS[moved.category].includes(moved.issue),issue+" migrated to something that is not in the catalog");
+ }
+
+ /* The migration must not move an option that is already current. */
+ for(const issue of options)assert.deepEqual(migrateRepairIdentity("A/C and HVAC",issue),{category:"A/C and HVAC",issue});
+});
+
+test("an alarm number never survives without the lamp it belongs to", async () => {
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* Found by driving the form: typing "ab4x" leaves a bare "4" sitting in the
+    field looking entered, and a single digit does not save, because 4 could be
+    04 or 40 and only the panel knows which. The form now says so instead of
+    dropping it quietly. */
+ assert.match(logPage,/typedAlarmDigits\.length===1\?"Alarm numbers are two digits/);
+ assert.match(logPage,/A single digit will not save\./);
+ assert.match(logPage,/className=\{typedAlarmDigits\.length===1\?"diag-alarm-warning":undefined\}/);
+ /* And a number typed with no lamp ticked says what will happen to it. */
+ assert.match(logPage,/An alarm number on its own is not saved, because it belongs to a lamp\./);
+
+ /* The same rule at the storage boundary, not only in the hint. */
+ const [noLamp,oneDigit,moved]=normalizeDefects([
+  {id:"a",category:"A/C and HVAC",issue:"No cooling",details:"",operability:"service",state:"open",alarmCode:"32"},
+  {id:"b",category:"A/C and HVAC",issue:"No cooling",details:"",operability:"service",state:"open",diagLight:"yellow",alarmCode:"4"},
+  {id:"c",category:"Bus Controls",issue:"Operating Controls - Horn",details:"",operability:"service",state:"open",diagLight:"red",alarmCode:"32"},
+ ],"","bus-alarm");
+ assert.equal(noLamp.alarmCode,undefined,"an alarm number with no lamp has nothing to belong to");
+ assert.equal(oneDigit.diagLight,"yellow","the lamp itself still stands");
+ assert.equal(oneDigit.alarmCode,undefined,"a single digit is not a two-digit alarm");
+ /* The lamp is judged by the MIGRATED category. A horn record carrying a lamp
+    is read under Operator/Driver Controls, which has no lamp, so it drops. */
+ assert.equal(moved.category,"Operator/Driver Controls");
+ assert.equal(moved.diagLight,undefined,"a lamp must not survive a migration into a category without one");
+ assert.equal(moved.alarmCode,undefined);
 });

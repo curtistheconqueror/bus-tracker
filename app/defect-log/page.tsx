@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import QuickFilterMenu from "../quick-filter-menu";
@@ -254,6 +254,13 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   setValue(current=>({...current,onDownSheet:on,defect:on?{...current.defect,state:current.defect.state==="deferred"?"open":current.defect.state,deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined}:current.defect}));
  };
  const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=isCheckEngineIssue(value.defect.category,value.quickIssue);
+ const diagLightMode=hasDiagLightField(value.defect.category),diagLight=normalizeDiagLight(value.defect.diagLight),typedAlarmDigits=String(value.defect.alarmCode||"").replace(/\D/g,"").slice(0,2);
+ /* Ticking the lamp that is already on clears it, so a lamp recorded by mistake
+    can be taken back off without saving the defect and reopening it. Switching
+    to the other lamp keeps whatever alarm number was already typed — the panel
+    escalating yellow to red on the same alarm is the ordinary case, not a
+    reason to make somebody retype the number. */
+ const setDiagLight=(light:DiagLight)=>setValue(current=>({...current,defect:{...current.defect,diagLight:normalizeDiagLight(current.defect.diagLight)===light?undefined:light}}));
  /* Whether this repair carries a count, and what that count is called, comes
     from the catalog rather than from a category test written into this form.
     Fans were hard-coded here; air bags would have been a second copy of it. */
@@ -288,6 +295,15 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     {defectNote(value.defect.category,value.quickIssue||value.defect.issue)&&<p className="defect-note"><b>BEFORE YOU CLOSE THIS</b>{defectNote(value.defect.category,value.quickIssue||value.defect.issue)}</p>}
     {recentDuplicate&&<p className="duplicate-defect-warning" role="alert"><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after 48 hours.</p>}
     {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
+    {diagLightMode&&<fieldset className="wide diag-light-picker"><legend>HVAC DIAG LIGHT (OPTIONAL)</legend><div className="diag-light-choices">{DIAG_LIGHTS.map(light=><label className={"diag-light-"+light+(diagLight===light?" selected":"")} key={light}><input type="checkbox" checked={diagLight===light} onChange={()=>setDiagLight(light)}/><span>{DIAG_LIGHT_LABELS[light]}</span></label>)}<label className="diag-alarm-code">ALARM #<input inputMode="numeric" maxLength={2} placeholder="00" value={value.defect.alarmCode||""} onChange={event=>updateDefect("alarmCode",event.target.value.replace(/\D/g,"").slice(0,2))}/></label></div><small className={typedAlarmDigits.length===1?"diag-alarm-warning":undefined}>{
+     /* A single digit is the trap. It sits in the field looking entered and
+        then does not save, because 4 could be 04 or 40 and only the panel
+        knows which. Say so here rather than dropping it quietly on save. */
+     typedAlarmDigits.length===1?"Alarm numbers are two digits — type 0"+typedAlarmDigits+" if that is what the panel shows. A single digit will not save."
+     :!diagLight?(typedAlarmDigits?"Tick the lamp the panel is showing. An alarm number on its own is not saved, because it belongs to a lamp.":"Tick a lamp only if the panel is showing one. Two digits, so 04 stays 04.")
+     :typedAlarmDigits.length===2?"Saved with the defect and shown on the Down Sheet."
+     :"Add the two-digit alarm number from the panel if it is showing one."
+    }</small></fieldset>}
     {value.defect.category==="Preventive Maintenance"&&value.quickIssue==="Add engine oil"&&<><label>QUANTITY<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
     <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
