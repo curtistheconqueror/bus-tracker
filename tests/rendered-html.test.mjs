@@ -6987,3 +6987,23 @@ test("every Defect Log card puts the same information at the same tab stop, at a
   assert.ok(last&&parseFloat(last[1])>=8,sel+" must end up at 8px or larger (last rule wins)");
  }
 });
+
+test("the collapsed bus card carries no category glyph; each expanded row keeps its own", async () => {
+ const [logPage,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ /* The round icon showed the category of whichever defect happened to be first,
+    which on a MULTIPLE DEFECTS card was one category standing in for three. */
+ assert.doesNotMatch(logPage,/className="log-icon"/,"the collapsed card must not render the category icon");
+ assert.doesNotMatch(logPage,/repairCategoryEmoji\(primary\.defect\.category\)/);
+ /* The title is the plain category name, or MULTIPLE DEFECTS. */
+ assert.match(logPage,/<b>\{group\.records\.length===1\?primary\.defect\.category:"MULTIPLE DEFECTS"\}<\/b>/);
+ /* Each expanded row still leads with its own emoji, where it is accurate. */
+ assert.match(logPage,/<span className="log-repair"><b>\{repairCategoryLabel\(record\.defect\.category\)\}<\/b>/);
+ /* And the header grid lost the icon column at every width, with the meta row
+    starting under the bus number rather than under the repair text. */
+ assert.match(css,/\.log-card-group>\.log-group-header\{grid-template-columns:82px minmax\(0,1fr\) 150px\}/);
+ assert.match(css,/@media\(max-width:760px\)\{\.log-card-group>\.log-group-header\{grid-template-columns:72px minmax\(0,1fr\)\}\.log-card-group>\.log-group-header \.log-meta\{grid-column:1\/-1\}\}/);
+ assert.match(css,/@media\(max-width:390px\)\{\.log-card-group>\.log-group-header\{grid-template-columns:64px minmax\(0,1fr\)\}\}/);
+});

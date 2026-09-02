@@ -570,3 +570,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    after FIXED than after OPEN and would move further after IN PROGRESS. It now
    always begins a line of its own at the row's left edge. */
 @media(max-width:760px){.grouped-defect-main .log-meta time{flex-basis:100%}}
+
+/* ── Collapsed bus card without the category icon ────────────────────────────
+   The icon column is gone, so the header is two columns: the bus, then the
+   repair text. The meta row starts under the bus number's left edge, which is
+   where it started before, so the tab stops from the previous release hold.
+   Every card moves the same amount. Appended last to win source order over the
+   three earlier grid declarations. */
+.log-card-group>.log-group-header{grid-template-columns:82px minmax(0,1fr) 150px}
+@media(max-width:760px){.log-card-group>.log-group-header{grid-template-columns:72px minmax(0,1fr)}.log-card-group>.log-group-header .log-meta{grid-column:1/-1}}
+@media(max-width:390px){.log-card-group>.log-group-header{grid-template-columns:64px minmax(0,1fr)}}
