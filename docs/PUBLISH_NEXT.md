@@ -1,15 +1,16 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 138 was published from 0969840510ffdec2b746e13da66f3ffcfaa2e76e on 2026-09-01.**
+**STATUS: VERSION 139 PENDING — publish from `a33ffab`. Version 138 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Published | **137** | `69deec5` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
+| Next | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
 | Published | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
+| Published | **137** | `69deec5` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Versions 137 and 138 are live.** The handoffs below are retained as release records; there is nothing pending to publish.
+**Version 138 is live from `0969840`. Version 139 is next from `a33ffab`; its handoff is at the bottom of this file.** The 136–138 handoffs are retained above it as release records.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -566,4 +567,182 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 138 | Live | <published tip hash> | A/C and HVAC gains six options — Semi cold air, Bad connection / wiring, and separate one-fan and both-fan entries for the condenser and evaporator, so a partial fan failure stays distinguishable from a total one; Refrigerant leak reads as Refrigerant / Freon leak. A/C repairs can record the HVAC panel's diagnostic lamp as yellow or red with its two-digit alarm number, kept as text so 04 stays 04 and shown at the front of the Down Sheet line; a lamp without a valid two-digit number, and a number without a lamp, are both refused rather than stored where nothing displays them |
+```
+
+---
+
+# Version 139 — Tech Services learns the shape of the check-off sheet
+
+**Publish this next, after Version 138.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`a33ffab`** |
+| Last code-bearing commit | `a33ffab` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 138, published from `0969840` |
+
+One commit, three application files:
+
+```
+git log --oneline 8e3454f..a33ffab
+a33ffab Group Tech Services the way the shop's check-off sheets are laid out
+
+git diff --name-only 8e3454f a33ffab -- app
+app/facility-defect-clear.ts
+app/quick-filters.ts
+app/repair-catalog.ts
+```
+
+No dependency, database, or CI change. The filter returns nothing:
+
+```
+git diff --name-only 8e3454f a33ffab -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 182 tests passing (up from 179 at Version 138), ESLint clean, production
+build succeeds.
+
+## Migrations
+
+**No database migration, no dependency change, no LocalStorage key touched.
+Nothing on disk is rewritten.** This is a read-time regroup, the same mechanism
+as the Bus Controls split in Version 136: a stored record keeps the wording it
+was saved with, and `migrateRepairIdentity` moves it to its new home as it is
+read. **Nothing is retired.**
+
+### The category change
+
+`Tech Services` was one flat list of ten options. It is now five groups holding
+twenty-two:
+
+| Group | Options |
+| --- | --- |
+| Farebox | 11 — INOP (general), No power, Blank / black screen, Bill transport INOP, Coin mech INOP, Coin off line, Coin bin missing, Unlocked / won't lock, Can't unlock top / coin bypass reset, Loose from floor mounts, Other |
+| Ventra | 2 — INOP (general), Other |
+| CUBIC Screen | 3 — BUS ER, MV ER, Screen black |
+| IBS Screen | 2 — INOP (general), Screen black |
+| Signs, Cameras and Other | 4 — Destination Sign, Dash cam, Camera / DVR system, Other Tech Services |
+
+Catalogue totals: **308 options across 21 categories → 320 across 21.**
+
+The shop's farebox check-off sheet checks three things per bus — power, bill
+transport, coin mech — and none of them had an option, so every finding landed
+on the bare word `Farebox`. Eleven live records sit there today with nothing
+more specific, five of them saying "black screen" in free text. Those three
+columns are options now, and so is the black screen.
+
+### Verified against the live Shop Cloud, not asserted
+
+Every distinct wording actually present under Tech Services in `bus_defects`
+was read from the live project and run through the new migration:
+
+| | |
+| --- | --- |
+| Live Tech Services records (`deleted_at is null`) | **33** |
+| Land on a live, re-pickable option | **32** |
+| — of which keep their exact stored wording | 12 (`CUBIC Screen - BUS ER` ×6, `CUBIC Screen - MV ER` ×6) |
+| — of which are renamed on read | 20 (`Farebox` ×11, `Farebox won't lock` ×3, `Ventra` ×3, `Destination Sign` ×2, `IBS Screen` ×1) |
+| Off-catalog, left exactly as logged | **1** (`Unspecified issue` — already off-catalog before this release) |
+| Orphaned | **0** |
+
+**The two CUBIC Screen wordings do not move at all.** They already read
+`Group - Item`, so they became their own group with their stored identity
+untouched. The twelve live records under them are not renamed even on read.
+
+All ten wordings a Version 138 device can write still resolve. The two-step
+legacy chain still resolves: a record logged as `MDT Screen` becomes
+`IBS Screen` and then `IBS Screen - INOP (general)`. The migration is
+idempotent across all 22 new entries.
+
+### Two wordings became one
+
+`Farebox won't lock` (3 live records) and the check-off sheet's "says unlock,
+won't lock" were one fault written two ways. They share `Unlocked / won't lock`.
+The opposite fault — can't unlock the top to reset the coin bypass, a live
+record on 17524 — has its own option and is not conflated with it.
+
+## Two things found on the way, both fixed here
+
+### The IBS & Ventra quick filter never matched a CUBIC screen
+
+BUS ER and MV ER are the two Ventra devices, but neither the word "IBS" nor
+"Ventra" appears in their wording, so the filter named for them missed every
+one. Measured over the 33 live Tech Services records:
+
+| | Version 138 | Version 139 |
+| --- | --- | --- |
+| Live records matching `IBS & Ventra` | **4** | **16** |
+
+The twelve that appear are the CUBIC records. Nothing else changes; a farebox
+still does not match it.
+
+### A Facility Map alert that flips twice added its defect twice
+
+`syncFacilityAlertDefects` writes a defect when a tracker flag (check engine,
+no horn, farebox, IBS / Ventra…) turns on, and checks first that the bus does
+not already carry it. It ran that check by comparing the alert table's wording
+against defects it had **just normalized** — and normalizing migrates a wording
+to its current home. Once a wording had moved, the comparison could never
+match, so the second flip of the same flag added the alert again.
+
+Three of the six alert wordings were already in that state before this release
+(the horn, the transmission fault, the kneeler). The Tech Services regroup
+would have made it five. The alert is now migrated *before* the comparison,
+which fixes all six and means new alerts are written in the wording a record
+reads as, rather than one it will be migrated to.
+
+**Forced, not assumed:** with the raw comparison put back, the new test fails on
+the duplicate; restored, it passes.
+
+## Known issue this release does not fix
+
+**A device still on Version 138 shows the flat Tech Services list.** Same as
+every catalogue change: the grouping is applied on read by the build doing the
+reading, and stored wordings do not change. Nothing is lost in either direction.
+**Refresh every device once this is live** so a farebox fault reads the same
+way on the floor and in the office.
+
+## Validation
+
+- 182 regression tests passing, ESLint clean, production build succeeds
+- **The live Shop Cloud was queried, not estimated** — 33 records, 32 landing,
+  1 already off-catalog, 0 orphaned
+- **The flat list and the grouped picker were checked against each other** for
+  every category: 0 out of step
+- **The quick-filter change was measured** over the live records: 4 → 16
+- **The double-add bug was driven to failure and back** — a flag flipped twice
+  with the fix reverted adds two defects; with the fix, one
+- **The legacy chain still resolves two renames deep** (`MDT Screen`)
+
+## After it is live
+
+1. **Open any repair → Tech Services.** The issue picker should show five
+   groups, Farebox first. Under Farebox, `INOP (general)` leads and the three
+   sheet columns — no power, bill transport, coin mech — are all there.
+2. **Open a bus with an existing Farebox defect** — there are eleven. It should
+   read `Farebox - INOP (general)` with its details unchanged, and open, filter
+   and report exactly as before.
+3. **Open a bus with a CUBIC Screen defect** — there are twelve. Its wording
+   should be **exactly** what it was; these did not move.
+4. **Press the `IBS/Ventra` quick filter.** Expect the CUBIC screen buses to
+   appear for the first time. Before this release, they never did.
+5. **On the Facility Map, flip a bus's Farebox flag on, off, on.** The Defect
+   Log should show one farebox defect for it, not two.
+6. **Refresh every device** that reads this board.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 139 | Live | <published tip hash> | Tech Services becomes five groups — Farebox, Ventra, CUBIC Screen, IBS Screen, and Signs, Cameras and Other — so the farebox check-off sheet's three columns (power, bill transport, coin mech) and the black screen are real options instead of free text under the bare word Farebox; 10 options become 22, nothing is retired, and the twelve live CUBIC records keep their exact wording. The IBS & Ventra quick filter now matches CUBIC screens (4 → 16 live matches), and a Facility Map alert flag flipped twice no longer adds its defect twice |
 ```
