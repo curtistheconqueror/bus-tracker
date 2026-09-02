@@ -1,16 +1,16 @@
 # Publish next
 
-**STATUS: VERSIONS 137 AND 138 PENDING — publish 137 from `d6f99d8` first, then 138 from `6a02073`. Version 136 is live.**
+**STATUS: VERSIONS 137 AND 138 PENDING — publish 137 from `d6f99d8` first, then 138 from `0969840`. Version 136 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
-| Then | **138** | `6a02073` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
+| Then | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
 **Version 136 was published from `dccf431`.** Two remain, and they are separate
-publishes in order: `6a02073` contains `d6f99d8`, so **publishing 138 alone
+publishes in order: `0969840` contains `d6f99d8`, so **publishing 138 alone
 carries 137 with it**. That is fine if both are wanted at once — but the two
 sets of post-publish checks are separate and both need running.
 
@@ -436,15 +436,16 @@ Suggested `docs/RELEASES.md` row:
 
 # Version 138 — The A/C category learns to count, and the HVAC panel gets recorded
 
-**Publish this after Version 137.** It stacks on both: `6a02073` contains
-`d6f99d8`, which contains `dccf431`. Publishing it carries 136 and 137 too.
+**Publish this after Version 137.** It stacks on it: `0969840` contains
+`d6f99d8`, so publishing 138 carries 137 with it. Version 136 is already live,
+published from `dccf431`.
 
 ## Source
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`6a02073`** |
-| Last code-bearing commit | `6a02073` — the release source is this commit |
+| **Release source** | **`0969840`** |
+| Last code-bearing commit | `0969840` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 137, from `d6f99d8` |
 
