@@ -594,3 +594,22 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    so it is black and the size of the text beside it, not a 7px grey caption. */
 .log-search span{font-size:11px;font-weight:900;color:var(--log-text,#172b4d);letter-spacing:.2px}
 @media(max-width:760px){.downsheet-check b{font-size:12px}.downsheet-check small{font-size:11px}.deferred-history-note{font-size:11px}.deferred-history-note b{font-size:12px}.log-search span{font-size:12px}}
+
+/* ── Daily Stats, collapsed by default ───────────────────────────────────────
+   The five tiles were the first thing on the page. They are now behind one
+   bar that carries the three numbers worth a glance, so the page opens on the
+   filters and the log button instead of a scoreboard. */
+.daily-stats{margin:0 14px 8px}
+.daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:44px;border:1px solid var(--log-border,#bac7d9);border-radius:8px;background:var(--log-surface,#fff);padding:8px 12px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 7%,var(--log-surface,#fff));outline:none}
+.daily-stats-toggle>b{flex:none;font-size:12px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
+.daily-stats-toggle>small{flex:1;min-width:0;font-size:10px;font-weight:800;color:var(--log-muted,#6e7e94);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.daily-stats-toggle>i{flex:none;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}
+.daily-stats.open .log-summary{padding-top:8px}
+@media(max-width:760px){.daily-stats{margin:0 8px 8px}.daily-stats-toggle{min-height:48px}.daily-stats-toggle>b{font-size:13px}.daily-stats-toggle>small{font-size:11px}}
+
+/* LOG DEFECT, first thing under the header. Full width on a phone so the page
+   answers "what is this for" before anything has to be scrolled. */
+.log-primary-action{min-height:44px;border:0;border-radius:7px;background:#0d7a45;color:#fff;padding:0 16px;font-family:inherit;font-size:12px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.log-primary-action:hover,.log-primary-action:focus-visible{background:#0a8b4c;outline:none}
+@media(max-width:760px){.log-controls>.log-primary-action{grid-column:1/-1;grid-row:1;width:100%;min-height:50px;font-size:14px}.log-controls>.log-filters{grid-column:1/-1;grid-row:2}.log-controls>.quick-filter-control{grid-row:3}.log-controls .log-undo-button{grid-row:3}.log-controls .log-settings-button{grid-row:3}.log-controls .log-search-wrap{grid-row:4}}

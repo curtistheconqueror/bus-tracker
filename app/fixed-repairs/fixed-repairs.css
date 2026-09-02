@@ -162,3 +162,17 @@
 .fixed-card-body section>b{font-size:9px}
 .fixed-card-body section>small{font-size:9px}
 .fixed-card-body .not-duplicated-note{font-size:9px}
+
+/* ── LOG A REPAIR ────────────────────────────────────────────────────────────
+   A repair done without a defect being logged first. Armon went to this page
+   to add a fix and found only ADD FIX DETAILS, which edits a record that
+   already exists. The button says what it does; the editor behind it is the
+   one every other record uses. */
+.fixed-feed>header .log-repair-button{flex:none;min-height:40px;border:0;border-radius:7px;background:var(--fixed-green,#0d7a45);color:#fff;padding:0 15px;font-family:inherit;font-size:12px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.fixed-feed>header .log-repair-button:hover,.fixed-feed>header .log-repair-button:focus-visible{filter:brightness(1.12);outline:none}
+.fixed-feed>header .log-repair-button:disabled{opacity:.45;cursor:not-allowed}
+.fixed-new-bus{display:grid;gap:5px;margin:0 16px;padding:11px 13px;border:1px solid var(--fixed-green,#0d7a45);border-radius:8px;background:color-mix(in srgb,var(--fixed-green,#0d7a45) 7%,var(--fixed-surface,#fff))}
+.fixed-new-bus label{display:grid;gap:4px;font-size:9px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted,#5a6a86)}
+.fixed-new-bus select{width:100%;min-height:42px;border:1px solid var(--fixed-border,#b8c4d6);border-radius:6px;background:var(--fixed-surface,#fff);padding:6px 9px;color:var(--fixed-ink,#172b4d);font-size:13px;font-weight:800}
+.fixed-new-bus>small{font-size:10px;line-height:1.4;color:var(--fixed-muted,#5a6a86)}
+@media(max-width:760px){.fixed-feed>header .log-repair-button{width:100%;min-height:46px;font-size:13px}.fixed-new-bus{margin:0 10px}}

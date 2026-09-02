@@ -7009,3 +7009,73 @@ test("the collapsed bus card carries no category glyph; each expanded row keeps 
  assert.match(css,/@media\(max-width:760px\)\{\.log-card-group>\.log-group-header\{grid-template-columns:72px minmax\(0,1fr\)\}\.log-card-group>\.log-group-header \.log-meta\{grid-column:1\/-1\}\}/);
  assert.match(css,/@media\(max-width:390px\)\{\.log-card-group>\.log-group-header\{grid-template-columns:64px minmax\(0,1fr\)\}\}/);
 });
+
+test("the Defect Log opens on what it is for, not on a scoreboard", async () => {
+ const [logPage,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Five stat tiles were the first thing on the page, above the filters and the
+    button that logs a defect. They are behind one bar now, closed unless the
+    device says otherwise, so absent storage means closed. */
+ assert.match(logPage,/const STATS_OPEN_KEY="pace-defect-log-stats-open-v1"/);
+ assert.match(logPage,/const \[statsOpen,setStatsOpen\]=useState\(false\)/,"stats must default to closed");
+ assert.match(logPage,/setStatsOpen\(localStorage\.getItem\(STATS_OPEN_KEY\)==="1"\)/,"only an explicit 1 opens it");
+ assert.match(logPage,/writeSetting\(localStorage,STATS_OPEN_KEY,statsOpen\?"1":"0"\)/);
+ assert.match(logPage,/\{statsOpen&&<section className="log-summary"/,"the tiles must not render while closed");
+ assert.match(css,/\.daily-stats-toggle\{/);
+
+ /* LOG DEFECT is the first control, and it is not also repeated in the feed
+    header — two buttons doing one thing is what made the page feel busy. */
+ assert.match(logPage,/<button className="log-primary-action" type="button" onClick=\{\(\)=>setEditing\(newDraft\(\)\)\}>\+ LOG DEFECT<\/button>/);
+ assert.equal((logPage.match(/\+ LOG DEFECT/g)||[]).length,1,"LOG DEFECT must appear exactly once");
+ assert.match(css,/\.log-primary-action\{/);
+
+ /* Three filter buttons, not five. OPEN differed from ALL only by hiding
+    in-progress and today's fixes; DOWN SHEET has its own page. */
+ const row=logPage.match(/\[\["all","ALL"\].*?\]\] as \[Filter,string\]\[\]/);
+ assert.ok(row,"the filter row must still be a literal list");
+ assert.deepEqual(row[0].match(/"(ALL|OPEN|IN PROGRESS|FIXED TODAY|DOWN SHEET)"/g),['"ALL"','"IN PROGRESS"','"FIXED TODAY"']);
+
+ /* But BOTH removed keys still filter, so a saved default view of either keeps
+    working. Removing the button must not remove the behaviour. */
+ assert.match(logPage,/if\(filter==="open"&&!\(record\.defect\.state==="open"\|\|record\.defect\.state==="deferred"\)\)return false/);
+ assert.match(logPage,/if\(filter==="downsheet"&&!activeDownBusIdSet\.has\(record\.bus\.id\)\)return false/);
+ assert.match(logPage,/<option value="open">Open<\/option>/,"and both remain choosable as a default view");
+ assert.match(logPage,/<option value="downsheet">/);
+
+ /* Pressing the active filter clears back to ALL. It used to stay stuck on. */
+ assert.match(logPage,/onClick=\{\(\)=>setFilter\(current=>current===value\?"all":value\)\}/);
+});
+
+test("a repair fixed without a defect can be logged straight to Fixed Repairs", async () => {
+ const [fixedPage,css]=await Promise.all([
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+
+ /* The page only offered ADD FIX DETAILS, which edits a record that already
+    exists, so a mechanic who fixed something never logged had nowhere to put
+    it. The button opens the same editor every other record uses. */
+ assert.match(fixedPage,/className="log-repair-button"[^>]*onClick=\{logRepair\}/);
+ assert.match(fixedPage,/\+ LOG A REPAIR/);
+ assert.match(css,/\.log-repair-button\{/);
+ /* Disabled with no fleet, because there would be no bus to attach it to. */
+ assert.match(fixedPage,/disabled=\{!fleet\.length\}/);
+
+ /* A blank record starts completed — this page is the fixed history. */
+ assert.match(fixedPage,/state:"completed",source:"defect-log"/);
+ /* The only thing a blank record lacks is the bus, so the editor asks for it
+    and nothing else about the form changes. */
+ assert.match(fixedPage,/\{isNew&&<section className="fixed-new-bus">/);
+ assert.match(fixedPage,/isNew\?"LOG A REPAIR":"FIXED REPAIR"/);
+
+ /* THE BUG THIS AVOIDS: saveCompletion mapped over the bus's existing defects.
+    A record that is not on the bus yet matches nothing, so mapping alone would
+    have written no record and reported success. It appends instead. */
+ assert.match(fixedPage,/const current=normalizeDefects\(bus\.defects,bus\.pendingRepair\|\|"",bus\.id\),exists=current\.some\(defect=>defect\.id===record\.defect\.id\)/);
+ assert.match(fixedPage,/defects:exists\?current\.map\(defect=>defect\.id!==record\.defect\.id\?defect:saved\(defect\)\):\[\.\.\.current,saved\(record\.defect\)\]/);
+ /* And it lands on UNDO like every other change here. */
+ assert.match(fixedPage,/changeFleet\(next,\(isNewRecord\?"Logged Bus ":"Edited Bus "\)\+record\.bus\.n\+" fixed repair"\)/);
+});
