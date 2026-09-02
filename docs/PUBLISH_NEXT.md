@@ -1,14 +1,18 @@
 # Publish next
 
-**STATUS: VERSION 137 PENDING — publish from `d6f99d8`. Version 136 is live.**
+**STATUS: VERSIONS 137 AND 138 PENDING — publish 137 from `d6f99d8` first, then 138 from `6a02073`. Version 136 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Next | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
+| Then | **138** | `6a02073` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
+| Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 136 was published from `dccf431`. Version 137 is next from `d6f99d8`; its handoff is retained below.**
+**Version 136 was published from `dccf431`.** Two remain, and they are separate
+publishes in order: `6a02073` contains `d6f99d8`, so **publishing 138 alone
+carries 137 with it**. That is fine if both are wanted at once — but the two
+sets of post-publish checks are separate and both need running.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -426,4 +430,142 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 137 | Live | <published tip hash> | Fleet Campaigns is pre-cached by the service worker, so it opens on a phone that has lost signal instead of coming up blank; the test that pinned the pre-cache list now reads the real routes off disk so a new page cannot be added without it; cache name bumped to v4, which clears the dead hashed chunks left by earlier builds at the cost of one online re-download of the app shell |
+```
+
+---
+
+# Version 138 — The A/C category learns to count, and the HVAC panel gets recorded
+
+**Publish this after Version 137.** It stacks on both: `6a02073` contains
+`d6f99d8`, which contains `dccf431`. Publishing it carries 136 and 137 too.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`6a02073`** |
+| Last code-bearing commit | `6a02073` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 137, from `d6f99d8` |
+
+Gate: 179 tests passing (up from 176 at 136), ESLint clean, production build
+succeeds. No dependency, database or CI change.
+
+## Migrations
+
+**No database migration, no dependency change, no LocalStorage key touched.**
+Two new optional fields on a repair record, and one read-time rename.
+
+| Addition | Shape | Notes |
+| --- | --- | --- |
+| `diagLight` | `"yellow" \| "red"` | one value, not two flags — the panel cannot show both |
+| `alarmCode` | text, exactly two digits | text so `04` does not read back as `4` |
+
+Both are dropped on read unless they are valid, so a hand-edited file or a
+newer build cannot put a lamp the panel does not have onto a record. **A record
+written by an older build reads back untouched** — absent fields simply stay
+absent.
+
+**Read-time rename:** `Refrigerant leak` → `Refrigerant / Freon leak`. Nothing
+stored is rewritten. Verified against the live board: **25 A/C records, all 25
+landing on a pickable option, and none of them using the renamed wording**, so
+this rename touches zero live records today. All 13 A/C wordings a Version 136
+device can write still resolve.
+
+## What changed
+
+### 1. Six new A/C options — the fans are counted, not described
+
+| Added |
+| --- |
+| `Semi cold air` |
+| `Condenser fan INOP - 1 fan` |
+| `Condenser fans INOP - both fans` |
+| `Evaporator fan / motor INOP - 1` |
+| `Evaporator fans / motors INOP - both` |
+| `Bad connection / wiring` |
+
+One fan down and both fans down are different jobs — the first still cools
+badly and limps, the second does not cool at all — and a single "fan INOP"
+option would lose that the moment it saved. `Semi cold air` sits between
+`No cooling` and nothing at all, which is what a driver actually reports.
+`Bad connection / wiring` was previously only reachable as the much vaguer
+`Controls / electrical`, which stays for everything else.
+
+A/C and HVAC goes from **13 options to 19**; the catalogue from **302 to 308**
+across the same 21 categories.
+
+### 2. The HVAC diag lamp and its alarm number
+
+A new optional block on **A/C repairs only**: two lamps, yellow and red, and a
+two-digit alarm number off the panel. Offered on the whole A/C category rather
+than a list of specific repairs, since any HVAC fault can put the lamp up.
+
+- **One lamp, never two.** Stored as a single value, because the panel cannot
+  show yellow and red at once. Ticking the lit lamp again clears it; switching
+  lamps keeps whatever number was already typed, since a panel escalating
+  yellow to red on the same alarm is the ordinary case.
+- **The number is text, not a number.** `04` and `4` are different alarms and a
+  numeric field would lose the leading zero.
+- **It leads the supporting details**, so the Down Sheet line reads
+  `A/C and HVAC — Semi cold air — RED DIAG LIGHT alarm 32 — warm at the back`
+  rather than burying it in a notes field nobody scrolls to.
+
+### 3. Two silent-loss traps, both found by driving the form
+
+Neither showed up in the tests, which passed throughout:
+
+- **A single digit looked entered and did not save.** Typing `ab4x` leaves a
+  bare `4` in the field; on save it vanished, because `4` could be `04` or `40`
+  and only the panel knows which. The form now says so in an amber hint —
+  *"type 04 if that is what the panel shows. A single digit will not save."*
+- **An alarm number with no lamp ticked had nothing to belong to.** It was
+  stored where no screen displays it. The hint now says so, and the number is
+  dropped at the storage boundary rather than kept invisibly.
+
+The lamp is also judged by the **migrated** category, so a record renamed out of
+A/C — a horn defect moving to Operator/Driver Controls — drops the lamp rather
+than showing an HVAC alarm against a brake job.
+
+## Validation
+
+- 179 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a real browser at 360, 390, 430 and 820** — the block is not
+  clipped at any of them, and it reflows from two rows to one on a tablet
+- **Measured, not eyeballed:** an apparent overflow past the parent turned out
+  to be the form's own scroll container (`.log-form`, `overflow-y:auto`,
+  scrollHeight 1583 vs clientHeight 533). Scrolled into view it is fully on
+  screen, uncovered, and clickable — so nothing was "fixed" that was not broken
+- **Both traps were reproduced before they were fixed** and re-driven after
+- **Round-tripped through storage:** saving RED + `32` writes
+  `{diagLight:"red", alarmCode:"32"}` and the feed line renders the lamp
+- **The live board was queried, not estimated** — 25 A/C records, 0 orphaned,
+  0 using the renamed wording
+- No page errors in any browser run
+
+## After it is live
+
+1. **Open any A/C repair.** A new **HVAC DIAG LIGHT (OPTIONAL)** block should
+   appear under the issue picker, with YELLOW, RED and an ALARM # box.
+2. **Open a non-A/C repair** — a brake job — and confirm the block is absent.
+3. **Tick a lamp, type an alarm number, save and reopen.** Both should still be
+   there, and the Down Sheet line should read the lamp and number.
+4. **Type a single digit** and confirm the amber warning appears saying it will
+   not save.
+5. **Check the A/C issue list** for the six new options, and that
+   `Refrigerant / Freon leak` is there in place of `Refrigerant leak` — an
+   existing record logged under the old wording should read as the new one.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 138 | Live | <published tip hash> | A/C and HVAC gains six options — Semi cold air, Bad connection / wiring, and separate one-fan and both-fan entries for the condenser and evaporator, so a partial fan failure stays distinguishable from a total one; Refrigerant leak reads as Refrigerant / Freon leak. A/C repairs can record the HVAC panel's diagnostic lamp as yellow or red with its two-digit alarm number, kept as text so 04 stays 04 and shown at the front of the Down Sheet line; a lamp without a valid two-digit number, and a number without a lamp, are both refused rather than stored where nothing displays them |
 ```
