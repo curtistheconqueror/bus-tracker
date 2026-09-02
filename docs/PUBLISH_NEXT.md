@@ -1,11 +1,11 @@
 # Publish next
 
-**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `198083b`. Version 143 is live.**
+**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `0153c09`. Version 143 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
-| Then | **145** | `198083b` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
+| Then | **145** | `0153c09` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
 | Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
@@ -1032,6 +1032,20 @@ above the new base. In an expanded row the timestamp now starts a line of its
 own rather than trailing the state pill, so it no longer moves by a pill's width
 between OPEN and FIXED.
 
+## Five defects found and fixed before this shipped
+
+The two releases were smoke-tested and the diff reviewed from a clean context
+before queueing. Five real faults came out of it; all five are fixed in
+`0153c09`, and each was driven in a browser before and after.
+
+| Severity | Fault | Now |
+| --- | --- | --- |
+| **High** | A refused fleet write on Fixed Repairs was reported as a save. `persistFleet` discarded the writer's boolean; `changeFleet` set the undo snapshot and closed the editor regardless. With LOG A REPAIR creating records that exist nowhere else, a phone at its storage limit lost the only copy silently and then offered to undo it. | The write result is checked, the editor stays open with what was typed, and this page now has the save banner the other three already had. |
+| **High** | Changing the BUS dropdown wiped the whole form — the editor was keyed on the bus id, so picking a bus remounted it and reset the draft. | The key is gone; the select was already controlled by its prop. |
+| Medium | The DAILY STATS bar hardcoded labels a shop can rename in settings, and the tiles that honour them are closed by default. | The bar uses the saved labels, and DOWNING is back in the summary. |
+| Low | A repair logged on Fixed Repairs was stamped `source: "defect-log"` and shown as FIXED FROM THE DEFECT LOG, which it never touched — and inherited that source's rule making it unremovable on the Facility Map. | It is `"fixed-log"`, labelled LOGGED AS A COMPLETED REPAIR. |
+| Low | A saved default view of Open or Down Sheet left a filtered board with no button lit and no way back without opening settings. | Each button appears while its own filter is active, so it explains the view and clears it. |
+
 ## The way back
 
 **If Curtis does not like the new layout**, either is clean:
@@ -1350,20 +1364,21 @@ of watching a mechanic use the app for the first time.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`198083b`** |
-| Last code-bearing commit | `198083b` — the release source is this commit |
+| **Release source** | **`0153c09`** |
+| Last code-bearing commit | `0153c09` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 144, from `9f1f73f` |
 
 ```
-git log --oneline 9f1f73f..198083b
+git log --oneline 9f1f73f..0153c09
+0153c09 Fix five defects a cold review of the queued releases found         <- this release
 198083b Give SETTINGS its name, and keep it with the controls it belongs to           <- this release
 19991fe Queue Version 145 behind 144                                                  <- docs only
 3890055 Open the Defect Log on its job, and let a repair be logged without a defect   <- this release
 2bcf1b0 Set the handoff status to Version 144 pending                                 <- docs only
 c7b86f6 Queue Version 144                                                             <- docs only
 
-git diff --name-only 2bcf1b0 198083b -- app
+git diff --name-only 2bcf1b0 0153c09 -- app
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
 app/fixed-repairs/fixed-repairs.css
@@ -1373,7 +1388,7 @@ app/fixed-repairs/page.tsx
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 2bcf1b0 198083b -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 2bcf1b0 0153c09 -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
 Gate: 191 tests passing (up from 188 at Version 144), ESLint clean, production
