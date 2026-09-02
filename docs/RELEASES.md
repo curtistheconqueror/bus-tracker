@@ -4,7 +4,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 140 | Live | f0c7939 | SCAN SWEEP reads farebox and Ventra check-off sheets from photos using the existing scan configuration; includes Version 139 Tech Services sheet-style grouping |
+| 142 | Live | 1ff1224 | Card lines align at fixed tab stops with clearer reading text across Defect Log, Down Sheet and Fixed Repairs |
+| 141 | Previous live | e99e06a | Enlarged Defect Log Down Sheet badge using Facility Map's saved editable colors |
+| 140 | Previous live | f0c7939 | SCAN SWEEP reads farebox and Ventra check-off sheets from photos using the existing scan configuration; includes Version 139 Tech Services sheet-style grouping |
 | 139 | Previous live | a33ffab | Tech Services is grouped by Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
 | 138 | Previous live | 0969840 | A/C and HVAC defects now record fan count, Freon service, diagnostic-lamp status, and alarm number; includes the Version 137 Fleet Campaigns offline cache |
 | 137 | Previous live | 69deec5 | Fleet Campaigns is pre-cached so it remains available when a phone loses signal |

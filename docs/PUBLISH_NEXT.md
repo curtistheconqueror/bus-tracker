@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSION 142 PENDING — publish from `1ff1224`. Version 141 is live.**
+**STATUS: NONE PENDING — Sites Version 142 was published from 1ff1224 on 2026-09-02.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
