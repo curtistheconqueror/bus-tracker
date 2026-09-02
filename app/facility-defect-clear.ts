@@ -1,4 +1,4 @@
-import {defectSummary,isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
+import {defectSummary,isUnresolved,migrateRepairIdentity,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
 import {statusForLocation,type FleetStatus} from "./smart-status.ts";
 
 export const FACILITY_DEFECT_CLEAR_UNDO_KEY="pace-facility-defect-clear-undo-v1";
@@ -23,7 +23,13 @@ function hasLegacyFlag(bus:FacilityDefectBus){return FLAG_KEYS.some(key=>Boolean
 
 export function syncFacilityAlertDefects<T extends FacilityDefectBus>(previous:T|undefined,next:T,now=new Date().toISOString()):T{
  const defects=normalizeDefects(next.defects,next.pendingRepair||"",next.id),added=[...defects];
- FLAG_KEYS.forEach(key=>{if(!next[key]||previous?.[key])return;const choice=ALERT_DEFECTS[key],duplicate=added.some(defect=>isUnresolved(defect)&&defect.category===choice.category&&defect.issue===choice.issue);if(!duplicate)added.push({id:"facility-alert-"+key+"-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),...choice,details:"Added from Facility Map alert",operability:"service",state:"open",createdAt:now,updatedAt:now,source:"defect-log"})});
+ /* The alert wordings above are compared against defects that have just been
+    normalized — and normalizing migrates wordings to their current home. So the
+    choice has to be migrated too, or a wording that has moved never matches
+    what is already on the bus and a flag that flips twice adds the alert twice.
+    Three of the six were already in that state before Tech Services regrouped;
+    migrating here fixes all of them and writes the current wording. */
+ FLAG_KEYS.forEach(key=>{if(!next[key]||previous?.[key])return;const raw=ALERT_DEFECTS[key],choice=migrateRepairIdentity(raw.category,raw.issue),duplicate=added.some(defect=>isUnresolved(defect)&&defect.category===choice.category&&defect.issue===choice.issue);if(!duplicate)added.push({id:"facility-alert-"+key+"-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),...choice,details:"Added from Facility Map alert",operability:"service",state:"open",createdAt:now,updatedAt:now,source:"defect-log"})});
  return added.length===defects.length?next:{...next,defects:added,pendingRepair:defectSummary(added)};
 }
 

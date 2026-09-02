@@ -37,7 +37,10 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  if(key==="bad-ramp")return /\b(?:ramp|kneeler|wheelchair lift|wheelchair ramp)\b/i.test(text);
  if(key==="no-horn")return /\bhorn\b/i.test(text);
  if(key==="farebox")return /\bfare\s*box\b|\bfarebox\b/i.test(text);
- if(key==="ibs-ventra")return /\b(?:ibs|ventra)\b/i.test(text);
+ /* The CUBIC screens ARE the Ventra hardware — BUS ER and MV ER are the two
+    Ventra devices — but neither word appears in their wording, so the filter
+    named for them missed every one. Twelve live records at the time of writing. */
+ if(key==="ibs-ventra")return /\b(?:ibs|ventra|cubic)\b/i.test(text);
  if(key==="leak")return /\b(?:leak|leaks|leaking|seep|seeping)\b/i.test(text);
  /* Matched on the repair rather than on the word "heat", which appears in
     Amerex heat sensors, in Overheating, and in half the estimate notes in the

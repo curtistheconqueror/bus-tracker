@@ -139,7 +139,14 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
  "Operator/Driver Controls":["Driver Seat - Seat belt","Driver Seat - Leaking air","Driver Seat - Will not lock","Driver Seat - Adjustment / locking bar","Driver Seat - Controls / buttons","Gauges and Dash - Fuel gauge INOP / false reading","Gauges and Dash - Speedometer","Gauges and Dash - Other gauge / indicator","Gauges and Dash - Front dash damage","Gauges and Dash - Front instrument dash damaged / replacement","System Switches - Kneeler button","System Switches - Ramp power switch","System Switches - Ramp deploy / stow switch","System Switches - Front door open / close switch","System Switches - Rear door open / close switch","System Switches - HVAC / heat controls","System Switches - A/C control panel","System Switches - Blower control","System Switches - Floor heat switch","System Switches - Interior light controls","System Switches - Mirror heater switch - C/S","System Switches - Mirror adjuster switch - C/S","Operating Controls - Turn signals (steering column)","Operating Controls - Turn signals (floor panel)","Operating Controls - Front start button","Operating Controls - Rear start button","Operating Controls - Horn","Operating Controls - Horn / seat alarm will not stop","Operating Controls - High beams stay on","Operating Controls - Red air valve hard to turn","Operating Controls - Parking brake knob will not pull up (apply)","Operating Controls - Parking brake knob will not push down (release)","Operating Controls - Parking brake knob hard to pull or push","Operating Controls - Parking brake knob pops out while driving","Operating Controls - Pedal adjuster","Operating Controls - Steering wheel tilt / telescoping","Operating Controls - Operator light","Operating Controls - Switches broken / loose","Operating Controls - Side control panel damage","Operating Controls - Other bus control defect"],
- "Tech Services":["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
+ /* Grouped the way the shop's own check-off sheets are laid out. The farebox
+    sheet checks power, bill transport and coin mech per bus; those three had no
+    option, so eleven live records sat on the bare word "Farebox", five of them
+    saying "black screen" in free text. The CUBIC screen options already read
+    "Group - Item", so they keep their stored identity exactly and the twelve
+    live records under them are untouched. Nothing is retired: every old wording
+    reads as its new home. */
+ "Tech Services":["Farebox - INOP (general)","Farebox - No power","Farebox - Blank / black screen","Farebox - Bill transport INOP","Farebox - Coin mech INOP","Farebox - Coin off line","Farebox - Coin bin missing","Farebox - Unlocked / won't lock","Farebox - Can't unlock top / coin bypass reset","Farebox - Loose from floor mounts","Farebox - Other farebox defect","Ventra - INOP (general)","Ventra - Other Ventra defect","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","CUBIC Screen - Screen black","IBS Screen - INOP (general)","IBS Screen - Screen black","Signs, Cameras and Other - Destination Sign","Signs, Cameras and Other - Dash cam","Signs, Cameras and Other - Camera / DVR system","Signs, Cameras and Other - Other Tech Services"],
  "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
@@ -509,6 +516,19 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "Stop Request":["Stop request INOP (curbside)","Stop request INOP (roadside)","Stop request INOP (wheelchair area - curbside)","Stop request INOP (wheelchair area - roadside)","Stop request pull cord / line - broken (curbside)","Stop request pull cord / line - broken (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
   "Bike Rack":["Arm replacement","Loose / pivots"],
  },
+ /* "INOP (general)" is the landing spot for a fault known only by its device —
+    the bare "Farebox" and "Ventra" records logged before anything more specific
+    existed. It sits first in its group, the way "Front door" leads Doors, so a
+    mechanic who knows the box is dead but not why still has a plain first
+    choice. The CUBIC Screen group keeps the two error wordings the shop already
+    uses; the sweep sheet's DT and MV columns are those two devices. */
+ "Tech Services":{
+  "Farebox":["INOP (general)","No power","Blank / black screen","Bill transport INOP","Coin mech INOP","Coin off line","Coin bin missing","Unlocked / won't lock","Can't unlock top / coin bypass reset","Loose from floor mounts","Other farebox defect"],
+  "Ventra":["INOP (general)","Other Ventra defect"],
+  "CUBIC Screen":["BUS ER","MV ER","Screen black"],
+  "IBS Screen":["INOP (general)","Screen black"],
+  "Signs, Cameras and Other":["Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
+ },
  "Amerex":{
   "Fire Suppression":["FIRE alarm (system discharged)","Heat sensor communication fault","Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Control head no power","Other Fire Suppression Trouble"],
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
@@ -651,6 +671,22 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
     one; nothing stored is rewritten. */
  "A/C and HVAC":{
   "Refrigerant leak":"Refrigerant / Freon leak",
+ },
+ /* Tech Services became a grouped category. Every flat wording it had moves to
+    its group; the two CUBIC Screen wordings already carried their group and are
+    absent here on purpose — they do not move. "Farebox won't lock" and the
+    sweep sheet's "says unlock, won't lock" were one fault written two ways, so
+    they share a home. A record logged as "MDT Screen" reaches here as "IBS
+    Screen" via LEGACY_ISSUE_RENAMES first, then lands like any other. */
+ "Tech Services":{
+  "Farebox":"Farebox - INOP (general)",
+  "Farebox won't lock":"Farebox - Unlocked / won't lock",
+  "Ventra":"Ventra - INOP (general)",
+  "IBS Screen":"IBS Screen - INOP (general)",
+  "Destination Sign":"Signs, Cameras and Other - Destination Sign",
+  "Dash cam":"Signs, Cameras and Other - Dash cam",
+  "Camera / DVR system":"Signs, Cameras and Other - Camera / DVR system",
+  "Other Tech Services":"Signs, Cameras and Other - Other Tech Services",
  },
  "Engine":{
   /* The light on the dash is what gets reported. "Diagnosis" described what the

@@ -1032,7 +1032,10 @@ test("Facility Map repair entry routes to authoritative workflows and legacy-onl
   const routed=syncFacilityAlertDefects(previous,{...previous,noHorn:true},"2026-08-26T22:05:00.000Z");
   assert.equal(routed.defects.length,1);
   assert.equal(routed.defects[0].source,"defect-log");
-  assert.equal(routed.defects[0].issue,"Horn");
+  /* Written in the wording a record READS as, not the pre-rename wording the
+     alert table happens to carry. Pinning "Horn" here was pinning a stale write. */
+  assert.equal(routed.defects[0].category,"Operator/Driver Controls");
+  assert.equal(routed.defects[0].issue,"Operating Controls - Horn");
   assert.equal(syncFacilityAlertDefects(routed,routed).defects.length,1);
 
   const defectLogDraft=defectFromDraft({category:"Engine",issue:"Misfire",details:"",operability:"service",state:"open",source:"defect-log"},"select","facility-log");
@@ -1334,7 +1337,7 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - C/S"));
   assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - R/S"));
   assert.ok(REPAIR_OPTIONS.Brakes.includes("Brake mod light"));
-  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox won't lock"));
+  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Unlocked / won't lock"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - BUS ER"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - MV ER"));
   assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
@@ -1345,7 +1348,7 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("System Switches - Kneeler button"));
   assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Gauges and Dash - Front dash damage"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("Bike rack - bent / replacement"));
-  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("IBS Screen"));
+  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("IBS Screen - INOP (general)"));
   assert.ok(REPAIR_OPTIONS.Bodywork.includes("IBS screen pole - broken"));
   for(const issue of ["Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged"])
     assert.ok(REPAIR_OPTIONS.Bodywork.includes(issue),issue);
@@ -1353,7 +1356,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS.Miscellaneous.includes("Fire extinguisher missing"));
   assert.equal(repairIssueDisplayLabel("Fire extinguisher missing"),"🧯 Fire extinguisher missing");
   assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes("Bike rack - arms / pivot adjustment"));
-  assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen");
+  /* Two renames in a chain: MDT Screen became IBS Screen, and IBS Screen then
+     moved into its group. A record from the MDT era lands at the end of both. */
+  assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen - INOP (general)");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration", "CNG"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
@@ -5023,8 +5028,8 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  assert.ok(lights.includes("Outside rear view mirror - R/S"));
 
  // the dash cam is an onboard electronic system, so it sits with the others
- assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Dash cam"));
- assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Camera / DVR system"));
+ assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Signs, Cameras and Other - Dash cam"));
+ assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Signs, Cameras and Other - Camera / DVR system"));
 
  // lamps, not the stalk: Bus Controls keeps the turn signal switches
  assert.ok(lights.includes("Turn signal lamps"));
@@ -6686,4 +6691,80 @@ test("an alarm number never survives without the lamp it belongs to", async () =
  assert.equal(moved.category,"Operator/Driver Controls");
  assert.equal(moved.diagLight,undefined,"a lamp must not survive a migration into a category without one");
  assert.equal(moved.alarmCode,undefined);
+});
+
+test("Tech Services is grouped the way the shop's check-off sheets are, and every old wording still lands", () => {
+ const groups=REPAIR_OPTION_GROUPS["Tech Services"];
+ assert.deepEqual(Object.keys(groups),["Farebox","Ventra","CUBIC Screen","IBS Screen","Signs, Cameras and Other"]);
+
+ /* The farebox sheet checks power, bills and coin per bus. Each is now an option. */
+ for(const item of ["No power","Bill transport INOP","Coin mech INOP","Coin off line","Coin bin missing","Blank / black screen"])
+  assert.ok(groups.Farebox.includes(item),item+" must be a Farebox option");
+ /* The general option leads its group, the way Front door leads Doors. */
+ assert.equal(groups.Farebox[0],"INOP (general)");
+ assert.equal(groups.Ventra[0],"INOP (general)");
+ assert.equal(groups["IBS Screen"][0],"INOP (general)");
+
+ /* The flat list and the grouped picker must agree exactly, or a stored
+    identity can be drawn that cannot be re-picked. */
+ const flat=new Set(REPAIR_OPTIONS["Tech Services"]);
+ const drawn=new Set(Object.entries(groups).flatMap(([g,items])=>items.map(i=>g+" - "+i)));
+ assert.deepEqual([...flat].sort(),[...drawn].sort());
+
+ /* The CUBIC wordings already carried their group, so they do not move — the
+    twelve live records under them keep their exact stored identity. */
+ assert.deepEqual(migrateRepairIdentity("Tech Services","CUBIC Screen - BUS ER"),{category:"Tech Services",issue:"CUBIC Screen - BUS ER"});
+ assert.deepEqual(migrateRepairIdentity("Tech Services","CUBIC Screen - MV ER"),{category:"Tech Services",issue:"CUBIC Screen - MV ER"});
+
+ /* Every wording a Version 138 device can write lands on a pickable option. */
+ for(const old of ["Farebox","Farebox won't lock","Ventra","IBS Screen","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"]){
+  const m=migrateRepairIdentity("Tech Services",old);
+  assert.equal(m.category,"Tech Services",old+" must stay in Tech Services");
+  assert.ok(flat.has(m.issue),old+" -> "+m.issue+" is not in the catalog");
+ }
+ assert.equal(migrateRepairIdentity("Tech Services","Farebox").issue,"Farebox - INOP (general)");
+ assert.equal(migrateRepairIdentity("Tech Services","Farebox won't lock").issue,"Farebox - Unlocked / won't lock");
+
+ /* And nothing already current drifts on a second read. */
+ for(const issue of flat)assert.deepEqual(migrateRepairIdentity("Tech Services",issue),{category:"Tech Services",issue});
+
+ /* An off-catalog wording the live board carries is left exactly as logged. */
+ assert.deepEqual(migrateRepairIdentity("Tech Services","Unspecified issue"),{category:"Tech Services",issue:"Unspecified issue"});
+});
+
+test("a Facility Map alert flag that flips twice adds its defect once, in the current wording", () => {
+ /* syncFacilityAlertDefects compares its alert wording against defects that have
+    just been normalized — and normalizing migrates a wording to its current
+    home. Comparing the RAW wording against migrated defects never matched once
+    a wording had moved, so the second flip of the same flag added the alert
+    again. Three of the six alert wordings were already in that state; the Tech
+    Services regroup would have made it five. */
+ const off={id:"fb",l:"B12",s:"in",farebox:false,defects:[]};
+ const on={...off,farebox:true};
+ const first=syncFacilityAlertDefects(off,on);
+ assert.equal(first.defects.length,1,"the first flip adds the alert");
+ assert.equal(first.defects[0].issue,"Farebox - INOP (general)","and writes the current wording, not the one it will be migrated to");
+ assert.equal(first.defects[0].category,"Tech Services");
+
+ /* Flag goes off and on again with that defect still open: nothing new. */
+ const second=syncFacilityAlertDefects({...first,farebox:false},{...first,farebox:true});
+ assert.equal(second.defects.length,1,"the second flip must not add a duplicate");
+
+ /* The same for an alert whose wording moved in an earlier release. */
+ const ramp=syncFacilityAlertDefects({id:"r",l:"B1",s:"in",badRampKneeler:false,defects:[]},{id:"r",l:"B1",s:"in",badRampKneeler:true,defects:[]});
+ assert.equal(ramp.defects.length,1);
+ assert.equal(ramp.defects[0].category,"Bus Accessories","written in the migrated category");
+ const rampAgain=syncFacilityAlertDefects({...ramp,badRampKneeler:false},{...ramp,badRampKneeler:true});
+ assert.equal(rampAgain.defects.length,1,"a moved wording must dedupe too");
+});
+
+test("the IBS & Ventra quick filter finds the CUBIC screens, which are the Ventra hardware", () => {
+ const bus=issue=>({id:"b",defects:[{id:"d",category:"Tech Services",issue,operability:"service",state:"open"}],pendingRepair:""});
+ assert.equal(quickFilterDefects(bus("CUBIC Screen - BUS ER"),"ibs-ventra").length,1);
+ assert.equal(quickFilterDefects(bus("CUBIC Screen - MV ER"),"ibs-ventra").length,1);
+ assert.equal(quickFilterDefects(bus("Ventra"),"ibs-ventra").length,1);
+ assert.equal(quickFilterDefects(bus("IBS Screen"),"ibs-ventra").length,1);
+ /* And still not a farebox. */
+ assert.equal(quickFilterDefects(bus("Farebox"),"ibs-ventra").length,0);
+ assert.equal(quickFilterDefects(bus("Farebox"),"farebox").length,1);
 });
