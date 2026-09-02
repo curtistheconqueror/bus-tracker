@@ -1,18 +1,15 @@
 # Publish next
 
-**STATUS: VERSIONS 137 AND 138 PENDING — publish 137 from `d6f99d8` first, then 138 from `0969840`. Version 136 is live.**
+**STATUS: NONE PENDING — Sites Version 138 was published from 0969840510ffdec2b746e13da66f3ffcfaa2e76e on 2026-09-01.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
-| Then | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
+| Published | **137** | `69deec5` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
+| Published | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 136 was published from `dccf431`.** Two remain, and they are separate
-publishes in order: `0969840` contains `d6f99d8`, so **publishing 138 alone
-carries 137 with it**. That is fine if both are wanted at once — but the two
-sets of post-publish checks are separate and both need running.
+**Versions 137 and 138 are live.** The handoffs below are retained as release records; there is nothing pending to publish.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release

@@ -4,7 +4,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 136 | Live | dccf431 | Bus Controls splits into Operator/Driver Controls and Bus Accessories; stop-request choices are sided and named for the floor, the four general door/ramp choices remain available, and Bodywork gains complete ramp replacement beyond repair; existing records migrate at read time without rewriting stored data |
+| 138 | Live | 0969840 | A/C and HVAC defects now record fan count, Freon service, diagnostic-lamp status, and alarm number; includes the Version 137 Fleet Campaigns offline cache |
+| 137 | Previous live | 69deec5 | Fleet Campaigns is pre-cached so it remains available when a phone loses signal |
+| 136 | Previous live | dccf431 | Bus Controls splits into Operator/Driver Controls and Bus Accessories; stop-request choices are sided and named for the floor, the four general door/ramp choices remain available, and Bodywork gains complete ramp replacement beyond repair; existing records migrate at read time without rewriting stored data |
 | 135 | Previous live | d3c05c3 | MERGE DUPES now writes its authorized cleanup and only tombstones records after a successful save; TEST DRIVEN and BRAKE TEST work states record an explicit pass or fail, with brake-test failures marking the bus Remove From Service |
 | 134 | Previous live | 43ddeae | Reconciled the frozen Version 130–133 work with the existing live catalog correction: duplicate-repair merging, the expanded repair catalog and part-number completion flow, resilient storage-save reporting and windowed Fixed Repairs, plus DEFERRED Bay 12 holds with a timed alert, evening review, return-to-service history, and the Bodywork IBS screen-pole defect |
 | 133 | Previous live | 5c257d3 | Preserved the Bodywork IBS screen-pole defect while reconciling the prior Sites source history |
