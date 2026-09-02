@@ -2307,7 +2307,10 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/DIAGNOSIS \/ TEST \/ VERIFICATION/);
   assert.match(fixedPage,/not-duplicated-note/);
   assert.match(fixedPage,/FIXED DATE &amp; TIME/);
-  assert.match(fixedPage,/writeFleetStorage\(localStorage,next\)/);
+  /* Was writeFleetStorage, whose bare boolean the caller threw away, so a
+     refused write closed the editor and reported success. */
+  assert.match(fixedPage,/const written=writeFleetStorageResult\(localStorage,next\)/);
+  assert.match(fixedPage,/if\(!written\.ok\)return false/);
   assert.doesNotMatch(fixedPage,/className="fixed-undo"/);
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.match(fixedPage,/className="fixed-settings-button"[\s\S]*Open Fixed Repairs settings/);
@@ -7034,9 +7037,19 @@ test("the Defect Log opens on what it is for, not on a scoreboard", async () => 
 
  /* Three filter buttons, not five. OPEN differed from ALL only by hiding
     in-progress and today's fixes; DOWN SHEET has its own page. */
- const row=logPage.match(/\[\["all","ALL"\].*?\]\] as \[Filter,string\]\[\]/);
+ const row=logPage.match(/\[\["all","ALL"\][\s\S]*?\] as \[Filter,string\]\[\]/);
  assert.ok(row,"the filter row must still be a literal list");
- assert.deepEqual(row[0].match(/"(ALL|OPEN|IN PROGRESS|FIXED TODAY|DOWN SHEET)"/g),['"ALL"','"IN PROGRESS"','"FIXED TODAY"']);
+ /* Three are always offered. OPEN and DOWN SHEET appear ONLY while one of them
+    is the active filter — which happens when somebody's saved default view is
+    one of them. Otherwise they would see a filtered board with no button lit,
+    nothing explaining why, and no way back without opening settings. */
+ assert.match(row[0],/\.\.\.\(filter==="open"\?\[\["open","OPEN"\] as \[Filter,string\]\]:\[\]\)/);
+ assert.match(row[0],/\.\.\.\(filter==="downsheet"\?\[\["downsheet","DOWN SHEET"\] as \[Filter,string\]\]:\[\]\)/);
+ /* The summary bar everyone sees must honour the labels a shop can rename in
+    settings; it hardcoded the English words while the tiles that respect them
+    are now closed by default. */
+ assert.match(logPage,/\{settings\.display\.labels\.active\.toLowerCase\(\)\}/);
+ assert.match(logPage,/\{settings\.display\.labels\.fixed\.toLowerCase\(\)\}/);
 
  /* But BOTH removed keys still filter, so a saved default view of either keeps
     working. Removing the button must not remove the behaviour. */
@@ -7065,7 +7078,22 @@ test("a repair fixed without a defect can be logged straight to Fixed Repairs", 
  assert.match(fixedPage,/disabled=\{!fleet\.length\}/);
 
  /* A blank record starts completed — this page is the fixed history. */
- assert.match(fixedPage,/state:"completed",source:"defect-log"/);
+ assert.match(fixedPage,/state:"completed",source:"fixed-log"/,"a repair logged here did not come from the Defect Log");
+ assert.match(fixedPage,/"fixed-log":\{className:"from-tracker",label:"LOGGED AS A COMPLETED REPAIR"\}/);
+
+ /* THE SECOND BUG THIS AVOIDS: a refused fleet write. changeFleet set the undo
+    snapshot and closed the editor regardless of whether anything was written,
+    so a phone at its storage limit lost the only copy of a repair silently and
+    then offered to undo it. Driven in a browser: storage unchanged, modal
+    closed, nothing said. The editor now stays open with the banner showing. */
+ assert.match(fixedPage,/if\(!persistFleet\(next\)\)return false/);
+ assert.match(fixedPage,/if\(changeFleet\(next,\(isNewRecord\?"Logged Bus ":"Edited Bus "\)\+record\.bus\.n\+" fixed repair"\)\)setNewRepair\(null\)/);
+ assert.match(fixedPage,/<SaveAlert reason=\{saveProblem\}/,"this page had no save banner at all");
+
+ /* THE THIRD: a key on the bus id remounted the editor on every bus change and
+    reset the whole form. Driven: category, fix text and initials all cleared
+    when the bus was picked after typing. */
+ assert.doesNotMatch(fixedPage,/<CompletionEditor key=\{newRepair\.bus\.id\}/,"the editor must not remount when the bus changes");
  /* The only thing a blank record lacks is the bus, so the editor asks for it
     and nothing else about the form changes. */
  assert.match(fixedPage,/\{isNew&&<section className="fixed-new-bus">/);

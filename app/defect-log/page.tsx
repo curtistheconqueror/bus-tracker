@@ -672,7 +672,7 @@ export default function DefectLog(){
       choice is remembered per device. */}
   <section className={"daily-stats"+(statsOpen?" open":"")}>
    <button type="button" className="daily-stats-toggle" aria-expanded={statsOpen} onClick={()=>setStatsOpen(open=>!open)}>
-    <b>DAILY STATS</b><small>{stats.active} active · {stats.buses} buses · {stats.fixedToday} fixed today</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
+    <b>DAILY STATS</b><small>{stats.active} {settings.display.labels.active.toLowerCase()} · {stats.buses} {settings.display.labels.buses.toLowerCase()} · {stats.downing} {settings.display.labels.downing.toLowerCase()} · {stats.fixedToday} {settings.display.labels.fixed.toLowerCase()}</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
    </button>
    {statsOpen&&<section className="log-summary" aria-label="Defect log summary">
    <div className="primary"><strong>{stats.active}</strong><span>{settings.display.labels.active}</span></div><div><strong>{stats.buses}</strong><span>{settings.display.labels.buses}</span></div><div><strong>{stats.progress}</strong><span>{settings.display.labels.progress}</span></div><div className="downing"><strong>{stats.downing}</strong><span>{settings.display.labels.downing}</span></div><div className="fixed-today"><strong>{stats.fixedToday}</strong><span>{settings.display.labels.fixed}</span></div>
@@ -688,7 +688,15 @@ export default function DefectLog(){
        says which buses are on it. Both KEYS still work, so a saved default
        view of either keeps filtering — the button is what was removed, not
        the filter. Pressing the active one clears back to ALL. */}
-   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"]] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value?"all":value)} key={value}>{label}</button>)}</div>
+   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
+    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
+       default view. Somebody whose default is one of them would otherwise see a
+       filtered board with no button lit and nothing saying why — and no way back
+       without opening settings. The button appears only while its own filter is
+       the active one, so it explains the view and clears it, without adding two
+       buttons back for everybody else. */
+    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value?"all":value)} key={value}>{label}</button>)}</div>
    <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("")}}/><div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/></label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
    <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is

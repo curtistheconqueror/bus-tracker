@@ -8,9 +8,10 @@ import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,write
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
-import {REPORT_EXPORT_HINT} from "../fleet-backup";
+import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
-import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorage} from "../storage";
+import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorageResult,type FleetWriteReason} from "../storage";
+import SaveAlert from "../save-alert";
 
 /* How many completed repairs render at once.
 
@@ -112,7 +113,7 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
 }
 
 export default function FixedRepairs(){
- const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[settingsOpen,setSettingsOpen]=useState(false);
+ const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[settingsOpen,setSettingsOpen]=useState(false);
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
@@ -133,8 +134,26 @@ export default function FixedRepairs(){
  useEffect(()=>setVisibleCount(PAGE_SIZE),[search,category]);
  const windowed=useMemo(()=>visible.slice(0,visibleCount),[visible,visibleCount]);
  const hiddenCount=visible.length-windowed.length;
- const persistFleet=(next:DefectLogFleetBus[])=>{if(!writeFleetStorage(localStorage,next))return;setFleet(next)};
- const changeFleet=(next:DefectLogFleetBus[],label:string)=>{setUndoSnapshot({fleet,label});persistFleet(next);setEditing(null)};
+ /* Returns whether the board was actually written. It used to return nothing,
+    so every caller carried on as if the save had happened. */
+ const persistFleet=(next:DefectLogFleetBus[])=>{
+  const written=writeFleetStorageResult(localStorage,next);
+  setSaveProblem(written.reason||"");
+  if(!written.ok)return false;
+  setFleet(next);return true;
+ };
+ /* Nothing may claim a change that was refused. The undo snapshot, closing the
+    editor and the "Logged Bus 1462" label all used to run regardless — so a
+    phone at its storage limit closed the form, said nothing, and offered to
+    undo a record it had never written. On this page that could be the only
+    copy of a repair, because LOG A REPAIR creates records that exist nowhere
+    else. A refused write now leaves the editor open with the banner showing,
+    so the mechanic still has what they typed. */
+ const changeFleet=(next:DefectLogFleetBus[],label:string)=>{
+  const before=fleet;
+  if(!persistFleet(next))return false;
+  setUndoSnapshot({fleet:before,label});setEditing(null);return true;
+ };
  const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{/* A cause typed here has to be learned too. This is often where a fault gets its proper name, once the bus is apart, and a finding recorded on this page teaching nothing would be a gap nobody would notice. */if(normalizeFinding(draft.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.category,issue:draft.issue,finding:draft.finding});writeFindingsMemory(localStorage,next);return next});if(draft.partsUsed&&draft.partNumber.trim())setPartsMemory(current=>{const learned=learnPart(current,{category:draft.category,issue:draft.issue,partNumber:draft.partNumber,partName:draft.partName,scope:draft.rememberScope});writePartsMemory(localStorage,learned);return learned});/* A count is only this page's business where the repair declares one. Retyping
    a fan record as something uncounted clears the count, because "3 fans" left
    on a radiator swap is a lie; an oil quantity, which no count field governs,
@@ -155,7 +174,7 @@ const next=fleet.map(bus=>{
  return {...bus,defects:exists?current.map(defect=>defect.id!==record.defect.id?defect:saved(defect)):[...current,saved(record.defect)]};
 });
 const isNewRecord=!fleet.some(bus=>bus.id===record.bus.id&&normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).some(defect=>defect.id===record.defect.id));
-changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fixed repair");setNewRepair(null)};
+if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fixed repair"))setNewRepair(null)};
  const reopenRepair=(record:FixedRecord)=>{if(!confirm("Undo this fix and reopen the defect for Bus "+record.bus.n+"? It will return to the active Defect Log."))return;const now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,state:"open",completedAt:undefined,completedBy:undefined,defectLogHiddenAt:undefined,updatedAt:now})});changeFleet(next,"Reopened Bus "+record.bus.n+" defect")};
  const deleteRepair=(record:FixedRecord)=>{if(!confirm("Delete this repair record for Bus "+record.bus.n+"? You can immediately undo this action."))return;const next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.id!==record.defect.id)});changeFleet(next,"Deleted Bus "+record.bus.n+" repair")};
  /* A repair somebody did without logging a defect first — which is how it
@@ -167,7 +186,7 @@ changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fixed 
  const logRepair=()=>{
   if(!fleet.length){alert("This device has no buses yet. Open the Facility Map first.");return}
   const now=new Date().toISOString();
-  setNewRepair({bus:fleet[0],defect:{id:"fixed-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"Miscellaneous",issue:"",details:"",operability:"service",state:"completed",source:"defect-log",createdAt:now,updatedAt:now,completedAt:now} as StructuredDefect});
+  setNewRepair({bus:fleet[0],defect:{id:"fixed-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"Miscellaneous",issue:"",details:"",operability:"service",state:"completed",source:"fixed-log",createdAt:now,updatedAt:now,completedAt:now} as StructuredDefect});
  };
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null);setNewRepair(null)};
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
@@ -188,13 +207,18 @@ const REPAIR_ORIGINS={
  tracker:{className:"from-tracker",label:"LOGGED ON THE FACILITY MAP"},
  operator:{className:"from-tracker",label:"LOGGED BY THE AI OPERATOR"},
  scan:{className:"from-tracker",label:"IMPORTED FROM A SCANNED SHEET"},
+ /* Logged straight onto this page, never on the Defect Log. Saying it came
+    from there would be the small lie the comment below warns about. */
+ "fixed-log":{className:"from-tracker",label:"LOGGED AS A COMPLETED REPAIR"},
 } as const;
 function repairOrigin(source:string|undefined){
  return REPAIR_ORIGINS[source as keyof typeof REPAIR_ORIGINS]||null;
 }
 
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
- return <main className="fixed-repairs-app" style={appearanceStyle}><DeferredNavBadge/><DeferredReviewPrompt/>
+ /* This page had no save banner at all, alone among the four. A refused write
+    here is the one that can lose the only copy of a record. */
+ return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button><button type="button" className="fixed-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open Fixed Repairs settings">&#9881; SETTINGS</button></section>
@@ -205,7 +229,10 @@ function repairOrigin(source:string|undefined){
    <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}{partNumberMissing(record.defect)&&<b className="missing-part-number" title="A part was used on this repair and its number has not been entered yet">MISSING PART #</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button><button type="button" className="reopen-repair" onClick={()=>reopenRepair(record)}>UNDO FIX</button><button type="button" className="delete-repair" onClick={()=>deleteRepair(record)}>DELETE</button></div></footer>
   </article>)}</div>:<div className="fixed-empty"><b>No fixed repairs match this view.</b><span>Completed repairs will flow here automatically from the Defect Log, Down Sheet, and Fleet Tracker.</span></div>}</section>
   {editing&&<CompletionEditor record={editing} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setEditing(null)}/>}
-  {newRepair&&<CompletionEditor key={newRepair.bus.id} record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);return current&&bus?{...current,bus}:current})}/>}
+  {/* No key on the bus id: it would remount the editor on every bus change and
+      reset the whole form, so a mechanic who picked the bus last lost the
+      record they had just typed. The bus select is controlled by the prop. */}
+  {newRepair&&<CompletionEditor record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);return current&&bus?{...current,bus}:current})}/>}
   {settingsOpen&&<FixedAppearanceModal settings={settings} setSettings={updateSettings} close={()=>setSettingsOpen(false)}/>}
  </main>
 }
