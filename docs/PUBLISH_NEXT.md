@@ -1,16 +1,17 @@
 # Publish next
 
-**STATUS: VERSION 139 PENDING — publish from `a33ffab`. Version 138 is live.**
+**STATUS: VERSIONS 139 AND 140 PENDING — publish 139 from `a33ffab` first, then 140 from `f0c7939`. Version 138 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
+| Then | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
 | Published | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
 | Published | **137** | `69deec5` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 138 is live from `0969840`. Version 139 is next from `a33ffab`; its handoff is at the bottom of this file.** The 136–138 handoffs are retained above it as release records.
+**Version 138 is live from `0969840`.** Two remain, and they are separate publishes in order: `f0c7939` contains `a33ffab`, so **publishing 140 alone carries 139 with it**. Fine if both are wanted at once, but the two sets of post-publish checks are separate and both need running. The 136–138 handoffs are retained as release records.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -745,4 +746,186 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 139 | Live | <published tip hash> | Tech Services becomes five groups — Farebox, Ventra, CUBIC Screen, IBS Screen, and Signs, Cameras and Other — so the farebox check-off sheet's three columns (power, bill transport, coin mech) and the black screen are real options instead of free text under the bare word Farebox; 10 options become 22, nothing is retired, and the twelve live CUBIC records keep their exact wording. The IBS & Ventra quick filter now matches CUBIC screens (4 → 16 live matches), and a Facility Map alert flag flipped twice no longer adds its defect twice |
+```
+
+---
+
+# Version 140 — The check-off sheets get a camera
+
+**Publish this after Version 139.** It stacks on it: `f0c7939` contains `a33ffab`,
+so publishing 140 carries 139 with it. Version 139 must be live or go live with
+this — the sweep files against the Tech Services groups 139 introduces.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`f0c7939`** |
+| Last code-bearing commit | `f0c7939` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 139, from `a33ffab` |
+
+```
+git log --oneline 8bd48c7..f0c7939
+f0c7939 Scan the farebox and Ventra check-off sheets from a photo
+
+git diff --name-only 8bd48c7 f0c7939 -- app
+app/api/sweep-scan/route.ts            <- new: the scan route
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/defect-log/sweep-scan-import.ts    <- new: what a mark means, in code
+app/defect-log/sweep-scanner.tsx       <- new: the modal
+app/down-sheet/down-sheet-scanner.tsx  <- one import; behaviour unchanged
+app/scan-photo.ts                      <- new: the shared photo prep
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 8bd48c7 f0c7939 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 186 tests passing (up from 182 at Version 139), ESLint clean, production
+build succeeds.
+
+## Migrations and configuration
+
+**No database migration, no dependency change, no LocalStorage key added.** What
+the sweep files are ordinary defect records, `source: "defect-log"`, exactly
+as LOG DEFECT writes them.
+
+**No new secret is required.** The new route `/api/sweep-scan` uses the same
+`OPENROUTER_API_KEY` the Down Sheet scan already runs on. It reads an optional
+`SWEEP_SCAN_MODEL`, falling back to `DOWN_SHEET_SCAN_MODEL`, then to the same
+default model. Nothing has to be set for it to work where the Down Sheet scan
+already works.
+
+**One thing to confirm once live**, because it is the only way this release can
+fail silently: the route deployed and can see the key. An empty POST proves both:
+
+```
+curl -s -X POST https://<live host>/api/sweep-scan
+# expected  {"error":"Choose at least one photo."}     -> route is live, key present
+# if you see {"error":"Photo processing is not configured yet."} -> route is live, key MISSING
+# if you see HTML or a 404                                       -> route did not deploy
+```
+
+## What changed
+
+### 1. SCAN SWEEP, a new button on the Defect Log
+
+Next to LOG DEFECT, CLEAN UP and MERGE DUPES. Opens the same kind of modal the
+Down Sheet scan uses — take a photo or upload one, up to six pages, READ SHEETS,
+review, approve — **but approving files defects onto buses.** It never touches
+the Down Sheet, never closes a record, and never files a row that was not
+ticked. Both sheet types can go in together; the model tells them apart by the
+printed title.
+
+### 2. What a mark means is decided in code, not by the model
+
+The route describes the two sheets to the model — their columns and what each
+kind of mark is — and the client decides again from what comes back. Anything
+that is not one of four words reads as blank, and **blank means nobody looked;
+it is never read as working.** That rule is the difference between this sheet
+and a Down Sheet, and it is stated to the model and enforced in code.
+
+| Mark column | Files as |
+| --- | --- |
+| DT | `CUBIC Screen - BUS ER` |
+| MV | `CUBIC Screen - MV ER` |
+| Farebox power | `Farebox - No power` |
+| Bills Trans | `Farebox - Bill transport INOP` |
+| Coin Mech | `Farebox - Coin mech INOP` |
+
+A **written note** on the sheet names faults the columns cannot — coin off line,
+blank screen, coin bin missing, unlocked / won't lock, can't unlock top, loose
+from mounts — and **a note beats the column it explains**, so "coin off line"
+files Coin off line and not also a generic coin fault for the same cell. "Can't
+unlock" is tested before "unlock", because they are opposite faults. Every
+finding's issue can be re-pointed from a dropdown of Tech Services options
+before it is filed.
+
+### 3. Three kinds of row are held back
+
+- **Already on the board.** The bus carries an open record with that wording.
+  Offered, labelled, and unticked, so the sweep confirms what is known without
+  doubling it.
+- **Not in fleet / duplicate fleet number.** Same rules as the Down Sheet scan;
+  cannot be ticked.
+- **Unclear.** A mark the model could not read never becomes a finding.
+
+### 4. Sheet says OK, board says open
+
+Buses ticked working on a device the board still holds an open record for are
+listed under the findings — with the open wording, read through the migration —
+for a person to decide. **Nothing is closed from a tick mark.** A destination
+sign or a brake job is not listed, because the sweep did not check them.
+
+### 5. Filing is the ordinary path
+
+Each approved finding goes through the same single-record save as LOG DEFECT, so
+the **48-hour duplicate guard** applies to every one. The fleet is threaded
+through one save at a time and written **once**; a refused write claims nothing.
+Each record carries the note, which page it came from, and who checked —
+`coin off line — Sweep sheet p2 · checked by BB` — with the initials in
+`reportedBy`. **UNDO LAST** reverses the whole filing as one change.
+
+### 6. Shared photo prep
+
+`scanReadyPhoto` moved from the Down Sheet scanner into `app/scan-photo.ts`
+so both scanners share one 700 KB cap. The Down Sheet scanner's behaviour,
+including its upload filename, is unchanged.
+
+## Validation
+
+- 186 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a real browser at 390 wide with the route mocked** to rows shaped
+  like the 8-29 sheets: button enabled with a fleet and disabled without one;
+  modal not clipped; READ disabled until a photo is added; 5 buses read →
+  7 findings → 5 filed; ALREADY ON BOARD arrives unticked; NOT IN FLEET cannot
+  be ticked; a finding re-pointed in the dropdown files as re-pointed; storage
+  carries issue, note, provenance and `reportedBy`; UNDO LAST reads
+  *Undo Filed 5 sweep findings*
+- **The 503 path was forced**: the modal shows *Photo processing is not
+  configured yet.*, stays on the photo step, and storage is byte-for-byte
+  unchanged
+- **The OK-vs-board panel was driven separately**: a bus with an open Farebox
+  and an open CUBIC record, ticked OK on both sheets, is listed with both
+  wordings read through the migration; its open brake job and another bus's
+  destination sign are not
+- Unit tests cover the mark normalisation, the note-beats-column rule, the
+  opposite lock faults, dedupe within a bus, the fleet-match states, and the
+  provenance on the record
+- No page errors in any browser run
+
+## After it is live
+
+1. **Run the curl above** against the live host. Expect *Choose at least one
+   photo.*
+2. **Defect Log → 📷 SCAN SWEEP.** Confirm the modal opens and READ SHEETS is
+   disabled until a photo is added.
+3. **Photograph both 8-29 sheets** — they are the first real test. Expect around
+   a dozen findings, with the five DT errors landing as `CUBIC Screen - BUS ER`,
+   the two MV errors as `CUBIC Screen - MV ER`, and 17531's note producing both
+   Coin off line and Blank / black screen.
+4. **Look at the badges before approving.** 17523 should arrive as ALREADY ON
+   BOARD and unticked. Anything the model was unsure of should say so under the
+   details.
+5. **Approve, then open one of the buses.** The record should read the note,
+   the page, and the checker's initials.
+6. **Press UNDO LAST once** to confirm the whole filing comes back off, then
+   file it again.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 140 | Live | <published tip hash> | SCAN SWEEP on the Defect Log photographs the farebox and Ventra check-off sheets and files what they found as Tech Services defects: the five mark columns map to catalog options, a written note names the faults the columns cannot and beats the column it explains, blank is read as not checked and never as working, findings already on the board arrive unticked, and buses ticked OK that the board still holds open are listed for a person rather than closed. Filing uses the same single-record save as LOG DEFECT with the 48-hour duplicate guard and one write, carries page and checker initials on each record, and is reversed by UNDO LAST. Uses the existing OPENROUTER_API_KEY; no new secret |
 ```
