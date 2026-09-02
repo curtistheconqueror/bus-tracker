@@ -7128,3 +7128,27 @@ test("SETTINGS keeps its place beside QUICK FILTERS and says what it is", async 
  assert.match(css,/\.log-controls \.log-undo-button\{height:44px;min-height:44px\}/);
  assert.match(css,/\.log-controls \.quick-filter-trigger\{height:44px;min-height:44px\}/);
 });
+
+test("a record with a malformed details field renders instead of taking the page down", () => {
+ /* Every consumer calls .trim() on details. normalizeDefects passed a
+    non-string straight through, so one bad record threw inside defectLabel and
+    the whole page rendered a runtime error instead of the board. The board is
+    imported from JSON backups and synced from other devices, and importBoard
+    validates only id, n and l — so a malformed record really can reach here.
+    Found when a test fixture passed an object where the text belonged. */
+ const bad=normalizeDefects([
+  {id:"obj",category:"Brakes",issue:"ABS warning",details:{diagLight:"red"},operability:"service",state:"open"},
+  {id:"num",category:"Brakes",issue:"ABS warning",details:42,operability:"service",state:"open"},
+  {id:"nul",category:"Brakes",issue:"ABS warning",details:null,operability:"service",state:"open"},
+  {id:"undef",category:"Brakes",issue:"ABS warning",operability:"service",state:"open"},
+ ],"","bus-bad");
+ for(const defect of bad)assert.equal(typeof defect.details,"string",defect.id+" must normalize to a string");
+ assert.equal(bad[2].details,"");
+ assert.equal(bad[3].details,"");
+ /* And the label functions that used to throw now return a string for each. */
+ for(const defect of bad){
+  assert.equal(typeof defectLabel(defect),"string");
+  assert.equal(typeof defectSupportingDetails(defect),"string");
+ }
+ assert.doesNotThrow(()=>defectSummary(bad));
+});

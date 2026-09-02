@@ -793,6 +793,14 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
+  /* details is coerced, not trusted. Every consumer calls .trim() on it —
+     defectSupportingDetails, defectLabel, the editors — so a record whose
+     details is not a string throws and takes the whole page down with a
+     runtime error rather than rendering what it can. The board is imported
+     from JSON backups and synced from other devices, and importBoard only
+     validates id, n and l, so a malformed record can reach here. Found by a
+     fixture that passed an object where the text belonged: every page went
+     white. */
   const state:DefectState=defect.state==="completed"?"completed":defect.state==="deferred"?"deferred":defect.state==="in-progress"?"in-progress":"open";
    const {category,issue}=migrateRepairIdentity(defect.category,defect.issue);
   /* Read from the MIGRATED category, not the stored one, so a record moved by a
@@ -801,7 +809,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:defect.details||"",operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
