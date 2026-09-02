@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 135
-Live feature checkpoint: commit d3c05c3
+Live release: Sites Version 136
+Live feature checkpoint: commit dccf431
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 135 is the current user-approved live release. Its source checkpoint is commit d3c05c3. MERGE DUPES now completes its authorized cleanup, preserves the recovery snapshot, and never writes tombstones if a save is refused. Repairs can also record TEST DRIVEN and BRAKE TEST with an explicit pass or fail; a failed brake test marks the bus Remove From Service while a pass never returns it to service automatically. Update every device that can edit this data, because older builds discard unknown work-state keys. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Version 136 is the current user-approved live release. Its source checkpoint is commit dccf431. Bus Controls is now split into Operator/Driver Controls and Bus Accessories, while existing records migrate at read time without rewriting stored data. Stop-request defects are sided and named the way the floor uses them, the four heavily used general door/ramp choices remain available, and Bodywork includes complete ramp replacement beyond repair. Refresh every device so the shop and office use the same category names. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

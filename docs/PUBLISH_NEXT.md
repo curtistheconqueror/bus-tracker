@@ -1,18 +1,14 @@
 # Publish next
 
-**STATUS: VERSIONS 136 AND 137 PENDING — publish 136 from `dccf431` first, then 137 from `d6f99d8`.**
+**STATUS: VERSION 137 PENDING — publish from `d6f99d8`. Version 136 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
-| Then | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
+| Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
+| Next | **137** | `d6f99d8` | Fleet Campaigns is pre-cached, so it is not blank on a phone that loses signal |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**These are two separate publishes, in order.** 136 is frozen at `dccf431` and
-its section below is unchanged; 137 sits on top of it and is described at the
-bottom of this file. Publishing 137 alone would carry 136 with it, since
-`d6f99d8` contains `dccf431` — that is fine if both are wanted at once, but the
-two sets of post-publish checks are separate and both need running.
+**Version 136 was published from `dccf431`. Version 137 is next from `d6f99d8`; its handoff is retained below.**
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
