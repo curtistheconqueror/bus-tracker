@@ -1,11 +1,11 @@
 # Publish next
 
-**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `0153c09`. Version 143 is live.**
+**STATUS: VERSIONS 144 AND 145 PENDING — publish 144 from `9f1f73f` first, then 145 from `5aab35f`. Version 143 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
 | Next | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
-| Then | **145** | `0153c09` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
+| Then | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
 | Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
@@ -1032,10 +1032,10 @@ above the new base. In an expanded row the timestamp now starts a line of its
 own rather than trailing the state pill, so it no longer moves by a pill's width
 between OPEN and FIXED.
 
-## Five defects found and fixed before this shipped
+## Six defects found and fixed before this shipped
 
 The two releases were smoke-tested and the diff reviewed from a clean context
-before queueing. Five real faults came out of it; all five are fixed in
+before queueing. Six real faults came out of it; all six are fixed in
 `0153c09`, and each was driven in a browser before and after.
 
 | Severity | Fault | Now |
@@ -1044,6 +1044,7 @@ before queueing. Five real faults came out of it; all five are fixed in
 | **High** | Changing the BUS dropdown wiped the whole form — the editor was keyed on the bus id, so picking a bus remounted it and reset the draft. | The key is gone; the select was already controlled by its prop. |
 | Medium | The DAILY STATS bar hardcoded labels a shop can rename in settings, and the tiles that honour them are closed by default. | The bar uses the saved labels, and DOWNING is back in the summary. |
 | Low | A repair logged on Fixed Repairs was stamped `source: "defect-log"` and shown as FIXED FROM THE DEFECT LOG, which it never touched — and inherited that source's rule making it unremovable on the Facility Map. | It is `"fixed-log"`, labelled LOGGED AS A COMPLETED REPAIR. |
+| **High** | `normalizeDefects` passed a non-string `details` straight through, and every consumer calls `.trim()` on it — so one malformed record threw inside the render and the whole page showed a runtime error instead of the board. Reachable from a JSON backup import, which validates only `id`, `n` and `l`. | `details` is coerced at the read boundary every consumer already passes through. |
 | Low | A saved default view of Open or Down Sheet left a filtered board with no button lit and no way back without opening settings. | Each button appears while its own filter is active, so it explains the view and clears it. |
 
 ## The way back
@@ -1364,13 +1365,16 @@ of watching a mechanic use the app for the first time.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`0153c09`** |
-| Last code-bearing commit | `0153c09` — the release source is this commit |
+| **Release source** | **`5aab35f`** |
+| Last code-bearing commit | `5aab35f` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 144, from `9f1f73f` |
 
 ```
-git log --oneline 9f1f73f..0153c09
+git log --oneline 9f1f73f..5aab35f
+5aab35f Never let one malformed record take a whole page down   <- this release
+a5fff18 Rewrite the 145 log block from actual git output   <- docs only
+6321f7d Repoint the 145 handoff at the fix commit   <- docs only
 0153c09 Fix five defects a cold review of the queued releases found   <- this release
 8741bd2 Correct three facts in the Version 145 handoff   <- docs only
 eb2d508 Repoint the 145 handoff at the SETTINGS commit   <- docs only
@@ -1384,10 +1388,10 @@ c7b86f6 Queue Version 144   <- docs only
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 2bcf1b0 0153c09 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 2bcf1b0 5aab35f -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: 191 tests passing (up from 188 at Version 144), ESLint clean, production
+Gate: 192 tests passing (up from 188 at Version 144), ESLint clean, production
 build succeeds.
 
 ## Migrations
@@ -1469,7 +1473,7 @@ change on that page.
 
 ## Validation
 
-- 191 regression tests passing, ESLint clean, production build succeeds
+- 192 regression tests passing, ESLint clean, production build succeeds
 - **Driven in a real browser at 390 wide.** Defect Log: stats closed on first
   load, opened, remembered across a reload, closed again; LOG DEFECT visible
   without scrolling and present exactly once; each filter pressed on and off
