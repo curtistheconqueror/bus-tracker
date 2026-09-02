@@ -1,10 +1,11 @@
 # Publish next
 
-**STATUS: VERSION 141 PENDING — publish from `1ff1224`. Version 140 is live.**
+**STATUS: VERSION 142 PENDING — publish from `1ff1224`. Version 141 is live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **141** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
+| Next | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
+| Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
 | Published | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
 | Published | **139** | `a33ffab` | Tech Services is grouped the way the shop's check-off sheets are laid out: Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |
 | Published | **138** | `0969840` | A/C counts its fans, says Freon, and records the HVAC diag lamp and alarm number |
@@ -12,7 +13,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 140 is live from `f0c7939`. Version 141 is next from `1ff1224`; its handoff is at the bottom of this file.** It carries Codex's `e99e06a` (the enlarged DS badge), which is on `main` but not yet live. The 136–140 handoffs are retained as release records.
+**Version 141 is live from `e99e06a`. Version 142 is next from `1ff1224`; its handoff is at the bottom of this file.** The 136–140 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -933,9 +934,9 @@ Suggested `docs/RELEASES.md` row:
 
 ---
 
-# Version 141 — Every line on a card starts at the same tab stop
+# Version 142 — Every line on a card starts at the same tab stop
 
-**Publish this next, after Version 140.** Curtis asked for this to be built so
+**Publish this next, after Version 141.** Curtis asked for this to be built so
 it can be taken back if he does not like the new layout; the way back is at the
 end of this section.
 
@@ -945,16 +946,12 @@ end of this section.
 | --- | --- |
 | **Release source** | **`1ff1224`** |
 | Last code-bearing commit | `1ff1224` — the release source is this commit |
-| Also carried | `e99e06a` — Codex's enlarged DS badge, on `main` since 140 went live, not yet published |
 | Branch | `main` on the private `origin` remote |
-| Previous | Version 140, published from `f0c7939` |
+| Previous | Version 141, published from `e99e06a` |
 
 ```
-git log --oneline f0c7939..1ff1224
-1ff1224 Give every card line a fixed tab stop, and bring the reading text up a step   <- this release
-e99e06a Enlarge Defect Log Down Sheet badge                                        <- Codex, carried
-6ca9f4f Record Sites Versions 139 and 140 releases                                 <- docs only
-54fba33 Queue Version 140                                                          <- docs only
+git log --oneline e99e06a..1ff1224
+1ff1224 Give every card line a fixed tab stop, and bring the reading text up a step   <- one commit on top of the live version
 
 git diff --name-only e99e06a 1ff1224 -- app
 app/defect-log/defect-log.css
@@ -1014,7 +1011,7 @@ at x146 at 390 wide.
 | ×N | 28 × 21, 10px | **38 × 24, 11px** |
 
 Both on the same colour token, so a Down Sheet badge colour set on the Facility
-Map recolours both here. Both carry the thin border Codex gave DS in `e99e06a`.
+Map recolours both here. Both carry the thin border Codex gave DS in Version 141 (`e99e06a`); this release keeps that border and brings the size up a further step, as asked.
 
 ### 4. Reading text comes up one step, on all three feeds
 
@@ -1036,8 +1033,8 @@ between OPEN and FIXED.
 
 **If Curtis does not like the new layout**, either is clean:
 
-- **Publish from `e99e06a`** instead. That is `main` as Codex left it, with the
-  enlarged DS badge and none of this.
+- **Republish Version 141 from `e99e06a`.** That is the live version as it stands
+  today, with Codex's enlarged DS badge and none of this.
 - Or revert on `main` and publish the revert: `git revert 1ff1224` produces one new
   commit that removes exactly this release and nothing else. It is a single
   code commit for that reason.
@@ -1055,7 +1052,7 @@ between OPEN and FIXED.
   timestamp shift in expanded Defect Log rows, now fixed. After the size
   changes, nothing on any of the three pages overflows its box, and no reading
   text remains below 8px
-- Codex's `e99e06a` was brought underneath this work by fast-forward, not
+- Version 141's `e99e06a` was brought underneath this work by fast-forward, not
   merged over; its border and colour-token wiring are kept
 
 ## After it is live
@@ -1085,5 +1082,5 @@ between OPEN and FIXED.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 141 | Live | <published tip hash> | Every line on a Defect Log card sits at a fixed tab stop regardless of which badges the bus carries — OPEN, status, LATEST and VIEW at the same place on every card, the title without the duplicated category emoji — with DS and ×N as a matched 24px pair on one colour token (carrying the enlarged, bordered DS badge from e99e06a); the small grey reading text comes up a step on the Defect Log, Fixed Repairs and Down Sheet feeds while editor and settings labels stay as they were. One code commit, reversible with a single revert |
+| 142 | Live | <published tip hash> | Every line on a Defect Log card sits at a fixed tab stop regardless of which badges the bus carries — OPEN, status, LATEST and VIEW at the same place on every card, the title without the duplicated category emoji — with DS and ×N as a matched 24px pair on one colour token (one step above the Version 141 DS badge, keeping its border); the small grey reading text comes up a step on the Defect Log, Fixed Repairs and Down Sheet feeds while editor and settings labels stay as they were. One code commit, reversible with a single revert |
 ```
