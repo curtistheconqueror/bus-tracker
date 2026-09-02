@@ -580,3 +580,17 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-card-group>.log-group-header{grid-template-columns:82px minmax(0,1fr) 150px}
 @media(max-width:760px){.log-card-group>.log-group-header{grid-template-columns:72px minmax(0,1fr)}.log-card-group>.log-group-header .log-meta{grid-column:1/-1}}
 @media(max-width:390px){.log-card-group>.log-group-header{grid-template-columns:64px minmax(0,1fr)}}
+
+/* ── The four choices under the save buttons, and SEARCH ─────────────────────
+   Read on a phone at 7-8px, which is smaller than anything else a mechanic
+   has to act on. The label comes to 11px and the line under it to 10px, and
+   the copy is cut to what is needed to choose. Appended last so source order
+   settles the tie with the earlier .downsheet-check rules. */
+.downsheet-check b{font-size:11px;letter-spacing:.2px}
+.downsheet-check small{font-size:10px;line-height:1.35}
+.deferred-history-note{font-size:10px}
+.deferred-history-note b{font-size:11px}
+/* SEARCH is the word somebody hunts for on a page they have not used before,
+   so it is black and the size of the text beside it, not a 7px grey caption. */
+.log-search span{font-size:11px;font-weight:900;color:var(--log-text,#172b4d);letter-spacing:.2px}
+@media(max-width:760px){.downsheet-check b{font-size:12px}.downsheet-check small{font-size:11px}.deferred-history-note{font-size:11px}.deferred-history-note b{font-size:12px}.log-search span{font-size:12px}}

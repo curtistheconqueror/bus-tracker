@@ -6514,7 +6514,9 @@ test("DEFERRED cannot be ticked on a repair the Down Sheet already has, and a wr
     SHEET both ticked — a combination the form refuses to let anybody create.
     Measured in a browser, not assumed: both boxes came back checked. */
  assert.match(logPage, /disabled=\{value\.defect\.state==="completed"\|\|value\.onDownSheet\}/);
- assert.match(logPage, /This repair is on the Down Sheet and the sheet has it deferred/);
+ /* The tick still shows the truth and still says where the state came from;
+    the sentence is shorter since the copy was cut for phone reading. */
+ assert.match(logPage, /On the sheet, and the sheet has it deferred\./);
  // A deferredAt in the future rendered "DEFERRED -120M" before this floor.
  assert.match(logPage, /return elapsed===null\?null:Math\.max\(0,elapsed\)/);
  // The floor is display-only: the alert and the review still read the signed

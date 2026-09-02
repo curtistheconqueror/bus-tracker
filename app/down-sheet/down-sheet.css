@@ -267,3 +267,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    The 7px lines under the bus number, in the assignment cell, the estimate
    cell and the updated cell come up to 8px, in step with the other feeds. */
 .fleet-number small,.assignment small,.estimate-cell small,.updated small{font-size:8px}
+
+/* SEARCH matches the Defect Log's: black and readable, not a 7px grey caption.
+   ORDER beside it stays a caption on purpose — one of the two is the thing a
+   first-time user is looking for. */
+.down-view-controls .down-search>b{font-size:11px;font-weight:900;color:var(--down-ink,#172b4d);letter-spacing:.2px}
+@media(max-width:760px){.down-view-controls .down-search>b{font-size:12px}}
