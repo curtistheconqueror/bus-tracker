@@ -1200,3 +1200,138 @@ Suggested `docs/RELEASES.md` row:
 ```
 | 143 | Live | <published tip hash> | The collapsed Defect Log bus card no longer shows a category glyph — the round icon showed only the first defect's category, one category standing in for three on a multi-defect bus — while each expanded defect row and each Fixed Repairs card keeps its own emoji; the icon column is removed from the header grid so every card shifts equally and the 142 tab stops hold |
 ```
+
+---
+
+# Version 144 — The choices you have to read, and the word you look for
+
+**Publish this next, after Version 143.** Stage one of a two-stage cleanup of
+the Defect Log, prompted by watching a mechanic use the app for the first time.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`9f1f73f`** |
+| Last code-bearing commit | `9f1f73f` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 143, published from `f94608b` |
+
+```
+git log --oneline 3082954..9f1f73f
+9f1f73f Make the four save-screen choices readable, and name the search SEARCH
+
+git diff --name-only 3082954 9f1f73f -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet.css
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 3082954 9f1f73f -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 188 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None.** Copy and CSS. Nothing a record carries is different, and no control
+changed what it does.
+
+## What changed
+
+### 1. The four choices under the save buttons
+
+They carried their label at 7–8px and their explanation at 7px — smaller than
+anything else a mechanic has to act on — and the explanations had grown into
+paragraphs that have to be read past to make a choice.
+
+| | Version 143 | Version 144 |
+| --- | --- | --- |
+| Label | 7–8 px | **11 px, 12 on a phone** |
+| Explanation | 7 px | **10 px, 11 on a phone** |
+
+The copy is cut to what is needed to choose:
+
+| Choice | Now reads |
+| --- | --- |
+| RECOMMEND FOR DOWN SHEET | Put it forward for the sheet. Not added yet. |
+| DOWN SHEET | Add it to the sheet now. |
+| DEFERRED | Hold the bus back from service. |
+| DEFECT / CONDITION NOT DUPLICATED | Could not reproduce the reported condition. |
+
+DEFERRED has four conditional messages depending on the record's state. All
+four are cut the same way and all four still say which state the record is in
+and where it came from — including the one that explains why the box is
+disabled while the repair is on the Down Sheet. WAS DEFERRED keeps the return
+time and drops the rest.
+
+### 2. SEARCH
+
+The Defect Log's search box was labelled **FIND** in 7px grey. That is not a
+word somebody scans a page for, and it was the smallest text on the row. It now
+reads **SEARCH**, 11px, weight 900, in the page's ink.
+
+The Down Sheet already said SEARCH but in the same 7px grey caption style; it
+is brought to the same size and weight, so the two pages match. **ORDER** beside
+it stays a caption on purpose — one of the two is the thing a first-time user
+is looking for, and making both loud would be no help.
+
+**The Facility Map's LOCATE is deliberately unchanged.** It jumps to a bus on
+the map rather than searching a list, so calling it SEARCH would name two
+different actions the same thing.
+
+Fixed Repairs and Fleet Campaigns have no text search box, so there was nothing
+to rename there.
+
+## Validation
+
+- 188 regression tests passing, ESLint clean, production build succeeds
+- **Measured at 390 wide in a real browser**: every card label 12px, every copy
+  line 11px, no card taller than 54px, nothing clipped, nothing overflowing its
+  box, no page errors
+- Both search labels read back at 12px / weight 900 in the page ink; ORDER
+  beside the Down Sheet's stays at 8px as intended
+- One test pinned the old DEFERRED sentence and was updated to the new wording;
+  what it checks — that the box is disabled on a Down Sheet repair and says why
+  — is unchanged
+
+## After it is live
+
+1. **Open any repair and scroll to the four choices.** Label and explanation
+   should be readable at arm's length without leaning in.
+2. **Open a repair that is on the Down Sheet.** DEFERRED should still be
+   disabled and still explain why, in one line.
+3. **Open a repair that was deferred and returned to service.** The WAS
+   DEFERRED note should show the return time and say it is still open.
+4. **Defect Log and Down Sheet.** Both search boxes should be labelled SEARCH
+   in black, clearly larger than before.
+5. **Facility Map.** LOCATE is unchanged; that is intended.
+
+## Still to come — stage two
+
+Not in this release, queued next: collapse the five summary tiles into a
+DAILY STATS bar closed by default, drop the OPEN and DOWN SHEET filter
+buttons while keeping the OPEN key working for anybody whose saved default
+view uses it, let a filter be pressed again to turn it off, and move
++ LOG DEFECT up so the page opens on what it is for.
+
+## The way back
+
+`git revert 9f1f73f` — one commit, copy and CSS only.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 144 | Live | <published tip hash> | The four choices under the save buttons — recommend, down sheet, deferred, not duplicated — are readable on a phone at 11-12px with their explanations cut to one short line each, and the Defect Log's 7px grey FIND label becomes a black 11px SEARCH matching the Down Sheet's, which is brought to the same size; the Facility Map's LOCATE is left as it is because it jumps to a bus rather than searching a list |
+```
