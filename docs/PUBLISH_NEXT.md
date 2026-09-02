@@ -1102,12 +1102,17 @@ kept as its own commit so either can be taken back without the other.
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 142, published from `1ff1224` |
 
-Two commits since the live version; one of them is Codex's release record:
+Five commits since the live version; only the top one is application code. The
+other four are the 142 handoff being written and corrected, and Codex's release
+record:
 
 ```
 git log --oneline 1ff1224..f94608b
 f94608b Take the category glyph off the collapsed bus card      <- this release
-ebd4727 Record Sites Versions 141 and 142 releases           <- docs only
+ebd4727 Record Sites Versions 141 and 142 releases           <- docs only (Codex)
+8fdd0e2 Renumber the queued polish release to Version 142    <- docs only
+a9c6305 Correct the 141 handoff's commit range               <- docs only
+ded95b4 Queue Version 141                                    <- docs only
 
 git diff --name-only ebd4727 f94608b -- app
 app/defect-log/defect-log.css
