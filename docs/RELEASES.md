@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 142 | Live | 1ff1224 | Card lines align at fixed tab stops with clearer reading text across Defect Log, Down Sheet and Fixed Repairs |
+| 143 | Live | f94608b | Collapsed Defect Log bus cards no longer display one defect's category glyph; expanded defect rows retain their own glyphs |
+| 142 | Previous live | 1ff1224 | Card lines align at fixed tab stops with clearer reading text across Defect Log, Down Sheet and Fixed Repairs |
 | 141 | Previous live | e99e06a | Enlarged Defect Log Down Sheet badge using Facility Map's saved editable colors |
 | 140 | Previous live | f0c7939 | SCAN SWEEP reads farebox and Ventra check-off sheets from photos using the existing scan configuration; includes Version 139 Tech Services sheet-style grouping |
 | 139 | Previous live | a33ffab | Tech Services is grouped by Farebox, Ventra, CUBIC Screen, IBS Screen, Signs and Cameras |

@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 142
-Live feature checkpoint: commit 1ff1224
+Live release: Sites Version 143
+Live feature checkpoint: commit f94608b
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 142 is the current user-approved live release. Its source checkpoint is commit 1ff1224. Defect Log, Down Sheet and Fixed Repairs card lines now align at fixed tab stops and have clearer reading text; the enlarged, Facility Map-colored Down Sheet badge remains in place from Version 141. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Version 143 is the current user-approved live release. Its source checkpoint is commit f94608b. A collapsed Defect Log bus card no longer wears the category glyph of one of its defects; category glyphs remain on the individual expanded defect rows. The Version 142 fixed card tab stops, clearer reading text, and the enlarged, Facility Map-colored Down Sheet badge remain in place. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 143 PENDING — publish from `f94608b`. Version 142 is live.**
+**STATUS: NONE PENDING — Sites Version 143 was published from `f94608b` on 2026-09-02.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
+| Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
 | Published | **142** | `1ff1224` | Every card line sits at a fixed tab stop, the two purple badges are a matched pair, and the reading text comes up a step on all three feeds |
 | Published | **141** | `e99e06a` | Enlarged Down Sheet badge on the Defect Log (Codex) |
 | Published | **140** | `f0c7939` | SCAN SWEEP on the Defect Log reads the farebox and Ventra check-off sheets from a photo and files what they found |
@@ -14,7 +14,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 142 is live from `1ff1224`. Version 143 is next from `f94608b`; its handoff is at the bottom of this file.** The 136–142 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 143 is live from `f94608b`.** The 136–143 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
