@@ -954,6 +954,7 @@ git log --oneline f0c7939..1ff1224
 1ff1224 Give every card line a fixed tab stop, and bring the reading text up a step   <- this release
 e99e06a Enlarge Defect Log Down Sheet badge                                        <- Codex, carried
 6ca9f4f Record Sites Versions 139 and 140 releases                                 <- docs only
+54fba33 Queue Version 140                                                          <- docs only
 
 git diff --name-only e99e06a 1ff1224 -- app
 app/defect-log/defect-log.css
