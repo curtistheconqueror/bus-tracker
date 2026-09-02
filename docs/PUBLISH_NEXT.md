@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSIONS 139 AND 140 PENDING — publish 139 from `a33ffab` first, then 140 from `f0c7939`. Version 138 is live.**
+**STATUS: NONE PENDING — Sites Version 140 was published from f0c7939 on 2026-09-01.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
