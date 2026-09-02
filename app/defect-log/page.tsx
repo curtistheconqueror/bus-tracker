@@ -5,6 +5,8 @@ import "./defect-log.css";
 import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryEmoji,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {defectLogRecords,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
+import SweepScanner from "./sweep-scanner";
+import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import SectionTransferControls from "../section-transfer-controls";
@@ -485,6 +487,7 @@ export default function DefectLog(){
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
+ const [sweepOpen,setSweepOpen]=useState(false);
 
  useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
@@ -601,6 +604,28 @@ export default function DefectLog(){
    ...Object.fromEntries(result.groups.flatMap(group=>group.droppedIds.map(id=>[id,now])))});
   alert(result.removed+" duplicate record"+(result.removed===1?"":"s")+" merged on "+result.busesAffected+" bus"+(result.busesAffected===1?"":"es")+". Nothing was deleted — each fault is now on one record.");
  };
+ /* Files the findings a reviewer approved from a scanned farebox / Ventra
+    sweep sheet. Each goes through the same single-record save as LOG DEFECT,
+    so the 48-hour duplicate guard applies to every one: a fault somebody
+    already logged this week is skipped, not doubled. The fleet is threaded
+    through one save at a time and written once at the end, so a refused write
+    leaves the board exactly as it was — and, as with every change here, UNDO
+    LAST is the way back. */
+ const fileSweep=(findings:SweepFinding[])=>{
+  const now=new Date().toISOString();
+  let nextFleet=fleet,nextDown=downEntries,filed=0,skipped=0;
+  for(const finding of findings){
+   const result=saveDefectLogRecord(nextFleet,nextDown,finding.busId,sweepDefect(finding,now),false,now);
+   if(result.error){skipped++;continue}
+   nextFleet=result.fleet;nextDown=result.downEntries;filed++;
+  }
+  if(!filed){alert(skipped?"Nothing was filed. Every approved finding was already logged on its bus in the last 48 hours.":"Nothing was filed.");return}
+  const written=persist(nextFleet,nextDown);
+  if(!written.ok)return;
+  setUndoSnapshot({fleet,downEntries,label:"Filed "+filed+" sweep finding"+(filed===1?"":"s")});
+  setSweepOpen(false);
+  alert(filed+" finding"+(filed===1?"":"s")+" filed as open Tech Services defect"+(filed===1?"":"s")+(skipped?". "+skipped+" skipped — already logged on that bus in the last 48 hours":"")+". UNDO LAST reverses it.");
+ };
  const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);if(undoSnapshot.mergedAway)writeMergedAway(localStorage,undoSnapshot.mergedAway);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
@@ -660,7 +685,7 @@ export default function DefectLog(){
    </article>})}</div>:<div className="mystery-empty"><b>Nothing unaccounted for.</b><span>Every eligible on-site work-area bus is accounted for on the Down Sheet.</span></div>)}
   </section>
   <section className="log-feed">
-   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   <div className="feed-title"><div className="feed-actions"><button onClick={()=>setEditing(newDraft())}>+ LOG DEFECT</button><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button>{sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}<a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · ");return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>

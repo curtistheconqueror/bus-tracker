@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
+import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../app/defect-log/sweep-scan-import.ts";
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../app/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
@@ -1626,7 +1627,12 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.match(page, /currentEntries=\{active\}/);
   assert.ok(scanner.includes("READING PAGE"));
   assert.ok(scanner.includes("scanReadyPhoto"));
-  assert.ok(scanner.includes("700*1024"));
+  /* The size cap moved to app/scan-photo.ts so the Down Sheet scan and the
+     farebox / Ventra sweep scan share one limit. The invariant is the same:
+     photos are capped at 700 KB before they leave the phone. */
+  const scanPhoto = await readFile(new URL("../app/scan-photo.ts", import.meta.url), "utf8");
+  assert.ok(scanPhoto.includes("700*1024"));
+  assert.match(scanner, /import \{scanReadyPhoto\} from "\.\.\/scan-photo"/);
   assert.ok(route.includes("OPENROUTER_API_KEY"));
   assert.ok(route.includes('import("cloudflare:workers")'));
   assert.ok(route.includes('"google/gemini-2.5-flash"'));
@@ -6767,4 +6773,156 @@ test("the IBS & Ventra quick filter finds the CUBIC screens, which are the Ventr
  /* And still not a farebox. */
  assert.equal(quickFilterDefects(bus("Farebox"),"ibs-ventra").length,0);
  assert.equal(quickFilterDefects(bus("Farebox"),"farebox").length,1);
+});
+
+test("the sweep scan turns marks into findings, lets a written note beat the column it explains, and never reads blank as OK", async () => {
+ const fleet=[
+  {id:"b-15506",n:"15506",defects:[]},
+  {id:"b-17531",n:"17531",defects:[]},
+  {id:"b-17548",n:"17548",defects:[]},
+  {id:"b-17523",n:"17523",defects:[{id:"x",category:"Tech Services",issue:"CUBIC Screen - MV ER",details:"",operability:"service",state:"open"}]},
+  {id:"b-dupA",n:"18500",defects:[]},{id:"b-dupB",n:"18500",defects:[]},
+ ];
+
+ /* Anything the route returns is untrusted: a mark that is not one of the four
+    words reads as blank, and blank is never ok. */
+ const raw=normalizeSweepRow({pageNumber:2,sheet:"FAREBOX",busNumber:"Bus 17548",dt:"nonsense",mv:"",power:"OK",bills:"fault",coin:"ok",initial:"CJ",note:"",confidence:"0.9",reviewNote:""});
+ assert.equal(raw.sheet,"farebox");
+ assert.equal(raw.busNumber,"17548");
+ assert.equal(raw.dt,"blank","an unknown mark word must read as blank, never ok");
+ assert.equal(raw.mv,"blank");
+ assert.equal(raw.power,"ok");
+ assert.equal(raw.bills,"fault");
+ assert.equal(raw.confidence,0.9);
+
+ const rows=[
+  /* Ventra sheet: DT error, MV fine. */
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"15506",dt:"fault",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+  /* Farebox sheet: the same bus, ticked OK, with the foot-of-sheet note. */
+  normalizeSweepRow({pageNumber:2,sheet:"farebox",busNumber:"15506",dt:"blank",mv:"blank",power:"ok",bills:"ok",coin:"fault",initial:"Cw",note:"coin off line",confidence:.8,reviewNote:""}),
+  /* A note written across all three cells. */
+  normalizeSweepRow({pageNumber:2,sheet:"farebox",busNumber:"17531",dt:"blank",mv:"blank",power:"fault",bills:"fault",coin:"fault",initial:"BB",note:"coin off line blank screen",confidence:.7,reviewNote:"words across the row"}),
+  /* A plain column fault with no note. */
+  raw,
+  /* Already on the board. */
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"17523",dt:"unclear",mv:"fault",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.85,reviewNote:"DT cell holds a dash"}),
+  /* Two buses share this fleet number. */
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"18500",dt:"fault",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+  /* Not in the fleet at all. */
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"99999",dt:"fault",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+  /* Blank everywhere: must produce nothing, not an OK. */
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"17500",dt:"blank",mv:"blank",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:1,reviewNote:""}),
+ ];
+ const findings=sweepFindings(rows,fleet);
+ const by=bus=>findings.filter(f=>f.busNumber===bus).map(f=>f.source+":"+f.issue).sort();
+
+ /* DT and MV are the two CUBIC screens. */
+ assert.deepEqual(by("15506"),["dt:CUBIC Screen - BUS ER","note:Farebox - Coin off line"].sort());
+ /* The note explained the coin column, so the generic coin fault is NOT also filed. */
+ assert.ok(!by("15506").includes("coin:Farebox - Coin mech INOP"),"a note beats the column it explains");
+
+ /* Two faults out of one note; the columns it covered stay quiet, the one it did not (power) does not. */
+ assert.deepEqual(by("17531"),["note:Farebox - Coin off line","note:Farebox - Blank / black screen","power:Farebox - No power","bills:Farebox - Bill transport INOP"].sort());
+
+ /* A bare column fault maps straight to its option. */
+ assert.deepEqual(by("17548"),["bills:Farebox - Bill transport INOP"]);
+
+ /* Already open on the bus: offered, but unticked, and labelled. */
+ const known=findings.find(f=>f.busNumber==="17523");
+ assert.equal(known.issue,"CUBIC Screen - MV ER");
+ assert.equal(known.alreadyOpen,true);
+ assert.equal(known.selected,false,"a finding already on the board must not be pre-selected");
+ /* An unclear cell never becomes a finding. */
+ assert.ok(!by("17523").some(s=>s.startsWith("dt:")),"unclear must not file");
+
+ /* Fleet matching, same rules as the Down Sheet scan. */
+ assert.equal(findings.find(f=>f.busNumber==="18500").fleetMatch,"duplicate");
+ assert.equal(findings.find(f=>f.busNumber==="18500").selected,false);
+ assert.equal(findings.find(f=>f.busNumber==="99999").fleetMatch,"unknown");
+ assert.equal(findings.find(f=>f.busNumber==="99999").selected,false);
+
+ /* Blank is nobody looked. */
+ assert.equal(by("17500").length,0);
+
+ /* Everything a finding points at is a real Tech Services option. */
+ for(const f of findings)assert.ok(REPAIR_OPTIONS["Tech Services"].includes(f.issue),f.issue+" is not a Tech Services option");
+});
+
+test("sweep notes name the shop's own faults, and opposite lock faults never collide", () => {
+ const issues=note=>noteIssues(note).map(item=>item.issue);
+ assert.deepEqual(issues("coin off line"),["Farebox - Coin off line"]);
+ assert.deepEqual(issues("Coin offline"),["Farebox - Coin off line"]);
+ assert.deepEqual(issues("says unlock won't lock"),["Farebox - Unlocked / won't lock"]);
+ assert.deepEqual(issues("farebox unlocked"),["Farebox - Unlocked / won't lock"]);
+ assert.deepEqual(issues("blank screen"),["Farebox - Blank / black screen"]);
+ assert.deepEqual(issues("coin bin missing"),["Farebox - Coin bin missing"]);
+ /* "Can't unlock" is the OPPOSITE of "won't lock" and must not produce both. */
+ assert.deepEqual(issues("can't unlock top to reset coin bypass"),["Farebox - Can't unlock top / coin bypass reset"]);
+ assert.deepEqual(issues(""),[]);
+ assert.deepEqual(issues("Cw"),[],"initials are not a fault");
+});
+
+test("the sweep lists buses ticked OK that the board still holds open, and files with provenance", () => {
+ const fleet=[
+  {id:"a",n:"17533",defects:[
+   {id:"1",category:"Tech Services",issue:"Farebox",details:"",operability:"service",state:"open"},
+   {id:"2",category:"Tech Services",issue:"CUBIC Screen - BUS ER",details:"",operability:"service",state:"open"},
+   {id:"3",category:"Brakes",issue:"Other brake repair",details:"",operability:"service",state:"open"},
+  ]},
+  {id:"b",n:"18507",defects:[{id:"4",category:"Tech Services",issue:"Destination Sign",details:"",operability:"service",state:"open"}]},
+  {id:"c",n:"17554",defects:[{id:"5",category:"Tech Services",issue:"Ventra",details:"",operability:"service",state:"completed"}]},
+ ];
+ const rows=[
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"17533",dt:"ok",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+  normalizeSweepRow({pageNumber:2,sheet:"farebox",busNumber:"17533",dt:"blank",mv:"blank",power:"ok",bills:"ok",coin:"ok",initial:"Cw",note:"",confidence:.9,reviewNote:""}),
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"18507",dt:"ok",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+  normalizeSweepRow({pageNumber:1,sheet:"ventra",busNumber:"17554",dt:"ok",mv:"ok",power:"blank",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""}),
+ ];
+ const ok=sweepOkAgainstBoard(rows,fleet);
+ /* 17533: both devices OK on the sheet, farebox AND cubic open on the board — listed, brakes excluded. */
+ const bus=ok.find(item=>item.busNumber==="17533");
+ assert.ok(bus);
+ assert.deepEqual(bus.openIssues.sort(),["CUBIC Screen - BUS ER","Farebox - INOP (general)"],"stored wordings are read through the migration, and non-Tech-Services records are ignored");
+ /* 18507's open record is a destination sign; the sweep does not check those. */
+ assert.ok(!ok.some(item=>item.busNumber==="18507"),"a record the sweep cannot see is not a disagreement");
+ /* 17554's Ventra record is already completed. */
+ assert.ok(!ok.some(item=>item.busNumber==="17554"));
+
+ /* The record a finding becomes carries where it came from. */
+ const finding=sweepFindings([normalizeSweepRow({pageNumber:2,sheet:"farebox",busNumber:"17531",dt:"blank",mv:"blank",power:"blank",bills:"blank",coin:"fault",initial:"BB",note:"coin off line",confidence:.8,reviewNote:""})],[{id:"z",n:"17531",defects:[]}])[0];
+ const defect=sweepDefect(finding,"2026-08-29T21:00:00.000Z");
+ assert.equal(defect.category,"Tech Services");
+ assert.equal(defect.issue,"Farebox - Coin off line");
+ assert.match(defect.details,/^coin off line — Sweep sheet p2 · checked by BB$/);
+ assert.equal(defect.reportedBy,"BB");
+ assert.equal(defect.state,"open");
+ assert.equal(defect.source,"defect-log");
+ assert.equal(defect.createdAt,"2026-08-29T21:00:00.000Z");
+});
+
+test("the sweep scanner is its own door on the Defect Log and never touches the Down Sheet", async () => {
+ const [logPage,scanner,route,downScanner]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8"),
+ ]);
+ /* A separate button next to LOG DEFECT, not the Down Sheet's scan button. */
+ assert.match(logPage,/className="sweep-scan-button"[^>]*onClick=\{\(\)=>setSweepOpen\(true\)\}[^>]*>📷 SCAN SWEEP</);
+ assert.match(logPage,/<SweepScanner fleet=\{fleet\} onClose=\{\(\)=>setSweepOpen\(false\)\} onFile=\{fileSweep\}\/>/);
+ /* Filing goes through the same single-record save as LOG DEFECT, and UNDO LAST covers it. */
+ assert.match(logPage,/saveDefectLogRecord\(nextFleet,nextDown,finding\.busId,sweepDefect\(finding,now\),false,now\)/);
+ assert.match(logPage,/setUndoSnapshot\(\{fleet,downEntries,label:"Filed "\+filed\+" sweep finding"/);
+ /* Nothing is claimed on a refused write. */
+ assert.match(logPage,/const written=persist\(nextFleet,nextDown\);\s*if\(!written\.ok\)return;/);
+ /* The scanner posts to its own route and shares the photo prep. */
+ assert.match(scanner,/fetch\("\/api\/sweep-scan"/);
+ assert.match(scanner,/import \{scanReadyPhoto\} from "\.\.\/scan-photo"/);
+ assert.match(downScanner,/import \{scanReadyPhoto\} from "\.\.\/scan-photo"/,"the Down Sheet scanner shares the same photo prep");
+ assert.doesNotMatch(scanner,/down-sheet|DownSheet|writeDownSheetStorage/,"the sweep scanner must not know the Down Sheet exists");
+ /* The route's description of the sheet carries the rule that matters most. */
+ assert.match(route,/Blank means nobody checked it\. It NEVER means working\./);
+ assert.match(route,/a dash is a check, not a fault/);
+ assert.match(route,/Never invent a bus, a mark, or a fault/);
+ assert.match(route,/enum:\["ok","fault","blank","unclear"\]/);
 });

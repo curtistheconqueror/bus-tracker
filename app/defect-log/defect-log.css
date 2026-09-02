@@ -493,3 +493,30 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 /* The one-digit warning. Amber rather than red: the entry is incomplete, not
    wrong, and a mechanic mid-typing should not be shouted at. */
 .diag-light-picker>small.diag-alarm-warning{color:#8a5a00;font-weight:900}
+
+/* ── Farebox / Ventra sweep scan ─────────────────────────────────────────────
+   Same shape as the Down Sheet scan modal so the two read as one kind of thing,
+   but built on the log's own tokens so it sits in this page's theme. Purple is
+   the scan colour across the app; it stays here for the same reason. */
+.sweep-scan-button{border:1px solid #6b31b6!important;background:#f2eaff!important;color:#3d1c6e!important}
+.feed-title .sweep-scan-button:disabled{opacity:.55}
+.sweep-modal{width:min(1180px,98vw);max-height:96vh;display:flex;flex-direction:column;border-radius:11px;background:var(--log-surface,#f8fafc);box-shadow:0 25px 85px #000b;overflow:hidden}
+.sweep-body{display:flex;flex-direction:column;gap:12px;min-height:260px;padding:16px 18px;overflow:auto}
+.sweep-intro{display:grid;gap:4px;padding:11px 13px;border-left:4px solid #6b31b6;background:#f2eaff;color:#2b2350}.sweep-intro b{font-size:11px}.sweep-intro span{font-size:9px;line-height:1.4}
+.sweep-pickers{display:flex;justify-content:center;gap:12px;padding:8px}.sweep-pickers button,.sweep-read{min-height:42px;border:0;border-radius:7px;padding:0 22px;background:#173d74;color:#fff;font-size:10px;font-weight:900;cursor:pointer;touch-action:manipulation}.sweep-pickers button:first-child{background:#08733f}
+.sweep-file-input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}
+.sweep-previews{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}.sweep-previews:empty{display:none}.sweep-previews figure{margin:0;border:1px solid var(--log-border,#b8c4d6);border-radius:7px;background:#fff;overflow:hidden}.sweep-previews img{display:block;width:100%;height:150px;object-fit:cover}.sweep-previews figcaption{display:flex;align-items:center;justify-content:space-between;padding:7px;font-size:8px;font-weight:900}.sweep-previews figcaption button{border:0;background:transparent;color:#a1262e;font-size:7px;font-weight:900;cursor:pointer}
+.sweep-read{align-self:center;min-width:180px;background:#6b31b6}.sweep-read:disabled{opacity:.45;cursor:not-allowed}
+.sweep-review-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--log-border,#c7d1e1);border-radius:7px;background:#fff}.sweep-review-head div{display:flex;flex-direction:column;gap:2px}.sweep-review-head b{font-size:11px;color:#183b6d}.sweep-review-head span{font-size:8px;color:#65758e}.sweep-review-head button{border:1px solid #aebcd1;border-radius:5px;background:#f4f7fb;padding:7px 10px;color:#314a6d;font-size:8px;font-weight:900;cursor:pointer}
+.sweep-rows{display:grid;gap:8px;max-height:48vh;overflow:auto;padding-right:4px}
+.sweep-row{display:grid;grid-template-columns:28px 105px minmax(220px,1.6fr) minmax(220px,1.4fr) 70px;gap:8px;align-items:end;padding:9px;border:1px solid var(--log-border,#b9c7da);border-radius:7px;background:#fff}
+.sweep-row.unknown,.sweep-row.duplicate{border-color:#df9b43;background:#fff8ea}.sweep-row.already{border-style:dashed;opacity:.85}
+.sweep-row label{display:flex;flex-direction:column;gap:4px;color:#5a6d89;font-size:7px;font-weight:900}.sweep-row input,.sweep-row select{width:100%;height:34px;border:1px solid var(--log-border,#b8c4d6);border-radius:5px;background:#fff;padding:5px 7px;color:#1d3457;font-size:9px;font-weight:700}
+.sweep-select{align-self:center!important}.sweep-select input{width:18px;height:18px}
+.sweep-bus{display:flex;flex-direction:column;gap:2px;align-self:center}.sweep-bus small{font-size:7px;color:#75849b}.sweep-bus b{font-size:17px;color:#073d7c}.sweep-bus em{font-size:7px;font-style:normal;font-weight:900;color:#187443}.sweep-row.unknown .sweep-bus em,.sweep-row.duplicate .sweep-bus em{color:#a55c00}.sweep-row.already .sweep-bus em{color:#6b31b6}
+.sweep-source{align-self:center;display:inline-flex;justify-content:center;border-radius:4px;padding:5px 6px;font-size:8px;font-weight:900;letter-spacing:.3px;background:#eef2f8;color:#314a6d}.sweep-source.note{background:#fff3d6;color:#7a4d05}
+.sweep-row .sweep-review-note{color:#9b5800;font-size:7px;line-height:1.3}
+.sweep-ok{border:1px solid #c9b46a;border-radius:8px;background:#fffbea;overflow:hidden}.sweep-ok header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#f6e9b3}.sweep-ok header span{display:flex;flex-direction:column;gap:2px}.sweep-ok header b{color:#5d4a00;font-size:10px}.sweep-ok header small{color:#6f6230;font-size:8px}.sweep-ok header strong{flex:none;border-radius:5px;background:#7a5c00;color:#fff;padding:7px 9px;font-size:9px}.sweep-ok>p{margin:0;padding:10px 12px;color:#5e4a1d;font-size:8px;line-height:1.45}.sweep-ok>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:0 12px 12px}.sweep-ok>div span{display:flex;flex-direction:column;gap:2px;border:1px solid #dfc27e;border-radius:6px;background:#fff;padding:8px}.sweep-ok>div b{color:#5d3d00;font-size:10px}.sweep-ok>div small{color:#6e6043;font-size:7px;line-height:1.35}
+.sweep-error{margin:0;padding:10px;border-left:4px solid #b62b35;background:#ffe8e9;color:#7a1820;font-size:9px;font-weight:800}
+@media(max-width:1000px){.sweep-row{grid-template-columns:28px 95px 1fr 1fr}.sweep-source{grid-column:2}.sweep-previews{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.sweep-modal{width:100vw;max-height:100vh;max-height:100dvh;border-radius:0}.sweep-body{padding:10px}.sweep-pickers{display:grid;grid-template-columns:1fr 1fr}.sweep-pickers button{padding:0 8px}.sweep-previews{grid-template-columns:repeat(2,1fr)}.sweep-row{grid-template-columns:28px 1fr 70px}.sweep-row>label{grid-column:1/-1}.sweep-ok>div{grid-template-columns:repeat(2,minmax(0,1fr))}.sweep-rows{max-height:none}}

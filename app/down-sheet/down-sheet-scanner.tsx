@@ -4,6 +4,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {mergeReviewedRows,reviewScannedRows,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
+import {scanReadyPhoto} from "../scan-photo";
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -16,24 +17,6 @@ type Props={
 };
 
 const MAX_FILES=6;
-const MAX_SCAN_BYTES=700*1024;
-
-async function scanReadyPhoto(file:File,page:number){
- if(file.size<=MAX_SCAN_BYTES&&file.type==="image/jpeg")return file;
- const url=URL.createObjectURL(file);
- try{
-  const image=await new Promise<HTMLImageElement>((resolve,reject)=>{const element=new Image();element.onload=()=>resolve(element);element.onerror=()=>reject(new Error("One selected photo could not be prepared."));element.src=url});
-  const longest=Math.max(image.naturalWidth,image.naturalHeight),scale=Math.min(1,2400/longest),canvas=document.createElement("canvas");
-  canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-  const context=canvas.getContext("2d");if(!context)throw new Error("One selected photo could not be prepared.");
-  context.drawImage(image,0,0,canvas.width,canvas.height);
-  let quality=.82,blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
-  while(blob&&blob.size>MAX_SCAN_BYTES&&quality>.38){quality-=.07;blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/jpeg",quality))}
-  if(blob&&blob.size>MAX_SCAN_BYTES){const reduction=Math.min(.92,Math.sqrt(MAX_SCAN_BYTES/blob.size)*.9),width=Math.max(1,Math.round(canvas.width*reduction)),height=Math.max(1,Math.round(canvas.height*reduction)),smaller=document.createElement("canvas");smaller.width=width;smaller.height=height;const smallerContext=smaller.getContext("2d");if(!smallerContext)throw new Error("One selected photo could not be prepared.");smallerContext.drawImage(canvas,0,0,width,height);blob=await new Promise<Blob|null>(resolve=>smaller.toBlob(resolve,"image/jpeg",.72))}
-  if(!blob)throw new Error("One selected photo could not be prepared.");
-  return new File([blob],`down-sheet-page-${page}.jpg`,{type:"image/jpeg",lastModified:Date.now()});
- }finally{URL.revokeObjectURL(url)}
-}
 
 export default function DownSheetScanner({fleet,currentEntries,defaultShift,onClose,onImport}:Props){
  const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
@@ -69,7 +52,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
    const scanned:ScannedDownSheetRow[]=[];
    for(let index=0;index<photos.length;index++){
     setProgress(`READING PAGE ${index+1} OF ${photos.length}`);
-    const prepared=await scanReadyPhoto(photos[index].file,index+1),form=new FormData();form.append("photos",prepared);
+    const prepared=await scanReadyPhoto(photos[index].file,index+1,"down-sheet-page"),form=new FormData();form.append("photos",prepared);
     const response=await fetch("/api/down-sheet-scan",{method:"POST",body:form});
     let payload:{rows?:ScannedDownSheetRow[];error?:string}={};
     try{payload=await response.json() as typeof payload}catch{}
