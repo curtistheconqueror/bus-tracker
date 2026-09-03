@@ -350,6 +350,29 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    request rather than something done, and the two must not read alike at a
    glance in a list somebody is about to act on. */
 .work-state-badge.down-sheet-recommended{border-color:#d09a3c;background:#fdf1dd;color:#8a4c00}
+/* Solid in the DS badge's own purple, because this one is not a suggestion:
+   this defect is why the bus is on the sheet. It has to be told apart from
+   DS REC above it at a glance, and the two sit in the same view. */
+.work-state-badge.on-down-sheet{border-color:var(--downsheet-badge,#6b35bb);background:var(--downsheet-badge,#6b35bb);color:var(--downsheet-badge-text,#fff)}
+
+/* The banner that answers "which of these three put the bus on the sheet".
+
+   A full-width strip rather than another badge in the meta line: with three
+   defects on a card the DS badge on the header says only that ONE of them did,
+   and a fourth small badge in a row of small badges would not have closed that
+   question. It takes the row's own purple so it reads as the same fact the DS
+   badge states, and so a shop that recolours the badge recolours this too. */
+.down-sheet-banner{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;flex-basis:100%;width:100%;box-sizing:border-box;margin:0;border-bottom:1px solid color-mix(in srgb,var(--downsheet-badge,#6b35bb) 30%,transparent);border-left:3px solid var(--downsheet-badge,#6b35bb);background:color-mix(in srgb,var(--downsheet-badge,#6b35bb) 10%,var(--log-surface));padding:6px 9px}
+.down-sheet-banner b{color:var(--downsheet-badge,#6b35bb);font-size:9px;font-weight:900;letter-spacing:.5px}
+.down-sheet-banner span{color:var(--log-text);font-size:10px;font-weight:700}
+/* Only the row's banner is a flex item; letting it claim a whole line is what
+   keeps it a banner instead of a fourth column squeezed beside the actions. */
+.grouped-defect-row.on-down-sheet{flex-wrap:wrap}
+/* The bus is on the sheet, but for work that is not in this log at all. Amber
+   rather than purple: it is telling you where NOT to look. */
+.down-sheet-banner.elsewhere{border-radius:6px;border:1px solid #d09a3c;border-left-width:3px;background:#fdf1dd;margin-bottom:6px}
+.down-sheet-banner.elsewhere b{color:#8a4c00}
+.down-sheet-banner.elsewhere span{color:#6b3d00;font-weight:600}
 /* Outline teal, not the solid teal of an active DEFERRED — this repair is
    not currently held back, only carrying the memory that it once was. */
 .work-state-badge.deferred-history{border-color:#0e7490;background:#fff;color:#0e7490}

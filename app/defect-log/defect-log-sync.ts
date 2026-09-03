@@ -1,5 +1,6 @@
 import {defectSupportingDetails,defectSummary,isUnresolved,normalizeDefects,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
+import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 
@@ -10,13 +11,21 @@ export type DefectLogFleetBus={
 
 export type DefectLogDownEntry={
  id:string;defectId?:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+ /* Carried through because a modern entry writes one record per card, so the
+    cards are what say which defects the sheet has. Optional: an entry stored
+    before cards existed has none. */
+ repairItems?:{id:string;category:string;repair:string;details:string;done?:boolean}[];
  assignmentType:"Mechanic"|"Vendor";assignedTo:string;section:"Pending"|"Accident"|"Scheduled Repair"|"Inspection"|"Vendor Repair"|"Roadcall"|"Other";
  shift:"1st"|"2nd"|"3rd";workflow:"Scheduled"|"In Progress"|"Waiting for Parts"|"On Hold"|"Completed"|"Deferred";
  operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";timeEstimate:ReturnType<typeof normalizeRepairTimeEstimate>;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:{at:string;initials:string;action:string}[];
 };
 
-export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean};
+export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean;
+ /* The entry that has this exact defect on the sheet, when one does. Carried on
+    the record so a card can say WHICH defect put the bus on the sheet, and what
+    the sheet says about it, without re-deriving the link at render time. */
+ downSheetEntry?:DefectLogDownEntry};
 export type DefectLogBusGroup={bus:DefectLogFleetBus;records:DefectLogRecord[];updatedAt:string};
 
 export function isPendingDownSheetRecord(record:DefectLogRecord,activeDownBusIds:ReadonlySet<string>){
@@ -64,12 +73,58 @@ export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
 const RECENT_DUPLICATE_WINDOW_MS=48*60*60*1000;
 function sameDefectChoice(left:StructuredDefect,right:StructuredDefect){return left.category.trim().toLowerCase()===right.category.trim().toLowerCase()&&left.issue.trim().toLowerCase()===right.issue.trim().toLowerCase()}
 export function recentDefectDuplicate(bus:DefectLogFleetBus,incoming:StructuredDefect,now=new Date().toISOString()){const currentTime=Date.parse(now);if(!Number.isFinite(currentTime)||!incoming.category.trim()||!incoming.issue.trim())return null;return normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).find(defect=>{if(defect.id===incoming.id||!isUnresolved(defect)||!sameDefectChoice(defect,incoming))return false;const loggedTime=Date.parse(defect.createdAt||defect.updatedAt||"");const age=currentTime-loggedTime;return Number.isFinite(loggedTime)&&age>=0&&age<RECENT_DUPLICATE_WINDOW_MS})||null}
+/* Every defect an active sheet entry is writing to, and the entry doing it.
+
+   It used to read only the entry's STATED defectId, which named at most one
+   record and is empty on every entry typed in by hand. A bus could sit on the
+   sheet for a fault open in the log and no record would know it. Asking the
+   sheet's own downSheetDefectIds covers all four doors — the stated id, the
+   ids an entry mints per card, and the record a card adopts because the bus
+   already had it. */
+function downSheetEntryByDefectId(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
+ const linked=new Map<string,DefectLogDownEntry>();
+ for(const entry of downEntries){
+  if(entry.workflow==="Completed")continue;
+  const bus=fleet.find(item=>item.id===entry.busId);
+  if(!bus)continue;
+  for(const id of downSheetDefectIds(entry,normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)))
+   /* First entry wins. Two active entries for one bus is already blocked on
+      save, so this only decides a tie that should not exist. */
+   if(!linked.has(id))linked.set(id,entry);
+ }
+ return linked;
+}
+
 export function defectLogRecords(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]):DefectLogRecord[]{
- const activeDownIds=new Set(downEntries.filter(entry=>entry.workflow!=="Completed"&&entry.defectId).map(entry=>entry.defectId));
+ const linked=downSheetEntryByDefectId(fleet,downEntries);
  return fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log").map(defect=>{
   const createdAt=defect.createdAt||bus.parkedAt||new Date(0).toISOString();
-  return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:activeDownIds.has(defect.id)};
+  const downSheetEntry=linked.get(defect.id);
+  return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:Boolean(downSheetEntry),
+   ...(downSheetEntry?{downSheetEntry}:{})};
  })).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/* What the sheet says about a repair, in one line, for the banner on the
+   defect. The workflow leads because it answers "is anybody on it"; the shift
+   and the name answer "who". */
+export function downSheetEntryLabel(entry:DefectLogDownEntry){
+ const who=entry.assignmentType==="Vendor"
+  ?(entry.assignedTo.trim()?"Vendor: "+entry.assignedTo.trim():"Vendor")
+  :entry.assignedTo.trim().toUpperCase();
+ return [entry.workflow,entry.shift?entry.shift+" shift":"",entry.section,who].map(part=>String(part||"").trim()).filter(Boolean).join(" · ");
+}
+
+/* The active entries for a bus that no defect listed under it accounts for.
+
+   A bus can be on the sheet for something that was never typed into the Defect
+   Log — a scan, or a repair logged straight onto the sheet — and in that case
+   the DS badge on the card is true while none of the defects under it carries
+   the banner. Saying so is the difference between "the app is not telling me
+   which one" and "none of these is the one". */
+export function unexplainedDownSheetEntries(records:DefectLogRecord[],busId:string,downEntries:DefectLogDownEntry[]){
+ const named=new Set(records.filter(record=>record.downSheetEntry).map(record=>record.downSheetEntry!.id));
+ return downEntries.filter(entry=>entry.busId===busId&&entry.workflow!=="Completed"&&!named.has(entry.id));
 }
 export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGroup[]{
  const groups=new Map<string,DefectLogBusGroup>();

@@ -162,6 +162,20 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  });
 }
 
+/* Which records on the bus this entry is actually writing to.
+
+   Exported so the Defect Log can name the defect that put a bus on the sheet
+   using the SHEET'S OWN answer rather than a second rule beside it. The obvious
+   second rule — read the entry's stated defectId — is wrong for two of the four
+   doors: an entry typed in by hand states no defectId at all, and one carrying
+   repair cards writes a record per card. A badge computed that way says "no
+   defect on this bus put it on the sheet" while the sheet is writing to one of
+   them, which is worse than no badge. Asking defectTargets cannot disagree with
+   what the save does, because it IS what the save does. */
+export function downSheetDefectIds(entry:SyncDownEntry,defects:StructuredDefect[]){
+ return defectTargets(entry,defects).map(target=>target.id).filter(Boolean);
+}
+
 export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:SyncDownEntry,now=new Date().toISOString()):T[]{
  /* Moved first, so everything below sees the space the bus is going to be in.
     The status is derived from the location, so doing this the other way round

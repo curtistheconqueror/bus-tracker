@@ -7074,6 +7074,85 @@ test("the sweep lists buses ticked OK that the board still holds open, and files
  assert.equal(defect.createdAt,"2026-08-29T21:00:00.000Z");
 });
 
+test("the Defect Log names WHICH defect has the bus on the down sheet",async()=>{
+ const { defectLogRecords, downSheetEntryLabel, unexplainedDownSheetEntries } =
+  await import("../app/defect-log/defect-log-sync.ts");
+
+ const D=(id,category,issue,details)=>({id,source:"defect-log",category,issue,details,
+  operability:"service",state:"open",createdAt:"2026-09-01T21:01:00.000Z",updatedAt:"2026-09-01T21:57:00.000Z"});
+ const bus={id:"b1",n:"17526",l:"waiting-1",s:"out",down:true,pendingRepair:"",defects:[
+  D("d1","Bus Accessories","Doors - Rear door will not close","Rear Alarm stays on"),
+  D("d2","Operator/Driver Controls","Operating Controls - Horn","The connection from top down"),
+  D("d3","Tech Services","IBS Screen - INOP (general)","Can't log in")]};
+ const entry=(over={})=>({id:"repair-1788400000000-abcde",busId:"b1",busNumber:"17526",
+  category:"Operator/Driver Controls",repair:"Operating Controls - Horn",customReason:"The connection from top down",
+  repairItems:[{id:"item-x",category:"Operator/Driver Controls",repair:"Operating Controls - Horn",
+   details:"The connection from top down"}],
+  assignmentType:"Mechanic",assignedTo:"AR",section:"Pending",shift:"1st",workflow:"In Progress",
+  operationalStatus:"out",priority:"Routine",createdAt:"2026-09-01T21:57:00.000Z",
+  updatedAt:"2026-09-01T21:57:00.000Z",updatedBy:"AR",completedAt:"",history:[],...over});
+
+ // THE CASE. Three defects, a DS badge on the card, and until now nothing said
+ // which of the three was the reason. The entry states NO defectId — it was
+ // typed in through + ADD DOWN BUS — so reading the stated id would have found
+ // nothing and left the question unanswered.
+ const horn=entry();
+ assert.equal(horn.defectId,undefined,"a hand-typed entry states no defect id");
+ const flagged=defectLogRecords([bus],[horn]);
+ const marked=flagged.filter(record=>record.onDownSheet);
+ assert.equal(marked.length,1,"exactly one defect is named");
+ assert.equal(marked[0].defect.id,"d2","and it is the horn, not the door or the screen");
+ assert.equal(marked[0].downSheetEntry.id,horn.id,"the record carries the entry, so the banner can say what the sheet says");
+ for(const other of flagged.filter(record=>record.defect.id!=="d2")){
+  assert.equal(other.onDownSheet,false);
+  assert.equal(other.downSheetEntry,undefined);
+ }
+
+ // What the banner reads.
+ assert.equal(downSheetEntryLabel(horn),"In Progress · 1st shift · Pending · AR");
+ assert.equal(downSheetEntryLabel(entry({assignmentType:"Vendor",assignedTo:"Cummins"})),
+  "In Progress · 1st shift · Pending · Vendor: Cummins");
+ assert.equal(downSheetEntryLabel(entry({assignedTo:"",workflow:"Scheduled"})),"Scheduled · 1st shift · Pending");
+
+ // An entry naming the defect outright still works — that is the Defect Log's
+ // own DOWN SHEET tick, and it must not have been broken to fix the other door.
+ const ticked=defectLogRecords([bus],[entry({repairItems:undefined,defectId:"d3",
+  category:"Tech Services",repair:"IBS Screen - INOP (general)",customReason:"Can't log in"})]);
+ assert.deepEqual(ticked.filter(record=>record.onDownSheet).map(record=>record.defect.id),["d3"]);
+
+ // A finished entry is not still holding the bus, so nothing is marked.
+ assert.equal(defectLogRecords([bus],[entry({workflow:"Completed"})]).some(record=>record.onDownSheet),false);
+
+ // NONE OF THESE IS THE ONE. A bus can be on the sheet for work that was never
+ // typed into this log, and then the DS badge is true while no defect below
+ // carries the banner — which reads like the app declining to answer.
+ const elsewhere=entry({category:"Brakes",repair:"Air brake fault",customReason:"Scanned off the paper sheet",
+  repairItems:[{id:"item-y",category:"Brakes",repair:"Air brake fault",details:"Scanned off the paper sheet"}]});
+ const stranded=defectLogRecords([bus],[elsewhere]);
+ assert.equal(stranded.some(record=>record.onDownSheet),false,"no logged defect accounts for it");
+ assert.deepEqual(unexplainedDownSheetEntries(stranded,"b1",[elsewhere]).map(item=>item.id),[elsewhere.id],
+  "so the sheet entry is named instead");
+ // And when a defect DOES account for it, there is nothing left to explain.
+ assert.deepEqual(unexplainedDownSheetEntries(flagged,"b1",[horn]),[]);
+ // A completed entry is not an unexplained one.
+ assert.deepEqual(unexplainedDownSheetEntries(stranded,"b1",[entry({workflow:"Completed"})]),[]);
+
+ // The banner is actually rendered, in both places a defect is read.
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/record\.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET<\/b>/,
+  "the expanded row carries the banner");
+ assert.match(page,/work-state-badge on-down-sheet">THIS DEFECT HAS THE BUS ON THE DOWN SHEET/,
+  "the focus view says it in full");
+ assert.match(page,/unexplainedDownSheetEntries\(group\.records,group\.bus\.id,downEntries\)/,
+  "and the case where none of them is the one is rendered too");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ // It takes the shop's own DS badge colour, so recolouring the badge recolours
+ // the banner rather than leaving two different purples side by side.
+ assert.match(css,/\.down-sheet-banner\{[^}]*var\(--downsheet-badge/);
+ // And it claims a whole line instead of becoming a fourth column.
+ assert.match(css,/\.grouped-defect-row\.on-down-sheet\{flex-wrap:wrap\}/);
+});
+
 test("the sweep scanner is its own door on the Defect Log and never touches the Down Sheet", async () => {
  const [logPage,scanner,route,downScanner]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
