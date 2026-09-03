@@ -2,6 +2,7 @@ import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normali
 import {stampOperationalChange} from "../operational-time.ts";
 import {hasRequiredInteriorCleaning,hasUnresolvedDefects} from "../smart-status.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "../facility-areas.ts";
+import {adoptableDefect} from "../defect-identity.ts";
 
 export type SyncFleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -112,18 +113,51 @@ export function downSheetDefectIdCandidates(entry:SyncDownEntry){
  return [...legacyDefectIds(entry),...carriedItems(entry).map(item=>"downsheet-"+entryKey(entry)+"-"+item.id)];
 }
 
+/* A repair the bus is already carrying is that repair, whoever wrote it down.
+
+   Ids alone were not enough. A card mints its defect id from the entry and the
+   card, so a fault already open in the Defect Log — a check engine light, say —
+   arrived on the sheet under an id nothing on the bus matched, and the bus ended
+   up carrying the same fault twice: once from the log, once from the sheet, each
+   looking to the app like a separate problem. Defect counts drive what a foreman
+   looks at first and every "how many are down" number on the board, so this is
+   not cosmetic.
+
+   The scan already asked this question before writing. Adding it here covers the
+   other two ways a repair reaches the sheet — typed in by hand, and pulled on by
+   the app when a bus is marked down — so all three behave the same way.
+
+   Only an EXACT repeat is adopted, and only a record still unresolved: a
+   genuinely different fault on the same bus is still its own record, and a
+   repair completed last month is not reopened by a new one that reads like it.
+   A card whose own record already exists keeps it, so editing a card updates
+   what it wrote rather than wandering onto a neighbour. */
 function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  const items=carriedItems(entry);
  const legacyIds=legacyDefectIds(entry);
  const legacy=current.find(defect=>legacyIds.includes(defect.id));
- if(!items.length)return [{id:legacy?.id||legacyIds[0],category:entry.category,repair:entry.repair,details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined}];
  const taken=new Set<string>();
+ const adopt=(category:string,repair:string,details:string)=>
+  adoptableDefect(current,{category,issue:repair,details},taken);
+ /* An adopted record keeps its OWN details. It already says what the card says —
+    that is what made it a match — and a card built by the app spells a record
+    out, folding its lamp, alarm number and reported symptoms in ahead of the
+    note. Writing that sentence back into the details field would flatten those
+    structured fields into free text and then repeat them: a record whose symptom
+    is "Misfire" would start reading "Misfire — Misfire — ...". */
+ if(!items.length){
+  const adopted=legacy?undefined:adopt(entry.category,entry.repair,entry.customReason);
+  const id=legacy?.id||adopted?.id||legacyIds[0];
+  return [{id,category:entry.category,repair:entry.repair,details:adopted?adopted.details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined}];
+ }
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
-  const adopts=index===0&&legacy&&!current.some(defect=>defect.id===own)&&!taken.has(legacy.id);
-  const id=adopts?legacy.id:own;
+  const mine=current.some(defect=>defect.id===own);
+  const adopts=index===0&&legacy&&!mine&&!taken.has(legacy.id);
+  const adopted=adopts||mine?undefined:adopt(item.category,item.repair,item.details);
+  const id=adopts?legacy.id:mine?own:adopted?.id||own;
   taken.add(id);
-  return {id,category:item.category,repair:item.repair,details:item.details,done:item.done===true,
+  return {id,category:item.category,repair:item.repair,details:adopted?adopted.details:item.details,done:item.done===true,
    actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
  });
 }

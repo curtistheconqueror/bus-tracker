@@ -32,8 +32,12 @@
 
 import {defectLabel,isUnresolved,normalizeDefects,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "./down-sheet/down-sheet-sync.ts";
+/* The identity rule lives on its own so the Down Sheet can ask the same
+   question before it writes without these two files importing each other. */
+import {comparableFingerprint,defectFingerprint,type DuplicateBus} from "./defect-identity.ts";
 
-export type DuplicateBus={id:string;n?:string;defects?:StructuredDefect[];pendingRepair?:string};
+export {defectFingerprint,matchingUnresolvedDefectId} from "./defect-identity.ts";
+export type {DuplicateBus};
 
 export type DuplicateGroupReport={
  busId:string;
@@ -56,38 +60,12 @@ export type DuplicateMergeResult<TBus,TEntry>={
  relinkedEntries:number;
 };
 
-/* Category, symptom and details, with case and run-together spacing removed.
-
-   Deliberately NOT the printed label. Two records can print the same line while
-   differing in a field the label leaves out, and a printed line is a
-   presentation decision that will change again; identity for a stored record
-   has to be about what the record says. */
-export function defectFingerprint(defect:{category?:string;issue?:string;details?:string}){
- return [defect.category,defect.issue,defect.details]
-  .map(value=>String(value??"").trim().toLowerCase().replace(/\s+/g," "))
-  .join("|");
-}
-
-/* What an untyped defect normalizes to: the catch-all category and symptom the
-   app supplies when somebody logs a fault and writes nothing about it.
-
-   Derived by running a blank record through the same normalizer the board uses,
-   rather than written out as two string literals, so that changing the
-   placeholder upstream cannot silently turn this guard off. */
-const PLACEHOLDER_FINGERPRINT=defectFingerprint(
- normalizeDefects([{id:"placeholder",category:"",issue:"",details:"",operability:"service",state:"open"}])[0]);
-
-/* Whether a record says enough about itself to be called a repeat of another.
-
-   Two records that are nothing but the placeholder — no details, no category
-   anybody chose, no symptom anybody chose — are indistinguishable, but that is
-   not evidence they are the same fault. They are just as likely to be two
-   different problems nobody typed up, and collapsing them would delete a real
-   defect with no way for anyone to notice. Being indistinguishable is a reason
-   to leave them alone, not a licence to merge. */
-function comparable(fingerprint:string){
- return /[a-z0-9]/.test(fingerprint)&&fingerprint!==PLACEHOLDER_FINGERPRINT;
-}
+/* Merging is the destructive half, so it stays on the strict fingerprint: what
+   the record itself says, and nothing else. Adoption on the Down Sheet can
+   afford to also recognise the way a card spells a record out, because the worst
+   it can do is update a record that already exists. Getting it wrong here
+   deletes one. */
+const comparable=comparableFingerprint;
 
 const STATE_RANK:Record<string,number>={open:1,deferred:2,"in-progress":3};
 
@@ -251,24 +229,4 @@ export function mergeDuplicateDefects<TBus extends DuplicateBus,TEntry extends S
 
  return {buses:nextBuses,entries:nextEntries,groups,removed,
   busesAffected:new Set(groups.map(group=>group.busId)).size,relinkedEntries};
-}
-
-/* What a scan should write to instead of minting a new record.
-
-   This is the half that stops the problem happening again. When a sheet photo
-   brings in a repair for a bus, and the bus already carries an unresolved record
-   saying exactly that, the scan belongs on the record that is already there.
-   Returning its id lets the import adopt it, and the second scan of the same
-   paper updates one record rather than adding a second.
-
-   Every one of the 25 duplicates on the live board would have been prevented by
-   this. */
-export function matchingUnresolvedDefectId(
- bus:DuplicateBus|undefined,record:{category?:string;repair?:string;reason?:string}
-){
- if(!bus)return undefined;
- const wanted=defectFingerprint({category:record.category,issue:record.repair,details:record.reason});
- if(!comparable(wanted))return undefined;
- return normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)
-  .find(defect=>isUnresolved(defect)&&defectFingerprint(defect)===wanted)?.id;
 }

@@ -5882,6 +5882,118 @@ test("duplicate defects merge into one record without losing anything",async()=>
  assert.equal(afterSave[0].defects.length,1,"saving that entry must update, not duplicate");
 });
 
+test("a repair already on the bus is not recorded twice by the down sheet",async()=>{
+ const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+ const { defectSupportingDetails, normalizeDefects } = await import("../app/repair-catalog.ts");
+ const { blankRepairItem } = await import("../app/down-sheet/down-sheet-repair-items.ts");
+
+ // A bus carrying a check engine light typed into the Defect Log, exactly as
+ // that page stores it.
+ const logged=(extra={})=>({id:"d1",category:"Engine",issue:"Check engine light",details:"Loses power on the hill",
+  operability:"service",state:"open",source:"defect-log",createdAt:"2026-09-01T08:00:00.000Z",...extra});
+ const bus=(defects)=>({id:"b",n:"17563",l:"west-9",s:"defect",defects,pendingRepair:""});
+
+ // A card the way the editor hands one over: a fresh id minted from the clock,
+ // which is what used to make this a second record.
+ const card=(category,repair,details,id="repair-item-1788398225431-0-asi95")=>
+  ({id,category,repair,details,estimateEnabled:false,timeEstimate:blankRepairItem().timeEstimate});
+ const entry=(items,extra={})=>({id:"repair-1788398225431-x4gda",busId:"b",
+  category:items[0]?.category||"",repair:items[0]?.repair||"",customReason:items[0]?.details||"",
+  repairItems:items,assignmentType:"Mechanic",assignedTo:"AM",workflow:"Scheduled",
+  operationalStatus:"defect",...extra});
+
+ // THE CASE. Somebody uses + ADD DOWN BUS and writes down the fault the bus is
+ // already logged for. One fault, one record — the sheet writes to the record
+ // that is there rather than opening a second one beside it.
+ const [same]=applyDownEntryToFleet([bus([logged()])],
+  entry([card("Engine","Check engine light","Loses power on the hill")]),"2026-09-02T09:00:00.000Z");
+ assert.equal(same.defects.length,1,"the same repair added by hand must not become a second record");
+ assert.equal(same.defects[0].id,"d1","the record already on the bus is the one written to");
+ assert.equal(same.defects[0].createdAt,"2026-09-01T08:00:00.000Z","the day the fault was first seen is kept");
+ assert.equal(same.defects[0].source,"defect-log","and where it came from is not rewritten");
+
+ // A genuinely different fault on the same bus is still its own record.
+ const [other]=applyDownEntryToFleet([bus([logged()])],
+  entry([card("Brakes","ABS warning light","")]),"2026-09-02T09:00:00.000Z");
+ assert.equal(other.defects.length,2,"a different fault is a different record");
+
+ // Finishing it on the sheet closes the logged fault, rather than closing a
+ // copy and leaving the original open for good.
+ const [closed]=applyDownEntryToFleet([bus([logged()])],
+  entry([{...card("Engine","Check engine light","Loses power on the hill"),done:true}],{workflow:"Completed"}),
+  "2026-09-02T09:00:00.000Z");
+ assert.equal(closed.defects.length,1);
+ assert.equal(closed.defects[0].state,"completed");
+
+ // A record already resolved is never reopened by a new card that reads like
+ // it: that is a fault that has come back, and it gets its own record.
+ const [again]=applyDownEntryToFleet([bus([logged({state:"completed",completedAt:"2026-09-01T15:00:00.000Z"})])],
+  entry([card("Engine","Check engine light","Loses power on the hill")]),"2026-09-02T09:00:00.000Z");
+ assert.equal(again.defects.length,2,"a repeat of a finished repair is new work");
+
+ // THE APP'S OWN SPELLING. A bus marked down is pulled onto the sheet by the
+ // app, and the card it builds carries the defect's SUPPORTING text — the
+ // reported symptoms, and on an A/C fault the diagnostic lamp and its alarm
+ // number, folded in ahead of the note — not the bare details field. Both
+ // spellings are the same record.
+ const [reported]=normalizeDefects([logged({symptoms:["Misfire"]})]);
+ assert.equal(defectSupportingDetails(reported),"Misfire — Loses power on the hill");
+ const [pulled]=applyDownEntryToFleet([bus([reported])],
+  entry([card("Engine","Check engine light",defectSupportingDetails(reported))]),"2026-09-02T09:00:00.000Z");
+ assert.equal(pulled.defects.length,1,"a bus the app pulls onto the sheet must not duplicate its own defects");
+ assert.equal(pulled.defects[0].id,"d1");
+ // The adopted record keeps its own details rather than swallowing the spelled
+ // out card, which would leave it reading "Misfire — Misfire — ...".
+ assert.equal(pulled.defects[0].details,"Loses power on the hill");
+ assert.deepEqual(pulled.defects[0].symptoms,["Misfire"]);
+ assert.equal(defectSupportingDetails(pulled.defects[0]),"Misfire — Loses power on the hill");
+
+ // Same again with a lamp, which is the A/C form of the same problem.
+ const [lamp]=normalizeDefects([logged({category:"A/C and HVAC",issue:"Blows warm air",diagLight:"red",alarmCode:"32"})]);
+ assert.equal(defectSupportingDetails(lamp),"RED DIAG LIGHT alarm 32 — Loses power on the hill");
+ const [lit]=applyDownEntryToFleet([bus([lamp])],
+  entry([card("A/C and HVAC","Blows warm air",defectSupportingDetails(lamp))]),"2026-09-02T09:00:00.000Z");
+ assert.equal(lit.defects.length,1,"the lamp spelled into the card is the same record");
+ assert.equal(lit.defects[0].id,"d1");
+ assert.equal(lit.defects[0].diagLight,"red","and the lamp itself survives being written to");
+ assert.equal(lit.defects[0].alarmCode,"32");
+ assert.equal(lit.defects[0].details,"Loses power on the hill","the lamp is not flattened into the note");
+
+ // Two cards can never both land on one record: the second keeps its own id
+ // rather than overwriting what the first just claimed.
+ const [twice]=applyDownEntryToFleet([bus([logged()])],
+  entry([card("Engine","Check engine light","Loses power on the hill","item-a"),
+         card("Engine","Check engine light","Loses power on the hill","item-b")]),"2026-09-02T09:00:00.000Z");
+ assert.equal(twice.defects.length,2);
+ assert.equal(new Set(twice.defects.map(defect=>defect.id)).size,2,"two cards, two ids");
+
+ // A card that has already written its own record keeps it. Re-typing a card to
+ // match a neighbouring fault must update what that card wrote, not wander onto
+ // the neighbour and leave its own record orphaned.
+ const first=applyDownEntryToFleet([bus([])],entry([card("Brakes","ABS warning light","")]),"2026-09-02T09:00:00.000Z");
+ assert.equal(first[0].defects.length,1);
+ const own=first[0].defects[0].id;
+ const withLog=[{...first[0],defects:[logged(),...first[0].defects]}];
+ const [edited]=applyDownEntryToFleet(withLog,
+  entry([card("Engine","Check engine light","Loses power on the hill")]),"2026-09-02T10:00:00.000Z");
+ assert.equal(edited.defects.length,2,"the card updates the record it owns");
+ assert.equal(edited.defects.find(defect=>defect.id===own).issue,"Check engine light");
+
+ // An empty card claims nothing. Two records that say nothing are not evidence
+ // of one fault — they are just as likely to be two problems nobody typed up —
+ // so a blank entry writes its own "Repair required" placeholder the way it
+ // always has, and the record already sitting there is left alone rather than
+ // being quietly written over.
+ const blank={id:"d2",category:"Miscellaneous",issue:"Repair required",details:"",
+  operability:"service",state:"open",source:"defect-log",createdAt:"2026-09-01T08:00:00.000Z"};
+ const [untouched]=applyDownEntryToFleet([bus([blank])],
+  entry([{...card("","",""),estimateEnabled:true}]),"2026-09-02T09:00:00.000Z");
+ const kept=untouched.defects.find(defect=>defect.id==="d2");
+ assert.ok(kept,"the existing record must still be there");
+ assert.equal(kept.createdAt,"2026-09-01T08:00:00.000Z","and must not have been adopted on a blank");
+ assert.equal(kept.source,"defect-log");
+});
+
 test("a merge survives the shop cloud instead of being undone by it",async()=>{
  const { mergedAwayRows, withoutMergedAway, readMergedAway, writeMergedAway,
          defectLogPayload, changedRows } = await import("../app/cloud-sync.ts");
