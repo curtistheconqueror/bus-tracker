@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 144 was published from `9f1f73f` and Version 145 from `5aab35f` on 2026-09-02.**
+**STATUS: VERSION 146 PENDING — publish from `acf86c2`. Versions 144 and 145 are live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **146** | `acf86c2` | The Facility Map has a heading a screen reader can announce, and the Down Sheet opens on + ADD DOWN BUS |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
@@ -1520,4 +1521,125 @@ Suggested `docs/RELEASES.md` row:
 
 ```
 | 145 | Live | <published tip hash> | The Defect Log opens on + LOG DEFECT instead of a scoreboard: the five stat tiles collapse into a DAILY STATS bar closed by default and remembered per device, the log button moves to the top and is no longer duplicated, and the OPEN and DOWN SHEET filter buttons are removed while both keys keep filtering so saved default views still work; pressing the active filter now clears it. Fixed Repairs gains + LOG A REPAIR for a repair done without a defect ever being logged, opening the existing editor with a bus picker, and the save path now appends a new record instead of silently writing nothing |
+```
+
+---
+
+# Version 146 — A page a screen reader can name, and a sheet that opens on its job
+
+**Publish this next, after Version 145.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`acf86c2`** |
+| Last code-bearing commit | `acf86c2` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 145, published from `5aab35f` |
+
+```
+git log --oneline 5aab35f..acf86c2
+acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet header
+84164ff Record Sites Versions 144 and 145 releases
+651c61f Record the sixth fix in the 145 handoff
+
+git diff --name-only 5aab35f acf86c2 -- app
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/globals.css
+app/page.tsx
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 5aab35f acf86c2 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 192 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**No storage rewrite.** One new LocalStorage key,
+`pace-down-sheet-stats-open-v1`, holding `"1"` or `"0"`; absent means closed,
+the same shape as the Defect Log's.
+
+## What changed
+
+### 1. The Facility Map has a heading
+
+Its title was styled to look like one without being tagged as one, so it was
+the only page of five a screen reader announced unnamed, and the only one where
+jumping to the main heading did nothing. It is an `<h1>` now.
+
+**Nothing changed visually, and that was the work.** The bare `header` rule in
+`globals.css` sets a fixed 38px height and its own font size, and an `h1`
+arrives with a 2em default and block margins that would have burst that box. It
+inherits both and carries no margin — measured at 11px in a 40px banner with no
+overflow.
+
+### 2. The Down Sheet opens on the button that adds a bus
+
+| | Version 145 | Version 146 |
+| --- | --- | --- |
+| First thing on the page | eight stat tiles | **SHEET STATS bar**, closed |
+| + ADD DOWN BUS | bottom-right of six buttons, under a red CLEAR DOWNSHEET | **first, full width** |
+| CLEAR DOWNSHEET / UNDO IMPORT / UNDO CLEAR | always on screen, the loudest things on it | **behind MORE** |
+| Pressing the active shift filter | stayed stuck on | **clears back to ALL** |
+
+The bar carries the four numbers worth a glance — active, pending, estimated
+labour and capacity — and remembers open or closed per device. The two undo
+buttons still appear only when there is something to undo, so MORE is usually a
+single item. COMPLETED TODAY is still a button inside the panel and still
+filters.
+
+### 3. A disclosure that was not hiding anything
+
+Caught while verifying the above. A bare `display:grid` on the disclosure's
+contents overrode the browser's own rule that hides a closed `<details>`, so
+**CLEAR DOWNSHEET was fully visible while the panel reported itself closed** —
+the disclosure was decorative. Scoped to the open state now; measured closed,
+then open.
+
+## Validation
+
+- 192 regression tests passing, ESLint clean, production build succeeds
+- **Driven at 390 and 1180.** Stats closed on first load, opened, remembered
+  across a reload, closed again. + ADD DOWN BUS present exactly once, visible
+  without scrolling, full width at 390. Each shift filter pressed on and back
+  off. MORE verified closed then open. No control off screen at either width;
+  the body never scrolls sideways
+- **The h1 was measured, not assumed** — 11px inside a 40px banner, no overflow
+- One rendered-HTML test asserted on a stat tile now behind the toggle; it
+  asserts the bar and the add button instead
+
+## After it is live
+
+1. **Down Sheet on a phone.** SHEET STATS closed, then + ADD DOWN BUS full
+   width, then the shift filters.
+2. **Tap SHEET STATS.** The eight tiles appear; leave and come back and it
+   should still be open.
+3. **Tap a shift, then tap it again.** It should clear back to ALL.
+4. **Tap MORE.** CLEAR DOWNSHEET is there, with the two undos when there is
+   something to undo. With MORE closed, none of them is on screen.
+5. **The Facility Map should look exactly as it did.** The change is for screen
+   readers.
+
+## The way back
+
+`git revert acf86c2` — one commit.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it |
 ```
