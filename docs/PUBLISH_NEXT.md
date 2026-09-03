@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 146 PENDING — publish from `1d5454b`. Versions 144 and 145 are live.**
+**STATUS: NONE PENDING — Sites Version 146 was published from `1d5454b` on 2026-09-02.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
+| Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
@@ -17,7 +17,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 145 is live from `5aab35f`.** The 136–145 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 146 is live from `1d5454b`.** The 136–146 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
