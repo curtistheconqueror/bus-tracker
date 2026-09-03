@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 146 was published from `1d5454b` on 2026-09-02.**
+**STATUS: VERSION 147 PENDING — publish from `9d69a9b`. Version 146 is live from `1d5454b`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
 | Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
@@ -18,6 +19,8 @@
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
 **Version 146 is live from `1d5454b`.** The 136–146 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+
+Version 147 sits on top of the published 146 — it was rebased onto Codex's release commit `4c1e502`, never merged over it.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -36,6 +39,153 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 147 — The defect form asks for the bus the way a mechanic reaches for it
+
+**Publish this next, after Version 146.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`9d69a9b`** |
+| Last code-bearing commit | `9d69a9b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 146, published from `1d5454b` |
+
+**One application commit.** It was written before Codex published 146 and has
+been **rebased onto the release commit `4c1e502`**, not merged over it, so the
+history stays a straight line:
+
+```
+git log --oneline 1d5454b..9d69a9b
+9d69a9b Name the bus boxes for what they do, and make the typed number the big one   <- app code
+4c1e502 Record Sites Version 146 release                                             <- Codex, docs only
+afbcc83 Queue Version 146 from 1d5454b                                               <- docs only
+
+git diff --name-only 1d5454b 9d69a9b -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 1d5454b 9d69a9b -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 196 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None.** No storage key, no payload shape, no catalog identity. This release
+changes only what the LOG DEFECT form looks like; every record it writes is
+identical to what Version 146 wrote.
+
+## What changed
+
+All of it is in the LOG DEFECT / edit-defect form on the Defect Log, which is
+the screen a mechanic uses more than any other.
+
+### 1. The bus boxes are named for what they do
+
+| | Version 146 | Version 147 |
+| --- | --- | --- |
+| First box | `BUS NUMBER`, and the first thing in it was a row of generations | **`BUS GENERATIONS`** — the chips, and the count |
+| Second box | — | **`BUS NUMBER`** — TYPE BUS # and BUS LIST together |
+
+One box called BUS NUMBER whose opening row was 15s / 17s / 18s / 20s was
+telling a new person the wrong thing about both halves. The generations narrow
+the fleet; the number names one bus. Each box now says which job it is doing.
+
+### 2. TYPE BUS # is the biggest control on the screen
+
+It is the way in that actually gets used, and it was rendering at the same 16px
+as every other field. It is now **full width above the list, 26px, weight 800,
+in the page's own `--log-text`** instead of the muted grey the other inputs
+inherit — 27px on a phone.
+
+It stays on `--log-text` rather than a hardcoded `#000` on purpose: that token
+is a user setting in Defect Log COLORS, and black would be invisible in the dark,
+midnight and tactical themes.
+
+### 3. The LOGGED stamp moves to the bottom
+
+It sat between the bus and the category, where it read like a field somebody had
+to deal with. It is a fact about the record, so it is now the last thing in the
+form, above the save buttons.
+
+### 4. The bus list says why it is disabled
+
+BUS LIST is disabled until a generation is chosen, and that control now lives in
+a different box. Without a reason stated where the list is, it reads as a broken
+dropdown, so it now says *"Pick a generation above to use the bus list, or type
+the full number."*
+
+### The wiring did not change
+
+Worth writing down because it is a **three-way** binding and the split makes it
+look like two:
+
+- a generation filters the bus list **and** the type-ahead behind TYPE BUS #
+  (both read the same `candidates` array);
+- typing two digits lights the matching generation chip, and an exact number
+  selects the bus;
+- picking from the list fills the number **and** lights the generation.
+
+The split is what a person reads. Nothing about how the three controls talk to
+each other moved.
+
+## Validation
+
+- 196 regression tests passing, ESLint clean, production build succeeds
+- **Driven at 414px**, the width of the reported screenshot: legends read
+  `BUS GENERATIONS` then `BUS NUMBER`; picking 15s and typing `15505` selects
+  Bus 15505 - On Road; the stamp reports as `child 15 of 15 (LAST)`
+- One new test covering all four changes, plus the wiring's box membership
+- **A CSS trap was found by measuring, not by reading.**
+  `.log-form input,.log-form select{font-size:16px}` sits **later** in
+  `defect-log.css` at the **same specificity** as an unscoped
+  `.type-bus-number>input`, so the first attempt lost the tie and rendered at
+  16px with no error anywhere — it looked applied and was not. Measured at 16px,
+  scoped to `.log-form .type-bus-number>input`, measured again at 27px. The test
+  pins the scoping and **was confirmed to fail without it**
+
+## After it is live
+
+1. **Open LOG DEFECT on a phone.** Two boxes: BUS GENERATIONS with the chips,
+   then BUS NUMBER with a large typed field above the bus list.
+2. **Type a full bus number without touching the chips.** The matching
+   generation should light up on its own and the bus should be selected.
+3. **Tap a generation, then the bus list.** It should be enabled and filtered to
+   that generation.
+4. **Open the form on a fresh bus and look at the bus list before picking a
+   generation.** It should be disabled with the line telling you why.
+5. **Scroll to the bottom of the form.** LOGGED should be the last thing above
+   the save buttons, not up by the category.
+
+## The way back
+
+`git revert 9d69a9b` — one commit, two application files, no migration to undo.
+
+Nothing stored depends on it, so a revert is purely cosmetic: every defect
+logged while 147 was live reads identically afterwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 147 | Live | <published tip hash> | The LOG DEFECT form splits its one mislabelled BUS NUMBER box into BUS GENERATIONS for the 15s/17s/18s/20s chips and BUS NUMBER for the two ways of naming one bus; TYPE BUS # becomes the biggest control on the screen at 26px in the page's own text colour rather than 16px muted grey; the LOGGED stamp moves from between the bus and the category down to the bottom of the form; and the bus list now says it needs a generation instead of looking like a broken dropdown |
+```
 
 ---
 
