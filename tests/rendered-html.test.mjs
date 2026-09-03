@@ -3612,7 +3612,7 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  assert.match(editor,/item\.repair&&!repairs\.includes\(item\.repair\)&&<option value=\{item\.repair\}>\{item\.repair\} \(as logged\)<\/option>/);
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
- assert.deepEqual(REPAIR_OPTIONS["Air System"].slice(0,4),
+ assert.deepEqual(REPAIR_OPTIONS["Pneumatic System"].slice(0,4),
   ["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear"]);
 
  // A belt fitted to a pulley out of line comes back, so the note says to check
@@ -3866,8 +3866,58 @@ test("the Down Sheet editor holds the page still and fills a phone screen",async
  assert.match(css,/\.repair-form \.estimate-toggle\{display:grid;grid-template-columns:22px auto 1fr/);
 });
 
+test("Air System is read as Pneumatic System, and the two rear valves by what they do",async()=>{
+ const { REPAIR_OPTIONS, migrateRepairIdentity, normalizeDefects, defectCountField,
+         normalizeRepairCount, repairCategoryEmoji } = await import("../app/repair-catalog.ts");
+ const { recommendedRepairMinutes } = await import("../app/down-sheet/repair-time-estimates.ts");
+
+ // The picker offers the new name only.
+ assert.ok(REPAIR_OPTIONS["Pneumatic System"],"the category is listed under its new name");
+ assert.equal(REPAIR_OPTIONS["Air System"],undefined,"the old name is gone from the picker");
+ assert.equal(REPAIR_OPTIONS["Pneumatic System"].includes("R-12 relay valve (C/S rear)"),false);
+ assert.equal(REPAIR_OPTIONS["Pneumatic System"].includes("R-14 relay valve (R/S rear)"),false);
+
+ // NOTHING STORED IS REWRITTEN. Every record on the shop's board was logged
+ // under the old name, and the rename has to be a read, not a migration pass
+ // over live data. A record logged before today reads as its new home.
+ assert.deepEqual(migrateRepairIdentity("Air System","Air compressor"),
+  {category:"Pneumatic System",issue:"Air compressor"});
+ assert.deepEqual(migrateRepairIdentity("Air System","R-12 relay valve (C/S rear)"),
+  {category:"Pneumatic System",issue:"R-12 service valve (C/S rear)"});
+ assert.deepEqual(migrateRepairIdentity("Air System","R-14 relay valve (R/S rear)"),
+  {category:"Pneumatic System",issue:"R-14 parking brake valve (R/S rear)"});
+ // And a record already written under the new name is left where it is.
+ assert.deepEqual(migrateRepairIdentity("Pneumatic System","R-12 service valve (C/S rear)"),
+  {category:"Pneumatic System",issue:"R-12 service valve (C/S rear)"});
+
+ // Read through the board the way every page reads it.
+ const [carried]=normalizeDefects([{id:"d1",category:"Air System",issue:"R-12 relay valve (C/S rear)",
+  details:"Leaks down overnight",state:"open",operability:"service",createdAt:"2026-01-04T09:00:00.000Z"}]);
+ assert.equal(carried.category,"Pneumatic System");
+ assert.equal(carried.issue,"R-12 service valve (C/S rear)");
+ assert.equal(carried.id,"d1","the record keeps its identity, so its history follows it");
+ assert.equal(carried.details,"Leaks down overnight");
+ assert.equal(carried.createdAt,"2026-01-04T09:00:00.000Z");
+
+ // The three things keyed on the category name still find it, under either
+ // spelling, so a rename cannot silently drop an air-bag count or an estimate.
+ assert.equal(defectCountField("Air System","Leaking air bag - Rear").max,4);
+ assert.equal(defectCountField("Pneumatic System","Leaking air bag - Rear").max,4);
+ assert.equal(normalizeRepairCount(4,"Air System","Leaking air bag - Rear"),4);
+ assert.equal(normalizeRepairCount(4,"Pneumatic System","Leaking air bag - Rear"),4);
+ assert.equal(repairCategoryEmoji("Pneumatic System"),repairCategoryEmoji("Air System"));
+ assert.notEqual(repairCategoryEmoji("Pneumatic System"),repairCategoryEmoji("Miscellaneous"),
+  "the new name must not be falling through to the catch-all glyph");
+ assert.equal(recommendedRepairMinutes("Pneumatic System","Air dryer"),
+              recommendedRepairMinutes("Air System","Air dryer"),
+              "an unmigrated read still estimates the same");
+ assert.notEqual(recommendedRepairMinutes("Pneumatic System","Air dryer"),
+                 recommendedRepairMinutes("Miscellaneous","Air dryer"),
+                 "the new name must not be falling through to the catch-all estimate");
+});
+
 test("the parking brake knob and the rear air valves are in the catalog",()=>{
- const controls=REPAIR_OPTIONS["Operator/Driver Controls"],air=REPAIR_OPTIONS["Air System"];
+ const controls=REPAIR_OPTIONS["Operator/Driver Controls"],air=REPAIR_OPTIONS["Pneumatic System"];
 
  // The yellow diamond knob you pull up to set and push down to release. It sits
  // beside the red air valve on the dash, so it sits beside it in the list too.
@@ -3889,10 +3939,11 @@ test("the parking brake knob and the rear air valves are in the catalog",()=>{
 
  // Every bus has these three, and none of them were listed.
  assert.ok(air.includes("Treadle valve (brake pedal)"));
- // Named by the side they are on, the way the catalog already writes C/S and
- // R/S, so nobody has to remember which valve is which end of the bus.
- assert.ok(air.includes("R-12 relay valve (C/S rear)"));
- assert.ok(air.includes("R-14 relay valve (R/S rear)"));
+ // Named for what the valve DOES, then the side it is on. The model number
+ // alone said nothing about whether a bus could move; the service valve and the
+ // parking brake valve are what get said on the floor.
+ assert.ok(air.includes("R-12 service valve (C/S rear)"));
+ assert.ok(air.includes("R-14 parking brake valve (R/S rear)"));
 
  // Every grouped category is held in two structures: the picker renders
  // REPAIR_OPTION_GROUPS while the stored identity comes from REPAIR_OPTIONS. An
@@ -4868,14 +4919,14 @@ test("a stored Steering defect keeps its wording under the merged category",()=>
 
  // loose steering is a distinct driver complaint, not "steering pull"
  const steering=REPAIR_OPTIONS["Suspension and Steering"];
- assert.equal(steering.includes("Front air bag leak"),false,"Air System owns confirmed air-bag leaks");
- assert.equal(steering.includes("Rear air bag leak"),false,"Air System owns confirmed air-bag leaks");
+ assert.equal(steering.includes("Front air bag leak"),false,"Pneumatic System owns confirmed air-bag leaks");
+ assert.equal(steering.includes("Rear air bag leak"),false,"Pneumatic System owns confirmed air-bag leaks");
  assert.equal(steering.includes("Air bag"),false,"the vague legacy choice is retired from new entries");
  for(const side of ["C/S","R/S"]){
   const note=defectNote("Suspension and Steering","Bus leaning - "+side);
   assert.match(note,/leaking air bag or a leveling-valve fault/i);
   assert.match(note,/edit this same defect/i);
-  assert.match(note,/Air System/i);
+  assert.match(note,/Pneumatic System/i);
  }
  const historical=normalizeDefects([{id:"old-front",category:"Suspension and Steering",issue:"Front air bag leak",state:"open",operability:"service"}]);
  assert.equal(historical[0].issue,"Front air bag leak","retiring the duplicate picker choice does not rewrite history");

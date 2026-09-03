@@ -152,7 +152,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
- "Air System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 relay valve (C/S rear)","R-14 relay valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
+ "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
  "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
@@ -181,7 +181,8 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  "Doors, Ramp and ADA":"♿",
  "Lights and Fixtures":"💡",
  Bodywork:"🚌",
- "Air System":"💨",
+ "Pneumatic System":"💨",
+ "Air System":"💨", /* legacy category, kept so an unmigrated read still finds its glyph */
  Inspection:"🔍",
  "Preventive Maintenance":"🛠️",
  "Interior Cleaning":"🧽",
@@ -253,8 +254,8 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
  },
  "Suspension and Steering":{
   "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
-  "Bus leaning - C/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
-  "Bus leaning - R/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
+  "Bus leaning - C/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Pneumatic System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
+  "Bus leaning - R/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Pneumatic System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
  },
  "Amerex":{
   "CNG - PRD cap missing":"Check for a leak before you close this out. Fit a balloon over the vent and watch whether it inflates: the cap being gone can mean gas has been venting past it. If it inflates, log PRD leaking as well.",
@@ -292,7 +293,7 @@ const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
   "Surge tank - heating side low":coolantAdded,
   "Surge tank - both sides low":coolantAdded,
  },
- "Air System":{
+ "Pneumatic System":{
   "Leaking air bag - Front C/S":airBagCount(2),
   "Leaking air bag - Front R/S":airBagCount(2),
   "Leaking air bag - Rear":airBagCount(4),
@@ -600,7 +601,7 @@ export const RETIRED_ISSUES:Record<string,readonly string[]>={
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain","Air System":"Pneumatic System"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -664,6 +665,16 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
      read as the new one; nothing stored is rewritten. */
   "System Switches - Mirror heater switch":"System Switches - Mirror heater switch - C/S",
   "System Switches - C/S adjuster switch":"System Switches - Mirror adjuster switch - C/S",
+ },
+ /* Both were listed by valve model and where it sits, which says nothing about
+    what the valve does. R-12 is the service valve and R-14 the parking brake
+    valve, which is what gets said on the floor and what decides whether a bus
+    can move. The side stays, because that is still how you find it. Keyed by
+    "Pneumatic System" because the category rename above has already run by the
+    time this lookup happens. */
+ "Pneumatic System":{
+  "R-12 relay valve (C/S rear)":"R-12 service valve (C/S rear)",
+  "R-14 relay valve (R/S rear)":"R-14 parking brake valve (R/S rear)",
  },
  /* The floor says Freon, the catalog said Refrigerant, and somebody searching
     the Defect Log for "freon" found nothing. Both words are in the wording now
