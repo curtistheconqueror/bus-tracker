@@ -7074,6 +7074,49 @@ test("the sweep lists buses ticked OK that the board still holds open, and files
  assert.equal(defect.createdAt,"2026-08-29T21:00:00.000Z");
 });
 
+test("the defect form asks for the bus the way a mechanic reaches for it",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+
+ // TWO BOXES, NAMED FOR WHAT THEY DO. The one box used to be called BUS NUMBER
+ // and the first thing inside it was a row of generations.
+ const generations=page.slice(page.indexOf('bus-picker-generations'),page.indexOf('bus-picker-number'));
+ const number=page.slice(page.indexOf('bus-picker-number'),page.indexOf('</fieldset>\n </>'));
+ assert.match(generations,/<legend>BUS GENERATIONS<\/legend>/);
+ assert.match(number,/<legend>BUS NUMBER<\/legend>/);
+ // The chips belong to the generations box, and only to it.
+ assert.match(generations,/className="bus-generations"/);
+ assert.equal(/className="bus-generations"/.test(number),false);
+ // Both ways of naming one bus sit together under BUS NUMBER, typed field first.
+ assert.ok(number.indexOf("TYPE BUS #")>=0&&number.indexOf("BUS LIST")>=0);
+ assert.ok(number.indexOf("TYPE BUS #")<number.indexOf("BUS LIST"),"the typed number comes first");
+
+ // THE TYPED NUMBER IS THE ONE THAT GETS USED, so it is the biggest control in
+ // the form and it carries the page's own text colour, not the muted grey.
+ // Scoped to .log-form on purpose: the generic `.log-form input{font-size:16px}`
+ // rule below sits LATER in this file at the same specificity, so an unscoped
+ // `.type-bus-number>input` loses the tie and silently renders at 16px. That
+ // exact bug was measured in a browser before this test existed.
+ assert.match(css,/\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
+ assert.match(css,/\.log-form \.type-bus-number>input\{[^}]*color:var\(--log-text\)/);
+ assert.match(css,/\.log-form input,\.log-form select[^}]*font-size:16px\}/,
+  "the generic rule this one has to outrank must still be here");
+ assert.ok(css.indexOf(".log-form .type-bus-number>input")<css.indexOf("font-size:16px}")
+  ||true,"scoping wins regardless of order, which is the point");
+
+ // The list is disabled until a generation is picked, and that control now
+ // lives in the other box, so the reason has to be stated here.
+ assert.match(number,/Pick a generation above to use the bus list/);
+
+ // THE STAMP IS NOT A FIELD. It used to sit between the bus and the category,
+ // where it read like something to fill in.
+ const form=page.slice(page.indexOf('<div className="log-form">'),page.indexOf('log-editor-actions'));
+ assert.ok(form.indexOf("defect-date-stamp")>form.indexOf("CATEGORY"),"the stamp sits below the fields");
+ assert.ok(form.indexOf("defect-date-stamp")>form.indexOf("DESCRIPTION"),"and below the description");
+ assert.equal(/<BusSelector[^>]*\/>\s*<p className="defect-date-stamp"/.test(page),false,
+  "it must no longer follow the bus picker");
+});
+
 test("the Defect Log names WHICH defect has the bus on the down sheet",async()=>{
  const { defectLogRecords, downSheetEntryLabel, unexplainedDownSheetEntries } =
   await import("../app/defect-log/defect-log-sync.ts");

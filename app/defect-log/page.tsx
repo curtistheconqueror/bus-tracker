@@ -88,11 +88,33 @@ function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:strin
  const chooseGeneration=(next:string)=>{setGeneration(next);const current=fleet.find(bus=>bus.id===busId);if(current&&busGeneration(current.n)!==next)select("");if(!number.startsWith(next))setNumber("")};
  const typeNumber=(raw:string)=>{const digits=raw.replace(/\D/g,"");setNumber(digits);const prefix=digits.slice(0,2);if(digits.length>=2&&generations.includes(prefix))setGeneration(prefix);const exact=fleet.find(bus=>bus.n===digits);select(exact?.id||"")};
  const chooseBus=(id:string)=>{const bus=fleet.find(item=>item.id===id);select(id);setNumber(bus?.n||"");if(bus)setGeneration(busGeneration(bus.n))};
- return <fieldset className="wide bus-picker"><legend>BUS NUMBER</legend>
-  <div className="bus-generations" aria-label="Bus generation">{generations.map(value=><button type="button" className={generation===value?"active":""} aria-pressed={generation===value} onClick={()=>chooseGeneration(value)} key={value}>{generationLabel(value)}</button>)}</div>
-  <div className="bus-picker-fields"><label>TYPE BUS #<input autoFocus inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list="defect-log-bus-numbers" placeholder="Enter full bus number"/><datalist id="defect-log-bus-numbers">{candidates.map(bus=><option value={bus.n} key={bus.id}/>)}</datalist></label><label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>)}</select></label></div>
-  <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Choose 15s, 17s, 18s, or 20s first, or type the full number."}</small>
- </fieldset>;
+ /* Two boxes, because the old single box was called BUS NUMBER and the first
+    thing in it was a row of generations. The chips narrow the fleet; the number
+    names one bus. Naming each box for what it does is the whole change.
+
+    They stay wired the way they always were - a generation filters the list AND
+    the type-ahead, typing a number lights its generation, picking from the list
+    fills the number - so the split is what a person reads, not what the code
+    does. */
+ return <>
+  <fieldset className="wide bus-picker bus-picker-generations"><legend>BUS GENERATIONS</legend>
+   <div className="bus-generations" aria-label="Bus generation">{generations.map(value=><button type="button" className={generation===value?"active":""} aria-pressed={generation===value} onClick={()=>chooseGeneration(value)} key={value}>{generationLabel(value)}</button>)}</div>
+   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Narrows the bus list below. Skip it if you know the number."}</small>
+  </fieldset>
+  <fieldset className="wide bus-picker bus-picker-number"><legend>BUS NUMBER</legend>
+   <div className="bus-picker-fields">
+    {/* The typed number is the way in that gets used, so it is the biggest
+        thing in the form and it reads in the page's own text colour rather
+        than the muted grey every other field uses. */}
+    <label className="type-bus-number">TYPE BUS #<input autoFocus inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list="defect-log-bus-numbers" placeholder="Enter full bus number"/><datalist id="defect-log-bus-numbers">{candidates.map(bus=><option value={bus.n} key={bus.id}/>)}</datalist></label>
+    <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>)}</select></label>
+   </div>
+   {/* The list is disabled until a generation is picked, and that control now
+       lives in the box above, so the reason has to be said here or it reads as
+       broken. */}
+   {!generation&&<small>Pick a generation above to use the bus list, or type the full number.</small>}
+  </fieldset>
+ </>;
 }
 function MysteryMoveModal({bus,fleet,move,close}:{bus:DefectLogFleetBus;fleet:DefectLogFleetBus[];move:(area:string)=>boolean;close:()=>void}){
  const [area,setArea]=useState(""),currentArea=sectionForLocation(bus.l),choices=Object.entries(RELOCATION_AREAS).map(([name,slots])=>({name,current:slots.includes(bus.l),open:slots.filter(slot=>!fleet.some(item=>item.l===slot)).length}));
@@ -291,7 +313,6 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    <div className="log-form">
     <BusSelector fleet={fleet} busId={value.busId} select={busId=>setValue(current=>({...current,busId}))}/>
-    <p className="defect-date-stamp"><b>LOGGED</b> {timeLabel(value.defect.createdAt||new Date().toISOString())}{value.defect.updatedAt&&value.defect.updatedAt!==value.defect.createdAt&&<> · <b>UPDATED</b> {timeLabel(value.defect.updatedAt)}</>}</p>
     <label>CATEGORY<select value={value.defect.category} onChange={event=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,defect:{...current.defect,category:event.target.value,issue:"",symptoms:[],quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}))}><option value="">Select category</option>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
     <label>QUICK SELECT (OPTIONAL)<select value={value.quickIssue} disabled={!value.defect.category} onChange={event=>{const issue=event.target.value,picked=defectCountField(value.defect.category,issue),oilIssue=value.defect.category==="Preventive Maintenance"&&issue==="Add engine oil";setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,defect:{...current.defect,issue,partsUsed:false,partNumber:"",partName:"",symptoms:isCheckEngineIssue(current.defect.category,issue)?current.defect.symptoms||[]:[],quantity:undefined,unit:picked?picked.unit:oilIssue?"quarts":undefined,operability:defaultDefectOperability(current.defect.category,issue)}}))}}><option value="">{value.defect.category?"Save category only or choose an issue":"Select category first"}</option>{offCatalogIssue&&<option value={offCatalogIssue}>{offCatalogIssue} (as logged)</option>}{REPAIR_OPTION_GROUPS[value.defect.category]?Object.entries(REPAIR_OPTION_GROUPS[value.defect.category]).map(([group,items])=><optgroup label={repairGroupDisplayLabel(group)} key={group}>{items.map(entry=><option value={group+" - "+entry} key={entry}>{repairIssueDisplayLabel(entry,group)}</option>)}</optgroup>):repairs.map(repair=><option value={repair} key={repair}>{repairIssueDisplayLabel(repair)}</option>)}</select></label>
     {/* Shown where the choice was just made, not behind Advanced Details. The
@@ -412,6 +433,9 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     {hasHistory&&<p className="deferred-history-note" role="note"><b>WAS DEFERRED</b>Returned to service {timeLabel(value.defect.deferredReturnedAt||"")}. Still open.</p>}
     <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Could not reproduce the reported condition.</small></span></label>
 
+    {/* Moved off the top of the form. Sitting between the bus and the category
+        it read like a field somebody had to deal with; it is only a stamp. */}
+    <p className="defect-date-stamp"><b>LOGGED</b> {timeLabel(value.defect.createdAt||new Date().toISOString())}{value.defect.updatedAt&&value.defect.updatedAt!==value.defect.createdAt&&<> · <b>UPDATED</b> {timeLabel(value.defect.updatedAt)}</>}</p>
    </div>
    <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
   </form>
