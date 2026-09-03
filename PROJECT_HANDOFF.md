@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 143
-Live feature checkpoint: commit f94608b
+Live release: Sites Version 145
+Live feature checkpoint: commit 5aab35f
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 143 is the current user-approved live release. Its source checkpoint is commit f94608b. A collapsed Defect Log bus card no longer wears the category glyph of one of its defects; category glyphs remain on the individual expanded defect rows. The Version 142 fixed card tab stops, clearer reading text, and the enlarged, Facility Map-colored Down Sheet badge remain in place. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Version 145 is the current user-approved live release. Its source checkpoint is commit 5aab35f. The Defect Log now opens with collapsed DAILY STATS and + LOG DEFECT at the top; Fixed Repairs can log a completed repair that never had a defect entered first. Version 144's clearer save-screen choices and SEARCH labels are included. The only new device-local preference is pace-defect-log-stats-open-v1; absent means the stats remain closed. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
