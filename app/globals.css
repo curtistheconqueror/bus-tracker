@@ -792,3 +792,11 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .deferred-review-actions{display:grid;grid-template-columns:auto 1fr auto}
 @media(max-width:760px){.deferred-review-actions{grid-template-columns:1fr 1fr}.deferred-review-actions span{display:none}}
 @media(max-width:760px){.save-alert{padding:9px 11px}.save-alert button{width:100%}}
+
+/* The Facility Map's title is an h1 so the page has a name a screen reader can
+   announce and jump to. The bare `header` rule above sets a fixed height:38px
+   and its own font-size, and an h1 arrives with a 2em default and block
+   margins that would burst that box. It inherits instead and carries no
+   margin, so the banner looks exactly as it did — this change is for screen
+   readers, not for the eye. */
+header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;color:inherit;text-shadow:inherit}

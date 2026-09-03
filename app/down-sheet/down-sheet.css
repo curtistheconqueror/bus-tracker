@@ -273,3 +273,45 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    first-time user is looking for. */
 .down-view-controls .down-search>b{font-size:11px;font-weight:900;color:var(--down-ink,#172b4d);letter-spacing:.2px}
 @media(max-width:760px){.down-view-controls .down-search>b{font-size:12px}}
+
+/* ── SHEET STATS, collapsed by default ───────────────────────────────────────
+   Eight tiles were the first thing on the page, above the filters and above
+   the button that adds a bus. Behind one bar now, with the numbers worth a
+   glance on it. Mirrors the Defect Log's DAILY STATS so the two pages open the
+   same way. */
+.sheet-stats{margin:0 14px 8px}
+.sheet-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:44px;border:1px solid var(--down-border,#bac7d9);border-radius:8px;background:var(--down-surface,#fff);padding:8px 12px;color:var(--down-ink,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+.sheet-stats-toggle:hover,.sheet-stats-toggle:focus-visible{background:color-mix(in srgb,var(--down-accent,#0b64bd) 7%,var(--down-surface,#fff));outline:none}
+.sheet-stats-toggle>b{flex:none;font-size:12px;font-weight:900;letter-spacing:.4px;color:var(--down-accent,#0b64bd)}
+.sheet-stats-toggle>small{flex:1;min-width:0;font-size:10px;font-weight:800;color:var(--down-muted,#6e7e94);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-stats-toggle>i{flex:none;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.5px;color:var(--down-accent,#0b64bd)}
+.sheet-stats.open .down-summary{padding-top:8px}
+
+/* + ADD DOWN BUS, first and full width. It used to sit bottom-right of a block
+   of six, under a red CLEAR DOWNSHEET. */
+.down-primary-action{min-height:46px;border:0;border-radius:7px;background:#0d7a45;color:#fff;padding:0 16px;font-family:inherit;font-size:13px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.down-primary-action:hover,.down-primary-action:focus-visible{background:#0a8b4c;outline:none}
+.down-primary-action:disabled{opacity:.5;cursor:not-allowed}
+
+/* Recovery, not daily work: behind a disclosure so the loudest buttons on the
+   page are not the destructive ones. */
+.down-more{border:1px solid var(--down-border,#bac7d9);border-radius:7px;background:var(--down-surface,#fff)}
+.down-more>summary{display:flex;align-items:center;justify-content:center;min-height:40px;padding:0 12px;color:var(--down-muted,#5a6a86);font-size:10px;font-weight:900;letter-spacing:.5px;cursor:pointer;list-style:none}
+.down-more>summary::-webkit-details-marker{display:none}
+.down-more>summary::after{content:" ▾";margin-left:6px}
+.down-more[open]>summary::after{content:" ▴"}
+/* Only when open. A bare `display:grid` here overrode the browser's own
+   `details:not([open])>*:not(summary){display:none}`, so the buttons this
+   disclosure exists to tuck away were on screen the whole time — measured:
+   CLEAR DOWNSHEET fully visible with the panel reporting itself closed. */
+.down-more[open]>div{display:grid;gap:7px;padding:0 9px 9px}
+.down-more:not([open])>div{display:none}
+.down-more>div button{min-height:42px;width:100%}
+@media(max-width:760px){
+ .sheet-stats{margin:0 8px 8px}
+ .sheet-stats-toggle{min-height:48px}
+ .sheet-stats-toggle>b{font-size:13px}
+ .sheet-stats-toggle>small{font-size:11px}
+ .down-controls>.down-primary-action{grid-column:1/-1;width:100%;min-height:52px;font-size:15px}
+ .down-more{grid-column:1/-1}
+}

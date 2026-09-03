@@ -915,7 +915,13 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
   assert.match(html, /MECHANIC \/ VENDOR/);
-  assert.match(html, /SHEET CAPACITY/);
+  /* The eight stat tiles are behind SHEET STATS now, closed by default, so the
+     capacity tile is not in the first render. The bar that replaced them
+     carries the capacity figure, and the page opens on the button that adds a
+     bus instead of on a scoreboard. */
+  assert.match(html, /SHEET STATS/);
+  assert.doesNotMatch(html, /SHEET CAPACITY/);
+  assert.match(html, /\+ ADD DOWN BUS/);
   assert.match(html, /SHOW COMPLETED/);
   assert.match(html, /ADD DOWN BUS/);
   assert.match(html, /CLEAR DOWNSHEET/);

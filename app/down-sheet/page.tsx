@@ -56,6 +56,7 @@ type DownEntry={
 
 const MAX_ENTRIES=98;
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
+const STATS_OPEN_KEY="pace-down-sheet-stats-open-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 const STATUS_LABELS:Record<FleetStatus,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 
@@ -146,6 +147,11 @@ export default function DownSheet(){
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
  const [settingsOpen,setSettingsOpen]=useState(false);
+ /* Absent means closed, like the Defect Log's. A device that has never opened
+    the stats does not have to write anything to say so. */
+ const [statsOpen,setStatsOpen]=useState(false);
+ useEffect(()=>{setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
@@ -228,7 +234,16 @@ export default function DownSheet(){
    <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a className="active" href="/down-sheet" aria-current="page">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav>
   </header>
 
-  <section className="down-summary" aria-label="Down sheet summary">
+  {/* Eight tiles were the first thing on the sheet, above the filters and above
+      the button that adds a bus. Behind one bar now, carrying the numbers worth
+      a glance, remembered per device. COMPLETED TODAY stays a button inside —
+      it filters — so it is only reachable with the panel open, same as before
+      it had a bar in front of it. */}
+  <section className={"sheet-stats"+(statsOpen?" open":"")}>
+   <button type="button" className="sheet-stats-toggle" aria-expanded={statsOpen} onClick={()=>setStatsOpen(open=>!open)}>
+    <b>SHEET STATS</b><small>{counters.active} {String(displaySettings.labels.active).toLowerCase()} · {counters.pending} {String(displaySettings.labels.pending).toLowerCase()} · {formatRepairTime(counters.activeMinutes)} est. labor · {active.length}/{MAX_ENTRIES} capacity</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
+   </button>
+   {statsOpen&&<section className="down-summary" aria-label="Down sheet summary">
    <div className="primary-count"><strong>{counters.active}</strong><span>{displaySettings.labels.active}</span></div>
    <div><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
    <div><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
@@ -237,19 +252,32 @@ export default function DownSheet(){
    <div className="labor-total"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
    <div className="labor-total view-total"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>
    <div className="capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
+   </section>}
   </section>
 
   <section className="down-controls">
+   {/* The one thing this page is for, first and full width. It used to sit in
+       the bottom-right of a block of six, below CLEAR DOWNSHEET. */}
+   <button className="down-primary-action" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES} title={active.length>=MAX_ENTRIES?"The sheet is full at "+MAX_ENTRIES+" buses":"Add a bus to the Down Sheet"}>+ ADD DOWN BUS</button>
    <div className="shift-filter" aria-label="Filter down sheet by shift">
-    <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
+    <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
    </div>
    <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
-   {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
-   {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
-   <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
    <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
-   <button className="add-repair" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES}>+ ADD DOWN BUS</button>
    <button className="down-settings" type="button" onClick={()=>setSettingsOpen(true)} aria-label="Open down sheet settings">⚙ SETTINGS</button>
+   {/* Clearing the sheet and undoing an import are recovery, not daily work.
+       They were the loudest things on the page — a red CLEAR DOWNSHEET beside
+       two amber buttons — sitting above the button that adds a bus. They are
+       behind MORE now, and the undos still appear only when there is something
+       to undo, so the row is usually just the one item. */}
+   <details className="down-more">
+    <summary>MORE</summary>
+    <div>
+     {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
+     {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
+     <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
+    </div>
+   </details>
   </section>
 
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
