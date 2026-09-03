@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 146 PENDING — publish from `acf86c2`. Versions 144 and 145 are live.**
+**STATUS: VERSION 146 PENDING — publish from `21a0d06`. Versions 144 and 145 are live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **146** | `acf86c2` | The Facility Map has a heading a screen reader can announce, and the Down Sheet opens on + ADD DOWN BUS |
+| Next | **146** | `21a0d06` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
@@ -1525,7 +1525,7 @@ Suggested `docs/RELEASES.md` row:
 
 ---
 
-# Version 146 — A page a screen reader can name, and a sheet that opens on its job
+# Version 146 — A page a screen reader can name, a sheet that opens on its job, one repair kept as one record, and the air system named the way the shop names it
 
 **Publish this next, after Version 145.**
 
@@ -1533,31 +1533,41 @@ Suggested `docs/RELEASES.md` row:
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`acf86c2`** |
-| Last code-bearing commit | `acf86c2` — the release source is this commit |
+| **Release source** | **`21a0d06`** |
+| Last code-bearing commit | `21a0d06` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 145, published from `5aab35f` |
 
-```
-git log --oneline 5aab35f..acf86c2
-acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet header
-84164ff Record Sites Versions 144 and 145 releases
-651c61f Record the sixth fix in the 145 handoff
+Six commits sit in this range and **three of them touch application code**:
 
-git diff --name-only 5aab35f acf86c2 -- app
+```
+git log --oneline 5aab35f..21a0d06
+21a0d06 Name the air system what the shop calls it, and the rear valves for what they do   <- app code
+3c1f800 Write to the repair a bus already has, instead of logging it twice   <- app code
+eeab372 Queue Version 146                                                    <- docs only
+acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet header   <- app code
+84164ff Record Sites Versions 144 and 145 releases                           <- docs only
+651c61f Record the sixth fix in the 145 handoff                              <- docs only
+
+git diff --name-only 5aab35f 21a0d06 -- app
+app/defect-identity.ts
+app/down-sheet/down-sheet-sync.ts
 app/down-sheet/down-sheet.css
 app/down-sheet/page.tsx
+app/down-sheet/repair-time-estimates.ts
+app/duplicate-defects.ts
 app/globals.css
 app/page.tsx
+app/repair-catalog.ts
 ```
 
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 5aab35f acf86c2 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 5aab35f 21a0d06 -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: 192 tests passing, ESLint clean, production build succeeds.
+Gate: 194 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -1594,17 +1604,114 @@ buttons still appear only when there is something to undo, so MORE is usually a
 single item. COMPLETED TODAY is still a button inside the panel and still
 filters.
 
-### 3. A disclosure that was not hiding anything
+### 3. A note on the MORE disclosure — nothing to review in the diff
 
-Caught while verifying the above. A bare `display:grid` on the disclosure's
-contents overrode the browser's own rule that hides a closed `<details>`, so
-**CLEAR DOWNSHEET was fully visible while the panel reported itself closed** —
-the disclosure was decorative. Scoped to the open state now; measured closed,
-then open.
+**This is not a shipped fix; it never reached a commit.** While building the
+disclosure above, a bare `display:grid` on its contents overrode the browser's
+own rule that hides a closed `<details>`, leaving CLEAR DOWNSHEET fully visible
+while the panel reported itself closed. It was caught and scoped to `[open]`
+before `acf86c2` was written, so every committed state of `down-sheet.css`
+already carries `.down-more[open]>div` and `.down-more:not([open])>div`. Recorded
+only so the `[open]` scoping is not mistaken for an accident and simplified
+away later.
+
+### 4. A repair the bus already has is written to, not logged a second time
+
+**Curtis asked the right question and the answer was yes, it duplicated.** A bus
+logged for a check engine light, then put on the Down Sheet by hand for that
+same fault, ended up carrying it twice — once from the log, once from the sheet,
+each under a different id, each looking to the app like a separate problem.
+MERGE DUPES caught it afterwards, which is what it is for, but it should not
+have had to.
+
+The rule already existed and two of the four doors skipped it:
+
+| How a repair reaches the sheet | Before | Now |
+| --- | --- | --- |
+| Defect Log → tick DOWN SHEET | writes to the logged record | same, plus the widening below |
+| SCAN SHEET photo import | asks first, adopts the record | same, plus the widening below |
+| **+ ADD DOWN BUS, typed by hand** | **minted a second record** | **writes to the one that is there** |
+| **Pulled on by the app when a bus is marked down** | **minted a second record** | **writes to the one that is there** |
+
+The question is now asked at both doors that write repairs — `importScan` in
+`app/down-sheet/page.tsx` and `defectTargets` in `down-sheet-sync.ts` — against
+**one shared rule** in `app/defect-identity.ts`, so all four behave the same way.
+**Only an exact repeat is adopted, and only one still unresolved.** A genuinely
+different fault on the same bus is still its own record, and a repair finished
+last month is not reopened by new work that reads like it. A card that already
+wrote its own record keeps it, so editing a card updates what it wrote rather
+than wandering onto a neighbouring fault.
+
+Two spellings count as the same record. A card the app builds from a defect
+carries that defect's **supporting text** — the diagnostic lamp and its alarm
+number, then the reported symptoms, then the note — rather than the bare details
+field, because on a sheet that is the line that decides what the bus needs.
+Without matching both, a bus the app pulls onto the sheet comes back carrying
+its own defects a second time. An adopted record then keeps its own details:
+writing the spelled-out card back would flatten the lamp and the symptoms into
+free text and then repeat them, leaving a record reading `Misfire — Misfire — …`.
+
+The identity rule moves to a new `app/defect-identity.ts` so the sheet and the
+duplicate cleanup share one copy instead of importing each other. Two copies
+would drift and the symptom is silent — duplicates quietly returning on a board
+nobody is auditing. **Merging keeps the stricter rule**, matching only on what
+the record itself says, because merging deletes a record and adoption only
+updates one.
+
+#### What else this widening touches — read before publishing
+
+Adoption is now looser than it was, and two paths this section first described
+as untouched do change. Neither is a regression, but neither is nothing:
+
+- **MERGE DUPES is genuinely unchanged.** `defectFingerprint`, the placeholder
+  guard and `mergeDuplicateDefects` moved between files without a change to what
+  they do — verified by diffing the function across `acf86c2..21a0d06`.
+- **The scan matcher matches more than it did.** `matchingUnresolvedDefectId`
+  compared one fingerprint before; it now accepts the supporting spelling too.
+  So a scanned row whose reason column carries the app's own spelled-out line —
+  which is exactly what the Down Sheet PRINT puts on the paper — now adopts the
+  existing record where it previously minted a new one. That is the intended
+  direction for print-then-rescan, but it is a change to the scan path.
+- **A DOWN SHEET tick entry with more than one card changes.** A single-card
+  tick is identical. Add a second card that repeats another record already on
+  the bus and it now writes to that record instead of minting a third: measured
+  three records before, two after.
+
+### 5. The air system is named what the shop names it
+
+**Air System becomes Pneumatic System.** Under it, two options were listed by
+valve model and where the valve sits, which says nothing about what the valve
+does or whether the bus can move:
+
+| Was | Is |
+| --- | --- |
+| `R-12 relay valve (C/S rear)` | **`R-12 service valve (C/S rear)`** |
+| `R-14 relay valve (R/S rear)` | **`R-14 parking brake valve (R/S rear)`** |
+
+Both keep the side, because that is still how you find them on the bus.
+
+**Nothing stored is rewritten.** Every record on the live board was logged under
+`Air System`, so this is a read-time rename like every other one in
+`repair-catalog.ts`: the category goes in `LEGACY_CATEGORY_RENAMES`, the two
+valves in `CATEGORY_ISSUE_RENAMES` keyed by the category the record has *after*
+the rename has run. A defect logged in January keeps its id, its details and its
+first-seen date, and simply reads as its new home.
+
+Three things are keyed on the category name and would have gone quiet if only
+the picker had changed — **the air-bag replacement counts, the category glyph,
+and the repair-time estimate.** The counts follow the migrated category. The
+glyph and the estimate keep an `Air System` entry too, the way this codebase
+already does for `No Start` and `Doors, Ramp and Lift`, so a caller holding an
+unmigrated category lands on the right value instead of the catch-all.
+
+Two options still read `Air-system warning` and `Other air-system repair`, and
+that is deliberate: they name the physical system on the bus, which is still the
+air system, rather than referring to the category title. Say the word and they
+change too.
 
 ## Validation
 
-- 192 regression tests passing, ESLint clean, production build succeeds
+- 194 regression tests passing, ESLint clean, production build succeeds
 - **Driven at 390 and 1180.** Stats closed on first load, opened, remembered
   across a reload, closed again. + ADD DOWN BUS present exactly once, visible
   without scrolling, full width at 390. Each shift filter pressed on and back
@@ -1613,6 +1720,48 @@ then open.
 - **The h1 was measured, not assumed** — 11px inside a 40px banner, no overflow
 - One rendered-HTML test asserted on a stat tile now behind the toggle; it
   asserts the bar and the add button instead
+- **The duplicate was reproduced in a browser before it was fixed and re-driven
+  after.** Bus 17563 open on the Defect Log for a check engine light, added to
+  the Down Sheet by hand for the same fault: two records before, one after, and
+  MERGE DUPES goes from offering a cleanup to having nothing to clean. Adding
+  the same bus for a *different* fault still produces two records
+- **The app's own pull was driven too** — a bus marked down, pulled onto the
+  sheet by the app and saved back unchanged: one record, and its details still
+  read `Loses power on the hill` rather than swallowing the card's spelling
+- One new test for the duplicate: the reported case, a different fault,
+  completing through the sheet, a resolved record not being reopened, both
+  spellings, two cards never landing on one record, a card keeping the record it
+  owns, and a blank card adopting nothing
+- **The rename was driven against records stored the old way**, not just against
+  the picker. Two defects written as `Air System` — one an R-12 valve, one an
+  air-bag leak carrying a count of 4 — read back as
+  `Pneumatic System — R-12 service valve (C/S rear)` and
+  `Pneumatic System — Leaking air bag - Rear — 4 replaced`, with ids and
+  first-seen dates intact. The picker offers `💨 Pneumatic System` and no
+  `Air System`
+- One new test for the rename covers the migration in both directions, the
+  counts, the glyph and the estimate under both spellings, and asserts the new
+  name is not quietly falling through to the Miscellaneous defaults
+- Three existing tests named `Air System` directly and now name the new
+  category; the many tests that pass `"Air System"` as *stored* input were left
+  exactly as they were, because they now exercise the migration
+- **The two behaviour changes above were measured against the old code**, by
+  loading `acf86c2`'s own modules beside the new ones rather than reasoning
+  about the diff:
+
+  ```
+  two-card DOWN SHEET tick   BEFORE: 3 records -> ["d1","d2","downsheet-repair-tick-1-item-b"]
+                             AFTER : 2 records -> ["d1","d2"]
+  one-card DOWN SHEET tick   BEFORE: 2 records   AFTER: 2 records   (identical)
+
+  scan reason = stored spelling      OLD -> defect-A   NEW -> defect-A
+  scan reason = supporting spelling  OLD -> undefined  NEW -> defect-A
+  ```
+- A cold review of this handoff found five wrong claims in an earlier draft —
+  a "no behaviour change" that was not true of the scan or of a multi-card tick,
+  an assertion count, a door count, and a fix described in "What changed" that
+  had never reached a commit. All are corrected above; the review is the reason
+  the section-4 caveat block exists
 
 ## After it is live
 
@@ -1625,10 +1774,33 @@ then open.
    something to undo. With MORE closed, none of them is on screen.
 5. **The Facility Map should look exactly as it did.** The change is for screen
    readers.
+6. **Take a bus that is open on the Defect Log and add it to the Down Sheet by
+   hand for that same repair.** The Defect Log should still show one line for
+   it, now carrying the DS badge — not two lines. Then do it again for a
+   different fault on the same bus and confirm that one *does* get its own line.
+7. **Open LOG DEFECT and look at the category list.** It should read
+   💨 Pneumatic System, with no Air System anywhere, and the two rear valves
+   should read *service valve* and *parking brake valve*.
+8. **Find a bus already logged under the old Air System.** It should now read
+   Pneumatic System with the same details and the same date, and any air-bag
+   count on it should still show.
 
 ## The way back
 
-`git revert acf86c2` — one commit.
+`git revert 21a0d06 3c1f800 acf86c2` — three application commits, newest first.
+
+Each can also be reverted alone. They all touch `tests/rendered-html.test.mjs`
+but different parts of it, so git auto-merges.
+
+Reverting `21a0d06` alone puts the category back to Air System and the valves
+back to their model-number wording. **No record is stranded either way**: the
+rename is read-time, so a defect logged while Pneumatic System was live still
+carries `Air System` in storage and reads correctly once the rename is gone.
+
+Reverting `3c1f800` alone restores the old behaviour, in which a repair typed
+onto the Down Sheet for a fault the bus is already logged for becomes a second
+record. That is not data loss — MERGE DUPES folds them back together — but the
+counts read high until somebody runs it.
 
 ## Publishing constraints that still apply
 
@@ -1641,5 +1813,5 @@ then open.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it |
+| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it; a repair added to the Down Sheet for a fault the bus is already logged for now writes to the record that is there instead of logging it a second time, matching only exact repeats that are still unresolved; and the Air System category is renamed Pneumatic System with its two rear valves named for what they do rather than their model number, read-time so nothing stored is rewritten |
 ```
