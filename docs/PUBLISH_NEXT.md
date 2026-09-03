@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 146 PENDING — publish from `21a0d06`. Versions 144 and 145 are live.**
+**STATUS: VERSION 146 PENDING — publish from `1d5454b`. Versions 144 and 145 are live.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **146** | `21a0d06` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, and Air System becomes Pneumatic System |
+| Next | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
@@ -1525,7 +1525,7 @@ Suggested `docs/RELEASES.md` row:
 
 ---
 
-# Version 146 — A page a screen reader can name, a sheet that opens on its job, one repair kept as one record, and the air system named the way the shop names it
+# Version 146 — A page a screen reader can name, a sheet that opens on its job, one repair kept as one record that says why the bus is down, and the air system named the way the shop names it
 
 **Publish this next, after Version 145.**
 
@@ -1533,15 +1533,17 @@ Suggested `docs/RELEASES.md` row:
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`21a0d06`** |
-| Last code-bearing commit | `21a0d06` — the release source is this commit |
-| Branch | `main` on the private `origin` remote |
+| **Release source** | **`1d5454b`** |
+| Last code-bearing commit | `1d5454b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote — **pushed**, `origin/main` carries this commit |
 | Previous | Version 145, published from `5aab35f` |
 
-Six commits sit in this range and **three of them touch application code**:
+Eight commits sit in this range and **four of them touch application code**:
 
 ```
-git log --oneline 5aab35f..21a0d06
+git log --oneline 5aab35f..1d5454b
+1d5454b Say which defect has the bus on the down sheet                       <- app code
+834d76a Queue Version 146 from 21a0d06, and correct what the handoff claimed <- docs only
 21a0d06 Name the air system what the shop calls it, and the rear valves for what they do   <- app code
 3c1f800 Write to the repair a bus already has, instead of logging it twice   <- app code
 eeab372 Queue Version 146                                                    <- docs only
@@ -1549,8 +1551,11 @@ acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet 
 84164ff Record Sites Versions 144 and 145 releases                           <- docs only
 651c61f Record the sixth fix in the 145 handoff                              <- docs only
 
-git diff --name-only 5aab35f 21a0d06 -- app
+git diff --name-only 5aab35f 1d5454b -- app
 app/defect-identity.ts
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
 app/down-sheet/down-sheet-sync.ts
 app/down-sheet/down-sheet.css
 app/down-sheet/page.tsx
@@ -1564,10 +1569,10 @@ app/repair-catalog.ts
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 5aab35f 21a0d06 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 5aab35f 1d5454b -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: 194 tests passing, ESLint clean, production build succeeds.
+Gate: 195 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -1709,9 +1714,42 @@ that is deliberate: they name the physical system on the bus, which is still the
 air system, rather than referring to the category title. Say the word and they
 change too.
 
+### 6. The Defect Log says WHICH defect has the bus down
+
+**This is the other half of section 4, and it is the half you can see.** A card
+with three defects showed one purple `DS` badge. That badge is true of the
+*bus*, so with more than one defect under it nothing said which one was the
+reason — bus 17526 carrying a rear door, a horn and an IBS screen, all open,
+under a single DS.
+
+The specific defect now carries a **full-width banner** reading `ON THE DOWN
+SHEET` with what the sheet says about it: workflow, shift, section and who has
+it. A banner rather than a fourth badge — with three defects the answer has to
+attach to one row, and another small badge in a row of small badges would not
+have closed the question. The FOCUS view says the same thing spelled out, the
+way it spells out everything else.
+
+**The link is asked of the sheet itself.** `defectLogRecords` read only the
+entry's *stated* `defectId`, which names at most one record and is empty on
+every entry typed in through + ADD DOWN BUS. So a bus could sit on the sheet for
+a fault open in the log and no record would know it. It now calls
+`downSheetDefectIds`, a new export wrapping the same `defectTargets` the save
+uses, so the badge cannot disagree with what the sheet actually writes to — the
+stated id, the ids an entry mints per card, and the record a card adopts because
+the bus already had it.
+
+**And when none of them is the one.** A bus can be on the sheet for work never
+typed into this log — scanned off paper, or logged straight onto the sheet.
+Then the DS badge is true and no defect below carries a banner, which reads like
+the app declining to answer. That case now names the sheet entry in amber and
+says it is not one of the defects below.
+
+The banner takes the shop's own DS badge colour, so recolouring the badge
+recolours this too rather than leaving two purples side by side.
+
 ## Validation
 
-- 194 regression tests passing, ESLint clean, production build succeeds
+- 195 regression tests passing, ESLint clean, production build succeeds
 - **Driven at 390 and 1180.** Stats closed on first load, opened, remembered
   across a reload, closed again. + ADD DOWN BUS present exactly once, visible
   without scrolling, full width at 390. Each shift filter pressed on and back
@@ -1757,6 +1795,14 @@ change too.
   scan reason = stored spelling      OLD -> defect-A   NEW -> defect-A
   scan reason = supporting spelling  OLD -> undefined  NEW -> defect-A
   ```
+- **The banner was driven at 390 and 1180** on a bus shaped like 17526, against
+  an entry storing no `defectId` at all. The horn carries the banner; the door
+  and the screen do not. On desktop the banner claims a whole line — 1099px of
+  the row's 1101 — leaving the row's columns intact below it, and the body never
+  scrolls sideways. The "none of these is the one" case was driven separately
+- **That test was confirmed to fail against the old rule.** Putting the
+  `defectId`-only lookup back turns it red, so it is checking the fix rather
+  than passing on the fixture
 - A cold review of this handoff found five wrong claims in an earlier draft —
   a "no behaviour change" that was not true of the scan or of a multi-card tick,
   an assertion count, a door count, and a fix described in "What changed" that
@@ -1784,13 +1830,23 @@ change too.
 8. **Find a bus already logged under the old Air System.** It should now read
    Pneumatic System with the same details and the same date, and any air-bag
    count on it should still show.
+9. **Open a bus with several defects that is on the Down Sheet — 17526 is the
+   one this came from.** Exactly one defect should carry the purple ON THE DOWN
+   SHEET banner, and it should be the repair the sheet actually has. If the
+   sheet has that bus for something not in the log, an amber banner at the top
+   should name it and say it is not one of the defects below.
 
 ## The way back
 
-`git revert 21a0d06 3c1f800 acf86c2` — three application commits, newest first.
+`git revert 1d5454b 21a0d06 3c1f800 acf86c2` — four application commits, newest
+first. Driven: the set reverts clean and leaves 192 tests passing.
 
-Each can also be reverted alone. They all touch `tests/rendered-html.test.mjs`
-but different parts of it, so git auto-merges.
+Each can also be reverted alone; all four touch `tests/rendered-html.test.mjs`
+but different parts of it, so git auto-merges. **No ordering constraint** —
+`1d5454b`'s `downSheetDefectIds` only calls `defectTargets`, which exists either
+way, so reverting `3c1f800` alone while keeping the banner still builds
+(verified). It just puts the duplicate back: the banner would then point at the
+second record the sheet mints instead of the one already on the bus.
 
 Reverting `21a0d06` alone puts the category back to Air System and the valves
 back to their model-number wording. **No record is stranded either way**: the
@@ -1813,5 +1869,5 @@ counts read high until somebody runs it.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it; a repair added to the Down Sheet for a fault the bus is already logged for now writes to the record that is there instead of logging it a second time, matching only exact repeats that are still unresolved; and the Air System category is renamed Pneumatic System with its two rear valves named for what they do rather than their model number, read-time so nothing stored is rewritten |
+| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it; a repair added to the Down Sheet for a fault the bus is already logged for now writes to the record that is there instead of logging it a second time, matching only exact repeats that are still unresolved; a bus card with several defects now marks the specific defect that has it on the Down Sheet with a banner saying what the sheet says, and names the sheet entry when none of the listed defects is the reason; and the Air System category is renamed Pneumatic System with its two rear valves named for what they do rather than their model number, read-time so nothing stored is rewritten |
 ```
