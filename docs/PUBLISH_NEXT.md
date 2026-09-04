@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 147 was published from `9d69a9b` on 2026-09-03.**
+**STATUS: NONE PENDING — Sites Version 148 was published from `60c2a01` on 2026-09-03.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
+| Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
 | Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
@@ -18,7 +18,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 147 is live from `9d69a9b`.** The 136–147 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 148 is live from `60c2a01`.** The 136–148 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 Version 147 sits on top of the published 146 — it was rebased onto Codex's release commit `4c1e502`, never merged over it.
 

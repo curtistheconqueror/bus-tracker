@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 147 | Live | 9d69a9b | Defect Log bus selectors are named for their purpose and a typed bus number is the primary control |
+| 148 | Live | 60c2a01 | Bus List appears before Type Bus #; Amerex adds Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 |
+| 147 | Previous live | 9d69a9b | Defect Log bus selectors are named for their purpose and a typed bus number is the primary control |
 | 146 | Previous live | 1d5454b | Down Sheet identifies the defect that put a bus down, duplicate logging reuses the existing repair, and Air System is renamed Pneumatic System |
 | 145 | Previous live | 5aab35f | Defect Log opens on collapsed DAILY STATS and + LOG DEFECT; Fixed Repairs can log a completed repair without a prior defect, including a safe append save path |
 | 144 | Previous live | 9f1f73f | Save-screen choices and Defect Log/Down Sheet SEARCH labels are readable on phone widths |
