@@ -70,7 +70,25 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
 export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
  return fleet.reduce((count,bus)=>count+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt).length,0);
 }
-const RECENT_DUPLICATE_WINDOW_MS=48*60*60*1000;
+/* How far back the form looks before calling a new report a repeat of one the
+   bus is already carrying.
+
+   It was 48 hours, and the live board proved that too short: of the 25
+   duplicate records found on it, two were typed into this form by hand on
+   different days, the second one landing after the two-day window had closed.
+   A fault reported Monday and reported again Thursday is the same fault; a
+   week is not.
+
+   Widening is safe because the guard only ever matches a record that is STILL
+   UNRESOLVED. A repair that was finished and came back does not match - the
+   finished one is resolved - so a genuine recurrence still gets its own record
+   no matter how soon it returns.
+
+   The label is exported beside the number so the wording a mechanic reads
+   cannot drift away from the rule the code enforces. */
+export const RECENT_DUPLICATE_WINDOW_HOURS=120;
+export const RECENT_DUPLICATE_WINDOW_LABEL="5 days";
+const RECENT_DUPLICATE_WINDOW_MS=RECENT_DUPLICATE_WINDOW_HOURS*60*60*1000;
 function sameDefectChoice(left:StructuredDefect,right:StructuredDefect){return left.category.trim().toLowerCase()===right.category.trim().toLowerCase()&&left.issue.trim().toLowerCase()===right.issue.trim().toLowerCase()}
 export function recentDefectDuplicate(bus:DefectLogFleetBus,incoming:StructuredDefect,now=new Date().toISOString()){const currentTime=Date.parse(now);if(!Number.isFinite(currentTime)||!incoming.category.trim()||!incoming.issue.trim())return null;return normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).find(defect=>{if(defect.id===incoming.id||!isUnresolved(defect)||!sameDefectChoice(defect,incoming))return false;const loggedTime=Date.parse(defect.createdAt||defect.updatedAt||"");const age=currentTime-loggedTime;return Number.isFinite(loggedTime)&&age>=0&&age<RECENT_DUPLICATE_WINDOW_MS})||null}
 /* Every defect an active sheet entry is writing to, and the entry doing it.

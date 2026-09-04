@@ -32,7 +32,7 @@ import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recomme
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
-import { activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
@@ -2270,15 +2270,24 @@ test("Defect Log timestamps reports and blocks only recent identical unresolved 
   const existing={id:"old-defect",category:"Engine",issue:"Loss of power",details:"First report",operability:"service",state:"open",source:"defect-log",createdAt:"2026-08-22T12:00:00.000Z",updatedAt:"2026-08-22T12:00:00.000Z"};
   const bus={id:"bus-1",n:"17501",s:"defect",l:"road-1",defects:[existing]};
   const incoming={id:"new-defect",category:"Engine",issue:"Loss of power",details:"Second report",operability:"service",state:"open",source:"defect-log"};
-  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-24T11:59:00.000Z")?.id,"old-defect");
-  const blocked=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-24T11:59:00.000Z");
+  /* 120 hours, logged 2026-08-22T12:00Z, so the window shuts at 2026-08-27T12:00Z.
+     It used to be 48, and the live board showed that too short: two of the 25
+     duplicates found on it were typed into this form by hand after the two-day
+     window had already closed. */
+  assert.equal(RECENT_DUPLICATE_WINDOW_HOURS,120);
+  assert.equal(RECENT_DUPLICATE_WINDOW_LABEL,"5 days");
+  // Still blocked well past the old two-day line.
+  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-24T12:00:00.000Z")?.id,"old-defect",
+    "the day the old 48-hour window expired must now still be caught");
+  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-27T11:59:00.000Z")?.id,"old-defect");
+  const blocked=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-27T11:59:00.000Z");
   assert.equal(blocked.error,"recent-duplicate");
   assert.equal(blocked.fleet[0].defects.length,1);
-  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-24T12:00:00.000Z"),null);
-  const allowed=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-24T12:00:00.000Z");
+  assert.equal(recentDefectDuplicate(bus,incoming,"2026-08-27T12:00:00.000Z"),null);
+  const allowed=saveDefectLogRecord([bus],[],"bus-1",incoming,false,"2026-08-27T12:00:00.000Z");
   assert.equal(allowed.error,null);
   assert.equal(allowed.fleet[0].defects.length,2);
-  assert.equal(allowed.fleet[0].defects.find(defect=>defect.id==="new-defect").createdAt,"2026-08-24T12:00:00.000Z");
+  assert.equal(allowed.fleet[0].defects.find(defect=>defect.id==="new-defect").createdAt,"2026-08-27T12:00:00.000Z");
   const completedBus={...bus,defects:[{...existing,state:"completed"}]};
   assert.equal(recentDefectDuplicate(completedBus,incoming,"2026-08-22T13:00:00.000Z"),null);
   const manual=saveDefectLogRecord([bus],[],"bus-1",{...incoming,id:"manual-defect",issue:"Manual entry"},false,"2026-08-22T13:00:00.000Z");

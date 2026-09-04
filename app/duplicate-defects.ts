@@ -9,8 +9,9 @@
    beside them does not already say.
 
    It is not only scans. Two of the 21 were typed into the Defect Log by hand on
-   different days; the 48-hour duplicate guard on that form only looks back two
-   days, and the second entry came later than that.
+   different days; the duplicate guard on that form looked back only 48 hours at
+   the time, and the second entry came later than that. That window is 120 hours
+   now, which would have caught both of them before they were written.
 
    The cost is not cosmetic. Defect counts drive what a foreman looks at first,
    the shared lists that go out to the crew, and every "how many are down"
