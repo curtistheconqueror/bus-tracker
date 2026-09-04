@@ -24,7 +24,7 @@ export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
    the outcome left to prose is exactly the ambiguity that costs most on a
    safety item, and a failed brake test is the first thing anybody would want
    to pull as a list — which free text cannot answer. */
-export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order"|"test-driven"|"brake-test";
+export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order"|"test-driven"|"brake-test"|"operator-reported";
 export type BrakeTestResult="pass"|"fail";
 /* result is only ever set on the brake-test key. Optional everywhere else so
    one stamp shape still covers every state. */
@@ -35,6 +35,14 @@ export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string
  {key:"parts-on-order",label:"PARTS ON ORDER",short:"PARTS",hint:"Waiting on a part to arrive"},
  {key:"test-driven",label:"TEST DRIVEN",short:"DRIVEN",hint:"Road tested, details in the notes"},
  {key:"brake-test",label:"BRAKE TEST",short:"BRAKE",hint:"Record the result below"},
+ /* Where the report came from rather than work the shop did, which is why it
+    sits last. It was being typed into the description as "Operator Reported
+    Defect", so it was already a fact people recorded - it just could not be
+    counted, filtered, or read off a badge while it lived in free text.
+
+    It conflicts with nothing. An operator reports a fault, the shop inspects
+    it and road tests it, and all three are true of the same repair. */
+ {key:"operator-reported",label:"OPERATOR REPORTED",short:"OPERATOR",hint:"Came in from the operator, not the shop"},
 ];
 export const BRAKE_TEST_KEY:WorkStateKey="brake-test";
 export function brakeTestResult(defect:StructuredDefect){return defect.workStates?.[BRAKE_TEST_KEY]?.result}

@@ -2966,7 +2966,21 @@ test("a repair records how far it got, and what was found travels with it",async
     test were added anyway, and the warning does not bite: it was about
     OVERLAP, and unlike inspected-vs-diagnosed these are discrete physical
     acts rather than judgements about how far the thinking has got. */
- assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order","test-driven","brake-test"]);
+ /* Order is layout: the picker is a three-column grid, so the sixth key is the
+    bottom-right box. Operator-reported goes last because it is where the report
+    came from, not work the shop did. */
+ assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order","test-driven","brake-test","operator-reported"]);
+ assert.equal(WORK_STATES.length%3,0,"a full bottom row, so no box sits alone");
+
+ /* MORE THAN ONE IS THE NORMAL CASE. An operator reports a fault, the shop
+    inspects it, then road tests it - all three are true of the same repair and
+    none rules out another. workStates is a record keyed per state rather than
+    one chosen value, so several at once survive a read. */
+ const together=normalizeDefects([{id:"d1",category:"Engine",issue:"Check engine light",details:"",
+  operability:"service",state:"open",
+  workStates:{"operator-reported":{by:"AR"},inspected:{by:"AR"},"test-driven":{by:"AR"}}}]);
+ assert.deepEqual(Object.keys(together[0].workStates).sort(),
+  ["inspected","operator-reported","test-driven"],"three at once survive a read");
 
  // ticking stamps who and when
  let defect=setDefectWorkState(base,"diagnosed",true,"2026-08-27T15:00:00.000Z","CJ");
@@ -3027,6 +3041,17 @@ test("a repair records how far it got, and what was found travels with it",async
  // the form put it below the fold of a phone editor, which is exactly how the
  // campaign paste box got missed, so it sits above WORK STATUS instead.
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* Several at once only STAYS possible while the picker draws checkboxes.
+    Turning these into radios, or adding mutual exclusion, would silently start
+    throwing away recorded work and nothing else would complain. */
+ const picker=page.slice(page.indexOf("work-state-picker"),page.indexOf("brake-test-result"));
+ assert.match(picker,/<input type="checkbox" checked=\{on\} onChange=\{event=>toggleWorkState\(state\.key,event\.target\.checked\)\}\/>/);
+ assert.equal(/type="radio"/.test(picker),false,"the work states are never one-of");
+ /* The one thing that IS exclusive stays exclusive: a brake test is a pass or a
+    fail, never both. A pair of aria-pressed buttons off one stored result. */
+ assert.match(page,/className=\{"brake-test-"\+result\+\(picked\?" selected":""\)\} aria-pressed=\{picked\}/);
+ assert.match(page,/const picked=brakeTestResult\(value\.defect\)===result;/);
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("advanced-defect-details"),"above ADVANCED DETAILS");
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("WORK STATUS<select"),"and above WORK STATUS");
 
