@@ -1,10 +1,12 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 148 was published from `60c2a01` on 2026-09-03.**
+**STATUS: VERSION 149 PENDING — publish from `9b4e14b`. Version 148 is live from `60c2a01`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **149** | `9b4e14b` | The Defect Log looks back five days for a duplicate report instead of two |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
+| Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
 | Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
@@ -39,6 +41,120 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 149 — Five days is the same fault; two days was not long enough
+
+**Publish this next, after Version 148.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`9b4e14b`** |
+| Last code-bearing commit | `9b4e14b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 148, published from `60c2a01` |
+
+**One application commit.** Written before Codex published 148 and **rebased
+onto the release commit `2b34c52`**, not merged over it:
+
+```
+git log --oneline 60c2a01..9b4e14b
+9b4e14b Look back five days for a duplicate defect, not two   <- app code
+2b34c52 Record Sites Version 148 release                      <- Codex, docs only
+
+git diff --name-only 60c2a01 9b4e14b -- app
+app/defect-log/defect-log-sync.ts
+app/defect-log/page.tsx
+app/duplicate-defects.ts
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 60c2a01 9b4e14b -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 196 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None.** No storage key, no payload shape, no catalog identity. Only a number
+and the wording that reports it.
+
+## What changed
+
+The Defect Log's duplicate guard looked back **48 hours**. It now looks back
+**120 hours — five days.**
+
+**The live board is the reason.** Of the 25 duplicate records found on it, two
+were typed into this form by hand on different days, with the second landing
+after the two-day window had already shut. A fault reported Monday and reported
+again Thursday is the same fault. Both of those would now be caught before they
+were written.
+
+### Why widening cannot suppress real work
+
+The guard **only ever matches a record that is still unresolved.** A repair that
+was finished and came back does not match, because the finished one is resolved
+— so a genuine recurrence still gets its own record no matter how soon it
+returns. The rule that decides a match is unchanged: same bus, same category,
+same issue.
+
+### The number and the wording now come from one place
+
+`RECENT_DUPLICATE_WINDOW_HOURS` and `RECENT_DUPLICATE_WINDOW_LABEL` are exported
+together from `defect-log-sync.ts`, and the four messages that used to hardcode
+"48 hours" read the label. The copy can no longer drift away from the rule the
+code enforces, and the next change to this window is one line.
+
+The note in `duplicate-defects.ts` recording how those two duplicates reached
+the board was **updated rather than rewritten** — it still says the guard looked
+back 48 hours at the time, and now adds what it looks back today.
+
+## Validation
+
+- 196 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a browser against a defect logged three days ago** — past the old
+  window, inside the new one:
+  `ALREADY LOGGED Sep 1, 12:53 AM · Use the existing defect. A new report is
+  allowed after 5 days.` with the save button disabled
+- The boundary test moved to the new line and **was confirmed to fail** with the
+  window put back to 48, so it checks the change rather than passing on the
+  fixture
+- The test also asserts the day the old 48-hour window used to expire is now
+  still caught
+
+## After it is live
+
+1. **Find a bus with an open defect logged two to four days ago.** Try to log
+   the same category and repair again. It should refuse, and the message should
+   say *five days*, not 48 hours.
+2. **Check a defect that was fixed and came back.** It should still be allowed
+   through — the guard only holds back reports of faults that are still open.
+3. **Nothing else on the Defect Log should look different.**
+
+## The way back
+
+`git revert 9b4e14b` — one commit, no migration to undo. Reverting narrows the
+window to 48 hours again; nothing stored depends on it, and records written
+while 149 was live read identically afterwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 149 | Live | <published tip hash> | The Defect Log's duplicate guard looks back five days instead of two, so a fault reported Monday and typed in again Thursday is recognised as the same fault rather than becoming a second record; the window only ever matches records that are still unresolved, so a repair that was fixed and came back still gets its own record; and the window and the wording that reports it now come from one exported constant so they cannot drift apart |
+```
 
 ---
 
