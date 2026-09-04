@@ -1,6 +1,7 @@
 "use client";
 
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
+import TrackerNav from "../tracker-nav";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetSettings from "./down-sheet-settings";
@@ -231,7 +232,7 @@ export default function DownSheet(){
  return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
-   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a className="active" href="/down-sheet" aria-current="page">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav>
+   <TrackerNav active="/down-sheet"/>
   </header>
 
   {/* Eight tiles were the first thing on the sheet, above the filters and above

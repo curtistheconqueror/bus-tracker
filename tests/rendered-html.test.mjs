@@ -234,7 +234,7 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /ON DOWN SHEET/);
   assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
   assert.match(page, /showDownSheetBadges\?downSheetBadgeViewBusIds/);
-  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{\[/);
+  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{otherPages\(/);
   assert.match(page, /<h3>DS BADGE<\/h3>/);
   assert.match(page, /<b>SHOW BADGE<\/b>/);
   assert.match(page, /visuals\.downSheetBadgeText/);
@@ -964,8 +964,8 @@ test("tracker uses one counted Down Sheet control and one counted Defect Log con
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   /* Both moved into the PAGES menu when four page buttons were wrapping the
      command bar onto a second row. Still one of each, still counted. */
-  assert.equal((page.match(/label:"DOWN SHEET",count:actualDownSet\.size/g) || []).length, 1);
-  assert.equal((page.match(/label:"DEFECT LOG",count:defectLogCount/g) || []).length, 1);
+  assert.equal((page.match(/"\/down-sheet":actualDownSet\.size/g) || []).length, 1);
+  assert.equal((page.match(/"\/defect-log":defectLogCount/g) || []).length, 1);
   assert.doesNotMatch(page, /className="downsheet-command"/);
   assert.doesNotMatch(page, /className="defectlog-command"/);
   assert.match(page, /defectLogCount=activeDefectLogCount\(buses\)/);
@@ -2226,7 +2226,9 @@ test("phone layouts expose large primary controls and category-only defect entry
     readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
   ]);
-  assert.match(trackerPage, /className="mobile-mode-nav"[\s\S]*?FLEET TRACKER[\s\S]*?DOWN SHEET[\s\S]*?DEFECT LOG/);
+  // The phone nav is the shared list in the map's own shell; its order and
+  // labels are pinned once, in the test on tracker-nav.tsx.
+  assert.match(trackerPage, /<TrackerNav className="mobile-mode-nav" active="\/"\/>/);
   assert.match(trackerCss, /\.mobile-mode-nav a\{[^}]*min-height:50px/);
   assert.match(trackerPage, /className="phone-command-dock"[\s\S]*?>FIND<[\s\S]*?>FILTERS<[\s\S]*?>AI<[\s\S]*?>MORE</);
   assert.match(trackerPage, /className="garage-scroll"[\s\S]*?className="garagegrid"/);
@@ -2315,7 +2317,11 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
     readFile(new URL("../public/sw.js",import.meta.url),"utf8"),
     readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
   ]);
-  for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/href="\/fixed-repairs"[\s\S]*?FIXED REPAIRS/);
+  /* The link is written once, in the shared list; each page is asserted to draw
+     that list rather than to carry its own copy of the link. */
+  const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+  assert.match(navPages,/\{href:"\/fixed-repairs",label:"FIXED REPAIRS"\}/);
+  for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/<TrackerNav[^>]*\/>/);
   assert.ok(trackerPage.indexOf("mobile-mode-nav")<trackerPage.indexOf("FLEET MAINTENANCE BUS TRACKING SYSTEM"),"phone route navigation must render before the Facility Map header");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
@@ -2966,6 +2972,43 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(1.25),"1.25");
 });
 
+test("every page draws the same five links from one list",async()=>{
+ const nav=await readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8");
+ const {TRACKER_PAGES,otherPages}=await import("../app/tracker-pages.ts");
+ const pagesSource=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+
+ /* Five copies of this nav drifted: the Facility Map called itself FLEET
+    TRACKER in its own nav while every other page called it FACILITY MAP. One
+    list, one name. */
+ assert.deepEqual(TRACKER_PAGES.map(page=>page.label),
+  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS"]);
+ assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists"]);
+ /* Checked on the data, not the source: the file's own comment records the old
+    name to explain why the component exists, and prose is not a label. */
+ assert.equal(TRACKER_PAGES.some(page=>page.label==="FLEET TRACKER"),false,"the map's private name for itself is gone");
+ assert.equal(/label:"FLEET TRACKER"/.test(pagesSource),false);
+
+ // The component owns the landmark and the current-page mark.
+ assert.match(nav,/<nav className=\{className\} aria-label="Tracker pages">/);
+ assert.match(nav,/aria-current=\{current\?"page":undefined\}/);
+
+ // Every page renders it, marking itself, and none still carries a hand-written copy.
+ const pages=[["app/page.tsx","/"],["app/down-sheet/page.tsx","/down-sheet"],["app/defect-log/page.tsx","/defect-log"],
+  ["app/fixed-repairs/page.tsx","/fixed-repairs"],["app/lists/page.tsx","/lists"]];
+ for(const [file,active] of pages){
+  const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
+  assert.match(source,new RegExp('<TrackerNav[^>]*active="'+active.replace(/\//g,"\\/")+'"'),file+" marks itself as current");
+  assert.equal(/<nav aria-label="Tracker pages">/.test(source),false,file+" no longer hand-writes the nav");
+  assert.equal(/<a href="\/lists">FLEET CAMPAIGNS<\/a>/.test(source),false,file+" carries no literal copy of a link");
+ }
+
+ // The map's desktop menu is the same list minus the map, with counts attached.
+ const other=otherPages({"/defect-log":7,"/down-sheet":2});
+ assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists"]);
+ assert.equal(other.find(page=>page.href==="/defect-log").count,7);
+ assert.equal(other.find(page=>page.href==="/lists").count,undefined,"no count is no count, not zero");
+});
+
 test("ALL means everything, including whatever is in the search box",async()=>{
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
 
@@ -3246,13 +3289,14 @@ test("the command bar carries the other pages behind one trigger",async()=>{
  // the four buttons are gone from the bar and live in the menu instead
  for(const gone of ["downsheet-command","defectlog-command","fixed-repairs-command","lists-command"])
   assert.ok(!page.includes('className="'+gone+'"'),gone+" should be inside the PAGES menu now");
- assert.match(page,/<PageMenu pages=\{\[/);
+ assert.match(page,/<PageMenu pages=\{otherPages\(/);
+  const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
  for(const href of ["/down-sheet","/defect-log","/fixed-repairs","/lists"])
-  assert.ok(page.includes('href:"'+href+'"'),"the menu must still reach "+href);
+  assert.ok(navPages.includes('href:"'+href+'"'),"the menu must still reach "+href);
  // the counts come along: the reason to glance at the bar is to see what is waiting
- assert.match(page,/count:actualDownSet\.size/);
- assert.match(page,/count:defectLogCount/);
- assert.match(page,/count:fixedRepairCount/);
+ assert.match(page,/"\/down-sheet":actualDownSet\.size/);
+ assert.match(page,/"\/defect-log":defectLogCount/);
+ assert.match(page,/"\/fixed-repairs":fixedRepairCount/);
 
  // same shape as the quick filter control beside it, so the pattern is learned once
  assert.match(menu,/aria-haspopup="menu"/);
@@ -4427,12 +4471,14 @@ test("bus lists survive a round trip through storage",()=>{
 test("every page offers the Fleet Campaigns tab without changing the lists route",async()=>{
  const pages=await Promise.all(["../app/page.tsx","../app/down-sheet/page.tsx","../app/defect-log/page.tsx","../app/fixed-repairs/page.tsx","../app/lists/page.tsx"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
- for(const page of pages){assert.match(page,/href="\/lists"/);assert.match(page,/>FLEET CAMPAIGNS<\/a>/)}
+ const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+ assert.match(navPages,/\{href:"\/lists",label:"FLEET CAMPAIGNS"\}/);
+ for(const page of pages)assert.match(page,/<TrackerNav[^>]*\/>/);
  // the lists page marks itself current and links back to the other four
  const listsPage=pages.at(-1);
- assert.match(listsPage,/className="active" href="\/lists" aria-current="page"/);
+ assert.match(listsPage,/<TrackerNav active="\/lists"\/>/);
  assert.match(listsPage,/<h1>Fleet Campaigns<\/h1>/);
- for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(listsPage.includes('href="'+href+'"'),href);
+ for(const href of ["/","/down-sheet","/defect-log","/fixed-repairs"]) assert.ok(navPages.includes('href:"'+href+'"'),href);
  // globals.css styles bare <header>, so this page must not use one
  assert.equal(/<header>|<footer>/.test(listsPage),false);
 
@@ -4452,7 +4498,7 @@ test("every page offers the Fleet Campaigns tab without changing the lists route
  assert.match(listsPage,/<details className="list-columns">/);
  // the Facility Map hides its header nav on desktop and navigates from the
  // command bar, so without this button the page is unreachable there
- assert.match(pages[0],/\{href:"\/lists",label:"FLEET CAMPAIGNS"\}/);
+ assert.match(navPages,/\{href:"\/lists",label:"FLEET CAMPAIGNS"\}/);
 });
 
 test("the lists page neutralises the global aside and section styling",async()=>{

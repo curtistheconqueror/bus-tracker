@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useRef,useState} from "react";
+import TrackerNav from "../tracker-nav";
 import "./lists.css";
 import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
@@ -135,7 +136,7 @@ export default function Lists(){
 
  return <main className="lists-app"><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
-   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">FLEET CAMPAIGNS</a></nav>
+   <TrackerNav active="/lists"/>
   </header>
 
   <WorkTimePanel lists={lists} buses={fleet} defaultPerson={initials.trim().toUpperCase()}/>
