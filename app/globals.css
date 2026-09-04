@@ -616,7 +616,7 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 }
 
 /* Four-section navigation and Fixed Repairs access. */
-@media(max-width:800px){.mobile-mode-nav{grid-template-columns:repeat(4,minmax(0,1fr))}.mobile-mode-nav a{padding-left:2px;padding-right:2px;font-size:9px}.command-bar>.fixed-repairs-command{display:none}}
+@media(max-width:800px){.mobile-mode-nav{grid-template-columns:repeat(3,minmax(0,1fr))}.mobile-mode-nav a{padding-left:2px;padding-right:2px;font-size:9px}.command-bar>.fixed-repairs-command{display:none}}
 /* Dated actual-mileage history in the bus editor. */
 .odometer-workbench{border:1px solid #9fb4cf;border-radius:8px;background:#f5f9ff;overflow:hidden}
 .odometer-workbench>header{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid #c4d2e4;background:#e7f1fd;color:#163b68}.odometer-workbench>header span{display:flex;flex-direction:column;gap:3px}.odometer-workbench>header b{font-size:10px}.odometer-workbench>header small{font-size:8px;color:#5d718d}.odometer-workbench>header>strong{font-size:9px;white-space:nowrap}

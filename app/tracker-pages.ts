@@ -14,6 +14,9 @@ export const TRACKER_PAGES:readonly TrackerPage[]=[
  {href:"/defect-log",label:"DEFECT LOG"},
  {href:"/fixed-repairs",label:"FIXED REPAIRS"},
  {href:"/lists",label:"FLEET CAMPAIGNS"},
+ /* The gear is a page now. Every settings panel in the app lives behind it,
+    so the per-page gear buttons are gone. */
+ {href:"/settings",label:"⚙ SETTINGS"},
 ];
 
 /* The same list minus the page you are on, with whatever counts that page can

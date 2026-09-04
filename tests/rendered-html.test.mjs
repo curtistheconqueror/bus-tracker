@@ -235,9 +235,12 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
   assert.match(page, /showDownSheetBadges\?downSheetBadgeViewBusIds/);
   assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{otherPages\(/);
-  assert.match(page, /<h3>DS BADGE<\/h3>/);
-  assert.match(page, /<b>SHOW BADGE<\/b>/);
-  assert.match(page, /visuals\.downSheetBadgeText/);
+  /* The badge's own settings render on the shared Settings page now, from the
+     map's panel module; the map still draws what they say. */
+  const panel = await readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8");
+  assert.match(panel, /<h3>DS BADGE<\/h3>/);
+  assert.match(panel, /<b>SHOW BADGE<\/b>/);
+  assert.match(panel, /visuals\.downSheetBadgeText/);
   assert.match(css, /\.downsheet-ready-badge\{position:absolute;top:-5px;left:-5px/);
   assert.match(css, /color:var\(--downsheet-badge-text\)/);
   assert.match(page, /LAST MOVED FROM/);
@@ -486,7 +489,9 @@ test("server-renders the live fleet command dashboard", async () => {
 
   assert.match(html, />LOCATE</);
   assert.match(html, />REFRESH</);
-  assert.match(html, /> SETTINGS</);
+  // The gear is a page in the nav now; the map's own button opens board actions.
+  assert.match(html, /> ACTIONS</);
+  assert.doesNotMatch(html, /> SETTINGS</);
   assert.match(html, /AI OPERATOR/);
   const commandBar=html.slice(html.indexOf('<footer class="command-bar">'),html.indexOf('</footer>')+9);
   assert.ok(commandBar.indexOf('class="locate-command"')<commandBar.indexOf('class="command-highlights"'));
@@ -606,16 +611,23 @@ test("includes full theme, manual color, highlight, and locate controls", async 
     readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8"),
   ]);
 
+  /* The presets and the colour controls moved with the settings to the shared
+     Settings page: the presets into the map's data module, the controls into
+     its panel. The map still applies every one of them. */
+  const [model, panel] = await Promise.all([
+    readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
+  ]);
   for (const theme of ["Default", "Terminal", "Black / Dark", "Midnight", "Tactical"]) {
-    assert.match(page, new RegExp(`label:\"${theme.replace("/", "\\/")}\"`));
+    assert.match(model, new RegExp(`label:\"${theme.replace("/", "\\/")}\"`));
   }
   for (const control of ["Page Background", "Panel Background", "Parking Spaces", "Command Bar", "SECTION BACKGROUNDS", "BUS STATUS COLORS"]) {
-    assert.match(page, new RegExp(control));
+    assert.match(panel, new RegExp(control));
   }
-  assert.match(page, /garageSpecial:string;garageFrame:string;mysterySlot:string/);
-  assert.match(page, /Bays 11 & 12 Parking Spaces/);
-  assert.match(page, /Garage Border, Top & Row Banners/);
-  assert.match(page, /Mystery Spaces/);
+  assert.match(model, /garageSpecial:string;garageFrame:string;mysterySlot:string/);
+  assert.match(panel, /Bays 11 & 12 Parking Spaces/);
+  assert.match(panel, /Garage Border, Top & Row Banners/);
+  assert.match(panel, /Mystery Spaces/);
   assert.match(page, /bay12AwarenessBusIds/);
   assert.match(css, /\.spot\.awareness-slot/);
   assert.match(page, /className=\{c>=10\?"garage-special-slot":undefined\}/);
@@ -662,7 +674,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /Math\.hypot\([^)]*\)>=7/);
   assert.match(page, /data-empty-touch=\{singleTapEmptySpaces\?"single":"double"\}/);
   assert.match(page, /now-lastEmptyTouch\.current<700/);
-  assert.match(page, /ALLOW SINGLE-TAP EMPTY SPACES ON TOUCHSCREENS/);
+  assert.match(panel, /ALLOW SINGLE-TAP EMPTY SPACES ON TOUCHSCREENS/);
   assert.match(css, /-webkit-touch-callout:none/);
   assert.match(page, /onContextMenu=\{event=>\{if\(pointerType\.current==="touch"\)event\.preventDefault\(\)\}\}/);
   assert.match(css, /\.token\{touch-action:none/);
@@ -685,7 +697,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /All matches are highlighted/);
   assert.match(page, /All matching buses are highlighted/);
   assert.match(page, /setMultiLocateIds\(matches\.length>1/);
-  assert.match(page, /New buses can only be created in Settings/);
+  assert.match(page, /New buses can only be created under ACTIONS/);
   assert.match(page, /ACTIVE TRACKER FLEET/);
   assert.match(page, /CREATE NEW BUS/);
   assert.match(page, /Map spaces only relocate buses that already exist/);
@@ -704,7 +716,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.fleet-creation-control\{/);
   assert.match(css, /\.switch-reassign\{/);
   assert.match(css, /\.switch-toggle\{/);
-  assert.match(page, /Protected fleet identity\. Change only in Settings\./);
+  assert.match(page, /Protected fleet identity\. Change only under ACTIONS\./);
   assert.match(page, /FLEET NUMBER CONTROL/);
   assert.match(page, /Duplicate numbers are blocked/);
   assert.match(page, /MOVE TO AREA/);
@@ -1440,7 +1452,6 @@ test("Defect Log keeps multiple check-engine symptoms inside one defect record",
   assert.match(page,/toggleCheckEngineSymptom/);
   assert.match(css,/\.engine-symptom-picker/);
   assert.match(css,/Phone-only header containment and in-flow summary\/filter layout/);
-  assert.match(css,/\.log-settings-button\{position:static;grid-column:2;grid-row:2/);
   /* The position reset is gone because the collision is gone: the tile was
      className="fixed", which Tailwind owns, and no longer is. */
   assert.match(css,/\.log-summary \.fixed-today\{grid-column:1\/-1\}/);
@@ -1448,11 +1459,18 @@ test("Defect Log keeps multiple check-engine symptoms inside one defect record",
 test("bus marker display toggles between icons and large number tiles per device", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(page, /BUS MARKER DISPLAY/);
-  assert.match(page, /SHOW LARGE NUMBER TILES INSTEAD OF BUS ICONS/);
+  const [model, panel] = await Promise.all([
+    readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(panel, /BUS MARKER DISPLAY/);
+  assert.match(panel, /SHOW LARGE NUMBER TILES INSTEAD OF BUS ICONS/);
   assert.match(page, /data-bus-display=\{busDisplay\}/);
   assert.match(page, /setBusDisplay\(ui\.busDisplay==="number"\?"number":"icon"\)/);
-  assert.match(page, /if\(saved\.busDisplay==="icon"\|\|saved\.busDisplay==="number"\)setBusDisplay\(saved\.busDisplay\)/);
+  /* A change made on the Settings page reaches an open map through the storage
+     event, read through the same normalizer the Settings page writes with. */
+  assert.match(model, /busDisplay:ui\.busDisplay==="number"\?"number":"icon"/);
+  assert.match(page, /const ui=readBoardSettings\(event\.newValue\);[^}]*setBusDisplay\(ui\.busDisplay\)/);
   assert.match(css, /\.app\[data-bus-display="number"\] \.token>\.bus\{display:none\}/);
   assert.match(css, /\.app\[data-bus-display="number"\] \.token-number\{font-size:12px/);
   assert.match(css, /color-mix\(in srgb,var\(--marker-status\) 22%,#fff\)/);
@@ -1475,10 +1493,11 @@ test("confirmation prompts are per-device settings that default to on", async ()
 
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  // Settings UI exposes independent move and group-defect toggles.
-  assert.match(page, /CONFIRMATION PROMPTS/);
-  assert.match(page, /CONFIRM BUS MOVES &amp; SWITCHES/);
-  assert.match(page, /CONFIRM GROUP DEFECT ASSIGNMENT/);
+  const panel = await readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8");
+  // The Settings page exposes independent move and group-defect toggles.
+  assert.match(panel, /CONFIRMATION PROMPTS/);
+  assert.match(panel, /CONFIRM BUS MOVES &amp; SWITCHES/);
+  assert.match(panel, /CONFIRM GROUP DEFECT ASSIGNMENT/);
   assert.match(css, /\.confirmation-settings>label\{margin-top:8px\}/);
   // All three move paths and the bulk-defect path honor the preference.
   assert.match(page, /confirmAction\(confirmMoves,"Move Bus "\+bus\.n\+enteredNote/);
@@ -1958,13 +1977,20 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   assert.ok(page.includes("DOWN SHEET"));
   assert.ok(page.includes("AI OPERATOR"));
   assert.ok(css.includes("@media(max-width:760px)"));
-  assert.ok(page.includes("BACKGROUND"));
-  assert.ok(page.includes("PRIMARY TEXT"));
-  assert.ok(page.includes("SECONDARY TEXT"));
-  assert.ok(page.includes("Midnight"));
-  assert.ok(page.includes("Tactical"));
-  assert.ok(page.includes("Extra Large"));
-  assert.ok(page.includes("pace-defect-log-settings-v1"));
+  /* The log's settings live in their own modules now - the model, and the
+     panel the Settings page renders - and the log reads the key they write. */
+  const [model, panel] = await Promise.all([
+    readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.ok(model.includes("BACKGROUND"));
+  assert.ok(model.includes("PRIMARY TEXT"));
+  assert.ok(model.includes("SECONDARY TEXT"));
+  assert.ok(model.includes("Midnight"));
+  assert.ok(model.includes("Tactical"));
+  assert.ok(panel.includes("Extra Large"));
+  assert.ok(model.includes("pace-defect-log-settings-v1"));
+  assert.ok(page.includes("readSettings(localStorage.getItem(SETTINGS_KEY))"));
   assert.ok(css.includes("--log-page"));
   const response = await render("/defect-log");
   assert.equal(response.status, 200);
@@ -2037,11 +2063,13 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
-  assert.match(page,/type LogGroupContrast="standard"\|"strong"/);
-  assert.match(page,/groupContrast:"strong"/);
-  assert.match(page,/saved\.groupContrast==="standard"\?"standard":"strong"/);
+  const model=await readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8");
+  const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+  assert.match(model,/type LogGroupContrast="standard"\|"strong"/);
+  assert.match(model,/groupContrast:"strong"/);
+  assert.match(model,/saved\.groupContrast==="standard"\?"standard":"strong"/);
   assert.match(page,/data-group-contrast=\{settings\.groupContrast\}/);
-  assert.match(page,/BUS GROUP SEPARATION/);
+  assert.match(panel,/BUS GROUP SEPARATION/);
   assert.match(css,/data-group-contrast="strong"\]\s+\.log-list\{gap:16px;padding:10px\}/);
   assert.match(css,/data-group-contrast="strong"\]\s+\.log-card-group\{[^}]*border-bottom-width:3px[^}]*border-left-width:7px/);
   assert.match(css,/@media\(max-width:760px\)\{\.defect-log-app\[data-group-contrast="strong"\][^}]*\.log-list\{gap:14px/);
@@ -2344,8 +2372,8 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/if\(!written\.ok\)return false/);
   assert.doesNotMatch(fixedPage,/className="fixed-undo"/);
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
-  assert.match(fixedPage,/className="fixed-settings-button"[\s\S]*Open Fixed Repairs settings/);
-  assert.match(fixedPage,/FixedAppearanceModal settings=\{settings\}/);
+  assert.equal(/fixed-settings-button/.test(fixedPage),false,"the gear left this page for the shared Settings page");
+  assert.equal(/<FixedAppearanceModal/.test(fixedPage),false,"the appearance panel renders on the shared Settings page now");
   assert.match(fixedSettings,/pace-defect-log-settings-v1/);
   assert.match(fixedSettings,/THEME[\s\S]*FONT[\s\S]*COLORS/);
   assert.match(fixedSettings,/localStorage\.setItem\(SETTINGS_KEY/);
@@ -2357,18 +2385,17 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/className="log-undo-button"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.match(defectCss,/\.log-undo-button\{[^}]*background:var\(--log-surface[^}]*color:var\(--log-muted/);
   assert.match(defectCss,/@media\(max-width:760px\)\{\.log-controls\{grid-template-columns:minmax\(0,1fr\) 82px 48px/);
-  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(4/);
+  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-header\{[^}]*overflow:visible/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header\{height:auto\}/);
-  assert.match(fixedCss,/\.fixed-settings-button\{background:var\(--fixed-accent/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-settings-shade\{align-items:stretch/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header nav\{[^}]*height:auto[^}]*background:transparent/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-editor>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
-  assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(4/);
+  assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
-  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists"\]/);
+  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/settings"\]/);
   /* Checked against the real route list rather than a second copy of it, so
      adding a page and forgetting the service worker fails here instead of
      going unnoticed until a phone loses signal in a bay and that page is
@@ -2380,7 +2407,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   for(const route of served)assert.ok(precached.includes(route),route+" is a real page but sw.js does not pre-cache it, so it is blank offline");
   /* Changing CORE_PAGES without bumping the cache name leaves phones on the old
      pre-cache: activate only purges caches whose name no longer matches. */
-  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v4"/);
+  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v5"/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
@@ -2972,7 +2999,7 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(1.25),"1.25");
 });
 
-test("every page draws the same five links from one list",async()=>{
+test("every page draws the same six links from one list",async()=>{
  const nav=await readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8");
  const {TRACKER_PAGES,otherPages}=await import("../app/tracker-pages.ts");
  const pagesSource=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
@@ -2981,8 +3008,9 @@ test("every page draws the same five links from one list",async()=>{
     TRACKER in its own nav while every other page called it FACILITY MAP. One
     list, one name. */
  assert.deepEqual(TRACKER_PAGES.map(page=>page.label),
-  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS"]);
- assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists"]);
+  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS","⚙ SETTINGS"]);
+ assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
+ assert.equal(TRACKER_PAGES.length%3,0,"six links: two full rows of three on a phone, never one alone");
  /* Checked on the data, not the source: the file's own comment records the old
     name to explain why the component exists, and prose is not a label. */
  assert.equal(TRACKER_PAGES.some(page=>page.label==="FLEET TRACKER"),false,"the map's private name for itself is gone");
@@ -2994,7 +3022,7 @@ test("every page draws the same five links from one list",async()=>{
 
  // Every page renders it, marking itself, and none still carries a hand-written copy.
  const pages=[["app/page.tsx","/"],["app/down-sheet/page.tsx","/down-sheet"],["app/defect-log/page.tsx","/defect-log"],
-  ["app/fixed-repairs/page.tsx","/fixed-repairs"],["app/lists/page.tsx","/lists"]];
+  ["app/fixed-repairs/page.tsx","/fixed-repairs"],["app/lists/page.tsx","/lists"],["app/settings/page.tsx","/settings"]];
  for(const [file,active] of pages){
   const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
   assert.match(source,new RegExp('<TrackerNav[^>]*active="'+active.replace(/\//g,"\\/")+'"'),file+" marks itself as current");
@@ -3004,9 +3032,122 @@ test("every page draws the same five links from one list",async()=>{
 
  // The map's desktop menu is the same list minus the map, with counts attached.
  const other=otherPages({"/defect-log":7,"/down-sheet":2});
- assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists"]);
+ assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
  assert.equal(other.find(page=>page.href==="/defect-log").count,7);
  assert.equal(other.find(page=>page.href==="/lists").count,undefined,"no count is no count, not zero");
+});
+
+test("every setting in the app lives on one page, behind the gear in the nav",async()=>{
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [page,css,mapPage,logPage,logCss,downPage,fixedPage,layout]=await Promise.all([
+  read("app/settings/page.tsx"),read("app/settings/settings.css"),read("app/page.tsx"),
+  read("app/defect-log/page.tsx"),read("app/defect-log/defect-log.css"),read("app/down-sheet/page.tsx"),
+  read("app/fixed-repairs/page.tsx"),read("app/layout.tsx"),
+ ]);
+
+ /* The shell. Every page's stylesheet loads, and this page's loads last, so
+    the last word on html, body, header and nav is this page's. */
+ assert.match(page,/<TrackerNav active="\/settings"\/>/);
+ const stylesheets=['"../defect-log/defect-log.css"','"../down-sheet/down-sheet.css"','"../fixed-repairs/fixed-repairs.css"','"./settings.css"'];
+ const positions=stylesheets.map(file=>page.indexOf("import "+file));
+ assert.ok(positions.every(index=>index>=0),"every page stylesheet is imported");
+ assert.deepEqual([...positions].sort((left,right)=>left-right),positions,"settings.css is imported last");
+ assert.match(layout,/import "\.\/globals\.css"/,"globals.css still comes first, from the layout");
+ assert.match(css,/^html,body\{/m,"the page shell is restated after three stylesheets that each set it");
+ assert.match(css,/\.settings-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
+ assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.settings-header nav\{[^}]*grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
+
+ /* One section per page, each rendering that page's OWN panel inline - the
+    component the gear used to open, not a copy of it. */
+ assert.match(page,/<MapSettingsPanel buses=\{fleet\} board=\{board\} update=\{updateBoard\}\/>/);
+ assert.match(page,/<DownSheetSettings inline /);
+ assert.match(page,/<LogSettingsModal inline /);
+ assert.match(page,/<FixedAppearanceModal inline /);
+ for(const id of ["facility-map","down-sheet","defect-log","fixed-repairs"])assert.match(page,new RegExp('<section id="'+id+'"'),id+" is a section");
+
+ /* Fixed Repairs reads the Defect Log's key. One state drives both panels, so
+    neither can write a stale copy of the other's change back. */
+ assert.match(page,/setSettings=\{next=>updateLog\(\{theme:next\.theme,fontSize:next\.fontSize,fontFamily:next\.fontFamily,appearance:next\.appearance\}\)\}/);
+ assert.equal(/useFixedAppearance/.test(page),false,"a second reader of the same key would race the first");
+
+ /* Two calls to update in one tick build on each other, not on the render
+    both came from - the map's colour fields set the theme to custom and then
+    the colour. */
+ assert.match(page,/const next=\{\.\.\.\(latest\.current\?\?value\),\.\.\.patch\};latest\.current=next;setValue\(next\);report\(write\(localStorage,next\)\)/);
+
+ /* Writes merge over what each key already holds. Checked on the data
+    modules, which are what the page calls. */
+ const {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings}=await import("../app/map-settings.ts");
+ const {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings}=await import("../app/down-sheet/down-sheet-settings-store.ts");
+ const store=new Map();
+ const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))}};
+ storage.setItem(BOARD_SETTINGS_KEY,JSON.stringify({theme:"midnight",downSheetBadgeView:"off-road",futureField:"keep"}));
+ const board=readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY));
+ assert.equal(board.theme,"midnight");
+ assert.equal(board.downSheetBadgeView,"off-road");
+ assert.ok(writeBoardSettings(storage,{...board,busDisplay:"number"}).ok);
+ const storedBoard=JSON.parse(storage.getItem(BOARD_SETTINGS_KEY));
+ assert.equal(storedBoard.busDisplay,"number");
+ assert.equal(storedBoard.downSheetBadgeView,"off-road","the DS badge menu's field survives a Settings-page write");
+ assert.equal(storedBoard.futureField,"keep","a field this release has not heard of survives too");
+ assert.equal(storedBoard.statusVersion,3,"colours are stamped the way the map reads them back");
+ assert.deepEqual(readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY)).colors,board.colors,"the midnight colours read back as written");
+ storage.setItem(DOWN_SHEET_SETTINGS_KEY,JSON.stringify({showCompleted:true,defaultShift:"3rd",quickNotes:"3 road calls today",order:"category"}));
+ const down=readDownSheetSettings(storage.getItem(DOWN_SHEET_SETTINGS_KEY));
+ assert.equal(down.showCompleted,true);
+ assert.equal(down.defaultShift,"3rd");
+ assert.equal(down.defaultInitials,"");
+ assert.ok(writeDownSheetSettings(storage,{...down,defaultInitials:"JD"}).ok);
+ const storedDown=JSON.parse(storage.getItem(DOWN_SHEET_SETTINGS_KEY));
+ assert.equal(storedDown.defaultInitials,"JD");
+ assert.equal(storedDown.quickNotes,"3 road calls today","the sheet's note is not blanked by a default changed elsewhere");
+ assert.equal(storedDown.order,"category","nor its sort order");
+ assert.equal(readDownSheetSettings("not json").defaultShift,"1st","a damaged key reads as the defaults");
+ assert.equal(readDownSheetSettings(JSON.stringify({defaultShift:"4th"})).defaultShift,"1st","a shift the sheet does not have is not kept");
+
+ /* Every gear is gone from the pages. The map's button opens actions only. */
+ assert.equal(/log-settings-button/.test(logPage),false,"the Defect Log's gear is gone");
+ assert.equal(/<LogSettingsModal/.test(logPage),false);
+ assert.equal(/className="down-settings"/.test(downPage),false,"the Down Sheet's gear is gone");
+ assert.equal(/<DownSheetSettings/.test(downPage),false);
+ assert.equal(/<FixedAppearanceModal/.test(fixedPage),false);
+ /* With a glyph, like the gear it replaces: the phone command bar shows only
+    the glyph (font-size:0 on the text), so a button without one is invisible
+    there - measured, not guessed, in a 390px Chromium. */
+ assert.match(mapPage,/aria-label="Open board actions"><span aria-hidden="true">&#9776;<\/span> ACTIONS<\/button>/);
+ /* The command bar is display:none on phones; there the same panel opens from
+    the phone command menu, and that button says the same thing. */
+ assert.match(mapPage,/setPhoneCommandPanel\(null\);setSettingsOpen\(true\)\}\}>ACTIONS<\/button>/);
+ assert.equal(/>SETTINGS<\/button>/.test(mapPage),false,"nothing on the map calls the actions panel settings any more");
+ assert.equal(/<MapSettingsPanel/.test(mapPage),false,"the map does not draw its settings twice");
+ /* And every page still takes a change made here into its own state, or its
+    next write would put its stale copy over the new value. */
+ assert.match(logPage,/if\(event\.key===SETTINGS_KEY\)setSettings\(readSettings\(event\.newValue\)\)/);
+ assert.match(downPage,/if\(event\.key===SETTINGS_KEY\)\{try\{const saved=JSON\.parse\(event\.newValue\|\|"\{\}"\);setShowCompleted/);
+ assert.match(mapPage,/if\(event\.key===BOARD_SETTINGS_KEY&&event\.newValue\)\{const ui=readBoardSettings\(event\.newValue\);setColors\(ui\.colors\)/);
+
+ /* MERGE DUPES moved here with its count on the button, and left the log. */
+ assert.match(page,/MERGE DUPES\{duplicateCount\?" \("\+duplicateCount\+"\)":""\}/);
+ assert.match(page,/const duplicateCount=useMemo\(\(\)=>mergeDuplicateDefects\(fleet,downEntries\)\.removed/);
+ assert.equal(/merge-duplicates|mergeDuplicateDefects|readMergedAway/.test(logPage),false,"the button and the merge left the Defect Log");
+ assert.equal(/merge-duplicates/.test(logCss),false,"and its styling with it");
+ assert.match(logPage,/<button className="cleanup-log"[^>]*>CLEAN UP<\/button><button className="sweep-scan-button"/,"CLEAN UP and SCAN SWEEP are now neighbours");
+
+ /* The section transfers came with their panels. An import that the device
+    refuses says so instead of claiming a merge. */
+ assert.match(page,/<SectionTransferControls kind="defect-log"/);
+ assert.match(page,/<SectionTransferControls kind="down-sheet"/);
+ assert.equal(/SectionTransferControls/.test(logPage),false);
+ assert.equal(/SectionTransferControls/.test(downPage),false);
+ assert.match(page,/persist\(buses as SettingsBus\[\],downEntries\)\.ok\?mergeSummary\("defect-log",merged\):refused/);
+ assert.match(page,/persist\(reconcileDownSheetMembership\(fleet,active\),entries\)\.ok\?mergeSummary\("down-sheet",merged\):refused/,"an imported sheet marks its buses down on the map at once");
+
+ const response=await render("/settings");
+ assert.equal(response.status,200);
+ const html=await response.text();
+ for(const label of ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","MERGE DUPES","DUPLICATE RECORDS","MAINTENANCE INTERVALS","SHOW COMPLETED","REQUIRE INITIALS ON RECORDED WORK"])
+  assert.ok(html.includes(label),"the page renders "+label);
+ assert.match(html,/aria-current="page"[^>]*href="\/settings"|href="\/settings"[^>]*aria-current="page"/,"the nav marks Settings as the current page");
 });
 
 test("ALL means everything, including whatever is in the search box",async()=>{
@@ -3181,7 +3322,8 @@ test("a repair records how far it got, and what was found travels with it",async
  // The initials setting covers both saving a repair fixed and ticking a state,
  // so there is one switch rather than two that can disagree.
  assert.match(page,/before ticking a work state/);
- assert.match(page,/REQUIRE INITIALS ON RECORDED WORK/);
+ const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ assert.match(panel,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
 test("dash lights are named as reported, and the start rename does not invert history",()=>{
@@ -3291,7 +3433,7 @@ test("the command bar carries the other pages behind one trigger",async()=>{
   assert.ok(!page.includes('className="'+gone+'"'),gone+" should be inside the PAGES menu now");
  assert.match(page,/<PageMenu pages=\{otherPages\(/);
   const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
- for(const href of ["/down-sheet","/defect-log","/fixed-repairs","/lists"])
+ for(const href of ["/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"])
   assert.ok(navPages.includes('href:"'+href+'"'),"the menu must still reach "+href);
  // the counts come along: the reason to glance at the bar is to see what is waiting
  assert.match(page,/"\/down-sheet":actualDownSet\.size/);
@@ -3478,10 +3620,20 @@ test("the Down Sheet is the only thing that decides whether a bus is down",async
  assert.match(map,/reconcileDownSheetMembership\(current,activeDownIds\)/);
  const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  assert.match(sheet,/Active Down Sheet rows are the single source of truth/);
- /* An imported entry goes through the same normalizer hydration uses. One
+ /* An imported entry used to go through the normalizer on the sheet. One
     arriving without a timeEstimate crashed the sheet, because a row asks it for
-    repairMinutes without checking, so the import took nothing at all. */
- assert.match(sheet,/setEntries\(merged\.map\(\(entry,index\)=>normalizeEntry\(entry,index\)\)\)/);
+    repairMinutes without checking. The import lives on the Settings page now
+    and writes straight to storage, so it is the sheet's two READ paths that
+    normalize: hydration, and the storage event that fires when the Settings
+    page writes. */
+ assert.match(sheet,/restored=nextEntries\.map\(normalizeEntry\)/);
+ assert.match(sheet,/if\(payload\.valid\)setEntries\(payload\.entries\.map\(normalizeEntry\)\)/);
+ /* And what the sheet used to do when its entries changed - mark the buses
+    down - the import does itself, because the map draws its badges from that
+    flag and nobody may have the sheet open. */
+ const settings=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ assert.match(settings,/const active=entries\.filter\(entry=>entry\.workflow!=="Completed"\)\.map\(entry=>entry\.busId\);/);
+ assert.match(settings,/persist\(reconcileDownSheetMembership\(fleet,active\),entries\)/);
 });
 
 test("a section moves between devices without dragging the rest of the app with it",()=>{
@@ -3579,8 +3731,11 @@ test("only the button that writes a restorable file is called a backup",async()=
     in. They used to read as variations on the same idea — EXPORT LOG next to
     EXPORT / SHARE BACKUP — and the difference only surfaces on the day somebody
     tries to restore a phone from the wrong one. */
- const [log,fixed,lists,map,backup]=await Promise.all([
+ /* The Defect Log's report button sits on its settings panel, which the shared
+    Settings page renders now; the page itself no longer carries it. */
+ const [logPage,log,fixed,lists,map,backup]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
@@ -3603,8 +3758,9 @@ test("only the button that writes a restorable file is called a backup",async()=
     there. It pointed at EXPORT / SHARE BACKUP, which no longer exists. */
  const hint=backup.match(/REPORT_EXPORT_HINT="([^"]*)"/)[1];
  assert.match(hint,/Report only[\s\S]*cannot be imported back/);
- assert.match(hint,/EXPORT ALL DATA in Facility Map settings/);
+ assert.match(hint,/EXPORT ALL DATA under ACTIONS on the Facility Map/);
  assert.ok(!/SHARE BACKUP/.test(hint),"the hint must not send anybody to a label that no longer exists");
+ assert.ok(!/Facility Map settings/.test(hint),"nor to a settings modal the map no longer has");
 
  // The real one keeps the word, and it is the only button that has it.
  // The whole-app pair says ALL DATA now, because it is no longer the only
@@ -3612,7 +3768,7 @@ test("only the button that writes a restorable file is called a backup",async()=
  assert.match(map,/onClick=\{exportBoard\}>EXPORT ALL DATA</);
  assert.match(map,/IMPORT ALL DATA<input type="file"/);
  assert.match(map,/All data replaces everything on the destination device/);
- assert.equal((log+fixed+lists).match(/>[^<]*BACKUP[^<]*<\/button>/gi),null);
+ assert.equal((logPage+log+fixed+lists).match(/>[^<]*BACKUP[^<]*<\/button>/gi),null);
 });
 
 test("the operator blower and the mirror switches land in both structures a grouped category needs",()=>{
@@ -4789,26 +4945,28 @@ test("Curtis's two real buses show why miles cannot decide these services",()=>{
 });
 
 test("Fleet Tracker records every maintenance type and never invents a mileage service interval",async()=>{
- const [page,css,intervals]=await Promise.all([
+ const [page,panel,css,intervals]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
   readFile(new URL("../app/service-intervals.ts",import.meta.url),"utf8"),
  ]);
  assert.match(page,/MAINTENANCE TYPE/);
- assert.match(page,/MAINTENANCE INTERVALS/);
+ // The intervals themselves are set on the shared Settings page, in the map's panel.
+ assert.match(panel,/MAINTENANCE INTERVALS/);
  assert.match(page,/INTERVAL NOT SET/);
  assert.match(page,/SERVICE_SEVERITY_LABELS\[service\.status\.severity\]/);
  assert.match(page,/HR PAST/);
  assert.match(page,/severity-"\+service\.status\.severity/);
  assert.match(page,/serviceIntervalStatus\(d,service\.kind,serviceIntervals\[service\.setting\],serviceIntervals\[service\.monthsSetting\]\)/);
  // each service takes an hour limit and a calendar limit, whichever comes first
- assert.match(page,/placeholder="Hours" aria-label=\{service\.label\+" interval in engine hours"\}/);
- assert.match(page,/placeholder="Months" aria-label=\{service\.label\+" interval in months"\}/);
+ assert.match(panel,/placeholder="Hours" aria-label=\{service\.label\+" interval in engine hours"\}/);
+ assert.match(panel,/placeholder="Months" aria-label=\{service\.label\+" interval in months"\}/);
  assert.match(page,/ENGINE HOURS AT COMPLETION/);
  assert.match(page,/CURRENT ENGINE HOURS/);
  assert.match(page,/MILES PER ENGINE HOUR/);
  assert.match(page,/METER RESET/);
- assert.match(page,/FLEET AVERAGE/);
+ assert.match(panel,/FLEET AVERAGE/);
  assert.match(css,/\.service-interval-settings input\{width:120px;min-height:44px/);
  assert.match(css,/\.maintenance-entry select\{min-height:44px\}/);
 
@@ -5168,18 +5326,22 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
 });
 
 test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
- const [logPage,logCss]=await Promise.all([
+ const [logPage,logSettings,logCss]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
  // globals.css styles bare <header> as a 38px dark banner and bare <footer> as
  // a pill fixed to the bottom of the viewport. The editor's action bar had a
  // rule only inside the phone breakpoint, so on desktop it detached from the
  // modal, floated over the page and swallowed clicks; the grouped defect list
- // wore the dark banner. Every one of them now carries a class.
- assert.equal(/<header>|<footer>/.test(logPage),false,"no bare header or footer may come back");
+ // wore the dark banner. Every one of them now carries a class. The settings
+ // panel is its own module now, rendered on the Settings page, and the rule
+ // holds there too - that page loads globals.css like every other.
+ const logMarkup=logPage+logSettings;
+ assert.equal(/<header>|<footer>/.test(logMarkup),false,"no bare header or footer may come back");
  for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions","part-prompt-head"])
-  assert.ok(logPage.includes('className="'+className+'"'),className+" must be applied in the markup");
+  assert.ok(logMarkup.includes('className="'+className+'"'),className+" must be applied in the markup");
 
  // the element selectors still match these tags, so the global properties are
  // neutralised before each one is styled deliberately
@@ -5599,15 +5761,17 @@ test("connection details are checked where the message can name the field",async
 });
 
 test("the shop cloud never becomes a condition of using the board",async()=>{
- const [control,page,css]=await Promise.all([
+ const [control,page,panel,css]=await Promise.all([
   readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
  ]);
- // It lives in Settings, mounted beside the other self-contained controls —
- // never in front of the map.
- assert.match(page,/<section className="settings-group cloud-sync-settings">/);
- assert.match(page,/<CloudSyncControl\/>/);
+ // It lives on the Settings page, in the map's section beside the other
+ // self-contained controls — never in front of the map.
+ assert.match(panel,/<section className="settings-group cloud-sync-settings">/);
+ assert.match(panel,/<CloudSyncControl\/>/);
+ assert.equal(/<CloudSyncControl/.test(page),false,"never in front of the map");
  assert.match(css,/\.cloud-status\{/);
  // Pushing reads what is ON DISK, not what the page is holding. writeFleetStorage
  // refuses writes it considers destructive and the board's save effect discards
@@ -5754,8 +5918,9 @@ test("the Defect Log can show the tracker's status colours, off by default",asyn
  ]);
  // Off by default: more colour on a long list should be a choice, not something
  // that happens to people.
- assert.match(page,/statusColor:false/);
- assert.match(page,/statusColor=saved\.statusColor===true/);
+ const model=await readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8");
+ assert.match(model,/statusColor:false/);
+ assert.match(model,/statusColor=saved\.statusColor===true/);
  assert.match(page,/data-status-color=\{settings\.statusColor\?"on":"off"\}/);
  assert.match(page,/SHOW STATUS COLOR/);
  assert.match(page,/<span className="log-bus-number" data-status=\{group\.bus\.s\}>/);
@@ -6566,8 +6731,12 @@ test("the bus group outline is darker than every other border, and can be recolo
  // A chosen colour is applied as an inline variable, and only when one is set,
  // so leaving it alone keeps the theme-aware default.
  assert.match(logPage,/\.\.\.\(settings\.groupBorder\?\{"--log-card-border":settings\.groupBorder\}:\{\}\)/);
- assert.match(logPage,/groupBorder:safeBorderColor\(saved\.groupBorder\)/);
- assert.ok(logPage.includes("USE THEME COLOR"),"there must be a way back to the theme colour");
+ const [model,panel]=await Promise.all([
+  readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
+ ]);
+ assert.match(model,/groupBorder:safeBorderColor\(saved\.groupBorder\)/);
+ assert.ok(panel.includes("USE THEME COLOR"),"there must be a way back to the theme colour");
 });
 
 test("a stored outline colour cannot inject anything into the style attribute",async()=>{
@@ -6894,6 +7063,7 @@ test("a brake test records a result, and only the two it can mean", () => {
 
 test("a failed brake test takes the bus out of service, and MERGE DUPES cannot claim a save it did not make", async () => {
  const logPage = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ const settingsPage = await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
 
  // Failing sets availability to down; passing deliberately leaves it alone.
  assert.match(logPage, /const setBrakeTestResult=\(result:BrakeTestResult\)=>\{/);
@@ -6905,14 +7075,21 @@ test("a failed brake test takes the bus out of service, and MERGE DUPES cannot c
     defects before and 42 after, because the bulk-loss guard refuses any write
     dropping five or more records — while the handler still showed "21
     duplicate records merged" and wrote 21 cloud tombstones for records that
-    were never merged. */
- assert.match(logPage, /const written=persist\(result\.buses,result\.entries,\{allowBulkDefectLoss:true\}\);/);
- assert.match(logPage, /if\(!written\.ok\)return;/);
- // The guard is lifted for the merge ONLY — persist defaults to the full check.
+    were never merged. MERGE DUPES lives on the Settings page now, and the fix
+    went with it. */
+ assert.match(settingsPage, /const written=persist\(result\.buses,result\.entries,\{allowBulkDefectLoss:true\}\);/);
+ assert.match(settingsPage, /if\(!written\.ok\)return;/);
+ // The guard is lifted for the merge ONLY — persist defaults to the full check, on both pages.
+ assert.match(settingsPage, /const persist=\(nextFleet:SettingsBus\[\],nextDown:DefectLogDownEntry\[\],options:FleetWriteOptions=\{\}\)/);
+ assert.match(settingsPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
  assert.match(logPage, /const persist=\(nextFleet:DefectLogFleetBus\[\],nextDown:DefectLogDownEntry\[\],options:FleetWriteOptions=\{\}\)/);
  assert.match(logPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
+ assert.equal(/allowBulkDefectLoss:true/.test(logPage), false, "nothing left on the Defect Log lifts the guard");
  // The recovery snapshot is NOT skipped, so the pre-merge board stays restorable.
- assert.doesNotMatch(logPage, /allowBulkDefectLoss:true,\s*skipRecoverySnapshot/);
+ assert.doesNotMatch(settingsPage, /allowBulkDefectLoss:true,\s*skipRecoverySnapshot/);
+ // The tombstones are written only after the write landed, and undone with it.
+ assert.ok(settingsPage.indexOf("if(!written.ok)return;")<settingsPage.indexOf("writeMergedAway(localStorage,{...before,"),"tombstones follow a write that happened");
+ assert.match(settingsPage, /const undoMerge=\(\)=>\{[\s\S]*?if\(!persist\(mergeUndo\.fleet,mergeUndo\.downEntries\)\.ok\)return;[\s\S]*?writeMergedAway\(localStorage,mergeUndo\.mergedAway\)/);
 });
 
 test("the HVAC diag lamp records one light and a two-digit alarm, and only on A/C repairs", async () => {
@@ -7501,8 +7678,9 @@ test("the Defect Log opens on what it is for, not on a scoreboard", async () => 
     working. Removing the button must not remove the behaviour. */
  assert.match(logPage,/if\(filter==="open"&&!\(record\.defect\.state==="open"\|\|record\.defect\.state==="deferred"\)\)return false/);
  assert.match(logPage,/if\(filter==="downsheet"&&!activeDownBusIdSet\.has\(record\.bus\.id\)\)return false/);
- assert.match(logPage,/<option value="open">Open<\/option>/,"and both remain choosable as a default view");
- assert.match(logPage,/<option value="downsheet">/);
+ const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ assert.match(panel,/<option value="open">Open<\/option>/,"and both remain choosable as a default view");
+ assert.match(panel,/<option value="downsheet">/);
 
  /* Pressing the active filter clears back to ALL. It used to stay stuck on.
     The toggle now lives in showEverythingOr, which does this and also clears
@@ -7566,14 +7744,12 @@ test("SETTINGS keeps its place beside QUICK FILTERS and says what it is", async 
     not disappear when they collapse. Asserted by position in the markup — the
     button sits inside .log-controls, which is outside the .daily-stats block. */
  const controls=logPage.slice(logPage.indexOf('<section className="log-controls">'),logPage.indexOf('<section className="log-feed"'));
- assert.ok(controls.includes('className="log-settings-button"'),"SETTINGS must live in the controls row");
+ assert.equal(controls.includes("log-settings-button"),false,"the gear left the controls row: SETTINGS is a page in the nav now");
  const statsBlock=logPage.slice(logPage.indexOf('className={"daily-stats"'),logPage.indexOf('<section className="log-controls">'));
  assert.ok(statsBlock.length>0&&statsBlock.includes("daily-stats-toggle"),"the stats block must be found for this check to mean anything");
  assert.ok(!statsBlock.includes("log-settings-button"),"and never inside the collapsible stats");
  /* A bare gear read as decoration beside two buttons that say what they do. */
- assert.match(logPage,/<button className="log-settings-button".*?><span aria-hidden="true">&#9881;<\/span> SETTINGS<\/button>/);
  /* Same height as the two buttons beside it, so the row is one set of controls. */
- assert.match(css,/\.log-controls \.log-settings-button\{[^}]*height:44px;min-height:44px/);
  assert.match(css,/\.log-controls \.log-undo-button\{height:44px;min-height:44px\}/);
  assert.match(css,/\.log-controls \.quick-filter-trigger\{height:44px;min-height:44px\}/);
 });

@@ -1,76 +1,45 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
+import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "./defect-log-settings";
 import TrackerNav from "../tracker-nav";
 import "./defect-log.css";
 import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
-import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord} from "./defect-log-sync";
+import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "./defect-log-sync";
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
-import SectionTransferControls from "../section-transfer-controls";
-import {exportDefectLogPayload,mergeDefectLog,mergeSummary} from "../section-transfer";
 import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,type QuickFilterKey} from "../quick-filters";
 import {lockPageScroll} from "../scroll-lock";
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
-import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogDisplaySettings,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "./quick-filter-share";
-import {mergeDuplicateDefects} from "../duplicate-defects";
-import {readMergedAway,writeMergedAway} from "../cloud-sync";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
-import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup} from "../fleet-backup";
-import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_BACKUP_INTERVAL,FLEET_BACKUP_INTERVAL_CHOICES,FLEET_STORAGE_KEY as FLEET_KEY,normalizeFleetBackupInterval,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "../storage";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "../storage";
 
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "../facility-areas";
-type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
-type LogTheme="light"|"dark"|"midnight"|"tactical"|"custom";
-type LogFontSize="standard"|"large"|"extra";
-type LogFontFamily="clean"|"condensed"|"classic";
-type LogGroupContrast="standard"|"strong";
-type LogAppearance={page:string;surface:string;text:string;muted:string;header:string;headerText:string;accent:string};
-type LogSettings={defaultInitials:string;requireInitials:boolean;defaultFilter:Filter;showFixed:boolean;theme:LogTheme;fontSize:LogFontSize;fontFamily:LogFontFamily;groupContrast:LogGroupContrast;groupBorder:string;statusColor:boolean;appearance:LogAppearance;display:DefectLogDisplaySettings;backupInterval:number};
-/* mergedAway is the ledger as it stood BEFORE the change, so undoing a merge
-   also stops this device tombstoning records it has just put back. Absent on
-   every other kind of change, which leaves the ledger alone. */
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;mergedAway?:Record<string,string>};
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string};
 
-const SETTINGS_KEY="pace-defect-log-settings-v1";
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 const MYSTERY_COLLAPSED_KEY="pace-defect-log-mystery-collapsed-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
    that has never opened the stats does not have to write anything to say so. */
 const STATS_OPEN_KEY="pace-defect-log-stats-open-v1";
-const LIGHT_APPEARANCE:LogAppearance={page:"#e9eef6",surface:"#ffffff",text:"#172b4d",muted:"#60728c",header:"#061d45",headerText:"#ffffff",accent:"#0b64bd"};
-const LOG_THEMES:Record<Exclude<LogTheme,"custom">,{label:string;appearance:LogAppearance}>={
- light:{label:"Light",appearance:LIGHT_APPEARANCE},
- dark:{label:"Dark",appearance:{page:"#101318",surface:"#1d222a",text:"#f3f6fa",muted:"#aeb9c8",header:"#06080c",headerText:"#ffffff",accent:"#4d9cff"}},
- midnight:{label:"Midnight",appearance:{page:"#071225",surface:"#10213d",text:"#e4eeff",muted:"#9eb0cb",header:"#020a18",headerText:"#ffffff",accent:"#68a4ff"}},
- tactical:{label:"Tactical",appearance:{page:"#26291f",surface:"#393e30",text:"#f0ecd7",muted:"#b8b49d",header:"#15180f",headerText:"#f4e8b8",accent:"#bca75f"}},
-};
-const FONT_STACKS:Record<LogFontFamily,string>={clean:"Arial, Helvetica, sans-serif",condensed:"'Arial Narrow', 'Roboto Condensed', Arial, sans-serif",classic:"Georgia, 'Times New Roman', serif"};
-const COLOR_FIELDS:[keyof LogAppearance,string][]=[["page","BACKGROUND"],["surface","CARDS"],["text","PRIMARY TEXT"],["muted","SECONDARY TEXT"],["header","HEADER"],["headerText","HEADER TEXT"],["accent","ACCENT"]];
-const DEFAULT_SETTINGS:LogSettings={defaultInitials:"",requireInitials:false,defaultFilter:"all",showFixed:true,theme:"light",fontSize:"standard",fontFamily:"clean",groupContrast:"strong",groupBorder:"",statusColor:false,appearance:{...LIGHT_APPEARANCE},display:DEFAULT_DEFECT_LOG_DISPLAY,backupInterval:FLEET_BACKUP_INTERVAL};
 const STATUS_LABELS:Record<string,string>={service:"In Service",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 const STATE_LABELS:Record<DefectState,string>={open:"OPEN","in-progress":"IN PROGRESS",deferred:"DEFERRED",completed:"FIXED"};
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
 function readDown(raw:string|null):DefectLogDownEntry[]{const payload=readDownSheetPayload<DefectLogDownEntry>(raw);return payload.valid?payload.entries:[]}
 function readMysterySlot(raw:string|null){try{const value=JSON.parse(raw||"{}").visuals?.mysterySlot;return /^#[0-9a-f]{6}$/i.test(String(value))?String(value):"#edf3ff"}catch{return "#edf3ff"}}
-function readSettings(raw:string|null):LogSettings{try{const saved=JSON.parse(raw||"{}") as Partial<LogSettings>,requireInitials=saved.requireInitials===true,theme:LogTheme=["light","dark","midnight","tactical","custom"].includes(String(saved.theme))?saved.theme as LogTheme:"light",preset=theme==="custom"?LIGHT_APPEARANCE:LOG_THEMES[theme].appearance,fontSize:LogFontSize=["standard","large","extra"].includes(String(saved.fontSize))?saved.fontSize as LogFontSize:"standard",fontFamily:LogFontFamily=["clean","condensed","classic"].includes(String(saved.fontFamily))?saved.fontFamily as LogFontFamily:"clean",groupContrast:LogGroupContrast=saved.groupContrast==="standard"?"standard":"strong",statusColor=saved.statusColor===true;return {...DEFAULT_SETTINGS,...saved,requireInitials,theme,fontSize,fontFamily,groupContrast,groupBorder:safeBorderColor(saved.groupBorder),statusColor,appearance:{...preset,...saved.appearance},display:normalizeDefectLogDisplay(saved.display),backupInterval:normalizeFleetBackupInterval(saved.backupInterval)}}catch{return {...DEFAULT_SETTINGS,appearance:{...LIGHT_APPEARANCE},display:normalizeDefectLogDisplay(null)}}}
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
-function locationLabel(location:string){
- const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
- const found=labels.find(([prefix])=>location.startsWith(prefix));return found?found[1]:location||"Location not set";
-}
 function newDraft():LogDraft{const now=new Date().toISOString();return {busId:"",quickIssue:"",onDownSheet:false,defect:{id:"defect-log-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"",issue:"",details:"",operability:"service",state:"open",createdAt:now,updatedAt:now,diagnosticNote:"",actionTaken:"",partNumber:"",reportedBy:"",source:"defect-log"}}}
 function recordDraft(record:DefectLogRecord):LogDraft{return {busId:record.bus.id,quickIssue:record.defect.issue==="Manual entry"||record.defect.issue==="Unspecified issue"?"":record.defect.issue,onDownSheet:record.onDownSheet,defect:{...record.defect}}}
 async function copyText(text:string){
@@ -458,42 +427,6 @@ function ShopNotesEditor({record,label,save}:{record:DefectLogRecord;label:strin
  </label>;
 }
 
-function LogSettingsModal({settings,setSettings,close,exportLog,transfer}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog:()=>void;transfer:React.ReactNode}){
- const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
- const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
- const setDisplayLabel=(key:keyof DefectLogLabels,value:string)=>setSettings({...settings,display:{...settings.display,labels:{...settings.display.labels,[key]:value}}});
- const setDisplayStyle=(key:DefectLogStyleKey,field:"color"|"fontSize",value:string)=>setSettings({...settings,display:{...settings.display,styles:{...settings.display.styles,[key]:{...settings.display.styles[key],[field]:field==="fontSize"?Number(value):value}}}});
- return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}><section className="log-settings">
-  <header className="log-settings-head"><span><small>DEFECT LOG</small><h2>Settings</h2></span><button onClick={close}>x</button></header>
-  <div>
-   <label>YOUR INITIALS OR NAME<input maxLength={12} value={settings.defaultInitials} onChange={event=>setSettings({...settings,defaultInitials:event.target.value.replace(/[^a-z0-9 ]/gi,"").toUpperCase()})}/></label>
-   <label className="require-initials"><input type="checkbox" checked={settings.requireInitials} onChange={event=>setSettings({...settings,requireInitials:event.target.checked})}/><span><b>REQUIRE INITIALS ON RECORDED WORK</b><small>A repair cannot be saved as fixed, and a work state cannot be ticked, without a name on it. Leave off to keep both optional.</small></span></label>
-   <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
-   <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
-   <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
-   <section className="log-settings-group"><h3>FONT</h3><div className="log-font-grid"><label>STYLE<select value={settings.fontFamily} onChange={event=>setSettings({...settings,fontFamily:event.target.value as LogFontFamily})}><option value="clean">Clean</option><option value="condensed">Condensed</option><option value="classic">Classic</option></select></label><label>SIZE<select value={settings.fontSize} onChange={event=>setSettings({...settings,fontSize:event.target.value as LogFontSize})}><option value="standard">Standard</option><option value="large">Large</option><option value="extra">Extra Large</option></select></label></div></section>
-   <section className="log-settings-group log-group-contrast-setting"><h3>BUS GROUP SEPARATION</h3><label>CONTRAST<select value={settings.groupContrast} onChange={event=>setSettings({...settings,groupContrast:event.target.value as LogGroupContrast})}><option value="strong">Strong (recommended)</option><option value="standard">Standard</option></select></label><small>Strong adds a clearer outer border, extra space, and an expanded-bus shade without changing defect or status colors.</small><label>OUTLINE COLOR<div className="group-border-row"><input type="color" value={settings.groupBorder||"#9ea6b4"} aria-label="Bus group outline color" onChange={event=>setSettings({...settings,groupBorder:safeBorderColor(event.target.value)})}/><button type="button" onClick={()=>setSettings({...settings,groupBorder:""})} disabled={!settings.groupBorder}>USE THEME COLOR</button><small>Left on the theme color the outline follows whichever theme is set, so it stays readable on the dark ones. Choosing a color here fixes it for every theme on this device.</small></div></label></section>
-   <section className="log-settings-group"><h3>COLORS</h3><div className="log-color-grid">{COLOR_FIELDS.map(([key,label])=><label className="log-color-field" key={key}><span>{label}</span><input type="color" value={settings.appearance[key]} onChange={event=>setColor(key,event.target.value)}/></label>)}</div><button type="button" className="reset-look" onClick={()=>applyTheme("light")}>RESET LOOK</button></section>
-   <section className="log-settings-group"><h3>WORDING</h3><div className="log-wording-grid">{(Object.keys(DEFECT_LOG_LABEL_NAMES) as (keyof DefectLogLabels)[]).map(key=><label key={key}>{DEFECT_LOG_LABEL_NAMES[key]}<input value={settings.display.labels[key]} onChange={event=>setDisplayLabel(key,event.target.value)}/></label>)}</div></section>
-   <section className="log-settings-group"><h3>TEXT STYLE</h3><div className="log-style-grid">{(Object.keys(DEFECT_LOG_STYLE_LABELS) as DefectLogStyleKey[]).map(key=><div key={key}><b>{DEFECT_LOG_STYLE_LABELS[key]}</b><label>COLOR<input type="color" value={settings.display.styles[key].color} onChange={event=>setDisplayStyle(key,"color",event.target.value)}/></label><label>SIZE<input type="number" min="7" max="32" value={settings.display.styles[key].fontSize} onChange={event=>setDisplayStyle(key,"fontSize",event.target.value)}/></label></div>)}</div><button type="button" className="reset-look" onClick={()=>setSettings({...settings,display:normalizeDefectLogDisplay(null)})}>RESET TEXT</button></section>
-   {/* The reminder used to be fixed at 20, which is either a nag or a stranger
-       depending on how busy the shop is. Whoever is living with the banner picks
-       the number. */}
-   <label className="backup-interval-field">REMIND ME TO BACK UP EVERY
-    <select value={settings.backupInterval} onChange={event=>setSettings({...settings,backupInterval:normalizeFleetBackupInterval(event.target.value)})}>
-     {FLEET_BACKUP_INTERVAL_CHOICES.map(count=><option value={count} key={count}>{count} new defects</option>)}
-    </select>
-    <small>Counts Defect Log entries saved since the last full backup. The banner appears on the Defect Log when the count is reached.</small>
-   </label>
-   {/* Above the report on purpose: sending the log to another device is the
-       thing somebody comes in here to do, and the report is the thing they
-       press by mistake while looking for it. */}
-   {transfer}
-   <button className="export-log" onClick={exportLog} title={REPORT_EXPORT_HINT}>EXPORT LOG REPORT</button>
-   <p>Repair records are included with the board backup because they stay attached to each bus.</p>
-  </div>
- </section></div>;
-}
 
 export default function DefectLog(){
  const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]);
@@ -519,7 +452,6 @@ export default function DefectLog(){
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
  const [editing,setEditing]=useState<LogDraft|null>(null);
- const [settingsOpen,setSettingsOpen]=useState(false);
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);
  const [expandedBusIds,setExpandedBusIds]=useState<string[]>([]);
@@ -541,7 +473,7 @@ export default function DefectLog(){
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
  const records=useMemo(()=>allRecords.filter(record=>!record.defect.defectLogHiddenAt),[allRecords]);
@@ -576,19 +508,14 @@ export default function DefectLog(){
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,item.key==="deferred"?deferredCandidateIds.length:quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilter==="deferred"?deferredCandidateIds:quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
- /* How many open repairs are recorded more than once, from the same function
-    that does the merging — so the number on the button is by construction the
-    number the button will act on, rather than a second count that can disagree
-    with it. */
- const duplicateCount=useMemo(()=>mergeDuplicateDefects(fleet,downEntries).removed,[fleet,downEntries]);
-
  /* Reports why nothing was kept instead of returning in silence. The state is
     not advanced on a refusal, on purpose — the screen keeps showing what is
     actually stored rather than a change that did not land. */
  /* Returns the fleet write's result so a caller can tell whether anything was
-    actually stored. Every caller but the merge below wants the default write,
-    guard and all; the merge is the one operation here whose whole purpose is
-    to end with fewer records than it started with. */
+    actually stored. Every caller here wants the default write, guard and all.
+    The one operation whose whole purpose is to end with fewer records than it
+    started with — MERGE DUPES — lives on the Settings page now, with the
+    guard lifted there and only there. */
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[],options:FleetWriteOptions={}):StorageWriteResult=>{
   const written=writeFleetStorageResult(localStorage,nextFleet,options);
   setSaveProblem(written.reason||"");
@@ -604,55 +531,6 @@ export default function DefectLog(){
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
- /* Fold exact repeats into one record each.
-
-    Explicit, and pressed by a person. Never automatic on load: everything else
-    that runs at read time in this app rearranges what is SHOWN, while this
-    changes stored repair records, and a board that silently rewrites those the
-    moment it opens is one nobody can audit. It lands on UNDO LAST like every
-    other change here, so the way back is the way back from anything else. */
- const mergeDuplicates=()=>{
-  /* Recomputed rather than read off the badge. The badge is a render behind
-     whatever just changed, and this decides what gets written. */
-  const preview=mergeDuplicateDefects(fleet,downEntries);
-  if(!preview.removed){alert("No duplicate defects were found. Every open repair on this board is recorded once.");return}
-  const buses=preview.busesAffected;
-  if(!confirm("Merge "+preview.removed+" duplicate record"+(preview.removed===1?"":"s")+" on "+buses+" bus"+(buses===1?"":"es")+"?\n\nOnly exact repeats are merged — same category, same symptom, same details. Everything written on the copies is kept on the record that stays, along with the earliest reported date. Nothing is merged across buses, and UNDO LAST reverses it."))return;
-  const now=new Date().toISOString();
-  const result=mergeDuplicateDefects(fleet,downEntries,now);
-  const before=readMergedAway(localStorage);
-  /* allowBulkDefectLoss, and only here.
-
-     The safety stop refuses any write that drops five or more records, which
-     is exactly right for a sync or a bug and exactly wrong for this: folding
-     21 duplicates is a deliberate, confirmed cleanup whose entire point is to
-     end with fewer records, and the count was shown in the prompt before
-     anybody agreed to it. Left guarded, the merge silently did nothing — the
-     board kept all 42 records, the badge kept saying 21, and the alert below
-     still claimed success. Measured, not guessed: 42 defects before, 42
-     after, with the safety stop firing behind a success message.
-
-     The recovery snapshot is deliberately NOT skipped, so the pre-merge board
-     is still written to pace-board-recovery-v1 before anything changes. That
-     plus the confirm count, UNDO LAST, and merge rules that provably keep
-     every field is the safety net here — not the blanket record-count guard,
-     which cannot tell a cleanup from a catastrophe. */
-  const written=persist(result.buses,result.entries,{allowBulkDefectLoss:true});
-  /* Nothing below may run on a write that did not happen. Claiming a merge
-     that was refused is how somebody stops trusting the number, and the
-     tombstones are worse than cosmetic: they would tell the Shop Cloud to
-     drop records this device still holds. */
-  if(!written.ok)return;
-  setUndoSnapshot({fleet,downEntries,mergedAway:before,label:"Merged "+result.removed+" duplicate record"+(result.removed===1?"":"s")});
-  /* A push only sends what a bus still carries, so a folded record is not
-     removed anywhere by merging alone: it stays live on the server, comes back
-     on the next GET THE SHOP'S COPY, and the merge undoes itself. Writing the
-     ids down is what makes the cleanup survive a sync — this device refuses
-     them on the way in, and tombstones them on the way out. */
-  writeMergedAway(localStorage,{...before,
-   ...Object.fromEntries(result.groups.flatMap(group=>group.droppedIds.map(id=>[id,now])))});
-  alert(result.removed+" duplicate record"+(result.removed===1?"":"s")+" merged on "+result.busesAffected+" bus"+(result.busesAffected===1?"":"es")+". Nothing was deleted — each fault is now on one record.");
- };
  /* Files the findings a reviewer approved from a scanned farebox / Ventra
     sweep sheet. Each goes through the same single-record save as LOG DEFECT,
     so the duplicate guard applies to every one: a fault somebody
@@ -675,7 +553,7 @@ export default function DefectLog(){
   setSweepOpen(false);
   alert(filed+" finding"+(filed===1?"":"s")+" filed as open Tech Services defect"+(filed===1?"":"s")+(skipped?". "+skipped+" skipped — already logged on that bus in the last 48 hours":"")+". UNDO LAST reverses it.");
  };
- const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);if(undoSnapshot.mergedAway)writeMergedAway(localStorage,undoSnapshot.mergedAway);setUndoSnapshot(null)};
+ const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
@@ -700,7 +578,7 @@ export default function DefectLog(){
   setQuickFilterShareStatus(outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
  };
  const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterLabel,quickFilterBuses,quickFilter);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
- const exportLog=()=>{const payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:allRecords.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Defect Log report")};
+ 
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><DeferredNavBadge/><DeferredReviewPrompt/>
@@ -745,7 +623,7 @@ export default function DefectLog(){
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
     decoration, so it carries its name and is shaped like the buttons beside it. */}
-   <button className="log-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open defect log settings"><span aria-hidden="true">&#9881;</span> SETTINGS</button>
+   
   </section>
   {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header><div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=quickFilterDefects(bus,quickFilter),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
@@ -764,7 +642,7 @@ export default function DefectLog(){
   </section>
   <section className="log-feed">
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button>{sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}<a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button>{sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}<a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · ");return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
@@ -832,6 +710,6 @@ export default function DefectLog(){
   </div>}
   {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
-  {settingsOpen&&<LogSettingsModal settings={settings} setSettings={setSettings} close={()=>setSettingsOpen(false)} exportLog={exportLog} transfer={<SectionTransferControls kind="defect-log" buildPayload={()=>exportDefectLogPayload(fleet)} applyPayload={payload=>{const {buses,report}=mergeDefectLog(fleet,payload);persist(buses as DefectLogFleetBus[],downEntries);return mergeSummary("defect-log",report)}}/>}/>}
+  
  </main>;
 }

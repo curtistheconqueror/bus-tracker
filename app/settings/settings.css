@@ -1,0 +1,82 @@
+/* The shared Settings page.
+
+   Imported after globals.css and after the three page stylesheets, on purpose.
+   Each of those styles its own settings panel, and this file only has to say
+   two things: what changes when that panel sits inline on a page instead of
+   floating in a modal, and what the page shell around them looks like - which
+   it has to say last, because every one of those stylesheets also styles
+   html, body, header and nav. */
+
+html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:Arial,Helvetica,sans-serif}
+.settings-app{min-height:100vh;padding-bottom:40px;background:#e8edf6;color:#112657;font-family:Arial,Helvetica,sans-serif}
+
+/* The header, in the shape every other page's header has. globals.css styles
+   the bare header and nav elements for the map, so each property the map sets
+   is set again here. */
+.settings-header{position:relative;z-index:2;height:auto;min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:linear-gradient(110deg,#041a3e,#0a4f96);color:#fff;font-size:inherit;font-weight:400;text-shadow:none}
+.settings-header>div>span{font-size:7px;font-weight:900;letter-spacing:1.5px}
+.settings-header h1{margin:2px 0;font-size:28px;font-weight:900}
+.settings-header p{margin:0;font-size:9px;opacity:.82}
+.settings-header nav{height:auto;min-width:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:0;border:0;background:transparent;color:inherit}
+.settings-header nav a{min-width:102px;min-height:42px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff55;border-radius:6px;color:#fff;padding:5px 8px;font-size:8px;font-weight:900;text-align:center;text-decoration:none}
+.settings-header nav a.active{background:#fff;color:#06275c}
+
+/* Four sections is a long page on a phone. The jump row stays put. */
+.settings-jump{position:sticky;top:0;z-index:3;height:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px;padding:8px 14px;background:#f4f7fb;color:#112657;border:0;border-bottom:1px solid #c6cee0}
+.settings-jump a{min-height:34px;display:inline-flex;align-items:center;border:1px solid #b7c4d7;border-radius:6px;background:#fff;color:#173968;padding:0 12px;font-size:9px;font-weight:900;text-decoration:none;touch-action:manipulation}
+
+.settings-sections{display:grid;gap:18px;padding:14px}
+.settings-section{display:grid;gap:12px;padding:14px;border:1px solid #bac7d9;border-radius:12px;background:#fff;box-shadow:0 2px 9px #16345a13;scroll-margin-top:58px}
+.settings-section-head{display:grid;gap:3px}
+.settings-section-head>span{font-size:8px;font-weight:900;letter-spacing:1.5px;color:#0b64bd}
+.settings-section-head h2{margin:0;font-size:22px;color:#061d45}
+.settings-section-head p{margin:0;font-size:10px;line-height:1.4;color:#455a79}
+
+/* FACILITY MAP. The map's panel body was the scrolling middle of a modal. */
+.settings-section-map .settings-body{padding:0;overflow:visible}
+.settings-section-map .settings-actions{padding:0;border-top:0;background:transparent}
+
+/* DOWN SHEET. The panel keeps its own header and body; the modal's action
+   strip is empty inline and would draw as a bare rule. */
+.settings-section-down .down-settings-modal{width:100%;max-width:none;max-height:none;border:1px solid #c9d4e4;border-radius:10px;box-shadow:none;overflow:visible}
+.settings-section-down .down-settings-body{overflow:visible}
+.settings-section-down .repair-editor-actions{display:none}
+
+/* DEFECT LOG. The section is drawn in the log's own theme, from the same
+   variables the log page sets, so picking a theme previews it right here.
+   The three derived colours are the log page's, restated because they are
+   defined on its root class and this page does not carry that class. */
+.settings-section-log{--log-soft:color-mix(in srgb,var(--log-surface) 88%,var(--log-page));--log-border:color-mix(in srgb,var(--log-text) 22%,var(--log-surface));--log-card-border:color-mix(in srgb,var(--log-text) 42%,var(--log-surface));background:var(--log-page);color:var(--log-text);font-family:var(--log-font);border-color:var(--log-border)}
+.settings-section-log .settings-section-head>span{color:var(--log-accent)}
+.settings-section-log .settings-section-head h2,.settings-section-log .settings-section-head p{color:var(--log-text)}
+.log-settings.inline{width:100%;max-width:none;max-height:none;border:1px solid var(--log-border);border-radius:11px;box-shadow:none;overflow:visible}
+.log-settings.inline>div{overflow:visible}
+.settings-tools p{margin:0;font-size:9px;line-height:1.4;color:var(--log-muted)}
+.settings-tool-row{display:flex;flex-wrap:wrap;gap:8px}
+.settings-tool-row button{flex:1 1 200px;min-height:44px;border:1px solid #c8892a;border-radius:7px;background:#fff4e0;color:#7a4d05;font-family:inherit;font-size:10px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+/* Carries a count, so it reads as a finding rather than a tool: amber while
+   there is something to merge, plainly disabled once there is not. */
+.settings-tool-row button:disabled{border-color:var(--log-border);background:var(--log-surface);color:var(--log-muted);opacity:.6;cursor:default}
+.settings-tool-row .undo-merge{border-color:var(--log-accent);background:var(--log-surface);color:var(--log-accent)}
+
+/* FIXED REPAIRS. Same idea: the section wears the page's variables. */
+.settings-section-fixed{background:var(--fixed-page,#e8eef6);color:var(--fixed-ink,#172b4d);font-family:var(--fixed-font,Arial,Helvetica,sans-serif);font-size:calc(1em * var(--fixed-scale,1));border-color:var(--fixed-border)}
+.settings-section-fixed .settings-section-head>span{color:var(--fixed-accent,#0b64bd)}
+.settings-section-fixed .settings-section-head h2,.settings-section-fixed .settings-section-head p{color:var(--fixed-ink,#172b4d)}
+.fixed-settings.inline{width:100%;max-width:none;height:auto;max-height:none;border:1px solid var(--fixed-border);border-radius:11px;box-shadow:none;overflow:visible}
+.fixed-settings.inline>header{position:static}
+
+/* Phones: six links in two full rows of three, like every other page, and
+   nothing narrower than a thumb. */
+@media(max-width:760px){
+ .settings-header{min-height:0;align-items:flex-start;flex-direction:column;gap:12px;padding:12px;overflow:visible}
+ .settings-header>div{width:100%;min-width:0}
+ .settings-header h1{font-size:22px}
+ .settings-header nav{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .settings-header nav a{min-width:0;height:50px;padding:0 4px;font-size:10px;line-height:1.15;white-space:normal;touch-action:manipulation}
+ .settings-jump{padding:6px 8px}
+ .settings-jump a{flex:1 1 calc(50% - 6px);justify-content:center;min-height:44px}
+ .settings-sections{gap:12px;padding:8px}
+ .settings-section{padding:10px;border-radius:10px;scroll-margin-top:110px}
+ .settings-tool-row button{min-height:48px}
+}

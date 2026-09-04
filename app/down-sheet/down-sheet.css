@@ -193,7 +193,7 @@ button,input,select,textarea{font:inherit}
 @media(max-width:760px){.down-header{height:auto;min-height:0;gap:12px;padding:12px;overflow:visible}.down-header>div{width:100%;min-width:0}.down-header h1{max-width:100%;font-size:min(var(--down-page-title-size,25px),22px);line-height:1.08;overflow-wrap:anywhere}.down-header nav{width:100%;height:auto;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:6px;padding:0;border:0;background:transparent;overflow:visible}.down-header nav a{width:100%;min-width:0;height:50px;padding:0 4px;font-size:10px;line-height:1.15;white-space:normal;touch-action:manipulation}}
 
 /* Fixed Repairs is the fourth workflow tab. */
-@media(max-width:760px){.down-header nav{grid-template-columns:repeat(4,minmax(0,1fr))}.down-header nav a{padding-left:2px;padding-right:2px;font-size:9px}}
+@media(max-width:760px){.down-header nav{grid-template-columns:repeat(3,minmax(0,1fr))}.down-header nav a{padding-left:2px;padding-right:2px;font-size:9px}}
 /* The page behind an open editor scrolled with it, which is what made the modal
    feel like it was fighting back. overscroll-behavior is the half that stops a
    flick reaching the page once the form hits its end. */
