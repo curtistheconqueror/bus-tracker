@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Sites Version 149 was published from `011bb09` on 2026-09-03.**
+**STATUS: VERSION 150 PENDING — publish from `e89d17b`. Version 149 is live from `011bb09`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **150** | `e89d17b` | Every setting in the app lives on one Settings page, sixth in the nav behind the gear, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Published | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
 | Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
@@ -41,6 +42,244 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 150 — One Settings page for everything, behind the gear in the nav
+
+**Publish this next, after Version 149.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`e89d17b`** |
+| Last code-bearing commit | `e89d17b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 149, published from `011bb09` |
+
+**Four application commits.** Three were written before Codex published 149
+and have been **rebased onto the release commit `b7da27a`**, not merged over
+it:
+
+```
+git log --oneline 011bb09..e89d17b
+e89d17b Put every setting in the app on one page, behind the gear in the nav   <- app code
+e9bfc30 Draw the page nav from one list instead of five copies                 <- app code
+38e3365 Make ALL mean everything, search box included                          <- app code
+35f9006 Give a repair a service bulletin, and name the sensor that shuts buses down   <- app code
+b7da27a Record Sites Version 149 release                                       <- Codex, docs only
+074ad4d Fold the sixth work state into the Version 149 handoff                 <- docs only
+```
+
+Application files touched, in full — a **new route, `app/settings/`**, and the
+service worker:
+
+```
+git diff --name-only 011bb09 e89d17b -- app public
+app/defect-log/defect-log-settings-modal.tsx   (new)
+app/defect-log/defect-log-settings.ts          (new)
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet-settings-store.ts    (new)
+app/down-sheet/down-sheet-settings.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/fixed-repairs/fixed-repairs-settings.tsx
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
+app/fleet-backup.ts
+app/globals.css
+app/lists/page.tsx
+app/map-settings-panel.tsx                     (new)
+app/map-settings.ts                            (new)
+app/page.tsx
+app/repair-catalog.ts
+app/settings/page.tsx                          (new)
+app/settings/settings.css                      (new)
+app/status-icon.tsx                            (new)
+app/tracker-nav.tsx                            (new)
+app/tracker-pages.ts                           (new)
+public/sw.js
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 011bb09 e89d17b -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: **200 tests passing** (196 at Version 149, four added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and no rewrite.** No storage key is renamed and no payload shape
+changes. `app/storage.ts` is untouched. The seven keys read exactly as they
+did; the Settings page writes each one by **merging over what it already
+holds**, so the Down Sheet's quick note and sort order, the DS badge view the
+map's menu sets, and any field a later release adds all survive a change made
+there.
+
+**One thing phones will notice once:** `public/sw.js` gains `/settings` in
+`CORE_PAGES`, which bumps the shell cache name from `pace-bus-tracker-shell-v4`
+to **`v5`**. The first online launch after the update re-downloads the shell,
+once; after that `/settings` works offline like every other page. This is the
+same bump Fleet Campaigns needed in Version 137.
+
+MERGE DUPES still runs only when a person presses it and confirms.
+
+## What changed
+
+### 1. The gear is a page
+
+Every page kept its own settings behind its own gear — the Facility Map's
+modal held fifteen sections, the Down Sheet's five, the Defect Log's eight, and
+Fixed Repairs re-read the Defect Log's key to show three of those again.
+
+**⚙ SETTINGS is now the sixth link in the nav on every page**, and `/settings`
+holds one large section per page: FACILITY MAP, DOWN SHEET, DEFECT LOG, FIXED
+REPAIRS, with a jump row at the top. Each section renders that page's **own
+panel inline** — the same component the gear used to open, with the shade and
+the close button switched off — so nothing was copied and nothing can drift.
+The Defect Log and Fixed Repairs sections are drawn in the theme you pick, so
+what you see there is what the page will look like.
+
+**The per-page gears are gone** from the Down Sheet, the Defect Log and Fixed
+Repairs. The Facility Map's button is **ACTIONS** (☰ on a phone, under MORE)
+and opens only what acts on the board rather than describes it: backup and
+transfer, repair cleanup, creating a bus, renumbering one. Two map hints that
+said *"in Settings"* now say *"under ACTIONS"*, and the report tooltip points
+at *EXPORT ALL DATA under ACTIONS on the Facility Map*.
+
+**Fixed Repairs has no settings of its own** — it reads the Defect Log's
+theme, font and colours off the same key — so its section is driven from the
+same state as the Defect Log's and either one changes both. The section says so.
+
+### 2. MERGE DUPES lives on the Settings page
+
+Under DEFECT LOG, with **the live count on the button** — from the same
+function that does the merging, so the number is by construction the number
+the button will act on. The bulk-loss guard is lifted there and only there, as
+it was on the Defect Log since 135. **UNDO MERGE** appears after a merge and
+puts every record back, cloud tombstones included, until you leave the page.
+The Defect Log's feed row is now CLEAN UP · SCAN SWEEP · AI OPERATOR.
+
+The Defect Log's report button and both section transfers (Down Sheet, Defect
+Log) came with their panels. An imported Down Sheet marks its buses down on
+the map at once rather than waiting for the sheet to be opened.
+
+### 3. A repair can carry a Technical Service Bulletin
+
+**LOW OIL** and **COOLANT LEVEL SENSOR** join Misfire and Loss of power as
+check-engine symptoms — four boxes in two columns, bottom row full. The sensor
+is named in full because it is not the coolant temp sensor.
+
+**TSB — TECHNICAL SERVICE BULLETIN** is a second, permanent note under the
+existing amber one, in warm tan: what this fleet has learned about a repair,
+keyed on category and issue and read through the same migration as notes. The
+first bulletin is the coolant level sensor, written down from Curtis — which
+sensor it is, that it shuts the bus down below a tight glycol threshold, that
+a bus which shut down and restarts fine is usually this, that high engine
+temperature is a severe leak and not this, and that a bus running with it
+unplugged has its low-glycol shutdown bypassed.
+
+### 4. ALL means everything, search box included
+
+Pressing ALL on the Defect Log clears the search box too. Only ALL does; IN
+PROGRESS and FIXED TODAY keep the search, because narrowing a search by state
+is their whole point.
+
+### 5. One nav list
+
+The page nav is drawn from one list in `tracker-pages.ts`; five hand-written
+copies had drifted (the map called itself FLEET TRACKER). Adding the sixth
+page was one line because of this.
+
+## Validation
+
+- 200 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a 390px, 800px and 1180px Chromium, 47 checks, zero console
+  errors** — a script, not a test suite, so the tests carry the guarantees:
+  - six links in one row at 1180 and **two full rows of three at 390**; no
+    horizontal overflow at either width; the four panels inline with no shade
+  - changing DEFAULT SHIFT on the Settings page left the Down Sheet's
+    `quickNotes` and `order` in the key untouched
+  - picking the Midnight theme for the map kept `downSheetBadgeView` and an
+    unknown future field in the key, and stamped `statusVersion:3`
+  - a manual map colour set the theme to custom **and** the colour — two
+    updates in one tick, which is the case a state-only implementation lost
+  - picking Dark under DEFECT LOG turned both that section and FIXED REPAIRS
+    dark, **reached an open Defect Log tab**, and that tab did not write its
+    old theme back; picking Tactical under FIXED REPAIRS drove the log panel
+  - MERGE DUPES on a seeded exact repeat: count `(1)`, confirm, 3 records → 2
+    with the earliest date kept, tombstone written; UNDO MERGE: 3 records,
+    count back, tombstone withdrawn
+  - every other page at 390: no gear button, SETTINGS in the nav, ACTIONS on
+    the map (under MORE on a phone) opens backup/cleanup/create/renumber only
+- Two things were caught by measuring rather than reading: the map's
+  relabelled button had no glyph and the phone command bar hides button text,
+  so it was invisible on phones until the glyph went back; and the map page had
+  lost a line in the extraction (`applyTheme`) that the type checker found
+  before the build did
+- A test asserts `sw.js` pre-caches every real route under `app/`, so a page
+  added without the service worker fails the suite — that is what forced the
+  cache bump
+
+## After it is live
+
+1. **Open any page.** Six links in the nav, ⚙ SETTINGS last; on a phone, two
+   rows of three.
+2. **Open ⚙ SETTINGS.** Four sections and a jump row. Every panel sits in the
+   page — nothing pops up, nothing to close.
+3. **Under DEFECT LOG pick Dark.** That section and FIXED REPAIRS turn dark
+   together. Open the Defect Log: dark. Open Fixed Repairs: dark.
+4. **Under DOWN SHEET change DEFAULT SHIFT**, then open the Down Sheet. The
+   quick note is still there and + ADD DOWN BUS defaults to the new shift.
+5. **Look at MERGE DUPES.** The live board was cleaned up in 135, so expect it
+   disabled with the hover text *Every open repair on this board is recorded
+   once* — or a count, if repeats have crept back. Pressing it still asks first.
+6. **On the Facility Map** the gear is gone; ACTIONS (☰ under MORE on a phone)
+   opens backup and transfer, repair cleanup, create and renumber — and nothing
+   else.
+7. **On the Down Sheet, the Defect Log and Fixed Repairs** there is no gear
+   button anywhere.
+8. **On a phone**, the first launch online after the update re-downloads the
+   shell once. Then put it in airplane mode and open ⚙ SETTINGS: it loads.
+9. **Open LOG DEFECT, choose Engine → Check engine light.** Four symptom
+   boxes; tick COOLANT LEVEL SENSOR and the tan TSB appears under the note.
+
+## The way back
+
+Measured in a throwaway worktree, not assumed:
+
+- `git revert e89d17b` alone is **clean** — it removes the Settings page, puts
+  every gear and MERGE DUPES back where they were, and drops the cache name to
+  `v4`. Phones re-download the shell once more.
+- `git revert e89d17b e9bfc30` (newest first) is clean.
+- **`38e3365` or `35f9006` alone conflict** in `tests/rendered-html.test.mjs`
+  (and `35f9006` in `app/defect-log/page.tsx`) because later commits edited the
+  same lines. To take those out, revert **all four, newest first**:
+  `git revert e89d17b e9bfc30 38e3365 35f9006` — clean.
+
+No migration to undo in any case. A record that already carries a symptom
+added in `35f9006` keeps the stored string, harmlessly ignored, and it
+reappears if the box comes back.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 150 | Live | <published tip hash> | Every setting in the app lives on one Settings page, the sixth link in the nav behind the gear, one large section per page rendering that page's own panel inline, with every write merging over what the key already holds; the per-page gears are gone and the Facility Map's button is ACTIONS, holding only backup and transfer, repair cleanup, create and renumber; MERGE DUPES moves to the Settings page with its live count on the button and an UNDO MERGE; Fixed Repairs' appearance is shown to be the Defect Log's, driven from one state so neither can overwrite the other; the service worker pre-caches /settings (shell cache v5, one re-download); a repair can carry a Technical Service Bulletin under its note, the first one for the coolant level sensor, and Low oil and Coolant level sensor are check-engine symptoms; ALL on the Defect Log clears the search box; and the page nav is drawn from one list instead of five copies |
+```
 
 ---
 
