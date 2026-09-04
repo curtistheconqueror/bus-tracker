@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 150 PENDING — publish from `e89d17b`. Version 149 is live from `011bb09`.**
+**STATUS: VERSION 150 PENDING — publish from `ca5cec0`. Version 149 is live from `011bb09`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **150** | `e89d17b` | Every setting in the app lives on one Settings page, sixth in the nav behind the gear, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
+| Next | **150** | `ca5cec0` | Every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Published | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
 | Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
@@ -53,17 +53,18 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`e89d17b`** |
-| Last code-bearing commit | `e89d17b` — the release source is this commit |
+| **Release source** | **`ca5cec0`** |
+| Last code-bearing commit | `ca5cec0` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 149, published from `011bb09` |
 
-**Four application commits.** Three were written before Codex published 149
+**Five application commits.** Three were written before Codex published 149
 and have been **rebased onto the release commit `b7da27a`**, not merged over
-it:
+it; the last two came after it:
 
 ```
-git log --oneline 011bb09..e89d17b
+git log --oneline 011bb09..ca5cec0
+ca5cec0 Collapse the Settings sections, and make the title row the thing you press   <- app code
 e89d17b Put every setting in the app on one page, behind the gear in the nav   <- app code
 e9bfc30 Draw the page nav from one list instead of five copies                 <- app code
 38e3365 Make ALL mean everything, search box included                          <- app code
@@ -76,7 +77,7 @@ Application files touched, in full — a **new route, `app/settings/`**, and the
 service worker:
 
 ```
-git diff --name-only 011bb09 e89d17b -- app public
+git diff --name-only 011bb09 ca5cec0 -- app public
 app/defect-log/defect-log-settings-modal.tsx   (new)
 app/defect-log/defect-log-settings.ts          (new)
 app/defect-log/defect-log-sync.ts
@@ -107,7 +108,7 @@ public/sw.js
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 011bb09 e89d17b -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 011bb09 ca5cec0 -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
 Gate: **200 tests passing** (196 at Version 149, four added), ESLint clean,
@@ -145,6 +146,13 @@ panel inline** — the same component the gear used to open, with the shade and
 the close button switched off — so nothing was copied and nothing can drift.
 The Defect Log and Fixed Repairs sections are drawn in the theme you pick, so
 what you see there is what the page will look like.
+
+**The sections collapse.** Open, all four ran to fourteen phone screens.
+FACILITY MAP starts open; DOWN SHEET, DEFECT LOG and FIXED REPAIRS start
+closed, each a single bold title row until it is pressed. The whole row is
+the button, not a chevron to aim for. The jump links at the top open what
+they jump to. A closed section is hidden rather than unmounted, so its state
+is where you left it when it opens again.
 
 **The per-page gears are gone** from the Down Sheet, the Defect Log and Fixed
 Repairs. The Facility Map's button is **ACTIONS** (☰ on a phone, under MORE)
@@ -200,10 +208,16 @@ page was one line because of this.
 ## Validation
 
 - 200 regression tests passing, ESLint clean, production build succeeds
-- **Driven in a 390px, 800px and 1180px Chromium, 47 checks, zero console
+- **Driven in a 390px, 800px and 1180px Chromium, 56 checks, zero console
   errors** — a script, not a test suite, so the tests carry the guarantees:
   - six links in one row at 1180 and **two full rows of three at 390**; no
-    horizontal overflow at either width; the four panels inline with no shade
+    horizontal overflow at either width, collapsed or with everything open;
+    the four panels inline with no shade
+  - **collapsed by default the way the page ships:** FACILITY MAP open, the
+    other three closed; **4,647px tall at 390 against 11,879px with everything
+    open**; every title row at least 58px tall; pressing a title opens it and
+    pressing it again closes it; the DEFECT LOG jump link opens its section
+    and lands it under the sticky jump row
   - changing DEFAULT SHIFT on the Settings page left the Down Sheet's
     `quickNotes` and `order` in the key untouched
   - picking the Midnight theme for the map kept `downSheetBadgeView` and an
@@ -231,8 +245,10 @@ page was one line because of this.
 
 1. **Open any page.** Six links in the nav, ⚙ SETTINGS last; on a phone, two
    rows of three.
-2. **Open ⚙ SETTINGS.** Four sections and a jump row. Every panel sits in the
-   page — nothing pops up, nothing to close.
+2. **Open ⚙ SETTINGS.** FACILITY MAP is open; DOWN SHEET, DEFECT LOG and
+   FIXED REPAIRS are single bold title rows. Press a title and it opens in
+   place — nothing pops up, nothing to close. The jump links at the top open a
+   section too.
 3. **Under DEFECT LOG pick Dark.** That section and FIXED REPAIRS turn dark
    together. Open the Defect Log: dark. Open Fixed Repairs: dark.
 4. **Under DOWN SHEET change DEFAULT SHIFT**, then open the Down Sheet. The
@@ -252,16 +268,21 @@ page was one line because of this.
 
 ## The way back
 
-Measured in a throwaway worktree, not assumed:
+Measured in a throwaway worktree from `ca5cec0`, not assumed:
 
-- `git revert e89d17b` alone is **clean** — it removes the Settings page, puts
-  every gear and MERGE DUPES back where they were, and drops the cache name to
-  `v4`. Phones re-download the shell once more.
-- `git revert e89d17b e9bfc30` (newest first) is clean.
+- `git revert ca5cec0` alone is **clean** — the sections stop collapsing and
+  everything else stays.
+- `git revert ca5cec0 e89d17b` (newest first) is **clean** — it removes the
+  Settings page, puts every gear and MERGE DUPES back where they were, and
+  drops the cache name to `v4`. Phones re-download the shell once more.
+  **`e89d17b` alone conflicts** now, because `ca5cec0` edited the same three
+  files; take the two together.
+- `git revert ca5cec0 e89d17b e9bfc30` is clean.
 - **`38e3365` or `35f9006` alone conflict** in `tests/rendered-html.test.mjs`
   (and `35f9006` in `app/defect-log/page.tsx`) because later commits edited the
-  same lines. To take those out, revert **all four, newest first**:
-  `git revert e89d17b e9bfc30 38e3365 35f9006` — clean.
+  same lines — measured from `e89d17b`, and `ca5cec0` touches none of those
+  files. To take those out, revert **all five, newest first**:
+  `git revert ca5cec0 e89d17b e9bfc30 38e3365 35f9006` — clean.
 
 No migration to undo in any case. A record that already carries a symptom
 added in `35f9006` keeps the stored string, harmlessly ignored, and it
