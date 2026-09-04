@@ -2966,6 +2966,29 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(1.25),"1.25");
 });
 
+test("ALL means everything, including whatever is in the search box",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* THE BUG. A tech searched a bus number, tapped into the defect, came back
+    and pressed ALL - and still saw one bus, because the search box was still
+    holding the board down and nothing on screen said so. The only way out was
+    to notice the text and delete it by hand. */
+ assert.match(page,/const showEverythingOr=\(value:Filter\)=>\{/);
+ assert.match(page,/const next=filter===value\?"all":value;/);
+ assert.match(page,/if\(next==="all"\)setSearch\(""\);/);
+
+ // Every filter button goes through it, so pressing the lit one clears back to
+ // ALL and takes the search with it.
+ assert.match(page,/onClick=\{\(\)=>showEverythingOr\(value\)\}/);
+ assert.equal(/onClick=\{\(\)=>setFilter\(current=>current===value\?"all":value\)\}/.test(page),false,
+  "no button may set the filter without going through the handler that clears the search");
+
+ /* Only ALL clears it. Narrowing a search down by state is the entire point of
+    IN PROGRESS and FIXED TODAY, so wiping the search there would break them. */
+ const handler=page.slice(page.indexOf("const showEverythingOr"),page.indexOf("const showEverythingOr")+400);
+ assert.equal((handler.match(/setSearch\(""\)/g)||[]).length,1,"the search is cleared in exactly one branch");
+});
+
 test("a technical service bulletin carries what the fleet knows, beside the note",async()=>{
  const { defectTsb, defectNote } = await import("../app/repair-catalog.ts");
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
@@ -7435,8 +7458,11 @@ test("the Defect Log opens on what it is for, not on a scoreboard", async () => 
  assert.match(logPage,/<option value="open">Open<\/option>/,"and both remain choosable as a default view");
  assert.match(logPage,/<option value="downsheet">/);
 
- /* Pressing the active filter clears back to ALL. It used to stay stuck on. */
- assert.match(logPage,/onClick=\{\(\)=>setFilter\(current=>current===value\?"all":value\)\}/);
+ /* Pressing the active filter clears back to ALL. It used to stay stuck on.
+    The toggle now lives in showEverythingOr, which does this and also clears
+    the search box when the result is ALL - see the test named for that. */
+ assert.match(logPage,/onClick=\{\(\)=>showEverythingOr\(value\)\}/);
+ assert.match(logPage,/const next=filter===value\?"all":value;/);
 });
 
 test("a repair fixed without a defect can be logged straight to Fixed Repairs", async () => {

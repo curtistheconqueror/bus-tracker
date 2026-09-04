@@ -500,6 +500,19 @@ export default function DefectLog(){
  const [settings,setSettings]=useState<LogSettings>(DEFAULT_SETTINGS);
  const [filter,setFilter]=useState<Filter>("all");
  const [search,setSearch]=useState("");
+ /* ALL means show me everything, and until now it only meant half of that.
+    A tech searched a bus number, tapped into the defect, came back, pressed
+    ALL - and still saw one bus, because the search box was still holding the
+    board down and nothing on screen said so. The only way out was to notice
+    the text and delete it.
+
+    So ALL clears the search as well as the filter. Every other button keeps
+    the search, because narrowing a search by state is the point of them. */
+ const showEverythingOr=(value:Filter)=>{
+  const next=filter===value?"all":value;
+  setFilter(next);
+  if(next==="all")setSearch("");
+ };
  const [quickFilter,setQuickFilter]=useState<QuickFilterKey|null>(null);
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
@@ -725,7 +738,7 @@ export default function DefectLog(){
        the active one, so it explains the view and clears it, without adding two
        buttons back for everybody else. */
     ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
-    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value?"all":value)} key={value}>{label}</button>)}</div>
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
    <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("")}}/><div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/></label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
    <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
