@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 148
-Live feature checkpoint: commit 60c2a01
+Live release: Sites Version 149
+Live feature checkpoint: commit 011bb09
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 148 is the current user-approved live release. Its source checkpoint is commit 60c2a01. Bus List appears before Type Bus # in the Defect Log form, and Amerex Fire Suppression includes Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2. No storage change was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Version 149 is the current user-approved live release. Its source checkpoint is commit 011bb09. The duplicate guard now recognizes unresolved reports for five days, and WORK DONE SO FAR includes an OPERATOR REPORTED checkbox that can be combined with the existing work-state checks. No migration or storage rewrite was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
