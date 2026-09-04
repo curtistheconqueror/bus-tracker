@@ -103,11 +103,11 @@ function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:strin
   </fieldset>
   <fieldset className="wide bus-picker bus-picker-number"><legend>BUS NUMBER</legend>
    <div className="bus-picker-fields">
+    <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>)}</select></label>
     {/* The typed number is the way in that gets used, so it is the biggest
         thing in the form and it reads in the page's own text colour rather
         than the muted grey every other field uses. */}
     <label className="type-bus-number">TYPE BUS #<input autoFocus inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list="defect-log-bus-numbers" placeholder="Enter full bus number"/><datalist id="defect-log-bus-numbers">{candidates.map(bus=><option value={bus.n} key={bus.id}/>)}</datalist></label>
-    <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>)}</select></label>
    </div>
    {/* The list is disabled until a generation is picked, and that control now
        lives in the box above, so the reason has to be said here or it reads as

@@ -1367,9 +1367,11 @@ test("repair catalog exposes robust category and issue choices", () => {
      moved into its group. A record from the MDT era lands at the end of both. */
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen - INOP (general)");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration", "CNG"]);
-  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 2 Roof 1", "Control head no power", "Other Fire Suppression Trouble"]);
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 1 Roof 2", "Trouble Mod 2 Roof 1", "Trouble Mod 2 Roof 2", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 2"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 2 Roof 2"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
   // Amerex keeps the wording printed on the panel; every other grouped
   // category gets plain wording that names its own groups.
@@ -7087,9 +7089,9 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
  // The chips belong to the generations box, and only to it.
  assert.match(generations,/className="bus-generations"/);
  assert.equal(/className="bus-generations"/.test(number),false);
- // Both ways of naming one bus sit together under BUS NUMBER, typed field first.
+ // Both ways of naming one bus sit together under BUS NUMBER, with the list first.
  assert.ok(number.indexOf("TYPE BUS #")>=0&&number.indexOf("BUS LIST")>=0);
- assert.ok(number.indexOf("TYPE BUS #")<number.indexOf("BUS LIST"),"the typed number comes first");
+ assert.ok(number.indexOf("BUS LIST")<number.indexOf("TYPE BUS #"),"the bus list comes first");
 
  // THE TYPED NUMBER IS THE ONE THAT GETS USED, so it is the biggest control in
  // the form and it carries the page's own text colour, not the muted grey.
