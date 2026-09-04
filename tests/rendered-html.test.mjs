@@ -555,6 +555,8 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(html,/aria-expanded="true"/);
   assert.match(html,/>QUICK FILTERS</);
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+   /* Four boxes in a two-column grid: two full rows, nothing sitting alone. */
+   assert.match(css,/\.engine-symptom-picker>div\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
@@ -1415,7 +1417,13 @@ test("repair catalog exposes robust category and issue choices", () => {
 test("Defect Log keeps multiple check-engine symptoms inside one defect record", async () => {
  // Stop engine light is now a catalog entry of its own and half of the combined
  // entry, so offering it again as a tick box would be two ways to say one thing.
- assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power"]);
+ /* Four now, and the last is deliberately a component rather than a symptom:
+    the picker exists to narrow a check-engine light into somewhere to look, and
+    on this fleet the coolant LEVEL sensor is the highest point of failure that
+    ends in a shutdown. Named in full because it is not the coolant TEMP sensor,
+    and a count that mixes the two is worse than no count. */
+ assert.deepEqual(CHECK_ENGINE_SYMPTOMS,["Misfire","Loss of power","Low oil","Coolant level sensor"]);
+ assert.equal(CHECK_ENGINE_SYMPTOMS.length%2,0,"a full bottom row in the two-column picker");
   const [defect]=normalizeDefects([{id:"check-engine-1",category:"Engine",issue:"Check engine light",symptoms:["Misfire","Loss of power","Misfire"],details:"Under load",operability:"service",state:"open",source:"defect-log"}]);
   assert.deepEqual(defect.symptoms,["Misfire","Loss of power"]);
   assert.equal(defectSupportingDetails(defect),"Misfire, Loss of power — Under load");
@@ -2956,6 +2964,48 @@ test("work time totals per person, day by day, and says what it is not counting"
  assert.equal(formatWorkHours(2),"2");
  assert.equal(formatWorkHours(0.5),"0.5");
  assert.equal(formatWorkHours(1.25),"1.25");
+});
+
+test("a technical service bulletin carries what the fleet knows, beside the note",async()=>{
+ const { defectTsb, defectNote } = await import("../app/repair-catalog.ts");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+
+ /* A bulletin is not the note. The note says what to do in the next five
+    minutes; the bulletin says what this fleet has learned about the repair and
+    stays true long after the bus in front of you is fixed. Both are shown. */
+ for(const issue of ["Check engine light","Stop engine light","Check engine and stop engine light"]){
+  const tsb=defectTsb("Engine",issue);
+  assert.ok(tsb,issue+" carries a bulletin");
+  assert.match(tsb,/coolant LEVEL sensor is not the coolant temp sensor/i,
+   "the whole point is telling the two sensors apart");
+  assert.match(tsb,/highest point of failure/i);
+  assert.match(tsb,/unplugged/i,"a bypassed shutdown has to be said out loud");
+ }
+ // Silent everywhere it has nothing to say, rather than showing an empty box.
+ assert.equal(defectTsb("Engine","Rear main seal"),"");
+ assert.equal(defectTsb("Brakes","Parking brake"),"");
+ assert.equal(defectTsb("",""),"");
+ assert.equal(defectTsb(undefined,null),"");
+
+ /* Read through the same migration the rest of the catalog uses, so a bulletin
+    written today still reaches a record logged under an older category name. */
+ assert.equal(defectTsb("Air System","Air compressor"),defectTsb("Pneumatic System","Air compressor"));
+
+ // It renders directly under the note, and it is its own element - folding the
+ // two together would bury one behind the other.
+ assert.ok(page.indexOf('className="defect-note"')<page.indexOf('className="defect-tsb"'),
+  "the bulletin sits under the note");
+ assert.match(page,/<b>TSB — TECHNICAL SERVICE BULLETIN<\/b>/);
+ // Same size and shape as the note, different colour, so neither outranks the
+ // other and the two are told apart without reading either heading.
+ assert.match(css,/\.defect-tsb\{[^}]*font-size:9px/);
+ assert.match(css,/\.defect-note\{[^}]*font-size:9px/);
+ assert.match(css,/\.defect-tsb\{[^}]*background:#f3ede1/);
+ assert.notEqual(/\.defect-tsb\{[^}]*background:#f3ede1/.test(css),
+  /\.defect-note\{[^}]*background:#f3ede1/.test(css),"the two do not share a colour");
+ // The note it sits beside is unaffected.
+ assert.match(defectNote("A/C and HVAC","A/C compressor pulley misaligned"),/straight edge/i);
 });
 
 test("a repair records how far it got, and what was found travels with it",async()=>{

@@ -273,6 +273,36 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
   "Fire Suppression - FIRE alarm (system discharged)":"The system fires on its own with no operator input, so this means the bottles have already gone off. The bus does not move until it is recharged and inspected.",
  },
 };
+/* TECHNICAL SERVICE BULLETINS.
+
+   DEFECT_NOTES says what to do in the next five minutes. A bulletin says what
+   this fleet has learned about a repair, and it stays true long after the bus
+   in front of you is fixed. Both are shown, one under the other, because they
+   answer different questions and folding them together would bury one.
+
+   Keyed on category and issue the same way notes are, and read through the same
+   migration, so a bulletin written today still reaches a record logged under an
+   older wording.
+
+   Everything in here is knowledge that otherwise lives in one person's head. */
+const COOLANT_LEVEL_SENSOR_TSB="The coolant LEVEL sensor is not the coolant temp sensor. It shuts the bus down when glycol in the surge tank drops below a tight threshold, and it is the highest point of failure on this fleet. A bus that shut down and then restarts and runs fine is usually this sensor. High engine temperature will also shut a bus down, and that is a severe leak, not this. A bus running with the sensor unplugged has its low-glycol shutdown bypassed - say so in the description, because nothing else on the record will.";
+
+const DEFECT_TSBS:Record<string,Record<string,string>>={
+ Engine:{
+  /* Written down from Curtis: the single highest-failure item on this fleet,
+     and the one most often mistaken for a different sensor with a similar name. */
+  "Check engine light":COOLANT_LEVEL_SENSOR_TSB,
+  "Stop engine light":COOLANT_LEVEL_SENSOR_TSB,
+  "Check engine and stop engine light":COOLANT_LEVEL_SENSOR_TSB,
+ },
+};
+
+/* The bulletin for a repair, or "" when this fleet has nothing to say about it. */
+export function defectTsb(category:unknown,issue:unknown){
+ const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
+ return DEFECT_TSBS[moved.category]?.[moved.issue]||"";
+}
+
 export function defectNote(category:unknown,issue:unknown){
  const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
  return DEFECT_NOTES[moved.category]?.[moved.issue]||"";
@@ -493,7 +523,15 @@ export function diagLightLabel(defect:{diagLight?:DiagLight;alarmCode?:string}){
  return DIAG_LIGHT_LABELS[light]+(code?" alarm "+code:"");
 }
 
-export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power"] as const;
+/* What the bus is doing, beyond the lamp on the dash.
+
+   The last one is not a symptom in the strict sense, and it is here on purpose.
+   The picker's job is to narrow "check engine light" into something the next
+   person can act on, and on this fleet the coolant LEVEL sensor is the highest
+   point of failure that ends in a shutdown - so ticking it says where to look
+   better than any true symptom would. It is named in full because it is not the
+   coolant TEMP sensor, and a count that mixes the two is worse than no count. */
+export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Low oil","Coolant level sensor"] as const;
 
 /* The three dash-light entries that carry the symptom picker. Kept as a list so
    a fourth cannot be added to the catalog and quietly lose its symptoms. */
