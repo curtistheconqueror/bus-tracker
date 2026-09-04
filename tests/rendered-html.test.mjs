@@ -3065,6 +3065,22 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  assert.match(page,/<FixedAppearanceModal inline /);
  for(const id of ["facility-map","down-sheet","defect-log","fixed-repairs"])assert.match(page,new RegExp('<section id="'+id+'"'),id+" is a section");
 
+ /* Collapsible. Open, the four sections ran to fourteen phone screens. FACILITY
+    MAP starts open and the other three closed; the bold title row is the
+    control; a closed body is hidden rather than unmounted, so its panel's
+    storage listeners keep running and its state is where it was left. */
+ assert.match(page,/const DEFAULT_OPEN:Record<SectionKey,boolean>=\{map:true,down:false,log:false,fixed:false\}/);
+ assert.match(page,/<button type="button" className="settings-section-toggle" aria-expanded=\{open\} aria-controls=\{id\+"-body"\} onClick=\{onToggle\}>/);
+ assert.match(page,/<div id=\{id\+"-body"\} className="settings-section-body" hidden=\{!open\}>/);
+ for(const [id,key] of [["facility-map","map"],["down-sheet","down"],["defect-log","log"],["fixed-repairs","fixed"]]){
+  assert.match(page,new RegExp('<SectionHead id="'+id+'" kicker="[A-Z ]+" title="[^"]+" open=\\{open\\.'+key+'\\} onToggle=\\{\\(\\)=>toggle\\("'+key+'"\\)\\}\\/>'),id+" title row toggles it");
+  assert.match(page,new RegExp('<SectionBody id="'+id+'" open=\\{open\\.'+key+'\\}>'),id+" body follows the same flag");
+  assert.match(page,new RegExp('<a href="#'+id+'" onClick=\\{\\(\\)=>reveal\\("'+key+'"\\)\\}>'),id+" jump link opens what it jumps to");
+ }
+ assert.match(css,/\.settings-section-body\[hidden\]\{display:none\}/,"the body's grid display must not defeat the hidden attribute");
+ assert.match(css,/\.settings-section-title\{[^}]*font-size:26px;font-weight:900/,"the title is the line people read to find a setting");
+ assert.match(css,/\.settings-section-toggle\{width:100%;min-height:58px/,"the whole row is the target, not a chevron");
+
  /* Fixed Repairs reads the Defect Log's key. One state drives both panels, so
     neither can write a stale copy of the other's change back. */
  assert.match(page,/setSettings=\{next=>updateLog\(\{theme:next\.theme,fontSize:next\.fontSize,fontFamily:next\.fontFamily,appearance:next\.appearance\}\)\}/);
@@ -3148,6 +3164,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const label of ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","MERGE DUPES","DUPLICATE RECORDS","MAINTENANCE INTERVALS","SHOW COMPLETED","REQUIRE INITIALS ON RECORDED WORK"])
   assert.ok(html.includes(label),"the page renders "+label);
  assert.match(html,/aria-current="page"[^>]*href="\/settings"|href="\/settings"[^>]*aria-current="page"/,"the nav marks Settings as the current page");
+ assert.match(html,/<div id="facility-map-body" class="settings-section-body">/,"FACILITY MAP renders open");
+ for(const id of ["down-sheet","defect-log","fixed-repairs"])assert.match(html,new RegExp('<div id="'+id+'-body" class="settings-section-body" hidden=""'),id+" renders closed");
 });
 
 test("ALL means everything, including whatever is in the search box",async()=>{

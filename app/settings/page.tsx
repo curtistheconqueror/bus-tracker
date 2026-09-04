@@ -14,11 +14,18 @@
    off. That is deliberate: a copy of each panel would be a second thing to
    keep right, and these panels are already right.
 
+   The sections collapse. Open, all four together ran to fourteen phone
+   screens, which is not a settings page anybody scrolls; the map's alone is
+   eleven sections. FACILITY MAP starts open and the other three start closed,
+   and a section's title row is the thing you press to open it. A closed
+   section stays mounted, only hidden, so its panel's storage listeners keep
+   running and its state is where you left it when you open it again.
+
    What this page does not take is the Facility Map's four ACTIONS - backup and
    transfer, repair cleanup, creating a bus, renumbering one. Those act on the
    board rather than describe it, and they stay on the map. */
 
-import {useEffect,useMemo,useRef,useState,type CSSProperties} from "react";
+import {useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import TrackerNav from "../tracker-nav";
 /* Every page's own stylesheet, so each panel here looks exactly as it did
    behind that page's gear. settings.css comes LAST: all three of these, and
@@ -54,6 +61,11 @@ type SettingsBus=DefectLogFleetBus&{odometerReadings?:unknown;engineHourReadings
    also stops this device tombstoning records it has just put back. */
 type MergeUndo={fleet:SettingsBus[];downEntries:DefectLogDownEntry[];mergedAway:MergedAwayDefects;label:string};
 
+type SectionKey="map"|"down"|"log"|"fixed";
+/* The map first because it is the page the app opens on; the rest closed so
+   the page is four title rows long until somebody asks for more. */
+const DEFAULT_OPEN:Record<SectionKey,boolean>={map:true,down:false,log:false,fixed:false};
+
 function readFleet(raw:string|null):SettingsBus[]{const payload=readFleetPayload<SettingsBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
 function readDown(raw:string|null):DefectLogDownEntry[]{const payload=readDownSheetPayload<DefectLogDownEntry>(raw);return payload.valid?payload.entries:[]}
 /* The Defect Log writes its settings object whole, and so does this - over
@@ -88,12 +100,38 @@ function useStoredSettings<T extends object>(key:string,read:(raw:string|null)=>
  return [value,update] as const;
 }
 
+/* A section's title row, which is also the control that opens and closes it.
+   One button, the whole width, so the target is the row and not a chevron
+   somebody has to aim for; the chevron only says which way it will go. */
+function SectionHead({id,kicker,title,open,onToggle}:{id:string;kicker:string;title:string;open:boolean;onToggle:()=>void}){
+ return <h2 className="settings-section-head" id={id+"-heading"}>
+  <button type="button" className="settings-section-toggle" aria-expanded={open} aria-controls={id+"-body"} onClick={onToggle}>
+   <span className="settings-section-kicker">{kicker}</span>
+   <span className="settings-section-title">{title}</span>
+   <span className="settings-section-chevron" aria-hidden="true">&#9662;</span>
+  </button>
+ </h2>;
+}
+
+/* The body is hidden rather than unmounted when closed, on purpose - see the
+   file comment. `hidden` is the attribute, so the browser handles it; the
+   stylesheet only has to not defeat it. */
+function SectionBody({id,open,children}:{id:string;open:boolean;children:ReactNode}){
+ return <div id={id+"-body"} className="settings-section-body" hidden={!open}>{children}</div>;
+}
+
 export default function SettingsPage(){
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const report=(result:StorageWriteResult)=>setSaveProblem(result.reason||"");
  const [board,updateBoard]=useStoredSettings(BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,report);
  const [down,updateDown]=useStoredSettings(DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings,report);
  const [log,updateLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
+
+ const [open,setOpen]=useState<Record<SectionKey,boolean>>(DEFAULT_OPEN);
+ const toggle=(key:SectionKey)=>setOpen(current=>({...current,[key]:!current[key]}));
+ /* A jump link opens what it jumps to. Landing on a closed title row and
+    having to press it again is the kind of thing that reads as broken. */
+ const reveal=(key:SectionKey)=>setOpen(current=>current[key]?current:{...current,[key]:true});
 
  /* The board and the sheet, for the parts of this page that act on records:
     the section transfers, the log report, and MERGE DUPES. */
@@ -209,37 +247,50 @@ export default function SettingsPage(){
  const logStyle={...(log.groupBorder?{"--log-card-border":log.groupBorder}:{}),"--log-page":log.appearance.page,"--log-surface":log.appearance.surface,"--log-text":log.appearance.text,"--log-muted":log.appearance.muted,"--log-header":log.appearance.header,"--log-header-text":log.appearance.headerText,"--log-accent":log.appearance.accent,"--log-font":FONT_STACKS[log.fontFamily]} as CSSProperties;
  const fixedScale=log.fontSize==="extra"?"1.22":log.fontSize==="large"?"1.1":"1";
  const fixedStyle={"--fixed-page":log.appearance.page,"--fixed-surface":log.appearance.surface,"--fixed-ink":log.appearance.text,"--fixed-muted":log.appearance.muted,"--fixed-header":log.appearance.header,"--fixed-header-text":log.appearance.headerText,"--fixed-accent":log.appearance.accent,"--fixed-font":FONT_STACKS[log.fontFamily],"--fixed-scale":fixedScale} as CSSProperties;
+ const sectionClass=(key:SectionKey,name:string)=>"settings-section settings-section-"+name+(open[key]?" open":" closed");
 
  return <main className="settings-app">
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
-  <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Changes save on this device as you make them.</p></div><TrackerNav active="/settings"/></header>
+  <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/></header>
   <nav className="settings-jump" aria-label="Settings sections">
-   <a href="#facility-map">FACILITY MAP</a><a href="#down-sheet">DOWN SHEET</a><a href="#defect-log">DEFECT LOG</a><a href="#fixed-repairs">FIXED REPAIRS</a>
+   <a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
   </nav>
   <div className="settings-sections">
-   <section id="facility-map" className="settings-section settings-section-map" aria-labelledby="facility-map-heading">
-    <div className="settings-section-head"><span>FACILITY MAP</span><h2 id="facility-map-heading">Board settings</h2><p>Shop Cloud, bus markers, the DS badge, touch controls, maintenance intervals, confirmation prompts, themes and every colour on the board. Backup and transfer, repair cleanup, and creating or renumbering a bus stay on the map behind ACTIONS.</p></div>
-    <MapSettingsPanel buses={fleet} board={board} update={updateBoard}/>
+   <section id="facility-map" className={sectionClass("map","map")} aria-labelledby="facility-map-heading">
+    <SectionHead id="facility-map" kicker="FACILITY MAP" title="Board settings" open={open.map} onToggle={()=>toggle("map")}/>
+    <SectionBody id="facility-map" open={open.map}>
+     <p className="settings-section-blurb">Shop Cloud, bus markers, the DS badge, touch controls, maintenance intervals, confirmation prompts, themes and every colour on the board. Backup and transfer, repair cleanup, and creating or renumbering a bus stay on the map behind ACTIONS.</p>
+     <MapSettingsPanel buses={fleet} board={board} update={updateBoard}/>
+    </SectionBody>
    </section>
-   <section id="down-sheet" className="settings-section settings-section-down" aria-labelledby="down-sheet-heading">
-    <div className="settings-section-head"><span>DOWN SHEET</span><h2 id="down-sheet-heading">Sheet settings</h2><p>Defaults for new entries, the sheet's wording and text style, and moving the sheet to another device.</p></div>
-    <DownSheetSettings inline transfer={downTransfer} defaultInitials={down.defaultInitials} setDefaultInitials={value=>updateDown({defaultInitials:value})} defaultShift={down.defaultShift} setDefaultShift={value=>updateDown({defaultShift:value})} showCompleted={down.showCompleted} setShowCompleted={value=>updateDown({showCompleted:value})} display={down.display} setDisplay={value=>updateDown({display:value})} onClose={noop}/>
+   <section id="down-sheet" className={sectionClass("down","down")} aria-labelledby="down-sheet-heading">
+    <SectionHead id="down-sheet" kicker="DOWN SHEET" title="Sheet settings" open={open.down} onToggle={()=>toggle("down")}/>
+    <SectionBody id="down-sheet" open={open.down}>
+     <p className="settings-section-blurb">Defaults for new entries, the sheet's wording and text style, and moving the sheet to another device.</p>
+     <DownSheetSettings inline transfer={downTransfer} defaultInitials={down.defaultInitials} setDefaultInitials={value=>updateDown({defaultInitials:value})} defaultShift={down.defaultShift} setDefaultShift={value=>updateDown({defaultShift:value})} showCompleted={down.showCompleted} setShowCompleted={value=>updateDown({showCompleted:value})} display={down.display} setDisplay={value=>updateDown({display:value})} onClose={noop}/>
+    </SectionBody>
    </section>
-   <section id="defect-log" className="settings-section settings-section-log" aria-labelledby="defect-log-heading" style={logStyle}>
-    <div className="settings-section-head"><span>DEFECT LOG</span><h2 id="defect-log-heading">Log settings</h2><p>Your initials, the default view, theme, font, colours, wording and text style, the backup reminder, moving the log to another device, and the log report. The panel below is drawn in the theme you pick, so what you see here is what the log will look like.</p></div>
-    <LogSettingsModal inline settings={log} setSettings={next=>updateLog(next)} close={noop} exportLog={exportLog} transfer={logTransfer}/>
-    <section className="log-settings-group settings-tools" aria-labelledby="duplicates-heading">
-     <h3 id="duplicates-heading">DUPLICATE RECORDS</h3>
-     <p>One fault on a bus should be one record. This folds exact repeats — same category, same symptom, same details — into one record each, keeping everything written on every copy and the earliest date it was seen. It never runs on its own. The count on the button is live.</p>
-     <div className="settings-tool-row">
-      <button type="button" className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button>
-      {mergeUndo&&<button type="button" className="undo-merge" onClick={undoMerge} title={mergeUndo.label+" — put every record back"}>UNDO MERGE</button>}
-     </div>
-    </section>
+   <section id="defect-log" className={sectionClass("log","log")} aria-labelledby="defect-log-heading" style={logStyle}>
+    <SectionHead id="defect-log" kicker="DEFECT LOG" title="Log settings" open={open.log} onToggle={()=>toggle("log")}/>
+    <SectionBody id="defect-log" open={open.log}>
+     <p className="settings-section-blurb">Your initials, the default view, theme, font, colours, wording and text style, the backup reminder, moving the log to another device, and the log report. The panel below is drawn in the theme you pick, so what you see here is what the log will look like.</p>
+     <LogSettingsModal inline settings={log} setSettings={next=>updateLog(next)} close={noop} exportLog={exportLog} transfer={logTransfer}/>
+     <section className="log-settings-group settings-tools" aria-labelledby="duplicates-heading">
+      <h3 id="duplicates-heading">DUPLICATE RECORDS</h3>
+      <p>One fault on a bus should be one record. This folds exact repeats — same category, same symptom, same details — into one record each, keeping everything written on every copy and the earliest date it was seen. It never runs on its own. The count on the button is live.</p>
+      <div className="settings-tool-row">
+       <button type="button" className="merge-duplicates" onClick={mergeDuplicates} disabled={!duplicateCount} title={duplicateCount?duplicateCount+" open repair"+(duplicateCount===1?" is":"s are")+" recorded more than once":"Every open repair on this board is recorded once"}>MERGE DUPES{duplicateCount?" ("+duplicateCount+")":""}</button>
+       {mergeUndo&&<button type="button" className="undo-merge" onClick={undoMerge} title={mergeUndo.label+" — put every record back"}>UNDO MERGE</button>}
+      </div>
+     </section>
+    </SectionBody>
    </section>
-   <section id="fixed-repairs" className="settings-section settings-section-fixed" aria-labelledby="fixed-repairs-heading" style={fixedStyle}>
-    <div className="settings-section-head"><span>FIXED REPAIRS</span><h2 id="fixed-repairs-heading">Appearance</h2><p>Fixed Repairs shares the Defect Log's theme, font and colours: one setting, two pages. Change it here or under Defect Log and both follow.</p></div>
-    <FixedAppearanceModal inline settings={fixed} setSettings={next=>updateLog({theme:next.theme,fontSize:next.fontSize,fontFamily:next.fontFamily,appearance:next.appearance})} close={noop}/>
+   <section id="fixed-repairs" className={sectionClass("fixed","fixed")} aria-labelledby="fixed-repairs-heading" style={fixedStyle}>
+    <SectionHead id="fixed-repairs" kicker="FIXED REPAIRS" title="Appearance" open={open.fixed} onToggle={()=>toggle("fixed")}/>
+    <SectionBody id="fixed-repairs" open={open.fixed}>
+     <p className="settings-section-blurb">Fixed Repairs shares the Defect Log's theme, font and colours: one setting, two pages. Change it here or under Defect Log and both follow.</p>
+     <FixedAppearanceModal inline settings={fixed} setSettings={next=>updateLog({theme:next.theme,fontSize:next.fontSize,fontFamily:next.fontFamily,appearance:next.appearance})} close={noop}/>
+    </SectionBody>
    </section>
   </div>
  </main>;
