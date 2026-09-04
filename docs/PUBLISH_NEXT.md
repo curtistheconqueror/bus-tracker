@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 149 PENDING — publish from `9b4e14b`. Version 148 is live from `60c2a01`.**
+**STATUS: VERSION 149 PENDING — publish from `011bb09`. Version 148 is live from `60c2a01`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **149** | `9b4e14b` | The Defect Log looks back five days for a duplicate report instead of two |
+| Next | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
 | Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
 | Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
@@ -44,7 +44,7 @@ what to check once it is live.
 
 ---
 
-# Version 149 — Five days is the same fault; two days was not long enough
+# Version 149 — Five days is the same fault, and the operator's report is a fact worth keeping
 
 **Publish this next, after Version 148.**
 
@@ -52,39 +52,49 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`9b4e14b`** |
-| Last code-bearing commit | `9b4e14b` — the release source is this commit |
+| **Release source** | **`011bb09`** |
+| Last code-bearing commit | `011bb09` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 148, published from `60c2a01` |
 
-**One application commit.** Written before Codex published 148 and **rebased
-onto the release commit `2b34c52`**, not merged over it:
+**Two application commits.** The first was written before Codex published 148
+and has been **rebased onto the release commit `2b34c52`**, not merged over it:
 
 ```
-git log --oneline 60c2a01..9b4e14b
-9b4e14b Look back five days for a duplicate defect, not two   <- app code
-2b34c52 Record Sites Version 148 release                      <- Codex, docs only
+git log --oneline 60c2a01..011bb09
+011bb09 Record that the operator reported it, alongside whatever the shop did   <- app code
+13835c8 Queue Version 149 from 9b4e14b, and put the 147 row back                <- docs only
+9b4e14b Look back five days for a duplicate defect, not two                     <- app code
+2b34c52 Record Sites Version 148 release                                        <- Codex, docs only
 
-git diff --name-only 60c2a01 9b4e14b -- app
+git diff --name-only 60c2a01 011bb09 -- app
 app/defect-log/defect-log-sync.ts
 app/defect-log/page.tsx
 app/duplicate-defects.ts
+app/repair-catalog.ts
 ```
 
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 60c2a01 9b4e14b -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 60c2a01 011bb09 -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
 Gate: 196 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
-**None.** No storage key, no payload shape, no catalog identity. Only a number
-and the wording that reports it.
+**None, and no rewrite.** No storage key and no payload shape changes. The
+catalog gains a work-state key; it does not rename or retire one, so every
+record already on the board reads exactly as it did.
+
+`operator-reported` is simply absent from every existing record, which is what
+"not ticked" has always looked like in this field — `workStates` is a partial
+record, so a missing key is the normal state, not a gap to fill.
 
 ## What changed
+
+### 1. Five days, not two
 
 The Defect Log's duplicate guard looked back **48 hours**. It now looks back
 **120 hours — five days.**
@@ -126,6 +136,35 @@ back 48 hours at the time, and now adds what it looks back today.
   fixture
 - The test also asserts the day the old 48-hour window used to expire is now
   still caught
+- **The six boxes were driven, not assumed.** They render in grid order with
+  OPERATOR REPORTED bottom-right; ticking OPERATOR REPORTED, INSPECTED and TEST
+  DRIVEN leaves all three checked; saving stores
+  `["operator-reported","inspected","test-driven"]` on the record
+- The checkbox assertion **was confirmed to fail against a radio conversion**
+
+### 2. A repair can record that the operator reported it
+
+WORK DONE SO FAR gains a **sixth box, OPERATOR REPORTED**, in the bottom-right
+of the three-column grid. Six also fills the bottom row, so no box sits alone.
+
+It was already a fact people recorded — *"Operator Reported Defect"* typed into
+the description by hand — it just could not be counted, filtered, or read off a
+badge while it lived in free text.
+
+It is **last on purpose**: it says where the report came from rather than work
+the shop did, which is what the other five describe.
+
+**Several boxes at once already worked, and still do.** `workStates` is a record
+keyed per state rather than one chosen value, so an operator report, an
+inspection and a road test are all true of the same repair. What this release
+adds is a **test**, because that only stays true while the picker draws
+checkboxes — turning them into radios, or adding mutual exclusion, would
+silently start throwing away recorded work and nothing else in the app would
+complain.
+
+The one control that IS exclusive stays exclusive and is now pinned too: a brake
+test is a pass or a fail, never both, held as one stored result behind a pair of
+`aria-pressed` buttons rather than two independent boxes.
 
 ## After it is live
 
@@ -134,13 +173,22 @@ back 48 hours at the time, and now adds what it looks back today.
    say *five days*, not 48 hours.
 2. **Check a defect that was fixed and came back.** It should still be allowed
    through — the guard only holds back reports of faults that are still open.
-3. **Nothing else on the Defect Log should look different.**
+3. **Open LOG DEFECT and look at WORK DONE SO FAR.** Six boxes now, with
+   OPERATOR REPORTED in the bottom-right corner.
+4. **Tick three of them at once** — say OPERATOR REPORTED, INSPECTED and TEST
+   DRIVEN. All three should stay ticked, save together, and show on the record.
+5. **Tick BRAKE TEST.** The pass/fail choice should still appear, and still be
+   one or the other.
+6. **Nothing else on the Defect Log should look different.**
 
 ## The way back
 
-`git revert 9b4e14b` — one commit, no migration to undo. Reverting narrows the
-window to 48 hours again; nothing stored depends on it, and records written
-while 149 was live read identically afterwards.
+`git revert 011bb09 9b4e14b` — two commits, newest first, no migration to undo.
+
+Either reverts alone. Reverting `9b4e14b` narrows the window to 48 hours again.
+Reverting `011bb09` removes the sixth box; **any record that already ticked it
+keeps the stored key**, harmlessly ignored, and it reappears if the box comes
+back — nothing is destroyed by going backwards.
 
 ## Publishing constraints that still apply
 
@@ -153,7 +201,7 @@ while 149 was live read identically afterwards.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 149 | Live | <published tip hash> | The Defect Log's duplicate guard looks back five days instead of two, so a fault reported Monday and typed in again Thursday is recognised as the same fault rather than becoming a second record; the window only ever matches records that are still unresolved, so a repair that was fixed and came back still gets its own record; and the window and the wording that reports it now come from one exported constant so they cannot drift apart |
+| 149 | Live | <published tip hash> | The Defect Log's duplicate guard looks back five days instead of two, so a fault reported Monday and typed in again Thursday is recognised as the same fault rather than becoming a second record; the window only ever matches records that are still unresolved, so a repair that was fixed and came back still gets its own record; the window and the wording that reports it now come from one exported constant so they cannot drift apart; and WORK DONE SO FAR gains a sixth box, OPERATOR REPORTED, in the bottom-right, recording as structured data what was being typed into the description by hand, alongside any of the other five rather than instead of them |
 ```
 
 ---
