@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 150 PENDING — publish from `ca5cec0`. Version 149 is live from `011bb09`.**
+**STATUS: VERSION 150 PENDING — publish from `6d62787`. Version 149 is live from `011bb09`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **150** | `ca5cec0` | Every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
+| Next | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Published | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
 | Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
@@ -45,26 +45,30 @@ what to check once it is live.
 
 ---
 
-# Version 150 — One Settings page for everything, behind the gear in the nav
+# Version 150 — One Settings page for everything, and IMPORT ALL DATA works again
 
-**Publish this next, after Version 149.**
+**Publish this next, after Version 149.** It carries a data-safety fix: the
+map's IMPORT ALL DATA button has thrown on every press since Aug 31 (section 6).
 
 ## Source
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`ca5cec0`** |
-| Last code-bearing commit | `ca5cec0` — the release source is this commit |
+| **Release source** | **`6d62787`** |
+| Last code-bearing commit | `6d62787` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 149, published from `011bb09` |
 
-**Five application commits.** Three were written before Codex published 149
+**Six application commits.** Three were written before Codex published 149
 and have been **rebased onto the release commit `b7da27a`**, not merged over
-it; the last two came after it:
+it; the last three came after it:
 
 ```
-git log --oneline 011bb09..ca5cec0
+git log --oneline 011bb09..6d62787
+6d62787 Import the writer IMPORT ALL DATA calls, so restoring a backup works again   <- app code
+484b525 Move Version 150 to ca5cec0: the Settings sections collapse                  <- docs only
 ca5cec0 Collapse the Settings sections, and make the title row the thing you press   <- app code
+6acf869 Queue Version 150 from e89d17b                                                <- docs only
 e89d17b Put every setting in the app on one page, behind the gear in the nav   <- app code
 e9bfc30 Draw the page nav from one list instead of five copies                 <- app code
 38e3365 Make ALL mean everything, search box included                          <- app code
@@ -77,7 +81,7 @@ Application files touched, in full — a **new route, `app/settings/`**, and the
 service worker:
 
 ```
-git diff --name-only 011bb09 ca5cec0 -- app public
+git diff --name-only 011bb09 6d62787 -- app public
 app/defect-log/defect-log-settings-modal.tsx   (new)
 app/defect-log/defect-log-settings.ts          (new)
 app/defect-log/defect-log-sync.ts
@@ -108,10 +112,10 @@ public/sw.js
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 011bb09 ca5cec0 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 011bb09 6d62787 -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: **200 tests passing** (196 at Version 149, four added), ESLint clean,
+Gate: **201 tests passing** (196 at Version 149, five added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -205,9 +209,40 @@ The page nav is drawn from one list in `tracker-pages.ts`; five hand-written
 copies had drifted (the map called itself FLEET TRACKER). Adding the sixth
 page was one line because of this.
 
+### 6. IMPORT ALL DATA restores a backup again
+
+**Found by the type checker while checking this release, and confirmed in the
+source and in a browser.** The commit of Aug 31 that added the save-failure
+banner swapped the map's storage import to `writeFleetStorageResult` and left
+three bare `writeFleetStorage(...)` calls behind: **IMPORT ALL DATA**, and the
+AI operator's clear-down-sheet plan and its undo. A bundler does not check
+free identifiers, so every build since has passed, and every press of IMPORT
+ALL DATA has thrown `ReferenceError: writeFleetStorage is not defined` — caught
+into *"This file is not a valid fleet board backup. No changes were made."*
+The one button that restores a phone from a backup restored nothing, and said
+the file was at fault.
+
+**The fix is the missing name in the import.** Nothing else changes: the same
+guarded writer, the same confirm, the same `allowBulkDefectLoss:true` a
+deliberate restore has always carried.
+
+**The test is the rule it broke,** not the one line: every file under `app/`
+that calls a storage function must import it, checked against the storage
+module's own export list rather than a copy. It was **confirmed to fail** with
+the import line stashed and to pass with it restored, so the next missing
+import fails the suite instead of the first person to press the button.
+
 ## Validation
 
-- 200 regression tests passing, ESLint clean, production build succeeds
+- 201 regression tests passing, ESLint clean, production build succeeds
+- **IMPORT ALL DATA round-tripped in Chromium against the dev server:**
+  EXPORT ALL DATA wrote a 62-bus backup; two buses were removed from storage
+  and the reload drew 60; IMPORT ALL DATA from that file asked first, then
+  reported *"Board backup imported successfully. All 62 buses are now
+  available on this device."*, storage held 62 and the map drew 62, with no
+  page error. **The same run against the pre-fix code produced the "not a
+  valid fleet board backup" alert and left the board at 60** — the failure the
+  live site has been giving
 - **Driven in a 390px, 800px and 1180px Chromium, 56 checks, zero console
   errors** — a script, not a test suite, so the tests carry the guarantees:
   - six links in one row at 1180 and **two full rows of three at 390**; no
@@ -265,24 +300,33 @@ page was one line because of this.
    shell once. Then put it in airplane mode and open ⚙ SETTINGS: it loads.
 9. **Open LOG DEFECT, choose Engine → Check engine light.** Four symptom
    boxes; tick COOLANT LEVEL SENSOR and the tan TSB appears under the note.
+10. **On the Facility Map, ACTIONS → EXPORT ALL DATA, then IMPORT ALL DATA
+    with the file it just wrote.** It asks first, then says *Board backup
+    imported successfully* with the bus count. Before this release the same
+    press said the file was not a valid backup. Do this on a phone too — it
+    is the phone restore path.
 
 ## The way back
 
-Measured in a throwaway worktree from `ca5cec0`, not assumed:
+Measured in a throwaway worktree from `6d62787`, not assumed:
 
+- **Do not revert `6d62787`.** It is the import fix; taking it out puts IMPORT
+  ALL DATA back to throwing. It does revert cleanly on its own, which is the
+  only reason to say so.
 - `git revert ca5cec0` alone is **clean** — the sections stop collapsing and
   everything else stays.
-- `git revert ca5cec0 e89d17b` (newest first) is **clean** — it removes the
-  Settings page, puts every gear and MERGE DUPES back where they were, and
+- `git revert 6d62787 ca5cec0 e89d17b` (newest first) is **clean** — it removes
+  the Settings page, puts every gear and MERGE DUPES back where they were, and
   drops the cache name to `v4`. Phones re-download the shell once more.
-  **`e89d17b` alone conflicts** now, because `ca5cec0` edited the same three
-  files; take the two together.
-- `git revert ca5cec0 e89d17b e9bfc30` is clean.
+  `e89d17b` alone conflicts, because `ca5cec0` edited the same files; if the
+  Settings page has to go, keep the fix by reverting the pair and then
+  re-applying `6d62787` — it is one word in one import line.
+- `git revert 6d62787 ca5cec0 e89d17b e9bfc30` is clean.
 - **`38e3365` or `35f9006` alone conflict** in `tests/rendered-html.test.mjs`
   (and `35f9006` in `app/defect-log/page.tsx`) because later commits edited the
-  same lines — measured from `e89d17b`, and `ca5cec0` touches none of those
-  files. To take those out, revert **all five, newest first**:
-  `git revert ca5cec0 e89d17b e9bfc30 38e3365 35f9006` — clean.
+  same lines — measured from `e89d17b`; no later commit touches those files. To
+  take those out, revert **all six, newest first**:
+  `git revert 6d62787 ca5cec0 e89d17b e9bfc30 38e3365 35f9006` — clean.
 
 No migration to undo in any case. A record that already carries a symptom
 added in `35f9006` keeps the stored string, harmlessly ignored, and it
@@ -299,7 +343,7 @@ reappears if the box comes back.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 150 | Live | <published tip hash> | Every setting in the app lives on one Settings page, the sixth link in the nav behind the gear, one large section per page rendering that page's own panel inline, with every write merging over what the key already holds; the per-page gears are gone and the Facility Map's button is ACTIONS, holding only backup and transfer, repair cleanup, create and renumber; MERGE DUPES moves to the Settings page with its live count on the button and an UNDO MERGE; Fixed Repairs' appearance is shown to be the Defect Log's, driven from one state so neither can overwrite the other; the service worker pre-caches /settings (shell cache v5, one re-download); a repair can carry a Technical Service Bulletin under its note, the first one for the coolant level sensor, and Low oil and Coolant level sensor are check-engine symptoms; ALL on the Defect Log clears the search box; and the page nav is drawn from one list instead of five copies |
+| 150 | Live | <published tip hash> | IMPORT ALL DATA on the Facility Map restores a backup again — since Aug 31 it had thrown on a missing import and reported the file as invalid, and a test now checks that every storage function a file calls is one it imports; every setting in the app lives on one Settings page, the sixth link in the nav behind the gear, one collapsible section per page rendering that page's own panel inline with FACILITY MAP open by default, with every write merging over what the key already holds; the per-page gears are gone and the Facility Map's button is ACTIONS, holding only backup and transfer, repair cleanup, create and renumber; MERGE DUPES moves to the Settings page with its live count on the button and an UNDO MERGE; Fixed Repairs' appearance is shown to be the Defect Log's, driven from one state so neither can overwrite the other; the service worker pre-caches /settings (shell cache v5, one re-download); a repair can carry a Technical Service Bulletin under its note, the first one for the coolant level sensor, and Low oil and Coolant level sensor are check-engine symptoms; ALL on the Defect Log clears the search box; and the page nav is drawn from one list instead of five copies |
 ```
 
 ---
