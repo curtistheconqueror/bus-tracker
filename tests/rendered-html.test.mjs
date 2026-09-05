@@ -3168,6 +3168,41 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const id of ["down-sheet","defect-log","fixed-repairs"])assert.match(html,new RegExp('<div id="'+id+'-body" class="settings-section-body" hidden=""'),id+" renders closed");
 });
 
+test("every storage function a page calls is one it imports, so IMPORT ALL DATA can run at all",async()=>{
+ /* Found by the type checker, confirmed in the source, not inferred: the commit
+    of 2026-08-31 that added the save-failure banner swapped the map's import
+    to writeFleetStorageResult and left three bare writeFleetStorage(...) calls
+    behind - the map's IMPORT ALL DATA among them. A bundler does not check free
+    identifiers, so the build passed and the button threw a ReferenceError the
+    moment somebody tried to restore a phone from a backup. Nothing in the gate
+    asked the type checker. This asks the one question that matters: does every
+    file that calls a storage function import it. */
+ const storage=await readFile(new URL("../app/storage.ts",import.meta.url),"utf8");
+ const exported=[...storage.matchAll(/^export (?:async )?function ([A-Za-z]+)/gm)].map(match=>match[1]);
+ assert.ok(exported.includes("writeFleetStorage")&&exported.length>10,"the storage module's functions are read off its source, not listed here");
+ const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(entry=>
+  entry.isDirectory()?walk(new URL(entry.name+"/",dir)):/\.(ts|tsx)$/.test(entry.name)?[new URL(entry.name,dir)]:[]))).flat();
+ const files=await walk(new URL("../app/",import.meta.url));
+ let checked=0;
+ for(const file of files){
+  const source=await readFile(file,"utf8");
+  const imports=[...source.matchAll(/import \{([^}]*)\} from "(?:\.\.\/|\.\/)+storage"/g)];
+  if(!imports.length)continue;
+  const locals=new Set(imports.flatMap(match=>match[1].split(",").map(item=>item.trim().replace(/^type /,"")).filter(Boolean).map(item=>item.split(/\s+as\s+/).pop())));
+  for(const name of exported){
+   if(!new RegExp("(^|[^.\\w])"+name+"\\(").test(source))continue;
+   checked++;
+   assert.ok(locals.has(name),file.pathname.split("/app/")[1]+" calls "+name+"() without importing it - a ReferenceError waiting for the first press");
+  }
+ }
+ assert.ok(checked>=20,"expected to check many call sites, checked "+checked);
+ /* And the one that was broken, by name: the map imports the guarded writer
+    and IMPORT ALL DATA restores the board through it. */
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(map,/import \{[^}]*\bwriteFleetStorage\b[^}]*\} from "\.\/storage"/);
+ assert.match(map,/if\(!writeFleetStorage\(localStorage,imported,\{allowBulkDefectLoss:true\}\)\)throw new Error\("storage-write"\)/);
+});
+
 test("ALL means everything, including whatever is in the search box",async()=>{
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
 
