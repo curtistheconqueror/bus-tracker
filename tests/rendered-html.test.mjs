@@ -396,7 +396,9 @@ test("Every row of a real Pace South down sheet lands in the right band", () => 
     ["34",row("17569","ROARING and excessive play in differential"),"unscheduled"],
     ["36",row("17535","ACCIDENT BUS - TOWED - 08/04/26"),"unscheduled"],
     // Rows 38-48: the inspection block the paper sheet already groups at the bottom.
-    ["38",row("17550","B12 / STEERING SHAKES AT 35 MPH"),"inspection"],
+    // A B12 with a steering complaint written beside it. The B12 does not stop
+    // the shake from being a fault, so the bus counts as down.
+    ["38",row("17550","B12 / STEERING SHAKES AT 35 MPH"),"unscheduled"],
     ["39",row("15510","A15"),"inspection"],
     ["41",row("15512","B18"),"inspection"],
     ["43",row("18510","A21"),"inspection"],
@@ -424,6 +426,33 @@ test("Every row of a real Pace South down sheet lands in the right band", () => 
   // vendor is still off property.
   assert.equal(downSheetGroup(row("17996","A15","Bus & Truck")),"off-property");
   assert.equal(downSheetGroup(row("17995","A15","RJ"),"offsite-2"),"off-property");
+
+  /* Bus 17514 is on this sheet twice: once for MISFIRES with JEVELL on it, and
+     again on the PM'S line. A bus gets one row, so those fold together — and
+     the fold must not file a live misfire under scheduled maintenance, which is
+     how a real breakdown would drop out of the down count. */
+  assert.equal(downSheetGroup(row("17514","MISFIRES / PM'S","JEVELL")),"scheduled");
+  assert.equal(downSheetGroup(row("17514","PM'S / MISFIRES","JEVELL")),"scheduled","which row was photographed first must not decide it");
+  assert.equal(downSheetGroup(row("17514","MISFIRES","JEVELL")),"scheduled");
+  assert.equal(downSheetGroup(row("17514","PM'S")),"inspection");
+  // Scheduled work reached through repairItems folds the same way.
+  assert.equal(downSheetGroup({busNumber:"17514",assignmentType:"Mechanic",assignedTo:"JEVELL",section:"Inspection",repairItems:[{category:"Inspection",repair:"PM'S",details:""},{category:"Engine",repair:"Misfire",details:"cylinder 5"}]}),"scheduled","a stated Inspection section must not outrank a fault written on the row");
+  // Leftovers that are not complaints: the bus numbers on a PM line, and
+  // punctuation left behind by the apostrophe in PM'S.
+  assert.equal(downSheetGroup(row("17514","PM'S 17514 17556 17525 17551")),"inspection");
+  // A row with nothing written on it still honours an explicit Inspection section.
+  assert.equal(downSheetGroup({busNumber:"17993",repair:"",customReason:"",section:"Inspection",assignmentType:"Mechanic",assignedTo:""}),"inspection");
+
+  /* The app's own stand-ins are not complaints. normalizeEntry stamps
+     "Repair required" into the repair field and into every repair item of an
+     entry that arrives without one, so this is the exact shape an inspection
+     row has after a round trip through storage. Reading that phrase as a
+     written fault put every inspection back in the down count: the built app
+     showed INSPECTIONS 0 against data that scored 16 in isolation. */
+  assert.equal(downSheetGroup({busNumber:"17992",category:"Miscellaneous",repair:"Repair required",customReason:"A15",assignmentType:"Mechanic",assignedTo:"",section:"Pending",repairItems:[{category:"Miscellaneous",repair:"Repair required",details:"A15"}]}),"inspection");
+  assert.equal(downSheetGroup({busNumber:"17991",category:"Miscellaneous",repair:"Repair required",customReason:"PM'S",assignmentType:"Mechanic",assignedTo:"",section:"Pending",repairItems:[{category:"Miscellaneous",repair:"Repair required",details:"PM'S"}]}),"inspection");
+  // But a real fault beside the placeholder is still a real fault.
+  assert.equal(downSheetGroup({busNumber:"17990",category:"Miscellaneous",repair:"Repair required",customReason:"A15 / MISFIRES",assignmentType:"Mechanic",assignedTo:"",section:"Pending"}),"unscheduled");
 });
 
 test("The Down Sheet photo import reads the four section headings the sheet is organized into", async () => {
@@ -445,20 +474,32 @@ test("The Down Sheet photo import reads the four section headings the sheet is o
   // Each band's heading, read off a photographed sheet, has to come back as the
   // section that puts the bus back in that same band.
   const rows=[
-    {heading:"OFF PROPERTY",section:"Vendor Repair",group:"off-property",assignedTo:"Bus & Truck"},
-    {heading:"SCHEDULED",section:"Scheduled Repair",group:"scheduled",assignedTo:"RJ"},
-    {heading:"UNSCHEDULED",section:"Pending",group:"unscheduled",assignedTo:""},
-    {heading:"INSPECTIONS & SCHEDULED MAINTENANCE",section:"Inspection",group:"inspection",assignedTo:""},
-    {heading:"INSPECTIONS",section:"Inspection",group:"inspection",assignedTo:""},
-    {heading:"Spark Plugs",section:"Inspection",group:"inspection",assignedTo:""},
-    {heading:"Valve Adjustment",section:"Inspection",group:"inspection",assignedTo:""},
+    {heading:"OFF PROPERTY",section:"Vendor Repair",group:"off-property",assignedTo:"Bus & Truck",repair:"Sway bar bracket weld"},
+    {heading:"SCHEDULED",section:"Scheduled Repair",group:"scheduled",assignedTo:"RJ",repair:"Brakes — Air leak"},
+    {heading:"UNSCHEDULED",section:"Pending",group:"unscheduled",assignedTo:"",repair:"Engine — Misfire"},
+    {heading:"INSPECTIONS & SCHEDULED MAINTENANCE",section:"Inspection",group:"inspection",assignedTo:"",repair:"A-15"},
+    {heading:"INSPECTIONS",section:"Inspection",group:"inspection",assignedTo:"",repair:"B18"},
+    {heading:"Spark Plugs",section:"Inspection",group:"inspection",assignedTo:"",repair:"Spark plugs"},
+    {heading:"Valve Adjustment",section:"Inspection",group:"inspection",assignedTo:"",repair:"Valve adjustment"},
+    {heading:"PM'S",section:"Inspection",group:"inspection",assignedTo:"",repair:"PM'S"},
   ];
   for(const row of rows){
-    const [record]=mergeReviewedRows([{key:"k",selected:true,fleetMatch:"matched",busId:"a",busNumber:"17505",repeatedCount:1,pageNumber:1,lineNumber:"1",reason:"",assignedTo:row.assignedTo,category:"Miscellaneous",repair:"Driver-reported defect",section:row.heading,shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""}]);
+    const [record]=mergeReviewedRows([{key:"k",selected:true,fleetMatch:"matched",busId:"a",busNumber:"17505",repeatedCount:1,pageNumber:1,lineNumber:"1",reason:"",assignedTo:row.assignedTo,category:"Miscellaneous",repair:row.repair,section:row.heading,shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""}]);
     assert.equal(record.section,row.section,row.heading+" was read as "+record.section);
     const assignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic";
     assert.equal(downSheetGroup({busNumber:record.busNumber,category:record.category,repair:record.repair,assignmentType,assignedTo:record.assignedTo,section:record.section}),row.group,row.heading+" did not come back to its own band");
   }
+
+  /* The same rule on the scan path: two photographed rows for one bus merge
+     into the one entry a bus gets, and a fault merged with a PM is still a
+     fault. The scanner joins the reasons, so both facts reach the sheet. */
+  const [folded]=mergeReviewedRows([
+    {key:"a",selected:true,fleetMatch:"matched",busId:"a",busNumber:"17514",repeatedCount:2,pageNumber:1,lineNumber:"29",reason:"MISFIRES",assignedTo:"JEVELL",category:"Engine",repair:"Engine — Misfire",section:"UNSCHEDULED",shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""},
+    {key:"b",selected:true,fleetMatch:"matched",busId:"a",busNumber:"17514",repeatedCount:2,pageNumber:2,lineNumber:"49",reason:"PM'S",assignedTo:"",category:"Inspection",repair:"PM'S",section:"INSPECTIONS & SCHEDULED MAINTENANCE",shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""},
+  ]);
+  assert.equal(folded.reason,"MISFIRES / PM'S","both facts have to survive the fold");
+  assert.equal(folded.assignedTo,"JEVELL");
+  assert.equal(downSheetGroup({busNumber:folded.busNumber,repair:folded.repair,customReason:folded.reason,assignmentType:"Mechanic",assignedTo:folded.assignedTo,section:folded.section}),"scheduled","a bus with a live misfire must not be counted as scheduled maintenance");
 });
 test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
   const fleet = [

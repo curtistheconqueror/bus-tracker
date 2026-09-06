@@ -63,6 +63,54 @@ export const DOWN_SHEET_INSPECTION_PATTERN=/\binspections?\b|\b[abc](?:\s*-\s*)?
 export const DOWN_SHEET_VENDORS:[RegExp,string][]=[[/\bcummins\b/i,"CUMMINS"],[/\bbus\s*(?:&|and)\s*truck\b/i,"BUS & TRUCK"],[/\bthermo\s*king\b/i,"THERMO KING"],[/\ballison\b/i,"ALLISON"]];
 export const DOWN_SHEET_OFF_PROPERTY_PATTERN=/\boff[\s-]*(?:property|site)\b/i;
 
+/* What was actually written about the bus, which is not the whole row.
+
+   The bus number, the mechanic and the section are all things ABOUT the entry;
+   only these say what is wrong with it. The catalog category is left out on
+   purpose — it is a bucket the app picks, not something anybody wrote, and
+   "Miscellaneous" sitting in the text would make every row look like it carried
+   a complaint. */
+/* The app's own stand-ins for "nothing was written here". normalizeEntry stamps
+   `Repair required` into the repair field AND into every repair item of any
+   entry that arrives without one, so a row whose whole reason is `A15` comes
+   back off storage carrying that phrase. Read as a complaint it made every
+   inspection look like a bus that broke — the browser said INSPECTIONS 0 where
+   the same data said 16 in isolation, which is why this is measured against the
+   built app and not only unit-tested. */
+const REASON_PLACEHOLDERS=/^(?:repair required|repair|driver-reported defect|miscellaneous|repair required\.?)$/i;
+function reasonText(entry:DownSheetViewEntry){
+ const items=(entry.repairItems||[]).flatMap(item=>[item.repair,item.details]);
+ return [entry.repair,entry.customReason,...items]
+  .map(value=>String(value||"").trim())
+  .filter(value=>value&&!REASON_PLACEHOLDERS.test(value))
+  .join(" / ").toLowerCase();
+}
+const INSPECTION_STRIPPER=new RegExp(DOWN_SHEET_INSPECTION_PATTERN.source,"gi");
+
+/* Is scheduled maintenance ALL this row carries?
+
+   A bus can be on the sheet twice — once for a fault and once because a PM came
+   due — and the sheet folds those into the one row a bus is allowed. Asking
+   only "does this row mention a PM" then filed a bus with a live misfire under
+   inspections, and a real breakdown vanished out of the down count. That is the
+   one thing this page must never do.
+
+   So the maintenance wording is struck out and whatever is left is examined. If
+   anything with words in it survives, somebody wrote a complaint here and the
+   bus is down; leftover punctuation and bus numbers are not a complaint. Both
+   facts still show on the row — the reason keeps saying MISFIRES / PM'S — it is
+   only the counting that has to pick one, and it picks the fault.
+
+   PM DEFECTS needs no special case here: the maintenance pattern already
+   refuses to match it, so those rows never reach this question. */
+export function downSheetScheduledOnly(entry:DownSheetViewEntry){
+ const written=reasonText(entry);
+ if(!written)return entry.section==="Inspection";
+ if(!DOWN_SHEET_INSPECTION_PATTERN.test(written))return false;
+ const remainder=written.replace(INSPECTION_STRIPPER," ").replace(/[^a-z0-9]+/g," ");
+ return !/[a-z]{3}/.test(remainder);
+}
+
 /* Precedence, which is deliberately NOT the reading order above.
 
    Where the bus physically is beats everything: a bus sitting at Bus & Truck is
@@ -82,7 +130,7 @@ export function downSheetGroup(entry:DownSheetViewEntry,location=""):DownSheetGr
     send it off property. */
  if(DOWN_SHEET_VENDORS.some(([pattern])=>pattern.test(String(entry.assignedTo||""))))return "off-property";
  if(DOWN_SHEET_OFF_PROPERTY_PATTERN.test(entryText(entry)))return "off-property";
- if(entry.section==="Inspection"||DOWN_SHEET_INSPECTION_PATTERN.test(entryText(entry)))return "inspection";
+ if(downSheetScheduledOnly(entry))return "inspection";
  return String(entry.assignedTo||"").trim()?"scheduled":"unscheduled";
 }
 
