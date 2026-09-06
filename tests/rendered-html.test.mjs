@@ -462,7 +462,8 @@ test("The Down Sheet photo import reads the four section headings the sheet is o
   for(const heading of ["OFF PROPERTY","SCHEDULED","UNSCHEDULED","INSPECTIONS & SCHEDULED MAINTENANCE"]){
     assert.ok(route.includes(heading), "the scan prompt never names the "+heading+" band");
   }
-  assert.match(route, /pencilled into the margins/);
+  assert.match(route, /pencilled in the margins/);
+  assert.match(route, /EVERY bus number written anywhere on the sheet MUST produce a row/);
 
   // The reviewer is told which band each scanned row lands in BEFORE importing,
   // read from the same two functions the sheet uses so the two cannot drift.
@@ -8588,7 +8589,10 @@ test("the catalog carries the service codes and the hazmat condition the sheet a
 
  const route=await readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8");
  assert.match(route,/HAZMAT means a biohazard on board/);
- assert.match(route,/Every printed line number that has a bus number beside it MUST produce a row/);
+ assert.match(route,/EVERY bus number written anywhere on the sheet MUST produce a row/);
+ // Handwritten rows have no line number, so they have to be named as loudly as
+ // the printed ones or the emphasis on line numbers pushes them out.
+ assert.match(route,/lineNumber set to "margin"/);
 });
 
 test("a scanned row the model had to guess at is flagged even when its bus number resolves",async()=>{
@@ -8677,4 +8681,65 @@ test("live sync is a doorbell, not a delivery",async()=>{
  // and live sync runs with nobody watching.
  assert.match(liveSource,/allowBulkDefectLoss:false/);
  assert.equal(typeof announceStoredChange,"function");
+});
+
+test("the scan corrects what the camera misread, and never touches what it must not",async()=>{
+ const {correctScannedText,knownMechanicNames}=await import("../app/down-sheet/scan-spelling.ts");
+ const {isMarginRow,reviewScannedRows}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+
+ /* The shop's own mechanics, learned from entries the device already holds. A
+    fixed word list turns TIROS into TIRES; only the shop's history turns CAROS
+    back into CARLOS. */
+ const names=knownMechanicNames([{assignedTo:"CARLOS"},{assignedTo:"MAUI/ GILBERT"},{assignedTo:"JEVELL"}]);
+ assert.deepEqual(names.sort(),["carlos","gilbert","jevell","maui"]);
+ // A bay number is not a person.
+ assert.deepEqual(knownMechanicNames([{assignedTo:"BAY 12"},{assignedTo:"EJ"}]),[]);
+
+ assert.equal(correctScannedText("FRONT TIROS/COOLANT LEAK",names),"FRONT TIRES/COOLANT LEAK");
+ assert.equal(correctScannedText("CAROS",names),"CARLOS");
+ // A swapped pair is the commonest handwriting error and scores 2 under plain
+ // Levenshtein, which would put it out of reach for a five-letter word.
+ assert.equal(correctScannedText("RAMP CHIAN BROKEN",names),"RAMP CHAIN BROKEN");
+ assert.equal(correctScannedText("Not Building Air Presure",names),"Not Building Air Pressure");
+ // Casing is preserved rather than prettified.
+ assert.equal(correctScannedText("tiros",names),"tires");
+
+ /* The things it must never touch. A spell-corrector loose on a maintenance
+    sheet is how a real part number becomes a plausible wrong one. */
+ for(const safe of ["A21","A3","B18","17565","15502","HAZMAT BAY 12","BRAKES Grinding HARD TO STOP.","B12 / STEERING SHAKES AT 35 MPH"])
+  assert.equal(correctScannedText(safe,names),safe,safe+" must be left exactly as written");
+ // Nothing with a digit in it, ever — that is where bus and part numbers live.
+ assert.equal(correctScannedText("R/C 17565 TOWED",names),"R/C 17565 TOWED");
+ // A word already correct is never "improved".
+ assert.equal(correctScannedText("BRAKES",names),"BRAKES");
+
+ /* Two candidates means the guess is a coin toss, so nothing is changed. This
+    is the rule that stops a confident wrong correction, which is worse than no
+    correction at all: "tirs" sits one edit from both "tire" and "tires". */
+ assert.equal(correctScannedText("TIRS",names),"TIRS");
+ assert.equal(correctScannedText("HOSS",names),"HOSS");
+
+ /* A row written by hand outside the table has no printed line number — and is
+    the kind that comes back wrong: FRONT TIROS, CAROS, and a 17565 read as
+    17563, which is a real bus too, so it resolved and looked certain. */
+ assert.equal(isMarginRow({lineNumber:"margin"}),true);
+ assert.equal(isMarginRow({lineNumber:""}),true);
+ assert.equal(isMarginRow({lineNumber:"23"}),false);
+
+ const row=(lineNumber,busNumber,reason,confidence)=>({pageNumber:1,lineNumber,busNumber,reason,assignedTo:"",category:"",repair:"",section:"",shift:"1st",operationalStatus:"out",confidence,reviewNote:""});
+ const reviewed=reviewScannedRows([
+  row("23","17510","BRAKES",0.99),
+  row("margin","17565","FRONT TIROS",0.95),
+ ],[{id:"a",n:"17510"},{id:"b",n:"17565"}],names);
+ // A margin row is capped under the review threshold whatever the model claimed.
+ assert.equal(reviewed[0].confidence,0.99,"a printed row keeps its own confidence");
+ assert.ok(reviewed[1].confidence<=0.6,"a margin row is always one to check");
+ assert.equal(reviewed[1].reason,"FRONT TIRES","the correction reaches the reviewer");
+
+ /* My own previous prompt change stressed "every printed line number", which the
+    margin rows do not have — so the instruction has to name them just as loudly. */
+ const route=await readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8");
+ assert.match(route,/EVERY bus number written anywhere on the sheet MUST produce a row/);
+ assert.match(route,/lineNumber set to "margin"/);
+ assert.match(route,/a bus written in the margin and not read reaches nobody/);
 });

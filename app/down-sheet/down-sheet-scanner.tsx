@@ -2,7 +2,8 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
-import {describeLineGaps,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {knownMechanicNames} from "./scan-spelling";
 import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
@@ -76,7 +77,10 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     if(!response.ok){if(response.status===413)throw new Error(`Page ${index+1} is still too large. Retake it closer to the sheet.`);throw new Error(payload.error||`Page ${index+1} could not be processed.`)}
     scanned.push(...(Array.isArray(payload.rows)?payload.rows:[]).map(row=>({...row,pageNumber:index+1})));
    }
-   const reviewed=reviewScannedRows(scanned,fleet).map(row=>({...row,shift:row.shift||defaultShift}));
+   /* The shop's own mechanics, read off the entries this device already holds.
+      A fixed word list can turn TIROS into TIRES; only the shop's own history
+      can turn CAROS back into CARLOS. */
+   const reviewed=reviewScannedRows(scanned,fleet,knownMechanicNames(currentEntries)).map(row=>({...row,shift:row.shift||defaultShift}));
    setRows(reviewed);
    if(!reviewed.length)setError("No bus repair rows were found. Try a clearer photo.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
@@ -117,7 +121,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
       const unsure=row.confidence<LOW_CONFIDENCE;
       return <article className={`scan-row ${row.fleetMatch}${unsure?" unsure":""}`} key={row.key}>
        <label className="scan-select"><input type="checkbox" checked={row.selected} disabled={row.fleetMatch!=="matched"} onChange={event=>updateRow(row.key,{selected:event.target.checked})}/><span/></label>
-       <div className="scan-bus"><small>P{row.pageNumber} · L{row.lineNumber||"?"}</small><b>{row.busNumber||"NO BUS"}</b><em>{row.fleetMatch==="matched"?row.repeatedCount>1?`${row.repeatedCount} ROWS · MERGED`:"FLEET MATCH":row.fleetMatch==="duplicate"?"DUPLICATE FLEET NUMBER":"NOT IN FLEET"}</em>{unsure&&<u>CHECK THIS ROW &middot; {Math.round(row.confidence*100)}% SURE</u>}</div>
+       <div className="scan-bus"><small>P{row.pageNumber} · {isMarginRow(row)?"MARGIN":"L"+row.lineNumber}</small><b>{row.busNumber||"NO BUS"}</b><em>{row.fleetMatch==="matched"?row.repeatedCount>1?`${row.repeatedCount} ROWS · MERGED`:"FLEET MATCH":row.fleetMatch==="duplicate"?"DUPLICATE FLEET NUMBER":"NOT IN FLEET"}</em>{unsure&&<u>CHECK THIS ROW &middot; {Math.round(row.confidence*100)}% SURE</u>}</div>
        <label className="scan-reason">REASON<input value={row.reason} onChange={event=>updateRow(row.key,{reason:event.target.value})}/>{row.reviewNote&&<small>{row.reviewNote}</small>}</label>
        <label>CATEGORY<select value={row.category in REPAIR_OPTIONS?row.category:"Miscellaneous"} onChange={event=>updateRow(row.key,{category:event.target.value,repair:REPAIR_OPTIONS[event.target.value][0]})}>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
        <label>REPAIR<select value={repairs.includes(row.repair)?row.repair:repairs[0]} onChange={event=>updateRow(row.key,{repair:event.target.value})}>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>

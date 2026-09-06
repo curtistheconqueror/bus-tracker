@@ -1,4 +1,5 @@
 import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS} from "./down-sheet-view.ts";
+import {correctScannedText} from "./scan-spelling.ts";
 
 export type ScanStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -83,14 +84,29 @@ export function describeLineGaps(gaps:number[]):string{
  return runs.join(", ");
 }
 
-export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[]):ReviewedScanRow[]{
+/* A row written by hand outside the table. It has no printed line number, which
+   is also why it is the kind most often misread: FRONT TIROS, CAROS, and a
+   17565 that came back as 17563. Whatever the model says about its own
+   certainty, a margin row is one to look at. */
+export function isMarginRow(row:{lineNumber?:string}){
+ const line=String(row?.lineNumber??"").trim().toLowerCase();
+ return line===""||line==="margin";
+}
+
+export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[],vocabulary:string[]=[]):ReviewedScanRow[]{
  const fleetByNumber=new Map<string,ScanFleetBus[]>();
  for(const bus of fleet){const number=busDigits(bus.n);if(!number)continue;fleetByNumber.set(number,[...(fleetByNumber.get(number)||[]),bus])}
  const scanCounts=new Map<string,number>();
  for(const row of rows){const number=busDigits(row.busNumber);if(number)scanCounts.set(number,(scanCounts.get(number)||0)+1)}
  return rows.map((row,index)=>{
   const busNumber=busDigits(row.busNumber),matches=fleetByNumber.get(busNumber)||[],fleetMatch=matches.length===1?"matched":matches.length>1?"duplicate":"unknown";
-  return {...row,busNumber,key:`scan-${row.pageNumber||1}-${row.lineNumber||index+1}-${index}`,selected:fleetMatch==="matched",fleetMatch,busId:fleetMatch==="matched"?matches[0].id:"",repeatedCount:scanCounts.get(busNumber)||1};
+  /* Corrected before anybody reads it, and still editable afterwards. A margin
+     row is capped below the review threshold whatever the model claimed: it was
+     handwritten and unnumbered, and those are the rows that come back wrong. */
+  const confidence=isMarginRow(row)?Math.min(Number(row.confidence)||0,0.6):row.confidence;
+  return {...row,busNumber,confidence,
+   reason:correctScannedText(row.reason,vocabulary),
+   assignedTo:correctScannedText(row.assignedTo,vocabulary),key:`scan-${row.pageNumber||1}-${row.lineNumber||index+1}-${index}`,selected:fleetMatch==="matched",fleetMatch,busId:fleetMatch==="matched"?matches[0].id:"",repeatedCount:scanCounts.get(busNumber)||1};
  });
 }
 
