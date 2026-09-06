@@ -39,7 +39,7 @@ import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, 
 import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterMatch } from "../app/quick-filters.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
-import { downSheetWorkGroup, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
+import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
@@ -307,6 +307,100 @@ test("Down Sheet supports search, bus ordering, work groups, and explicit note s
   assert.match(page, /Unsaved changes/);
   assert.match(css, /\.down-view-controls\{/);
   assert.match(css, /\.work-group-row/);
+});
+
+test("Down Sheet divides itself into off property, scheduled, unscheduled and inspection bands by default", async () => {
+  assert.deepEqual(DOWN_SHEET_GROUPS.map(group=>group.key),["off-property","scheduled","unscheduled","inspection"]);
+  assert.equal(downSheetGroupLabel("inspection"),"INSPECTIONS & SCHEDULED MAINTENANCE");
+  assert.equal(downSheetGroupRank("off-property"),0);
+  assert.equal(downSheetGroupRank("inspection"),3);
+
+  // Precedence is off property, then what the work is, then who has it.
+  const atVendor={busId:"a",busNumber:"17520",category:"Inspection",repair:"A-15",assignmentType:"Mechanic",assignedTo:"RJ",section:"Inspection"};
+  assert.equal(downSheetGroup(atVendor,"offsite-3"),"off-property","a bus parked off property is off property whatever the work is");
+  assert.equal(downSheetGroup(atVendor,"garage-4"),"inspection","in the yard the same bus is an inspection");
+  assert.equal(downSheetGroup({busNumber:"15505",category:"Transmission",repair:"Shift fault",assignmentType:"Vendor",assignedTo:"Allison"}),"off-property");
+  assert.equal(downSheetGroup({busNumber:"15506",category:"Engine",repair:"Misfire",assignmentType:"Mechanic",assignedTo:"",section:"Vendor Repair"}),"off-property");
+  assert.equal(downSheetGroup({busNumber:"15507",category:"Engine",repair:"Misfire",assignmentType:"Mechanic",assignedTo:"TB",section:"Pending"}),"scheduled");
+  // The pencilled-in overflow rows: a real repair with no name beside it.
+  assert.equal(downSheetGroup({busNumber:"15508",category:"Brakes",repair:"Air leak",assignmentType:"Mechanic",assignedTo:"",section:"Pending"}),"unscheduled");
+  assert.equal(downSheetGroup({busNumber:"15509",category:"Miscellaneous",repair:"Spark plugs",assignmentType:"Mechanic",assignedTo:""}),"inspection");
+  assert.equal(downSheetGroup({busNumber:"15510",category:"Miscellaneous",repair:"Valve adjustment",assignmentType:"Mechanic",assignedTo:""}),"inspection");
+  // An inspection with nobody on it is still an inspection, not an unscheduled breakdown.
+  assert.equal(downSheetGroup({busNumber:"15511",category:"Inspection",repair:"B-12",assignmentType:"Mechanic",assignedTo:""}),"inspection");
+
+  const entries=[
+    {id:"1",busId:"a",busNumber:"18510",category:"Engine",repair:"Misfire",assignmentType:"Mechanic",assignedTo:"",section:"Pending"},
+    {id:"2",busId:"b",busNumber:"18505",category:"Inspection",repair:"A-15",assignmentType:"Mechanic",assignedTo:"RJ",section:"Inspection"},
+    {id:"3",busId:"c",busNumber:"18520",category:"Transmission",repair:"Rebuild",assignmentType:"Vendor",assignedTo:"Allison",section:"Vendor Repair"},
+    {id:"4",busId:"d",busNumber:"18515",category:"Brakes",repair:"Air leak",assignmentType:"Mechanic",assignedTo:"TB",section:"Pending"},
+    {id:"5",busId:"e",busNumber:"18501",category:"Body Shop",repair:"Panel repair",assignmentType:"Mechanic",assignedTo:"",section:"Pending"},
+  ];
+  const groups=groupDownSheetEntries(entries,"number-asc",{a:"garage-1",b:"garage-2",c:"offsite-0",d:"bay-3",e:"body-0"});
+  assert.deepEqual(groups.map(group=>group.key),["off-property","scheduled","unscheduled","inspection"]);
+  assert.deepEqual(groups.map(group=>group.entries.map(entry=>entry.busNumber)),[["18520"],["18515"],["18501","18510"],["18505"]]);
+  // Every visible row lands in exactly one band: the counts add up to the sheet.
+  assert.equal(groups.reduce((total,group)=>total+group.entries.length,0),entries.length);
+  // ORDER re-sorts inside a band; it never dissolves the bands or moves a row between them.
+  const reordered=groupDownSheetEntries(entries,"number-desc",{a:"garage-1",b:"garage-2",c:"offsite-0",d:"bay-3",e:"body-0"});
+  assert.deepEqual(reordered.map(group=>group.key),groups.map(group=>group.key));
+  assert.deepEqual(reordered.map(group=>group.entries.length),groups.map(group=>group.entries.length));
+  assert.deepEqual(reordered[2].entries.map(entry=>entry.busNumber),["18510","18501"]);
+
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  assert.match(page, /down-group-counts/);
+  assert.match(page, /TOTAL ON SHEET/);
+  assert.match(page, /down-group-row group-/);
+  // The band rules ask where the bus is, so the page has to hand them the map's
+  // own location by bus id. Grouping on the entry alone would silently drop the
+  // off-property rule to whatever the paper sheet happened to say.
+  assert.match(page, /fleet\.map\(bus=>\[bus\.id,bus\.l\|\|""\]\)/);
+  assert.match(page, /groupDownSheetEntries\([\s\S]{0,400}?,order,locations\)/);
+  // The dividers are not conditional on an ordering the way the work-category ones are.
+  assert.doesNotMatch(page, /order==="category"&&group\.label/);
+  assert.match(css, /\.down-table \.down-group-row td\{/);
+  assert.match(css, /\.down-group-counts\{/);
+  // The band colours must be defined at the top level, not only inside a phone breakpoint.
+  const topLevel=css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,"");
+  for(const key of DOWN_SHEET_GROUPS.map(group=>group.key)){
+    assert.match(topLevel, new RegExp("\\.down-group-row\\.group-"+key), key+" divider has no colour outside a media query");
+  }
+});
+
+test("The Down Sheet photo import reads the four section headings the sheet is organized into", async () => {
+  const route = await readFile(new URL("../app/api/down-sheet-scan/route.ts", import.meta.url), "utf8");
+  assert.match(route, /A heading is never a bus row/);
+  for(const heading of ["OFF PROPERTY","SCHEDULED","UNSCHEDULED","INSPECTIONS & SCHEDULED MAINTENANCE"]){
+    assert.ok(route.includes(heading), "the scan prompt never names the "+heading+" band");
+  }
+  assert.match(route, /pencilled into the margins/);
+
+  // The reviewer is told which band each scanned row lands in BEFORE importing,
+  // read from the same two functions the sheet uses so the two cannot drift.
+  const scanner = await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8");
+  assert.match(scanner, /downSheetGroup,downSheetGroupLabel/);
+  assert.match(scanner, />GOES TO </);
+  const scanCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  assert.match(scanCss.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,""), /\.scan-row \.scan-band\{grid-column:1\/-1/);
+
+  // Each band's heading, read off a photographed sheet, has to come back as the
+  // section that puts the bus back in that same band.
+  const rows=[
+    {heading:"OFF PROPERTY",section:"Vendor Repair",group:"off-property",assignedTo:"Bus & Truck"},
+    {heading:"SCHEDULED",section:"Scheduled Repair",group:"scheduled",assignedTo:"RJ"},
+    {heading:"UNSCHEDULED",section:"Pending",group:"unscheduled",assignedTo:""},
+    {heading:"INSPECTIONS & SCHEDULED MAINTENANCE",section:"Inspection",group:"inspection",assignedTo:""},
+    {heading:"INSPECTIONS",section:"Inspection",group:"inspection",assignedTo:""},
+    {heading:"Spark Plugs",section:"Inspection",group:"inspection",assignedTo:""},
+    {heading:"Valve Adjustment",section:"Inspection",group:"inspection",assignedTo:""},
+  ];
+  for(const row of rows){
+    const [record]=mergeReviewedRows([{key:"k",selected:true,fleetMatch:"matched",busId:"a",busNumber:"17505",repeatedCount:1,pageNumber:1,lineNumber:"1",reason:"",assignedTo:row.assignedTo,category:"Miscellaneous",repair:"Driver-reported defect",section:row.heading,shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""}]);
+    assert.equal(record.section,row.section,row.heading+" was read as "+record.section);
+    const assignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic";
+    assert.equal(downSheetGroup({busNumber:record.busNumber,category:record.category,repair:record.repair,assignmentType,assignedTo:record.assignedTo,section:record.section}),row.group,row.heading+" did not come back to its own band");
+  }
 });
 test("AI operator plans safe tracker and down-sheet actions with number-smart resolution", () => {
   const fleet = [

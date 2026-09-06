@@ -315,3 +315,57 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-controls>.down-primary-action{grid-column:1/-1;width:100%;min-height:52px;font-size:15px}
  .down-more{grid-column:1/-1}
 }
+
+/* ---- Down Sheet section bands -------------------------------------------
+   Appended at the top level on purpose. Rules dropped in beside a
+   `@media(max-width:760px)` block earlier in this file silently landed INSIDE
+   it, and a divider that only has a colour on a phone is worse than none. The
+   phone overrides below open their own block. */
+.down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.down-group-counts .group-count{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1px solid #b7c3d7;border-radius:7px;background:#fff;text-align:center}
+.down-group-counts .group-count strong{font-size:20px;font-weight:900;line-height:1;color:#173e73}
+.down-group-counts .group-count span{font-size:7px;font-weight:900;letter-spacing:.5px;color:#526481;line-height:1.15}
+.down-group-counts .group-count.total{border-color:#0b63ce;background:#eaf4ff}
+.down-group-counts .group-count.total strong{color:#075dbb;font-size:23px}
+.down-group-counts .group-count.group-off-property{border-color:#c78a2a;background:#fdf5e6}
+.down-group-counts .group-count.group-off-property strong{color:#8a5600}
+.down-group-counts .group-count.group-scheduled{border-color:#4f9a63;background:#eef8f0}
+.down-group-counts .group-count.group-scheduled strong{color:#1f6b37}
+.down-group-counts .group-count.group-unscheduled{border-color:#c15a55;background:#fdeeed}
+.down-group-counts .group-count.group-unscheduled strong{color:#992722}
+.down-group-counts .group-count.group-inspection{border-color:#8a6bbf;background:#f4effc}
+.down-group-counts .group-count.group-inspection strong{color:#5a3491}
+
+.down-table .down-group-row td{height:34px;padding:6px 10px;border-top:3px solid #7d90ad;border-bottom:1px solid #7d90ad;background:#d3e0f2!important;color:#12325f;font-size:10px;font-weight:900;letter-spacing:.7px}
+.down-table .down-group-row td>b{font-size:11px;font-weight:900}
+.down-table .down-group-row td>i{display:inline-block;min-width:22px;margin-left:8px;padding:1px 6px;border-radius:9px;background:#12325f;color:#fff;font-style:normal;font-size:9px;font-weight:900;text-align:center}
+.down-table .down-group-row td>span{margin-left:10px;font-size:8px;font-weight:700;letter-spacing:.3px;opacity:.75;text-transform:none}
+.down-table .down-group-row.group-off-property td{border-color:#c78a2a;background:#f7e7c8!important;color:#6f4400}
+.down-table .down-group-row.group-off-property td>i{background:#6f4400}
+.down-table .down-group-row.group-scheduled td{border-color:#4f9a63;background:#d9efdf!important;color:#17552b}
+.down-table .down-group-row.group-scheduled td>i{background:#17552b}
+.down-table .down-group-row.group-unscheduled td{border-color:#c15a55;background:#f8dcda!important;color:#7f1d18}
+.down-table .down-group-row.group-unscheduled td>i{background:#7f1d18}
+.down-table .down-group-row.group-inspection td{border-color:#8a6bbf;background:#e8dffa!important;color:#4b2a80}
+.down-table .down-group-row.group-inspection td>i{background:#4b2a80}
+
+@media(max-width:900px){.down-group-counts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){
+ .down-group-counts{margin:0 8px 8px;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .down-group-counts .group-count.total{grid-column:1/-1}
+ .down-group-counts .group-count span{font-size:9px}
+ .down-group-counts .group-count strong{font-size:22px}
+ .down-table .down-group-row td{height:auto;padding:8px 10px}
+ .down-table .down-group-row td>span{display:none}
+}
+
+/* Where a scanned row will land, said on the row itself. Top level, and it
+   spans the whole grid so it reads as a footer to the row rather than a
+   seventh column squeezed in beside MECHANIC / VENDOR. */
+.scan-row .scan-band{grid-column:1/-1;margin:2px 0 0;padding:4px 8px;border-radius:5px;background:#eef2f8;color:#4a5c77;font-size:7px;font-weight:900;letter-spacing:.5px}
+.scan-row .scan-band b{font-size:9px;font-weight:900}
+.scan-row .scan-band.group-off-property{background:#f7e7c8;color:#6f4400}
+.scan-row .scan-band.group-scheduled{background:#d9efdf;color:#17552b}
+.scan-row .scan-band.group-unscheduled{background:#f8dcda;color:#7f1d18}
+.scan-row .scan-band.group-inspection{background:#e8dffa;color:#4b2a80}
+@media(max-width:760px){.scan-row .scan-band{font-size:9px}.scan-row .scan-band b{font-size:11px}}

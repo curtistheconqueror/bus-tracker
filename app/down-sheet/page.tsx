@@ -15,7 +15,7 @@ import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type Repair
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
-import {downSheetWorkGroup,matchesDownSheetSearch,orderDownSheetEntries,type DownSheetOrder} from "./down-sheet-view";
+import {downSheetWorkGroup,groupDownSheetEntries,matchesDownSheetSearch,type DownSheetOrder} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -169,7 +169,13 @@ export default function DownSheet(){
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
- const visible=useMemo(()=>orderDownSheetEntries(entries.filter(entry=>(fixedToday?entry.workflow==="Completed"&&isToday(entry.completedAt):(showCompleted||isActive(entry)))&&(filter==="All"||entry.shift===filter)&&matchesDownSheetSearch(entry,search)),order),[entries,filter,showCompleted,search,order,fixedToday]);
+ /* Where each bus actually is, which is the first thing the section rules ask.
+    The map owns this — the sheet only reads it — so it is looked up by bus id
+    rather than copied onto the entry, where it would go stale the moment
+    somebody moved the bus on the map. */
+ const locations=useMemo(()=>Object.fromEntries(fleet.map(bus=>[bus.id,bus.l||""])),[fleet]);
+ const groups=useMemo(()=>groupDownSheetEntries(entries.filter(entry=>(fixedToday?entry.workflow==="Completed"&&isToday(entry.completedAt):(showCompleted||isActive(entry)))&&(filter==="All"||entry.shift===filter)&&matchesDownSheetSearch(entry,search)),order,locations),[entries,filter,showCompleted,search,order,fixedToday,locations]);
+ const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
@@ -284,6 +290,15 @@ export default function DownSheet(){
    <span className="view-results"><b>{visible.length}</b> IN VIEW</span>
   </section>
 
+  {/* The totals the sheet is read for, before the sheet itself. A bus away at a
+      vendor and a bus sitting in the yard with nobody on it are both "down" in
+      one long list, and that list could not tell anyone how many of each there
+      were. Same four bands, same order, as the dividers below. */}
+  <section className="down-group-counts" aria-label="Down sheet section counts">
+   <div className="group-count total"><strong>{visible.length}</strong><span>TOTAL ON SHEET</span></div>
+   {groups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
+  </section>
+
   <section className="quick-notes">
    <label htmlFor="down-quick-notes"><b>{displaySettings.labels.quickNotes}</b><span>{quickNotes===savedQuickNotes?"Saved on this device":"Unsaved changes"}</span></label>
    <div className="quick-notes-editor"><textarea id="down-quick-notes" value={quickNotes} onChange={event=>setQuickNotes(event.target.value)} placeholder="Example: 3 road calls today; follow up with vendor; check late-shift parts delivery."/><button type="button" onClick={saveQuickNote} disabled={quickNotes===savedQuickNotes}>SAVE NOTE</button></div>
@@ -293,8 +308,17 @@ export default function DownSheet(){
    <div className="sheet-scroll">
     <table className="down-table">
      <thead><tr><th>{displaySettings.labels.line}</th><th>{displaySettings.labels.busNumber}</th><th>{displaySettings.labels.reasonDown}</th><th>{displaySettings.labels.assignment}</th><th>{displaySettings.labels.section}</th><th>{displaySettings.labels.shift}</th><th>{displaySettings.labels.workStatus}</th><th>{displaySettings.labels.estimatedTime}</th><th>{displaySettings.labels.updatedBy}</th></tr></thead>
-     <tbody>{visible.length?visible.map((entry,index)=>{const group=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(visible[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&group.label!==previous?.label&&<tr className={"work-group-row group-"+group.rank}><td colSpan={9}>{group.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
-      <td className="line-number">{String(index+1).padStart(2,"0")}</td>
+     {/* The sheet divides itself, always — not only when an ordering is chosen.
+         Each band carries its own count on the divider so the number never has
+         to be arrived at by scrolling and adding. Line numbers keep running
+         across the bands, the way they do on the paper sheet. */}
+     <tbody>{visible.length?groups.map((group,groupIndex)=>{
+      if(!group.entries.length)return null;
+      const offset=groups.slice(0,groupIndex).reduce((sum,item)=>sum+item.entries.length,0);
+      return <Fragment key={group.key}>
+       <tr className={"down-group-row group-"+group.key}><td colSpan={9}><b>{group.label}</b><i>{group.entries.length}</i><span>{group.hint}</span></td></tr>
+       {group.entries.map((entry,index)=>{const work=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(group.entries[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&work.label!==previous?.label&&<tr className={"work-group-row group-"+work.rank}><td colSpan={9}>{work.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
+      <td className="line-number">{String(offset+index+1).padStart(2,"0")}</td>
       <td className="fleet-number"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
@@ -303,7 +327,9 @@ export default function DownSheet(){
       <td><b className={"workflow "+entry.workflow.toLowerCase().replaceAll(" ","-")}>{entry.workflow}</b></td>
       <td className="estimate-cell"><b>{isQuarantineEntry(entry)?"N/A":entryEstimateMinutes(entry)?formatRepairTime(entryEstimateMinutes(entry)):"NOT SET"}</b><small>{isQuarantineEntry(entry)?"QUARANTINE":"MECHANIC PLAN"}</small></td>
       <td className="updated"><b>{entry.updatedBy||"—"}</b><small>{timeLabel(entry.updatedAt)}</small></td>
-     </tr></Fragment>}):<tr><td className="empty-sheet" colSpan={9}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>
+     </tr></Fragment>})}
+      </Fragment>;
+     }):<tr><td className="empty-sheet" colSpan={9}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>
     </table>
    </div>
   </section>

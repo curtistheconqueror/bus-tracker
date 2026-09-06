@@ -2,7 +2,8 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
-import {mergeReviewedRows,reviewScannedRows,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {mergeReviewedRows,normalizedSection,reviewScannedRows,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
 
@@ -89,6 +90,13 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
      <div className="scan-review-head"><div><b>REVIEW ROWS</b><span>{imports.length} bus{imports.length===1?"":"es"} ready{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRows([]);setError("")}}>CHANGE PHOTOS</button></div>
      <div className="scan-rows">{rows.map(row=>{
       const repairs=REPAIR_OPTIONS[row.category]||REPAIR_OPTIONS.Miscellaneous;
+      /* Which band of the sheet this row is about to land in, shown before the
+         import rather than discovered after it. It is read from the same two
+         functions the sheet itself uses, so it cannot drift from where the bus
+         actually ends up, and it follows MECHANIC / VENDOR as that field is
+         typed — which is the field that decides scheduled from unscheduled. */
+      const section=normalizedSection(row.section||row.reason);
+      const band=downSheetGroup({busNumber:row.busNumber,category:row.category,repair:row.repair,customReason:row.reason,assignmentType:section==="Vendor Repair"?"Vendor":"Mechanic",assignedTo:row.assignedTo,section});
       return <article className={`scan-row ${row.fleetMatch}`} key={row.key}>
        <label className="scan-select"><input type="checkbox" checked={row.selected} disabled={row.fleetMatch!=="matched"} onChange={event=>updateRow(row.key,{selected:event.target.checked})}/><span/></label>
        <div className="scan-bus"><small>P{row.pageNumber} · L{row.lineNumber||"?"}</small><b>{row.busNumber||"NO BUS"}</b><em>{row.fleetMatch==="matched"?row.repeatedCount>1?`${row.repeatedCount} ROWS · MERGED`:"FLEET MATCH":row.fleetMatch==="duplicate"?"DUPLICATE FLEET NUMBER":"NOT IN FLEET"}</em></div>
@@ -96,6 +104,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
        <label>CATEGORY<select value={row.category in REPAIR_OPTIONS?row.category:"Miscellaneous"} onChange={event=>updateRow(row.key,{category:event.target.value,repair:REPAIR_OPTIONS[event.target.value][0]})}>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
        <label>REPAIR<select value={repairs.includes(row.repair)?row.repair:repairs[0]} onChange={event=>updateRow(row.key,{repair:event.target.value})}>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>
        <label>MECHANIC / VENDOR<input value={row.assignedTo} onChange={event=>updateRow(row.key,{assignedTo:event.target.value})}/></label>
+       <p className={"scan-band group-"+band}>GOES TO <b>{downSheetGroupLabel(band)}</b></p>
       </article>})}</div>
      <section className="scan-replacement" aria-label="Buses coming off the Down Sheet">
       <header><span><b>AUTHORITATIVE REPLACEMENT</b><small>The reviewed photo becomes the current Down Sheet.</small></span><strong>{comingOff.length} COMING OFF</strong></header>

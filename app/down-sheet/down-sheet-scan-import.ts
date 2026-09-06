@@ -54,12 +54,23 @@ export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[
  });
 }
 
-function normalizedSection(value:string):ScanImportRecord["section"]{
+/* A banded sheet's headings reach this function as the row's own section text,
+   so the words the shop actually writes at the top of a band are named here
+   beside the tidy stored values.
+
+   The order is load-bearing in one place: INSPECTIONS & SCHEDULED MAINTENANCE
+   contains the word "scheduled", so inspection has to be decided before it.
+   UNSCHEDULED needs no such care — the \b before "scheduled" cannot fall inside
+   the middle of the word — but it is tested first anyway so the two read as the
+   pair they are. */
+export function normalizedSection(value:string):ScanImportRecord["section"]{
  const exact=clean(value);if(SECTIONS.has(exact))return exact as ScanImportRecord["section"];
  if(/accident/i.test(exact))return "Accident";
- if(/inspect|\b[abc]\s*-?\s*\d+/i.test(exact))return "Inspection";
- if(/vendor|off property/i.test(exact))return "Vendor Repair";
+ if(/inspect|\b[abc]\s*-?\s*\d+|spark\s*plugs?|valve\s*adjust/i.test(exact))return "Inspection";
+ if(/vendor|off\s*-?\s*(?:property|site)|offsite/i.test(exact))return "Vendor Repair";
  if(/road\s*call|\br\/?c\b|towed/i.test(exact))return "Roadcall";
+ if(/\bunscheduled\b/i.test(exact))return "Pending";
+ if(/\bscheduled\b/i.test(exact))return "Scheduled Repair";
  return "Pending";
 }
 

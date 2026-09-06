@@ -1,7 +1,7 @@
 export type DownSheetOrder="number-asc"|"number-desc"|"category";
 
 export type DownSheetViewEntry={
- busNumber:string;category?:string;repair?:string;customReason?:string;assignmentType?:string;assignedTo?:string;section?:string;
+ busId?:string;busNumber:string;category?:string;repair?:string;customReason?:string;assignmentType?:string;assignedTo?:string;section?:string;
  repairItems?:Array<{category?:string;repair?:string;details?:string}>;
 };
 
@@ -13,6 +13,54 @@ export function matchesDownSheetSearch(entry:DownSheetViewEntry,query:string){
  if(!term)return true;
  if(/^\d+$/.test(term))return term.length===2?entry.busNumber.endsWith(term):entry.busNumber.includes(term);
  return entryText(entry).includes(term);
+}
+
+/* The four bands the sheet always divides itself into.
+
+   A foreman reading this page is answering two different questions at once —
+   how many buses are down, and how many of those are not even on the property —
+   and a single ranked list of 40 rows answers neither. These are the bands, in
+   the order they are read on the page. */
+export type DownSheetGroupKey="off-property"|"scheduled"|"unscheduled"|"inspection";
+export type DownSheetGroupDefinition={key:DownSheetGroupKey;label:string;hint:string};
+export const DOWN_SHEET_GROUPS:DownSheetGroupDefinition[]=[
+ {key:"off-property",label:"OFF PROPERTY",hint:"Away at a vendor or otherwise not in the yard"},
+ {key:"scheduled",label:"SCHEDULED",hint:"Down in the yard with a mechanic or vendor named"},
+ {key:"unscheduled",label:"UNSCHEDULED",hint:"Down in the yard with nobody assigned yet"},
+ {key:"inspection",label:"INSPECTIONS & SCHEDULED MAINTENANCE",hint:"Inspections, spark plugs and valve adjustments"},
+];
+const GROUP_ORDER=DOWN_SHEET_GROUPS.map(group=>group.key);
+export function downSheetGroupRank(key:DownSheetGroupKey){return GROUP_ORDER.indexOf(key)}
+export function downSheetGroupLabel(key:DownSheetGroupKey){return DOWN_SHEET_GROUPS.find(group=>group.key===key)?.label||""}
+
+/* Spark plugs and valve adjustments are scheduled maintenance the shop plans
+   for, not a bus that broke. They are named here because nobody writing the
+   sheet calls them an "inspection", and counting them as breakdowns is exactly
+   what made the down count read high. */
+export const DOWN_SHEET_INSPECTION_PATTERN=/\binspection\b|\b[abc]\s*-?\s*(?:6|12|15|18|24)\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b/i;
+
+/* Precedence, which is deliberately NOT the reading order above.
+
+   Where the bus physically is beats everything: a bus sitting at Bus & Truck is
+   off property whether it went there for an inspection or a transmission. What
+   the work IS comes next, because an inspection is an inspection whether or not
+   a name is pencilled beside it. Only then does it come down to who has it —
+   which is the question the pencilled-in overflow rows at the bottom of a paper
+   sheet never answer, and why those land in UNSCHEDULED rather than vanishing
+   into one undifferentiated list. */
+export function downSheetGroup(entry:DownSheetViewEntry,location=""):DownSheetGroupKey{
+ if(String(location||"").startsWith("offsite-"))return "off-property";
+ if(entry.assignmentType==="Vendor"||entry.section==="Vendor Repair")return "off-property";
+ if(entry.section==="Inspection"||DOWN_SHEET_INSPECTION_PATTERN.test(entryText(entry)))return "inspection";
+ return String(entry.assignedTo||"").trim()?"scheduled":"unscheduled";
+}
+
+/* Sections are the structure of the page; ORDER is how rows sit inside one.
+   Choosing WORK CATEGORIES re-sorts within each band rather than dissolving the
+   bands, so the counts on the dividers never change with the sort. */
+export function groupDownSheetEntries<T extends DownSheetViewEntry>(entries:T[],order:DownSheetOrder,locations:Record<string,string>={}){
+ const of=(entry:T)=>downSheetGroup(entry,locations[entry.busId||""]||"");
+ return DOWN_SHEET_GROUPS.map(group=>({...group,entries:orderDownSheetEntries(entries.filter(entry=>of(entry)===group.key),order)}));
 }
 
 export function downSheetWorkGroup(entry:DownSheetViewEntry){
