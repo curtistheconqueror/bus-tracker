@@ -1,12 +1,13 @@
 # Publish next
 
-**STATUS: VERSIONS 152 AND 153 PENDING — publish 152 from `015e789`, then 153 from `fd3b326`. Version 151 is live from `f5939df`.**
+**STATUS: VERSIONS 153 AND 154 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`. Version 152 is live from `b57dcb5`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Then | **153** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log, exactly** — 24 Tech Services records landed on 23 buses when a Down Sheet photo went through SCAN SWEEP, and an import could not remove them because an import never removes; every record a sweep files in one press shares one time stamp, and SCAN BATCHES lists each press and REMOVEs one, keeping anything worked on since, with PUT BACK as the way back; the AI Operator reads "remove the most recent 24 entries from the defect log" as that batch and checks the count; the removal reaches the other devices, because a pull now reads the tombstones too, and a restore reaches them because a live row now says deleted_at is null; the sweep scanner asks what the page IS before what is on it and refuses a Down Sheet; both scanners take up to 500 characters of NOTES FOR THIS SCAN — "line 23 is 17565", "HAZMAT means biohazard" — read with the photo and remembered on the device only when asked; and a scanned FRONT TIROS reads FRONT TIRES while the margin rows stop slipping out |
-| Next | **152** | `015e789` | **The shop cloud barely ran and then failed when it did, and this fixes both** — the sync engine lived only on the Settings page so a shift spent on the map synced nothing, and it now runs on every page and merges the shop's changes live as they happen; — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
-| Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
+| Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
+| Next | **153** | `015e789` | **Shop Cloud now runs on every page and merges shop changes live as they happen** — it includes the Version 152 tombstone/Down Sheet sync repair, improved scan review, catalog additions, and the corrected Deferred badge behavior |
+| Published | **152** | `b57dcb5` | **The shop cloud has been failing on every sweep since Aug 31 and this fixes it** — merged-away tombstones are sent safely, Down Sheet rows can sync, scan review flags missed and uncertain rows, SHOP CLOUD moves to the top of MASTER, A-3/A-21/HAZMAT join the catalog, and the DEFERRED badge opens the matching filter |
+| Previous live | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
@@ -24,7 +25,7 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 151 is live from `f5939df`.** The 136–151 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 **Two releases are pending, in order.** 152 is frozen at `015e789` and is not
 moved by anything here; 153 is the three commits on top of it, `dd1b093`,
@@ -56,7 +57,7 @@ what to check once it is live.
 
 ---
 
-# Version 153 — A scan sweep can be taken back out, exactly
+# Version 154 — A scan sweep can be taken back out, exactly
 
 **Publish this after Version 152.** It answers a mistake made on Sep 6 that the
 app had no way to undo: a photo of the Vehicle Down Sheet went through SCAN
@@ -373,7 +374,7 @@ Suggested `docs/RELEASES.md` row:
 ```
 
 
-# Version 152 — The shop cloud starts working again
+# Version 153 — The shop cloud starts working again
 
 **Publish this next, after Version 151.** It carries a week-long outage fix:
 every shop-cloud sweep has failed since Aug 31 (section 2), which is also why

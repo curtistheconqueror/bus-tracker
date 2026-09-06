@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 151 | Live | f5939df | Dated ROAD CALL events sync between Defect Log and Facility Map, remain in history while driving a seven-day filter, and permit a short mis-tick undo; Down Sheet bands distinguish off-property, scheduled, unscheduled and inspection work; master backup and restore controls move to Settings |
+| 152 | Live | b57dcb5 | Shop Cloud sync safely sends merged-defect tombstones and reaches Down Sheet rows; scan review flags missing and uncertain rows; the Deferred badge opens its matching bus filter; Shop Cloud is first under Settings MASTER; A-3, A-21, and a biohazard catalog condition are added |
+| 151 | Previous live | f5939df | Dated ROAD CALL events sync between Defect Log and Facility Map, remain in history while driving a seven-day filter, and permit a short mis-tick undo; Down Sheet bands distinguish off-property, scheduled, unscheduled and inspection work; master backup and restore controls move to Settings |
 | 150 | Previous live | 6d62787 | IMPORT ALL DATA on the Facility Map restores backups again; settings are centralized on an offline-capable Settings page, MERGE DUPES moves there with its live count and undo, Technical Service Bulletins attach to repairs, ALL clears search, and navigation comes from one shared list |
 | 149 | Previous live | 011bb09 | Unresolved duplicate reports are recognized for five days; WORK DONE SO FAR adds a combinable OPERATOR REPORTED checkbox |
 | 148 | Previous live | 60c2a01 | Bus List appears before Type Bus #; Amerex adds Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 |
