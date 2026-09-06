@@ -190,9 +190,15 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
  "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
- "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
+ /* A-3 and A-21 are on the sheet and were not on this list, so a scan of a real
+    morning had to pick the nearest thing: A3 became A-6 and A21 became A-15, and
+    the bus was recorded as having had a service it never had. */
+ "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
- "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
+ /* HAZMAT on the sheet means a biohazard on board — blood, vomit or faeces. It
+    had nowhere to go and landed as "Unknown diagnosis", which is the one thing
+    it must not read as: nobody boards or cleans that bus without knowing. */
+ "Interior Cleaning":["Scheduled Cleaning","Cleaning Required","Biohazard - blood, vomit or faeces (HAZMAT)"],
  "Miscellaneous":["Missing road hazard triangles (3 required)","Fire extinguisher missing","Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
 
@@ -639,7 +645,7 @@ const DOWNING_ISSUES:Record<string,readonly string[]>={
     picker must not open on May Stay In Service. Running hot is the opposite
     case and stays in service on purpose: eight or ten over finishes the day. */
  "Engine":["Overheat shutdown (235-240F)"],
- "Interior Cleaning":["Cleaning Required"],
+ "Interior Cleaning":["Cleaning Required","Biohazard - blood, vomit or faeces (HAZMAT)"],
  "Amerex":["Gas Concentration - Significant Leak","Fire Suppression - FIRE alarm (system discharged)","CNG - PRD leaking"],
 };
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{

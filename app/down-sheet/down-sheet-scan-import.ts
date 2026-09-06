@@ -45,6 +45,44 @@ const STATUSES=new Set<ScanStatus>(["service","defect","shop","out","decommissio
 function busDigits(value:string){return value.replace(/\D/g,"").slice(0,5)}
 function clean(value:unknown){return typeof value==="string"?value.trim():""}
 
+/* Which printed line numbers never came back from the photo.
+
+   The sheet numbers its rows 01..55, which is a gift: OCR cannot be trusted to
+   never drop a line, but a missing NUMBER can be detected exactly. On the 09/5
+   sheet two buses vanished silently - line 23 (18501, high oil usage) and line
+   30 (20504, IDOT-ABS light) - and nothing on screen said so. A bus that is
+   down and not on the sheet is a bus that goes back out broken.
+
+   Blank lines are normal on a part-filled sheet, so this reports rather than
+   accuses: it says which numbers are absent and lets the foreman glance at the
+   paper. Counting stops at the highest line actually read, since nobody knows
+   how far down the sheet was filled in. */
+export function scannedLineGaps(rows:ScannedDownSheetRow[]):number[]{
+ const seen=new Set<number>();
+ for(const row of rows){
+  const digits=String(row.lineNumber??"").replace(/\D/g,"");
+  const line=digits?parseInt(digits,10):NaN;
+  if(Number.isFinite(line)&&line>0)seen.add(line);
+ }
+ if(!seen.size)return [];
+ const highest=Math.max(...seen);
+ const gaps:number[]=[];
+ for(let line=1;line<=highest;line++)if(!seen.has(line))gaps.push(line);
+ return gaps;
+}
+
+/* "23, 30" and "37-41" rather than eleven separate numbers. */
+export function describeLineGaps(gaps:number[]):string{
+ const runs:string[]=[];
+ for(let at=0;at<gaps.length;){
+  let end=at;
+  while(end+1<gaps.length&&gaps[end+1]===gaps[end]+1)end++;
+  runs.push(end>at+0?gaps[at]+"\u2013"+gaps[end]:String(gaps[at]));
+  at=end+1;
+ }
+ return runs.join(", ");
+}
+
 export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[]):ReviewedScanRow[]{
  const fleetByNumber=new Map<string,ScanFleetBus[]>();
  for(const bus of fleet){const number=busDigits(bus.n);if(!number)continue;fleetByNumber.set(number,[...(fleetByNumber.get(number)||[]),bus])}

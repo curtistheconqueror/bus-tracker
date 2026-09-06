@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
-import {mergeReviewedRows,normalizedSection,reviewScannedRows,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
+import {describeLineGaps,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
 import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
@@ -32,6 +32,11 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  const imports=useMemo(()=>mergeReviewedRows(rows),[rows]);
  const comingOff=useMemo(()=>scannedSheetRemovals(currentEntries,imports.map(record=>record.busId)),[currentEntries,imports]);
  const flagged=rows.filter(row=>row.fleetMatch!=="matched").length;
+ /* Which numbered lines never came back. The sheet numbers its rows, so a
+    dropped one can be named exactly instead of being noticed a week later when
+    the bus goes out broken. Blank lines are normal, so this reports rather
+    than blocks. */
+ const lineGaps=useMemo(()=>scannedLineGaps(rows),[rows]);
 
  const addPhotos=(files:FileList|null)=>{
   if(!files)return;
@@ -88,6 +93,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     </>}
     {rows.length>0&&<>
      <div className="scan-review-head"><div><b>REVIEW ROWS</b><span>{imports.length} bus{imports.length===1?"":"es"} ready{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRows([]);setError("")}}>CHANGE PHOTOS</button></div>
+     {lineGaps.length>0&&<p className="scan-line-gaps" role="status"><b>LINES NOT READ: {describeLineGaps(lineGaps)}</b><small>Blank lines on the sheet are normal. Check the paper for any of these that had a bus written on them &mdash; a row missed here does not reach the Down Sheet at all.</small></p>}
      <div className="scan-rows">{rows.map(row=>{
       const repairs=REPAIR_OPTIONS[row.category]||REPAIR_OPTIONS.Miscellaneous;
       /* Which band of the sheet this row is about to land in, shown before the

@@ -369,3 +369,11 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .scan-row .scan-band.group-unscheduled{background:#f8dcda;color:#7f1d18}
 .scan-row .scan-band.group-inspection{background:#e8dffa;color:#4b2a80}
 @media(max-width:760px){.scan-row .scan-band{font-size:9px}.scan-row .scan-band b{font-size:11px}}
+
+/* A dropped row is the one scan failure nobody notices until the bus goes out.
+   Amber, not red: blank lines on a part-filled sheet are ordinary, so this asks
+   for a glance at the paper rather than claiming something is wrong. */
+.scan-line-gaps{display:grid;gap:3px;margin:0 0 8px;padding:9px 11px;border:1px solid #d9a441;border-left:4px solid #c07a00;border-radius:6px;background:#fff8ec}
+.scan-line-gaps>b{font-size:11px;font-weight:900;letter-spacing:.4px;color:#7a4b00}
+.scan-line-gaps>small{font-size:10px;line-height:1.35;color:#6b5836}
+@media(max-width:760px){.scan-line-gaps>b{font-size:13px}.scan-line-gaps>small{font-size:11px}}

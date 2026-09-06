@@ -1625,7 +1625,9 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(repairIssuePlaceholder("Operator/Driver Controls", "Gauges and Dash"), "Choose a defect in Gauges and Dash");
   // An ungrouped category never reaches step 2, but the helper must not throw.
   assert.equal(repairGroupPlaceholder("Engine"), "Choose one of 0 groups");
-  assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required"]);
+  // HAZMAT on the sheet is a biohazard on board, and it belongs here rather than
+  // in Miscellaneous, where it read as "Unknown diagnosis".
+  assert.deepEqual(REPAIR_OPTIONS["Interior Cleaning"], ["Scheduled Cleaning", "Cleaning Required", "Biohazard - blood, vomit or faeces (HAZMAT)"]);
   assert.equal(defaultDefectOperability("Interior Cleaning", "Scheduled Cleaning"), "service");
   assert.equal(defaultDefectOperability("Interior Cleaning", "Cleaning Required"), "down");
   const cleaningRequired = { defects: [{ id: "clean", category: "Interior Cleaning", issue: "Cleaning Required", details: "", operability: "down", state: "open" }] };
@@ -8528,4 +8530,58 @@ test("a merged-away tombstone goes up as an UPDATE by id, never inside an upsert
  const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
  assert.match(client,/executePushPlan\(supabase,pushPlan\(busChange\.changed,defectChange\.changed,entryChange\.changed\)\)/);
  assert.doesNotMatch(client,/const writes:\[string,CloudRow\[\],string\]\[\]/,"the old upsert-everything loop must be gone");
+});
+
+test("a numbered sheet says which lines the photo never returned",async()=>{
+ const {scannedLineGaps,describeLineGaps}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const row=(line,bus)=>({pageNumber:line<=28?1:2,lineNumber:String(line).padStart(2,"0"),busNumber:bus,reason:"",assignedTo:"",category:"",repair:"",section:"",shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""});
+
+ /* The 09/5 4:24pm sheet. Two buses vanished from the scan without a word —
+    line 23 (18501, high oil usage) and line 30 (20504, IDOT-ABS light) — and
+    a bus that is down and not on the sheet is a bus that goes back out broken.
+    The sheet numbers its rows, so a dropped one can be named exactly. */
+ const scanned=[];
+ for(let line=1;line<=36;line++){if(line===23||line===30)continue;scanned.push(row(line,"175"+String(line).padStart(2,"0")))}
+ assert.deepEqual(scannedLineGaps(scanned),[23,30]);
+ assert.equal(describeLineGaps([23,30]),"23, 30");
+
+ // Runs collapse, because "37-41" is readable and five numbers are not.
+ assert.equal(describeLineGaps([23,30,37,38,39,40,41]),"23, 30, 37\u201341");
+ assert.equal(describeLineGaps([]),"");
+
+ // A multi-bus line (PM'S, NO AC) is one line number over several rows.
+ assert.deepEqual(scannedLineGaps([row(1,"17510"),row(2,"17520"),row(2,"17500")]),[]);
+ // Nothing read at all is not "every line missing" — there is nothing to say.
+ assert.deepEqual(scannedLineGaps([]),[]);
+ // Counting stops at the highest line actually read: nobody knows how far down
+ // a part-filled sheet went, so absent trailing lines are not reported.
+ assert.deepEqual(scannedLineGaps([row(1,"17510"),row(3,"17530")]),[2]);
+
+ const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+ assert.match(scanner,/LINES NOT READ: \{describeLineGaps\(lineGaps\)\}/);
+ const css=await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
+ assert.match(css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,""),/\.scan-line-gaps\{/);
+});
+
+test("the catalog carries the service codes and the hazmat condition the sheet actually uses",async()=>{
+ const {REPAIR_OPTIONS,defaultDefectOperability}=await import("../app/repair-catalog.ts");
+ /* A3 and A21 are on the 09/5 sheet. Without them a scan had to pick the
+    nearest thing — A3 became A-6, A21 became A-15 — recording a service the
+    bus never had. */
+ for(const code of ["A-3","A-6","A-15","A-21","B-12","B-18","C-24"])
+  assert.ok(REPAIR_OPTIONS.Inspection.includes(code),code+" is missing from the Inspection list");
+
+ /* HAZMAT means a biohazard on board: blood, vomit or faeces. It had nowhere to
+    go and was filed as "Unknown diagnosis", which is the one thing it must not
+    read as — nobody boards or cleans that bus without knowing. */
+ const hazmat="Biohazard - blood, vomit or faeces (HAZMAT)";
+ assert.ok(REPAIR_OPTIONS["Interior Cleaning"].includes(hazmat));
+ // And it takes the bus out of service on its own, like Cleaning Required.
+ assert.equal(defaultDefectOperability("Interior Cleaning",hazmat),"down");
+ assert.equal(defaultDefectOperability("Interior Cleaning","Cleaning Required"),"down");
+ assert.equal(defaultDefectOperability("Interior Cleaning","Scheduled Cleaning"),"service");
+
+ const route=await readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8");
+ assert.match(route,/HAZMAT means a biohazard on board/);
+ assert.match(route,/Every printed line number that has a bus number beside it MUST produce a row/);
 });
