@@ -21,6 +21,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup} from "../fleet-backup";
+import ShopCloudLive from "../shop-cloud-live";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -231,7 +232,7 @@ export default function DownSheet(){
 
  const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 
- return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>

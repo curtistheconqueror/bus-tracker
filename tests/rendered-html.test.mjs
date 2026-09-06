@@ -6414,10 +6414,15 @@ test("the shop cloud never becomes a condition of using the board",async()=>{
  // itself declined to keep.
  assert.match(control,/readFleetStorage<.*>\(localStorage\)/);
  assert.doesNotMatch(control,/props\.buses|\{buses\}:/);
- // A pull merges; it never replaces.
- assert.match(control,/mergeFleetMap\(/);
- assert.match(control,/mergeDefectLog\(/);
- assert.match(control,/mergeDownSheet\(/);
+ /* A pull merges; it never replaces. The three merges moved into cloud-live.ts
+    when live sync arrived, so the button and the background use one copy and
+    cannot drift — the control delegates to it rather than keeping its own. */
+ const liveMerge=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ assert.match(liveMerge,/mergeFleetMap\(/);
+ assert.match(liveMerge,/mergeDefectLog\(/);
+ assert.match(liveMerge,/mergeDownSheet\(/);
+ assert.match(control,/applyCloudPull\(localStorage,/);
+ assert.equal(/mergeFleetMap\(/.test(control),false,"the control must not keep a second merge");
  assert.doesNotMatch(control,/localStorage\.clear\(\)/);
 });
 
@@ -8612,4 +8617,64 @@ test("a scanned row the model had to guess at is flagged even when its bus numbe
  assert.equal(rows.filter(r=>r.fleetMatch!=="matched"||r.confidence<LOW).length,2);
  // The old rule would have shown only one of them.
  assert.equal(rows.filter(r=>r.fleetMatch!=="matched").length,1);
+});
+
+test("the shop cloud runs on every page, not only while Settings is open",async()=>{
+ /* The 45-second sweep lived inside CloudSyncControl, which is mounted on the
+    Settings page and nowhere else. A mechanic could move buses around the
+    Facility Map for a whole shift, or log defects all night, and none of it
+    left the device — the only moments anything synced were the moments somebody
+    happened to have Settings open. */
+ for(const file of ["../app/page.tsx","../app/down-sheet/page.tsx","../app/defect-log/page.tsx","../app/fixed-repairs/page.tsx","../app/lists/page.tsx","../app/settings/page.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(source,/<ShopCloudLive\/>/,file+" does not run the shop cloud");
+  assert.match(source,/import ShopCloudLive from/,file+" is missing the import");
+ }
+ const live=await readFile(new URL("../app/shop-cloud-live.tsx",import.meta.url),"utf8");
+ const control=await readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8");
+ assert.match(live,/const SWEEP_MS=45000/);
+ // Exactly one sweeper. Leaving it in the control too would race whenever
+ // Settings was open, on the device most likely to be mid-edit.
+ assert.equal(/setInterval/.test(control),false,"the settings control must not sweep as well");
+ assert.match(live,/return null;/,"the engine renders nothing");
+ // Push before pull, always — a merge takes the incoming copy for a bus both
+ // devices know, so pulling over unsent work would lay the older copy on top.
+ assert.ok(live.indexOf("cloudPush(")<live.indexOf("cloudPull("),"live sync must send before it receives");
+ assert.match(live,/if\(!pullToo\|\|!pushed\.ok\|\|stopped\)return;/);
+});
+
+test("live sync is a doorbell, not a delivery",async()=>{
+ const {shouldSyncForChange,announceStoredChange,LIVE_TABLES,LIVE_DEBOUNCE_MS}=await import("../app/cloud-live.ts");
+ assert.deepEqual([...LIVE_TABLES],["buses","bus_defects","down_sheet_entries"]);
+
+ // Another device's write wakes this one; its own echo does not.
+ assert.equal(shouldSyncForChange({table:"buses",deviceLabel:"Phone"},"Ipad"),true);
+ assert.equal(shouldSyncForChange({table:"buses",deviceLabel:"Ipad"},"Ipad"),false);
+ assert.equal(shouldSyncForChange({table:"buses",deviceLabel:" ipad "},"Ipad"),false,"labels compare trimmed and case-insensitively");
+ // An unlabelled row is acted on rather than dropped: a missed change is worse
+ // than a wasted request.
+ assert.equal(shouldSyncForChange({table:"buses",deviceLabel:""},"Ipad"),true);
+ assert.equal(shouldSyncForChange({table:"buses",deviceLabel:"Phone"},""),true);
+ // A table we do not sync is never a reason to pull.
+ assert.equal(shouldSyncForChange({table:"shop_memory",deviceLabel:"Phone"},"Ipad"),false);
+
+ // The burst from one device's push must collapse into a single sync.
+ assert.ok(LIVE_DEBOUNCE_MS>=1000,"a hundred rows must not become a hundred pulls");
+
+ /* Every page already listens for `storage` to pick up another tab's work, but
+    the browser fires it only for OTHER tabs — so a merge done in this tab would
+    leave the board right on disk and stale on screen. Dispatching it ourselves
+    is why live sync needed no change to any page's own code. */
+ const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ assert.match(client,/postgres_changes/);
+ assert.match(client,/subscribeToShopCloud/);
+ // A notification's row is never written to the board; it only triggers a pull.
+ assert.equal(/payload\?\.new\?\.(?!device_label)/.test(client),false,"a realtime payload must not become board data");
+
+ const liveSource=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ assert.match(liveSource,/new StorageEvent\("storage"/);
+ // A merge is never a reason to accept a write the bulk-loss guard refuses,
+ // and live sync runs with nobody watching.
+ assert.match(liveSource,/allowBulkDefectLoss:false/);
+ assert.equal(typeof announceStoredChange,"function");
 });

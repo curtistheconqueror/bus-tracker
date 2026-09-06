@@ -9,6 +9,7 @@
 
 import {
  changedRows,
+ cloudConfigProblem,
  cloudFailureMessage,
  cloudFailurePhase,
  defectLogPayload,
@@ -27,8 +28,16 @@ import {
  type SyncBus,
  type SyncEntry,
 } from "./cloud-sync.ts";
+import {LIVE_TABLES,type LiveChange} from "./cloud-live.ts";
 
+type LiveChannel={
+ on(event:"postgres_changes",filter:{event:string;schema:string;table:string},handler:(payload:{new?:Record<string,unknown>})=>void):LiveChannel;
+ subscribe(callback?:(status:string)=>void):LiveChannel;
+ unsubscribe():Promise<unknown>;
+};
 type SupabaseLike={
+ channel(name:string):LiveChannel;
+ removeChannel(channel:LiveChannel):unknown;
  auth:{
   signInWithPassword(credentials:{email:string;password:string}):Promise<{data:unknown;error:{message:string}|null}>;
   signOut(options?:{scope:"local"|"global"}):Promise<{error:{message:string}|null}>;
@@ -124,6 +133,33 @@ export async function cloudSignedIn(config:CloudConfig):Promise<boolean>{
   const {data}=await supabase.auth.getSession();
   return Boolean(data?.session);
  }catch{return false}
+}
+
+/* Listen for another device's work.
+
+   Realtime is a doorbell, not a delivery: the handler is told only that a table
+   changed and by whom, and the caller then syncs down the ordinary path. No row
+   from a notification is ever written to the board — the merge rules are argued
+   out in one place and this does not become a second one.
+
+   Returns a function that stops listening, or null when the device is not
+   connected. Nothing here throws into the app: a shop with no realtime simply
+   falls back to the sweep it already had. */
+export function subscribeToShopCloud(config:CloudConfig,onChange:(change:LiveChange)=>void):Promise<(()=>void)|null>{
+ return (async()=>{
+  try{
+   if(cloudConfigProblem(config))return null;
+   const supabase=await cloudClient(config);
+   if(!supabase||typeof supabase.channel!=="function")return null;
+   let channel=supabase.channel("shop-cloud-live");
+   for(const table of LIVE_TABLES)
+    channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
+     onChange({table,deviceLabel:String(payload?.new?.device_label??"")});
+    });
+   channel.subscribe();
+   return()=>{try{supabase.removeChannel(channel)}catch{/* nothing to stop */}};
+  }catch{return null}
+ })();
 }
 
 export type PushInput={
