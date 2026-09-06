@@ -36,6 +36,7 @@ import "../down-sheet/down-sheet.css";
 import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
 import MapSettingsPanel from "../map-settings-panel";
+import CloudSyncControl from "../cloud-sync-control";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "../map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "../fleet-restore";
 import DownSheetSettings from "../down-sheet/down-sheet-settings";
@@ -334,7 +335,20 @@ export default function SettingsPage(){
    <section id="master" className={sectionClass("master","master")} aria-labelledby="master-heading">
     <SectionHead id="master" kicker="EVERY PAGE" title="Master settings" open={open.master} onToggle={()=>toggle("master")}/>
     <SectionBody id="master" open={open.master}>
-     <p className="settings-section-blurb">The settings that are about the whole app rather than one page: moving everything to another device, and one look across all four pages. Each page's own settings are in its section below, and anything set here can still be tuned there afterwards.</p>
+     <p className="settings-section-blurb">The settings that are about the whole app rather than one page: connecting this device to the shop, moving everything to another device, and one look across all four pages. Each page's own settings are in its section below, and anything set here can still be tuned there afterwards.</p>
+     {/* First thing on the page, above everything.
+
+         It was inside FACILITY MAP, which is a page's settings — and it is the
+         only control in the app that decides whether the map, the Defect Log
+         AND the Down Sheet reach the other devices at all. Somebody setting up
+         a new iPad had to know to open a section called "Board settings" and
+         scroll, to find the one thing they came for. It is a whole-app control
+         and it is now the first whole-app control anybody sees. */}
+     <section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">
+      <h3 id="master-cloud-heading">SHOP CLOUD</h3>
+      <p>Share the map, the Defect Log and the Down Sheet between every device in the shop. Each device is connected once and then keeps itself up to date. This never has to be on: with it off, or with no signal, the tracker works exactly as it does today.</p>
+      <CloudSyncControl/>
+     </section>
      <section className="settings-group master-transfer" aria-labelledby="master-transfer-heading">
       <h3 id="master-transfer-heading">MASTER EXPORT &amp; MASTER IMPORT</h3>
       <p>Everything this device holds, in one file: the map, the Defect Log, the Down Sheet, Fleet Campaigns, remembered parts and findings, and every page's settings. Export on the old device, then import that file on the new one.</p>
@@ -377,7 +391,7 @@ export default function SettingsPage(){
    <section id="facility-map" className={sectionClass("map","map")} aria-labelledby="facility-map-heading">
     <SectionHead id="facility-map" kicker="FACILITY MAP" title="Board settings" open={open.map} onToggle={()=>toggle("map")}/>
     <SectionBody id="facility-map" open={open.map}>
-     <p className="settings-section-blurb">Shop Cloud, bus markers, the DS badge, touch controls, maintenance intervals, confirmation prompts, themes and every colour on the board. Backup and transfer, repair cleanup, and creating or renumbering a bus stay on the map behind ACTIONS.</p>
+     <p className="settings-section-blurb">Bus markers, the DS badge, touch controls, maintenance intervals, confirmation prompts, themes and every colour on the board. Shop Cloud moved to MASTER at the top, since it carries the Defect Log and the Down Sheet too. Backup and transfer, repair cleanup, and creating or renumbering a bus stay on the map behind ACTIONS.</p>
      <MapSettingsPanel buses={fleet} board={board} update={updateBoard}/>
     </SectionBody>
    </section>

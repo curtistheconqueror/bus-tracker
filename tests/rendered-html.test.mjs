@@ -6384,17 +6384,27 @@ test("connection details are checked where the message can name the field",async
 });
 
 test("the shop cloud never becomes a condition of using the board",async()=>{
- const [control,page,panel,css]=await Promise.all([
+ const [control,page,panel,css,settings]=await Promise.all([
   readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
  ]);
- // It lives on the Settings page, in the map's section beside the other
- // self-contained controls — never in front of the map.
- assert.match(panel,/<section className="settings-group cloud-sync-settings">/);
- assert.match(panel,/<CloudSyncControl\/>/);
+ /* It is the FIRST group in MASTER, not inside the map's own section. It
+    decides whether the map, the Defect Log and the Down Sheet reach the other
+    devices at all, so it is a whole-app control — and somebody setting up a new
+    iPad should not have to open a section called "Board settings" and scroll to
+    find the one thing they came for. */
+ assert.match(settings,/<section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">/);
+ assert.match(settings,/<CloudSyncControl\/>/);
+ assert.equal(/cloud-sync-settings/.test(panel),false,"no longer in the map's section");
+ assert.equal(/CloudSyncControl/.test(panel),false,"the map panel must not import it either");
  assert.equal(/<CloudSyncControl/.test(page),false,"never in front of the map");
+ // First inside MASTER — ahead of MASTER EXPORT, the recovery control and the theme picker.
+ const master=settings.indexOf('id="master"');
+ for(const after of ["master-transfer","master-recovery","master-theme"])
+  assert.ok(settings.indexOf("cloud-sync-settings",master)<settings.indexOf(after,master),"SHOP CLOUD must come before "+after);
  assert.match(css,/\.cloud-status\{/);
  // Pushing reads what is ON DISK, not what the page is holding. writeFleetStorage
  // refuses writes it considers destructive and the board's save effect discards
@@ -8475,4 +8485,47 @@ test("the DEFERRED badge counts the same buses its filter lists", () => {
   const quiet = deferredBadgeCounts([{id: "a", n: "17510", defects: [defect("d1", "deferred", ago(5))]}], [], now);
   assert.equal(quiet.overdue, 0, "nothing past ninety minutes means no alarm");
   assert.equal(quiet.listed, 1, "but the filter still has a bus to show");
+});
+
+test("a merged-away tombstone goes up as an UPDATE by id, never inside an upsert missing its fleet number",async()=>{
+ const {defectRow,mergedAwayRows,normalizeCloudConfig}=await import("../app/cloud-sync.ts");
+ const {pushPlan,executePushPlan}=await import("../app/cloud-client.ts");
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Phone"});
+ const now="2026-09-06T22:23:15.000Z";
+ const live=defectRow({id:"d-live",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"down"},"17510",config,now);
+ const [dead]=mergedAwayRows({"d-dupe":"2026-08-31T03:16:06.000Z"},config,now);
+
+ /* Postgres checks NOT NULL on the insert half of an upsert before it reaches
+    the conflict, so a tombstone — which carries no fleet number by design —
+    can never be upserted. This is the bug that kept the Phone's status red at
+    "62 changes waiting" from Aug 31 to Sep 6 and held the Down Sheet off the
+    cloud the whole time. */
+ const plan=pushPlan([],[live,dead],[]);
+ const step=plan.find(s=>s.table==="bus_defects");
+ assert.deepEqual(step.upserts.map(r=>r.defect_id),["d-live"]);
+ assert.deepEqual(step.updates.map(r=>r.defect_id),["d-dupe"]);
+ for(const s of plan)assert.ok(s.upserts.every(r=>String(r.fleet_number??"").trim()),s.table+" would upsert a row with no fleet number");
+ assert.deepEqual(plan.map(s=>s.table),["buses","bus_defects","down_sheet_entries"],"buses go first");
+
+ // A fake server that behaves exactly as the real one did all week.
+ const calls=[];
+ const fake={from(table){return {
+  upsert:async(rows,options)=>{calls.push(["upsert",table,options.onConflict,rows.map(r=>r.defect_id)]);
+   return rows.some(r=>!String(r.fleet_number??"").trim())?{error:{message:'null value in column "fleet_number" of relation "'+table+'" violates not-null constraint'}}:{error:null}},
+  update:patch=>({eq:async(column,value)=>{calls.push(["update",table,column,value,Object.keys(patch).sort()]);return {error:null}}}),
+ }}};
+ assert.equal(await executePushPlan(fake,plan),null,"the mixed batch must go through");
+ assert.deepEqual(calls,[
+  ["upsert","bus_defects","defect_id",["d-live"]],
+  ["update","bus_defects","defect_id","d-dupe",["deleted_at","device_label","updated_at","updated_by"]],
+ ]);
+ // The patch carries the deletion and the signature only — the key rides in eq(), and no repair field is written back.
+ // The old shape, tombstone inside the upsert, is exactly what the server rejects, in its own words.
+ const old=await executePushPlan(fake,[{table:"bus_defects",conflict:"defect_id",upserts:[live,dead],updates:[]}]);
+ assert.match(old.message,/null value in column "fleet_number"/);
+
+ // cloudPush must actually use the planner, or the partition is decoration.
+ const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ assert.match(client,/executePushPlan\(supabase,pushPlan\(busChange\.changed,defectChange\.changed,entryChange\.changed\)\)/);
+ assert.doesNotMatch(client,/const writes:\[string,CloudRow\[\],string\]\[\]/,"the old upsert-everything loop must be gone");
 });
