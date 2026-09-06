@@ -47,6 +47,22 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 .settings-section-body[hidden]{display:none}
 .settings-section-blurb{margin:0;font-size:10px;line-height:1.4;color:#455a79}
 
+/* MASTER. The one section that is about the whole app, so it reads a little
+   heavier than the four page sections under it. */
+.settings-section-master{border-color:#8fa6cc;background:linear-gradient(180deg,#f7faff,#fff)}
+.settings-section-master .settings-section-kicker{color:#0b3d7a}
+.master-transfer-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.master-transfer-row>button,.master-transfer-row>label{min-height:52px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #0b3d7a;border-radius:8px;padding:0 14px;font-family:inherit;font-size:12px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+.master-transfer-row>button{background:#0b3d7a;color:#fff}
+.master-transfer-row>label{background:#fff;color:#0b3d7a}
+/* The file input is the label; it must stay reachable rather than display:none,
+   which would take it out of the accessibility tree with it. */
+.master-transfer-row input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.master-transfer .theme-grid,.master-theme .theme-grid{margin-top:2px}
+.master-font-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.master-font-grid label{display:flex;flex-direction:column;gap:4px;font-size:9px;font-weight:900;color:#3b4f72}
+.master-font-grid select{min-height:42px;border:1px solid #b7c4d7;border-radius:7px;background:#fff;color:#193357;padding:8px;font-family:inherit;font-size:11px;font-weight:700}
+
 /* FACILITY MAP. The map's panel body was the scrolling middle of a modal. */
 .settings-section-map .settings-body{padding:0;overflow:visible}
 .settings-section-map .settings-actions{padding:0;border-top:0;background:transparent}
@@ -98,4 +114,9 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .settings-section.closed{padding-bottom:8px}
  .settings-section-title{font-size:22px}
  .settings-tool-row button{min-height:48px}
+ /* Two full-width rows on a phone: MASTER IMPORT replaces the whole device, so
+    it must never sit half a thumb from MASTER EXPORT. */
+ .master-transfer-row{grid-template-columns:1fr}
+ .master-transfer-row>button,.master-transfer-row>label{min-height:56px}
+ .master-font-grid{grid-template-columns:1fr}
 }

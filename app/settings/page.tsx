@@ -25,7 +25,7 @@
    transfer, repair cleanup, creating a bus, renumbering one. Those act on the
    board rather than describe it, and they stay on the map. */
 
-import {useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import TrackerNav from "../tracker-nav";
 /* Every page's own stylesheet, so each panel here looks exactly as it did
    behind that page's gear. settings.css comes LAST: all three of these, and
@@ -36,11 +36,12 @@ import "../down-sheet/down-sheet.css";
 import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
 import MapSettingsPanel from "../map-settings-panel";
-import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings} from "../map-settings";
+import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "../map-settings";
+import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "../fleet-restore";
 import DownSheetSettings from "../down-sheet/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "../down-sheet/down-sheet-settings-store";
 import LogSettingsModal from "../defect-log/defect-log-settings-modal";
-import {FONT_STACKS,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "../defect-log/defect-log-settings";
+import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "../defect-log/defect-log-settings";
 import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repairs/fixed-repairs-settings";
 import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {normalizeDefects} from "../repair-catalog";
@@ -61,10 +62,34 @@ type SettingsBus=DefectLogFleetBus&{odometerReadings?:unknown;engineHourReadings
    also stops this device tombstoning records it has just put back. */
 type MergeUndo={fleet:SettingsBus[];downEntries:DefectLogDownEntry[];mergedAway:MergedAwayDefects;label:string};
 
-type SectionKey="map"|"down"|"log"|"fixed";
-/* The map first because it is the page the app opens on; the rest closed so
-   the page is four title rows long until somebody asks for more. */
-const DEFAULT_OPEN:Record<SectionKey,boolean>={map:true,down:false,log:false,fixed:false};
+type SectionKey="master"|"map"|"down"|"log"|"fixed";
+/* MASTER first and open, because it is the section that answers "I want the
+   whole app to look like this" and "get everything onto the other phone" -
+   the two things somebody opens this page for without knowing which page owns
+   the setting. The four page sections are closed until asked for. */
+const DEFAULT_OPEN:Record<SectionKey,boolean>={master:true,map:false,down:false,log:false,fixed:false};
+
+/* A master theme is a PAIR: the board has its own presets and the Defect Log
+   and Fixed Repairs share another set, and picking one of these applies both
+   so the whole app matches. Terminal has no counterpart on the log side, so it
+   borrows Dark, which is the closest thing to it.
+
+   Master is a WRITER, not a layer sitting over the pages. Pressing one of
+   these writes straight into each page's own settings, so the section below
+   immediately shows what happened and can then be changed on its own. Nothing
+   here has to remember which of two values wins, because there is only ever
+   one value. */
+const MASTER_THEMES:{key:string;label:string;map:string;log:LogSettings["theme"]}[]=[
+ {key:"default",label:"Default",map:"default",log:"light"},
+ {key:"terminal",label:"Terminal",map:"terminal",log:"dark"},
+ {key:"black",label:"Black / Dark",map:"black",log:"dark"},
+ {key:"midnight",label:"Midnight",map:"midnight",log:"midnight"},
+ {key:"tactical",label:"Tactical",map:"tactical",log:"tactical"},
+];
+const MASTER_FONTS:{key:LogSettings["fontFamily"];label:string}[]=[
+ {key:"clean",label:"Clean"},{key:"condensed",label:"Condensed"},{key:"classic",label:"Classic"}];
+const MASTER_SIZES:{key:LogSettings["fontSize"];label:string}[]=[
+ {key:"standard",label:"Standard"},{key:"large",label:"Large"},{key:"extra",label:"Extra Large"}];
 
 function readFleet(raw:string|null):SettingsBus[]{const payload=readFleetPayload<SettingsBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
 function readDown(raw:string|null):DefectLogDownEntry[]{const payload=readDownSheetPayload<DefectLogDownEntry>(raw);return payload.valid?payload.entries:[]}
@@ -89,15 +114,19 @@ function noop(){}
 function useStoredSettings<T extends object>(key:string,read:(raw:string|null)=>T,write:(storage:Storage,next:T)=>StorageWriteResult,report:(result:StorageWriteResult)=>void){
  const [value,setValue]=useState<T>(()=>read(null));
  const latest=useRef<T|null>(null);
+ const load=useCallback((raw:string|null)=>{const next=read(raw);latest.current=next;setValue(next)},[read]);
  useEffect(()=>{
-  const load=(raw:string|null)=>{const next=read(raw);latest.current=next;setValue(next)};
   load(localStorage.getItem(key));
   const receive=(event:StorageEvent)=>{if(event.key===key)load(event.newValue)};
   window.addEventListener("storage",receive);
   return()=>window.removeEventListener("storage",receive);
- },[key,read]);
+ },[key,load]);
  const update=(patch:Partial<T>)=>{const next={...(latest.current??value),...patch};latest.current=next;setValue(next);report(write(localStorage,next))};
- return [value,update] as const;
+ /* A MASTER IMPORT rewrites these keys from underneath this page. A write made
+    in this same tab raises no storage event, so the panels would go on showing
+    the settings the file just replaced until somebody reloaded. */
+ const reload=()=>load(localStorage.getItem(key));
+ return [value,update,reload] as const;
 }
 
 /* A section's title row, which is also the control that opens and closes it.
@@ -123,9 +152,9 @@ function SectionBody({id,open,children}:{id:string;open:boolean;children:ReactNo
 export default function SettingsPage(){
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const report=(result:StorageWriteResult)=>setSaveProblem(result.reason||"");
- const [board,updateBoard]=useStoredSettings(BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,report);
- const [down,updateDown]=useStoredSettings(DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings,report);
- const [log,updateLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
+ const [board,updateBoard,reloadBoard]=useStoredSettings(BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,report);
+ const [down,updateDown,reloadDown]=useStoredSettings(DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings,report);
+ const [log,updateLog,reloadLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
 
  const [open,setOpen]=useState<Record<SectionKey,boolean>>(DEFAULT_OPEN);
  const toggle=(key:SectionKey)=>setOpen(current=>({...current,[key]:!current[key]}));
@@ -219,6 +248,51 @@ export default function SettingsPage(){
   setMergeUndo(null);
  };
 
+ /* MASTER EXPORT and MASTER IMPORT: the whole app, in one file.
+
+    This is the ONLY file the app writes that can be read back in - the three
+    EXPORT ... REPORT buttons write snapshots for a person to read. It carries
+    the board, the Defect Log, the Down Sheet, campaigns, the remembered parts
+    and findings, and every page's settings.
+
+    The import REPLACES, which is why it is the only import in the app that
+    asks first. The section transfers inside each page's settings are the ones
+    that merge. */
+ const masterExport=()=>{void exportFleetBoardBackup(localStorage,fleet)};
+ const masterImport=async(event:React.ChangeEvent<HTMLInputElement>)=>{
+  const input=event.currentTarget,file=input.files?.[0];
+  input.value="";
+  if(!file)return;
+  const read=readFleetBackup(await file.text());
+  if(!read.ok){alert(FLEET_BACKUP_ERRORS[read.error]);return}
+  if(!confirm("MASTER IMPORT replaces everything stored on this device — the board, the Defect Log, the Down Sheet, campaigns and every page's settings — with "+read.backup.buses.length+" buses from this file.\n\nThis cannot be undone from here. Export first if this device holds anything you have not sent anywhere else."))return;
+  const result=restoreFleetBackup(localStorage,read.backup);
+  if(!result.ok){
+   /* The board write was refused, so nothing else was touched: there is no
+      half-restored device to explain. */
+   setSaveProblem((result.reason as FleetWriteReason)||"failed");
+   alert("Nothing was imported: this device refused to write the board. The notice at the top of the page says why.");
+   return;
+  }
+  setFleet(readFleet(localStorage.getItem(FLEET_KEY)));
+  setDownEntries(readDown(localStorage.getItem(DOWN_KEY)));
+  /* Written in this same tab, so no storage event fires and the panels below
+     would otherwise still be showing the settings the file just replaced. */
+  reloadBoard();reloadDown();reloadLog();
+  setMergeUndo(null);
+  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+".");
+ };
+
+ /* One theme across every page. It writes into each page's own settings rather
+    than sitting over them, so the sections below show the change and can still
+    be tuned one at a time afterwards. */
+ const masterTheme=MASTER_THEMES.find(theme=>theme.map===board.theme&&theme.log===log.theme);
+ const applyMasterTheme=(theme:typeof MASTER_THEMES[number])=>{
+  const preset=THEMES[theme.map];
+  if(preset)updateBoard({theme:theme.map,visuals:{...preset.visuals,sections:{...preset.visuals.sections}},colors:{...preset.colors}});
+  updateLog({theme:theme.log,appearance:{...LOG_THEMES[theme.log as Exclude<LogSettings["theme"],"custom">].appearance}});
+ };
+
  /* A snapshot to read or send to somebody; it cannot be imported back. */
  const exportLog=()=>{const records=defectLogRecords(fleet,downEntries),payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:records.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Defect Log report")};
 
@@ -253,9 +327,42 @@ export default function SettingsPage(){
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
   <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/></header>
   <nav className="settings-jump" aria-label="Settings sections">
-   <a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
+   <a href="#master" onClick={()=>reveal("master")}>MASTER</a><a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
   </nav>
   <div className="settings-sections">
+   <section id="master" className={sectionClass("master","master")} aria-labelledby="master-heading">
+    <SectionHead id="master" kicker="EVERY PAGE" title="Master settings" open={open.master} onToggle={()=>toggle("master")}/>
+    <SectionBody id="master" open={open.master}>
+     <p className="settings-section-blurb">The settings that are about the whole app rather than one page: moving everything to another device, and one look across all four pages. Each page's own settings are in its section below, and anything set here can still be tuned there afterwards.</p>
+     <section className="settings-group master-transfer" aria-labelledby="master-transfer-heading">
+      <h3 id="master-transfer-heading">MASTER EXPORT &amp; MASTER IMPORT</h3>
+      <p>Everything this device holds, in one file: the map, the Defect Log, the Down Sheet, Fleet Campaigns, remembered parts and findings, and every page's settings. Export on the old device, then import that file on the new one.</p>
+      <div className="master-transfer-row">
+       <button type="button" className="master-export" onClick={masterExport}>MASTER EXPORT</button>
+       <label className="master-import">MASTER IMPORT<input type="file" accept=".json,application/json" onChange={masterImport}/></label>
+      </div>
+      <small><b>MASTER IMPORT replaces everything on this device</b> once you confirm it. It is the only file in the app that can be read back in, and the only import that replaces rather than merges — to move one section without disturbing the rest, use the transfer inside that page's section below.</small>
+     </section>
+     <section className="settings-group master-theme" aria-labelledby="master-theme-heading">
+      <h3 id="master-theme-heading">ONE LOOK FOR EVERY PAGE</h3>
+      <p>Sets the Facility Map, the Defect Log and Fixed Repairs together, so the whole app matches. Picking one here writes it into each page's own settings, which you can then change on its own below.</p>
+      <div className="theme-grid">{MASTER_THEMES.map(theme=>{
+       const preset=THEMES[theme.map];
+       return <button type="button" className={masterTheme?.key===theme.key?"active":""} key={theme.key} onClick={()=>applyMasterTheme(theme)}>
+        <i style={{background:preset?.visuals.page,borderColor:preset?.visuals.border}}/><b>{theme.label}</b></button>;
+      })}</div>
+      {!masterTheme&&<div className="custom-theme-badge">PAGES SET INDIVIDUALLY</div>}
+     </section>
+     <section className="settings-group master-font" aria-labelledby="master-font-heading">
+      <h3 id="master-font-heading">READING TEXT</h3>
+      <p>The font the Defect Log and Fixed Repairs are set in. The Facility Map and the Down Sheet draw fixed layouts and are not affected.</p>
+      <div className="master-font-grid">
+       <label>STYLE<select value={log.fontFamily} onChange={event=>updateLog({fontFamily:event.target.value as LogSettings["fontFamily"]})}>{MASTER_FONTS.map(font=><option value={font.key} key={font.key}>{font.label}</option>)}</select></label>
+       <label>SIZE<select value={log.fontSize} onChange={event=>updateLog({fontSize:event.target.value as LogSettings["fontSize"]})}>{MASTER_SIZES.map(size=><option value={size.key} key={size.key}>{size.label}</option>)}</select></label>
+      </div>
+     </section>
+    </SectionBody>
+   </section>
    <section id="facility-map" className={sectionClass("map","map")} aria-labelledby="facility-map-heading">
     <SectionHead id="facility-map" kicker="FACILITY MAP" title="Board settings" open={open.map} onToggle={()=>toggle("map")}/>
     <SectionBody id="facility-map" open={open.map}>

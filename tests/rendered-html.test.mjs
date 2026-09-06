@@ -870,7 +870,12 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /IMPORT ALL DATA/);
   assert.match(page, /registration\?\.update\(\)/);
   assert.match(page, /window\.location\.reload\(\)/);
-  assert.match(page, /It will replace the board and settings currently stored on this device/);
+  /* The whole-app pair moved to MASTER EXPORT / MASTER IMPORT in Settings, and
+     the confirm in front of the replace went with it. The map keeps only the
+     Fleet Map transfer, and points at the new home. */
+  const settingsPage = await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+  assert.match(settingsPage, /MASTER IMPORT replaces everything stored on this device/);
+  assert.match(page, /MASTER EXPORT and MASTER IMPORT in Settings/);
   assert.match(css, /\.refresh-command\{/);
   assert.match(css, /\.board-data/);
 });
@@ -1494,6 +1499,7 @@ test("confirmation prompts are per-device settings that default to on", async ()
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const panel = await readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8");
+  const settingsPage = await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
   // The Settings page exposes independent move and group-defect toggles.
   assert.match(panel, /CONFIRMATION PROMPTS/);
   assert.match(panel, /CONFIRM BUS MOVES &amp; SWITCHES/);
@@ -1509,10 +1515,17 @@ test("confirmation prompts are per-device settings that default to on", async ()
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
   assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}\)\)/);
   assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
-  assert.match(page, /setServiceIntervals\(readSavedServiceIntervals\(saved\.serviceIntervalsUnit,saved\.serviceIntervals\)\)/);
-  assert.match(page, /if\(typeof saved\.confirmMoves==="boolean"\)setConfirmMoves\(saved\.confirmMoves\)/);
+  /* A restored backup reaches the intervals through the board-settings reader
+     now, rather than through a setter inside the map's own import handler. */
+  const boardModel = await readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8");
+  assert.match(boardModel, /serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/);
+  /* A restored backup reaches the prompts through the board-settings reader,
+     which defaults an unset or damaged value back to asking. */
+  assert.match(boardModel, /confirmMoves:confirmationPreference\(ui\.confirmMoves\)/);
+  assert.match(boardModel, /confirmDefects:confirmationPreference\(ui\.confirmDefects\)/);
   // Replacing the whole board must always ask, regardless of preferences.
-  assert.match(page, /confirm\("Import this backup\?/);
+  assert.match(settingsPage, /MASTER IMPORT replaces everything stored on this device/,
+    "replacing a whole device still always asks, wherever the button lives");
 });
 
 test("every facility section can collapse independently while global controls remain", async () => {
@@ -3069,7 +3082,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
     MAP starts open and the other three closed; the bold title row is the
     control; a closed body is hidden rather than unmounted, so its panel's
     storage listeners keep running and its state is where it was left. */
- assert.match(page,/const DEFAULT_OPEN:Record<SectionKey,boolean>=\{map:true,down:false,log:false,fixed:false\}/);
+ assert.match(page,/const DEFAULT_OPEN:Record<SectionKey,boolean>=\{master:true,map:false,down:false,log:false,fixed:false\}/,
+  "MASTER is the section that opens; the four page sections stay closed");
  assert.match(page,/<button type="button" className="settings-section-toggle" aria-expanded=\{open\} aria-controls=\{id\+"-body"\} onClick=\{onToggle\}>/);
  assert.match(page,/<div id=\{id\+"-body"\} className="settings-section-body" hidden=\{!open\}>/);
  for(const [id,key] of [["facility-map","map"],["down-sheet","down"],["defect-log","log"],["fixed-repairs","fixed"]]){
@@ -3164,8 +3178,98 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const label of ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","MERGE DUPES","DUPLICATE RECORDS","MAINTENANCE INTERVALS","SHOW COMPLETED","REQUIRE INITIALS ON RECORDED WORK"])
   assert.ok(html.includes(label),"the page renders "+label);
  assert.match(html,/aria-current="page"[^>]*href="\/settings"|href="\/settings"[^>]*aria-current="page"/,"the nav marks Settings as the current page");
- assert.match(html,/<div id="facility-map-body" class="settings-section-body">/,"FACILITY MAP renders open");
- for(const id of ["down-sheet","defect-log","fixed-repairs"])assert.match(html,new RegExp('<div id="'+id+'-body" class="settings-section-body" hidden=""'),id+" renders closed");
+ assert.match(html,/<div id="master-body" class="settings-section-body">/,"MASTER renders open");
+ for(const id of ["facility-map","down-sheet","defect-log","fixed-repairs"])assert.match(html,new RegExp('<div id="'+id+'-body" class="settings-section-body" hidden=""'),id+" renders closed");
+});
+
+test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one look",async()=>{
+ const {readFleetBackup,restoreFleetBackup,FLEET_BACKUP_ERRORS}=await import("../app/fleet-restore.ts");
+ const {FLEET_STORAGE_KEY,BOARD_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,readFleetPayload}=await import("../app/storage.ts");
+ const {BUS_LISTS_STORAGE_KEY}=await import("../app/bus-lists.ts");
+
+ /* Every refusal the Facility Map used to make, kept, because this replaces a
+    whole device and a bad file must change nothing at all. */
+ assert.equal(readFleetBackup("not json").ok,false);
+ assert.equal(readFleetBackup("not json").error,"unreadable");
+ assert.equal(readFleetBackup(JSON.stringify({kind:"x"})).error,"missing-buses");
+ assert.equal(readFleetBackup(JSON.stringify({buses:[{id:"a",n:"1"}]})).error,"invalid-bus","a bus with no location is not a bus");
+ assert.equal(readFleetBackup(JSON.stringify({buses:["nope"]})).error,"invalid-bus");
+ assert.equal(readFleetBackup(JSON.stringify({buses:[{id:"a",n:"1",l:"bay-1"},{id:"a",n:"2",l:"bay-2"}]})).error,"duplicate-id",
+  "two buses under one id would silently merge two real buses");
+ for(const error of Object.keys(FLEET_BACKUP_ERRORS))assert.match(FLEET_BACKUP_ERRORS[error],/No changes were made\.$/,error+" must say nothing changed");
+
+ /* The oldest backups were a bare array with no envelope. They still read. */
+ const legacy=readFleetBackup(JSON.stringify([{id:"a",n:"17505",l:"bay-1"}]));
+ assert.equal(legacy.ok,true);
+ assert.equal(legacy.backup.legacy,true);
+ assert.equal(legacy.backup.buses.length,1);
+
+ /* A full file restores every key it carries. */
+ const store=new Map([["pace-bus-lists-v1",JSON.stringify({keep:"me"})]]);
+ const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))},removeItem:key=>{store.delete(key)}};
+ const full=readFleetBackup(JSON.stringify({kind:"pace-south-fleet-board-backup",version:5,
+  buses:[{id:"a",n:"17505",l:"bay-1",defects:[]},{id:"b",n:"17506",l:"road-2",defects:[]}],
+  settings:{theme:"midnight",statusVersion:3},downSheet:{version:1,entries:[{id:"e1"}]},
+  downSheetSettings:{defaultShift:"3rd"},defectLogSettings:{theme:"dark"}}));
+ assert.equal(full.ok,true);
+ const result=restoreFleetBackup(storage,full.backup);
+ assert.equal(result.ok,true);
+ assert.equal(readFleetPayload(storage.getItem(FLEET_STORAGE_KEY)).buses.length,2,"the board is written through the guarded writer");
+ assert.equal(JSON.parse(storage.getItem(BOARD_SETTINGS_STORAGE_KEY)).theme,"midnight");
+ assert.deepEqual(JSON.parse(storage.getItem(DOWN_SHEET_STORAGE_KEY)).entries,[{id:"e1"}]);
+ assert.equal(JSON.parse(storage.getItem(DOWN_SHEET_SETTINGS_STORAGE_KEY)).defaultShift,"3rd");
+ assert.equal(JSON.parse(storage.getItem(DEFECT_LOG_SETTINGS_STORAGE_KEY)).theme,"dark");
+ assert.ok(result.restored.includes("board")&&result.restored.includes("down sheet"));
+ /* A KEY THE FILE DOES NOT CARRY IS LEFT ALONE. Campaigns were missing from
+    the backup until version 4, so restoring an older file must not wipe the
+    campaigns this device already holds. */
+ assert.deepEqual(JSON.parse(storage.getItem(BUS_LISTS_STORAGE_KEY)),{keep:"me"},"a key the file omits is not cleared");
+ assert.equal(result.restored.includes("campaigns"),false);
+
+ /* The page: MASTER first, open, holding the transfer and the one-look theme. */
+ const [page,css,map,backup]=await Promise.all([
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/settings.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+ ]);
+ assert.ok(page.indexOf('<section id="master"')<page.indexOf('<section id="facility-map"'),"MASTER is the first section");
+ assert.match(page,/>MASTER EXPORT</);
+ assert.match(page,/MASTER IMPORT<input type="file" accept="\.json,application\/json" onChange=\{masterImport\}\/>/);
+ assert.match(page,/const read=readFleetBackup\(await file\.text\(\)\)/);
+ assert.match(page,/if\(!read\.ok\)\{alert\(FLEET_BACKUP_ERRORS\[read\.error\]\);return\}/,"a bad file is refused before anything is written");
+ const importBody=page.slice(page.indexOf("const masterImport="),page.indexOf("const applyMasterTheme="));
+ assert.ok(importBody.indexOf("if(!read.ok)")<importBody.indexOf("if(!confirm("),"and refused before the confirm, so a bad file never even asks");
+ assert.match(page,/const result=restoreFleetBackup\(localStorage,read\.backup\)/);
+ /* Written in this tab, so no storage event fires: the panels have to be told. */
+ assert.match(page,/reloadBoard\(\);reloadDown\(\);reloadLog\(\)/,"the sections below refresh from what the file wrote");
+ assert.match(page,/const reload=\(\)=>load\(localStorage\.getItem\(key\)\)/);
+
+ /* MASTER is a writer, not a layer: one press writes both pages' own settings,
+    so there is never a second value to decide between. */
+ assert.match(page,/const applyMasterTheme=\(theme:typeof MASTER_THEMES\[number\]\)=>\{/);
+ assert.match(page,/updateBoard\(\{theme:theme\.map,visuals:/);
+ assert.match(page,/updateLog\(\{theme:theme\.log,appearance:/);
+ assert.match(page,/const masterTheme=MASTER_THEMES\.find\(theme=>theme\.map===board\.theme&&theme\.log===log\.theme\)/,
+  "and it reads back as active only when every page actually agrees");
+ assert.match(css,/\.settings-section-master\{/);
+ assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.master-transfer-row\{grid-template-columns:1fr\}/,
+  "on a phone the replace-everything button never sits half a thumb from export");
+
+ /* And they are gone from the map, which keeps only the Fleet Map transfer. */
+ assert.equal(/>EXPORT ALL DATA</.test(map),false,"the whole-app export left the map");
+ assert.equal(/IMPORT ALL DATA<input/.test(map),false);
+ assert.equal(/const importBoard=/.test(map),false,"and the map no longer carries its own restore");
+ assert.match(map,/MASTER EXPORT and MASTER IMPORT in Settings/,"the map points at where they went");
+ assert.match(backup,/MASTER EXPORT in Settings/,"and so does the report hint");
+
+ const response=await render("/settings");
+ assert.equal(response.status,200);
+ const html=await response.text();
+ for(const label of ["Master settings","MASTER EXPORT","MASTER IMPORT","ONE LOOK FOR EVERY PAGE"])
+  assert.ok(html.includes(label),"the page renders "+label);
+ assert.match(html,/<div id="master-body" class="settings-section-body">/,"MASTER renders open");
+ assert.match(html,/<div id="facility-map-body" class="settings-section-body" hidden=""/,"and FACILITY MAP now renders closed");
 });
 
 test("a road call is a dated event on the bus that ages off the board on its own",async()=>{
@@ -3429,8 +3533,15 @@ test("every storage function a page calls is one it imports, so IMPORT ALL DATA 
  /* And the one that was broken, by name: the map imports the guarded writer
     and IMPORT ALL DATA restores the board through it. */
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- assert.match(map,/import \{[^}]*\bwriteFleetStorage\b[^}]*\} from "\.\/storage"/);
- assert.match(map,/if\(!writeFleetStorage\(localStorage,imported,\{allowBulkDefectLoss:true\}\)\)throw new Error\("storage-write"\)/);
+ /* The whole-app restore moved out of the map into fleet-restore.ts, so this
+    now checks it where it lives - still guarded, still lifting the bulk-loss
+    stop that a deliberate whole-device replace has to lift. */
+ const restore=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ assert.match(restore,/import \{[^}]*\bwriteFleetStorageResult\b[^}]*\} from "\.\/storage\.ts"/);
+ assert.match(restore,/const written=writeFleetStorageResult\(storage,backup\.buses,\{allowBulkDefectLoss:true\}\);/);
+ assert.match(restore,/if\(!written\.ok\)return \{ok:false,restored:\[\],reason:written\.reason\}/,
+  "a refused board write leaves nothing half-restored");
+ assert.equal(/writeFleetStorage\(localStorage,imported/.test(map),false,"and the map no longer carries its own copy");
 });
 
 test("ALL means everything, including whatever is in the search box",async()=>{
@@ -4043,16 +4154,22 @@ test("only the button that writes a restorable file is called a backup",async()=
     there. It pointed at EXPORT / SHARE BACKUP, which no longer exists. */
  const hint=backup.match(/REPORT_EXPORT_HINT="([^"]*)"/)[1];
  assert.match(hint,/Report only[\s\S]*cannot be imported back/);
- assert.match(hint,/EXPORT ALL DATA under ACTIONS on the Facility Map/);
+ assert.match(hint,/MASTER EXPORT in Settings/);
  assert.ok(!/SHARE BACKUP/.test(hint),"the hint must not send anybody to a label that no longer exists");
  assert.ok(!/Facility Map settings/.test(hint),"nor to a settings modal the map no longer has");
+ assert.ok(!/EXPORT ALL DATA/.test(hint),"nor to a button that has been renamed");
 
  // The real one keeps the word, and it is the only button that has it.
  // The whole-app pair says ALL DATA now, because it is no longer the only
  // thing that can be imported — it is the one that replaces everything.
- assert.match(map,/onClick=\{exportBoard\}>EXPORT ALL DATA</);
- assert.match(map,/IMPORT ALL DATA<input type="file"/);
- assert.match(map,/All data replaces everything on the destination device/);
+ /* The whole-app pair is MASTER EXPORT / MASTER IMPORT in Settings now. It is
+    still the only file that can be read back in, and still the only import
+    that replaces rather than merges. */
+ const settings=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ assert.match(settings,/>MASTER EXPORT</);
+ assert.match(settings,/MASTER IMPORT<input type="file"/);
+ assert.match(settings,/MASTER IMPORT replaces everything on this device/);
+ assert.equal(/>EXPORT ALL DATA<|IMPORT ALL DATA<input/.test(map),false,"and the map no longer offers them");
  assert.equal((logPage+log+fixed+lists).match(/>[^<]*BACKUP[^<]*<\/button>/gi),null);
 });
 
@@ -5790,7 +5907,9 @@ test("release safety keeps interval units and learned parts attached to the righ
  // Both read paths go through the one migration, so an imported backup and a
  // device that has been running all along read a stored blob the same way.
  assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)\)/);
- assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(saved\.serviceIntervalsUnit,saved\.serviceIntervals\)\)/);
+ const boardModelSource=await readFile(new URL("../app/map-settings.ts",import.meta.url),"utf8");
+ assert.match(boardModelSource,/serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/,
+  "a restored backup still reaches the intervals, through the board-settings reader");
  assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
  // Campaigns were absent from the backup until version 4. Everything that
  // page holds — completed rows, initials, timestamps, billable hours — sat
@@ -5802,15 +5921,22 @@ test("release safety keeps interval units and learned parts attached to the righ
  // Learned causes went into the backup in the same change that created them,
  // rather than being noticed missing later the way the campaigns were.
  assert.match(backup,/findingsMemory:readSavedValue\(storage,FINDINGS_MEMORY_STORAGE_KEY\)/);
- assert.match(page,/parsed\.findingsMemory\)writeFindingsMemory\(localStorage,normalizeFindingsMemory\(parsed\.findingsMemory\)\)/);
+ /* The learned parts and findings ride the whole-app restore, which lives in
+    fleet-restore.ts now rather than inside the map's own import handler. */
+ const restoreModule=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ assert.match(restoreModule,/put\(FINDINGS_MEMORY_STORAGE_KEY,backup\.findingsMemory,"remembered findings",normalizeFindingsMemory\)/);
+ assert.match(restoreModule,/put\(PARTS_MEMORY_STORAGE_KEY,backup\.partsMemory,"remembered parts",normalizePartsMemory\)/);
  // and a restore brings them back, through the same normalizers the page uses
- assert.match(page,/parsed\.busLists\)localStorage\.setItem\("pace-bus-lists-v1",JSON\.stringify\(normalizeBusLists\(parsed\.busLists\)\)\)/);
- assert.match(page,/parsed\.busListTemplates\)localStorage\.setItem\("pace-bus-list-templates-v1"/);
+ assert.match(restoreModule,/put\(BUS_LISTS_STORAGE_KEY,backup\.busLists,"campaigns",normalizeBusLists\)/);
+ assert.match(restoreModule,/put\(BUS_LIST_TEMPLATES_STORAGE_KEY,backup\.busListTemplates,"campaign templates",normalizeBusListTemplates\)/);
+ /* And a key the file does not carry is left alone rather than cleared, which
+    is what keeps a version 3 file from wiping this device's campaigns. */
+ assert.match(restoreModule,/if\(value===undefined\|\|value===null\)return;/);
  // A version 3 file has neither key, so restoring one must leave the campaigns
  // already on this device alone rather than clearing them.
  assert.equal(/busLists\?[^)]*\)\s*:\s*\[\]|setItem\("pace-bus-lists-v1",JSON\.stringify\(normalizeBusLists\(parsed\.busLists\|\|/.test(page),false);
  assert.match(backup,/partsMemory:readSavedValue\(storage,PARTS_MEMORY_STORAGE_KEY\)/);
- assert.match(page,/writePartsMemory\(localStorage,normalizePartsMemory\(parsed\.partsMemory\)\)/);
+
  for(const source of [log,fixed]){
   assert.match(source,/partsUsed:false,partNumber:"",partName:"",rememberScope:undefined|rememberScope:undefined[\s\S]{0,180}?partsUsed:false,partNumber:"",partName:""/);
  }
