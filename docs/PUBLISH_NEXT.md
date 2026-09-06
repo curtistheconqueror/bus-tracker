@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 152 PENDING — publish from `b57dcb5`. Version 151 is live from `f5939df`.**
+**STATUS: VERSION 152 PENDING — publish from `015e789`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **152** | `b57dcb5` | **The shop cloud has been failing on every sweep since Aug 31 and this fixes it** — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
+| Next | **152** | `015e789` | **The shop cloud barely ran and then failed when it did, and this fixes both** — the sync engine lived only on the Settings page so a shift spent on the map synced nothing, and it now runs on every page and merges the shop's changes live as they happen; — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
@@ -59,16 +59,17 @@ the cloud's Down Sheet is still Aug 30.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`b57dcb5`** |
-| Last code-bearing commit | `b57dcb5` — the release source is this commit |
+| **Release source** | **`015e789`** |
+| Last code-bearing commit | `015e789` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 151, published from `f5939df` |
 
-**Six application commits.** The first was cherry-picked onto Codex's release
+**Seven application commits.** The first was cherry-picked onto Codex's release
 commit `e493516`, not merged over it:
 
 ```
-git log --oneline e493516..b57dcb5      # docs-only commits omitted
+git log --oneline e493516..015e789      # docs-only commits omitted
+015e789 Run the shop cloud on every page, and merge the shop's changes as they happen
 b57dcb5 Flag a scanned row the model guessed at, not only one that missed the fleet
 413daab Catch a scan that drops a row, and give A-3, A-21 and HAZMAT somewhere to go
 393b47f Put SHOP CLOUD first in MASTER, where nobody has to look for it
@@ -76,10 +77,16 @@ e3b33e4 Send a merged-away tombstone as an UPDATE, not inside an upsert
 9436f22 Make the DEFERRED badge count the same buses its filter lists
 a8e7e2a Make the DEFERRED badge show the buses it is counting
 
-git diff --name-only e493516 b57dcb5 -- app tests
+git diff --name-only e493516 015e789 -- app tests
 app/api/down-sheet-scan/route.ts
 app/cloud-client.ts
+app/cloud-live.ts               (new)
+app/cloud-sync-control.tsx
 app/cloud-sync.ts
+app/fixed-repairs/page.tsx
+app/lists/page.tsx
+app/page.tsx
+app/shop-cloud-live.tsx         (new)
 app/defect-log/page.tsx
 app/deferred-counts.ts          (new)
 app/deferred-watch.tsx
@@ -96,14 +103,18 @@ tests/rendered-html.test.mjs
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e493516 b57dcb5 -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e493516 015e789 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
-**No schema change.** The tombstone fix in section 2 changes how the app writes
-to Supabase, not what the database holds. **No new route and no service-worker
+**One database change, already applied** (section 5): `buses`, `bus_defects` and
+`down_sheet_entries` were added to the `supabase_realtime` publication, without
+which the app subscribes successfully and receives nothing forever. It is
+additive and reversible, changes no data and no column, and RLS still gates it.
+**No table, column or constraint changed.** The tombstone fix in section 2
+changes how the app writes to Supabase, not what the database holds. **No new route and no service-worker
 bump,** so no shell re-download.
 
-Gate: **212 tests passing** (206 at Version 151, six added), ESLint clean,
+Gate: **214 tests passing** (206 at Version 151, eight added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -216,9 +227,44 @@ all along in a `confidence` field nothing read. Below 0.75 a row now carries
 the flagged total. This does not make the OCR read a digit correctly; it makes
 the rows most likely to be wrong the ones that stand out.
 
+### 5. The shop cloud runs everywhere, and the shop's changes arrive live
+
+**The sync barely ran.** Every part of it — the 45-second sweep included — lived
+inside `CloudSyncControl`, which is mounted on **exactly one page**. A mechanic
+could move buses around the Facility Map for a whole shift, or log defects all
+night, and none of it left the device: the only moments anything synced were the
+moments somebody happened to have Settings open. Section 2's bug is why the
+sweeps that did run failed; this is why so few ran at all.
+
+The engine moves into `ShopCloudLive`, which renders nothing and is dropped into
+all six pages the way the DEFERRED badge already is. Settings keeps the buttons,
+the fields and the status line, and no longer keeps the sweep — two sweepers on
+one device would race whenever Settings was open.
+
+**Live sync is then one more trigger on that engine.** A Supabase realtime
+notification means *the shop has news*; the news is fetched and merged down the
+ordinary path with the same rules GET THE SHOP'S COPY uses. **Realtime is a
+doorbell, not a delivery** — no row from a notification is ever written to the
+board, because those merge rules were argued out once and do not get a second
+copy. The merge moved into `cloud-live.ts` so the button and the background
+share one implementation and cannot drift.
+
+Three things keep it safe. It **still sends before it receives**, so someone
+else's burst cannot land on top of unsent local work. It keeps
+`allowBulkDefectLoss:false`, because a merge is never a reason to accept a write
+the guard refuses and this runs with nobody watching. And a device **ignores the
+echo of its own writes**, matched on device label.
+
+**The screen keeps up without a reload.** Every page already listens for
+`storage` to pick up another tab's work — but the browser fires that only for
+OTHER tabs, so a merge performed in this tab would leave the board right on disk
+and stale in front of the user. `cloud-live` dispatches the event itself after a
+merge, and every existing handler then does the correct thing. That is why live
+sync needed **no change to any page's own code**.
+
 ## Validation
 
-- 212 regression tests passing, ESLint clean, production build succeeds
+- 214 regression tests passing, ESLint clean, production build succeeds
 - **The shop-cloud failure was diagnosed against the live database, not
   guessed:** the Postgres logs carry seven `null value in column "fleet_number"`
   errors, the newest at 22:23 today, each naming the exact PostgREST upsert; the
@@ -240,6 +286,14 @@ the rows most likely to be wrong the ones that stand out.
   upsert, gap detection disabled, `A-3`/`A-21` removed, the badge counting
   overdue defects again, and dropping the per-bus deduplication each fail their
   own test
+- **Live sync's one novel mechanism measured in the PRODUCTION build:** adding a
+  bus to storage and dispatching the synthetic `storage` event took the Facility
+  Map from 8 drawn buses to 9 **with no navigation and no reload** — the event
+  was heard, and the page's existing handler did the rest
+- **All six pages load with the engine mounted and zero console errors**
+- **The publication was empty before this.** `supabase_realtime` existed and
+  carried no tables, so the subscription would have connected and received
+  nothing forever. Verified after the migration: all three tables present
 - **A harness limitation worth keeping written down:** Playwright will not click
   the DEFERRED badge — `position:fixed` with an infinite pulse means the element
   is never "stable", and a coordinate click misses even with `force:true`. Drive
@@ -263,18 +317,30 @@ the rows most likely to be wrong the ones that stand out.
    review says so before you import. Rows the model guessed at are amber and say
    CHECK THIS ROW.
 8. **Check an A3 or A21 row** records as A-3 and A-21, not A-6 and A-15.
-9. **Log a HAZMAT bus.** Interior Cleaning → Biohazard, and it takes the bus out
+9. **The real test of this release: two devices, side by side.** Move a bus on
+   one and watch the other's map follow within a few seconds, with nobody
+   pressing anything and no page reloading. Then log a defect on one and watch it
+   reach the other's Defect Log.
+10. **Leave the Facility Map open and work for a while, never opening Settings.**
+   The changes must reach the cloud on their own — before this release they never
+   did.
+11. **Log a HAZMAT bus.** Interior Cleaning → Biohazard, and it takes the bus out
    of service on its own.
 
 ## The way back
 
-Measured in a throwaway worktree from `b57dcb5`:
+Measured in a throwaway worktree from `015e789`:
 
-- `git revert b57dcb5 413daab 393b47f e3b33e4 9436f22 a8e7e2a` (newest first) is
-  **clean** and takes the whole release out together.
+- `git revert 015e789 b57dcb5 413daab 393b47f e3b33e4 9436f22 a8e7e2a` (newest
+  first) takes the whole release out together.
 - **Do not revert `e3b33e4` on its own unless the intent is to stop the shop
   cloud working.** It reverts cleanly, and that is the only reason to mention it:
   taking it out puts every sweep back to failing.
+- `git revert 015e789` alone is **clean** and takes live sync out, putting the
+  sweep back inside the Settings page — which means back to syncing only while
+  Settings is open. The publication change can stay: with no subscriber it costs
+  nothing. To undo that too, `alter publication supabase_realtime drop table
+  public.buses, public.bus_defects, public.down_sheet_entries;`
 - `git revert b57dcb5` alone is **clean.** `git revert b57dcb5 413daab` (newest
   first) is **clean** and takes the scan work out as a unit.
 - **Single reverts of `413daab`, `393b47f`, and the DEFERRED pair conflict** —
@@ -296,7 +362,7 @@ Measured in a throwaway worktree from `b57dcb5`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 152 | Live | <published tip hash> | The shop cloud works again — every sweep had failed since Aug 31 because a merged-away tombstone, which carries no fleet number by design, was being sent inside an upsert that checks NOT NULL before it reaches the conflict, rolling back the whole chunk and, since the Down Sheet is written after the defects, keeping the Down Sheet out of the cloud entirely; tombstones now go as an ordinary UPDATE by id. SHOP CLOUD moves to the top of MASTER, the first thing on the Settings page, since it decides whether the map, the Defect Log and the Down Sheet reach the other devices at all. A photographed down sheet now names any numbered line it failed to read before anything is imported, and flags rows the model had to guess at rather than only rows whose bus number matched no bus — a misread digit usually lands on another real bus and looked certain. A-3 and A-21 join the Inspection catalog, so a sheet reading A3 or A21 is no longer recorded as A-6 or A-15, and HAZMAT becomes a biohazard condition that takes the bus out of service instead of reading as an unknown diagnosis. The pulsing 90-minute DEFERRED badge opens the Deferred filter showing the buses it counts, longest-held first, from every page including the one it points at, and its number now matches that list where it had counted deferred repairs and shown a bus held on two of them twice |
+| 152 | Live | <published tip hash> | The shop cloud now runs on every page instead of only while the Settings page was open — the sweep lived inside the settings control, so a shift spent on the Facility Map or the Defect Log synced nothing at all — and the shop's changes now arrive live, a Supabase realtime notification triggering the same merge GET THE SHOP'S COPY performs, with the screen keeping up without a reload because the merge announces itself to the listeners every page already had. The shop cloud also works again — every sweep had failed since Aug 31 because a merged-away tombstone, which carries no fleet number by design, was being sent inside an upsert that checks NOT NULL before it reaches the conflict, rolling back the whole chunk and, since the Down Sheet is written after the defects, keeping the Down Sheet out of the cloud entirely; tombstones now go as an ordinary UPDATE by id. SHOP CLOUD moves to the top of MASTER, the first thing on the Settings page, since it decides whether the map, the Defect Log and the Down Sheet reach the other devices at all. A photographed down sheet now names any numbered line it failed to read before anything is imported, and flags rows the model had to guess at rather than only rows whose bus number matched no bus — a misread digit usually lands on another real bus and looked certain. A-3 and A-21 join the Inspection catalog, so a sheet reading A3 or A21 is no longer recorded as A-6 or A-15, and HAZMAT becomes a biohazard condition that takes the bus out of service instead of reading as an unknown diagnosis. The pulsing 90-minute DEFERRED badge opens the Deferred filter showing the buses it counts, longest-held first, from every page including the one it points at, and its number now matches that list where it had counted deferred repairs and shown a bus held on two of them twice |
 ```
 
 
