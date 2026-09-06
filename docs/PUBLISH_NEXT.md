@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 152 PENDING — publish from `a8e7e2a`. Version 151 is live from `f5939df`.**
+**STATUS: VERSION 152 PENDING — publish from `9436f22`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **152** | `a8e7e2a` | The pulsing 90-minute DEFERRED badge opens the Deferred quick filter and shows the buses it is counting, longest-held first, instead of being a link that did nothing when pressed on the page it pointed at |
+| Next | **152** | `9436f22` | The pulsing 90-minute DEFERRED badge opens the Deferred quick filter and shows the buses it is counting, longest-held first, instead of being a link that did nothing when pressed on the page it pointed at — and its number now matches that list, where it used to count deferred repairs and show a bus held on two of them twice |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
@@ -57,20 +57,22 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`a8e7e2a`** |
-| Last code-bearing commit | `a8e7e2a` — the release source is this commit |
+| **Release source** | **`9436f22`** |
+| Last code-bearing commit | `9436f22` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 151, published from `f5939df` |
 
-**One application commit,** cherry-picked onto Codex's release commit `e493516`,
-not merged over it:
+**Two application commits.** The first was cherry-picked onto Codex's release
+commit `e493516`, not merged over it:
 
 ```
-git log --oneline e493516..a8e7e2a
+git log --oneline e493516..9436f22
+9436f22 Make the DEFERRED badge count the same buses its filter lists
 a8e7e2a Make the DEFERRED badge show the buses it is counting
 
-git diff --name-only e493516 a8e7e2a
+git diff --name-only e493516 9436f22 -- app tests
 app/defect-log/page.tsx
+app/deferred-counts.ts      (new)
 app/deferred-watch.tsx
 app/quick-filters.ts
 tests/rendered-html.test.mjs
@@ -79,12 +81,12 @@ tests/rendered-html.test.mjs
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e493516 a8e7e2a -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e493516 9436f22 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
 **No new route and no service-worker bump,** so no shell re-download.
 
-Gate: **207 tests passing** (206 at Version 151, one added), ESLint clean,
+Gate: **208 tests passing** (206 at Version 151, two added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -115,11 +117,30 @@ the query string is stripped once applied, so closing the drawer and reloading
 does not silently reopen it. Only real filter keys are honoured; a query string
 is user-supplied text.
 
-**One thing worth knowing before it is live:** the badge counts only buses past
-ninety minutes while the drawer lists every held-deferred bus, so a badge reading
-3 can open a list of 4. That is deliberate — the alarm is for overdue — but
-hiding a bus twenty minutes short of the line would make it a worse list. Say so
-if you would rather the two numbers matched.
+### The badge now counts what the filter lists
+
+Press 3 DEFERRED, get four buses. The two numbers were counting different
+things, and they differed in **two** ways rather than one:
+
+- **The ninety-minute line.** The badge counted only overdue; the drawer lists
+  every held-back bus.
+- **Defects versus buses, which was worse and had not been spotted.** The rows
+  behind the badge are one per DEFECT, so **a single bus held on two deferred
+  repairs counted as two.** A yard with three held buses could raise an alarm
+  reading five.
+
+The badge still appears only once a bus crosses ninety minutes — under that,
+DEFERRED is working as intended and nothing needs to flash — but the number
+printed on it is now the count of **buses the filter will list**, deduplicated by
+bus, using the same exclusions the drawer applies. The overdue figure survives in
+the aria-label, which reads *"4 buses held from service, 3 over 90 minutes"*, so
+a screen reader still gets the alarm and the list as separate facts.
+
+The counting moved into `deferred-counts.ts`, a plain module, because the test
+runner strips types from `.ts` but not from `.tsx` — so it is now tested against
+a fleet directly rather than by grepping the component for a constant. The
+pre-existing badge test was re-pointed at the new module; it asserted on where
+the number lived, not on what it did, and the behaviour it covers is unchanged.
 
 ## Validation
 
@@ -130,8 +151,15 @@ if you would rather the two numbers matched.
   overdue class, and 17513 at 20m below them; pressing it from the Down Sheet
   lands on `/defect-log` already filtered with the same list; closing the drawer
   and reloading leaves it closed
-- The badge counted **3** against four deferred buses, correctly excluding the
-  one held only twenty minutes
+- **The two numbers agree, measured in the PRODUCTION build.** A fleet with
+  17510 held on **two** deferred repairs, 17511 and 17512 held past ninety
+  minutes, 17513 held twenty minutes, and 17515 deferred but on the Down Sheet
+  renders a badge reading **4** against a drawer of exactly 17510 17511 17512
+  17513 — 17510 listed once, 17515 excluded from both, and the aria-label
+  reporting "4 buses held from service, 3 over 90 minutes"
+- **Both halves of the old count were confirmed to fail on their own:** counting
+  overdue defects again fails the new test, and dropping the per-bus
+  deduplication fails it separately
 - **Confirmed to fail without the fix:** reverting the badge to its bare
   `href="/defect-log"` fails the new test
 - **A harness limitation worth writing down, since it read as a bug twice:**
@@ -150,17 +178,24 @@ if you would rather the two numbers matched.
    to do nothing. The filter should open in place and scroll into view.
 4. **Check the order.** Longest-held bus first, with anything past ninety
    minutes marked.
-5. **Close the drawer and reload.** It must stay closed.
+5. **Check the number on the badge equals the number on the drawer.** They are
+   the same count now.
+6. **Defer two separate repairs on one bus.** It must count as one bus, not two.
+7. **Close the drawer and reload.** It must stay closed.
 
 ## The way back
 
-Measured in a throwaway worktree from `a8e7e2a`:
+Measured in a throwaway worktree from `9436f22`:
 
-- `git revert a8e7e2a` alone is **clean.** The badge goes back to a bare link
-  that does nothing when pressed on the Defect Log. Nothing else depends on it —
-  it touches only `deferred-watch.tsx`, `quick-filters.ts` and the Defect Log
-  page, and the Deferred quick filter it opens was already there and is
-  unchanged.
+- `git revert 9436f22` alone is **clean**, and puts the mismatched count back —
+  the badge would again show deferred repairs rather than buses, double-counting
+  a bus held on two. There is no reason to take this one out on its own.
+- `git revert 9436f22 a8e7e2a` (newest first) is **clean** and takes Version 152
+  out as a unit. The badge goes back to a bare link that does nothing when
+  pressed on the Defect Log. Nothing else depends on either commit — they touch
+  only `deferred-watch.tsx`, the new `deferred-counts.ts`, `quick-filters.ts`
+  and the Defect Log page, and the Deferred quick filter they open was already
+  there and is unchanged.
 - Nothing is written by this change, so there is no stored state to clean up
   going backwards.
 
@@ -175,7 +210,7 @@ Measured in a throwaway worktree from `a8e7e2a`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 152 | Live | <published tip hash> | The pulsing 90-minute DEFERRED badge now opens the Deferred quick filter and shows the buses it is counting — longest-held first, with anything past ninety minutes marked — instead of being a bare link to a page it also renders on, where pressing it did nothing at all and from anywhere else landed with no filter and left the overdue buses buried in the list; it works from every page and from the Defect Log itself, scrolls the filter into view, and strips its own query string so closing the drawer and reloading does not reopen it |
+| 152 | Live | <published tip hash> | The pulsing 90-minute DEFERRED badge now counts the same buses its filter lists — it had been counting deferred repairs past ninety minutes rather than held-back buses, so it disagreed with the list it opened and showed a bus held on two repairs twice — and it now opens the Deferred quick filter and shows the buses it is counting — longest-held first, with anything past ninety minutes marked — instead of being a bare link to a page it also renders on, where pressing it did nothing at all and from anywhere else landed with no filter and left the overdue buses buried in the list; it works from every page and from the Defect Log itself, scrolls the filter into view, and strips its own query string so closing the drawer and reloading does not reopen it |
 ```
 
 ---
