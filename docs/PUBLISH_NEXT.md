@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 152 PENDING — publish from `9436f22`. Version 151 is live from `f5939df`.**
+**STATUS: VERSION 152 PENDING — publish from `b57dcb5`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **152** | `9436f22` | The pulsing 90-minute DEFERRED badge opens the Deferred quick filter and shows the buses it is counting, longest-held first, instead of being a link that did nothing when pressed on the page it pointed at — and its number now matches that list, where it used to count deferred repairs and show a bus held on two of them twice |
+| Next | **152** | `b57dcb5` | **The shop cloud has been failing on every sweep since Aug 31 and this fixes it** — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
@@ -25,7 +25,7 @@
 
 **Version 151 is live from `f5939df`.** The 136–151 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-Version 152 sits on top of the published 151 — it was cherry-picked onto Codex's release commit `e493516`, never merged over it.
+Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
 Version 147 sits on top of the published 146 — it was rebased onto Codex's release commit `4c1e502`, never merged over it.
 
@@ -49,155 +49,241 @@ what to check once it is live.
 
 ---
 
-# Version 152 — The DEFERRED alarm shows what it is alarming about
+# Version 152 — The shop cloud starts working again
 
-**Publish this next, after Version 151.**
+**Publish this next, after Version 151.** It carries a week-long outage fix:
+every shop-cloud sweep has failed since Aug 31 (section 2), which is also why
+the cloud's Down Sheet is still Aug 30.
 
 ## Source
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`9436f22`** |
-| Last code-bearing commit | `9436f22` — the release source is this commit |
+| **Release source** | **`b57dcb5`** |
+| Last code-bearing commit | `b57dcb5` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 151, published from `f5939df` |
 
-**Two application commits.** The first was cherry-picked onto Codex's release
+**Six application commits.** The first was cherry-picked onto Codex's release
 commit `e493516`, not merged over it:
 
 ```
-git log --oneline e493516..9436f22
+git log --oneline e493516..b57dcb5      # docs-only commits omitted
+b57dcb5 Flag a scanned row the model guessed at, not only one that missed the fleet
+413daab Catch a scan that drops a row, and give A-3, A-21 and HAZMAT somewhere to go
+393b47f Put SHOP CLOUD first in MASTER, where nobody has to look for it
+e3b33e4 Send a merged-away tombstone as an UPDATE, not inside an upsert
 9436f22 Make the DEFERRED badge count the same buses its filter lists
 a8e7e2a Make the DEFERRED badge show the buses it is counting
 
-git diff --name-only e493516 9436f22 -- app tests
+git diff --name-only e493516 b57dcb5 -- app tests
+app/api/down-sheet-scan/route.ts
+app/cloud-client.ts
+app/cloud-sync.ts
 app/defect-log/page.tsx
-app/deferred-counts.ts      (new)
+app/deferred-counts.ts          (new)
 app/deferred-watch.tsx
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet.css
+app/map-settings-panel.tsx
 app/quick-filters.ts
+app/repair-catalog.ts
+app/settings/page.tsx
 tests/rendered-html.test.mjs
 ```
 
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e493516 9436f22 -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e493516 b57dcb5 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
-**No new route and no service-worker bump,** so no shell re-download.
+**No schema change.** The tombstone fix in section 2 changes how the app writes
+to Supabase, not what the database holds. **No new route and no service-worker
+bump,** so no shell re-download.
 
-Gate: **208 tests passing** (206 at Version 151, two added), ESLint clean,
+Gate: **212 tests passing** (206 at Version 151, six added), ESLint clean,
 production build succeeds.
 
 ## Migrations
 
-**None.** No storage key changes, no payload shape changes, and nothing new is
-written. The badge reads the same deferred defects it always did and opens a
-quick filter that already existed.
+**None, and nothing is rewritten.** No storage key changes and no payload shape
+changes.
+
+**Two catalog additions, which are additions only.** `A-3` and `A-21` join the
+Inspection list and a biohazard condition joins Interior Cleaning. Adding an
+option cannot disturb a stored record — the renames that would are read-time by
+design and untouched here.
 
 ## What changed
 
-The 90-minute badge was a bare link to `/defect-log`. It renders on **all six
-pages — the Defect Log included** — so pressing it there pointed at the page
-already on screen and **did nothing at all.** From any other page it did
-navigate, but landed with no filter, leaving the overdue buses wherever they
-happened to sit in the list. A 90-minute alarm that cannot show what it is
-alarming about is the one thing this badge must not be.
+### 1. The DEFERRED badge shows, and counts, the buses it is alarming about
 
-It opens the **Deferred (Held from Service)** quick filter now. **Nothing new
-was built to display them** — that filter already lists exactly these buses,
-longest-held first, marks the ones past ninety minutes, and excludes any bus
-already on the Down Sheet. The badge simply never reached it.
+The pulsing 90-minute badge was a bare link to `/defect-log`. It renders on all
+six pages — the Defect Log included — so pressing it there pointed at the page
+already on screen and **did nothing at all**; from elsewhere it landed with no
+filter, leaving the overdue buses wherever they sat in the list.
 
-Two routes, because the badge renders on the page it points at: from elsewhere
-it is an ordinary link carrying the key in the query string, and from the Defect
-Log it fires an event so the open page raises the filter in place. The drawer is
-scrolled to — a filter that opens below the fold has shown nobody anything — and
-the query string is stripped once applied, so closing the drawer and reloading
-does not silently reopen it. Only real filter keys are honoured; a query string
-is user-supplied text.
+It opens the **Deferred (Held from Service)** quick filter now, which already
+listed exactly those buses, longest-held first. Two routes, because the badge
+renders on the page it points at: a query string from elsewhere, an event from
+the Defect Log itself. The drawer is scrolled to, and the query string is
+stripped once applied so closing it and reloading does not reopen it.
 
-### The badge now counts what the filter lists
+**The number on it was also wrong, in two ways.** It counted overdue *defects*
+while the drawer lists held-back *buses* — so a bus held on two repairs counted
+as two, and a badge reading 3 could open a list of 4. It now prints the count of
+buses the filter will list, deduplicated, using the drawer's own exclusions. The
+badge still only *appears* past ninety minutes, and the overdue figure survives
+in the aria-label: *"4 buses held from service, 3 over 90 minutes"*.
 
-Press 3 DEFERRED, get four buses. The two numbers were counting different
-things, and they differed in **two** ways rather than one:
+### 2. The shop cloud has been failing every sweep since Aug 31
 
-- **The ninety-minute line.** The badge counted only overdue; the drawer lists
-  every held-back bus.
-- **Defects versus buses, which was worse and had not been spotted.** The rows
-  behind the badge are one per DEFECT, so **a single bus held on two deferred
-  repairs counted as two.** A yard with three held buses could raise an alarm
-  reading five.
+**This is the one to publish for.** The Phone's status has read *"62 changes
+waiting"* in red for a week.
 
-The badge still appears only once a bus crosses ninety minutes — under that,
-DEFERRED is working as intended and nothing needs to flash — but the number
-printed on it is now the count of **buses the filter will list**, deduplicated by
-bus, using the same exclusions the drawer applies. The overdue figure survives in
-the aria-label, which reads *"4 buses held from service, 3 over 90 minutes"*, so
-a screen reader still gets the alarm and the list as separate facts.
+MERGE DUPES writes a tombstone for each record it folds away — the key, the
+deletion stamp and the signature, deliberately carrying **no fleet number**,
+since writing a repair's fields back while deleting it would let a stale copy
+overwrite the version that survived. Those tombstones were appended to the
+ordinary defect rows and upserted with them.
 
-The counting moved into `deferred-counts.ts`, a plain module, because the test
-runner strips types from `.ts` but not from `.tsx` — so it is now tested against
-a fleet directly rather than by grepping the component for a constant. The
-pre-existing badge test was re-pointed at the new module; it asserted on where
-the number lived, not on what it did, and the behaviour it covers is unchanged.
+Postgres will not accept that. An upsert is an INSERT that falls through to
+UPDATE only after the insert half is rejected as a duplicate, and NOT NULL is
+checked on that insert half **first**. `bus_defects` requires `fleet_number`, so
+the tombstone is refused with `null value in column "fleet_number" ... violates
+not-null constraint` before the conflict on `defect_id` is ever reached, and the
+whole 200-row chunk rolls back with it.
+
+**The damage ran past the defects.** `cloudPush` returns on the first error and
+`down_sheet_entries` is written *after* `bus_defects`, so the Down Sheet was
+never attempted at all — the cloud's copy is still **Aug 30**. Not one tombstone
+ever landed, so the 37 duplicate groups the Phone cleaned locally are still live
+in the cloud.
+
+`pushPlan` now partitions each table's rows by whether they carry a fleet
+number. Repairs are upserted as before; a tombstone goes as an **UPDATE by
+`defect_id`**, which touches no required column, is what the shop's edit policy
+allows, and against an id the server never had changes nothing — correct, since
+there is nothing to delete. The roadmap always described a delete as *"an
+ordinary update"*; this is that sentence, kept.
+
+### 3. SHOP CLOUD moves to the top of MASTER
+
+It was inside FACILITY MAP — a page's settings — while being the only control
+that decides whether the map, the Defect Log **and** the Down Sheet reach the
+other devices at all. Setting up a new iPad meant knowing to open a collapsed
+section titled "Board settings" and scrolling past bus markers and the DS badge.
+
+It is the **first group in MASTER** now, the section that opens by default,
+ahead of MASTER EXPORT, RESTORE LAST GOOD COPY and the theme picker.
+
+### 4. A photographed sheet says what it failed to read
+
+Checked the 09/5 4:24pm sheet against the export the phone produced from it.
+
+**Two buses vanished without a word.** Line 23 (18501, high oil usage) and line
+30 (20504, IDOT-ABS light, JEVELL) are on the paper and reached nothing, and
+nothing on screen said a row had been missed. A bus that is down and not on the
+sheet is a bus that goes back out broken.
+
+OCR cannot be trusted never to drop a line, but **the sheet numbers its rows
+01..55**, so a missing number can be found exactly. The review screen names them
+— *"LINES NOT READ: 23, 30"* — before anything is imported, collapsing runs to
+`37–41`. It reports rather than blocks: blank lines are ordinary, and only the
+person holding the paper can tell a blank line from a missed one. Counting stops
+at the highest line actually read.
+
+**A-3 and A-21 were not in the catalog.** The sheet has A3 and A21; with nowhere
+to put them the scan picked the nearest thing it had, so **A3 was recorded as
+A-6 and A21 as A-15** — two buses credited with a service they never had. The
+band rules already accepted any one- or two-digit code; the catalog had not
+caught up.
+
+**HAZMAT had nowhere to go and read as "Unknown diagnosis".** On this sheet it
+means a biohazard on board — blood, vomit or faeces. It is its own entry under
+Interior Cleaning now and, like Cleaning Required, **takes the bus out of
+service on its own**.
+
+**And the review flagged the wrong kind of doubt.** It flagged only rows whose
+bus number matched no bus in the fleet — but a misread digit usually lands on
+*another real bus*: 17565 came back as 17563, which exists, so the row resolved
+cleanly, showed FLEET MATCH and arrived pre-selected. Every row that scan got
+wrong was pencilled into the margin, and the model had been reporting its doubt
+all along in a `confidence` field nothing read. Below 0.75 a row now carries
+**CHECK THIS ROW** with the percentage and an amber border, and counts toward
+the flagged total. This does not make the OCR read a digit correctly; it makes
+the rows most likely to be wrong the ones that stand out.
 
 ## Validation
 
-- 207 regression tests passing, ESLint clean, production build succeeds
-- **Driven against the PRODUCTION build, both routes, zero console errors:**
-  pressing the badge while already on the Defect Log opens the drawer in place
-  with 17510 at 6h 40m, 17511 at 3h 20m and 17512 at 1h 35m all carrying the
-  overdue class, and 17513 at 20m below them; pressing it from the Down Sheet
-  lands on `/defect-log` already filtered with the same list; closing the drawer
-  and reloading leaves it closed
-- **The two numbers agree, measured in the PRODUCTION build.** A fleet with
-  17510 held on **two** deferred repairs, 17511 and 17512 held past ninety
-  minutes, 17513 held twenty minutes, and 17515 deferred but on the Down Sheet
-  renders a badge reading **4** against a drawer of exactly 17510 17511 17512
-  17513 — 17510 listed once, 17515 excluded from both, and the aria-label
-  reporting "4 buses held from service, 3 over 90 minutes"
-- **Both halves of the old count were confirmed to fail on their own:** counting
-  overdue defects again fails the new test, and dropping the per-bus
-  deduplication fails it separately
-- **Confirmed to fail without the fix:** reverting the badge to its bare
-  `href="/defect-log"` fails the new test
-- **A harness limitation worth writing down, since it read as a bug twice:**
-  Playwright will not click this badge. It is `position:fixed` with an infinite
-  pulse animation, so the element is never "stable" and a coordinate click —
-  even with `force:true` — misses it silently. A finger does not have this
-  problem. Drive it with `element.click()` rather than `page.click()`
+- 212 regression tests passing, ESLint clean, production build succeeds
+- **The shop-cloud failure was diagnosed against the live database, not
+  guessed:** the Postgres logs carry seven `null value in column "fleet_number"`
+  errors, the newest at 22:23 today, each naming the exact PostgREST upsert; the
+  live tables show `bus_defects` with **0 tombstoned rows** and **37 live
+  duplicate groups**, and `down_sheet_entries` last updated **Aug 30** while
+  buses and defects are current
+- **The DEFERRED badge driven against the PRODUCTION build, both routes:**
+  pressing it on the Defect Log opens the drawer in place with 17510 at 6h 40m,
+  17511 at 3h 20m and 17512 at 1h 35m flagged overdue and 17513 at 20m below
+  them; from the Down Sheet it lands already filtered; closing and reloading
+  leaves it closed. A fleet with one bus held on **two** deferred repairs renders
+  a badge reading 4 against a drawer of exactly four buses, that bus listed once
+- **SHOP CLOUD measured at 1024×1366 and 390×844:** the heading is on screen
+  **without scrolling** on both, MASTER is open by default so it costs no taps,
+  it is first in MASTER, and nothing named Shop Cloud is left in Board settings
+- **The scan findings come from a real sheet and its real export**, compared row
+  by row: 55 entries against two photographed pages
+- **Every fix was confirmed to fail without it:** tombstones back inside the
+  upsert, gap detection disabled, `A-3`/`A-21` removed, the badge counting
+  overdue defects again, and dropping the per-bus deduplication each fail their
+  own test
+- **A harness limitation worth keeping written down:** Playwright will not click
+  the DEFERRED badge — `position:fixed` with an infinite pulse means the element
+  is never "stable", and a coordinate click misses even with `force:true`. Drive
+  it with `element.click()`
 
 ## After it is live
 
-1. **Leave a bus DEFERRED for more than ninety minutes.** The pulsing red badge
-   appears top-right on every page.
-2. **Press it while you are on the Facility Map or Down Sheet.** It should land
-   on the Defect Log with the Deferred filter already open.
-3. **Press it while you are already on the Defect Log** — this is where it used
-   to do nothing. The filter should open in place and scroll into view.
-4. **Check the order.** Longest-held bus first, with anything past ninety
-   minutes marked.
-5. **Check the number on the badge equals the number on the drawer.** They are
-   the same count now.
-6. **Defer two separate repairs on one bus.** It must count as one bus, not two.
-7. **Close the drawer and reload.** It must stay closed.
+1. **Open ⚙ SETTINGS.** SHOP CLOUD is the first thing under MASTER, no scrolling.
+2. **On the device that has been showing changes waiting, press SEND MY
+   CHANGES.** The count should go to zero and the banner should stop being red.
+   This is the whole point of the release.
+3. **Then press GET THE SHOP'S COPY on the other device.** The Down Sheet should
+   finally arrive; the cloud's copy has been stuck at Aug 30.
+4. **Check the duplicates you merged are gone from the other devices too.** The
+   tombstones have never landed, so they will travel for the first time.
+5. **Leave a bus DEFERRED past ninety minutes and press the red badge** — from
+   another page and from the Defect Log itself, where it used to do nothing. The
+   number on the badge must equal the number on the drawer.
+6. **Defer two repairs on one bus.** It counts as one bus, not two.
+7. **SCAN SHEET a full paper sheet.** If any numbered line was not read, the
+   review says so before you import. Rows the model guessed at are amber and say
+   CHECK THIS ROW.
+8. **Check an A3 or A21 row** records as A-3 and A-21, not A-6 and A-15.
+9. **Log a HAZMAT bus.** Interior Cleaning → Biohazard, and it takes the bus out
+   of service on its own.
 
 ## The way back
 
-Measured in a throwaway worktree from `9436f22`:
+Measured in a throwaway worktree from `b57dcb5`:
 
-- `git revert 9436f22` alone is **clean**, and puts the mismatched count back —
-  the badge would again show deferred repairs rather than buses, double-counting
-  a bus held on two. There is no reason to take this one out on its own.
-- `git revert 9436f22 a8e7e2a` (newest first) is **clean** and takes Version 152
-  out as a unit. The badge goes back to a bare link that does nothing when
-  pressed on the Defect Log. Nothing else depends on either commit — they touch
-  only `deferred-watch.tsx`, the new `deferred-counts.ts`, `quick-filters.ts`
-  and the Defect Log page, and the Deferred quick filter they open was already
-  there and is unchanged.
-- Nothing is written by this change, so there is no stored state to clean up
-  going backwards.
+- `git revert b57dcb5 413daab 393b47f e3b33e4 9436f22 a8e7e2a` (newest first) is
+  **clean** and takes the whole release out together.
+- **Do not revert `e3b33e4` on its own unless the intent is to stop the shop
+  cloud working.** It reverts cleanly, and that is the only reason to mention it:
+  taking it out puts every sweep back to failing.
+- `git revert b57dcb5` alone is **clean.** `git revert b57dcb5 413daab` (newest
+  first) is **clean** and takes the scan work out as a unit.
+- **Single reverts of `413daab`, `393b47f`, and the DEFERRED pair conflict** —
+  in `down-sheet-scanner.tsx` and `down-sheet.css` for the first, and in
+  `tests/rendered-html.test.mjs` for all three, because later commits appended to
+  the same files. None of these is a code disagreement; revert the stacked pair
+  above, or resolve the test file by keeping both sides.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards.
 
 ## Publishing constraints that still apply
 
@@ -210,10 +296,9 @@ Measured in a throwaway worktree from `9436f22`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 152 | Live | <published tip hash> | The pulsing 90-minute DEFERRED badge now counts the same buses its filter lists — it had been counting deferred repairs past ninety minutes rather than held-back buses, so it disagreed with the list it opened and showed a bus held on two repairs twice — and it now opens the Deferred quick filter and shows the buses it is counting — longest-held first, with anything past ninety minutes marked — instead of being a bare link to a page it also renders on, where pressing it did nothing at all and from anywhere else landed with no filter and left the overdue buses buried in the list; it works from every page and from the Defect Log itself, scrolls the filter into view, and strips its own query string so closing the drawer and reloading does not reopen it |
+| 152 | Live | <published tip hash> | The shop cloud works again — every sweep had failed since Aug 31 because a merged-away tombstone, which carries no fleet number by design, was being sent inside an upsert that checks NOT NULL before it reaches the conflict, rolling back the whole chunk and, since the Down Sheet is written after the defects, keeping the Down Sheet out of the cloud entirely; tombstones now go as an ordinary UPDATE by id. SHOP CLOUD moves to the top of MASTER, the first thing on the Settings page, since it decides whether the map, the Defect Log and the Down Sheet reach the other devices at all. A photographed down sheet now names any numbered line it failed to read before anything is imported, and flags rows the model had to guess at rather than only rows whose bus number matched no bus — a misread digit usually lands on another real bus and looked certain. A-3 and A-21 join the Inspection catalog, so a sheet reading A3 or A21 is no longer recorded as A-6 or A-15, and HAZMAT becomes a biohazard condition that takes the bus out of service instead of reading as an unknown diagnosis. The pulsing 90-minute DEFERRED badge opens the Deferred filter showing the buses it counts, longest-held first, from every page including the one it points at, and its number now matches that list where it had counted deferred repairs and shown a bus held on two of them twice |
 ```
 
----
 
 # Version 151 — A road call is a fact about the bus, not a sentence in a description
 
