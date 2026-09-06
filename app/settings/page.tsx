@@ -53,6 +53,7 @@ import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSh
 import {shareOrDownloadFile} from "../share-file";
 import {exportFleetBoardBackup} from "../fleet-backup";
 import SaveAlert from "../save-alert";
+import FleetRecoveryControl from "../fleet-recovery-control";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "../storage";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
@@ -342,6 +343,16 @@ export default function SettingsPage(){
        <label className="master-import">MASTER IMPORT<input type="file" accept=".json,application/json" onChange={masterImport}/></label>
       </div>
       <small><b>MASTER IMPORT replaces everything on this device</b> once you confirm it. It is the only file in the app that can be read back in, and the only import that replaces rather than merges — to move one section without disturbing the rest, use the transfer inside that page's section below.</small>
+     </section>
+     {/* The other half of getting a device back, and it belongs beside MASTER
+         IMPORT rather than on the map: both answer "this device is wrong, put
+         it right". The save-failure notice has told people to "restore the
+         last-known-good copy from Settings" for as long as it has existed, and
+         until now that was a promise the app did not keep. */}
+     <section className="settings-group master-recovery" aria-labelledby="master-recovery-heading">
+      <h3 id="master-recovery-heading">RESTORE LAST GOOD COPY</h3>
+      <p>The board as it was before the last save that changed it, kept automatically on this device. Use it when the board looks wrong and you have no export to fall back on. It restores the buses and their repairs; the Down Sheet, campaigns and settings are left as they are, so it is a smaller step back than MASTER IMPORT.</p>
+      <FleetRecoveryControl/>
      </section>
      <section className="settings-group master-theme" aria-labelledby="master-theme-heading">
       <h3 id="master-theme-heading">ONE LOOK FOR EVERY PAGE</h3>

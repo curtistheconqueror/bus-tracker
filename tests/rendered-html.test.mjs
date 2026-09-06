@@ -136,18 +136,31 @@ test("successful ordinary writes snapshot the previous board and backup reminder
 });
 
 test("phone safety controls expose full-board export reminders and recovery",async()=>{
- const [tracker,recovery,defect,reminder,backup]=await Promise.all([
+ const [tracker,recovery,defect,reminder,backup,settings,alert,storage]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fleet-recovery-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/save-alert.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/storage.ts",import.meta.url),"utf8"),
  ]);
- assert.match(tracker,/FleetRecoveryControl/);
+ /* RESTORE LAST GOOD COPY moved off the map to sit beside MASTER IMPORT: both
+    answer "this device is wrong, put it right", and splitting them left the
+    save-failure notice pointing at a Settings page that did not have it. */
+ assert.match(settings,/<FleetRecoveryControl\/>/,"recovery lives with the other whole-device work");
+ assert.equal(/FleetRecoveryControl/.test(tracker),false,"and no longer on the map");
  assert.match(recovery,/RESTORE LAST GOOD COPY/);
+ /* Every notice that sends somebody to recover must name where it actually is. */
+ assert.match(alert,/restore the last-known-good copy from Settings/);
+ assert.match(storage,/use MASTER EXPORT or RESTORE LAST GOOD COPY in Settings/);
+ assert.match(settings,/RESTORE LAST GOOD COPY<\/h3>/,"and Settings really carries that heading");
  assert.match(defect,/OfflineBackupReminder buses=\{fleet\}/);
  assert.match(reminder,/OFFLINE BACKUP DUE/);
- assert.match(reminder,/EXPORT FULL BACKUP/);
+ /* One action, one name: the reminder writes the same file MASTER EXPORT does. */
+ assert.match(reminder,/>MASTER EXPORT</);
+ assert.equal(/EXPORT FULL BACKUP/.test(reminder),false,"two labels for one action is how you end up with two backups and no idea which restores");
  assert.match(backup,/pace-south-fleet-board-backup/);
  assert.match(backup,/DOWN_SHEET_STORAGE_KEY/);
  assert.match(backup,/DEFECT_LOG_SETTINGS_STORAGE_KEY/);
@@ -866,16 +879,18 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
   assert.ok(modalZ > commandZ, `Bus editor layer ${modalZ} must exceed command strip ${commandZ}`);
   assert.match(backup, /pace-south-fleet-board-backup/);
-  assert.match(page, /EXPORT ALL DATA/);
-  assert.match(page, /IMPORT ALL DATA/);
   assert.match(page, /registration\?\.update\(\)/);
   assert.match(page, /window\.location\.reload\(\)/);
   /* The whole-app pair moved to MASTER EXPORT / MASTER IMPORT in Settings, and
      the confirm in front of the replace went with it. The map keeps only the
      Fleet Map transfer, and points at the new home. */
   const settingsPage = await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+  /* The whole-app pair is MASTER EXPORT / MASTER IMPORT in Settings now. */
+  assert.match(settingsPage, />MASTER EXPORT</);
+  assert.match(settingsPage, /MASTER IMPORT<input type="file"/);
   assert.match(settingsPage, /MASTER IMPORT replaces everything stored on this device/);
-  assert.match(page, /MASTER EXPORT and MASTER IMPORT in Settings/);
+  assert.match(page, /MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY/,
+    "the map names every whole-device control and where it now lives");
   assert.match(css, /\.refresh-command\{/);
   assert.match(css, /\.board-data/);
 });
@@ -3260,7 +3275,9 @@ test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one lo
  assert.equal(/>EXPORT ALL DATA</.test(map),false,"the whole-app export left the map");
  assert.equal(/IMPORT ALL DATA<input/.test(map),false);
  assert.equal(/const importBoard=/.test(map),false,"and the map no longer carries its own restore");
- assert.match(map,/MASTER EXPORT and MASTER IMPORT in Settings/,"the map points at where they went");
+ assert.match(map,/MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY/,"the map points at where they went");
+ assert.equal(/BOARD BACKUP &amp; TRANSFER/.test(map),false,"the section is the Fleet Map transfer alone now");
+ assert.match(map,/FLEET MAP TRANSFER<\/h3>/,"and is named for what it actually moves");
  assert.match(backup,/MASTER EXPORT in Settings/,"and so does the report hint");
 
  const response=await render("/settings");
@@ -4096,7 +4113,8 @@ test("a section moves between devices without dragging the rest of the app with 
  const report=readTransferPayload(JSON.stringify({kind:"fleet-real-time-defect-log",records:[]}),"defect-log");
  assert.match(report.error,/report, not a transfer/);
  const full=readTransferPayload(JSON.stringify({kind:"pace-south-fleet-board-backup"}),"down-sheet");
- assert.match(full.error,/IMPORT ALL DATA/);
+ assert.match(full.error,/MASTER IMPORT in Settings/,
+  "a message that sends somebody to a button must name one that exists");
  assert.equal(readTransferPayload("not json at all","defect-log").ok,false);
  assert.equal(readTransferPayload(JSON.stringify(log),"defect-log").ok,true);
  assert.match(transferFilename("fleet-map",new Date("2026-08-30T00:00:00Z")),/^pace-fleet-map-2026-08-30\.json$/);
