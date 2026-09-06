@@ -36,8 +36,32 @@ export function downSheetGroupLabel(key:DownSheetGroupKey){return DOWN_SHEET_GRO
 /* Spark plugs and valve adjustments are scheduled maintenance the shop plans
    for, not a bus that broke. They are named here because nobody writing the
    sheet calls them an "inspection", and counting them as breakdowns is exactly
-   what made the down count read high. */
-export const DOWN_SHEET_INSPECTION_PATTERN=/\binspection\b|\b[abc]\s*-?\s*(?:6|12|15|18|24)\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b/i;
+   what made the down count read high.
+
+   Read off a real sheet, and every clause here earns its place on one:
+
+   - The service codes are a letter and a number, and the number is whatever the
+     interval is — A3, A15, A21, B12, B18, C24 all appear on one morning's
+     sheet. An earlier version of this listed the intervals it had been shown
+     (6, 12, 15, 18, 24) and quietly filed A3 and A21 as breakdowns.
+   - The letter and number are written together or hyphenated, never separated
+     by a bare space. That is the whole reason for `(?:\s*-\s*)?` instead of
+     `\s*-?\s*`: "needs a 12 volt battery" is a repair, and the looser spacing
+     called it an inspection.
+   - **PM'S** heads a row carrying several buses at once. It is the shop's word
+     for the service, so it belongs here — but **PM DEFECTS** is the opposite
+     thing, the faults found while doing one, and those buses are down. The
+     lookahead is what keeps a real breakdown out of the maintenance count.
+   - TRANS HUB DIFF is a fluid service written as three assemblies with no
+     symptom. All three words are required, because a bus with a roaring
+     differential is a repair and says so. */
+export const DOWN_SHEET_INSPECTION_PATTERN=/\binspections?\b|\b[abc](?:\s*-\s*)?\d{1,2}\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b|\bpm'?s?\b(?!\s*defects?\b)|\btrans(?:mission)?[\s/,&-]*hubs?[\s/,&-]*diff/i;
+
+/* The vendors the shop actually sends buses to. Kept as one list because two
+   places ask about them: the work-category ordering names which vendor has it,
+   and the OFF PROPERTY band asks only whether one does. */
+export const DOWN_SHEET_VENDORS:[RegExp,string][]=[[/\bcummins\b/i,"CUMMINS"],[/\bbus\s*(?:&|and)\s*truck\b/i,"BUS & TRUCK"],[/\bthermo\s*king\b/i,"THERMO KING"],[/\ballison\b/i,"ALLISON"]];
+export const DOWN_SHEET_OFF_PROPERTY_PATTERN=/\boff[\s-]*(?:property|site)\b/i;
 
 /* Precedence, which is deliberately NOT the reading order above.
 
@@ -51,6 +75,13 @@ export const DOWN_SHEET_INSPECTION_PATTERN=/\binspection\b|\b[abc]\s*-?\s*(?:6|1
 export function downSheetGroup(entry:DownSheetViewEntry,location=""):DownSheetGroupKey{
  if(String(location||"").startsWith("offsite-"))return "off-property";
  if(entry.assignmentType==="Vendor"||entry.section==="Vendor Repair")return "off-property";
+ /* The paper column is headed MECHANIC/LOCATION, and a vendor's name written
+    there is the sheet saying where the bus is, not who is working on it. Only
+    that column counts: "waiting on a call back from Cummins" is a note about a
+    bus sitting in the yard, and reading vendor names out of the whole row would
+    send it off property. */
+ if(DOWN_SHEET_VENDORS.some(([pattern])=>pattern.test(String(entry.assignedTo||""))))return "off-property";
+ if(DOWN_SHEET_OFF_PROPERTY_PATTERN.test(entryText(entry)))return "off-property";
  if(entry.section==="Inspection"||DOWN_SHEET_INSPECTION_PATTERN.test(entryText(entry)))return "inspection";
  return String(entry.assignedTo||"").trim()?"scheduled":"unscheduled";
 }
@@ -65,10 +96,9 @@ export function groupDownSheetEntries<T extends DownSheetViewEntry>(entries:T[],
 
 export function downSheetWorkGroup(entry:DownSheetViewEntry){
  const text=entryText(entry);
- if(/\binspection\b|\b[abc]\s*-?\s*(?:6|12|15|18|24)\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b/i.test(text))return {rank:3,label:"INSPECTIONS / SCHEDULED MAINTENANCE"};
+ if(DOWN_SHEET_INSPECTION_PATTERN.test(text))return {rank:3,label:"INSPECTIONS / SCHEDULED MAINTENANCE"};
  if(/\bbody(?:work|\s*shop)?\b|\bcollision\b|\bpaint\s*(?:booth|repair)?\b/i.test(text))return {rank:1,label:"BODY SHOP"};
- const vendors:[[RegExp,string],[RegExp,string],[RegExp,string],[RegExp,string]]=[[/\bcummins\b/i,"CUMMINS"],[/\bbus\s*(?:&|and)\s*truck\b/i,"BUS & TRUCK"],[/\bthermo\s*king\b/i,"THERMO KING"],[/\ballison\b/i,"ALLISON"]];
- const vendor=vendors.find(([pattern])=>pattern.test(text));
+ const vendor=DOWN_SHEET_VENDORS.find(([pattern])=>pattern.test(text));
  if(vendor)return {rank:2,label:"VENDOR — "+vendor[1]};
  if(entry.assignmentType==="Vendor"||entry.section==="Vendor Repair")return {rank:2,label:"VENDOR — OTHER"};
  return {rank:0,label:"GENERAL REPAIRS"};

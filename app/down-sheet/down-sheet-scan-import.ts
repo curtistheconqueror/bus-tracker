@@ -1,3 +1,5 @@
+import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS} from "./down-sheet-view.ts";
+
 export type ScanStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
 export type ScanFleetBus={id:string;n:string};
@@ -66,8 +68,13 @@ export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[
 export function normalizedSection(value:string):ScanImportRecord["section"]{
  const exact=clean(value);if(SECTIONS.has(exact))return exact as ScanImportRecord["section"];
  if(/accident/i.test(exact))return "Accident";
- if(/inspect|\b[abc]\s*-?\s*\d+|spark\s*plugs?|valve\s*adjust/i.test(exact))return "Inspection";
- if(/vendor|off\s*-?\s*(?:property|site)|offsite/i.test(exact))return "Vendor Repair";
+ /* One definition of what an inspection looks like, shared with the sheet
+    itself, so a row the scan files under Inspection is the same row the sheet
+    would have put in that band on its own. Two copies drifted once already:
+    this one took any number after the letter while the sheet's took a list of
+    five, so A21 was an inspection to the scanner and a breakdown to the page. */
+ if(DOWN_SHEET_INSPECTION_PATTERN.test(exact))return "Inspection";
+ if(/vendor|offsite/i.test(exact)||DOWN_SHEET_OFF_PROPERTY_PATTERN.test(exact)||DOWN_SHEET_VENDORS.some(([pattern])=>pattern.test(exact)))return "Vendor Repair";
  if(/road\s*call|\br\/?c\b|towed/i.test(exact))return "Roadcall";
  if(/\bunscheduled\b/i.test(exact))return "Pending";
  if(/\bscheduled\b/i.test(exact))return "Scheduled Repair";

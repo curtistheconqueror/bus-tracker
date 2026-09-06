@@ -368,6 +368,64 @@ test("Down Sheet divides itself into off property, scheduled, unscheduled and in
   }
 });
 
+test("Every row of a real Pace South down sheet lands in the right band", () => {
+  /* Transcribed from the Vehicle Down Sheet photographed 09/5/2026 7:35 AM,
+     foreman DICKSON, both pages. This is the fixture that matters: the rules
+     were written against an imagined sheet and three of them were wrong on a
+     real one — the service codes A21 and A3 were filed as breakdowns because
+     the pattern listed the intervals it had been shown, the PM'S row carrying
+     six buses was filed as a breakdown, and TRANS HUB DIFF with it. */
+  const row=(busNumber,customReason,assignedTo="")=>({busNumber,category:"Miscellaneous",repair:"",customReason,assignmentType:"Mechanic",assignedTo,section:"Pending"});
+  const sheet=[
+    ["01",row("17510","QUARANTINE DO NOT MOVE (PER SAFETY)"),"unscheduled"],
+    ["03",row("17529","Sway Bar Bracket Weld@BUS AND TRUCK","Bus & Truck"),"off-property"],
+    ["04",row("17547","Off Property Sway Bar Bracket Mount Weld Broken","Bus & Truck"),"off-property"],
+    ["05",row("17504","R/C Towed in Trans Not Engaging Incorrect Gear Ratio Needs Trans"),"unscheduled"],
+    ["06",row("17508","Rear Brakes / Air Leak Won't Build Air Pressure// High oil usage"),"unscheduled"],
+    // PM DEFECTS is the faults found while doing a PM. The bus is down.
+    ["07",row("17512","PM Defects - Trans Filter Treads Stripped Broken Sway Bar Weld (GILBERT)","MAUI/GILBERT"),"scheduled"],
+    ["09",row("17541","Check Eng Light Trouble Mod 1 Fuel","Armon"),"scheduled"],
+    ["11",row("17562","Dragging on S/S / High Trans Temp / Stuck in 3rd Gear"),"unscheduled"],
+    ["12",row("17567","Check Eng Light / Amerex / No A/C// Needs MDT and mount"),"unscheduled"],
+    ["14",row("17545","PM Defect Won't Pass Brake Test / Rear Brakes / Flat Tire /High oil usage"),"unscheduled"],
+    ["17",row("15517","Check /Stop Eng Light Check Multiplex Light - Derate"),"unscheduled"],
+    ["20",row("18507","R/C CRANK NO START (TOW)/R/R/O TIRE DAMAGED"),"unscheduled"],
+    ["24",row("17540","High oil usage, possible air compressor mounting gasket... 18:08"),"unscheduled"],
+    ["25",row("15508","CYL #5 MISFIRE/MDT SCREEN"),"unscheduled"],
+    ["31",row("17560","IDOT-ABS INOP/ LAMP NOT COMING ON AT ALL/front door & ramp - inop","ARMON"),"scheduled"],
+    ["34",row("17569","ROARING and excessive play in differential"),"unscheduled"],
+    ["36",row("17535","ACCIDENT BUS - TOWED - 08/04/26"),"unscheduled"],
+    // Rows 38-48: the inspection block the paper sheet already groups at the bottom.
+    ["38",row("17550","B12 / STEERING SHAKES AT 35 MPH"),"inspection"],
+    ["39",row("15510","A15"),"inspection"],
+    ["41",row("15512","B18"),"inspection"],
+    ["43",row("18510","A21"),"inspection"],
+    ["44",row("17526","C24"),"inspection"],
+    ["45",row("17524","A3"),"inspection"],
+    ["48",row("17558","TRANS HUB DIFF"),"inspection"],
+    ["49a",row("17514","PM'S"),"inspection"],
+    ["49f",row("17516","PM'S"),"inspection"],
+    // The handwritten margin overflow, which is what unscheduled means here:
+    // a real repair with no name attached, squeezed in when the lines ran out.
+    ["m1",row("15505","No AC"),"unscheduled"],
+    ["m2",row("17554","Batt 1547/mirror"),"unscheduled"],
+    ["m3",row("17571","c/s Mirror"),"unscheduled"],
+  ];
+  for(const [line,entry,expected] of sheet){
+    assert.equal(downSheetGroup(entry),expected,`line ${line} (bus ${entry.busNumber}) — ${entry.customReason}`);
+  }
+  // A vendor named in a NOTE is not a bus that left the property.
+  assert.equal(downSheetGroup(row("17999","Waiting on a call back from Cummins about the injector")),"unscheduled");
+  // The spacing rule: a service code is written tight or hyphenated, never
+  // "a 12", or every battery note becomes an inspection.
+  assert.equal(downSheetGroup(row("17998","Needs a 12 volt battery")),"unscheduled");
+  assert.equal(downSheetGroup(row("17997","A-15")),"inspection");
+  // Off property is decided before what the work is, so an inspection at a
+  // vendor is still off property.
+  assert.equal(downSheetGroup(row("17996","A15","Bus & Truck")),"off-property");
+  assert.equal(downSheetGroup(row("17995","A15","RJ"),"offsite-2"),"off-property");
+});
+
 test("The Down Sheet photo import reads the four section headings the sheet is organized into", async () => {
   const route = await readFile(new URL("../app/api/down-sheet-scan/route.ts", import.meta.url), "utf8");
   assert.match(route, /A heading is never a bus row/);

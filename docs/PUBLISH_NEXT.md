@@ -120,7 +120,7 @@ git diff --name-only e8f9515 dda0661 -- supabase package.json package-lock.json 
 **No service-worker bump this time,** so no shell re-download: `/settings` was
 the last new route and it went out with 150.
 
-Gate: **205 tests passing** (201 at Version 150, four added), ESLint clean,
+Gate: **206 tests passing** (201 at Version 150, five added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -350,9 +350,40 @@ read from the same two functions the sheet itself uses so the two cannot drift,
 and it follows the MECHANIC / VENDOR field live as that field is typed — which
 is the field that decides scheduled from unscheduled.
 
+**The rules were then corrected against a real sheet** — the Vehicle Down Sheet
+of 09/5/2026, 55 rows over two pages — and three of them were wrong on it:
+
+- **The service codes are whatever the interval is.** That morning's sheet
+  carries A3, A15, A21, B12, B18 and C24. The rule listed the intervals it had
+  been shown — 6, 12, 15, 18, 24 — so **A21 and A3 were counted as buses that
+  broke.** It now takes any one- or two-digit code.
+- **The letter and the number are written together or hyphenated, never spaced.**
+  Tightening that was the price of widening the number: under the old loose
+  spacing, "needs a 12 volt battery" would have become an inspection.
+- **PM'S heads a row carrying six buses at once** and was counted as six
+  breakdowns. It is scheduled maintenance. **PM DEFECTS is the opposite** — the
+  faults found while doing a PM, on a bus that is genuinely down — and the sheet
+  carries two of those, so the rule has to tell them apart. It does.
+- **TRANS HUB DIFF** is a fluid service written as three assemblies with no
+  symptom. All three words are required, so a roaring differential stays a
+  repair.
+- **A vendor in the MECHANIC/LOCATION column means the bus is there.** Two rows
+  carry "Bus & Truck" in that column, and one writes "Off Property" into the
+  reason as well. **Only that column counts:** a note saying "waiting on a call
+  back from Cummins" is a bus sitting in the yard, and reading vendor names out
+  of the whole row would have sent it off property.
+
+The scan prompt learned the same sheet: a **struck-through bus number** has come
+off the sheet and is skipped, a **row carrying several bus numbers becomes one
+row per bus** sharing the reason, and the **MECHANIC/LOCATION column** is
+described for what it is. The scan's own idea of an inspection was replaced by
+the sheet's, because two copies had already drifted — the scanner took any
+number after the letter while the page took a list of five, so A21 was an
+inspection to one and a breakdown to the other.
+
 ## Validation
 
-- 205 regression tests passing, ESLint clean, production build succeeds
+- 206 regression tests passing, ESLint clean, production build succeeds
 - **The Down Sheet bands driven against the PRODUCTION build at 1440 and 390,
   zero console errors:** the four counts read 1 / 1 / 2 / 2 against a total of
   6 and summed to it; the four dividers rendered in order carrying those same
@@ -370,10 +401,24 @@ is the field that decides scheduled from unscheduled.
   stripping every media block out of the stylesheet and re-matching — the same
   trap that put the road-call card note inside the phone breakpoint earlier in
   this release
+- **The whole 09/5/2026 sheet is a test fixture**, transcribed row by row with
+  the band each row belongs in, including the two PM DEFECTS rows, the six-bus
+  PM'S row, both vendor rows and the three handwritten margin entries. Driven
+  against the PRODUCTION build it renders **54 rows as 2 off property, 9
+  scheduled, 27 unscheduled and 16 inspections** — so the sheet that reads as 54
+  buses down is **38 buses actually down, two of them not on the property.**
+  That is the count the sheet could not give before
+- **Every rule the real sheet corrected was confirmed to fail without it:**
+  restoring the old interval list, dropping PM, dropping the PM DEFECTS guard,
+  and loosening the code spacing each fail the fixture on their own
 - **Both new Down Sheet tests were confirmed to fail with the rules they cover
   removed:** deleting the location rule from `downSheetGroup` fails the band
   test, and moving inspection below scheduled in the scan normalizer fails the
   photo-import test
+- **Sharing one definition of an inspection immediately caught its own
+  regression:** the shared pattern required the singular, so the scan stopped
+  recognising its own INSPECTIONS heading. The photo-import test failed on it
+  before it could ship
 - **RESTORE LAST GOOD COPY driven against the PRODUCTION build, 13 checks,
   zero console errors:** it renders inside MASTER reading "1 DEFECTS" off the
   stored snapshot; the map's ACTIONS no longer carries it, is titled FLEET MAP
@@ -468,6 +513,13 @@ is the field that decides scheduled from unscheduled.
 19. **SCAN SHEET a photographed down sheet.** Each review row now says GOES TO
    with the band it will land in. Type a mechanic into a row and watch it move
    from UNSCHEDULED to SCHEDULED before you import.
+20. **Check the inspection block at the bottom of a real sheet.** Every service
+   code should be in INSPECTIONS — A3 and A21 included, not just the common
+   intervals — along with TRANS HUB DIFF and every bus on the PM'S line.
+21. **Check the two PM DEFECTS rows are NOT in inspections.** Those are faults
+   found while doing a PM, so those buses are down.
+22. **Check a bus with a vendor in the MECHANIC/LOCATION column** sits in OFF
+   PROPERTY even though it is parked in the yard on the map.
 
 ## The way back
 
