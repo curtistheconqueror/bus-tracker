@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 151 PENDING — publish from `ef5add7`. Version 150 is live from `6d62787`.**
+**STATUS: VERSION 151 PENDING — publish from `4241dd7`. Version 150 is live from `6d62787`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **151** | `ef5add7` | ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
+| Next | **151** | `4241dd7` | Settings opens on a MASTER section holding MASTER EXPORT and MASTER IMPORT, which move the whole app in one file, and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Published | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
@@ -54,16 +54,18 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`ef5add7`** |
-| Last code-bearing commit | `ef5add7` — the release source is this commit |
+| **Release source** | **`4241dd7`** |
+| Last code-bearing commit | `4241dd7` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 150, published from `6d62787` |
 
-**Two application commits.** The first was rebased onto Codex's release commit
-`e8f9515`, not merged over it:
+**Three application commits.** The first was rebased onto Codex's release
+commit `e8f9515`, not merged over it:
 
 ```
-git log --oneline e8f9515..ef5add7
+git log --oneline e8f9515..4241dd7
+4241dd7 Put a MASTER section at the top of Settings, with MASTER EXPORT and IMPORT
+4b154d9 Move Version 151 to ef5add7: the map's checkbox counts, and a minute to undo   <- docs only
 ef5add7 Count road calls ticked on the map, and give every tick a minute to be taken back
 a74d750 Queue Version 151 from 27891d9: road calls as dated events    <- docs only
 27891d9 Record road calls as dated events, and move PARTS ON ORDER to Fixed Repairs
@@ -81,18 +83,25 @@ git diff --name-only 27891d9 ef5add7 -- app
 app/defect-log/defect-log-sync.ts
 app/page.tsx
 app/road-calls.ts
+
+git diff --name-only ef5add7 4241dd7 -- app
+app/fleet-backup.ts
+app/fleet-restore.ts       (new)
+app/page.tsx
+app/settings/page.tsx
+app/settings/settings.css
 ```
 
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e8f9515 ef5add7 -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e8f9515 4241dd7 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
 **No service-worker bump this time,** so no shell re-download: `/settings` was
 the last new route and it went out with 150.
 
-Gate: **202 tests passing** (201 at Version 150, one added), ESLint clean,
+Gate: **203 tests passing** (201 at Version 150, two added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -213,9 +222,45 @@ call now — **and the breakdown stays recorded,** because it happened.
 stays where they put it, and a space another bus has taken is not reclaimed.
 The event is still withdrawn either way.
 
+### 8. Settings opens on MASTER, with the whole-app transfer in it
+
+The Settings page opened on FACILITY MAP, which is a page's settings rather
+than the app's. **MASTER is the first section now, and the one that starts
+open**; the four page sections stay closed.
+
+**MASTER EXPORT and MASTER IMPORT** move the whole app in one file — the
+board, the Defect Log, the Down Sheet, Fleet Campaigns, the remembered parts
+and findings, and every page's settings. They were EXPORT ALL DATA and IMPORT
+ALL DATA behind ACTIONS on the Facility Map, reachable from that one page;
+Settings is in the nav on all six. The map keeps its Fleet Map transfer and
+points at where they went.
+
+The reading and writing **moved into `fleet-restore.ts` rather than being
+copied**, so there is one answer to what a valid backup is. It keeps all four
+of the map's refusals — not a backup, no buses, something that is not a bus,
+and two buses under one id, which would silently merge two real buses — and
+keeps the rule that made them safe: **a key the file does not carry is left
+alone, not cleared.** Campaigns were missing from the backup until version 4,
+so restoring an older file must not wipe the campaigns this device holds. The
+board is written first and its result decides everything, so a refused write
+leaves nothing half-restored.
+
+**ONE LOOK FOR EVERY PAGE** sets the map and the Defect Log / Fixed Repairs
+pair together. It is a **writer, not a layer**: one press writes into each
+page's own settings, so the sections below show what happened and can still be
+tuned one at a time, and there is never a second value to decide between. It
+reads back as active only when every page actually agrees.
+
 ## Validation
 
-- 202 regression tests passing, ESLint clean, production build succeeds
+- 203 regression tests passing, ESLint clean, production build succeeds
+- **The MASTER section driven against the PRODUCTION build, 23 checks, zero
+  console errors:** MASTER first and open with the other four closed; Midnight
+  set the map's key and the log's key in one press; MASTER EXPORT wrote a
+  backup carrying the board and all seven side keys; emptying the board and
+  importing that file back restored two buses, the log's theme and the
+  campaigns, and the open page refreshed without a reload; a file that is not
+  a backup changed nothing and never even asked
 - **Driven against the PRODUCTION build, 19 checks, zero console errors:**
   - tick then untick at 30 seconds put bus 17505 back in `garage-4` with no
     event and no card note
@@ -250,32 +295,45 @@ The event is still withdrawn either way.
 
 ## After it is live
 
-1. **Open LOG DEFECT on any bus.** WORK DONE SO FAR still has six boxes, with
+1. **Open ⚙ SETTINGS.** It opens on **MASTER**, with MASTER EXPORT and MASTER
+   IMPORT and a theme picker that sets every page at once. The four page
+   sections are closed below it.
+2. **Press MASTER EXPORT, then MASTER IMPORT with the file it just wrote.** It
+   asks first, then reports what it restored. Do this on a phone too — it is
+   the phone move-to-a-new-device path, and it is no longer on the map.
+3. **Open LOG DEFECT on any bus.** WORK DONE SO FAR still has six boxes, with
    **ROAD CALL** third, where PARTS ON ORDER used to be.
-2. **Tick ROAD CALL and save.** The bus should move to the road on the Facility
+4. **Tick ROAD CALL and save.** The bus should move to the road on the Facility
    Map, wear its orange ROADCALL badge, and the Defect Log card should show a
    purple **ROAD CALL** note with the date and time under the LATEST line.
-3. **Open that repair and save it again.** The note must still say one road
+5. **Open that repair and save it again.** The note must still say one road
    call, not two.
-4. **Untick ROAD CALL and save straight away.** Within a minute of ticking it,
+6. **Untick ROAD CALL and save straight away.** Within a minute of ticking it,
    the whole thing comes back out: no note, no count, and the bus returns to
    the space it came from.
-5. **Do it again on a road call from yesterday.** The box unticks and the flag
+7. **Do it again on a road call from yesterday.** The box unticks and the flag
    clears, but the note and the count stay, because that breakdown happened.
-6. **Tick ROADCALL on the Facility Map** in the bus editor. It should count
+8. **Tick ROADCALL on the Facility Map** in the bus editor. It should count
    toward the same note, counter and filter as one ticked on the Defect Log.
-7. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
+9. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
    week, and nothing older.
-8. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
+10. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
    The tick is still there, now shown on **Fixed Repairs** rather than the
    Defect Log.
-9. **A bus that road-called eight days ago** should have no note and should not
+11. **A bus that road-called eight days ago** should have no note and should not
    be in the filter.
 
 ## The way back
 
-Measured in a throwaway worktree from `ef5add7`:
+Measured in a throwaway worktree from `4241dd7`:
 
+- `git revert 4241dd7` alone is **clean.** MASTER leaves the Settings page and
+  the whole-app transfer goes with it — which would leave the app with **no way
+  to move everything to another device**, since it is no longer on the map
+  either. If this one has to go, put the buttons back on the map's ACTIONS in
+  the same change.
+- `git revert 4241dd7 ef5add7 27891d9` (newest first) is **clean**, and takes
+  the whole release out together.
 - `git revert ef5add7` alone is **clean.** The map's checkbox stops recording
   events and the sixty-second window goes, leaving the Defect Log's box working
   as it did in the first commit.
@@ -302,7 +360,7 @@ Measured in a throwaway worktree from `ef5add7`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 151 | Live | <published tip hash> | ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
+| 151 | Live | <published tip hash> | Settings opens on a MASTER section carrying MASTER EXPORT and MASTER IMPORT, which move the whole app between devices in one file and replace EXPORT ALL DATA and IMPORT ALL DATA on the Facility Map, with the reading and writing shared in one module that keeps every refusal and leaves any key the file does not carry alone, plus one theme that sets every page at once by writing into each page's own settings; ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
 ```
 
 ---
