@@ -436,7 +436,7 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
     {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,12);
+  assert.equal(QUICK_FILTERS.length,13);
   /* Recommended for Down Sheet and Deferred stay last on purpose: the others
      answer "what is broken" and these two answer "what needs a decision". */
   assert.equal(QUICK_FILTERS.at(-2).key,"down-sheet-recommended");
@@ -3168,6 +3168,165 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const id of ["down-sheet","defect-log","fixed-repairs"])assert.match(html,new RegExp('<div id="'+id+'-body" class="settings-section-body" hidden=""'),id+" renders closed");
 });
 
+test("a road call is a dated event on the bus that ages off the board on its own",async()=>{
+ const {ALL_WORK_STATES,WORK_STATES,FIXED_REPAIR_WORK_STATES,WORK_STATE_KEYS,ROAD_CALL_KEY,PARTS_ON_ORDER_KEY,defectWorkStates,hasWorkState,normalizeWorkStates,setDefectWorkState}=await import("../app/repair-catalog.ts");
+ const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,appendRoadCall,applyRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote}=await import("../app/road-calls.ts");
+ const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel}=await import("../app/quick-filters.ts");
+
+ /* PARTS ON ORDER left the Defect Log's boxes for Fixed Repairs, and ROAD CALL
+    stands where it stood. Six on the form, three across, so the bottom row is
+    still full and no box sits alone. */
+ assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","road-call","test-driven","brake-test","operator-reported"]);
+ assert.equal(WORK_STATES.length%3,0,"still a full bottom row");
+ assert.deepEqual(FIXED_REPAIR_WORK_STATES.map(state=>state.key),["parts-on-order"]);
+ assert.equal(WORK_STATES.some(state=>state.key===PARTS_ON_ORDER_KEY),false,"off the Defect Log's form");
+
+ /* THE THING THAT WOULD HAVE BEEN SILENT DATA LOSS. Read-time normalization
+    drops any key it does not know, so removing parts-on-order from the form's
+    list while the normalizer read that same list would have erased the tick
+    from every record already carrying it. The vocabulary is the longer list. */
+ assert.ok(WORK_STATE_KEYS.includes(PARTS_ON_ORDER_KEY),"the stored key stays legal");
+ assert.deepEqual(WORK_STATE_KEYS,ALL_WORK_STATES.map(state=>state.key));
+ const stored=normalizeWorkStates({"parts-on-order":{by:"CJ",at:"2026-09-01T10:00:00.000Z"},inspected:true});
+ assert.equal(stored["parts-on-order"].by,"CJ","a record ticked on the old form still reads");
+ assert.deepEqual(defectWorkStates({workStates:stored}).map(state=>state.key),["inspected","parts-on-order"],"and still shows on the record");
+
+ /* The event model. Append-only: a second breakdown is a second event, never
+    an overwrite, because two in a week is the finding. */
+ const day=(n)=>new Date(Date.UTC(2026,8,n,12)).toISOString();
+ const now=day(10);
+ let calls=appendRoadCall(undefined,{id:"rc1",at:day(9)});
+ calls=appendRoadCall(calls,{id:"rc2",at:day(8)});
+ calls=appendRoadCall(calls,{id:"rc3",at:day(1)});
+ assert.equal(roadCallCount(calls),3,"the background counter is every road call ever");
+ assert.equal(latestRoadCall(calls).id,"rc1","newest first");
+ assert.deepEqual(recentRoadCalls(calls,now).map(event=>event.id),["rc1","rc2"],ROAD_CALL_WINDOW_DAYS+" days back, inclusive");
+ assert.deepEqual(roadCallBacklog(calls,now).map(event=>event.id),["rc3"],"older ones go to the backlog");
+ assert.equal(recentRoadCalls(calls,now).length+roadCallBacklog(calls,now).length,roadCallCount(calls),
+  "the window plus the backlog is always the whole history — nothing is deleted to make a bus fall off");
+
+ /* The edge, exactly. Seven days old still counts; a moment past does not. */
+ const edge=new Date(Date.parse(now)-ROAD_CALL_WINDOW_DAYS*24*60*60*1000).toISOString();
+ assert.equal(hasRecentRoadCall([{id:"edge",at:edge}],now),true,"exactly seven days still shows");
+ assert.equal(hasRecentRoadCall([{id:"past",at:new Date(Date.parse(edge)-1000).toISOString()}],now),false,"a second past it does not");
+ assert.equal(hasRecentRoadCall(undefined,now),false);
+ assert.deepEqual(normalizeRoadCalls([{id:"x"},{at:"nonsense"},null,"no"]),[],"an entry with no usable date is not a road call");
+ assert.equal(normalizeRoadCalls([{id:"keep",at:day(9),futureField:"kept"}])[0].futureField,"kept","fields a later release adds survive a read");
+
+ /* What the card says: a date for one, the count leading for more than one. */
+ const stamp=()=>"STAMP";
+ assert.equal(roadCallNote([{id:"a",at:day(9)}],now,stamp),"ROAD CALL STAMP");
+ assert.equal(roadCallNote(calls,now,stamp),"ROAD CALL ×2 · LATEST STAMP","two this week reads as two");
+ assert.equal(roadCallNote([{id:"old",at:day(1)}],now,stamp),"","a backlog road call says nothing on the card");
+ assert.equal(roadCallNote(undefined,now,stamp),"");
+
+ /* Ticking it does three things at once, and doing one without the others is
+    how the board starts disagreeing with itself. */
+ const fleet=[{id:"bus-1",n:"17505",s:"defect",l:"garage-4",defects:[]},{id:"bus-2",n:"17506",s:"service",l:"garage-5",defects:[]}];
+ const applied=applyRoadCall(fleet,"bus-1",{id:"rc",at:now},undefined,now);
+ const moved=applied.fleet.find(bus=>bus.id==="bus-1");
+ assert.equal(moved.roadcall,true,"the map's own flag goes on, so the orange badge appears where the shop already looks");
+ assert.equal(roadCallCount(moved.roadCalls),1);
+ assert.ok(moved.l.startsWith("road-"),"and the bus is parked on the road, because that is where it is: "+moved.l);
+ assert.equal(applied.moved,true);
+ assert.equal(applied.fleet.find(bus=>bus.id==="bus-2").l,"garage-5","no other bus is touched");
+ assert.equal(ROAD_CALL_AREA,"IN SERVICE / ON ROAD");
+ /* A full road lot must not lose the record. */
+ const full=applyRoadCall(fleet,"bus-1",{id:"rc",at:now},{"IN SERVICE / ON ROAD":[]},now);
+ assert.equal(full.moved,false);
+ assert.equal(roadCallCount(full.fleet.find(bus=>bus.id==="bus-1").roadCalls),1,"the breakdown is still recorded when there is nowhere to park");
+ assert.equal(full.fleet.find(bus=>bus.id==="bus-1").roadcall,true);
+
+ /* Through the real save path: ticking it on a defect records the event, and
+    re-saving that same defect does NOT record a second one. Without the
+    transition check the counter would count form opens, not breakdowns. */
+ const defect={id:"d1",category:"Engine",issue:"Check engine and stop engine light",details:"died on route",operability:"down",state:"open",reportedBy:"CJ"};
+ const first=saveDefectLogRecord(fleet,[],"bus-1",setDefectWorkState(defect,ROAD_CALL_KEY,true,now,"CJ"),false,now);
+ assert.equal(first.error,null);
+ const afterFirst=first.fleet.find(bus=>bus.id==="bus-1");
+ assert.equal(roadCallCount(afterFirst.roadCalls),1,"ticking it records the breakdown");
+ assert.equal(afterFirst.roadcall,true);
+ assert.ok(afterFirst.l.startsWith("road-"),"and parks it on the road");
+ assert.equal(afterFirst.roadCalls[0].by,"CJ","who ticked it");
+ assert.equal(afterFirst.roadCalls[0].defectId,"d1","and which fault it was");
+ const again=saveDefectLogRecord(first.fleet,[],"bus-1",{...afterFirst.defects[0],shopNotes:"waiting on the tow"},false,day(11));
+ assert.equal(roadCallCount(again.fleet.find(bus=>bus.id==="bus-1").roadCalls),1,
+  "re-saving a repair that already road-called must not record a second breakdown");
+ /* A SECOND breakdown, on a second fault, is a second event. This is the
+    ordinary way a bus road-calls twice in a week. */
+ const other={id:"d2",category:"Brakes",issue:"Other brake repair",details:"air loss",operability:"down",state:"open",reportedBy:"CJ"};
+ const twice=saveDefectLogRecord(again.fleet,[],"bus-1",setDefectWorkState(other,ROAD_CALL_KEY,true,day(12),"CJ"),false,day(12));
+ assert.equal(roadCallCount(twice.fleet.find(bus=>bus.id==="bus-1").roadCalls),2,"a second fault that road-called is a second event");
+ assert.match(roadCallNote(twice.fleet.find(bus=>bus.id==="bus-1").roadCalls,day(12),stamp),/^ROAD CALL ×2 /,"and the card says two");
+
+ /* UNTICKING THE ONLY TICKED BOX HAD TO STICK, and did not.
+
+    setDefectWorkState deletes the workStates KEY when the last tick goes, to
+    keep stored records clean - so the spread that merges an edit over the
+    stored record had nothing to override with, and the box came back on the
+    next read. It bit every one of the six boxes, not just this one; it matters
+    most here because ticking ROAD CALL moves a bus and writes a permanent
+    record, so a mis-tick has to be reversible. */
+ const only=setDefectWorkState({...defect,id:"d3"},ROAD_CALL_KEY,true,day(12),"CJ");
+ const ticked=saveDefectLogRecord(fleet,[],"bus-1",only,false,day(12));
+ const storedDefect=ticked.fleet.find(bus=>bus.id==="bus-1").defects.find(item=>item.id==="d3");
+ assert.equal(hasWorkState(storedDefect,ROAD_CALL_KEY),true);
+ const undone=saveDefectLogRecord(ticked.fleet,[],"bus-1",setDefectWorkState(storedDefect,ROAD_CALL_KEY,false,day(13),"CJ"),false,day(13));
+ assert.equal(hasWorkState(undone.fleet.find(bus=>bus.id==="bus-1").defects.find(item=>item.id==="d3"),ROAD_CALL_KEY),false,
+  "unticking the only ticked box must stick");
+ /* The breakdown itself is NOT unwritten by unticking, because it happened.
+    UNDO LAST on the Defect Log is the way back from a genuine mis-tick: it
+    restores the whole fleet, and road calls live on the bus record. */
+ assert.equal(roadCallCount(undone.fleet.find(bus=>bus.id==="bus-1").roadCalls),1,"the event is history, not a checkbox");
+
+ /* The quick filter: joins on the road call, leaves on its own at seven days. */
+ assert.ok(QUICK_FILTERS.some(filter=>filter.key==="road-call"),"there is a road-call filter");
+ assert.match(QUICK_FILTERS.find(filter=>filter.key==="road-call").label,new RegExp("Last "+ROAD_CALL_WINDOW_DAYS+" Days"));
+ assert.match(quickFilterFallbackLabel("road-call"),new RegExp("last "+ROAD_CALL_WINDOW_DAYS+" days"));
+ const board=[
+  {id:"fresh",n:"1",defects:[],roadCalls:[{id:"a",at:day(9)}]},
+  {id:"aged",n:"2",defects:[],roadCalls:[{id:"b",at:day(1)}]},
+  {id:"clean",n:"3",defects:[]},
+ ];
+ assert.deepEqual(quickFilterBusIds(board,"road-call",now),["fresh"],"only this week's breakdowns");
+ assert.deepEqual(quickFilterBusIds(board,"road-call",day(17)),[],"and the list empties itself as they age out");
+ /* The same bus, asked the week its road call happened rather than a week
+    later. Deliberately not asked against the whole board: "fresh" is stamped
+    later than this, and a road call dated ahead of the asking time stays
+    visible on purpose - a device with a fast clock must not drop a breakdown. */
+ assert.deepEqual(quickFilterBusIds([board[1]],"road-call",day(2)),["aged"],"a bus is on the list the week it happened");
+ assert.deepEqual(quickFilterBusIds([board[1]],"road-call",day(9)),[],"and off it a week later");
+ /* The bus's own history decides the list, not its defects: a road call
+    outlives the repair it was ticked on, so merging that repair away must not
+    take this week's breakdown off the board. */
+ assert.deepEqual(quickFilterBusIds([{id:"kept",n:"9",defects:[],roadCalls:[{id:"c",at:day(9)}]}],"road-call",now),["kept"]);
+ /* And the drawer still names the fault, fixed or not. */
+ const roadCalled=setDefectWorkState({...defect,state:"completed"},ROAD_CALL_KEY,true,day(9),"CJ");
+ assert.deepEqual(quickFilterDefects({id:"b",defects:[roadCalled]},"road-call",now).map(item=>item.id),["d1"],
+  "a bus fixed on Wednesday still broke down on Tuesday");
+ assert.deepEqual(quickFilterDefects({id:"b",defects:[roadCalled]},"road-call",day(20)).map(item=>item.id),[],"until it ages out");
+
+ /* The card. Under LATEST, on its own row, in the DS badge's purple - both
+    answer "what else do I need to know about this bus". */
+ const [page,css,fixedPage]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+ ]);
+ assert.match(page,/roadCall=roadCallNote\(group\.bus\.roadCalls,undefined,timeLabel\)/,"formatted the same way as the LATEST stamp beside it");
+ assert.ok(page.indexOf("LATEST {timeLabel(group.updatedAt)}")<page.indexOf('className="road-call-note"'),"the note renders after the LATEST line");
+ assert.match(css,/grid-template-areas:"badges state status" "time time view" "roadcall roadcall roadcall"/,"its own row under LATEST");
+ assert.match(css,/\.road-call-note\{grid-area:roadcall;justify-self:start/);
+ assert.match(css,/\.road-call-note\{[^}]*background:var\(--downsheet-badge,#7c3aed\)/,"the DS badge's purple, not a new colour");
+
+ /* PARTS ON ORDER on Fixed Repairs, stamped like every other work state. */
+ assert.match(fixedPage,/const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES\[0\]\.label/,"the label comes from the catalog, so it cannot drift");
+ assert.match(fixedPage,/partsOnOrder:hasWorkState\(record\.defect,PARTS_ON_ORDER_KEY\)/,"an existing tick shows when the record is opened");
+ assert.match(fixedPage,/setDefectWorkState\(savedFields\(defect\),PARTS_ON_ORDER_KEY,draft\.partsOnOrder,now,draft\.completedBy\.trim\(\)\.toUpperCase\(\)\)/);
+ assert.equal(/work-state-picker/.test(fixedPage),false,"only the one state moved, not the whole picker");
+});
+
 test("every storage function a page calls is one it imports, so IMPORT ALL DATA can run at all",async()=>{
  /* Found by the type checker, confirmed in the source, not inferred: the commit
     of 2026-08-31 that added the save-failure banner swapped the map's import
@@ -3278,8 +3437,10 @@ test("a repair records how far it got, and what was found travels with it",async
     acts rather than judgements about how far the thinking has got. */
  /* Order is layout: the picker is a three-column grid, so the sixth key is the
     bottom-right box. Operator-reported goes last because it is where the report
-    came from, not work the shop did. */
- assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","parts-on-order","test-driven","brake-test","operator-reported"]);
+    came from, not work the shop did. PARTS ON ORDER has since moved to Fixed
+    Repairs and ROAD CALL stands in its place, third; the road-call test covers
+    that move and the fact that the stored key stays readable. */
+ assert.deepEqual(WORK_STATES.map(state=>state.key),["inspected","diagnosed","road-call","test-driven","brake-test","operator-reported"]);
  assert.equal(WORK_STATES.length%3,0,"a full bottom row, so no box sits alone");
 
  /* MORE THAN ONE IS THE NORMAL CASE. An operator reports a fault, the shop

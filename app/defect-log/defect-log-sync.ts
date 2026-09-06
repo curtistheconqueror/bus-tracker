@@ -1,4 +1,5 @@
-import {defectSupportingDetails,defectSummary,isUnresolved,normalizeDefects,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {applyRoadCall,type RoadCallEvent} from "../road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
@@ -7,6 +8,9 @@ import {stampOperationalChange} from "../operational-time.ts";
 export type DefectLogFleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;shift?:string;roadcall?:boolean;down?:boolean;
  parkedAt?:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string;pendingRepair?:string;defects?:StructuredDefect[];bay12Watch?:boolean;
+ /* Dated breakdowns out on the road, appended and never rewritten. The card
+    shows the last seven days of them; the rest stay for the pattern. */
+ roadCalls?:RoadCallEvent[];
 };
 
 export type DefectLogDownEntry={
@@ -169,7 +173,18 @@ export function saveDefectLogRecord(
  const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  const existing=current.find(defect=>defect.id===incoming.id);
  const state=incoming.state;
- const defect:StructuredDefect={...existing,...incoming,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
+ /* workStates is taken from the incoming record rather than left to the
+   spread, because unticking the LAST box produces a defect with no workStates
+   KEY AT ALL - setDefectWorkState deletes it rather than leaving an undefined
+   behind, to keep stored records clean - and a missing key cannot override the
+   one `existing` still carries. Unticking your only ticked box therefore did
+   not stick: it came back on the next read.
+
+   Every caller passes a complete defect built from the record it is editing,
+   never a partial patch, so reading this field straight off the incoming copy
+   is what the callers already mean. A future caller that passes a patch would
+   have to carry workStates with it. */
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
@@ -183,7 +198,21 @@ export function saveDefectLogRecord(
  const hasActiveDown=nextDown.some(entry=>entry.busId===bus.id&&entry.workflow!=="Completed");
  const nextBusBase={...bus,defects,pendingRepair:defectSummary(defects),down:hasActiveDown};
  const nextBus=stampOperationalChange(bus,{...nextBusBase,s:repairStatus(nextBusBase,defects,state)},now) as DefectLogFleetBus;
- return {fleet:fleet.map(item=>item.id===bus.id?nextBus:item),downEntries:nextDown,error:null};
+ const nextFleet=fleet.map(item=>item.id===bus.id?nextBus:item);
+
+ /* A road call is recorded the moment the box goes from unticked to ticked,
+    and only then.
+
+    The transition is what matters, not the box's state: re-saving a repair
+    that road-called last week must not record a second breakdown, or the
+    count that makes a pattern visible becomes a count of how many times
+    somebody opened the form. `existing` is the record as it was stored before
+    this save, which is the only place that answer can come from. */
+ const roadCalled=hasWorkState(defect,ROAD_CALL_KEY)&&!(existing&&hasWorkState(existing,ROAD_CALL_KEY));
+ if(!roadCalled)return {fleet:nextFleet,downEntries:nextDown,error:null};
+ const applied=applyRoadCall(nextFleet,bus.id,
+  {id:"road-call-"+defect.id+"-"+now,at:now,by:defect.reportedBy||undefined,defectId:defect.id},undefined,now);
+ return {fleet:applied.fleet,downEntries:nextDown,error:null,roadCall:{moved:applied.moved,target:applied.target}};
 }
 
 export function returnDefectLogBusToService(

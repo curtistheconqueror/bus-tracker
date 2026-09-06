@@ -4,7 +4,11 @@ import {useEffect,useMemo,useState} from "react";
 import TrackerNav from "../tracker-nav";
 import "./fixed-repairs.css";
 import {useFixedAppearance} from "./fixed-repairs-settings";
-import {defectCountField,defectLabel,defectWorkStates,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "../repair-catalog";
+import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,hasWorkState,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,PARTS_ON_ORDER_KEY,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "../repair-catalog";
+
+/* Drawn from the catalog rather than typed here, so the label on this page and
+   the label a record was stamped with can never drift apart. */
+const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES[0].label;
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
@@ -33,7 +37,7 @@ import SaveAlert from "../save-alert";
 const PAGE_SIZE=50;
 
 type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
-type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
+type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;partsOnOrder:boolean;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
 type UndoSnapshot={fleet:DefectLogFleetBus[];label:string};
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
@@ -43,7 +47,7 @@ function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(
 function locationLabel(location:string){const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not recorded"}
 
 function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void}){
- const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
+ const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
  const remembered=recallPart(partsMemory,draft.category,draft.issue);
  /* Checking the box offers the remembered part and never overwrites typing. */
  const togglePartsUsed=(checked:boolean)=>setDraft(current=>{
@@ -90,6 +94,11 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
    {defectWorkStates(record.defect).length>0&&<p className="wide completion-work-states"><b>WORK RECORDED</b><span>{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <i className={"work-state-badge "+state.key} key={state.key}>{state.label}{who?" — "+who:""}</i>})}</span></p>}
    <div className="parts-used-block wide">
     <label className="parts-used-toggle"><input type="checkbox" checked={draft.partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this repair. Leave it off if none were used.</small></span></label>
+    {/* Moved here from the Defect Log's work-state boxes. It says what a repair
+        is waiting on rather than what the shop did, so it belongs with the part
+        it is about. Records that were ticked on the old form keep the tick and
+        show it here. */}
+    <label className="parts-used-toggle parts-on-order-toggle"><input type="checkbox" checked={draft.partsOnOrder} onChange={event=>update("partsOnOrder",event.target.checked)}/><span><b>{PARTS_ON_ORDER_LABEL}</b><small>Waiting on a part to arrive. Stays on the record with who ticked it and when.</small></span></label>
     {draft.partsUsed&&<div className="parts-used-fields">
      <label>PART NUMBER<input value={draft.partNumber} onChange={event=>update("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
      <label>PART NAME (OPTIONAL)<input value={draft.partName} onChange={event=>update("partName",event.target.value)} placeholder="Exact catalog name"/></label>
@@ -165,7 +174,11 @@ const countUnit=countField?countField.unit:hadCount?undefined:record.defect.unit
 const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime())?(record.defect.completedAt||new Date().toISOString()):parsed.toISOString(),now=new Date().toISOString();
 /* The saved shape, applied whether this record already exists on the bus or
    is being created here by LOG A REPAIR. */
-const saved=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),partNumber:draft.partNumber.trim(),partsUsed:draft.partsUsed,partName:draft.partName.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
+const savedFields=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),partNumber:draft.partNumber.trim(),partsUsed:draft.partsUsed,partName:draft.partName.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
+/* PARTS ON ORDER rides through the same stamping every work state uses, so it
+   carries who ticked it and when, and unticking clears the stamp outright
+   rather than leaving a false behind. */
+const saved=(defect:StructuredDefect):StructuredDefect=>setDefectWorkState(savedFields(defect),PARTS_ON_ORDER_KEY,draft.partsOnOrder,now,draft.completedBy.trim().toUpperCase());
 /* A repair logged straight to this page has no defect on the bus yet, so it is
    appended rather than mapped over. Mapping alone would have written nothing
    and reported success — the record simply would not appear. */

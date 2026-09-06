@@ -24,14 +24,31 @@ export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
    the outcome left to prose is exactly the ambiguity that costs most on a
    safety item, and a failed brake test is the first thing anybody would want
    to pull as a list — which free text cannot answer. */
-export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order"|"test-driven"|"brake-test"|"operator-reported";
+export type WorkStateKey="inspected"|"diagnosed"|"road-call"|"parts-on-order"|"test-driven"|"brake-test"|"operator-reported";
 export type BrakeTestResult="pass"|"fail";
 /* result is only ever set on the brake-test key. Optional everywhere else so
    one stamp shape still covers every state. */
 export type WorkStateStamp={at?:string;by?:string;result?:BrakeTestResult};
-export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string}[]=[
+type WorkStateDefinition={key:WorkStateKey;label:string;short:string;hint:string};
+
+/* Every work state the app has ever stored, in reading order.
+
+   This is the NORMALIZER'S vocabulary, and it is deliberately longer than the
+   six boxes the Defect Log draws. A key dropped from here is a key dropped
+   from every stored record on read, so a state that moves off a form stays in
+   this list and the work somebody recorded under it survives the move. */
+export const ALL_WORK_STATES:WorkStateDefinition[]=[
  {key:"inspected",label:"INSPECTED",short:"INSP",hint:"Looked at, nothing found yet"},
  {key:"diagnosed",label:"DIAGNOSED",short:"DIAG",hint:"Cause found, not fixed yet"},
+ /* A breakdown out on the road, and a different kind of fact from the rest of
+    this list: the others say what the shop did, this says what the bus did and
+    where it is. Ticking it records a dated event on the bus, turns the map's
+    own ROADCALL flag on, and parks the bus on the road, because that is where
+    it is. The rules live in road-calls.ts. */
+ {key:"road-call",label:"ROAD CALL",short:"ROAD",hint:"Broke down on the road — parks the bus on the road"},
+ /* Kept in the vocabulary, off the Defect Log's boxes. It says what is holding
+    a repair up rather than what the shop did, and it now sits with the parts
+    on Fixed Repairs. Records already carrying it read exactly as before. */
  {key:"parts-on-order",label:"PARTS ON ORDER",short:"PARTS",hint:"Waiting on a part to arrive"},
  {key:"test-driven",label:"TEST DRIVEN",short:"DRIVEN",hint:"Road tested, details in the notes"},
  {key:"brake-test",label:"BRAKE TEST",short:"BRAKE",hint:"Record the result below"},
@@ -44,10 +61,22 @@ export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string
     it and road tests it, and all three are true of the same repair. */
  {key:"operator-reported",label:"OPERATOR REPORTED",short:"OPERATOR",hint:"Came in from the operator, not the shop"},
 ];
+
+/* The six on the Defect Log, three across, so the bottom row is full and no
+   box sits alone. PARTS ON ORDER is the one missing; ROAD CALL stands where it
+   stood, third, at the end of the top row. */
+export const WORK_STATES:WorkStateDefinition[]=ALL_WORK_STATES.filter(state=>state.key!=="parts-on-order");
+
+/* And the one that moved, shown on Fixed Repairs beside the part it is about. */
+export const FIXED_REPAIR_WORK_STATES:WorkStateDefinition[]=ALL_WORK_STATES.filter(state=>state.key==="parts-on-order");
+
+export const ROAD_CALL_KEY:WorkStateKey="road-call";
+export const PARTS_ON_ORDER_KEY:WorkStateKey="parts-on-order";
 export const BRAKE_TEST_KEY:WorkStateKey="brake-test";
 export function brakeTestResult(defect:StructuredDefect){return defect.workStates?.[BRAKE_TEST_KEY]?.result}
 export function brakeTestFailed(defect:StructuredDefect){return brakeTestResult(defect)==="fail"}
-export const WORK_STATE_KEYS=WORK_STATES.map(state=>state.key);
+/* Every key, not just the six on the form, for the reason above. */
+export const WORK_STATE_KEYS=ALL_WORK_STATES.map(state=>state.key);
 
 export type StructuredDefect={
  id:string;
@@ -465,10 +494,11 @@ export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at
 
 export function hasWorkState(defect:StructuredDefect,key:WorkStateKey){return Boolean(defect.workStates?.[key])}
 
-/* Ordered as WORK_STATES is, so a record always reads the same way round
-   however the boxes were ticked. */
+/* Ordered as ALL_WORK_STATES is, so a record always reads the same way round
+   however the boxes were ticked - and so a state no longer drawn on the Defect
+   Log's form still shows on every record that carries it. */
 export function defectWorkStates(defect:StructuredDefect){
- return WORK_STATES.filter(state=>hasWorkState(defect,state.key));
+ return ALL_WORK_STATES.filter(state=>hasWorkState(defect,state.key));
 }
 
 /* "CJ, Aug 27" where both are known, either alone where one is, and nothing
