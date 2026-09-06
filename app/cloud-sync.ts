@@ -413,7 +413,13 @@ export function writeMergedAway(storage:StorageWriter,merged:MergedAwayDefects){
 
    Only the key, the tombstone and the signature. Writing the record's own
    fields back while deleting it would let a stale copy of a repair overwrite
-   the version that survived. */
+   the version that survived.
+
+   No fleet_number, and none is wanted here — but that means this row can never
+   ride in an upsert: bus_defects requires fleet_number on the insert half, and
+   Postgres refuses the whole chunk. cloud-client's pushPlan routes any row
+   without a fleet number as an UPDATE by id for exactly this reason. Putting
+   these into the upsert batch is what left the shop cloud red for a week. */
 export function mergedAwayRows(merged:MergedAwayDefects,config:CloudConfig,now:string):CloudRow[]{
  return Object.entries(merged).map(([defectId,at])=>({
   defect_id:defectId,

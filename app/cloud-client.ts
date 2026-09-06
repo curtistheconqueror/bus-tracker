@@ -36,6 +36,7 @@ type SupabaseLike={
  };
  from(table:string):{
   upsert(rows:CloudRow[],options:{onConflict:string}):Promise<{error:{message:string}|null}>;
+  update(patch:CloudRow):{eq(column:string,value:string):Promise<{error:{message:string}|null}>};
   select(columns:string):{is(column:string,value:null):{
    range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>;
   }};
@@ -138,6 +139,65 @@ export type PushInput={
 
 export type PushResult=CloudOutcome&{sent:SentFingerprints;pushed:number;pending:number};
 
+/* One table's worth of writes, split by the one distinction Postgres enforces.
+
+   A row carrying its fleet number is a repair and is upserted. A row without
+   one is a tombstone — mergedAwayRows deliberately sends only the key, the
+   deletion stamp and the signature — and it MUST go as an UPDATE by id, never
+   inside an upsert.
+
+   The reason is how ON CONFLICT works. PostgREST's upsert is an INSERT that
+   falls through to UPDATE only after the insert half is rejected as a
+   duplicate, and NOT NULL checks run on that insert half first. bus_defects
+   requires fleet_number, so a tombstone in an upsert batch is refused with
+   `null value in column "fleet_number" … violates not-null constraint` before
+   the conflict on defect_id is ever reached — and the whole 200-row chunk rolls
+   back with it. That is what the shop cloud failed on every 45-second sweep
+   from the day MERGE DUPES was first pressed until this was found on Sep 6: the
+   Phone's status stuck red at "62 changes waiting", zero tombstones ever
+   landed, the 37 duplicate groups it had cleaned locally stayed alive in the
+   cloud, and the Down Sheet — queued behind the failing defects — never reached
+   the cloud after Aug 31.
+
+   An UPDATE touches no required column, is what the shop's edit policy allows,
+   and against an id the server never had it changes nothing, which is right:
+   there is nothing to delete. The roadmap always described a delete as "an
+   ordinary update"; this is that sentence, kept.
+
+   Buses first. A defect or a sheet entry naming a bus the server has never
+   heard of is not an error here — nothing has a foreign key to buses, on
+   purpose, because a fleet number is a name both devices already agree on and
+   making it a key would let one device's missing bus reject another's work. */
+export type PushStep={table:string;conflict:string;upserts:CloudRow[];updates:CloudRow[]};
+export function pushPlan(busChanged:CloudRow[],defectChanged:CloudRow[],entryChanged:CloudRow[]):PushStep[]{
+ const tombstone=(row:CloudRow)=>!String((row as Record<string,unknown>).fleet_number??"").trim();
+ return [
+  {table:"buses",conflict:"fleet_number",upserts:busChanged,updates:[]},
+  {table:"bus_defects",conflict:"defect_id",upserts:defectChanged.filter(row=>!tombstone(row)),updates:defectChanged.filter(tombstone)},
+  {table:"down_sheet_entries",conflict:"entry_id",upserts:entryChanged,updates:[]},
+ ];
+}
+
+/* Chunked so one bad afternoon on a slow connection does not turn into a
+   single request the phone cannot finish. The first error stops everything, and
+   the caller leaves the fingerprints un-advanced so the same work is sent again
+   next sweep rather than believed to have gone. */
+export async function executePushPlan(supabase:SupabaseLike,plan:PushStep[]):Promise<{message:string}|null>{
+ for(const step of plan){
+  for(let at=0;at<step.upserts.length;at+=200){
+   const {error}=await supabase.from(step.table).upsert(step.upserts.slice(at,at+200),{onConflict:step.conflict});
+   if(error)return error;
+  }
+  for(const row of step.updates){
+   const record=row as Record<string,unknown>;
+   const patch=Object.fromEntries(Object.entries(record).filter(([key])=>key!==step.conflict)) as CloudRow;
+   const {error}=await supabase.from(step.table).update(patch).eq(step.conflict,String(record[step.conflict]??""));
+   if(error)return error;
+  }
+ }
+ return null;
+}
+
 /* Only what changed since this device last got through. A phone that has been
    in a basement all morning sends its morning's work and nothing else. */
 export async function cloudPush(input:PushInput):Promise<PushResult>{
@@ -171,24 +231,8 @@ export async function cloudPush(input:PushInput):Promise<PushResult>{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",sent,pushed:0,pending:outstanding};
 
-  /* Buses first. A defect or a sheet entry naming a bus the server has never
-     heard of is not an error here — nothing has a foreign key to buses, on
-     purpose, because a fleet number is a name both devices already agree on and
-     making it a key would let one device's missing bus reject another's work. */
-  const writes:[string,CloudRow[],string][]=[
-   ["buses",busChange.changed,"fleet_number"],
-   ["bus_defects",defectChange.changed,"defect_id"],
-   ["down_sheet_entries",entryChange.changed,"entry_id"],
-  ];
-  for(const [table,rows,conflict] of writes){
-   if(!rows.length)continue;
-   /* Chunked so one bad afternoon on a slow connection does not turn into a
-      single request the phone cannot finish. */
-   for(let at=0;at<rows.length;at+=200){
-    const {error}=await supabase.from(table).upsert(rows.slice(at,at+200),{onConflict:conflict});
-    if(error)return {...failed(new Error(error.message)),sent,pushed:0,pending:outstanding};
-   }
-  }
+  const error=await executePushPlan(supabase,pushPlan(busChange.changed,defectChange.changed,entryChange.changed));
+  if(error)return {...failed(new Error(error.message)),sent,pushed:0,pending:outstanding};
   return {ok:true,phase:"idle",message:"",sent:fingerprints,pushed:outstanding,pending:0};
  }catch(error){
   /* The fingerprints are NOT advanced on failure, so the next attempt sends the
