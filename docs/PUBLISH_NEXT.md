@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Version 150 is live from `6d62787`.**
+**STATUS: VERSION 151 PENDING — publish from `27891d9`. Version 150 is live from `6d62787`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **151** | `27891d9` | ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Published | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
@@ -42,6 +43,210 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 151 — A road call is a fact about the bus, not a sentence in a description
+
+**Publish this next, after Version 150.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`27891d9`** |
+| Last code-bearing commit | `27891d9` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 150, published from `6d62787` |
+
+**One application commit,** rebased onto Codex's release commit `e8f9515`, not
+merged over it:
+
+```
+git log --oneline e8f9515..27891d9
+27891d9 Record road calls as dated events, and move PARTS ON ORDER to Fixed Repairs
+
+git diff --name-only e8f9515 27891d9 -- app
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/fixed-repairs/page.tsx
+app/quick-filters.ts
+app/repair-catalog.ts
+app/road-calls.ts          (new)
+```
+
+No dependency, database, CI, or service-worker change:
+
+```
+git diff --name-only e8f9515 27891d9 -- supabase package.json package-lock.json .github public   # returns nothing
+```
+
+**No service-worker bump this time,** so no shell re-download: `/settings` was
+the last new route and it went out with 150.
+
+Gate: **202 tests passing** (201 at Version 150, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and no rewrite.** No storage key changes and no payload shape changes.
+Buses gain an optional `roadCalls` array; a bus without one reads exactly as it
+does today, which is what "never road-called" has always looked like.
+
+**The one thing that would have been silent data loss, and was not.** Removing
+`parts-on-order` from the Defect Log's six boxes could not mean removing it
+from the vocabulary the read-time normalizer uses, because that normalizer
+drops any key it does not recognise — every record already ticked PARTS ON
+ORDER would have lost it on the next read. The catalog now carries two lists:
+the full vocabulary, and the six the form draws from it. A test pins that the
+stored key stays legal and still shows on the records that carry it.
+
+## What changed
+
+### 1. ROAD CALL, in the box PARTS ON ORDER used to hold
+
+Third box, top right, so the grid is still six across three columns with a full
+bottom row.
+
+Ticking it does **three things at once**, because doing one without the others
+is how the board starts disagreeing with itself:
+
+1. **A dated event is appended to the bus** — append-only, never rewritten, the
+   same shape the odometer readings and maintenance events already use. It
+   carries who ticked it and which fault it was.
+2. **The map's own ROADCALL flag goes on,** so the orange badge and the pulsing
+   dot appear where the shop already looks for them.
+3. **The bus is parked on the road,** in the first open space, because that is
+   where it is. It goes through the same helper the relocation tools use, so
+   the status follows the existing rules: a bus with a downing defect on the
+   road reads Out of Service, which is what a broken-down bus is.
+
+**A full road lot is not a failure.** The event and the flag still land and the
+bus keeps its space — losing the record of a breakdown because 75 slots were
+taken would be far worse than a bus parked in the wrong place.
+
+**Only the transition from unticked to ticked records a breakdown.** Re-saving
+a repair that road-called last week must not record a second one, or the
+counter counts how many times somebody opened the form.
+
+### 2. Seven days on the card, forever in the history
+
+The Defect Log card carries the note **under the LATEST line**, in the **DS
+badge's purple** — both answer "what else do I need to know about this bus",
+and a second colour would say they were different kinds of thing. One road call
+reads as a date; two or more lead with the count.
+
+It shows for **seven days and then falls off on its own**. Nothing is deleted
+to make that happen: the event stays on the bus permanently, because four road
+calls in six months is a pattern and only an intact history shows it. The
+counter behind it counts every road call the bus has ever had.
+
+### 3. The quick filter, which empties itself
+
+**Road Calls (Last 7 Days)**, sitting with the other "what is broken" lists
+rather than at the end with the three that are about what somebody still has to
+decide. A bus joins the moment it road-calls and leaves as that road call ages
+past seven days. No clearing, no end-of-week reset.
+
+The **bus's own history** decides the list, not its defects — a road call
+outlives the repair it was ticked on, so a defect later merged away must not
+take this week's breakdown off the board with it.
+
+### 4. PARTS ON ORDER moved to Fixed Repairs
+
+Beside the part it is about. It says what a repair is waiting on rather than
+what the shop did, which is why it never sat comfortably with the other five.
+It is stamped through the same path every work state uses, so it carries who
+ticked it and when.
+
+### 5. Unticking your only ticked box now sticks
+
+**Found by building this, and it hit all six boxes.** `setDefectWorkState`
+deletes the `workStates` key when the last tick goes, to keep stored records
+clean — so the spread that merges an edit over the stored record had nothing to
+override with, and the box came back on the next read. Unticking one of several
+always worked; unticking your last one did not.
+
+It matters most here, because ticking ROAD CALL moves a bus and writes a
+permanent record, so a mis-tick has to be reversible. The breakdown itself is
+not unwritten by unticking, because it happened — **UNDO LAST** is the way back
+from a genuine mis-tick, and it already works, because road calls live on the
+bus record it restores.
+
+## Validation
+
+- 202 regression tests passing, ESLint clean, production build succeeds
+- **Driven in Chromium at 390 and 1180, 21 checks, zero console errors:**
+  - ticking ROAD CALL on bus 17505 moved it to `road-0`, set the map flag, and
+    stamped one event with `by:"CJ"` and `defectId:"d1"`
+  - saving that repair again left the count at one
+  - a road call two days old showed `ROAD CALL Sep 4, 12:36 AM` under the
+    LATEST line; a nine-day-old one showed nothing; a bus that never
+    road-called showed nothing
+  - the note measured `rgb(124, 58, 237)` from `--downsheet-badge`, the DS
+    badge's own purple, at both widths, and sat under and left-aligned with the
+    time on a phone
+  - the quick filter counted exactly 2 and listed 17505 and 17506, not the
+    nine-day-old 17507
+  - the map drew the bus on the road
+- The unticking fix and the seven-day edge are pinned by unit tests: exactly
+  seven days still shows, a second past it does not, and the window plus the
+  backlog always equals the whole history
+- **The card styling was caught by measuring, not reading.** It first landed
+  inside the phone breakpoint, so on a desktop the note drew as bare text with
+  no background at all; the browser reported no matching CSS rule, which is how
+  it was found. The visual rule is top level now, and the grid row stays in the
+  breakpoint that owns the grid.
+
+## After it is live
+
+1. **Open LOG DEFECT on any bus.** WORK DONE SO FAR still has six boxes, with
+   **ROAD CALL** third, where PARTS ON ORDER used to be.
+2. **Tick ROAD CALL and save.** The bus should move to the road on the Facility
+   Map, wear its orange ROADCALL badge, and the Defect Log card should show a
+   purple **ROAD CALL** note with the date and time under the LATEST line.
+3. **Open that repair and save it again.** The note must still say one road
+   call, not two.
+4. **Untick ROAD CALL and save.** The box must stay unticked when you reopen
+   it. The note stays, because the breakdown happened — use UNDO LAST if it was
+   a genuine mis-tick.
+5. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
+   week, and nothing older.
+6. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
+   The tick is still there, now shown on **Fixed Repairs** rather than the
+   Defect Log.
+7. **A bus that road-called eight days ago** should have no note and should not
+   be in the filter.
+
+## The way back
+
+Measured in a throwaway worktree from `27891d9`:
+
+- `git revert 27891d9` alone is **clean.** ROAD CALL leaves the boxes, PARTS ON
+  ORDER returns to them, and the card note and the filter go with it.
+- **Road-call events already written stay on their buses,** harmlessly ignored,
+  and reappear if the feature comes back. Nothing is destroyed by going
+  backwards. The same is true of the flags and the moves: a bus parked on the
+  road stays there, which is where it was put.
+- Reverting also takes the unticking fix with it. That fix is independent and
+  worth keeping — if the road-call work has to go but the fix should stay,
+  revert this commit and re-apply the one-line `workStates:incoming.workStates`
+  in `saveDefectLogRecord`.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 151 | Live | <published tip hash> | ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
+```
 
 ---
 
