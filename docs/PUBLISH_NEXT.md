@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 151 PENDING — publish from `415fe96`. Version 150 is live from `6d62787`.**
+**STATUS: VERSION 151 PENDING — publish from `dda0661`. Version 150 is live from `6d62787`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **151** | `415fe96` | Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
+| Next | **151** | `dda0661` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Published | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
@@ -54,16 +54,18 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`415fe96`** |
-| Last code-bearing commit | `415fe96` — the release source is this commit |
+| **Release source** | **`dda0661`** |
+| Last code-bearing commit | `dda0661` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 150, published from `6d62787` |
 
-**Four application commits.** The first was rebased onto Codex's release
+**Five application commits.** The first was rebased onto Codex's release
 commit `e8f9515`, not merged over it:
 
 ```
-git log --oneline e8f9515..415fe96
+git log --oneline e8f9515..dda0661
+dda0661 Divide the Down Sheet into off property, scheduled, unscheduled and inspections
+c5ca8d6 Move Version 151 to 415fe96, and correct the revert advice that was wrong   <- docs only
 415fe96 Move RESTORE LAST GOOD COPY into MASTER, and fix the pointers the move broke
 eb5f9a3 Move Version 151 to 4241dd7: MASTER settings and the whole-app transfer   <- docs only
 4241dd7 Put a MASTER section at the top of Settings, with MASTER EXPORT and IMPORT
@@ -99,18 +101,26 @@ app/page.tsx
 app/section-transfer.ts
 app/settings/page.tsx
 app/storage.ts
+
+git diff --name-only 415fe96 dda0661 -- app
+app/api/down-sheet-scan/route.ts
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet-view.ts
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
 ```
 
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e8f9515 415fe96 -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e8f9515 dda0661 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
 **No service-worker bump this time,** so no shell re-download: `/settings` was
 the last new route and it went out with 150.
 
-Gate: **203 tests passing** (201 at Version 150, two added), ESLint clean,
+Gate: **205 tests passing** (201 at Version 150, four added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -118,6 +128,12 @@ production build succeeds.
 **None, and no rewrite.** No storage key changes and no payload shape changes.
 Buses gain an optional `roadCalls` array; a bus without one reads exactly as it
 does today, which is what "never road-called" has always looked like.
+
+**The Down Sheet's four bands are read-time only.** Nothing is written to say
+which band an entry is in — the band is worked out on every read from the bus's
+location, the entry's section and its assigned mechanic, all of which are
+already stored. An existing sheet divides itself the first time it is opened,
+and a device rolled back reads it as the single list it was.
 
 **The one thing that would have been silent data loss, and was not.** Removing
 `parts-on-order` from the Defect Log's six boxes could not mean removing it
@@ -284,9 +300,80 @@ page's own settings, so the sections below show what happened and can still be
 tuned one at a time, and there is never a second value to decide between. It
 reads back as active only when every page actually agrees.
 
+### 9. The Down Sheet divides itself into four bands
+
+The sheet gave one long ranked list. The two questions it is actually read for
+— **how many buses are down, and how many of those are not even on the
+property** — could only be answered by scrolling and counting, and inspections,
+spark plugs and valve adjustments counted as breakdowns, which is what made the
+down count read high.
+
+It now divides itself **by default**, not only when an ordering is picked:
+
+| Band | What is in it |
+| --- | --- |
+| **OFF PROPERTY** | Away at a vendor or otherwise not in the yard |
+| **SCHEDULED** | Down in the yard with a mechanic or vendor named |
+| **UNSCHEDULED** | Down in the yard with nobody assigned yet |
+| **INSPECTIONS & SCHEDULED MAINTENANCE** | Inspections, spark plugs and valve adjustments |
+
+Every divider carries **its own count**, and the four counts sit **above the
+sheet beside the total**, so no number has to be arrived at by scrolling.
+
+**The precedence is deliberately not the reading order.** Where the bus
+physically is beats everything, so a bus at Bus & Truck is off property whether
+it went there for an inspection or a transmission. The page reads that from
+**the map's own location, looked up by bus id** — not from anything copied onto
+the entry, which would go stale the moment somebody moved the bus on the map.
+What the work *is* comes next, so an inspection is an inspection with or
+without a name beside it. **Only then does it come down to who has it,** which
+is what puts the pencilled-in overflow rows at the bottom of a paper sheet into
+UNSCHEDULED instead of leaving them indistinguishable from assigned work — the
+floor's own definition of unscheduled is a row with no name attached.
+
+**ORDER sorts inside a band now** rather than dissolving the bands, so the
+counts on the dividers never change with the sort. WORK CATEGORIES still
+sub-groups within each band, exactly as it did across the whole sheet before.
+
+**The photo import is taught the same structure,** because a sheet organized
+this way is the sheet that gets photographed. The scan prompt names the four
+headings, says a heading is **never a bus row** and applies to every row
+beneath it until the next one, and says a row's own wording still wins over the
+band it sits in — a collision is an Accident and an R/C is a Roadcall wherever
+it is written. Pencilled-in rows are called out as real rows to read, with the
+mechanic left empty when no name is written beside them. The section normalizer
+learns the heading words, with **inspection decided before scheduled** because
+INSPECTIONS & SCHEDULED MAINTENANCE contains the word "scheduled".
+
+**Each scan-review row now says which band it will land in before the import**,
+read from the same two functions the sheet itself uses so the two cannot drift,
+and it follows the MECHANIC / VENDOR field live as that field is typed — which
+is the field that decides scheduled from unscheduled.
+
 ## Validation
 
-- 203 regression tests passing, ESLint clean, production build succeeds
+- 205 regression tests passing, ESLint clean, production build succeeds
+- **The Down Sheet bands driven against the PRODUCTION build at 1440 and 390,
+  zero console errors:** the four counts read 1 / 1 / 2 / 2 against a total of
+  6 and summed to it; the four dividers rendered in order carrying those same
+  counts; line numbers ran 01–06 continuously across the bands; and **a bus
+  parked at `offsite-0` with a mechanic named and section Pending still landed
+  in OFF PROPERTY**, which only the location rule can do — that case is in the
+  seed precisely because nothing else in the row would put it there. On a
+  390px phone the total spans the row above a 2×2 of bands and the page does
+  not scroll sideways (`scrollWidth` 390 = `clientWidth` 390)
+- **The scan review driven against the PRODUCTION build** with the four
+  headings stubbed in place of the model: each row showed GOES TO with its own
+  band and colour, full width across the row's grid, and typing a mechanic into
+  the third row moved it live from UNSCHEDULED to SCHEDULED
+- **Each band divider resolves its own colour at the top level,** asserted by
+  stripping every media block out of the stylesheet and re-matching — the same
+  trap that put the road-call card note inside the phone breakpoint earlier in
+  this release
+- **Both new Down Sheet tests were confirmed to fail with the rules they cover
+  removed:** deleting the location rule from `downSheetGroup` fails the band
+  test, and moving inspection below scheduled in the scan normalizer fails the
+  photo-import test
 - **RESTORE LAST GOOD COPY driven against the PRODUCTION build, 13 checks,
   zero console errors:** it renders inside MASTER reading "1 DEFECTS" off the
   stored snapshot; the map's ACTIONS no longer carries it, is titled FLEET MAP
@@ -363,11 +450,36 @@ reads back as active only when every page actually agrees.
    Defect Log.
 12. **A bus that road-called eight days ago** should have no note and should not
    be in the filter.
+13. **Open DOWN SHEET.** Above the sheet there is now a row of counts — TOTAL ON
+   SHEET, then OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS &
+   SCHEDULED MAINTENANCE. The four should add up to the total.
+14. **Look down the sheet.** It is divided by four coloured dividers in that
+   same order, each carrying its own count. The line numbers keep running
+   across them.
+15. **Find a bus parked in OFF PROPERTY on the Facility Map** and check it sits
+   in the OFF PROPERTY band even though the sheet says a mechanic has it —
+   where the bus is beats what the sheet says.
+16. **Take the mechanic's name off a row** and save. It should move from
+   SCHEDULED to UNSCHEDULED. Put the name back and it returns.
+17. **Check a spark plug or valve adjustment row** sits with the inspections
+   rather than counting as a bus that broke.
+18. **Change ORDER to WORK CATEGORIES.** The four bands and their counts must
+   stay exactly as they were; only the order of rows inside each band changes.
+19. **SCAN SHEET a photographed down sheet.** Each review row now says GOES TO
+   with the band it will land in. Type a mechanic into a row and watch it move
+   from UNSCHEDULED to SCHEDULED before you import.
 
 ## The way back
 
-Measured in a throwaway worktree from `415fe96`:
+Measured in a throwaway worktree from `dda0661`:
 
+- `git revert dda0661` alone is **clean.** The Down Sheet goes back to one
+  ranked list and the scan prompt forgets the four headings. Nothing else in
+  the release depends on it — it shares **no application file** with the other
+  four commits, only the test file and this one, and both reverted cleanly when
+  measured.
+- `git revert dda0661 415fe96 4241dd7 ef5add7 27891d9` (newest first) is
+  **clean** and takes the whole release out together.
 - `git revert 415fe96` alone is **clean.** RESTORE LAST GOOD COPY goes back to
   the map and the three corrected pointers revert with it — including the
   wrong-file message, which would again name a button that does not exist.
@@ -377,8 +489,6 @@ Measured in a throwaway worktree from `415fe96`:
   recovery control back on the map together, which is where they both were.
   **Reverting `4241dd7` alone would leave the app with no way to move
   everything to another device**, since MASTER IMPORT is the only one now.
-- `git revert 415fe96 4241dd7 ef5add7 27891d9` (newest first) takes the whole
-  release out together.
 - `git revert ef5add7` alone is **clean.** The map's checkbox stops recording
   events and the sixty-second window goes, leaving the Defect Log's box working
   as it did in the first commit.
@@ -405,7 +515,7 @@ Measured in a throwaway worktree from `415fe96`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 151 | Live | <published tip hash> | Settings opens on a MASTER section carrying every whole-device control together — MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY, which the save-failure and safety-stop notices had already been pointing at Settings for — and the wrong-file message, the backup reminder's button name and the map's section title were corrected to match; MASTER EXPORT and MASTER IMPORT which move the whole app between devices in one file and replace EXPORT ALL DATA and IMPORT ALL DATA on the Facility Map, with the reading and writing shared in one module that keeps every refusal and leaves any key the file does not carry alone, plus one theme that sets every page at once by writing into each page's own settings; ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
+| 151 | Live | <published tip hash> | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default rather than giving one long ranked list, each divider carrying its own count with the four counts and the total sitting above the sheet, so how many buses are down and how many are not even on the property can both be read at a glance and inspections, spark plugs and valve adjustments stop counting as breakdowns; where the bus physically is decides the band ahead of anything the sheet says, read from the Facility Map's own location by bus id, then what the work is, then who has it, which puts the pencilled-in overflow rows with no name attached into UNSCHEDULED; ORDER now sorts inside a band instead of dissolving the bands, so the counts never change with the sort; and the photo import reads the same four headings, treating a heading as a heading rather than a bus row and applying it to every row beneath it while a row's own wording still wins, with each scan-review row saying which band it will land in before the import; Settings opens on a MASTER section carrying every whole-device control together — MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY, which the save-failure and safety-stop notices had already been pointing at Settings for — and the wrong-file message, the backup reminder's button name and the map's section title were corrected to match; MASTER EXPORT and MASTER IMPORT which move the whole app between devices in one file and replace EXPORT ALL DATA and IMPORT ALL DATA on the Facility Map, with the reading and writing shared in one module that keeps every refusal and leaves any key the file does not carry alone, plus one theme that sets every page at once by writing into each page's own settings; ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
 ```
 
 ---
