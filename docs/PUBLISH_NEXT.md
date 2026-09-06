@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: NONE PENDING — Version 151 is live from `f5939df`.**
+**STATUS: VERSION 152 PENDING — publish from `a8e7e2a`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Next | **152** | `a8e7e2a` | The pulsing 90-minute DEFERRED badge opens the Deferred quick filter and shows the buses it is counting, longest-held first, instead of being a link that did nothing when pressed on the page it pointed at |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
@@ -24,6 +25,8 @@
 
 **Version 151 is live from `f5939df`.** The 136–151 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
+Version 152 sits on top of the published 151 — it was cherry-picked onto Codex's release commit `e493516`, never merged over it.
+
 Version 147 sits on top of the published 146 — it was rebased onto Codex's release commit `4c1e502`, never merged over it.
 
 This file always describes the unpublished releases, and it lives at this exact
@@ -43,6 +46,137 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 152 — The DEFERRED alarm shows what it is alarming about
+
+**Publish this next, after Version 151.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`a8e7e2a`** |
+| Last code-bearing commit | `a8e7e2a` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 151, published from `f5939df` |
+
+**One application commit,** cherry-picked onto Codex's release commit `e493516`,
+not merged over it:
+
+```
+git log --oneline e493516..a8e7e2a
+a8e7e2a Make the DEFERRED badge show the buses it is counting
+
+git diff --name-only e493516 a8e7e2a
+app/defect-log/page.tsx
+app/deferred-watch.tsx
+app/quick-filters.ts
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, or service-worker change:
+
+```
+git diff --name-only e493516 a8e7e2a -- supabase package.json package-lock.json .github public   # returns nothing
+```
+
+**No new route and no service-worker bump,** so no shell re-download.
+
+Gate: **207 tests passing** (206 at Version 151, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None.** No storage key changes, no payload shape changes, and nothing new is
+written. The badge reads the same deferred defects it always did and opens a
+quick filter that already existed.
+
+## What changed
+
+The 90-minute badge was a bare link to `/defect-log`. It renders on **all six
+pages — the Defect Log included** — so pressing it there pointed at the page
+already on screen and **did nothing at all.** From any other page it did
+navigate, but landed with no filter, leaving the overdue buses wherever they
+happened to sit in the list. A 90-minute alarm that cannot show what it is
+alarming about is the one thing this badge must not be.
+
+It opens the **Deferred (Held from Service)** quick filter now. **Nothing new
+was built to display them** — that filter already lists exactly these buses,
+longest-held first, marks the ones past ninety minutes, and excludes any bus
+already on the Down Sheet. The badge simply never reached it.
+
+Two routes, because the badge renders on the page it points at: from elsewhere
+it is an ordinary link carrying the key in the query string, and from the Defect
+Log it fires an event so the open page raises the filter in place. The drawer is
+scrolled to — a filter that opens below the fold has shown nobody anything — and
+the query string is stripped once applied, so closing the drawer and reloading
+does not silently reopen it. Only real filter keys are honoured; a query string
+is user-supplied text.
+
+**One thing worth knowing before it is live:** the badge counts only buses past
+ninety minutes while the drawer lists every held-deferred bus, so a badge reading
+3 can open a list of 4. That is deliberate — the alarm is for overdue — but
+hiding a bus twenty minutes short of the line would make it a worse list. Say so
+if you would rather the two numbers matched.
+
+## Validation
+
+- 207 regression tests passing, ESLint clean, production build succeeds
+- **Driven against the PRODUCTION build, both routes, zero console errors:**
+  pressing the badge while already on the Defect Log opens the drawer in place
+  with 17510 at 6h 40m, 17511 at 3h 20m and 17512 at 1h 35m all carrying the
+  overdue class, and 17513 at 20m below them; pressing it from the Down Sheet
+  lands on `/defect-log` already filtered with the same list; closing the drawer
+  and reloading leaves it closed
+- The badge counted **3** against four deferred buses, correctly excluding the
+  one held only twenty minutes
+- **Confirmed to fail without the fix:** reverting the badge to its bare
+  `href="/defect-log"` fails the new test
+- **A harness limitation worth writing down, since it read as a bug twice:**
+  Playwright will not click this badge. It is `position:fixed` with an infinite
+  pulse animation, so the element is never "stable" and a coordinate click —
+  even with `force:true` — misses it silently. A finger does not have this
+  problem. Drive it with `element.click()` rather than `page.click()`
+
+## After it is live
+
+1. **Leave a bus DEFERRED for more than ninety minutes.** The pulsing red badge
+   appears top-right on every page.
+2. **Press it while you are on the Facility Map or Down Sheet.** It should land
+   on the Defect Log with the Deferred filter already open.
+3. **Press it while you are already on the Defect Log** — this is where it used
+   to do nothing. The filter should open in place and scroll into view.
+4. **Check the order.** Longest-held bus first, with anything past ninety
+   minutes marked.
+5. **Close the drawer and reload.** It must stay closed.
+
+## The way back
+
+Measured in a throwaway worktree from `a8e7e2a`:
+
+- `git revert a8e7e2a` alone is **clean.** The badge goes back to a bare link
+  that does nothing when pressed on the Defect Log. Nothing else depends on it —
+  it touches only `deferred-watch.tsx`, `quick-filters.ts` and the Defect Log
+  page, and the Deferred quick filter it opens was already there and is
+  unchanged.
+- Nothing is written by this change, so there is no stored state to clean up
+  going backwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 152 | Live | <published tip hash> | The pulsing 90-minute DEFERRED badge now opens the Deferred quick filter and shows the buses it is counting — longest-held first, with anything past ninety minutes marked — instead of being a bare link to a page it also renders on, where pressing it did nothing at all and from anywhere else landed with no filter and left the overdue buses buried in the list; it works from every page and from the Defect Log itself, scrolls the filter into view, and strips its own query string so closing the drawer and reloading does not reopen it |
+```
 
 ---
 
