@@ -36,7 +36,7 @@ import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDef
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
-import { QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterMatch } from "../app/quick-filters.ts";
+import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -8398,4 +8398,39 @@ test("a record with a malformed details field renders instead of taking the page
   assert.equal(typeof defectSupportingDetails(defect),"string");
  }
  assert.doesNotThrow(()=>defectSummary(bad));
+});
+
+test("the pulsing DEFERRED badge opens the Deferred filter instead of going nowhere", async () => {
+  const watch = await readFile(new URL("../app/deferred-watch.ts" + "x", import.meta.url), "utf8");
+  const log = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+
+  /* The badge renders on all six pages, the Defect Log included. It used to be
+     a bare link to /defect-log, so pressing it while standing on the Defect Log
+     pointed at the page already on screen and did nothing at all — and from
+     anywhere else it landed with no filter, leaving the overdue buses wherever
+     they sat in the list. */
+  assert.doesNotMatch(watch, /href="\/defect-log"/, "a bare link to the page the badge also renders on does nothing when pressed there");
+  assert.match(watch, /quickFilterHref\("deferred"\)/);
+  assert.match(watch, /window\.location\.pathname!=="\/defect-log"/, "the same-page case has to be handled separately from navigation");
+  assert.match(watch, new RegExp("dispatchEvent\\(new CustomEvent\\(QUICK_FILTER_EVENT"));
+
+  assert.equal(quickFilterHref("deferred"), "/defect-log?" + QUICK_FILTER_PARAM + "=deferred");
+  assert.equal(QUICK_FILTER_EVENT, "pace-open-quick-filter");
+
+  // Only real filter keys are honoured — a query string is user-supplied text.
+  assert.equal(quickFilterFromValue("deferred"), "deferred");
+  assert.equal(quickFilterFromValue("road-call"), "road-call");
+  for (const junk of ["", null, undefined, "nope", "__proto__", 7, {}]) {
+    assert.equal(quickFilterFromValue(junk), null, JSON.stringify(junk) + " is not a filter key");
+  }
+  // Every advertised key round-trips, so no filter can be linked to but not opened.
+  for (const item of QUICK_FILTERS) assert.equal(quickFilterFromValue(item.key), item.key);
+
+  // The Defect Log has to accept both routes, and not leave the query string
+  // behind — closing the drawer and reloading must not silently reopen it.
+  assert.match(log, new RegExp("addEventListener\\(QUICK_FILTER_EVENT"));
+  assert.match(log, /searchParams\.delete\(QUICK_FILTER_PARAM\)/);
+  assert.match(log, /quickFilterFromValue\(new URLSearchParams/);
+  // A filter that opens below the fold has not shown anybody anything.
+  assert.match(log, /\.quick-filter-drawer"\)\?\.scrollIntoView/);
 });

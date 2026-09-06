@@ -30,6 +30,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import {defectLabel,deferredMinutesElapsed,isHeldDeferred,isUnresolved,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
 import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
+import {QUICK_FILTER_EVENT,quickFilterHref} from "./quick-filters";
 
 const OVERDUE_MINUTES=90;
 const REVIEW_MINUTES=60;
@@ -104,8 +105,23 @@ export function DeferredNavBadge(){
   window.addEventListener("storage",onStorage);
   return ()=>{clearInterval(interval);window.removeEventListener("storage",onStorage)};
  },[]);
+ /* Pressing it has to actually show the buses it is counting.
+
+    It used to be a bare link to /defect-log, which meant that on the Defect Log
+    — where this badge also renders — it pointed at the page already on screen
+    and did nothing at all. Even from elsewhere it only landed on the log with
+    no filter, leaving the overdue buses wherever they happened to sit in the
+    list, which is the one thing a 90-minute alarm must not do.
+
+    It now opens the Deferred quick filter, which already lists exactly these
+    buses, longest-held first, and marks the ones past 90 minutes. */
+ const openDeferredFilter=(event:React.MouseEvent<HTMLAnchorElement>)=>{
+  if(window.location.pathname!=="/defect-log")return;
+  event.preventDefault();
+  window.dispatchEvent(new CustomEvent(QUICK_FILTER_EVENT,{detail:"deferred"}));
+ };
  if(!count)return null;
- return <a href="/defect-log" className="deferred-nav-badge" role="status" aria-label={count+" bus"+(count===1?"":"es")+" deferred over 90 minutes — open Defect Log"}><span aria-hidden="true">🚨</span> {count} DEFERRED</a>;
+ return <a href={quickFilterHref("deferred")} onClick={openDeferredFilter} className="deferred-nav-badge" role="status" aria-label={count+" bus"+(count===1?"":"es")+" deferred over 90 minutes — show them in the Defect Log"}><span aria-hidden="true">🚨</span> {count} DEFERRED</a>;
 }
 
 type ReviewAction="keep"|"downsheet"|"return";

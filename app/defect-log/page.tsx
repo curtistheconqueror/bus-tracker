@@ -11,7 +11,7 @@ import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
-import {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,type QuickFilterKey} from "../quick-filters";
+import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "../quick-filters";
 import {roadCallNote} from "../road-calls";
 import {lockPageScroll} from "../scroll-lock";
 import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
@@ -452,6 +452,26 @@ export default function DefectLog(){
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
+ /* Opened from the pulsing DEFERRED badge: by query string when it was pressed
+    on another page, by event when it was pressed on this one. The drawer is
+    scrolled to, because a filter that opens below the fold has not shown
+    anybody anything — and the query string is stripped afterwards so closing
+    the drawer and reloading does not silently reopen it. */
+ useEffect(()=>{
+  const open=(key:QuickFilterKey)=>{
+   setQuickFilter(key);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");
+   setTimeout(()=>document.querySelector(".quick-filter-drawer")?.scrollIntoView({behavior:"smooth",block:"start"}),0);
+  };
+  const requested=quickFilterFromValue(new URLSearchParams(window.location.search).get(QUICK_FILTER_PARAM));
+  if(requested){
+   open(requested);
+   const url=new URL(window.location.href);url.searchParams.delete(QUICK_FILTER_PARAM);
+   window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+  }
+  const receive=(event:Event)=>{const key=quickFilterFromValue((event as CustomEvent).detail);if(key)open(key)};
+  window.addEventListener(QUICK_FILTER_EVENT,receive);
+  return ()=>window.removeEventListener(QUICK_FILTER_EVENT,receive);
+ },[]);
  const [editing,setEditing]=useState<LogDraft|null>(null);
  const [mysterySlot,setMysterySlot]=useState("#edf3ff");
  const [hydrated,setHydrated]=useState(false);

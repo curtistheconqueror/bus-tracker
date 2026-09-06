@@ -130,3 +130,18 @@ export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey,now=new D
 }
 
 export function quickFilterBusIds<T extends QuickFilterBus>(fleet:T[],key:QuickFilterKey,now=new Date().toISOString()){return fleet.filter(bus=>quickFilterMatch(bus,key,now)).map(bus=>bus.id)}
+
+/* How the pulsing DEFERRED badge asks the Defect Log to open a filter.
+
+   Two routes, because the badge renders on all six pages — the Defect Log
+   included. From another page it is an ordinary link carrying the key in the
+   query string. From the Defect Log itself a link points at the page you are
+   already standing on, which does nothing visible and is exactly why pressing
+   the badge read as broken; there it fires the event instead and the open page
+   raises the filter in place. */
+export const QUICK_FILTER_PARAM="quick";
+export const QUICK_FILTER_EVENT="pace-open-quick-filter";
+export function quickFilterFromValue(value:unknown):QuickFilterKey|null{
+ return QUICK_FILTERS.some(item=>item.key===value)?value as QuickFilterKey:null;
+}
+export function quickFilterHref(key:QuickFilterKey,path="/defect-log"){return path+"?"+QUICK_FILTER_PARAM+"="+encodeURIComponent(key)}
