@@ -27,7 +27,7 @@
 
 import type {DurableRecord} from "./domain.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "./facility-areas.ts";
-import type {MovableRepairBus} from "./smart-status.ts";
+import {moveOrSwapBuses,type MovableRepairBus} from "./smart-status.ts";
 
 export type RoadCallEvent=DurableRecord&{
  /* When the road call was recorded. The event's own identity in time. */
@@ -35,12 +35,26 @@ export type RoadCallEvent=DurableRecord&{
  /* Who recorded it, when initials are set. Optional: a tick with no name is
     still a tick, the same rule the work states follow. */
  by?:string;
- /* The defect the tick came from, so a card can say which fault it was. */
+ /* The defect the tick came from, so a card can say which fault it was.
+    Absent on one ticked from the Facility Map, which is about the bus. */
  defectId?:string;
+ /* Where the bus was parked before this road call moved it, so a withdrawal
+    inside the undo window can put it back rather than leaving it stranded on
+    the road. Absent when nothing was moved. */
+ from?:string;
 };
 
 export const ROAD_CALL_WINDOW_DAYS=7;
 const WINDOW_MS=ROAD_CALL_WINDOW_DAYS*24*60*60*1000;
+
+/* How long a road call can be taken back.
+
+   A tick is a permanent record of a breakdown, so it does not come off because
+   somebody changed their mind an hour later - the whole point of the counter is
+   that it cannot be quietly tidied. But a wrong tap is a wrong tap, and the
+   person who made it knows within seconds. One minute is long enough to notice
+   and undo, and far too short to be used as a way of editing history. */
+export const ROAD_CALL_UNDO_SECONDS=60;
 
 /* Where a bus goes when it road-calls. It IS on the road at that moment, which
    is the whole meaning of the words, so the board should say so without
@@ -128,14 +142,61 @@ function defaultStamp(at:string){
    bus keeps its space - losing the record of a breakdown because 75 slots were
    taken would be far worse than a bus parked in the wrong place. */
 export function applyRoadCall<T extends RoadCallBus&MovableRepairBus>(
- fleet:T[],busId:string,event:RoadCallEvent,areas:Record<string,string[]>=RELOCATION_AREAS,now=new Date().toISOString()
+ fleet:T[],busId:string,event:RoadCallEvent,areas:Record<string,string[]>=RELOCATION_AREAS,now=new Date().toISOString(),
+ /* The Facility Map ticks this box on a bus whose location the same form can
+    set, so parking it is the Defect Log's job and optional here. */
+ {move=true}:{move?:boolean}={}
 ):{fleet:T[];moved:boolean;target:string}{
  const bus=fleet.find(item=>item.id===busId);
  if(!bus)return {fleet,moved:false,target:""};
- const recorded=fleet.map(item=>item.id===busId
-  ?{...item,roadcall:true,roadCalls:appendRoadCall(item.roadCalls,event)}
+ const before=String(bus.l||"");
+ const record=(from?:string)=>fleet.map(item=>item.id===busId
+  ?{...item,roadcall:true,roadCalls:appendRoadCall(item.roadCalls,from?{...event,from}:event)}
   :item);
- const move=moveBusToArea(recorded,busId,ROAD_CALL_AREA,areas,now);
- if(move.error)return {fleet:recorded,moved:false,target:""};
- return {fleet:move.fleet,moved:!move.unchanged,target:move.target};
+ if(!move)return {fleet:record(),moved:false,target:""};
+ /* Recorded with the old location on it, so the undo window can put the bus
+    back where it came from. */
+ const recorded=record(before);
+ const moved=moveBusToArea(recorded,busId,ROAD_CALL_AREA,areas,now);
+ if(moved.error||moved.unchanged)return {fleet:record(),moved:false,target:moved.unchanged?moved.target:""};
+ return {fleet:moved.fleet,moved:true,target:moved.target};
+}
+
+/* The event a fresh untick would take back, if there is one.
+
+   Only the most recent, and only inside the undo window. Anything older is
+   history and stays. */
+export function withdrawableRoadCall(value:unknown,now=new Date().toISOString()){
+ const latest=latestRoadCall(value);
+ if(!latest)return undefined;
+ const age=new Date(now).getTime()-Date.parse(latest.at);
+ return age>=0&&age<ROAD_CALL_UNDO_SECONDS*1000?latest:undefined;
+}
+
+/* Unticking the box.
+
+   The FLAG always comes off, because it says the bus is out on a road call
+   right now and it is not. What happens to the RECORD depends on the clock: a
+   tick taken back within the minute never really happened and is withdrawn
+   whole - event, and the move it caused - while an older one stays, because
+   the breakdown did.
+
+   The bus only goes back where it came from if it is still sitting where the
+   road call put it and that space is free. Somebody who has since moved it
+   themselves, or a space another bus has taken, wins over an undo. */
+export function clearRoadCall<T extends RoadCallBus&MovableRepairBus>(
+ fleet:T[],busId:string,now=new Date().toISOString()
+):{fleet:T[];withdrawn:boolean;restored:string}{
+ const bus=fleet.find(item=>item.id===busId);
+ if(!bus)return {fleet,withdrawn:false,restored:""};
+ const taken=withdrawableRoadCall(bus.roadCalls,now);
+ const kept=taken?normalizeRoadCalls(bus.roadCalls).filter(event=>event.id!==taken.id):normalizeRoadCalls(bus.roadCalls);
+ const cleared=fleet.map(item=>item.id===busId
+  ?{...item,roadcall:false,...(kept.length?{roadCalls:kept}:{roadCalls:undefined})}
+  :item);
+ const home=String(taken?.from||"");
+ const onTheRoad=String(bus.l||"").startsWith("road-");
+ if(!taken||!home||!onTheRoad||cleared.some(item=>item.id!==busId&&item.l===home))
+  return {fleet:cleared,withdrawn:Boolean(taken),restored:""};
+ return {fleet:moveOrSwapBuses(cleared,busId,home,now),withdrawn:true,restored:home};
 }

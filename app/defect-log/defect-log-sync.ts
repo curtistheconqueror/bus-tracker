@@ -1,5 +1,5 @@
 import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
-import {applyRoadCall,type RoadCallEvent} from "../road-calls.ts";
+import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
@@ -208,11 +208,20 @@ const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workS
     count that makes a pattern visible becomes a count of how many times
     somebody opened the form. `existing` is the record as it was stored before
     this save, which is the only place that answer can come from. */
- const roadCalled=hasWorkState(defect,ROAD_CALL_KEY)&&!(existing&&hasWorkState(existing,ROAD_CALL_KEY));
- if(!roadCalled)return {fleet:nextFleet,downEntries:nextDown,error:null};
- const applied=applyRoadCall(nextFleet,bus.id,
-  {id:"road-call-"+defect.id+"-"+now,at:now,by:defect.reportedBy||undefined,defectId:defect.id},undefined,now);
- return {fleet:applied.fleet,downEntries:nextDown,error:null,roadCall:{moved:applied.moved,target:applied.target}};
+ const wasRoadCall=Boolean(existing&&hasWorkState(existing,ROAD_CALL_KEY)),isRoadCall=hasWorkState(defect,ROAD_CALL_KEY);
+ if(isRoadCall&&!wasRoadCall){
+  const applied=applyRoadCall(nextFleet,bus.id,
+   {id:"road-call-"+defect.id+"-"+now,at:now,by:defect.reportedBy||undefined,defectId:defect.id},undefined,now);
+  return {fleet:applied.fleet,downEntries:nextDown,error:null,roadCall:{moved:applied.moved,target:applied.target}};
+ }
+ /* Taking the tick back. Inside the undo window the whole thing is withdrawn -
+    the event and the move it caused - because a wrong tap never happened.
+    Outside it the flag still comes off, but the breakdown stays recorded. */
+ if(!isRoadCall&&wasRoadCall){
+  const cleared=clearRoadCall(nextFleet,bus.id,now);
+  return {fleet:cleared.fleet,downEntries:nextDown,error:null,roadCall:{withdrawn:cleared.withdrawn,restored:cleared.restored}};
+ }
+ return {fleet:nextFleet,downEntries:nextDown,error:null};
 }
 
 export function returnDefectLogBusToService(

@@ -3170,7 +3170,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
 
 test("a road call is a dated event on the bus that ages off the board on its own",async()=>{
  const {ALL_WORK_STATES,WORK_STATES,FIXED_REPAIR_WORK_STATES,WORK_STATE_KEYS,ROAD_CALL_KEY,PARTS_ON_ORDER_KEY,defectWorkStates,hasWorkState,normalizeWorkStates,setDefectWorkState}=await import("../app/repair-catalog.ts");
- const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,appendRoadCall,applyRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote}=await import("../app/road-calls.ts");
+ const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,ROAD_CALL_UNDO_SECONDS,appendRoadCall,applyRoadCall,clearRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote,withdrawableRoadCall}=await import("../app/road-calls.ts");
+ const {moveOrSwapBuses:quickMove}=await import("../app/smart-status.ts");
  const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
  const {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel}=await import("../app/quick-filters.ts");
 
@@ -3306,6 +3307,76 @@ test("a road call is a dated event on the bus that ages off the board on its own
  assert.deepEqual(quickFilterDefects({id:"b",defects:[roadCalled]},"road-call",now).map(item=>item.id),["d1"],
   "a bus fixed on Wednesday still broke down on Tuesday");
  assert.deepEqual(quickFilterDefects({id:"b",defects:[roadCalled]},"road-call",day(20)).map(item=>item.id),[],"until it ages out");
+
+ /* THE ONE-MINUTE UNDO WINDOW.
+
+    A tick is a permanent record of a breakdown - it does not come off because
+    somebody changed their mind an hour later, or the counter could be quietly
+    tidied. But a wrong tap is a wrong tap and the person knows within seconds,
+    so a tick taken back inside the minute is withdrawn whole: the event, and
+    the move it caused. */
+ assert.equal(ROAD_CALL_UNDO_SECONDS,60);
+ const parked=[{id:"bus-9",n:"17599",s:"defect",l:"garage-7",defects:[]}];
+ const secondsLater=(seconds)=>new Date(Date.parse(now)+seconds*1000).toISOString();
+ const ticked9=applyRoadCall(parked,"bus-9",{id:"rc-9",at:now},undefined,now);
+ assert.ok(ticked9.fleet[0].l.startsWith("road-"),"parked on the road by the tick");
+ assert.equal(ticked9.fleet[0].roadCalls[0].from,"garage-7","the event remembers where the bus came from");
+
+ const quick=clearRoadCall(ticked9.fleet,"bus-9",secondsLater(30));
+ assert.equal(quick.withdrawn,true,"30 seconds later it never happened");
+ assert.equal(roadCallCount(quick.fleet[0].roadCalls),0,"the event is withdrawn");
+ assert.equal(quick.fleet[0].roadcall,false,"the flag comes off");
+ assert.equal(quick.fleet[0].l,"garage-7","and the bus goes back where it came from");
+ assert.equal(quick.restored,"garage-7");
+
+ const late=clearRoadCall(ticked9.fleet,"bus-9",secondsLater(61));
+ assert.equal(late.withdrawn,false,"a second past the minute, the breakdown stands");
+ assert.equal(roadCallCount(late.fleet[0].roadCalls),1,"the record stays");
+ assert.equal(late.fleet[0].roadcall,false,"but the flag still comes off, because the bus is not out on one now");
+ assert.ok(late.fleet[0].l.startsWith("road-"),"and it is left where it was put");
+ assert.equal(Boolean(withdrawableRoadCall(ticked9.fleet[0].roadCalls,secondsLater(59))),true,"59 seconds is inside");
+ assert.equal(Boolean(withdrawableRoadCall(ticked9.fleet[0].roadCalls,secondsLater(60))),false,"60 exactly is outside");
+
+ /* An undo never fights a person. If somebody moved the bus themselves, or
+    another bus took the old space, the withdrawal still happens but the
+    location is left alone. */
+ const movedOn=quickMove(ticked9.fleet,"bus-9","bay-3");
+ const notFought=clearRoadCall(movedOn,"bus-9",secondsLater(10));
+ assert.equal(notFought.withdrawn,true,"the event is still withdrawn");
+ assert.equal(notFought.fleet.find(bus=>bus.id==="bus-9").l,"bay-3","but a bus somebody has moved is left where they put it");
+ const occupied=[...ticked9.fleet,{id:"squatter",n:"17600",s:"service",l:"garage-7",defects:[]}];
+ const blocked=clearRoadCall(occupied,"bus-9",secondsLater(10));
+ assert.equal(blocked.withdrawn,true);
+ assert.ok(blocked.fleet.find(bus=>bus.id==="bus-9").l.startsWith("road-"),"and it does not evict whoever took the space");
+ assert.equal(blocked.fleet.find(bus=>bus.id==="squatter").l,"garage-7");
+
+ /* Through the Defect Log's save path, both directions. */
+ const mistake=saveDefectLogRecord(parked,[],"bus-9",setDefectWorkState({...defect,id:"d9"},ROAD_CALL_KEY,true,now,"CJ"),false,now);
+ assert.equal(roadCallCount(mistake.fleet[0].roadCalls),1);
+ const takenBack=saveDefectLogRecord(mistake.fleet,[],"bus-9",
+  setDefectWorkState(mistake.fleet[0].defects.find(item=>item.id==="d9"),ROAD_CALL_KEY,false,secondsLater(20),"CJ"),false,secondsLater(20));
+ assert.equal(roadCallCount(takenBack.fleet[0].roadCalls),0,"unticking within the minute withdraws it through the real save path");
+ assert.equal(takenBack.fleet[0].l,"garage-7","and puts the bus back");
+
+ /* THE MAP'S OWN CHECKBOX, which now counts too. Both directions go through
+    the same two functions the Defect Log uses, so the two can never disagree. */
+ const mapPageSource=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(mapPageSource,/function applyRoadCallEdit\(fleet:B\[\],previous:B\|undefined,saved:B\)/);
+ assert.match(mapPageSource,/if\(!saved\.roadcall\)return clearRoadCall\(fleet,saved\.id,now\)\.fleet;/);
+ assert.match(mapPageSource,/applyRoadCall\(fleet,saved\.id,\{id:"road-call-map-"\+saved\.id\+"-"\+now,at:now\},undefined,now,\{move:saved\.l===previous\.l\}\)/);
+ assert.match(mapPageSource,/setBuses\(current=>applyRoadCallEdit\(current\.map\(bus=>bus\.id===savedBus\.id\?savedBus:bus\),previous,savedBus\)\)/,
+  "wired into the map's save, not a second copy of the rule");
+ /* Ticked on the map with no location change in the same save: it parks, like
+    the Defect Log's box. */
+ const fromMap=applyRoadCall(parked,"bus-9",{id:"rc-map",at:now},undefined,now,{move:true});
+ assert.equal(roadCallCount(fromMap.fleet[0].roadCalls),1,"a road call ticked on the map counts toward the number");
+ assert.equal(fromMap.fleet[0].roadcall,true);
+ /* And with a location chosen in the same save, the choice wins. */
+ const chosen=applyRoadCall([{...parked[0],l:"bay-5"}],"bus-9",{id:"rc-map2",at:now},undefined,now,{move:false});
+ assert.equal(roadCallCount(chosen.fleet[0].roadCalls),1,"still counts");
+ assert.equal(chosen.fleet[0].roadcall,true,"still flags");
+ assert.equal(chosen.fleet[0].l,"bay-5","but a space somebody just chose is not overridden");
+ assert.equal(chosen.fleet[0].roadCalls[0].from,undefined,"and nothing was moved, so there is nowhere to put back");
 
  /* The card. Under LATEST, on its own row, in the DS badge's purple - both
     answer "what else do I need to know about this bus". */
