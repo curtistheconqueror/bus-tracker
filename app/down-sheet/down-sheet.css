@@ -377,3 +377,10 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .scan-line-gaps>b{font-size:11px;font-weight:900;letter-spacing:.4px;color:#7a4b00}
 .scan-line-gaps>small{font-size:10px;line-height:1.35;color:#6b5836}
 @media(max-width:760px){.scan-line-gaps>b{font-size:13px}.scan-line-gaps>small{font-size:11px}}
+
+/* A row the model had to guess at. Its bus number may still resolve to a real
+   bus — a misread digit usually does — so the doubt has to be shown on its own
+   rather than inferred from a failed fleet match. */
+.scan-row.unsure{border-color:#d9a441;background:#fffaf1}
+.scan-row .scan-bus u{margin-top:2px;display:block;color:#8a5600;font-size:7px;font-weight:900;letter-spacing:.3px;text-decoration:none}
+@media(max-width:760px){.scan-row .scan-bus u{font-size:9px}}

@@ -18,6 +18,9 @@ type Props={
 };
 
 const MAX_FILES=6;
+/* Below this the model is telling you it had to guess. Handwriting in the
+   margins lands here; clean printed rows do not. */
+const LOW_CONFIDENCE=0.75;
 
 export default function DownSheetScanner({fleet,currentEntries,defaultShift,onClose,onImport}:Props){
  const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
@@ -31,7 +34,15 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
  const imports=useMemo(()=>mergeReviewedRows(rows),[rows]);
  const comingOff=useMemo(()=>scannedSheetRemovals(currentEntries,imports.map(record=>record.busId)),[currentEntries,imports]);
- const flagged=rows.filter(row=>row.fleetMatch!=="matched").length;
+ /* Two different doubts, and only one of them was ever shown.
+
+    A row was flagged when its bus number matched no bus in the fleet. But a
+    misread digit usually lands on ANOTHER REAL BUS — 17565 came back as 17563,
+    which exists — so the row resolved cleanly and looked as certain as a
+    printed line. Every row the 09/5 scan got wrong was pencilled into the
+    margin, which is exactly where the model is least sure, and it said so in a
+    confidence it was never asked for. */
+ const flagged=rows.filter(row=>row.fleetMatch!=="matched"||row.confidence<LOW_CONFIDENCE).length;
  /* Which numbered lines never came back. The sheet numbers its rows, so a
     dropped one can be named exactly instead of being noticed a week later when
     the bus goes out broken. Blank lines are normal, so this reports rather
@@ -103,9 +114,10 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
          typed — which is the field that decides scheduled from unscheduled. */
       const section=normalizedSection(row.section||row.reason);
       const band=downSheetGroup({busNumber:row.busNumber,category:row.category,repair:row.repair,customReason:row.reason,assignmentType:section==="Vendor Repair"?"Vendor":"Mechanic",assignedTo:row.assignedTo,section});
-      return <article className={`scan-row ${row.fleetMatch}`} key={row.key}>
+      const unsure=row.confidence<LOW_CONFIDENCE;
+      return <article className={`scan-row ${row.fleetMatch}${unsure?" unsure":""}`} key={row.key}>
        <label className="scan-select"><input type="checkbox" checked={row.selected} disabled={row.fleetMatch!=="matched"} onChange={event=>updateRow(row.key,{selected:event.target.checked})}/><span/></label>
-       <div className="scan-bus"><small>P{row.pageNumber} · L{row.lineNumber||"?"}</small><b>{row.busNumber||"NO BUS"}</b><em>{row.fleetMatch==="matched"?row.repeatedCount>1?`${row.repeatedCount} ROWS · MERGED`:"FLEET MATCH":row.fleetMatch==="duplicate"?"DUPLICATE FLEET NUMBER":"NOT IN FLEET"}</em></div>
+       <div className="scan-bus"><small>P{row.pageNumber} · L{row.lineNumber||"?"}</small><b>{row.busNumber||"NO BUS"}</b><em>{row.fleetMatch==="matched"?row.repeatedCount>1?`${row.repeatedCount} ROWS · MERGED`:"FLEET MATCH":row.fleetMatch==="duplicate"?"DUPLICATE FLEET NUMBER":"NOT IN FLEET"}</em>{unsure&&<u>CHECK THIS ROW &middot; {Math.round(row.confidence*100)}% SURE</u>}</div>
        <label className="scan-reason">REASON<input value={row.reason} onChange={event=>updateRow(row.key,{reason:event.target.value})}/>{row.reviewNote&&<small>{row.reviewNote}</small>}</label>
        <label>CATEGORY<select value={row.category in REPAIR_OPTIONS?row.category:"Miscellaneous"} onChange={event=>updateRow(row.key,{category:event.target.value,repair:REPAIR_OPTIONS[event.target.value][0]})}>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
        <label>REPAIR<select value={repairs.includes(row.repair)?row.repair:repairs[0]} onChange={event=>updateRow(row.key,{repair:event.target.value})}>{repairs.map(repair=><option key={repair}>{repair}</option>)}</select></label>

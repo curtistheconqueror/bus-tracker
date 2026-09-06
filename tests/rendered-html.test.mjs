@@ -8585,3 +8585,31 @@ test("the catalog carries the service codes and the hazmat condition the sheet a
  assert.match(route,/HAZMAT means a biohazard on board/);
  assert.match(route,/Every printed line number that has a bus number beside it MUST produce a row/);
 });
+
+test("a scanned row the model had to guess at is flagged even when its bus number resolves",async()=>{
+ const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+ /* The flag used to mean one thing only: this bus number matches no bus in the
+    fleet. But a misread digit usually lands on ANOTHER REAL BUS — 17565 came
+    back as 17563, which exists — so the row resolved cleanly and looked as
+    certain as a printed line. Every row the 09/5 scan got wrong was pencilled
+    into the margin, and the model said so in a confidence nothing read. */
+ assert.match(scanner,/const LOW_CONFIDENCE=0\.75;/);
+ assert.match(scanner,/row\.fleetMatch!=="matched"\|\|row\.confidence<LOW_CONFIDENCE/);
+ assert.match(scanner,/CHECK THIS ROW/);
+ assert.match(scanner,/const unsure=row\.confidence<LOW_CONFIDENCE;/);
+
+ const css=(await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"))
+  .replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,"");
+ assert.match(css,/\.scan-row\.unsure\{/,"the doubt needs a colour outside a phone breakpoint");
+
+ // The count in the header covers both doubts, not just the fleet one.
+ const rows=[
+  {fleetMatch:"matched",confidence:0.98},   // printed, resolves — quiet
+  {fleetMatch:"matched",confidence:0.40},   // pencilled, resolves to a real bus — must still be flagged
+  {fleetMatch:"unknown",confidence:0.99},   // clean read of a bus we do not have
+ ];
+ const LOW=0.75;
+ assert.equal(rows.filter(r=>r.fleetMatch!=="matched"||r.confidence<LOW).length,2);
+ // The old rule would have shown only one of them.
+ assert.equal(rows.filter(r=>r.fleetMatch!=="matched").length,1);
+});
