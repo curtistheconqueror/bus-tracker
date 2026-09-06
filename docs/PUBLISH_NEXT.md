@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 151 PENDING — publish from `27891d9`. Version 150 is live from `6d62787`.**
+**STATUS: VERSION 151 PENDING — publish from `ef5add7`. Version 150 is live from `6d62787`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **151** | `27891d9` | ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
+| Next | **151** | `ef5add7` | ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Published | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
 | Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
 | Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
@@ -54,19 +54,21 @@ what to check once it is live.
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`27891d9`** |
-| Last code-bearing commit | `27891d9` — the release source is this commit |
+| **Release source** | **`ef5add7`** |
+| Last code-bearing commit | `ef5add7` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 150, published from `6d62787` |
 
-**One application commit,** rebased onto Codex's release commit `e8f9515`, not
-merged over it:
+**Two application commits.** The first was rebased onto Codex's release commit
+`e8f9515`, not merged over it:
 
 ```
-git log --oneline e8f9515..27891d9
+git log --oneline e8f9515..ef5add7
+ef5add7 Count road calls ticked on the map, and give every tick a minute to be taken back
+a74d750 Queue Version 151 from 27891d9: road calls as dated events    <- docs only
 27891d9 Record road calls as dated events, and move PARTS ON ORDER to Fixed Repairs
 
-git diff --name-only e8f9515 27891d9 -- app
+git diff --name-only e8f9515 ef5add7 -- app
 app/defect-log/defect-log-sync.ts
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
@@ -74,12 +76,17 @@ app/fixed-repairs/page.tsx
 app/quick-filters.ts
 app/repair-catalog.ts
 app/road-calls.ts          (new)
+
+git diff --name-only 27891d9 ef5add7 -- app
+app/defect-log/defect-log-sync.ts
+app/page.tsx
+app/road-calls.ts
 ```
 
 No dependency, database, CI, or service-worker change:
 
 ```
-git diff --name-only e8f9515 27891d9 -- supabase package.json package-lock.json .github public   # returns nothing
+git diff --name-only e8f9515 ef5add7 -- supabase package.json package-lock.json .github public   # returns nothing
 ```
 
 **No service-worker bump this time,** so no shell re-download: `/settings` was
@@ -174,9 +181,51 @@ not unwritten by unticking, because it happened — **UNDO LAST** is the way bac
 from a genuine mis-tick, and it already works, because road calls live on the
 bus record it restores.
 
+### 6. The map's own ROADCALL checkbox counts too
+
+The Facility Map has had a ROADCALL checkbox on every bus for a long time. It
+said the bus was out on one right now and said nothing once it was back, and
+it knew nothing about the Defect Log's box.
+
+Ticking it now writes **the same dated event**, so a road call logged on the
+map reaches the badge on the Defect Log card, the running counter and the
+seven-day filter. The two places can no longer disagree.
+
+It parks the bus on the road **only when that same save did not set a location
+itself.** The Defect Log's box has no location field to argue with, so it
+always parks; on the map, somebody who has just chosen a space means it.
+
+### 7. Sixty seconds to take a tick back
+
+A tick is a permanent record of a breakdown. It does not come off because
+somebody changed their mind an hour later — a counter that can be tidied stops
+meaning anything. But a wrong tap is a wrong tap, and the person who made it
+knows within seconds.
+
+**Unticking within sixty seconds withdraws the whole thing:** the event, and
+the move it caused. The event carries the location the bus came from, so the
+undo puts it back. This works from either box.
+
+**Outside the window the flag still comes off** — the bus is not out on a road
+call now — **and the breakdown stays recorded,** because it happened.
+
+**An undo never fights a person.** A bus somebody has since moved themselves
+stays where they put it, and a space another bus has taken is not reclaimed.
+The event is still withdrawn either way.
+
 ## Validation
 
 - 202 regression tests passing, ESLint clean, production build succeeds
+- **Driven against the PRODUCTION build, 19 checks, zero console errors:**
+  - tick then untick at 30 seconds put bus 17505 back in `garage-4` with no
+    event and no card note
+  - the same untick against a three-hour-old road call left the event, the road
+    slot and the card note alone, and only cleared the flag
+  - ticking ROADCALL on the Facility Map recorded an event that showed up in
+    the Defect Log's filter, and unticking it there put the bus back in
+    `garage-5`
+  - the exact edge is pinned by unit tests: 59 seconds is inside the window, 60
+    exactly is outside
 - **Driven in Chromium at 390 and 1180, 21 checks, zero console errors:**
   - ticking ROAD CALL on bus 17505 moved it to `road-0`, set the map flag, and
     stamped one event with `by:"CJ"` and `defectId:"d1"`
@@ -208,23 +257,31 @@ bus record it restores.
    purple **ROAD CALL** note with the date and time under the LATEST line.
 3. **Open that repair and save it again.** The note must still say one road
    call, not two.
-4. **Untick ROAD CALL and save.** The box must stay unticked when you reopen
-   it. The note stays, because the breakdown happened — use UNDO LAST if it was
-   a genuine mis-tick.
-5. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
+4. **Untick ROAD CALL and save straight away.** Within a minute of ticking it,
+   the whole thing comes back out: no note, no count, and the bus returns to
+   the space it came from.
+5. **Do it again on a road call from yesterday.** The box unticks and the flag
+   clears, but the note and the count stay, because that breakdown happened.
+6. **Tick ROADCALL on the Facility Map** in the bus editor. It should count
+   toward the same note, counter and filter as one ticked on the Defect Log.
+7. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
    week, and nothing older.
-6. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
+8. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
    The tick is still there, now shown on **Fixed Repairs** rather than the
    Defect Log.
-7. **A bus that road-called eight days ago** should have no note and should not
+9. **A bus that road-called eight days ago** should have no note and should not
    be in the filter.
 
 ## The way back
 
-Measured in a throwaway worktree from `27891d9`:
+Measured in a throwaway worktree from `ef5add7`:
 
-- `git revert 27891d9` alone is **clean.** ROAD CALL leaves the boxes, PARTS ON
-  ORDER returns to them, and the card note and the filter go with it.
+- `git revert ef5add7` alone is **clean.** The map's checkbox stops recording
+  events and the sixty-second window goes, leaving the Defect Log's box working
+  as it did in the first commit.
+- `git revert ef5add7 27891d9` (newest first) is **clean.** ROAD CALL leaves
+  the boxes, PARTS ON ORDER returns to them, and the card note and the filter
+  go with it.
 - **Road-call events already written stay on their buses,** harmlessly ignored,
   and reappear if the feature comes back. Nothing is destroyed by going
   backwards. The same is true of the flags and the moves: a bus parked on the
@@ -245,7 +302,7 @@ Measured in a throwaway worktree from `27891d9`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 151 | Live | <published tip hash> | ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
+| 151 | Live | <published tip hash> | ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
 ```
 
 ---
