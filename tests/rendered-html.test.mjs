@@ -37,6 +37,7 @@ import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusId
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
+import { deferredBadgeCounts } from "../app/deferred-counts.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -7555,10 +7556,13 @@ test("Facility Map bus tokens carry a DEF badge only for genuinely held-back bus
 
 test("the deferred nav badge only pulses past 90 minutes, and the evening prompt opens from 8:30pm for anything over 60", async () => {
  const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
- assert.match(watch, /const OVERDUE_MINUTES=90/);
+ // The 90-minute line and the counting moved to deferred-counts.ts, a plain
+ // module, so the numbers can be tested against a fleet instead of grepped for.
+ const counts = await readFile(new URL("../app/deferred-counts.ts", import.meta.url), "utf8");
+ assert.match(counts, /const DEFERRED_OVERDUE_MINUTES=90/);
+ assert.match(counts, /minutes>=DEFERRED_OVERDUE_MINUTES/);
  assert.match(watch, /const REVIEW_MINUTES=60/);
  assert.match(watch, /const REVIEW_HOUR=20,REVIEW_MINUTE=30/);
- assert.match(watch, /minutes>=OVERDUE_MINUTES/);
  assert.match(watch, /minutes<REVIEW_MINUTES/);
  // Every page drops in both pieces, so the alert reaches wherever the app is
  // actually open rather than only the page that happened to log the defect.
@@ -8433,4 +8437,42 @@ test("the pulsing DEFERRED badge opens the Deferred filter instead of going nowh
   assert.match(log, /quickFilterFromValue\(new URLSearchParams/);
   // A filter that opens below the fold has not shown anybody anything.
   assert.match(log, /\.quick-filter-drawer"\)\?\.scrollIntoView/);
+});
+
+test("the DEFERRED badge counts the same buses its filter lists", () => {
+  const now = new Date("2026-09-06T12:00:00Z");
+  const ago = m => new Date(now.getTime() - m * 60000).toISOString();
+  const defect = (id, state, at) => ({id, category: "Brakes", issue: "Air leak", details: "", state, ...(at ? {deferredAt: at} : {})});
+  const fleet = [
+    // One bus held on TWO deferred repairs, both overdue. This is the case the
+    // old count got wrong: the rows behind the badge are one per DEFECT, so a
+    // single bus counted as two and the badge disagreed with its own list.
+    {id: "a", n: "17510", defects: [defect("d1", "deferred", ago(400)), defect("d1b", "deferred", ago(380))]},
+    {id: "b", n: "17511", defects: [defect("d2", "deferred", ago(200))]},
+    // Held, but short of the ninety-minute line: listed, not overdue.
+    {id: "c", n: "17512", defects: [defect("d3", "deferred", ago(20))]},
+    // Deferred but on the Down Sheet — the sheet is the record now, so neither
+    // number counts it and the filter does not list it.
+    {id: "d", n: "17513", defects: [defect("d4", "deferred", ago(500))]},
+    {id: "e", n: "17514", defects: [defect("d5", "open")]},
+  ];
+  const downEntries = [{id: "r1", busId: "d", busNumber: "17513", workflow: "Scheduled"}];
+
+  const counts = deferredBadgeCounts(fleet, downEntries, now);
+  // Three buses listed — not the four defect-rows the old count would have found.
+  assert.equal(counts.listed, 3, "the badge prints buses, not deferred repairs");
+  assert.equal(counts.overdue, 2, "only 17510 and 17511 are past ninety minutes");
+
+  // The number on the badge must equal what the drawer lists, or pressing a
+  // badge reading 3 and getting four buses is exactly the confusion this fixes.
+  const listedByFilter = quickFilterBusIds(fleet, "deferred")
+    .filter(id => !downEntries.some(entry => entry.workflow !== "Completed" && entry.busId === id));
+  assert.equal(counts.listed, listedByFilter.length, "badge count and filter list must agree");
+  assert.deepEqual(listedByFilter, ["a", "b", "c"]);
+
+  // The badge appears on the overdue count, so a yard where everything is
+  // freshly deferred stays quiet even though the filter would list buses.
+  const quiet = deferredBadgeCounts([{id: "a", n: "17510", defects: [defect("d1", "deferred", ago(5))]}], [], now);
+  assert.equal(quiet.overdue, 0, "nothing past ninety minutes means no alarm");
+  assert.equal(quiet.listed, 1, "but the filter still has a bus to show");
 });
