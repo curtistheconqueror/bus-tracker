@@ -1,6 +1,8 @@
 # Publish next
 
-**STATUS: VERSION 160 PENDING — publish from `bbe33f6`. Repository release 159 is live from `2afa491` as Sites Version 155.**
+**STATUS: VERSIONS 160 AND 161 PENDING — publish 160 from `bbe33f6`, then 161 from `5d86071`. Repository release 159 is live from `2afa491` as Sites Version 155.**
+
+**161 is not on `main` yet.** `5d86071` is the code commit on `claude/codex-workflow-docs-fn9any` — this handoff commit sits directly on top of it, the way 160's does on `bbe33f6` — and it becomes reachable from `main` only when PR #1 is merged. CI is green on that branch. Publish 160 whenever you like; do not publish 161 until the merge has happened, and if the merge produces a different SHA — a squash, or another commit landing first — publish the merge result rather than the SHA written here.
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,6 +10,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Then | **161** | `5d86071` | **A bus comes off the Down Sheet, or is closed out, from its own row — and no page slides sideways on a tablet** — every row grows a green ✓ and a red ×: ✓ closes the bus out in one press with the same save the editor does, × takes the row off the sheet and keeps the bus's defects, status and location; both offer a way back on the page itself. TOTAL ON SHEET halves and DOWN BUSES joins it, counting the sheet minus the buses on it only for maintenance, which exposed that PM wording was never recognised as scheduled work at all. The ON ROAD badge stops wandering — it sat at three different x positions depending on how long the status label was, landing on the repair text on the longest ones. Amerex fire suppression gains the two engine positions the panel reports and the picker did not. And two separate faults that made an iPad-width page scroll sideways are gone |
 | **Next** | **160** | `bbe33f6` | **REFRESH on every page, and the Main Garage split by bay instead of by row** — saved to a home screen there is no address bar to reload from, so all six pages get the button the Facility Map already had, sharing one definition of refreshing: ask the service worker for a new version first, then reload; and Version 155's ready-bay line, which ran across under ROW 6, now runs down between bay 6 and bay 7 in the grid's own frame colour, because a bay in this shop runs front to back and there is no such thing as a row on the floor |
 | Published | **159** | **`2afa491`** | **Live as Sites Version 155.** A Down Sheet removal travels, so a cleared sheet stays cleared: removals are recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's Down Sheet flags follow the sheet the pull settled on |
 | Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
@@ -76,6 +79,228 @@ supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
 
 ---
+
+# Version 161 — A bus comes off the Down Sheet from its own row, and no page slides sideways on a tablet
+
+**Not on `main` yet.** `5d86071` is the code commit on
+`claude/codex-workflow-docs-fn9any`, with this handoff commit directly on top of
+it — the same shape as 160 sitting on `bbe33f6`. PR #1 is open and green.
+Publish only after that pull request is merged, and if the merge produces a
+different SHA — a squash, or another commit landing first — publish the merge
+result rather than the SHA below.
+
+## Source
+
+Release source: `5d86071`
+
+The commit list — `git log --oneline bbe33f6..5d86071`:
+
+```
+5d86071 Merge Codex's release 159 publish before writing the 161 handoff
+2345c1d Stop the tablet widths scrolling sideways, and close a bus out in one press
+12dcd59 Add the Amerex engine positions, which the panel reports and the picker did not
+71e78ed Add DOWN BUSES beside the total, and teach the sheet what a PM looks like
+8da74e7 Give ON ROAD and DELETE a fixed place on the row instead of a floating one
+ba514d3 Stop the entry point quoting numbers that go stale under it
+5dd3a99 Put a DELETE on every Down Sheet row, and make the removal travel
+c6ed43c Record release 159 deployment
+790d696 Record the gate count the entry point actually ships with
+92ca3d8 Hand Version 160 to Codex from bbe33f6
+d396a4b Give a new session one file to start from, and make the docs testable
+```
+
+The changed files — `git diff --name-only bbe33f6..5d86071 -- app tests`:
+
+```
+app/down-sheet/down-sheet-view.ts
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/globals.css
+app/repair-catalog.ts
+tests/rendered-html.test.mjs
+```
+
+The size — `git diff --shortstat bbe33f6..5d86071`:
+
+```
+12 files changed, 1113 insertions(+), 58 deletions(-)
+```
+
+Proof of no infra change — this returns nothing:
+
+```
+git diff --name-only bbe33f6..5d86071 -- supabase package.json package-lock.json .github public worker
+```
+(empty)
+
+The range starts at `bbe33f6` because that is what 160 publishes from, so this
+section describes what 161 adds on top of 160. It therefore also contains the
+two docs commits that were already on `main` before this branch, and Codex's own
+`c6ed43c` recording the 159 deployment.
+
+## Migrations
+
+None.
+
+One **new** LocalStorage key, `pace-down-sheet-entry-undo-v1`, which holds the
+last thing done to a single row so it can be taken back. It is documented in
+`CLAUDE.md`. No key is renamed and none is removed — checked by diffing every
+`pace-…-v1` string added and removed across the range.
+
+Nothing on disk is rewritten. The two Amerex catalog entries are additions, and
+every existing Amerex record reads back byte-identical.
+
+## What was wrong
+
+**There was no way to take one bus off the sheet, or to close one out.** Getting
+a row off meant opening the editor and marking it Completed, which is a claim
+about the work — wrong for a bus written down twice, wrong for one written down
+by mistake, and it puts a repair in the fixed count that nobody fixed. The
+Defect Log has had both a per-record REMOVE and a one-press MARK FIXED all along.
+
+**The ON ROAD badge had no fixed place on the row.** It was laid out inline after
+the bus button, and that button is as wide as the status label underneath it, so
+the badge's position was set by how long the words happened to be — measured at
+x145 for OUT OF SERVICE, x161 for WORK IN PROGRESS and x185 for IN SERVICE WITH
+DEFECTS. On the longest ones it landed on the repair text in the next column.
+Curtis photographed it on the live sheet.
+
+**The sheet did not know what a PM looks like.** The maintenance wording matched
+`pm's` but none of the catalog wording written beside it, so
+`Other preventive maintenance — PM'S` had `pm's` struck out and "other preventive
+maintenance" left standing, which reads as somebody having written a complaint.
+All eight Preventive Maintenance catalog items behaved that way; only the bare
+inspection codes were ever recognised. A PM bus counted as a bus down and sat in
+UNSCHEDULED rather than under INSPECTIONS & SCHEDULED MAINTENANCE.
+
+**The Amerex panel reports positions the picker did not offer.** Fire suppression
+reports trouble by module and position, and each module covers the engine as
+well as the two roof positions. Only the roofs were in the catalog, so a mechanic
+reading TROUBLE MOD 1 ENGINE off the faceplate had nothing to file it as.
+
+**Two pages scrolled sideways at tablet widths.** On the Down Sheet the nav is
+six links pinned at 108px — 703px with its gaps — sharing the header's single
+flex line with the title and REFRESH; between 761 and 1023 the three did not
+fit, and REFRESH was measured 194px past the right edge at 820px. Separately, a
+rule inside the map's `@media(max-width:800px)` block was written with bare
+`.quick-filter-control,.quick-filter-trigger` selectors; that control is shared
+with the Defect Log, so its trigger was forced to `width:100%`, grew to 722px
+inside a row that does not wrap, and pushed that page 531px sideways between 761
+and 800.
+
+## What changed
+
+**Every Down Sheet row carries a green tick and a red cross**, in the bus's own
+cell rather than a new column at the far right — the table scrolls sideways on a
+phone and a control parked off the edge is one you have to go looking for.
+
+The tick closes the bus out in one press. It runs through the same save the
+editor uses, so the repairs are marked done, the bus's defect is completed, its
+status is recomputed and the findings it taught are learned. There is no
+confirm, because a foreman closing out a sheet presses it many times in a row.
+
+The cross takes the row off the sheet. The bus keeps its defects, its status and
+its location — coming off the sheet is not being repaired, and the bus still has
+the fault. The DS badge follows on its own, because membership is reconciled
+from the rows that are left, so a bus carrying a second open row keeps it.
+
+Both put a line on the page offering the way back, and both write that copy
+down **before** the change, so a refused write leaves the sheet untouched.
+
+**The cell's contents sit in four fixed slots** — bus button, ON ROAD, tick,
+cross — each pinned to its own column, so an empty ON ROAD slot stays empty and
+nothing slides into it. Same fix the Defect Log's badge slot got. The bus column
+grew from 148px to 288px with the table's `min-width` rising by the same amount
+each time, so no other column paid for it.
+
+**TOTAL ON SHEET is half width now and DOWN BUSES sits beside it**, counting the
+buses on the sheet for a fault rather than only for maintenance. A row saying
+nothing but PM'S is due for service, not broken; a row with a fault counts, and
+so does a row carrying both. It is the same question DOWNED BUSES ON ROAD
+already asks, asked of the whole sheet, so the two are defined identically.
+
+**The maintenance wording now covers the PM catalog**, as whole phrases rather
+than words, because the risk of widening it is that it starts swallowing
+complaints. Buses on the sheet only for a PM now count under INSPECTIONS &
+SCHEDULED MAINTENANCE instead of UNSCHEDULED — **this moves rows between two
+bands Curtis reads daily**, and it is what he asked for: "inspections are their
+own thing. Don't mix with unscheduled work. Just keep inspections in their own
+count. Regardless if someone is assigned to the bus or not."
+
+**Amerex fire suppression gains Trouble Mod 1 Engine and Trouble Mod 2 Engine**,
+in both structures a grouped category needs, ordered with their own module so
+the picker reads Mod 1 roof / roof / engine, then Mod 2 — the way the panel does.
+
+**The tablet band no longer scrolls sideways.** The Down Sheet header wraps
+between 761 and 1023 and the nav takes a row of its own; the map's quick-filter
+rule is scoped to `.command-bar` so it cannot reach another page again.
+
+## Verified
+
+Gates re-run on `5d86071` itself, not carried over from the commits below it:
+`npm test` **233 pass, 0 fail** (it builds first), `npm run lint` clean,
+`npm run build` succeeds.
+
+Measured in Chromium, reproducing each fault first and re-measuring after:
+
+| | before | after |
+| --- | --- | --- |
+| ON ROAD x-spread across rows | 40px, 3 positions | **0** |
+| Row buttons x-spread across rows | 109px, 6 positions | **0** |
+| Overlap into the reason column | yes, on the longest label | none |
+| Slot row against its own cell | — | clears by 8px |
+| Longest status label in its slot | — | 122px of 124, 6px clear of the badge |
+| Touch target | — | 44px on phones, 26px above |
+| DOWN BUSES, 30-row sheet holding 7 PM buses | — | TOTAL 30 / DOWN 23, every width |
+| Sideways scroll, six pages, 744 to 1280 | Down Sheet 761–1023, Defect Log 761–800 | **none at any width** |
+| Mark fixed then undo | defect completed **plus a duplicate open** | one record, back to open |
+
+Behaviour, at 360, 390, 430, 820, 1180 and 1280:
+
+- **Delete** puts the row off, records the removal, keeps the defect on the bus
+  and clears only that bus's DS badge. **Reload** leaves it gone, which
+  `entriesFromFleet` would have undone had the badge flag not been cleared.
+  **PUT BACK** returns the row, un-records the removal, and restamps the entry
+  later than an untouched row so it beats its own tombstone.
+- **Mark fixed** sets the workflow to Completed, stamps who and when, writes the
+  history, completes the bus's defect, takes the row off the active sheet, and
+  **records no removal** because nothing was removed. **UNDO** returns the bus to
+  the identical single record, open.
+
+Both refused-write paths were driven on purpose by refusing the exact key: the
+undo copy refused, and the sheet write refused. In both, nothing changed, **no
+removal was recorded**, no stale undo copy was left, and the foreman was told.
+
+The map's own command bar was measured before and after the globals.css change
+at 768, 800 and 820 — unchanged at 180px, 188px and 114px.
+
+## What to check once it is live
+
+1. Open the Down Sheet on your phone and scroll. Every ON ROAD badge sits the
+   same distance from the bus number whatever the status underneath says, and
+   none of them touches the repair text.
+2. Every row has a green tick and a red cross beside the bus number, reachable
+   without scrolling sideways, and they line up down the whole page.
+3. Press the tick on a bus. The row closes out and a green line offers UNDO.
+   Press UNDO, then open that bus in the Defect Log: it should have its original
+   defect back, open, and **no duplicate beside it**.
+4. Press the cross on a bus. The row goes and a red line offers PUT BACK. On the
+   Facility Map that bus has lost its DS badge but keeps its defect and its
+   spot. Press PUT BACK and the row returns.
+5. Delete one and reload the page. It should stay gone, and PUT BACK should
+   still be offered.
+6. TOTAL ON SHEET and DOWN BUSES sit side by side, the same size as the bands
+   below them. DOWN BUSES should read the total minus the buses that are on the
+   sheet only for a PM or an inspection.
+7. Check INSPECTIONS & SCHEDULED MAINTENANCE — it should now include PM buses
+   that used to sit in UNSCHEDULED, and UNSCHEDULED should be lower by the same
+   number.
+8. On an iPad in portrait, check the Down Sheet and the Defect Log: neither
+   page should slide sideways.
+9. Log an Amerex defect. Fire Suppression should offer Trouble Mod 1 Engine and
+   Trouble Mod 2 Engine, each with its own module.
+10. With two devices on the shop cloud: delete a row on one, wait for a sweep,
+    and confirm it does not come back on either.
 
 # Version 160 — REFRESH on every page, and the garage split by bay instead of by row
 
