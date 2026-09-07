@@ -10342,3 +10342,50 @@ test("a device that realtime cannot reach goes back to asking, instead of sittin
   assert.ok(live.indexOf("cloudPush(")<live.indexOf("cloudPull("),"send before receive");
   assert.match(live,/if\(!pullToo\|\|!pushed\.ok\|\|stopped\)return;/);
 });
+
+test("UNDO FIX returns a repair to where it came from, or does not offer itself", async () => {
+  const page = await readFile(new URL("../app/fixed-repairs/page.tsx", import.meta.url), "utf8");
+
+  /* THE FAULT: it reopened the defect and said "It will return to the active
+     Defect Log", which was only ever true for a defect the Defect Log lists.
+     defectLogRecords keeps records whose source is "defect-log" and nothing
+     else, so a repair closed out from the Down Sheet came back open, stayed
+     off the sheet - its entry was left Completed - and never appeared in the
+     log either. Reported from the floor, and reproduced: pressed undo, and the
+     bus was on neither sheet.
+
+     Nothing was lost. The Facility Map lists every defect on a bus whatever
+     its source, and it was there the whole time - checked by opening the bus
+     on the map and reading "1 unresolved / 1 total". It fell off both sheets a
+     foreman works from, which is the bug. */
+  assert.doesNotMatch(page,/confirm\("Undo this fix and reopen the defect for Bus "\+record\.bus\.n\+"\? It will return to the active Defect Log\."\)/,"the promise was not true for every record that could reach it");
+
+  /* WHERE IT GOES BACK TO IS NOT GUESSED. It is the choice made at creation:
+     the map's editor writes source: addToDefectLog?"defect-log":"down-sheet",
+     and a Down Sheet repair carries an entry linked by defect id. */
+  assert.match(page,/const linked=entries\.find\(entry=>entry\.defectId===record\.defect\.id&&entry\.workflow==="Completed"\)/);
+  assert.match(page,/linked\?"It will return to the Down Sheet\."/);
+  assert.match(page,/record\.defect\.source==="defect-log"\?"It will return to the active Defect Log\."/);
+  assert.match(page,/"It will stay on the bus as an open defect, on the Facility Map\."/,"a legacy record with no source is still true to say this about");
+
+  /* In Progress, not Scheduled: down-sheet-editor.tsx already does exactly
+     this when the editor un-completes an entry, so the two agree. */
+  const editor = await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx", import.meta.url), "utf8");
+  assert.match(editor,/current\.workflow==="Completed"\?"In Progress"/,"the rule this follows");
+  assert.match(page,/workflow:"In Progress",completedAt:"",completedBy:""/);
+  assert.match(page,/action:"Reopened from Fixed Repairs"/,"the stamp says where the change came from, since it did not come from the sheet");
+
+  /* THE BUS FIRST. A refused fleet write stops the whole thing rather than
+     leaving a live row on the sheet for a defect still marked completed - and
+     a refused SHEET write is reported rather than passed over in silence. */
+  assert.match(page,/if\(!changeFleet\(next,"Reopened Bus "\+record\.bus\.n\+" defect"\)\)return;/);
+  assert.ok(page.indexOf('if(!changeFleet(next,"Reopened Bus ')<page.indexOf("writeDownSheetStorageResult(localStorage,reopened)"),"the bus is written before the sheet");
+  assert.match(page,/if\(!written\.ok\)\{setSaveProblem\(written\.reason\|\|"failed"\);alert\(/);
+
+  /* AND IT IS NOT OFFERED WHERE IT HAS NO MEANING. A repair logged straight
+     onto Fixed Repairs is created completed - somebody writing down a job
+     already done - so it was never open anywhere. Measured: the button is
+     absent on a fixed-log record and present on a defect-log one, with DELETE
+     on both. */
+  assert.match(page,/\{record\.defect\.source!=="fixed-log"&&<button type="button" className="reopen-repair"/);
+});

@@ -390,10 +390,8 @@ export default function DownSheet(){
   const reason=reasonLabel(entry);
   if(!confirm("Mark bus "+(entry.busNumber||"this bus")+" fixed and close it out?"+(reason?"\n\n"+reason:"")+"\n\nThe repair is marked done and the bus's defect is completed. UNDO puts it back."))return;
   const now=new Date().toISOString(),who=(entry.completedBy||(entry.assignmentType==="Mechanic"?entry.assignedTo:"")||defaultInitials||"").trim().toUpperCase();
-  /* The copy goes down first, exactly as the delete does. There is no confirm
-     on this — a foreman closing out a sheet presses it many times in a row and
-     a dialog each time is the reason nobody uses the feature — so the way back
-     has to exist before the change does. */
+  /* The copy goes down first, exactly as the delete does: the way back exists
+     before the change does, so a refused write leaves the sheet untouched. */
   /* The bus goes into the copy as well as the entry, and this is the whole
      reason the fix undo is not just "save the old entry again".
 

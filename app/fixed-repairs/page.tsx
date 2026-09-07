@@ -16,7 +16,7 @@ import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
-import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorageResult,type FleetWriteReason} from "../storage";
+import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
 import ShopCloudLive from "../shop-cloud-live";
 import {candidateBusNumbers,resolveBusNumber} from "../bus-number-resolver";
@@ -207,7 +207,44 @@ const next=fleet.map(bus=>{
 });
 const isNewRecord=!fleet.some(bus=>bus.id===record.bus.id&&normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).some(defect=>defect.id===record.defect.id));
 if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fixed repair"))setNewRepair(null)};
- const reopenRepair=(record:FixedRecord)=>{if(!confirm("Undo this fix and reopen the defect for Bus "+record.bus.n+"? It will return to the active Defect Log."))return;const now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,state:"open",completedAt:undefined,completedBy:undefined,defectLogHiddenAt:undefined,updatedAt:now})});changeFleet(next,"Reopened Bus "+record.bus.n+" defect")};
+ /* UNDO FIX PUTS A REPAIR BACK WHERE IT CAME FROM, and it did not.
+
+    It reopened the defect on the bus and said "It will return to the active
+    Defect Log" — which was only ever true for a defect the Defect Log lists.
+    The Defect Log shows records whose source is "defect-log" and nothing else,
+    so a repair closed out from the Down Sheet came back open, stayed off the
+    sheet (its entry was left Completed) and never appeared in the log either.
+    Reported from the floor: pressed undo, and the bus could not be found on
+    either sheet.
+
+    Nothing was ever lost — the Facility Map lists every defect on a bus
+    whatever its source, and it was sitting there the whole time — but it fell
+    off both sheets a foreman actually works from.
+
+    Where a repair goes back to is not guessed. It is the same choice that was
+    made when it was created: the map's own editor writes
+    `source: addToDefectLog ? "defect-log" : "down-sheet"`, and a Down Sheet
+    repair carries a sheet entry linked by defect id. */
+ const reopenRepair=(record:FixedRecord)=>{
+  const sheet=readDownSheetStorage<Record<string,unknown>>(localStorage);
+  const entries=sheet.valid?sheet.entries:[];
+  const linked=entries.find(entry=>entry.defectId===record.defect.id&&entry.workflow==="Completed");
+  const home=linked?"It will return to the Down Sheet.":record.defect.source==="defect-log"?"It will return to the active Defect Log.":"It will stay on the bus as an open defect, on the Facility Map.";
+  if(!confirm("Undo this fix and reopen the defect for Bus "+record.bus.n+"?\n\n"+home))return;
+  const now=new Date().toISOString(),next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id!==record.defect.id?defect:{...defect,state:"open",completedAt:undefined,completedBy:undefined,defectLogHiddenAt:undefined,updatedAt:now})});
+  /* The bus first. A refused write stops the whole thing here rather than
+     leaving a live row on the sheet for a defect still marked completed. */
+  if(!changeFleet(next,"Reopened Bus "+record.bus.n+" defect"))return;
+  if(!linked)return;
+  /* In Progress rather than Scheduled, because that is already this app's
+     answer for an entry that stops being Completed — down-sheet-editor.tsx
+     does exactly this when the editor un-completes one. The stamp says where
+     the change came from, since it did not come from the sheet. */
+  const reopened=entries.map(entry=>entry!==linked?entry:{...entry,workflow:"In Progress",completedAt:"",completedBy:"",updatedAt:now,
+   history:[...(Array.isArray(entry.history)?entry.history:[]),{at:now,initials:"—",action:"Reopened from Fixed Repairs"}]});
+  const written=writeDownSheetStorageResult(localStorage,reopened);
+  if(!written.ok){setSaveProblem(written.reason||"failed");alert("The defect was reopened on the bus, but this device could not write the Down Sheet, so the row is not back on the sheet yet. Export a backup and clear space, then try again.")}
+ };
  const deleteRepair=(record:FixedRecord)=>{if(!confirm("Delete this repair record for Bus "+record.bus.n+"? You can immediately undo this action."))return;const next=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.id!==record.defect.id)});changeFleet(next,"Deleted Bus "+record.bus.n+" repair")};
  /* A repair somebody did without logging a defect first — which is how it
     happens on the floor more often than not. It opens the same editor every
@@ -285,7 +322,10 @@ function repairOrigin(source:string|undefined){
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
    {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}
    <div className="fixed-card-body"><section><b>ORIGINAL REPORT</b><p>{defectLabel(record.defect)}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · By "+record.defect.reportedBy:""}</small>{record.defect.conditionNotDuplicated&&<em className="not-duplicated-note">DEFECT / CONDITION NOT DUPLICATED</em>}{record.defect.shopNotes&&<em>SHOP NOTES: {record.defect.shopNotes}</em>}</section><section className="repair-result"><b>FIX / STEPS TAKEN</b><p>{record.defect.actionTaken||"Fix details have not been entered yet."}</p>{record.defect.diagnosticNote&&<small><b>DIAG / VERIFY:</b> {record.defect.diagnosticNote}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}{record.defect.completedBy&&<small><b>FIXED BY:</b> {record.defect.completedBy}</small>}</section></div>
-   <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}{partNumberMissing(record.defect)&&<b className="missing-part-number" title="A part was used on this repair and its number has not been entered yet">MISSING PART #</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button><button type="button" className="reopen-repair" onClick={()=>reopenRepair(record)}>UNDO FIX</button><button type="button" className="delete-repair" onClick={()=>deleteRepair(record)}>DELETE</button></div></footer>
+   <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}{partNumberMissing(record.defect)&&<b className="missing-part-number" title="A part was used on this repair and its number has not been entered yet">MISSING PART #</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button>{/* Not offered on a repair logged straight onto this page. Those are created
+    completed — somebody writing down a job already done — so they were never
+    open anywhere and there is nothing to undo. DELETE covers a mistaken one. */}
+    {record.defect.source!=="fixed-log"&&<button type="button" className="reopen-repair" onClick={()=>reopenRepair(record)}>UNDO FIX</button>}<button type="button" className="delete-repair" onClick={()=>deleteRepair(record)}>DELETE</button></div></footer>
   </article>)}</div>:<div className="fixed-empty"><b>No fixed repairs match this view.</b><span>Completed repairs will flow here automatically from the Defect Log, Down Sheet, and Fleet Tracker.</span></div>}</section>
   {editing&&<CompletionEditor record={editing} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setEditing(null)}/>}
   {/* No key on the bus id: it would remount the editor on every bus change and
