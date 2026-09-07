@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSIONS 152 AND 153 PENDING — publish 152 from `015e789`, then 153 from `0db855a`. Version 151 is live from `f5939df`.**
+**STATUS: VERSIONS 152 AND 153 PENDING — publish 152 from `015e789`, then 153 from `fd3b326`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Then | **153** | `0db855a` | **A scan sweep can be taken back out of the Defect Log, exactly** — 24 Tech Services records landed on 23 buses when a Down Sheet photo went through SCAN SWEEP, and an import could not remove them because an import never removes; every record a sweep files in one press shares one time stamp, and SCAN BATCHES lists each press and REMOVEs one, keeping anything worked on since, with PUT BACK as the way back; the AI Operator reads "remove the most recent 24 entries from the defect log" as that batch and checks the count; the removal reaches the other devices, because a pull now reads the tombstones too, and a restore reaches them because a live row now says deleted_at is null; the sweep scanner asks what the page IS before what is on it and refuses a Down Sheet; and a scanned FRONT TIROS reads FRONT TIRES while the margin rows stop slipping out |
+| Then | **153** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log, exactly** — 24 Tech Services records landed on 23 buses when a Down Sheet photo went through SCAN SWEEP, and an import could not remove them because an import never removes; every record a sweep files in one press shares one time stamp, and SCAN BATCHES lists each press and REMOVEs one, keeping anything worked on since, with PUT BACK as the way back; the AI Operator reads "remove the most recent 24 entries from the defect log" as that batch and checks the count; the removal reaches the other devices, because a pull now reads the tombstones too, and a restore reaches them because a live row now says deleted_at is null; the sweep scanner asks what the page IS before what is on it and refuses a Down Sheet; both scanners take up to 500 characters of NOTES FOR THIS SCAN — "line 23 is 17565", "HAZMAT means biohazard" — read with the photo and remembered on the device only when asked; and a scanned FRONT TIROS reads FRONT TIRES while the margin rows stop slipping out |
 | Next | **152** | `015e789` | **The shop cloud barely ran and then failed when it did, and this fixes both** — the sync engine lived only on the Settings page so a shift spent on the map synced nothing, and it now runs on every page and merges the shop's changes live as they happen; — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
@@ -27,10 +27,10 @@
 **Version 151 is live from `f5939df`.** The 136–151 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
 **Two releases are pending, in order.** 152 is frozen at `015e789` and is not
-moved by anything here; 153 is the two commits on top of it, `dd1b093` and
-`0db855a`. Publish 152 first, then 153 — or, if it is simpler to publish once,
-publish 153 from `0db855a` and record both versions as live from it, since 153
-contains 152 whole.
+moved by anything here; 153 is the three commits on top of it, `dd1b093`,
+`0db855a` and `fd3b326`. Publish 152 first, then 153 — or, if it is simpler to
+publish once, publish 153 from `fd3b326` and record both versions as live from
+it, since 153 contains 152 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -68,19 +68,20 @@ not take them out — nor could it have (section 1).
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`0db855a`** |
-| Last code-bearing commit | `0db855a` — the release source is this commit |
+| **Release source** | **`fd3b326`** |
+| Last code-bearing commit | `fd3b326` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 152, pending from `015e789` |
 
-**Two application commits** on top of 152's `015e789`:
+**Three application commits** on top of 152's `015e789`:
 
 ```
-git log --oneline 015e789..0db855a      # docs-only commits omitted
+git log --oneline 015e789..fd3b326      # docs-only commits omitted
+fd3b326 Let the person holding the sheet tell the scanner what the camera will get wrong
 0db855a Take a whole scan sweep back out of the Defect Log, and stop the next one going in
 dd1b093 Correct what the camera misread, and stop the margin rows slipping out
 
-git diff --name-only 015e789 0db855a -- app tests
+git diff --name-only 015e789 fd3b326 -- app tests
 app/api/down-sheet-scan/route.ts
 app/api/sweep-scan/route.ts
 app/cloud-client.ts
@@ -95,9 +96,11 @@ app/defect-log/sweep-scan-import.ts
 app/defect-log/sweep-scanner.tsx
 app/down-sheet/down-sheet-scan-import.ts
 app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet.css
 app/down-sheet/scan-spelling.ts         (new)
 app/operator-engine.ts
 app/page.tsx
+app/scan-notes.ts                       (new)
 app/shop-cloud-live.tsx
 tests/rendered-html.test.mjs
 ```
@@ -105,7 +108,7 @@ tests/rendered-html.test.mjs
 No dependency, database, CI, worker, or service-worker change:
 
 ```
-git diff --name-only 015e789 0db855a -- supabase package.json package-lock.json .github public worker   # returns nothing
+git diff --name-only 015e789 fd3b326 -- supabase package.json package-lock.json .github public worker   # returns nothing
 ```
 
 **No database change.** The two cloud changes in section 4 are in what the app
@@ -115,7 +118,7 @@ null`. Both columns have existed since migration 0002; the read is covered by
 the existing "shop reads" policy; **no table, column, trigger or policy
 changes.** No new route and no service-worker bump.
 
-Gate: **220 tests passing** (214 at Version 152, six added), ESLint clean,
+Gate: **221 tests passing** (214 at Version 152, seven added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -123,9 +126,15 @@ production build succeeds.
 **None, and nothing is rewritten.** No storage key changes and no payload shape
 changes.
 
-**One new storage key, additive:** `pace-scan-batch-undo-v1` holds the last
-removed scan sweep so PUT BACK works after a reload. Absent means nothing to
-put back. It is written only by a removal and cleared by a restore.
+**Two new storage keys, both additive.** `pace-scan-batch-undo-v1` holds the
+last removed scan sweep so PUT BACK works after a reload; absent means nothing
+to put back; written only by a removal, cleared by a restore.
+`pace-scan-notes-v1` holds the scan notes a person asked to keep, one text per
+scanner; absent means none; written on every READ, with the text or with
+nothing, according to the tick.
+
+**One new form field on both scan routes,** `notes`, optional; a request
+without it is the request it was.
 
 **One first-sweep cost, harmless and once per device.** A defect row's
 fingerprint now includes `deleted_at: null`, so every fingerprint changes and
@@ -222,7 +231,32 @@ points at SCAN SHEET on the Down Sheet page. A page the model would not vouch
 for, or where most rows could not be placed on either sheet, arrives with
 nothing ticked and an amber notice.
 
-### 6. From `dd1b093`: FRONT TIROS, and the margin rows
+### 6. Tell the scanner what the camera will get wrong, before it does
+
+The photo reader is not pattern matching. It is a vision-language model reading
+the page under written instructions, and it follows a sentence the way a person
+would. So both scanners now carry **NOTES FOR THIS SCAN** — up to 500
+characters, a counter beside it — sent with every page and appended to the
+prompt **behind** the fixed instructions, never in front of them. "Line 23 is
+17565." "The margin name is Carlos." "TIROS means tires." "HAZMAT means a
+biohazard on board." The person who knows the row is ambiguous says so before
+the photo is read, instead of fixing the row afterwards on the review screen
+(which still works; every field there is still editable).
+
+The block that carries the notes bounds them in the same breath: a note can
+correct HOW something written on the sheet is read; it can **never add a bus, a
+row or a repair that is not on the paper**, and a note that contradicts what is
+clearly printed loses to the paper and is called out in reviewNote. Empty notes
+add nothing, so a scan without them is byte-for-byte the scan it was.
+
+**Keep these notes on this device for the next scan** remembers them with one
+tick — the shop's shorthand and the mechanics' names are not retyped every
+morning — and a one-off left unticked is forgotten, so a correction about line
+30 today does not come back tomorrow as a standing instruction. Each scanner
+remembers its own. The cap and the cleaning are applied on the server as well
+as in the box.
+
+### 7. From `dd1b093`: FRONT TIROS, and the margin rows
 
 A scanned row now has its words corrected against the shop's own vocabulary and
 the mechanics' names already on the device — TIROS becomes TIRES, CAROS becomes
@@ -236,7 +270,15 @@ MARGIN.
 
 ## Validation
 
-- 220 regression tests passing, ESLint clean, production build succeeds
+- 221 regression tests passing, ESLint clean, production build succeeds
+- **The notes box, driven against the PRODUCTION build at 390 px with the scan
+  routes stubbed, zero page errors:** a 700-character paste clamps at 500/500;
+  the request carries `name="notes"` with the text beside the page; ticked
+  notes are stored and come back pre-filled and ticked on the next open;
+  unticked notes are forgotten; the sweep scanner keeps its own; and a stubbed
+  `document: "other"` answer produces the red refusal with no FILE button —
+  which is the section 5 path measured in a browser, with the model's answer
+  the only thing stubbed
 - **Driven against the PRODUCTION build, zero page errors,** with the real Sep
   6 shape seeded — 24 sweep records on 23 buses among 30 defects:
   - SCAN BATCHES lists one row reading **24 RECORDS ON 23 BUSES · CHECKED BY
@@ -289,21 +331,29 @@ MARGIN.
    refuse the page in red and point at SCAN SHEET, with nothing to tick.
 7. **SCAN SHEET a page with a margin row.** The row arrives amber and marked
    MARGIN whatever the model claimed, and a misspelt shop word reads corrected.
+8. **Write a note before reading a sheet you know is ambiguous** — "line 23 is
+   17565" or "the margin name is Carlos" — and see whether the row comes back
+   right the first time. Tick KEEP for something standing like "HAZMAT means
+   biohazard" and confirm it is there the next morning; leave a one-off
+   unticked and confirm it is not.
 
 ## The way back
 
-Measured in a throwaway worktree from `0db855a`:
+Measured in a throwaway worktree from `fd3b326`:
 
-- `git revert 0db855a` alone is **clean** and takes out everything in sections
-  2–5, leaving `dd1b093`'s scan corrections in place.
-- `git revert 0db855a dd1b093` (newest first) is **clean** and takes the whole
-  release out, back to 152.
-- `git revert dd1b093` alone **conflicts in `tests/rendered-html.test.mjs`
-  only**, because `0db855a` appended to the same file; keep both sides, or
-  revert the pair above.
-- Going back leaves `pace-scan-batch-undo-v1` on any device that removed a
-  sweep; nothing reads it and it is harmless. Ledger entries a removal wrote
-  stay, by the ledger's own design.
+- `git revert fd3b326` alone is **clean** and takes out the notes box (section
+  6), leaving everything else in place.
+- `git revert fd3b326 0db855a` (newest first) is **clean** and takes out
+  sections 2–6, leaving `dd1b093`'s scan corrections in place.
+- `git revert fd3b326 0db855a dd1b093` (newest first) is **clean** and takes
+  the whole release out, back to 152.
+- **Single reverts of `0db855a` and `dd1b093` conflict** — `0db855a` in
+  `sweep-scanner.tsx` and the test file, `dd1b093` in the down-sheet scan route
+  and the test file — because the later commits touched the same lines. None is
+  a code disagreement; revert from the newest down, as above.
+- Going back leaves `pace-scan-batch-undo-v1` and `pace-scan-notes-v1` on any
+  device that used them; nothing reads them and they are harmless. Ledger
+  entries a removal wrote stay, by the ledger's own design.
 - Nothing in the cloud needs undoing. A tombstone is data, not an absence:
   the older app goes on filtering tombstoned rows out of its pulls exactly as
   it did before.
@@ -319,7 +369,7 @@ Measured in a throwaway worktree from `0db855a`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 153 | Live | <published tip hash> | A whole scan sweep can be taken back out of the Defect Log. On Sep 6 a photo of the Vehicle Down Sheet went through SCAN SWEEP and 24 Tech Services records landed on 23 buses in one press, and importing the other device's log could not remove them because an import keeps every record only the receiver has, by design. Every record a sweep files in one press shares one creation stamp, and SCAN BATCHES, beside SCAN SWEEP, lists each press and REMOVEs one — keeping any record marked fixed, deferred, ticked or written on since — with PUT BACK as the way back, surviving a reload. The AI Operator reads "remove the most recent 24 entries from the defect log" as that batch, checks the number rather than rounding to it, explains that "undo the most recent change" is the log's own UNDO LAST, and puts a sweep back on request. A removal now reaches the other devices, because a pull reads the tombstones as well as the live rows and drops a copy older than its tombstone while keeping one edited since, and a restore reaches them because a live defect row now says deleted_at is null and returns stamped newer than the deletion. The sweep scanner asks the model what the page is before what is on it and refuses a Down Sheet outright, pointing at SCAN SHEET. And a scanned FRONT TIROS reads FRONT TIRES, with handwritten margin rows named as loudly as printed lines and always arriving amber |
+| 153 | Live | <published tip hash> | A whole scan sweep can be taken back out of the Defect Log. On Sep 6 a photo of the Vehicle Down Sheet went through SCAN SWEEP and 24 Tech Services records landed on 23 buses in one press, and importing the other device's log could not remove them because an import keeps every record only the receiver has, by design. Every record a sweep files in one press shares one creation stamp, and SCAN BATCHES, beside SCAN SWEEP, lists each press and REMOVEs one — keeping any record marked fixed, deferred, ticked or written on since — with PUT BACK as the way back, surviving a reload. The AI Operator reads "remove the most recent 24 entries from the defect log" as that batch, checks the number rather than rounding to it, explains that "undo the most recent change" is the log's own UNDO LAST, and puts a sweep back on request. A removal now reaches the other devices, because a pull reads the tombstones as well as the live rows and drops a copy older than its tombstone while keeping one edited since, and a restore reaches them because a live defect row now says deleted_at is null and returns stamped newer than the deletion. The sweep scanner asks the model what the page is before what is on it and refuses a Down Sheet outright, pointing at SCAN SHEET. Both scanners take up to 500 characters of NOTES FOR THIS SCAN — "line 23 is 17565", "the margin name is Carlos", "HAZMAT means biohazard" — read with the photo under a rule that a note can correct how a row is read but never add a bus, and remembered on the device only when asked. And a scanned FRONT TIROS reads FRONT TIRES, with handwritten margin rows named as loudly as printed lines and always arriving amber |
 ```
 
 
