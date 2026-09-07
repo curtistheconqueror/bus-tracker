@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 153 (repository release 157)
-Live feature checkpoint: commit baffc24
+Live release: Sites Version 154 (repository release 158)
+Live feature checkpoint: commit a444242
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 157 is the current user-approved live release, deployed by Sites as Version 153. Its source checkpoint is commit baffc24. It carries the Shop Cloud sync and scan-review work from releases 153–154, Main Garage Ready Rows, corrected Down Sheet row semantics and road tallies, improved scan catalog matching, and an ON ROAD badge on every Down Sheet row. No storage-key or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 158 is the current user-approved live release, deployed by Sites as Version 154. Its source checkpoint is commit a444242. A genuinely held-back Deferred Defect Log repair now has a persistent UNDO DEFERRED action in both its expanded card and Focus view; it returns the repair to Open, clears the active deferred clock, and retains the dated WAS DEFERRED history. Down Sheet-owned Deferred work is deliberately excluded. No storage-key or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

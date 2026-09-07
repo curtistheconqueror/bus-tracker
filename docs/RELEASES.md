@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 154 / release 158 | Live | a444242 | Adds a persistent UNDO DEFERRED action to expanded Defect Log repair cards and Focus view; it returns a held-back repair to Open while retaining its dated deferred history, and never appears for Down Sheet-owned Deferred work |
 | 153 / release 157 | Live | baffc24 | Carries repository releases 153–157: Shop Cloud sync and scan-review repairs, reversible scan sweeps, Ready Rows, corrected Down Sheet scan wording and road tallies, improved catalog matching, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | 152 | Live | b57dcb5 | Shop Cloud sync safely sends merged-defect tombstones and reaches Down Sheet rows; scan review flags missing and uncertain rows; the Deferred badge opens its matching bus filter; Shop Cloud is first under Settings MASTER; A-3, A-21, and a biohazard catalog condition are added |
 | 151 | Previous live | f5939df | Dated ROAD CALL events sync between Defect Log and Facility Map, remain in history while driving a seven-day filter, and permit a short mis-tick undo; Down Sheet bands distinguish off-property, scheduled, unscheduled and inspection work; master backup and restore controls move to Settings |
