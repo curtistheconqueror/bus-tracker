@@ -757,20 +757,42 @@ test("server-renders the live fleet command dashboard", async () => {
 
 });
 
-test("renders the mobile Mystery list on the Defect Log", async () => {
+test("the Mystery list renders on the Down Sheet, and the Defect Log packs its controls away", async () => {
+  /* MYSTERY BUSES moved: every bus it lists is a bus that is NOT on the Down
+     Sheet, so it belongs beside that sheet rather than on the Defect Log. */
+  const downResponse=await render("/down-sheet");
+  assert.equal(downResponse.status,200);
+  const downHtml=await downResponse.text();
+  assert.match(downHtml,/MYSTERY BUSES/);
+  assert.match(downHtml,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
+  assert.match(downHtml,/class="mystery-board"/);
+  assert.match(downHtml,/class="mystery-toggle"/);
+
   const response=await render("/defect-log");
   assert.equal(response.status,200);
   const html=await response.text();
-  assert.match(html,/MYSTERY BUSES/);
-  assert.match(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
-  assert.match(html,/class="mystery-board"/);
-  assert.match(html,/class="mystery-toggle"/);
-  assert.match(html,/aria-expanded="true"/);
-  assert.match(html,/>QUICK FILTERS</);
+  assert.doesNotMatch(html,/class="mystery-board"/,"the board left this page");
+  assert.doesNotMatch(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
+
+  /* Nine controls were loose above the feed. Only the two used on every visit
+     stay out — LOG DEFECT and SEARCH — and the rest sit behind one button,
+     closed until it is opened. */
+  assert.match(html,/ADVANCED ACTIONS/);
+  assert.match(html,/class="log-advanced-toggle"/);
+  assert.match(html,/aria-expanded="false"/,"it opens closed, which is the point of it");
+  assert.match(html,/\+ LOG DEFECT/);
+  assert.match(html,/>SEARCH</);
+  for(const label of ["QUICK FILTERS","UNDO LAST","CLEAN UP","SCAN SWEEP","SCAN BATCHES","AI OPERATOR"])
+   assert.doesNotMatch(html,new RegExp(">"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"<"),label+" must be inside the closed section, not loose on the page");
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
    /* Four boxes in a two-column grid: two full rows, nothing sitting alone. */
    assert.match(css,/\.engine-symptom-picker>div\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
+  /* The board's phone rules moved to globals.css with the board itself — that
+     is the one stylesheet both pages load, and the Defect Log still needs the
+     MOVE / LOCATION editor's styles for its deferred drawer. */
+  const shared=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+  assert.match(shared,/@media\(max-width:760px\)\{\.mystery-board/);
+  assert.doesNotMatch(css,/\.mystery-board\{/,"the board's own styles must not be left behind on a page it no longer renders");
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
@@ -787,8 +809,8 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
   assert.match(css,/\.quick-filter-drawer>\.quick-filter-results\{min-height:0;grid-auto-rows:max-content/);
   assert.match(css,/inset:max\(8px,env\(safe-area-inset-top\)\) 8px max\(8px,env\(safe-area-inset-bottom\)\)/);
-  assert.match(css,/\.mystery-board\.collapsed>\.mystery-head\{border-bottom:0\}/);
-  assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
+  assert.match(shared,/\.mystery-board\.collapsed>\.mystery-head\{border-bottom:0\}/);
+  assert.match(shared,/\.mystery-toggle\{width:38px;height:38px/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -1548,10 +1570,18 @@ test("Mystery Buses can change facility location without changing defects or Dow
   assert.equal(moved.target,"garage-0");
   assert.equal(moved.fleet[0].down,true);
   assert.deepEqual(moved.fleet[0].defects,[defect]);
-  const [page,css]=await Promise.all([readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8")]);
-  assert.match(page,/MOVE \/ LOCATION/);
-  assert.match(page,/defects and Down Sheet membership are not changed/);
-  assert.match(css,/\.mystery-move\{[^}]*min-height:44px/);
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  /* The editor moved into the shared board module — the Down Sheet's MYSTERY
+     BUSES opens it, and so does the Defect Log's deferred drawer, which is why
+     there is one copy rather than two that drift. */
+  const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
+  assert.match(board,/MOVE \/ LOCATION/);
+  assert.match(board,/defects and Down Sheet membership are not changed/);
+  assert.match(page,/MOVE \/ LOCATION/,"the deferred drawer still offers it");
+  assert.match(page,/import \{MysteryMoveModal\} from "\.\.\/mystery-board"/,"and opens the shared one");
+  /* MOVE / LOCATION is shared: the Down Sheet's board and the Defect Log's
+     deferred drawer both open it, so its styles sit in globals.css. */
+  assert.match(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"),/\.mystery-move\{[^}]*min-height:44px/);
 });
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
@@ -1604,11 +1634,29 @@ test("repair catalog exposes robust category and issue choices", () => {
      moved into its group. A record from the MDT era lands at the end of both. */
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen - INOP (general)");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration", "CNG"]);
-  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 1 Roof 2", "Trouble Mod 2 Roof 1", "Trouble Mod 2 Roof 2", "Control head no power", "Other Fire Suppression Trouble"]);
+  /* Each module reports Roof 1, Roof 2 and the engine. The engine positions
+     were missing, so a mechanic reading TROUBLE MOD 1 ENGINE off the panel had
+     nothing in the picker to file it as. */
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 1 Roof 2", "Trouble Mod 1 Engine", "Trouble Mod 2 Roof 1", "Trouble Mod 2 Roof 2", "Trouble Mod 2 Engine", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 2"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 2 Roof 2"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Engine"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 2 Engine"));
+  /* The stored identity and the names the picker draws are two structures that
+     have to stay in step: add to one only, and the picker offers an option that
+     saves as nothing, or a saved record has no option to reach it. Checked for
+     the whole category rather than for the entries just added. */
+  for(const [group, issues] of Object.entries(REPAIR_OPTION_GROUPS.Amerex))
+   for(const issue of issues)
+    assert.ok(REPAIR_OPTIONS.Amerex.includes(group + " - " + issue), group + " - " + issue + " is in the picker but not in REPAIR_OPTIONS");
+  for(const option of REPAIR_OPTIONS.Amerex){
+   // first separator only: an issue name is allowed to contain " - " itself
+   const at = option.indexOf(" - ");
+   const group = option.slice(0, at), issue = option.slice(at + 3);
+   assert.ok(REPAIR_OPTION_GROUPS.Amerex[group]?.includes(issue), option + " is a stored option the picker cannot offer");
+  }
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
   // Amerex keeps the wording printed on the panel; every other grouped
   // category gets plain wording that names its own groups.
@@ -5955,10 +6003,12 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
 });
 
 test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
- const [logPage,logSettings,logCss]=await Promise.all([
+ const [logPage,logSettings,logCss,mysteryBoard,globalCss]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
  ]);
  // globals.css styles bare <header> as a 38px dark banner and bare <footer> as
  // a pill fixed to the bottom of the viewport. The editor's action bar had a
@@ -5968,13 +6018,26 @@ test("no element in the Defect Log relies on the global bare header and footer s
  // panel is its own module now, rendered on the Settings page, and the rule
  // holds there too - that page loads globals.css like every other.
  const logMarkup=logPage+logSettings;
- assert.equal(/<header>|<footer>/.test(logMarkup),false,"no bare header or footer may come back");
- for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions","part-prompt-head"])
+ assert.equal(/<header>|<footer>/.test(logMarkup+mysteryBoard),false,"no bare header or footer may come back");
+ for(const className of ["log-editor-head","log-settings-head","quick-filter-head","grouped-defect-head","log-editor-actions","part-prompt-head"])
   assert.ok(logMarkup.includes('className="'+className+'"'),className+" must be applied in the markup");
+
+ /* MYSTERY BUSES moved to the Down Sheet, and its markup went with it into a
+    module both pages render — the board on the Down Sheet, the MOVE / LOCATION
+    editor from the Defect Log's deferred drawer. Its header and footer are
+    still bare <header> and <footer> tags underneath, so the same trap applies;
+    the reset that neutralises them just has to live in the one stylesheet both
+    pages load. */
+ for(const className of ["mystery-head","mystery-move-head","mystery-move-actions"])
+  assert.ok(mysteryBoard.includes('className="'+className+'"'),className+" must be applied in the shared board markup");
+ const sharedReset=globalCss.match(/\.mystery-head,\.mystery-move-head,\.mystery-move-actions\{([^}]*)\}/);
+ assert.ok(sharedReset,"globals.css must reset the board's header and footer, or it wears the 38px banner and the fixed pill");
+ for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
+  assert.ok(sharedReset[1].includes(property),"the shared reset must clear "+property);
 
  // the element selectors still match these tags, so the global properties are
  // neutralised before each one is styled deliberately
- const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions,\.mystery-move-head,\.mystery-move-actions,\.part-prompt-head\{([^}]*)\}/);
+ const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.grouped-defect-head,\.log-editor-actions,\.part-prompt-head\{([^}]*)\}/);
  assert.ok(reset,"the reset block must exist");
  for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
   assert.ok(reset[1].includes(property),"the reset must clear "+property);
@@ -9095,6 +9158,127 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.equal(capped["d0-0"],undefined,"and the oldest, long since landed on the server, are what falls off");
 });
 
+test("the tablet band does not scroll sideways: the nav wraps, and a map rule stops leaking",async()=>{
+ const [down,globals]=await Promise.all([
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Two separate faults put an iPad-width page into sideways scroll.
+
+    The Down Sheet's nav is six links pinned at 108px, so with its gaps it is
+    703px, and above 760px it shares the header's one flex line with the title
+    and REFRESH. Between there and 1024 the three do not fit: REFRESH was
+    measured 194px past the right edge at 820px and the whole page scrolled,
+    not just the header. The header wraps in that band and the nav takes a row
+    of its own. */
+ assert.match(down,/@media\(min-width:761px\) and \(max-width:1023px\)\{[\s\S]{0,400}?\.down-header\{flex-wrap:wrap\}/,"the header has to wrap in the tablet band");
+ assert.match(down,/@media\(min-width:761px\) and \(max-width:1023px\)\{[\s\S]{0,400}?\.down-header nav\{order:3;flex:1 0 100%/,"and the nav takes its own row rather than squeezing the title and REFRESH");
+
+ /* The second was a global rule leaking. Inside the map's @media(max-width:800px)
+    block, `.quick-filter-control,.quick-filter-trigger` were written bare — but
+    that control is shared with the Defect Log, so its trigger was forced to
+    width:100%, grew to 722px inside a no-wrap row and pushed that page 531px
+    sideways at 761-800px. Scoped to the command bar, it cannot reach another
+    page again. */
+ assert.doesNotMatch(globals,/\.command-highlights>\*,\.quick-filter-control,\.quick-filter-trigger\{width:100%\}/,"the bare selectors reached every page that uses the quick filter");
+ assert.match(globals,/\.command-highlights>\*,\.command-bar \.quick-filter-trigger\{width:100%\}/,"scoped to the map's own command bar");
+});
+
+test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
+ const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+ const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
+
+ /* The PM half of the maintenance wording was missing, and the omission was
+    invisible because `pm's` itself matched: the catalog words written beside it
+    did not, so "Other preventive maintenance - PM'S" had `pm's` struck out and
+    "other preventive maintenance" left standing, which reads as a complaint.
+    Every one of the eight Preventive Maintenance catalog items behaved that
+    way — a PM bus counted as a bus down, and sat in UNSCHEDULED rather than
+    under INSPECTIONS & SCHEDULED MAINTENANCE. */
+ for(const repair of ["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"]){
+  assert.equal(downSheetMentionsDefect(row(repair,"PM'S","Inspection")),false,repair+" with PM'S beside it is scheduled maintenance, not a bus down");
+  assert.equal(downSheetGroup(row(repair,"PM'S","Inspection")),"inspection",repair+" belongs under INSPECTIONS & SCHEDULED MAINTENANCE");
+ }
+ for(const repair of ["B-18","B-12","A-3","A-21"])
+  assert.equal(downSheetMentionsDefect(row(repair,repair,"Inspection")),false,"an inspection code on its own is not a bus down");
+
+ /* The whole risk of widening that wording is that it starts swallowing
+    complaints. A fault written ALONGSIDE the maintenance still has to survive
+    the strip — this is the half that must never regress. */
+ for(const [repair,reason] of [
+  ["Other preventive maintenance","PM DEFECTS - Trans Leak"],
+  ["Other preventive maintenance","PM'S / BRAKES GRINDING"],
+  ["Misfire","MISFIRES / PM'S"],
+  ["Fluid service","FLUID LEAK"],
+  ["Lubrication","LUBE + AIR LEAK"],
+  ["Add engine oil","OIL LEAK REAR MAIN"],
+  ["Other repair","BIKE RACK BENT"],
+  ["B-18","B-18 FAILED - BRAKES"],
+ ]) assert.equal(downSheetMentionsDefect(row(repair,reason)),true,"a fault written beside maintenance is still a bus down: "+reason);
+
+ /* Curtis: "inspections are their own thing. Don't mix with unscheduled work.
+    Just keep inspections in their own count. Regardless if someone is assigned
+    to the bus or not."
+
+    The scheduled/unscheduled split is decided by whether a name is written in
+    the mechanic column, and that question must never be reached for an
+    inspection — so this is asserted with and without an assignee rather than
+    left to the order the checks happen to run in. A fault written beside the
+    maintenance is a different matter: that bus is down, and it leaves. */
+ for(const [repair,reason] of [["B-18","B-18"],["A-3","A-3"],["Other preventive maintenance","PM'S"],["Oil and filter service",""]]){
+  assert.equal(downSheetGroup(row(repair,reason,"Inspection")),"inspection",repair+" with nobody assigned belongs in its own count");
+  assert.equal(downSheetGroup({...row(repair,reason,"Inspection"),assignedTo:"ARMON"}),"inspection",repair+" stays in its own count when a mechanic is on it");
+ }
+ assert.equal(downSheetGroup({...row("Other preventive maintenance","PM'S / BRAKES GRINDING","Inspection"),assignedTo:"ARMON"}),"scheduled","a fault written beside the PM is a bus down, and leaves the inspection count");
+
+ // The tile, beside the total rather than under it, and the count behind it.
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const downBusCount=useMemo\(\(\)=>visible\.filter\(downSheetMentionsDefect\)\.length,\[visible\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
+ assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{downBusCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+
+ /* The total used to take a whole row by itself on a phone. It is one of a pair
+    now, so it takes half like every other tile. */
+ const css=await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
+ assert.doesNotMatch(css,/\.down-group-counts \.group-count\.total\{grid-column:1\/-1\}/,"the total must not span the whole row any more");
+ assert.match(css,/\.down-group-counts\{margin:0 14px 9px;display:grid;grid-template-columns:repeat\(6,/,"six tiles across the first row");
+});
+
+test("every Down Sheet row carries its own DELETE, on the bus's cell rather than off the right edge",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+
+ /* In the bus's own cell, which is the one column a phone never has to scroll
+    sideways to reach. A tenth column at the far right would be the control you
+    go looking for, and this is the one pressed by somebody holding a sheet. */
+ assert.match(page,/<td className="fleet-number">[\s\S]{0,1400}?<button className="delete-entry" type="button" onClick=\{\(\)=>deleteEntry\(entry\)\}/,"DELETE belongs on the face card, not in a column off the edge");
+ assert.match(page,/<td className="fleet-number">[\s\S]{0,1600}?<button className="fix-entry" type="button" onClick=\{\(\)=>markEntryFixed\(entry\)\}/,"MARK FIXED sits in the same cell, before the destructive one");
+ assert.match(page,/entry\.workflow!=="Completed"&&<button className="fix-entry"/,"and it is not offered on a row that is already closed out");
+ assert.match(page,/aria-label=\{"Delete bus "\+\(entry\.busNumber\|\|"entry"\)\+" from the Down Sheet"\}/,"and it has to say which bus it would delete");
+
+ // Asked before it happens, and the confirm says what survives it.
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,600}?if\(!confirm\(/);
+ assert.match(page,/The bus keeps its defects, status and location/,"deleting a row is not a claim that anything was repaired");
+
+ /* The way back is on the page, not behind MORE: an accidental delete is
+    exactly when nobody opens a menu to look for it. */
+ assert.match(page,/rowAction&&<p className=\{"down-deleted-note"[\s\S]{0,600}?onClick=\{undoDeleteEntry\}/);
+ assert.doesNotMatch(page,/<summary>MORE<\/summary>[\s\S]{0,600}?undoDeleteEntry/,"PUT BACK must not be the thing hidden behind a menu");
+
+ /* 26px reads fine under a mouse and misses under a thumb. The sheet is used
+    on phones, so the phone block has to give it a real target. */
+ assert.match(css,/\.delete-entry\{[^}]*width:26px/);
+ assert.match(css,/\.fix-entry\{[^}]*width:26px/,"MARK FIXED shares DELETE's shape so the pair reads as one group");
+ /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
+    the map — matched on content rather than position, since the file has many. */
+ const at=css.indexOf(".down-deleted-note button{width:100%");
+ assert.ok(at>0,"the phone override for the PUT BACK button is gone");
+ const phone=css.slice(at);
+ assert.match(phone,/\.delete-entry,\.fix-entry\{width:44px;height:44px/,"the phone block must raise both row buttons to a 44px touch target");
+});
+
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  assert.match(page,/import \{forgetRemovedEntries,rememberRemovedEntries\} from "\.\.\/cloud-sync"/);
@@ -9113,6 +9297,54 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(page,/const undoClear=\(\)=>\{[\s\S]{0,1200}?held\.has\(entry\.id\)\?entry:\{\.\.\.entry,updatedAt:restoredAt\}/);
  assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?rememberRemovedEntries\(localStorage,entries\.filter\(entry=>!kept\.has\(entry\.id\)\)\.map\(entry=>entry\.id\),restoredAt\)/,"rows the scan itself created have to come off everywhere too");
  assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?forgetRemovedEntries\(localStorage,\[\.\.\.kept\]\)/);
+
+ /* DELETE, one row at a time — the third door onto the same ledger, and the
+    one a foreman uses daily. A row merely dropped from this device stays live
+    on the server and comes back on the next pull. */
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,1800}?rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
+ /* Sliced rather than matched within a character window: this handler routes
+    two kinds of undo now, and a window wide enough to clear the routing is wide
+    enough to match the wrong function. */
+ const undoDelete=page.slice(page.indexOf("const undoDeleteEntry="));
+ assert.match(undoDelete,/forgetRemovedEntries\(localStorage,\[entry\.id\]\)/);
+ assert.match(undoDelete,/\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
+ /* The undo copy is written before the row goes, and the delete gives up if it
+    cannot be: a removal with no way back is the door this app does not build. */
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
+
+ /* MARK FIXED is one press and writes no tombstone: nothing was removed, the
+    row only stopped being active. It goes through saveEntry so a quick close-out
+    takes the same path the editor takes. */
+ const fix=page.slice(page.indexOf("const markEntryFixed="),page.indexOf("const undoFixEntry="));
+ assert.match(fix,/workflow:"Completed",completedAt:now/,"a closed-out row is stamped when it was closed");
+ assert.match(fix,/saveEntry\(normalizeEntry\(/,"one press must not mean a different kind of save");
+ assert.ok(!fix.includes("rememberRemovedEntries"),"marking fixed removes nothing, so it must not write a tombstone");
+ assert.match(fix,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return;/,"and the way back is written before the change, because there is no confirm");
+
+ /* The undo restores the BUS, not just the entry, and this is the whole reason
+    it is not simply "save the old entry again".
+
+    Completing an entry completes the bus's defect, and a completed defect is
+    resolved — so it is no longer adoptable, the re-saved entry cannot find it,
+    and it mints a SECOND record for the same fault while leaving the first
+    closed. Measured before this was fixed: one press and one undo left the bus
+    carrying d-1 completed and a fresh open duplicate beside it. Two records for
+    one fault is the thing this app must never do. */
+ const unfix=page.slice(page.indexOf("const undoFixEntry="),page.indexOf("const undoDeleteEntry="));
+ assert.match(unfix,/bus\?:\{id:string;s:FleetStatus;defects:StructuredDefect\[\];pendingRepair:string\}/,"the fields the completion changed have to be carried in the copy");
+ assert.match(unfix,/fleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
+ assert.ok(!unfix.includes("saveEntry("),"re-saving the entry is exactly what duplicated the defect");
+ assert.match(fix,/const bus=fleet\.find\(item=>item\.id===entry\.busId\)/,"the snapshot is taken before the change, not after");
+
+ /* And the tombstone goes only AFTER a write that succeeded. The other order
+    reads the same until the device is full, and then it tells the shop cloud to
+    drop a row this device still holds — deleted everywhere except where it was
+    pressed. Nothing on screen would show that, so it is pinned here. */
+ const del=page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed="));
+ assert.ok(del.indexOf("writeDownSheetStorageResult")<del.indexOf("rememberRemovedEntries"),"the sheet has to be written before the removal is recorded");
+ assert.match(del,/if\(!written\.ok\)\{[\s\S]{0,300}?return;/,"and a refused write has to stop the delete outright");
+ const undo=page.slice(page.indexOf("const undoDeleteEntry="));
+ assert.ok(undo.indexOf("writeDownSheetStorageResult")<undo.indexOf("forgetRemovedEntries"),"and putting one back writes the sheet before clearing its tombstone");
 
  /* The AI Operator clears the sheet too, from the map. It is the same operation
     through a different door, so it writes the same ledger — a clear that reaches
@@ -9352,6 +9584,13 @@ test("the handoff files stay true: every storage key is documented, and the entr
  // A fresh session is told where to start, and the file it is sent to exists.
  assert.match(claudeMd,/Read `docs\/NEXT_SESSION\.md` first/);
  assert.ok(nextSession.length>2000,"the entry point must actually say something");
+
+ /* No number in here that another file owns or that the next commit moves.
+    Both of these were wrong inside an hour: the live version (Codex publishes
+    while sessions run) and the test count (written as 229 by the same commit
+    that added the 230th test). Point at the source instead of copying it. */
+ assert.doesNotMatch(nextSession,/\b\d{2,}\s+tests?\s+passing/i,"NEXT_SESSION.md must not quote a passing-test count - it goes stale on the next commit that adds a test");
+ assert.doesNotMatch(nextSession,/Sites Version\s+\d+\s*=/i,"NEXT_SESSION.md must not name the live version - Codex owns that, in PUBLISH_NEXT.md and RELEASES.md");
 
  /* It must not promise files that are not there — a dead pointer in the first
     thing a session reads costs more than no pointer at all. */
@@ -9716,10 +9955,37 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.match(page,/isDownSheetRoadLocation\(locations\[entry\.busId\]\|\|""\)&&<i className="on-road-badge"/);
  assert.ok(page.includes('</button>{isDownSheetRoadLocation'),"the badge follows the button rather than sitting inside it");
  assert.match(css,/\.on-road-badge\{[^}]*white-space:nowrap/,"a badge that wrapped would push every row taller");
+
+ /* Fixed tab stops, the same fix the Defect Log's badge slot got. Laid out
+    inline the badge follows the bus button, and that button is as wide as the
+    status label under it — so ON ROAD sat at three x positions on neighbouring
+    rows (measured 145, 161 and 185 for OUT OF SERVICE, WORK IN PROGRESS and IN
+    SERVICE WITH DEFECTS), and the longest label pushed it onto the reason text
+    in the next column. Curtis photographed it on the live sheet.
+
+    Each piece owns a slot now. The explicit grid-column on each is what makes
+    an empty ON ROAD slot stay empty instead of DELETE sliding left into it. */
+ assert.match(page,/<td className="fleet-number"><span className="fleet-number-slots">/,"the cell's contents need a row of fixed slots to sit in");
+ assert.match(css,/\.fleet-number-slots\{display:grid;grid-template-columns:\d+px \d+px \d+px \d+px/,"four fixed columns: the bus button, the ON ROAD slot, MARK FIXED, DELETE");
+ for(const [sel,col] of [["\\.fleet-number-button","1"],["\\.on-road-badge","2"],["\\.fix-entry","3"],["\\.delete-entry","4"]])
+  assert.match(css,new RegExp("\\.fleet-number-slots>"+sel+"\\{grid-column:"+col),"each slot must be pinned to its own column, or it slides when a neighbour is absent");
+ assert.doesNotMatch(css,/\.on-road-badge\{[^}]*margin-left/,"the gap comes from the grid, not a margin that only exists when the badge does");
  /* 108px fitted the number and its status label exactly, so the badge beside it
     overflowed into the reason column and was clipped by 21px in the built page.
-    The column is sized for what it now carries, and the table's min-width rose
-    by the same 40px so no other column lost room to it. */
- assert.match(css,/\.down-table th:nth-child\(2\)\{width:148px\}/);
- assert.match(css,/\.down-table\{[^}]*min-width:1200px/);
+    DELETE later landed exactly the same way, hanging 13px into that column at
+    every phone width, because table-layout is fixed and the column does not
+    grow for what you put in it.
+
+    So the rule rather than the number: the column is sized for the worst row it
+    can hold — longest status label, ON ROAD, and a 44px delete target, measured
+    at 253px on a 390px phone — and the table's min-width rises with it, which
+    is what keeps the widening from coming out of another column. */
+ const busCol=Number(css.match(/\.down-table th:nth-child\(2\)\{width:(\d+)px\}/)?.[1]);
+ const tableMin=Number(css.match(/\.down-table\{[^}]*min-width:(\d+)px/)?.[1]);
+ /* 238 declared renders as a 261px box once padding and borders are on it,
+    against the 253px the worst row measured — 8px of headroom. Declared width
+    and measured box are not the same number, so this floor is the declared one
+    that was actually measured good. */
+ assert.ok(busCol>=238,"the bus column is "+busCol+"px, too narrow for the number, its status label, ON ROAD and DELETE together");
+ assert.equal(tableMin,1052+busCol,"the table's min-width has to rise with the bus column, or the extra room is taken from another column");
 });

@@ -41,10 +41,20 @@ something the shop does not have.
 | | |
 | --- | --- |
 | Branch | `main`, linear history, no force-pushes ever |
-| Live | Sites Version 154 = repository release 158 = commit `a444242` |
-| Pending publication | See the STATUS line of `docs/PUBLISH_NEXT.md` |
+| Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
+| Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Clean. Nothing stashed, nothing uncommitted. |
-| Gate at handoff | 229 tests passing, ESLint clean, production build succeeds |
+| Gate at handoff | All three green: the full suite passing, ESLint clean, production build succeeds. Run them; the count moves with every change that adds a test. |
+
+**Neither is the test count, for the same reason.** It was written down as 229
+by the very commit that added the 230th test, so the first thing a fresh session
+read was a number its own suite disagreed with.
+
+**Which version is live is deliberately not written here.** Codex publishes and
+owns `docs/PUBLISH_NEXT.md`, `docs/RELEASES.md` and `PROJECT_HANDOFF.md`, and it
+publishes while sessions are running — this row named a version and a commit and
+was wrong within the hour, twice. Read it from the file Codex updates rather
+than from a number copied into this one.
 
 **There is no stash and there are no uncommitted changes.** If you find some,
 somebody left them there after this file was written — read them before doing

@@ -118,6 +118,7 @@ undo and recovery, never synced
   pace-board-recovery-v1           last known good board
   pace-down-sheet-clear-undo-v1    UNDO CLEAR
   pace-down-sheet-scan-undo-v1     UNDO IMPORT
+  pace-down-sheet-entry-undo-v1    PUT BACK, for one deleted Down Sheet row
   pace-scan-batch-undo-v1          PUT BACK, for a Defect Log scan sweep
   pace-facility-defect-clear-undo-v1  UNDO MAP CLEANUP
 
@@ -139,9 +140,16 @@ per-device view state — which panel is open, what has been dismissed
   pace-tracker-collapsed-sections-v1
   pace-down-sheet-stats-open-v1
   pace-defect-log-stats-open-v1
-  pace-defect-log-mystery-collapsed-v1
+  pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
+  pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-defect-log-mystery-collapsed-v1` is read and written by the Down Sheet**,
+not the Defect Log. The MYSTERY BUSES board moved there — every bus it lists is
+a bus that is *not* on the sheet — and the key kept its old name because
+renaming one throws away what the device already holds. The name records where
+the panel used to live; the value is still "is this panel collapsed".
 
 `pace-locate-ack`, `pace-touch-drop` and `pace-open-quick-filter` look like keys
 and are not — they are CustomEvent names.

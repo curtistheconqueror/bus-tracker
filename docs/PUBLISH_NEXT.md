@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSIONS 159–160 PENDING — publish 159 from `2afa491`, then 160 from `bbe33f6`. Repository release 158 is live from `a444242` as Sites Version 154.**
+**STATUS: NONE PENDING — repository release 161 is live from `3b16d45` as Sites Version 157.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,8 +8,9 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Then | **160** | `bbe33f6` | **REFRESH on every page, and the Main Garage split by bay instead of by row** — saved to a home screen there is no address bar to reload from, so all six pages get the button the Facility Map already had, sharing one definition of refreshing: ask the service worker for a new version first, then reload; and Version 155's ready-bay line, which ran across under ROW 6, now runs down between bay 6 and bay 7 in the grid's own frame colour, because a bay in this shop runs front to back and there is no such thing as a row on the floor |
-| **Next** | **159** | **`2afa491`** | **A Down Sheet removal travels, so a cleared sheet stays cleared** — a correct 57-bus scan read 92 one sync later, and clearing the sheet did not help, because a row taken off was never removed anywhere: the entry simply stopped being sent, stayed live in the cloud, and came back on the next pull along with every sheet before it; removals are now recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's down flags follow the sheet the pull settled on |
+| Published | **161** | `3b16d45` | **Live as Sites Version 157.** Row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; independent inspection tallies; Mystery Buses on the Down Sheet; and Defect Log controls behind Advanced Actions |
+| Published | **160** | `bbe33f6` | **Live as Sites Version 156.** REFRESH is available on every page for home-screen use, and the Main Garage Ready boundary runs vertically between bays 6 and 7 without moving buses or slots |
+| Published | **159** | **`2afa491`** | **Live as Sites Version 155.** A Down Sheet removal travels, so a cleared sheet stays cleared: removals are recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's Down Sheet flags follow the sheet the pull settled on |
 | Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | Published | **158** | `a444242` | **Live as Sites Version 154.** Deferred no longer hides its way back: every genuinely held-back Defect Log repair has a visible UNDO DEFERRED action in its expanded card and Focus view; it returns the repair to Open, stamps the return as history, and never changes Down Sheet-owned Deferred work |
 | Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
@@ -37,21 +38,7 @@ commit, no migration, no dependency change.
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**One release is pending: 159, from `2afa491`.** Releases 153 through 157 went
-out together in `baffc24` as Sites Version 153 — 157 contained 156, 155, 154 and
-153 whole — and 158 followed from `a444242` as Sites Version 154. Their handoffs
-are kept below as release records.
-
-159 is one commit on top of Codex's release commit `909f482`. It was written
-against `baffc24` and rebased onto `909f482` after 157 and 158 published; the
-test, lint and build gates were re-run on the rebased commit. 160 is one commit
-on top of 159.
-
-Publish in order — or, if it is simpler to publish once, publish 160 from
-`bbe33f6` and record both as live from it, since 160 contains 159 whole. **If
-only one goes out, make it 159:** it repairs a live data fault the shop is
-looking at on the floor, while 160 is two corrections to how pages are
-operated.
+**No release is pending.** Repository release 159 went out as Sites Version 155 from `2afa491`, release 160 as Sites Version 156 from `bbe33f6`, and release 161 as Sites Version 157 from `3b16d45`. Their retained handoffs below are release records only.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 

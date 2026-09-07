@@ -51,16 +51,25 @@ button,input,select,textarea{font:inherit}
 .sheet-title span{font-size:17px;font-weight:900;color:#102e5b}
 .sheet-title p{margin:0;font-size:8px;font-weight:900;color:#657590}
 .sheet-scroll{overflow:auto;max-height:calc(100vh - 285px);min-height:320px}
-/* min-width rose with the bus column below, by the same 40px, so widening that
-   one column takes nothing away from the others: the table is inside a
-   horizontal scroller and simply gets 40px longer. */
-.down-table{width:100%;min-width:1200px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+/* min-width rose with the bus column below, by the same amount each time, so
+   widening that one column takes nothing away from the others: the table is
+   inside a horizontal scroller and simply gets longer. 40px for the ON ROAD
+   badge, then 90px more for the DELETE button beside it. */
+.down-table{width:100%;min-width:1340px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
 .down-table th:nth-child(1){width:48px;text-align:center}/* 108px fitted the number and its status label exactly, so the ON ROAD badge
    beside it overflowed into the reason column and was clipped by 21px —
    measured in the built page, not guessed. The column carries one more fact
-   now and is sized for it. */
-.down-table th:nth-child(2){width:148px}.down-table th:nth-child(3){width:260px}.down-table th:nth-child(4){width:140px}.down-table th:nth-child(5){width:112px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:118px}.down-table th:nth-child(8){width:95px}.down-table th:nth-child(9){width:105px}
+   now and is sized for it.
+
+   DELETE landed the same way: table-layout is fixed, so the column does not
+   grow for it and the button simply hung 13px into the reason column at every
+   phone width. Sized for the worst row this cell can hold — the longest status
+   label, the ON ROAD badge and two 44px targets — measured on a 390px phone,
+   against the 163px the column gave it when DELETE first went in. MARK FIXED
+   later took a fourth slot and the column and the table's min-width rose again
+   by the same 50px, so no other column paid for it. */
+.down-table th:nth-child(2){width:288px}.down-table th:nth-child(3){width:260px}.down-table th:nth-child(4){width:140px}.down-table th:nth-child(5){width:112px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:118px}.down-table th:nth-child(8){width:95px}.down-table th:nth-child(9){width:105px}
 .down-table td{height:55px;padding:5px 7px;border-right:1px solid #d8dee9;border-bottom:1px solid #c8d0de;background:#fff;font-size:10px;vertical-align:middle}
 .down-table tr:nth-child(even) td{background:#f9fbfe}
 .down-table tr.completed td{opacity:.62;background:#eef7f1}
@@ -76,8 +85,22 @@ button,input,select,textarea{font:inherit}
    news: it is still out earning its keep. It never wraps and never shrinks; a
    badge that folds onto a second line would push every row taller. */
 .down-table td.fleet-number{white-space:nowrap}
-.down-table td.fleet-number>.fleet-number-button{display:inline-flex;width:auto;vertical-align:middle}
-.on-road-badge{display:inline-flex;align-items:center;flex:none;margin-left:6px;padding:3px 7px;border:1px solid #1f6b37;border-radius:9px;background:#e4f4e8;color:#17552b;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.4px;vertical-align:middle;white-space:nowrap}
+/* Fixed tab stops, the same fix the Defect Log's badge slot got. Measured on
+   the live sheet before this: ON ROAD sat at three different x positions on
+   three neighbouring rows — the badge is laid out after the bus button, and
+   that button is as wide as the status label under it, so OUT OF SERVICE,
+   WORK IN PROGRESS and IN SERVICE WITH DEFECTS each put the badge somewhere
+   else, and the longest one pushed it onto the reason text in the next column.
+
+   Each piece has a slot it always occupies now. An empty ON ROAD slot stays
+   empty; DELETE does not slide left into it, so both line up down the whole
+   sheet whatever the status says. */
+.fleet-number-slots{display:grid;grid-template-columns:124px 66px 26px 26px;column-gap:6px;align-items:center}
+.fleet-number-slots>.fleet-number-button{grid-column:1;width:100%;min-width:0}
+.fleet-number-slots>.on-road-badge{grid-column:2;justify-self:start}
+.fleet-number-slots>.fix-entry{grid-column:3;justify-self:start}
+.fleet-number-slots>.delete-entry{grid-column:4;justify-self:start}
+.on-road-badge{display:inline-flex;align-items:center;flex:none;padding:3px 7px;border:1px solid #1f6b37;border-radius:9px;background:#e4f4e8;color:#17552b;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.4px;vertical-align:middle;white-space:nowrap}
 @media(max-width:760px){.on-road-badge{font-size:9px;padding:4px 8px}}
 .reason-button{width:100%;min-height:39px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;border:1px solid transparent;border-radius:4px;background:transparent;color:#1c3154;padding:3px 5px;text-align:left;cursor:pointer}
 .reason-button:hover,.reason-button:focus-visible{border-color:#88b6e9;background:#edf6ff}
@@ -118,6 +141,24 @@ button,input,select,textarea{font:inherit}
 .down-settings-body .settings-check{flex-direction:row;align-items:center;padding:10px;border:1px solid #d4dce9;border-radius:6px;background:#fff}.settings-check input{min-height:0;width:17px;height:17px}.settings-check span{font-size:8px}
 .settings-capacity{display:flex;align-items:center;gap:10px;padding:10px;border-radius:6px;background:#e9f2ff;color:#28456d}.settings-capacity b{font-size:23px;color:#075dbb}.settings-capacity span{font-size:8px;font-weight:900;text-transform:uppercase}
 .down-settings-body>p{margin:0;padding:9px;border-left:3px solid #efaa1b;background:#fff8e3;color:#725919;font-size:8px;line-height:1.4}
+/* The tablet band, where the header ran off the side of the screen.
+
+   The nav is six links held at 108px each, so with its gaps it is 703px wide,
+   and above 760px it sits on the header's single flex line beside the title and
+   REFRESH. Between there and 1024 the three do not fit: measured on an iPad in
+   portrait, REFRESH was pushed 194px past the right edge and the WHOLE PAGE
+   scrolled sideways, not just the header.
+
+   The header wraps here and the nav takes a row of its own, six across, with
+   the title and REFRESH keeping the row above. Below 760px the phone block
+   already does its own thing and is left alone. */
+@media(min-width:761px) and (max-width:1023px){
+ .down-header{flex-wrap:wrap}
+ .down-header>div{order:1}
+ .down-header>.app-refresh{order:2}
+ .down-header nav{order:3;flex:1 0 100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+ .down-header nav a{min-width:0;width:100%}
+}
 @media(max-width:900px){.down-header{padding:9px 12px}.down-header h1{font-size:20px}.down-summary{grid-template-columns:repeat(3,1fr)}.down-controls{flex-wrap:wrap}.completed-toggle{margin-left:0}.sheet-scroll{max-height:none}.down-app{padding-bottom:16px}}
 @media(max-width:760px){.down-header{align-items:flex-start;flex-direction:column}.down-header nav{width:100%}.down-header nav a{flex:1}.down-summary{grid-template-columns:repeat(2,1fr);margin:8px}.down-controls{margin:0 8px 8px}.shift-filter{width:100%}.shift-filter button{min-width:0;flex:1}.completed-toggle{margin-right:auto}.quick-notes{margin:0 8px 8px;grid-template-columns:1fr}.quick-notes textarea{border-left:0;border-top:1px solid #c8d2e2}.sheet-wrap{margin:0 8px}.down-footnote{display:none}}
 
@@ -343,12 +384,17 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    `@media(max-width:760px)` block earlier in this file silently landed INSIDE
    it, and a divider that only has a colour on a phone is worse than none. The
    phone overrides below open their own block. */
-.down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .down-group-counts .group-count{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1px solid #b7c3d7;border-radius:7px;background:#fff;text-align:center}
 .down-group-counts .group-count strong{font-size:20px;font-weight:900;line-height:1;color:#173e73}
 .down-group-counts .group-count span{font-size:7px;font-weight:900;letter-spacing:.5px;color:#526481;line-height:1.15}
 .down-group-counts .group-count.total{border-color:#0b63ce;background:#eaf4ff}
 .down-group-counts .group-count.total strong{color:#075dbb;font-size:23px}
+/* Paired with the total by size and with the down numbers by colour: it is the
+   red one because it is the count of buses actually broken, and it shares the
+   red of UNSCHEDULED and DOWNED BUSES ON ROAD so the eye groups the three. */
+.down-group-counts .group-count.down-buses{border-color:#c15a55;background:#fdeeed}
+.down-group-counts .group-count.down-buses strong{color:#992722;font-size:23px}
 .down-group-counts .group-count.group-off-property{border-color:#c78a2a;background:#fdf5e6}
 .down-group-counts .group-count.group-off-property strong{color:#8a5600}
 .down-group-counts .group-count.group-scheduled{border-color:#4f9a63;background:#eef8f0}
@@ -372,6 +418,18 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-group-counts .group-count.group-road.active{border-style:solid;box-shadow:inset 0 0 0 2px #fff}
 .down-group-counts .group-count.group-road-inspection.active{background:#e8dffa}
 .down-group-counts .group-count.group-road-down.active{background:#f8dcda}
+/* Red enough to read as destructive, quiet enough not to compete with the bus
+   number it sits beside — this is on every row of a long sheet. */
+.delete-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;padding:0;border:1px solid #b4321f;border-radius:6px;background:#fdeeeb;color:#8e2413;font-size:14px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
+.delete-entry:hover,.delete-entry:focus-visible{background:#b4321f;color:#fff;outline:none}
+/* Same shape and slot as DELETE, green because it is the good outcome. It is
+   the one press that closes a bus out, so it sits before the destructive one. */
+.fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;padding:0;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
+.fix-entry:hover,.fix-entry:focus-visible{background:#1f6b37;color:#fff;outline:none}
+.down-deleted-note.fixed{border-color:#1f6b37;border-left-color:#1f6b37;background:#e9f6ec;color:#17552b}
+.down-deleted-note.fixed button{border-color:#1f6b37;color:#17552b}
+.down-deleted-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #b4321f;border-left:4px solid #b4321f;border-radius:6px;background:#fdeeeb;font-size:10px;font-weight:800;color:#7c2011}
+.down-deleted-note button{min-height:32px;border:1px solid #b4321f;border-radius:5px;background:#fff;color:#8e2413;padding:0 10px;font-size:9px;font-weight:900;cursor:pointer}
 .down-road-filter-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #7d90ad;border-left:4px solid #0b63ce;border-radius:6px;background:#eaf2fd;font-size:10px;font-weight:800;color:#12325f}
 .down-road-filter-note button{min-height:32px;border:1px solid #0b63ce;border-radius:5px;background:#fff;color:#0b4f9e;padding:0 10px;font-size:9px;font-weight:900;cursor:pointer}
 
@@ -388,21 +446,32 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-table .down-group-row.group-inspection td{border-color:#8a6bbf;background:#e8dffa!important;color:#4b2a80}
 .down-table .down-group-row.group-inspection td>i{background:#4b2a80}
 
-/* Seven tiles: four bands and the total on the first row, the two road tallies
-   sharing the second so the pressable pair reads as its own thing. */
-.down-group-counts{grid-template-columns:repeat(5,minmax(0,1fr))}
-.down-group-counts .group-count.group-road{grid-column:span 2}
+/* Eight tiles: four bands, the total and DOWN BUSES on the first row, the two
+   road tallies sharing the second so the pressable pair reads as its own
+   thing. */
+.down-group-counts{grid-template-columns:repeat(6,minmax(0,1fr))}
+.down-group-counts .group-count.group-road{grid-column:span 3}
 .down-group-counts .group-count.group-road-inspection{grid-column:2/4}
 .down-group-counts .group-count.group-road-down{grid-column:4/6}
 @media(max-width:900px){.down-group-counts{grid-template-columns:repeat(3,minmax(0,1fr))}.down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:auto/span 3}}
 @media(max-width:760px){
  .down-group-counts{margin:0 8px 8px;grid-template-columns:repeat(2,minmax(0,1fr))}
- .down-group-counts .group-count.total{grid-column:1/-1}
+ /* The total used to take the whole width on its own. It is one of a pair now —
+    rows on the sheet beside buses actually down — so it takes half like every
+    other tile and the two read side by side. */
  /* Full width each on a phone: they are the two a foreman presses, and a
     thumb-sized target matters more here than fitting the row. */
  .down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:1/-1;min-height:56px}
  .down-road-filter-note{margin:0 8px 8px}
  .down-road-filter-note button{width:100%;min-height:44px}
+ .down-deleted-note{margin:0 8px 8px}
+ .down-deleted-note button{width:100%;min-height:44px}
+ /* 26px is fine under a mouse and not under a thumb. */
+ .delete-entry,.fix-entry{width:44px;height:44px;font-size:18px}
+ /* The status label and the badge are both a point larger here, and the target
+    is 44px, so the tab stops move out to match rather than letting anything
+    spill into the reason column. */
+ .fleet-number-slots{grid-template-columns:124px 72px 44px 44px}
  .down-group-counts .group-count span{font-size:9px}
  .down-group-counts .group-count strong{font-size:22px}
  .down-table .down-group-row td{height:auto;padding:8px 10px}
