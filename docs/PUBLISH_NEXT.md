@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSION 159 PENDING — publish 159 from `2afa491`. Repository release 158 is live from `a444242` as Sites Version 154.**
+**STATUS: VERSIONS 159–160 PENDING — publish 159 from `2afa491`, then 160 from `bbe33f6`. Repository release 158 is live from `a444242` as Sites Version 154.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,6 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Then | **160** | `bbe33f6` | **REFRESH on every page, and the Main Garage split by bay instead of by row** — saved to a home screen there is no address bar to reload from, so all six pages get the button the Facility Map already had, sharing one definition of refreshing: ask the service worker for a new version first, then reload; and Version 155's ready-bay line, which ran across under ROW 6, now runs down between bay 6 and bay 7 in the grid's own frame colour, because a bay in this shop runs front to back and there is no such thing as a row on the floor |
 | **Next** | **159** | **`2afa491`** | **A Down Sheet removal travels, so a cleared sheet stays cleared** — a correct 57-bus scan read 92 one sync later, and clearing the sheet did not help, because a row taken off was never removed anywhere: the entry simply stopped being sent, stayed live in the cloud, and came back on the next pull along with every sheet before it; removals are now recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's down flags follow the sheet the pull settled on |
 | Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | Published | **158** | `a444242` | **Live as Sites Version 154.** Deferred no longer hides its way back: every genuinely held-back Defect Log repair has a visible UNDO DEFERRED action in its expanded card and Focus view; it returns the repair to Open, stamps the return as history, and never changes Down Sheet-owned Deferred work |
@@ -43,7 +44,14 @@ are kept below as release records.
 
 159 is one commit on top of Codex's release commit `909f482`. It was written
 against `baffc24` and rebased onto `909f482` after 157 and 158 published; the
-test, lint and build gates were re-run on the rebased commit.
+test, lint and build gates were re-run on the rebased commit. 160 is one commit
+on top of 159.
+
+Publish in order — or, if it is simpler to publish once, publish 160 from
+`bbe33f6` and record both as live from it, since 160 contains 159 whole. **If
+only one goes out, make it 159:** it repairs a live data fault the shop is
+looking at on the floor, while 160 is two corrections to how pages are
+operated.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -66,6 +74,133 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 160 — REFRESH on every page, and the garage split by bay instead of by row
+
+**Publish this after Version 159.** Two things reported in one message, both
+about pages that could not be operated the way they are actually used.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`bbe33f6`** |
+| Last code-bearing commit | `bbe33f6` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 159, pending from `2afa491` |
+
+**One application commit** on top of 159's `2afa491`:
+
+```
+git log --oneline 2afa491..bbe33f6     # docs-only commits omitted
+bbe33f6 Put REFRESH on every page, and split the garage by bay instead of by row
+
+git diff --name-only 2afa491 bbe33f6 -- app tests
+app/defect-log/page.tsx
+app/down-sheet/page.tsx
+app/fixed-repairs/page.tsx
+app/globals.css
+app/lists/page.tsx
+app/page.tsx
+app/refresh-button.tsx      (new)
+app/settings/page.tsx
+tests/rendered-html.test.mjs
+
+git diff --shortstat 2afa491 bbe33f6
+ 10 files changed, 400 insertions(+), 58 deletions(-)
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 2afa491 bbe33f6 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **230 tests passing** (228 at Version 159, one added for REFRESH and one
+for the handoff files; the garage test was rewritten in place), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload shape
+or database change. The garage change is presentation only: no slot id moves, no
+bus moves, and `garage-0` through `garage-83` mean exactly what they meant
+before.
+
+## What changed
+
+### 1. REFRESH is on all six pages
+
+Saved to a home screen the app runs standalone, with no browser chrome — no
+address bar and no reload. A stale version, or a page that had got itself into a
+bad state, could only be cleared by closing and reopening the app, and even that
+does not force the service worker to look for an update. The Facility Map had a
+REFRESH button in its command bar; the other five pages had nothing.
+
+> "The refresh button is for when I make it a bookmark. I noticed I cannot
+> simply refresh like the browser version. That is why I want it"
+
+It is the map's own button, made shareable rather than copied, so there is one
+definition of what refreshing means: **ask the service worker for a new version
+first, then reload.** A bare reload serves the cached shell again and looks like
+the button did nothing, which is the whole failure this exists to fix.
+
+The map passes its own class and keeps the command-bar look it already had; the
+other five take the header shape, beside the page nav. The map's phone menu
+offers the same action and now goes through the same function, so the two cannot
+drift apart. On a phone the button is full width and 44px tall.
+
+### 2. The Main Garage divider runs down, not across
+
+Version 155 marked bays 1–6 as ready with a thick green line — and drew it the
+wrong way, horizontally, under ROW 6.
+
+> "when we referred to a bay it was actually going front to back up. It's going
+> front to back not side to side... there's no such thing as rows in the shop.
+> It's either bay one through 12."
+
+A bay in this shop runs front to back and is numbered 1 to 12 across the top of
+the grid. Each numbered column is one bay, however many rows deep the grid is
+drawn. The line across named a thing the floor does not have.
+
+The line now runs **down, between bay 6 and bay 7** — on the column header and
+on that column's cell in every row. It is drawn in the frame colour rather than
+a green of its own, because `--garage-frame` already draws this grid's borders,
+its numbers and its row labels, and a barrier belongs to the structure of the
+garage rather than competing with it. The heading badge reads **BAYS 1–6 READY**
+and takes the same colour, so recolouring the garage in Settings recolours both.
+
+The row labels stay. The app still needs a way to say *which space in a bay*, but
+they are a grid coordinate now rather than a place anybody would name out loud.
+
+## Verified
+
+Measured in a browser against the production build, not read off the CSS:
+
+- The divider class lands on the **bay 07** column header and on column index 6
+  in **all seven rows** — one continuous vertical line, 4px, `rgb(6,45,102)`,
+  which is `--garage-frame`.
+- **No horizontal border remains anywhere in the grid**: the old line under
+  ROW 6 is gone, not merely overpainted.
+- The heading badge renders `BAYS 1–6 READY` in the same colour.
+- REFRESH on the Down Sheet at 390px: 44px tall, full width, not overlapped by
+  any fixed element, and the document does not scroll horizontally.
+
+## What to check once it is live
+
+1. **REFRESH appears on all six pages** — Facility Map (command bar), Down
+   Sheet, Defect Log, Fixed Repairs, Fleet Campaigns and Settings (beside the
+   page nav).
+2. **It works from the home screen.** Open the bookmarked app, press REFRESH,
+   and it reloads and picks up this version. That is the case it was built for.
+3. **The Main Garage line runs top to bottom**, between bay 06 and bay 07, in
+   the same dark blue as the grid's numbers and borders — and there is no
+   horizontal line across the middle of the grid any more.
+4. **The heading badge says BAYS 1–6 READY**, not ROWS.
+5. **No bus moved.** The grid is the same grid; only the line and the badge
+   changed.
 
 ---
 
