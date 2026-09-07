@@ -9095,6 +9095,38 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.equal(capped["d0-0"],undefined,"and the oldest, long since landed on the server, are what falls off");
 });
 
+test("every Down Sheet row carries its own DELETE, on the bus's cell rather than off the right edge",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+
+ /* In the bus's own cell, which is the one column a phone never has to scroll
+    sideways to reach. A tenth column at the far right would be the control you
+    go looking for, and this is the one pressed by somebody holding a sheet. */
+ assert.match(page,/<td className="fleet-number">[\s\S]{0,1400}?<button className="delete-entry" type="button" onClick=\{\(\)=>deleteEntry\(entry\)\}/,"DELETE belongs on the face card, not in a column off the edge");
+ assert.match(page,/aria-label=\{"Delete bus "\+\(entry\.busNumber\|\|"entry"\)\+" from the Down Sheet"\}/,"and it has to say which bus it would delete");
+
+ // Asked before it happens, and the confirm says what survives it.
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,600}?if\(!confirm\(/);
+ assert.match(page,/The bus keeps its defects, status and location/,"deleting a row is not a claim that anything was repaired");
+
+ /* The way back is on the page, not behind MORE: an accidental delete is
+    exactly when nobody opens a menu to look for it. */
+ assert.match(page,/deletedEntry&&<p className="down-deleted-note"[\s\S]{0,400}?onClick=\{undoDeleteEntry\}/);
+ assert.doesNotMatch(page,/<summary>MORE<\/summary>[\s\S]{0,600}?undoDeleteEntry/,"PUT BACK must not be the thing hidden behind a menu");
+
+ /* 26px reads fine under a mouse and misses under a thumb. The sheet is used
+    on phones, so the phone block has to give it a real target. */
+ assert.match(css,/\.delete-entry\{[^}]*width:26px/);
+ /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
+    the map — matched on content rather than position, since the file has many. */
+ const at=css.indexOf(".down-deleted-note button{width:100%");
+ assert.ok(at>0,"the phone override for the PUT BACK button is gone");
+ const phone=css.slice(at);
+ assert.match(phone,/\.delete-entry\{width:44px;height:44px/,"the phone block must raise DELETE to a 44px touch target");
+});
+
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  assert.match(page,/import \{forgetRemovedEntries,rememberRemovedEntries\} from "\.\.\/cloud-sync"/);
@@ -9113,6 +9145,26 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
  assert.match(page,/const undoClear=\(\)=>\{[\s\S]{0,1200}?held\.has\(entry\.id\)\?entry:\{\.\.\.entry,updatedAt:restoredAt\}/);
  assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?rememberRemovedEntries\(localStorage,entries\.filter\(entry=>!kept\.has\(entry\.id\)\)\.map\(entry=>entry\.id\),restoredAt\)/,"rows the scan itself created have to come off everywhere too");
  assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?forgetRemovedEntries\(localStorage,\[\.\.\.kept\]\)/);
+
+ /* DELETE, one row at a time — the third door onto the same ledger, and the
+    one a foreman uses daily. A row merely dropped from this device stays live
+    on the server and comes back on the next pull. */
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,1800}?rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
+ assert.match(page,/const undoDeleteEntry=\(\)=>\{[\s\S]{0,1800}?forgetRemovedEntries\(localStorage,\[entry\.id\]\)/);
+ assert.match(page,/const undoDeleteEntry=\(\)=>\{[\s\S]{0,2000}?\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
+ /* The undo copy is written before the row goes, and the delete gives up if it
+    cannot be: a removal with no way back is the door this app does not build. */
+ assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
+
+ /* And the tombstone goes only AFTER a write that succeeded. The other order
+    reads the same until the device is full, and then it tells the shop cloud to
+    drop a row this device still holds — deleted everywhere except where it was
+    pressed. Nothing on screen would show that, so it is pinned here. */
+ const del=page.slice(page.indexOf("const deleteEntry="),page.indexOf("const undoDeleteEntry="));
+ assert.ok(del.indexOf("writeDownSheetStorageResult")<del.indexOf("rememberRemovedEntries"),"the sheet has to be written before the removal is recorded");
+ assert.match(del,/if\(!written\.ok\)\{[\s\S]{0,300}?return;/,"and a refused write has to stop the delete outright");
+ const undo=page.slice(page.indexOf("const undoDeleteEntry="));
+ assert.ok(undo.indexOf("writeDownSheetStorageResult")<undo.indexOf("forgetRemovedEntries"),"and putting one back writes the sheet before clearing its tombstone");
 
  /* The AI Operator clears the sheet too, from the map. It is the same operation
     through a different door, so it writes the same ledger — a clear that reaches
@@ -9718,8 +9770,20 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.match(css,/\.on-road-badge\{[^}]*white-space:nowrap/,"a badge that wrapped would push every row taller");
  /* 108px fitted the number and its status label exactly, so the badge beside it
     overflowed into the reason column and was clipped by 21px in the built page.
-    The column is sized for what it now carries, and the table's min-width rose
-    by the same 40px so no other column lost room to it. */
- assert.match(css,/\.down-table th:nth-child\(2\)\{width:148px\}/);
- assert.match(css,/\.down-table\{[^}]*min-width:1200px/);
+    DELETE later landed exactly the same way, hanging 13px into that column at
+    every phone width, because table-layout is fixed and the column does not
+    grow for what you put in it.
+
+    So the rule rather than the number: the column is sized for the worst row it
+    can hold — longest status label, ON ROAD, and a 44px delete target, measured
+    at 253px on a 390px phone — and the table's min-width rises with it, which
+    is what keeps the widening from coming out of another column. */
+ const busCol=Number(css.match(/\.down-table th:nth-child\(2\)\{width:(\d+)px\}/)?.[1]);
+ const tableMin=Number(css.match(/\.down-table\{[^}]*min-width:(\d+)px/)?.[1]);
+ /* 238 declared renders as a 261px box once padding and borders are on it,
+    against the 253px the worst row measured — 8px of headroom. Declared width
+    and measured box are not the same number, so this floor is the declared one
+    that was actually measured good. */
+ assert.ok(busCol>=238,"the bus column is "+busCol+"px, too narrow for the number, its status label, ON ROAD and DELETE together");
+ assert.equal(tableMin,1052+busCol,"the table's min-width has to rise with the bus column, or the extra room is taken from another column");
 });

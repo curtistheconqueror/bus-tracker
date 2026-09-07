@@ -51,16 +51,23 @@ button,input,select,textarea{font:inherit}
 .sheet-title span{font-size:17px;font-weight:900;color:#102e5b}
 .sheet-title p{margin:0;font-size:8px;font-weight:900;color:#657590}
 .sheet-scroll{overflow:auto;max-height:calc(100vh - 285px);min-height:320px}
-/* min-width rose with the bus column below, by the same 40px, so widening that
-   one column takes nothing away from the others: the table is inside a
-   horizontal scroller and simply gets 40px longer. */
-.down-table{width:100%;min-width:1200px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+/* min-width rose with the bus column below, by the same amount each time, so
+   widening that one column takes nothing away from the others: the table is
+   inside a horizontal scroller and simply gets longer. 40px for the ON ROAD
+   badge, then 90px more for the DELETE button beside it. */
+.down-table{width:100%;min-width:1290px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
 .down-table th:nth-child(1){width:48px;text-align:center}/* 108px fitted the number and its status label exactly, so the ON ROAD badge
    beside it overflowed into the reason column and was clipped by 21px —
    measured in the built page, not guessed. The column carries one more fact
-   now and is sized for it. */
-.down-table th:nth-child(2){width:148px}.down-table th:nth-child(3){width:260px}.down-table th:nth-child(4){width:140px}.down-table th:nth-child(5){width:112px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:118px}.down-table th:nth-child(8){width:95px}.down-table th:nth-child(9){width:105px}
+   now and is sized for it.
+
+   DELETE landed the same way: table-layout is fixed, so the column does not
+   grow for it and the button simply hung 13px into the reason column at every
+   phone width. Sized for the worst row this cell can hold — the longest status
+   label, the ON ROAD badge and a 44px delete target — which measured 253px on
+   a 390px phone against the 163px the column gave it. */
+.down-table th:nth-child(2){width:238px}.down-table th:nth-child(3){width:260px}.down-table th:nth-child(4){width:140px}.down-table th:nth-child(5){width:112px}.down-table th:nth-child(6){width:62px}.down-table th:nth-child(7){width:118px}.down-table th:nth-child(8){width:95px}.down-table th:nth-child(9){width:105px}
 .down-table td{height:55px;padding:5px 7px;border-right:1px solid #d8dee9;border-bottom:1px solid #c8d0de;background:#fff;font-size:10px;vertical-align:middle}
 .down-table tr:nth-child(even) td{background:#f9fbfe}
 .down-table tr.completed td{opacity:.62;background:#eef7f1}
@@ -372,6 +379,12 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-group-counts .group-count.group-road.active{border-style:solid;box-shadow:inset 0 0 0 2px #fff}
 .down-group-counts .group-count.group-road-inspection.active{background:#e8dffa}
 .down-group-counts .group-count.group-road-down.active{background:#f8dcda}
+/* Red enough to read as destructive, quiet enough not to compete with the bus
+   number it sits beside — this is on every row of a long sheet. */
+.delete-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;margin-left:6px;padding:0;border:1px solid #b4321f;border-radius:6px;background:#fdeeeb;color:#8e2413;font-size:14px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
+.delete-entry:hover,.delete-entry:focus-visible{background:#b4321f;color:#fff;outline:none}
+.down-deleted-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #b4321f;border-left:4px solid #b4321f;border-radius:6px;background:#fdeeeb;font-size:10px;font-weight:800;color:#7c2011}
+.down-deleted-note button{min-height:32px;border:1px solid #b4321f;border-radius:5px;background:#fff;color:#8e2413;padding:0 10px;font-size:9px;font-weight:900;cursor:pointer}
 .down-road-filter-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #7d90ad;border-left:4px solid #0b63ce;border-radius:6px;background:#eaf2fd;font-size:10px;font-weight:800;color:#12325f}
 .down-road-filter-note button{min-height:32px;border:1px solid #0b63ce;border-radius:5px;background:#fff;color:#0b4f9e;padding:0 10px;font-size:9px;font-weight:900;cursor:pointer}
 
@@ -403,6 +416,10 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:1/-1;min-height:56px}
  .down-road-filter-note{margin:0 8px 8px}
  .down-road-filter-note button{width:100%;min-height:44px}
+ .down-deleted-note{margin:0 8px 8px}
+ .down-deleted-note button{width:100%;min-height:44px}
+ /* 26px is fine under a mouse and not under a thumb. */
+ .delete-entry{width:44px;height:44px;font-size:18px}
  .down-group-counts .group-count span{font-size:9px}
  .down-group-counts .group-count strong{font-size:22px}
  .down-table .down-group-row td{height:auto;padding:8px 10px}

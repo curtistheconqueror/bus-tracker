@@ -118,6 +118,7 @@ undo and recovery, never synced
   pace-board-recovery-v1           last known good board
   pace-down-sheet-clear-undo-v1    UNDO CLEAR
   pace-down-sheet-scan-undo-v1     UNDO IMPORT
+  pace-down-sheet-entry-undo-v1    PUT BACK, for one deleted Down Sheet row
   pace-scan-batch-undo-v1          PUT BACK, for a Defect Log scan sweep
   pace-facility-defect-clear-undo-v1  UNDO MAP CLEANUP
 
