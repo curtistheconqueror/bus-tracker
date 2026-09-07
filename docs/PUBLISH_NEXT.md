@@ -1,9 +1,14 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 158 is live from `a444242` as Sites Version 154.**
+**STATUS: VERSION 159 PENDING — publish 159 from `2afa491`. Repository release 158 is live from `a444242` as Sites Version 154.**
+
+**159 repairs a live data fault the shop is looking at on the floor today** — the
+Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
+commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| **Next** | **159** | **`2afa491`** | **A Down Sheet removal travels, so a cleared sheet stays cleared** — a correct 57-bus scan read 92 one sync later, and clearing the sheet did not help, because a row taken off was never removed anywhere: the entry simply stopped being sent, stayed live in the cloud, and came back on the next pull along with every sheet before it; removals are now recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's down flags follow the sheet the pull settled on |
 | Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | Published | **158** | `a444242` | **Live as Sites Version 154.** Deferred no longer hides its way back: every genuinely held-back Defect Log repair has a visible UNDO DEFERRED action in its expanded card and Focus view; it returns the repair to Open, stamps the return as history, and never changes Down Sheet-owned Deferred work |
 | Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
@@ -31,14 +36,14 @@
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**Five releases are pending, in order.** 153 is frozen at `015e789` — Codex
-split it out from what this file used to call Version 152's own tip, publishing
-152 itself only as far as `b57dcb5` — and is not moved by anything here; 154 is
-the three commits on top of it, `dd1b093`, `0db855a` and `fd3b326`; 155 is one
-commit further, `6f8518b`; 156 is one more, `103b005`; 157 is the three after
-that, `62bb58d`, `e8cc258`, `17ccbc5` and `baffc24`. Publish in order — or, if
-it is simpler to publish once, publish 157 from `baffc24` and record all five
-versions as live from it, since 157 contains 156, 155, 154 and 153 whole.
+**One release is pending: 159, from `2afa491`.** Releases 153 through 157 went
+out together in `baffc24` as Sites Version 153 — 157 contained 156, 155, 154 and
+153 whole — and 158 followed from `a444242` as Sites Version 154. Their handoffs
+are kept below as release records.
+
+159 is one commit on top of Codex's release commit `909f482`. It was written
+against `baffc24` and rebased onto `909f482` after 157 and 158 published; the
+test, lint and build gates were re-run on the rebased commit.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -61,6 +66,206 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 159 — A Down Sheet removal travels, so a cleared sheet stays cleared
+
+**The only pending release.** This is not a feature. It is a live data fault the
+shop is looking at on the floor: the Down Sheet inflates itself on every sync, a
+cleared sheet refills, and it gets worse the longer it runs — every sheet that is
+scanned adds rows the cloud never lets go of.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`2afa491`** |
+| Last code-bearing commit | `2afa491` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Repository release 158, live from `a444242` as Sites Version 154 |
+
+**One application commit** on top of Codex's release commit `909f482`:
+
+```
+git log --oneline 909f482..2afa491     # docs-only commits omitted
+2afa491 Make a Down Sheet removal travel, so a cleared sheet stays cleared
+
+git diff --name-only 909f482 2afa491 -- app tests
+app/cloud-client.ts
+app/cloud-live.ts
+app/cloud-sync-control.tsx
+app/cloud-sync.ts
+app/down-sheet/page.tsx
+app/page.tsx
+app/shop-cloud-live.tsx
+tests/rendered-html.test.mjs
+
+git diff --shortstat 909f482 2afa491
+ 8 files changed, 440 insertions(+), 27 deletions(-)
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 909f482 2afa491 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **228 tests passing** (226 before this, two added), ESLint clean,
+production build succeeds. Rebased onto `909f482` after Codex published 157 and
+158; the gates were re-run on the rebased commit, not only on the original.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No schema change: the
+`deleted_at` column this uses has been on `down_sheet_entries` since migration
+`0002_shared_records.sql`, unused by the Down Sheet until now.
+
+One new LocalStorage key, `pace-cloud-removed-entries-v1`, written on a removal
+and read on a sync. No existing key is renamed, reshaped or read differently. A
+device that has never removed anything has no such key and behaves as it did.
+
+## What was wrong
+
+Reported from the floor on Sep 7: a Down Sheet photo was scanned, the total came
+back correct at **57**, and about fifteen seconds later — one live-sync round
+trip — the same sheet read **92**. Clearing the sheet first changed nothing; it
+refilled the same way. With nothing on the sheet at all, the page still reported
+"26 other buses".
+
+Nothing was wrong with the scan, and the ON ROAD tallies added in 157 had
+nothing to do with it. The Down Sheet had no way to say that a row was gone.
+
+A push only ever sends what the sheet still carries. An entry taken off was
+therefore simply not sent — it was not removed anywhere. The row stayed live on
+the server, the next pull read it back, and `mergeDownSheet` keeps every
+incoming entry the receiver lacks, which is correct and deliberate: it is what
+lets two devices each add buses without either one erasing the other's. Applied
+to a removal, it means the removal loses every time.
+
+Counted in the shop's own table, `down_sheet_entries` holds **93 rows, none of
+them tombstoned**, the oldest stamped `2026-08-30 19:24`:
+
+| Day | Rows | Buses |
+| --- | --- | --- |
+| Aug 30 | 23 | 23 |
+| Sep 5 | 4 | 4 |
+| Sep 6 | 6 | 6 |
+| Sep 7 | 60 | 57 |
+
+Thirty-three of those rows are sheets that were replaced days ago. **57 + 33 =
+90**, which is the number the screen was adding up — the two either side are
+rows the sheet counts and hides.
+
+The second half of the symptom follows from the first. Once a stale entry is
+merged back in, the map marks that bus down again; and a bus left marked down
+with no entry behind it is not inert, because `entriesFromFleet` mints a **brand
+new** entry for it the next time the Down Sheet page loads — under an id nothing
+has ever removed. That is the "26 other buses" on a sheet that was just cleared.
+
+## What changed
+
+The same three parts that already fixed exactly this for merged-away defects in
+release 152, applied one table over.
+
+### 1. A removal is written down
+
+A new ledger, `pace-cloud-removed-entries-v1`, records the entry id and when it
+came off. It is written wherever a removal actually happens, which is three
+places, not one:
+
+* **CLEAR DOWNSHEET** on the Down Sheet.
+* **A scan that replaces the sheet** — every bus the new sheet does not name.
+  This is the commonest removal in the shop and it was the one that travelled
+  least.
+* **The AI Operator's own clear**, issued from the Facility Map. Same operation,
+  different door, same ledger.
+
+Bounded at 2000 entries, oldest dropped first, because a scan a day forever is
+otherwise a key that only grows — and this app shares LocalStorage with a
+four-hundred-bus board that must never be the thing that fails to save. The
+oldest end is the safe end: a tombstone that has landed is kept by the server
+for good, and anything old enough to fall off here landed days ago.
+
+### 2. The removal goes up as a tombstone, as an UPDATE
+
+`down_sheet_entries.fleet_number` is `NOT NULL`, and Postgres checks that on the
+INSERT half of an upsert **before** it reaches the conflict on `entry_id`. So a
+tombstone — which deliberately carries no fleet number, because writing a
+repair's fields back while deleting it would let a stale copy overwrite the
+version that survived — can never ride in an upsert; it would take the whole
+200-row chunk down with it. That is the precise failure that kept the shop cloud
+red for a week on `bus_defects`, and the planner already knew how to route
+around it. It now splits `down_sheet_entries` the same way: repairs are
+upserted, tombstones are `UPDATE … WHERE entry_id = …`.
+
+An entry the sheet still carries is **never** tombstoned, whatever the ledger
+says. That is what keeps UNDO safe in the window before the ledger is cleared,
+and it means a stale ledger can never delete a live repair.
+
+### 3. They come back down, and take the local copies with them
+
+A pull now reads the entry tombstones alongside the defect ones and drops the
+matching entries from this device — **unless this device has touched one since
+the removal.** Work done on a repair after somebody else cleared the sheet is
+real work, and it is what wins: the copy stays, its next push puts the row back
+for everyone, which is the honest outcome when two people disagreed about
+whether a bus was still down.
+
+### 4. The map follows the sheet a pull settled on
+
+`applyCloudPull` now reconciles the board's `down` flags against the sheet it
+just wrote. Leaving that to the Down Sheet page is what let this survive a
+clear — the page only reconciles when it is the page you are on, and
+`entriesFromFleet` re-mints an entry for any bus still flagged down. The rule
+enforced here is the schema's own: the Down Sheet says which buses are down and
+the map reads it back.
+
+### 5. Putting a sheet back still works
+
+A live entry now sends `deleted_at: null` out loud, the way a live defect
+already did, so restoring an entry clears the tombstone the removal sent instead
+of leaving it standing. **UNDO CLEAR** and **UNDO IMPORT** both take the entries
+back off the ledger and restamp them as touched now — both halves are needed,
+because the server compares `updated_at` to decide whether a write beats a
+tombstone, and an entry put back carrying its old stamp would lose that
+comparison and be deleted again on the next pull, silently. Restoring a sheet is
+touching it, so the stamp is honest.
+
+UNDO IMPORT also removes, in the other direction: rows the scan itself created
+come off everywhere, not just here.
+
+## Verified
+
+Replayed through the real merge path against real storage, using the shop's own
+numbers — a 57-bus sheet on the device, 33 stale rows in the cloud:
+
+| | Sheet total after one pull | Buses marked down on the map |
+| --- | --- | --- |
+| Without the ledger (what the shop is running now) | **90** | 57 |
+| With removals recorded | **57** | 57 |
+
+Two tests were added, covering the tombstone's shape, its routing as an UPDATE
+against a fake server that rejects the old shape in the server's own words, the
+"never tombstone an entry the sheet still carries" rule, the newer-copy
+tie-break, the end-to-end drop through `applyCloudPull` including the map
+reconcile, the ledger's cap, and every place a removal or an undo is recorded.
+
+## What to check once it is live
+
+1. **The count holds.** Scan a Down Sheet, note the TOTAL ON SHEET, and leave
+   the page open for a minute. It must not move on its own.
+2. **Clearing sticks.** CLEAR DOWNSHEET, wait through a sync, and the sheet must
+   stay empty — on this device and on any other device signed in.
+3. **The stale days are gone.** After the first scan or clear on the fixed
+   build, the Aug 30 / Sep 5 / Sep 6 buses do not come back. They are removed by
+   the ordinary replacement the scan already performs; nothing has to be done to
+   the database by hand.
+4. **Undo still works both ways.** UNDO CLEAR and UNDO IMPORT put the sheet back
+   and it stays back through a sync, rather than emptying again a few seconds
+   later.
+5. **The map agrees.** A bus taken off the sheet loses its DS badge on the
+   Facility Map, and no bus wears the badge without a row on the sheet.
 
 ---
 
