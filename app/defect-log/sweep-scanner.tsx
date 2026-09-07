@@ -2,6 +2,8 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "../scan-photo";
+import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "../scan-notes";
+import {writeSetting} from "../storage";
 import {normalizeSweepDocument,normalizeSweepRow,sweepFindings,sweepOkAgainstBoard,sweepPageVerdict,SWEEP_COLUMN_LABEL,SWEEP_ISSUE_CHOICES,type ScannedSweepRow,type SweepFinding,type SweepFleetBus,type SweepOkBus,type SweepPageVerdict} from "./sweep-scan-import";
 
 /* The farebox / Ventra sweep scanner.
@@ -34,10 +36,16 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
+ /* Same box as the Down Sheet scanner: what the person knows the camera will
+    misread — "Cw is Carlos W", "the note at the bottom is 15506". Remembered
+    on the device only when asked. */
+ const [notes,setNotes]=useState("");
+ const [keepNotes,setKeepNotes]=useState(false);
  const cameraRef=useRef<HTMLInputElement>(null),uploadRef=useRef<HTMLInputElement>(null),photosRef=useRef<SelectedPhoto[]>([]);
 
  useEffect(()=>{photosRef.current=photos},[photos]);
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
+ useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep");if(kept){setNotes(kept);setKeepNotes(true)}},[]);
  const approved=useMemo(()=>findings.filter(finding=>finding.selected&&finding.fleetMatch==="matched"&&finding.busId),[findings]);
  const flagged=findings.filter(finding=>finding.fleetMatch!=="matched").length;
  const busesRead=useMemo(()=>new Set(rows.map(row=>row.busNumber).filter(Boolean)).size,[rows]);
@@ -59,11 +67,13 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
  const readSheets=async()=>{
   if(!photos.length)return;
   setBusy(true);setError("");
+  writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"sweep",notes,keepNotes));
   try{
    const scanned:ScannedSweepRow[]=[],held:{page:number;verdict:SweepPageVerdict}[]=[];
    for(let index=0;index<photos.length;index++){
     setProgress(`READING PAGE ${index+1} OF ${photos.length}`);
     const prepared=await scanReadyPhoto(photos[index].file,index+1,"sweep-sheet-page"),form=new FormData();form.append("photos",prepared);
+    if(notes.trim())form.append("notes",notes.trim());
     const response=await fetch("/api/sweep-scan",{method:"POST",body:form});
     let payload:{rows?:unknown[];document?:unknown;error?:string}={};
     try{payload=await response.json() as typeof payload}catch{}
@@ -106,6 +116,8 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
       <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
      </div>
      <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Cw is Carlos W. The note at the bottom is bus 15506. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <label className="sweep-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEETS"}</button>
     </>}
     {read&&<>

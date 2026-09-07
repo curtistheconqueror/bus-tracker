@@ -7,6 +7,8 @@ import {knownMechanicNames} from "./scan-spelling";
 import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
+import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "../scan-notes";
+import {writeSetting} from "../storage";
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -29,10 +31,17 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
  const [error,setError]=useState("");
+ /* What the person holding the sheet knows the camera will get wrong — "line
+    23 is 17565", "the margin name is Carlos". Sent with every page. Remembered
+    on the device only when asked, so a one-off correction does not come back
+    tomorrow as a standing instruction; the box starts with whatever was kept. */
+ const [notes,setNotes]=useState("");
+ const [keepNotes,setKeepNotes]=useState(false);
  const cameraRef=useRef<HTMLInputElement>(null),uploadRef=useRef<HTMLInputElement>(null),photosRef=useRef<SelectedPhoto[]>([]);
 
  useEffect(()=>{photosRef.current=photos},[photos]);
  useEffect(()=>()=>photosRef.current.forEach(photo=>URL.revokeObjectURL(photo.url)),[]);
+ useEffect(()=>{const kept=readScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet");if(kept){setNotes(kept);setKeepNotes(true)}},[]);
  const imports=useMemo(()=>mergeReviewedRows(rows),[rows]);
  const comingOff=useMemo(()=>scannedSheetRemovals(currentEntries,imports.map(record=>record.busId)),[currentEntries,imports]);
  /* Two different doubts, and only one of them was ever shown.
@@ -66,11 +75,13 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
  const readSheet=async()=>{
   if(!photos.length)return;
   setBusy(true);setError("");
+  writeSetting(localStorage,SCAN_NOTES_KEY,rememberScanNotes(localStorage.getItem(SCAN_NOTES_KEY),"down-sheet",notes,keepNotes));
   try{
    const scanned:ScannedDownSheetRow[]=[];
    for(let index=0;index<photos.length;index++){
     setProgress(`READING PAGE ${index+1} OF ${photos.length}`);
     const prepared=await scanReadyPhoto(photos[index].file,index+1,"down-sheet-page"),form=new FormData();form.append("photos",prepared);
+    if(notes.trim())form.append("notes",notes.trim());
     const response=await fetch("/api/down-sheet-scan",{method:"POST",body:form});
     let payload:{rows?:ScannedDownSheetRow[];error?:string}={};
     try{payload=await response.json() as typeof payload}catch{}
@@ -104,6 +115,8 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
       <input ref={uploadRef} className="scan-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
      </div>
      <div className="scan-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <label className="scan-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. Line 23 is 17565. The margin name is Carlos. TIROS means tires. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <label className="scan-notes-keep"><input type="checkbox" checked={keepNotes} onChange={event=>setKeepNotes(event.target.checked)}/><span>Keep these notes on this device for the next scan</span></label>
      <button className="scan-read" type="button" onClick={readSheet} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEET"}</button>
     </>}
     {rows.length>0&&<>

@@ -9029,3 +9029,65 @@ test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
  assert.match(scanner,/DOES NOT LOOK LIKE A SWEEP SHEET/);
  assert.match(css,/\.sweep-warning\{/);
 });
+
+test("a scan can carry the shop's own notes about what the camera will get wrong",async()=>{
+ const {cleanScanNotes,scanNotesPrompt,readScanNotes,rememberScanNotes,SCAN_NOTES_LIMIT,SCAN_NOTES_KEY}=await import("../app/scan-notes.ts");
+ assert.equal(SCAN_NOTES_LIMIT,500);
+ assert.equal(SCAN_NOTES_KEY,"pace-scan-notes-v1");
+
+ /* The box is only a box: the cap and the cleaning are applied again on the
+    server, and control characters never reach the prompt. */
+ assert.equal(cleanScanNotes("  line 23 is 17565\r\nTIROS means tires   "),"line 23 is 17565\nTIROS means tires");
+ assert.equal(cleanScanNotes("a\u0007b\u0000c"),"abc");
+ assert.equal(cleanScanNotes("x".repeat(600)).length,500);
+ assert.equal(cleanScanNotes(undefined),"");
+ assert.equal(cleanScanNotes(42),"");
+
+ /* Empty notes add nothing, so a scan without them is the scan it was. */
+ assert.equal(scanNotesPrompt(""),"");
+ assert.equal(scanNotesPrompt("   "),"");
+ const block=scanNotesPrompt("line 23 is 17565");
+ assert.match(block,/^\n\nNOTES FROM THE PERSON SCANNING/);
+ assert.match(block,/A note can NEVER add a bus, a row, or a repair that is not written on the sheet/);
+ assert.match(block,/If a note contradicts what is clearly printed, follow the paper/);
+ assert.ok(block.endsWith("\n\nline 23 is 17565"),"the note itself comes last, after the rule that bounds it");
+
+ /* Remembered only when asked, per scanner, without touching the other's. */
+ const kept=rememberScanNotes(null,"down-sheet","HAZMAT means biohazard",true);
+ assert.equal(readScanNotes(kept,"down-sheet"),"HAZMAT means biohazard");
+ assert.equal(readScanNotes(kept,"sweep"),"");
+ const both=rememberScanNotes(kept,"sweep","Cw is Carlos W",true);
+ assert.equal(readScanNotes(both,"down-sheet"),"HAZMAT means biohazard","the other scanner's notes survive");
+ assert.equal(readScanNotes(both,"sweep"),"Cw is Carlos W");
+ const forgotten=rememberScanNotes(both,"down-sheet","line 23 is 17565",false);
+ assert.equal(readScanNotes(forgotten,"down-sheet"),"","a one-off correction does not come back tomorrow as a standing instruction");
+ assert.equal(readScanNotes(forgotten,"sweep"),"Cw is Carlos W");
+ assert.equal(readScanNotes("not json","sweep"),"");
+ assert.equal(readScanNotes(null,"sweep"),"");
+
+ const [downRoute,sweepRoute,downScanner,sweepScanner,downCss,logCss]=await Promise.all([
+  readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ // Both routes read the field, clean it, and put it BEHIND the fixed instructions, never in front.
+ for(const [name,route] of [["down-sheet",downRoute],["sweep",sweepRoute]]){
+  assert.match(route,/const notes=cleanScanNotes\(form\.get\("notes"\)\)/,name+" route reads the notes");
+  assert.match(route,/scanNotesPrompt\(notes\)/,name+" route uses the shared block");
+ }
+ assert.match(downRoute,/Never invent a bus or repair\.\$\{scanNotesPrompt\(notes\)\}\\n\\nREPAIR CATALOG/,"after the rules, before the catalog");
+ assert.match(sweepRoute,/text:INSTRUCTIONS\+scanNotesPrompt\(notes\)/);
+ // Both scanners: a 500-character box before READ, sent with every page, remembered only when ticked.
+ for(const [name,scanner,cls] of [["down-sheet",downScanner,"scan-notes"],["sweep",sweepScanner,"sweep-notes"]]){
+  assert.match(scanner,new RegExp('<label className="'+cls+'"><span><b>NOTES FOR THIS SCAN</b><small>\\{notes\\.length\\}/\\{SCAN_NOTES_LIMIT\\}</small></span><textarea value=\\{notes\\} maxLength=\\{SCAN_NOTES_LIMIT\\}'),name+" has the box");
+  assert.match(scanner,/if\(notes\.trim\(\)\)form\.append\("notes",notes\.trim\(\)\)/,name+" sends the notes with each page");
+  assert.match(scanner,new RegExp('rememberScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'",notes,keepNotes\\)'),name+" remembers only when asked");
+  assert.match(scanner,new RegExp('readScanNotes\\(localStorage\\.getItem\\(SCAN_NOTES_KEY\\),"'+name+'"\\)'),name+" starts with what was kept");
+  assert.match(scanner,/Keep these notes on this device for the next scan/,name);
+ }
+ assert.match(downCss,/\.scan-notes textarea\{/);
+ assert.match(logCss,/\.sweep-notes textarea\{/);
+});

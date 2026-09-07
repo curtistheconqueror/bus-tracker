@@ -1,3 +1,5 @@
+import {cleanScanNotes,scanNotesPrompt} from "../../scan-notes";
+
 export const runtime="edge";
 
 /* Reads the shop's farebox and Ventra check-off sheets from photos.
@@ -74,7 +76,10 @@ export async function POST(request:Request){
   if(file.size>MAX_BYTES)return json({error:"Each photo must be 8 MB or smaller."},400);
  }
  const images=await Promise.all(files.map(async(file,index)=>({imageUrl:`data:${file.type};base64,${arrayBufferToBase64(await file.arrayBuffer())}`,page:index+1})));
- const content:Record<string,unknown>[]=[{type:"text",text:INSTRUCTIONS}];
+ /* The scanner's notes ride behind the fixed instructions, never in front of
+    them, so what a mark means is still decided by the description above. */
+ const notes=cleanScanNotes(form.get("notes"));
+ const content:Record<string,unknown>[]=[{type:"text",text:INSTRUCTIONS+scanNotesPrompt(notes)}];
  for(const image of images){content.push({type:"text",text:`PAGE ${image.page}`});content.push({type:"image_url",image_url:{url:image.imageUrl,detail:"high"}})}
  const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json","HTTP-Referer":"https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site","X-Title":"Fleet Maintenance Bus Tracker"},body:JSON.stringify({model:runtimeEnv.SWEEP_SCAN_MODEL||runtimeEnv.DOWN_SHEET_SCAN_MODEL||"google/gemini-2.5-flash",messages:[{role:"user",content}],response_format:{type:"json_schema",json_schema:{name:"sweep_sheet_scan",strict:true,schema:{type:"object",additionalProperties:false,properties:{document:{type:"string",enum:["ventra","farebox","mixed","other"]},rows:{type:"array",items:rowSchema}},required:["document","rows"]}}}})});
  if(!response.ok){
