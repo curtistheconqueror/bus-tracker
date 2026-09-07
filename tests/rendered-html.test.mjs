@@ -2256,6 +2256,8 @@ test("Defect Log counts only direct log records and returns buses to service wit
   assert.match(page,/hideDefectLogRecords\(result\.fleet/);
   assert.doesNotMatch(page,/PENDING DOWN SHEET/);
   assert.doesNotMatch(page,/mobile-log-bar/);
+  assert.match(page,/UNDO DEFERRED/);
+  assert.match(page,/deferredReturnedAt:now/);
   assert.doesNotMatch(page,/Enter your initials before marking/);
   assert.doesNotMatch(page,/input required maxLength=\{6\}/);
   assert.match(css,/out-of-service \.log-bus strong/);

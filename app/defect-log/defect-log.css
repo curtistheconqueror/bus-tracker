@@ -107,7 +107,9 @@ button,input,select,textarea{font:inherit}
 .inline-deferred-history-badge{display:inline-flex;min-width:22px;height:17px;align-items:center;justify-content:center;border-radius:9px;border:1px solid #0e7490;background:#fff;color:#0e7490;padding:0 5px;font-size:7px;font-weight:900;line-height:1}
 .back-service{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;color:#19703f}
 .back-service span{font-size:14px;font-weight:900;line-height:1}.back-service b{font-size:6.5px}.back-service:hover,.back-service:focus-visible{background:#edf8f1;outline:none}
+.undo-deferred{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;background:#e8f5f8;color:#0b6679}.undo-deferred span{font-size:14px;font-weight:900;line-height:1}.undo-deferred b{font-size:6.5px}.undo-deferred:hover,.undo-deferred:focus-visible{background:#d7f0f7;outline:none}
 @media(max-width:760px){.feed-title{gap:9px;align-items:stretch;flex-direction:column}.feed-title>span{align-items:flex-start;text-align:left}.feed-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}.feed-title .feed-operator,.feed-title button{width:100%;height:52px;min-height:52px;padding:0 7px;font-size:11px;line-height:1.15;letter-spacing:.15px;touch-action:manipulation}.back-service{flex-direction:row;gap:4px;border-top:0!important}}
+@media(max-width:760px){.undo-deferred{flex-direction:row;gap:4px;border-top:0!important}}
 /* Responsive grouped Defect Log */
 .bus-picker{grid-column:1/-1;display:flex;min-width:0;flex-direction:column;gap:7px;margin:0;border:1px solid var(--log-border,#b7c3d5);border-radius:8px;background:color-mix(in srgb,var(--log-accent) 4%,var(--log-surface));padding:10px}.bus-picker legend{padding:0 5px;color:var(--log-accent);font-size:8px;font-weight:900}.bus-generations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.bus-generations button{min-height:34px;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);font-size:9px;font-weight:900;cursor:pointer}.bus-generations button.active{border-color:var(--log-accent);background:var(--log-accent);color:var(--log-header-text)}.bus-picker-fields{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(220px,1.3fr);gap:8px}.bus-picker>small{color:var(--log-muted);font-size:8px;font-weight:800}.bus-picker-generations{margin-bottom:-2px}.bus-picker-number .bus-picker-fields{grid-template-columns:1fr}.log-form .type-bus-number>input{min-height:56px;color:var(--log-text);font-size:26px;font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums}.log-form .type-bus-number>input::placeholder{color:var(--log-muted);font-size:14px;font-weight:600;letter-spacing:0}
 .log-card-group{display:block}.log-card-group .log-group-header{width:100%;cursor:pointer}.defect-count-badge{display:inline-flex;min-width:30px;min-height:22px;align-items:center;justify-content:center;border-radius:11px;background:#6b35bb;color:#fff;padding:0 7px;font-size:10px;font-weight:900}
@@ -314,8 +316,10 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .fix-log-focus-defect{background:#08733f}
 .edit-log-focus-defect:hover,.edit-log-focus-defect:focus-visible{filter:brightness(1.1)}
 .fix-log-focus-defect:hover,.fix-log-focus-defect:focus-visible{background:#0a8b4c}
+.log-focus-record-actions .undo-deferred{min-height:44px;border:0!important;border-radius:8px;padding:0 14px;font-size:11px;font-weight:900;white-space:nowrap}
 @media(max-width:760px){
  .log-focus-shade{align-items:stretch;padding:0}
+ .log-focus-record-actions{flex-wrap:wrap;justify-content:flex-end}
  .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
  .log-focus-head{gap:9px;padding-top:calc(16px + env(safe-area-inset-top))}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
