@@ -22,6 +22,7 @@ import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup} from "../fleet-backup";
 import ShopCloudLive from "../shop-cloud-live";
+import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -197,8 +198,22 @@ export default function DownSheet(){
   next={...next,location:undefined};/* Every repair on the entry teaches its own cause, under its own symptom. */
  const found=(next.repairItems||[]).filter(item=>normalizeFinding(item.finding));
  if(found.length)writeFindingsMemory(localStorage,found.reduce((memory,item)=>learnFinding(memory,{category:item.category,issue:item.repair,finding:item.finding}),readFindingsMemory(localStorage)));setEntries(current=>current.some(entry=>entry.id===next.id)?current.map(entry=>entry.id===next.id?next:entry):[...current,next]);setEditing(null)};
- const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet);setSaveProblem(writeSetting(localStorage,DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot)).reason||"");writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
- const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const result=restoreDownSheetState(entries,fleet,snapshot);writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
+ const clearEntireDownSheet=()=>{if(!entries.length&&!fleet.some(bus=>bus.down)){alert("The down sheet is already clear.");return}if(!confirm("Clear the entire down sheet and uncheck every tracker bus marked on it? Bus locations and defects will stay unchanged."))return;const result=clearDownSheetState(entries,fleet);setSaveProblem(writeSetting(localStorage,DOWN_SHEET_CLEAR_UNDO_KEY,JSON.stringify(result.snapshot)).reason||"");
+  /* Written down so the removal actually travels. A push only sends what the
+     sheet still carries, so without this the cleared rows stayed live on the
+     server and the next pull handed every one of them back — which is why
+     clearing the sheet and watching it refill was reproducible. */
+  rememberRemovedEntries(localStorage,entries.map(entry=>entry.id),new Date().toISOString());writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(true)};
+ const undoClear=()=>{const snapshot=readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot){setUndoClearAvailable(false);alert("There is no cleared down sheet to restore.");return}const restoredAt=new Date().toISOString(),held=new Set(entries.map(entry=>entry.id)),plain=restoreDownSheetState(entries,fleet,snapshot);
+  /* Off the removal ledger, and restamped as touched now.
+
+     Both halves are needed. The ledger is what refuses an entry on the way back
+     in, and the server compares updated_at to decide whether a write is newer
+     than the tombstone the clear sent — so an entry put back carrying its old
+     stamp would lose that comparison and be deleted again on the next pull,
+     silently. Restoring the sheet IS touching it, so the stamp is honest. */
+  forgetRemovedEntries(localStorage,snapshot.entries.map(entry=>entry.id));
+  const result={...plain,entries:plain.entries.map(entry=>held.has(entry.id)?entry:{...entry,updatedAt:restoredAt})};writeDownSheetStorage(localStorage,result.entries);writeFleetStorage(localStorage,result.fleet);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setEntries(result.entries);setFleet(result.fleet);setUndoClearAvailable(false)};
  const importScan=(records:ScanImportRecord[])=>{
   const now=new Date().toISOString(),incomingIds=new Set(records.map(record=>record.busId)),removed=scannedSheetRemovals(entries,incomingIds),baseFleet=prepareFleetForScannedReplacement(fleet,removed,now);
   const imported=records.map((record,index)=>{
@@ -231,12 +246,24 @@ export default function DownSheet(){
    alert("This device has no room to save an undo copy, so the import was stopped. Export a backup and clear space, then scan again.");
    return;
   }
+  /* Every bus the new sheet does not name comes off, and comes off everywhere.
+     A replacing scan is the commonest removal in the shop and it was the one
+     that travelled least: the buses it dropped stayed live in the cloud, came
+     back on the next pull, and were counted again. */
+  rememberRemovedEntries(localStorage,removed.map(entry=>entry.id),now);
   writeDownSheetStorage(localStorage,nextEntries);
   setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");
   setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);
   alert(`${imported.length} bus${imported.length===1?"":"es"} imported as the current Down Sheet. ${removed.length} prior bus${removed.length===1?"":"es"} came off. Locations and saved defects were preserved.`);
  };
- const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();writeDownSheetStorage(localStorage,snapshot.entries);writeFleetStorage(localStorage,snapshot.fleet);localStorage.removeItem(SCAN_UNDO_KEY);setEntries(snapshot.entries.map(normalizeEntry));setFleet(snapshot.fleet);setUndoScanAvailable(false)}catch{localStorage.removeItem(SCAN_UNDO_KEY);setUndoScanAvailable(false);alert("There is no photo import to restore.")}};
+ const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();
+  /* The undo is itself a removal in one direction and a restore in the other:
+     rows the scan created go, rows it replaced come back. Both have to reach
+     the other devices or the import undoes itself only here. */
+  const restoredAt=new Date().toISOString(),kept=new Set((snapshot.entries as DownEntry[]).map(entry=>entry.id)),held=new Set(entries.map(entry=>entry.id));
+  rememberRemovedEntries(localStorage,entries.filter(entry=>!kept.has(entry.id)).map(entry=>entry.id),restoredAt);
+  forgetRemovedEntries(localStorage,[...kept]);
+  const restored=(snapshot.entries as Partial<DownEntry>[]).map(entry=>held.has(String(entry.id))?entry:{...entry,updatedAt:restoredAt});writeDownSheetStorage(localStorage,restored);writeFleetStorage(localStorage,snapshot.fleet);localStorage.removeItem(SCAN_UNDO_KEY);setEntries(restored.map(normalizeEntry));setFleet(snapshot.fleet);setUndoScanAvailable(false)}catch{localStorage.removeItem(SCAN_UNDO_KEY);setUndoScanAvailable(false);alert("There is no photo import to restore.")}};
 
  const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 

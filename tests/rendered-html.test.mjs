@@ -8940,7 +8940,179 @@ test("a scan sweep removed on one device reaches the others, and so does putting
  assert.match(client,/deleted:deletedRes\.deleted/);
  // Both callers hand the tombstones on; a pull that read them and dropped them would change nothing.
  for(const file of ["../app/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"])
-  assert.match(await readFile(new URL(file,import.meta.url),"utf8"),/applyCloudPull\(localStorage,\{[^}]*deleted:(?:got|result)\.deleted\}\)/,file);
+  assert.match(await readFile(new URL(file,import.meta.url),"utf8"),/applyCloudPull\(localStorage,\{[^}]*deleted:(?:got|result)\.deleted[,}]/,file);
+});
+
+test("a Down Sheet cleared on one device stays cleared, instead of arriving back as nine days of sheets",async()=>{
+ const {downSheetRow,removedEntryRows,withoutRemovedEntries,readRemovedEntries,rememberRemovedEntries,forgetRemovedEntries,
+        REMOVED_ENTRY_LEDGER_LIMIT,CLOUD_REMOVED_ENTRIES_KEY}=await import("../app/cloud-sync.ts");
+ const {pushPlan,executePushPlan,cloudPush,readTombstones}=await import("../app/cloud-client.ts");
+ const {dropTombstonedEntries,applyCloudPull}=await import("../app/cloud-live.ts");
+ const {serializeFleetPayload,serializeDownSheetPayload,FLEET_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY}=await import("../app/storage.ts");
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Phone"});
+ const NOW="2026-09-07T04:00:00.000Z",REMOVED="2026-09-07T03:30:00.000Z";
+
+ /* The bug, in one sentence: a push sends what the sheet still carries, so an
+    entry taken off was never removed anywhere, and the next pull handed it back.
+    A correct 57-bus scan read 92 about fifteen seconds later — one live-sync
+    round trip — and clearing the sheet first changed nothing, because clearing
+    was exactly the operation that did not travel. */
+
+ // A live entry says out loud that it is not removed, so putting one back clears its tombstone.
+ const live=downSheetRow({id:"e-live",busNumber:"17510",category:"Brakes",repair:"Air leak",updatedAt:NOW},config,NOW);
+ assert.strictEqual(live.deleted_at,null);
+ assert.equal(live.fleet_number,"17510");
+
+ // A tombstone carries the key, the stamp and the signature. Nothing about the repair.
+ const [dead]=removedEntryRows({"e-gone":REMOVED},config,NOW);
+ assert.deepEqual(Object.keys(dead).sort(),["deleted_at","device_label","entry_id","updated_at","updated_by"]);
+ assert.equal(dead.deleted_at,REMOVED);
+ assert.equal(dead.updated_at,REMOVED,"stamped when the removal happened, so keep_newest_write compares the right two times");
+
+ /* down_sheet_entries.fleet_number is NOT NULL, and Postgres checks that on the
+    INSERT half of an upsert before it ever reaches the conflict on entry_id. So
+    a tombstone in an upsert batch takes the whole 200-row chunk down with it —
+    the same failure that kept the shop cloud red for a week on bus_defects. */
+ const plan=pushPlan([],[],[live,dead]);
+ const step=plan.find(s=>s.table==="down_sheet_entries");
+ assert.deepEqual(step.upserts.map(r=>r.entry_id),["e-live"]);
+ assert.deepEqual(step.updates.map(r=>r.entry_id),["e-gone"]);
+ for(const s of plan)assert.ok(s.upserts.every(r=>String(r.fleet_number??"").trim()),s.table+" would upsert a row with no fleet number");
+
+ const calls=[];
+ const server={from(table){return {
+  upsert:async(rows,options)=>{calls.push(["upsert",table,options.onConflict,rows.map(r=>r.entry_id)]);
+   return rows.some(r=>!String(r.fleet_number??"").trim())?{error:{message:'null value in column "fleet_number" of relation "'+table+'" violates not-null constraint'}}:{error:null}},
+  update:patch=>({eq:async(column,value)=>{calls.push(["update",table,column,value,Object.keys(patch).sort()]);return {error:null}}}),
+ }}};
+ assert.equal(await executePushPlan(server,plan),null,"the mixed batch must go through");
+ assert.deepEqual(calls,[
+  ["upsert","down_sheet_entries","entry_id",["e-live"]],
+  ["update","down_sheet_entries","entry_id","e-gone",["deleted_at","device_label","updated_at","updated_by"]],
+ ]);
+ const old=await executePushPlan(server,[{table:"down_sheet_entries",conflict:"entry_id",upserts:[live,dead],updates:[]}]);
+ assert.match(old.message,/null value in column "fleet_number"/);
+
+ /* An entry the sheet still carries is never tombstoned, whatever the ledger
+    says — that is what makes UNDO CLEAR safe in the window before the ledger is
+    cleared. Two rows go up here, not three: the live entry and one tombstone. */
+ const pushed=await cloudPush({buses:[],entries:[{id:"e-live",busNumber:"17510",updatedAt:NOW}],config:{...config,url:"",anonKey:""},now:NOW,sent:{},
+  removedEntries:{"e-live":REMOVED,"e-gone":REMOVED}});
+ assert.equal(pushed.pending,2,"the live entry's own row plus one tombstone — never a tombstone for a bus still on the sheet");
+
+ /* Dropping locally. Same tie-break as the defects: an entry touched on THIS
+    device after the removal is real work and stays, and its next push puts the
+    row back for everyone. */
+ const held=[
+  {id:"e-stale",busId:"a",workflow:"Scheduled",updatedAt:"2026-08-30T19:24:14.189Z"},
+  {id:"e-worked",busId:"b",workflow:"Scheduled",updatedAt:"2026-09-07T03:45:00.000Z"},
+  {id:"e-mine",busId:"c",workflow:"Scheduled",updatedAt:NOW},
+ ];
+ const dropped=dropTombstonedEntries(held,{"e-stale":REMOVED,"e-worked":REMOVED,"never-here":REMOVED});
+ assert.deepEqual(dropped.dropped,["e-stale"]);
+ assert.deepEqual(dropped.entries.map(e=>e.id),["e-worked","e-mine"]);
+ assert.strictEqual(dropTombstonedEntries(held,{}).entries,held,"no tombstones, no work");
+
+ // And on the way in, so a second device holding yesterday's sheet cannot re-add them.
+ const sheetIn={kind:"pace-south-down-sheet-transfer",version:1,entries:[{id:"e-stale"},{id:"e-mine"}]};
+ assert.deepEqual(withoutRemovedEntries(sheetIn,{"e-stale":REMOVED}).entries.map(e=>e.id),["e-mine"]);
+ assert.strictEqual(withoutRemovedEntries(sheetIn,{}),sheetIn);
+
+ /* End to end, through the real merge path against real storage: the shop's
+    copy still lists the two stale entries, and both are tombstoned. They must
+    leave the sheet AND leave the map, because a bus left marked down with no
+    entry behind it is not inert — entriesFromFleet mints a brand new entry for
+    it under an id nothing has ever tombstoned, which is the "26 other buses"
+    message on a sheet that was just cleared. */
+ const storage=memoryStorage({
+  [FLEET_STORAGE_KEY]:serializeFleetPayload([
+   {id:"a",n:"17510",s:"out",l:"bay-1",down:true,defects:[],pendingRepair:""},
+   {id:"c",n:"17520",s:"out",l:"bay-2",down:true,defects:[],pendingRepair:""},
+  ]),
+  [DOWN_SHEET_STORAGE_KEY]:serializeDownSheetPayload([
+   {id:"e-stale",busId:"a",busNumber:"17510",workflow:"Scheduled",updatedAt:"2026-08-30T19:24:14.189Z"},
+   {id:"e-mine",busId:"c",busNumber:"17520",workflow:"Scheduled",updatedAt:NOW},
+  ]),
+ });
+ const announced=[];
+ const applied=applyCloudPull(storage,{
+  map:fleetMapPayload([],NOW),
+  defects:defectLogPayload([],NOW),
+  /* The server still hands the stale row down among the live ones — it was
+     tombstoned by another device, and this is the pull that finds out. */
+  sheet:downSheetPayload([{entry_id:"e-stale",fleet_number:"17510",updated_at:"2026-08-30T19:24:14.189Z",workflow:"Scheduled"}],NOW),
+  deleted:{},
+  removedEntries:{"e-stale":REMOVED},
+ },(key,value)=>announced.push([key,Boolean(value)]));
+ assert.equal(applied.ok,true,applied.error);
+ assert.equal(applied.droppedEntries,1);
+ assert.deepEqual(JSON.parse(storage.value(DOWN_SHEET_STORAGE_KEY)).entries.map(e=>e.id),["e-mine"],"the merge put it back and the tombstone took it off again");
+ const board=readFleetPayload(storage.value(FLEET_STORAGE_KEY));
+ assert.deepEqual(board.buses.map(bus=>[bus.n,bus.down===true]),[["17510",false],["17520",true]],"the map follows the sheet, so nothing re-mints the entry");
+ assert.ok(announced.some(([key])=>key===DOWN_SHEET_STORAGE_KEY),"the page in front of the user hears about it");
+
+ // The tombstones ride down on the same pull, read as two columns and paged like everything else.
+ const reads=[];
+ const fake={from(table){return {select(columns){return {not(column,op,value){reads.push([table,columns,column,op,value]);
+  return {range:async from=>({data:from===0?[{entry_id:"e-stale",deleted_at:REMOVED},{entry_id:"",deleted_at:"x"}]:[],error:null})}}}}}}};
+ const read=await readTombstones(fake,"down_sheet_entries","entry_id");
+ assert.deepEqual(read.deleted,{"e-stale":REMOVED});
+ assert.deepEqual(reads,[["down_sheet_entries","entry_id,deleted_at","deleted_at","is",null]]);
+ const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ assert.match(client,/readTombstones\(supabase,"down_sheet_entries","entry_id"\)/);
+ assert.match(client,/removedEntries:removedRes\.deleted/);
+ assert.match(client,/sheet:withoutRemovedEntries\(downSheetPayload\(entryRes\.rows,now\),removedEntries\)/);
+ for(const file of ["../app/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(source,/removedEntries:readRemovedEntries\(localStorage\)/,file+" must push its removals");
+  assert.match(source,/cloudPull\([^;]{0,160}?readRemovedEntries\(localStorage\)\)/,file+" must send them on the pull too");
+  assert.match(source,/applyCloudPull\(localStorage,\{[^}]*removedEntries:(?:got|result)\.removedEntries\}\)/,file);
+ }
+
+ /* The ledger itself: written where the removals happen, taken back where they
+    are undone, and bounded, because a scan a day forever is otherwise a
+    LocalStorage key that only grows. */
+ const ledger=memoryStorage();
+ rememberRemovedEntries(ledger,["e-1","e-2"," "],REMOVED);
+ assert.deepEqual(readRemovedEntries(ledger),{"e-1":REMOVED,"e-2":REMOVED});
+ forgetRemovedEntries(ledger,["e-1","never-here"]);
+ assert.deepEqual(readRemovedEntries(ledger),{"e-2":REMOVED});
+ assert.equal(ledger.value(CLOUD_REMOVED_ENTRIES_KEY),JSON.stringify({"e-2":REMOVED}));
+ const many=memoryStorage();
+ for(let day=0;day<40;day++)
+  rememberRemovedEntries(many,Array.from({length:80},(_,i)=>"d"+day+"-"+i),new Date(Date.UTC(2026,0,1+day)).toISOString());
+ const capped=readRemovedEntries(many);
+ assert.equal(Object.keys(capped).length,REMOVED_ENTRY_LEDGER_LIMIT);
+ assert.ok(capped["d39-0"],"the newest removals — the ones that may not have been pushed yet — are the ones kept");
+ assert.equal(capped["d0-0"],undefined,"and the oldest, long since landed on the server, are what falls off");
+});
+
+test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/import \{forgetRemovedEntries,rememberRemovedEntries\} from "\.\.\/cloud-sync"/);
+
+ // CLEAR DOWNSHEET, and the whole sheet with it.
+ assert.match(page,/const result=clearDownSheetState\(entries,fleet\);[\s\S]{0,600}?rememberRemovedEntries\(localStorage,entries\.map\(entry=>entry\.id\),new Date\(\)\.toISOString\(\)\)/);
+ // A replacing scan: every bus the new sheet does not name.
+ assert.match(page,/rememberRemovedEntries\(localStorage,removed\.map\(entry=>entry\.id\),now\)/);
+ assert.match(page,/removed=scannedSheetRemovals\(entries,incomingIds\)/,"which is the list the replacement already computed");
+
+ /* Both undos take the entries back off the ledger AND restamp them, because
+    the server compares updated_at: an entry put back carrying its old stamp
+    loses to the tombstone the removal sent and is deleted again on the next
+    pull, silently. */
+ assert.match(page,/const undoClear=\(\)=>\{[\s\S]{0,900}?forgetRemovedEntries\(localStorage,snapshot\.entries\.map\(entry=>entry\.id\)\)/);
+ assert.match(page,/const undoClear=\(\)=>\{[\s\S]{0,1200}?held\.has\(entry\.id\)\?entry:\{\.\.\.entry,updatedAt:restoredAt\}/);
+ assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?rememberRemovedEntries\(localStorage,entries\.filter\(entry=>!kept\.has\(entry\.id\)\)\.map\(entry=>entry\.id\),restoredAt\)/,"rows the scan itself created have to come off everywhere too");
+ assert.match(page,/const undoScan=\(\)=>\{[\s\S]{0,1400}?forgetRemovedEntries\(localStorage,\[\.\.\.kept\]\)/);
+
+ /* The AI Operator clears the sheet too, from the map. It is the same operation
+    through a different door, so it writes the same ledger — a clear that reaches
+    only this device is not a clear. */
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(map,/import \{forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway\} from "\.\/cloud-sync"/);
+ assert.match(map,/plan\.kind==="clearDownSheet"[\s\S]{0,1400}?rememberRemovedEntries\(localStorage,\(entries as \{id:string\}\[\]\)\.map\(entry=>entry\.id\),new Date\(\)\.toISOString\(\)\)/);
+ assert.match(map,/plan\.kind==="undoDownSheetClear"[\s\S]{0,1400}?forgetRemovedEntries\(localStorage,snapshot\.entries\.map\(entry=>entry\.id\)\)/);
 });
 
 test("SCAN BATCHES on the Defect Log, and the operator on the map, remove a sweep the same way",async()=>{

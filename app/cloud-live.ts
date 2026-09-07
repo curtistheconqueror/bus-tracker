@@ -11,6 +11,7 @@
    Nothing here decides what a merge means. */
 
 import {mergeDefectLog,mergeDownSheet,mergeFleetMap} from "./section-transfer.ts";
+import {reconcileDownSheetMembership} from "./down-sheet-counter.ts";
 import {readDownSheetStorage,readFleetStorage,writeDownSheetStorage,writeFleetStorage,DOWN_SHEET_STORAGE_KEY,FLEET_STORAGE_KEY} from "./storage.ts";
 
 export const LIVE_TABLES=["buses","bus_defects","down_sheet_entries"] as const;
@@ -70,12 +71,16 @@ export function announceStoredChange(key:string,value:string|null){
  }
 }
 
-export type CloudPullPayload={map:unknown;defects:unknown;sheet:unknown;deleted?:Record<string,string>};
-export type ApplyResult={ok:boolean;error:string;dropped:number};
+export type CloudPullPayload={map:unknown;defects:unknown;sheet:unknown;deleted?:Record<string,string>;removedEntries?:Record<string,string>};
+export type ApplyResult={ok:boolean;error:string;dropped:number;droppedEntries:number};
 
 type LiveStorage=Storage;
 
 type TombstoneBus={defects?:unknown};
+
+/* Only the four fields this module reasons about. The entry's real shape lives
+   on the Down Sheet page and is nobody else's business here. */
+type DownEntryShape={id?:string;busId?:string;workflow?:string;updatedAt?:string;createdAt?:string};
 
 /* Take off this device the records the shop has removed.
 
@@ -106,14 +111,68 @@ export function dropTombstonedDefects<T extends TombstoneBus>(buses:T[],deleted:
  return {buses:next,dropped};
 }
 
+/* Take off this device the Down Sheet entries the shop has taken off.
+
+   Exactly the job dropTombstonedDefects does one table over, and the Down Sheet
+   needed it more: mergeDownSheet ADDS every incoming entry the receiver lacks,
+   so a sheet cleared on the phone came straight back on the next pull, along
+   with every sheet before it. The count a mechanic reads off the top of the page
+   was the sum of nine days of sheets rather than the buses actually down.
+
+   Same tie-break as the defects, for the same reason: an entry this device has
+   touched SINCE the removal stays. Somebody working a repair after somebody else
+   cleared the sheet did real work, and it is the work that wins — its next push
+   puts the entry back for everyone, which is the honest outcome when two people
+   disagreed about whether a bus was still down. */
+export function dropTombstonedEntries<T extends {id?:string;updatedAt?:string;createdAt?:string}>(
+ entries:T[],removed:Record<string,string>|undefined
+):{entries:T[];dropped:string[]}{
+ const dropped:string[]=[];
+ if(!removed||!Object.keys(removed).length)return {entries,dropped};
+ const kept=entries.filter(entry=>{
+  const id=String(entry?.id??""),at=id?removed[id]:undefined;
+  if(!at)return true;
+  const mine=Date.parse(String(entry?.updatedAt||entry?.createdAt||""));
+  if(Number.isFinite(mine)&&mine>Date.parse(at))return true;
+  dropped.push(id);
+  return false;
+ });
+ return {entries:kept.length===entries.length?entries:kept,dropped};
+}
+
 /* The merge half of a pull, shared by the button and by live sync so the two can
    never drift. Everything it refuses, it refuses without changing anything. */
 export function applyCloudPull(storage:LiveStorage,result:CloudPullPayload,announce=announceStoredChange):ApplyResult{
  const fleet=readFleetStorage<Record<string,unknown>>(storage);
- if(!fleet.valid)return {ok:false,error:"This device's board could not be read",dropped:0};
+ if(!fleet.valid)return {ok:false,error:"This device's board could not be read",dropped:0,droppedEntries:0};
  const afterMap=mergeFleetMap(fleet.buses,result.map as never);
  const afterDefects=mergeDefectLog(afterMap.buses,result.defects as never);
  const afterTombstones=dropTombstonedDefects(afterDefects.buses,result.deleted);
+
+ /* The sheet is merged BEFORE the board is written, though it is saved second,
+    because the board's `down` flags have to be reconciled against the sheet
+    this pull actually settled on.
+
+    Leaving that to the Down Sheet page is what the code did, and it is why
+    clearing the sheet did not stay cleared. A bus left marked down with no entry
+    behind it is not inert: entriesFromFleet mints a BRAND NEW entry for it the
+    next time that page loads — under an id nothing has ever tombstoned — so a
+    removal that had just travelled correctly came straight back wearing a
+    different name. That is the "26 other buses" message on an empty sheet.
+
+    The rule is the schema's own: the Down Sheet says which buses are down and
+    the map reads it back. Enforced here so it holds on whichever page happens to
+    be open when the pull lands. */
+ const sheet=readDownSheetStorage<DownEntryShape>(storage);
+ const afterSheet=mergeDownSheet(sheet.valid?sheet.entries:[],result.sheet as never,afterTombstones.buses);
+ /* AFTER the merge, not before: the entries that have to go are the ones the
+    merge would otherwise have just put back. Taking them out of the incoming
+    payload alone is not enough — the receiver's own stale copy is the other
+    half, and the merge keeps whatever only the receiver has. */
+ const afterRemovals=dropTombstonedEntries(afterSheet.entries as DownEntryShape[],result.removedEntries);
+ const activeBusIds=afterRemovals.entries.filter(entry=>entry.workflow!=="Completed").map(entry=>String(entry.busId??""));
+ const reconciled=reconcileDownSheetMembership(afterTombstones.buses as (Record<string,unknown>&{id:string;down?:boolean})[],activeBusIds);
+
  /* allowBulkDefectLoss stays false for a merge: a merge is never a reason to
     accept a write the guard thinks is destructive, and live sync runs
     unattended — there is nobody watching to notice. A merge cannot lose a
@@ -122,12 +181,10 @@ export function applyCloudPull(storage:LiveStorage,result:CloudPullPayload,annou
     that is meant to reach here. The guard is lifted exactly then, and the
     recovery snapshot is still taken first, so RESTORE LAST GOOD COPY stands
     behind it. */
- if(!writeFleetStorage(storage,afterTombstones.buses,{allowBulkDefectLoss:afterTombstones.dropped.length>0}))
-  return {ok:false,error:"The merged board could not be saved",dropped:0};
+ if(!writeFleetStorage(storage,reconciled,{allowBulkDefectLoss:afterTombstones.dropped.length>0}))
+  return {ok:false,error:"The merged board could not be saved",dropped:0,droppedEntries:0};
  announce(FLEET_STORAGE_KEY,storage.getItem(FLEET_STORAGE_KEY));
- const sheet=readDownSheetStorage<{id?:string}>(storage);
- const afterSheet=mergeDownSheet(sheet.valid?sheet.entries:[],result.sheet as never,afterTombstones.buses);
- writeDownSheetStorage(storage,afterSheet.entries);
+ writeDownSheetStorage(storage,afterRemovals.entries);
  announce(DOWN_SHEET_STORAGE_KEY,storage.getItem(DOWN_SHEET_STORAGE_KEY));
- return {ok:true,error:"",dropped:afterTombstones.dropped.length};
+ return {ok:true,error:"",dropped:afterTombstones.dropped.length,droppedEntries:afterRemovals.dropped.length};
 }

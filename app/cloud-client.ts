@@ -19,8 +19,11 @@ import {
  fleetMapPayload,
  busRow,
  mergedAwayRows,
+ removedEntryRows,
  withoutMergedAway,
+ withoutRemovedEntries,
  type MergedAwayDefects,
+ type RemovedEntries,
  type CloudConfig,
  type CloudRow,
  type CloudState,
@@ -195,6 +198,9 @@ export type PushInput={
  /* Records this device folded into another. Optional so a caller that has
     never merged anything is unchanged. */
  merged?:MergedAwayDefects;
+ /* Down Sheet entries this device took off the sheet — a clear, a scan that
+    replaced it, or a row deleted by hand. Same shape, same reason. */
+ removedEntries?:RemovedEntries;
 };
 
 export type PushResult=CloudOutcome&{sent:SentFingerprints;pushed:number;pending:number};
@@ -219,6 +225,9 @@ export type PushResult=CloudOutcome&{sent:SentFingerprints;pushed:number;pending
    cloud, and the Down Sheet — queued behind the failing defects — never reached
    the cloud after Aug 31.
 
+   down_sheet_entries splits the same way and for the same reason: its
+   fleet_number is NOT NULL too, so an entry tombstone is an UPDATE by entry_id.
+
    An UPDATE touches no required column, is what the shop's edit policy allows,
    and against an id the server never had it changes nothing, which is right:
    there is nothing to delete. The roadmap always described a delete as "an
@@ -234,7 +243,7 @@ export function pushPlan(busChanged:CloudRow[],defectChanged:CloudRow[],entryCha
  return [
   {table:"buses",conflict:"fleet_number",upserts:busChanged,updates:[]},
   {table:"bus_defects",conflict:"defect_id",upserts:defectChanged.filter(row=>!tombstone(row)),updates:defectChanged.filter(tombstone)},
-  {table:"down_sheet_entries",conflict:"entry_id",upserts:entryChanged,updates:[]},
+  {table:"down_sheet_entries",conflict:"entry_id",upserts:entryChanged.filter(row=>!tombstone(row)),updates:entryChanged.filter(tombstone)},
  ];
 }
 
@@ -278,10 +287,21 @@ export async function cloudPush(input:PushInput):Promise<PushResult>{
     is cleared, and it means a stale entry can never delete a live repair. */
  const tombstones=mergedAwayRows(input.merged||{},config,now)
   .filter(row=>!defectRows.some(live=>live.defect_id===row.defect_id));
+ /* And the same for the sheet. Without these a removal never left the device:
+    the entry was simply not sent, the row stayed live, and the next pull handed
+    it straight back — which is how a 57-bus sheet read 92 fifteen seconds after
+    a correct scan.
+
+    An entry the sheet still carries is never tombstoned, whatever the ledger
+    says. That is what makes UNDO CLEAR and UNDO IMPORT safe in the window before
+    the ledger is cleared, and it means a stale ledger can never delete a live
+    repair. */
+ const entryTombstones=removedEntryRows(input.removedEntries||{},config,now)
+  .filter(row=>!entryRows.some(live=>live.entry_id===row.entry_id));
 
  const busChange=changedRows(busRows,"fleet_number",sent);
  const defectChange=changedRows([...defectRows,...tombstones],"defect_id",sent);
- const entryChange=changedRows(entryRows,"entry_id",sent);
+ const entryChange=changedRows([...entryRows,...entryTombstones],"entry_id",sent);
  const outstanding=busChange.changed.length+defectChange.changed.length+entryChange.changed.length;
  const fingerprints={...busChange.fingerprints,...defectChange.fingerprints,...entryChange.fingerprints};
 
@@ -307,23 +327,28 @@ export type PullResult=CloudOutcome&{
  sheet:ReturnType<typeof downSheetPayload>|null;
  /* Defect ids the shop has removed, with when. Applied by applyCloudPull. */
  deleted:Record<string,string>;
+ /* Down Sheet entry ids the shop has taken off, with when. Same job, other
+    table — a pull of live rows alone can never tell a device that an entry it
+    still holds is gone, because the merge keeps whatever only the receiver has. */
+ removedEntries:Record<string,string>;
 };
 
 /* Everything not tombstoned, handed back in the same shape a transfer FILE has
    so the caller can use the merge rules that already shipped — plus the
    tombstones themselves, as ids only, so a removal travels. */
-export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={}):Promise<PullResult>{
- const empty={map:null,defects:null,sheet:null,deleted:{}};
+export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={},removedEntries:RemovedEntries={}):Promise<PullResult>{
+ const empty={map:null,defects:null,sheet:null,deleted:{},removedEntries:{}};
  try{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",...empty};
-  const [busRes,defectRes,entryRes,deletedRes]=await Promise.all([
+  const [busRes,defectRes,entryRes,deletedRes,removedRes]=await Promise.all([
    readAll(supabase,"buses"),
    readAll(supabase,"bus_defects"),
    readAll(supabase,"down_sheet_entries"),
    readTombstones(supabase,"bus_defects","defect_id"),
+   readTombstones(supabase,"down_sheet_entries","entry_id"),
   ]);
-  const firstError=busRes.error||defectRes.error||entryRes.error||deletedRes.error;
+  const firstError=busRes.error||defectRes.error||entryRes.error||deletedRes.error||removedRes.error;
   if(firstError)return {...failed(new Error(firstError.message)),...empty};
   return {
    ok:true,phase:"idle",message:"",
@@ -333,8 +358,12 @@ export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayD
       the cleanup yet will go on pushing its own copies, and those would arrive
       here and undo the merge. */
    defects:withoutMergedAway(defectLogPayload(defectRes.rows,now),merged),
-   sheet:downSheetPayload(entryRes.rows,now),
+   /* And minus the entries this device has taken off the sheet, for the same
+      reason: another device holding yesterday's sheet pushes it back up, and
+      without this the clear undoes itself on the very next pull. */
+   sheet:withoutRemovedEntries(downSheetPayload(entryRes.rows,now),removedEntries),
    deleted:deletedRes.deleted,
+   removedEntries:removedRes.deleted,
   };
  }catch(error){return {...failed(error),...empty}}
 }

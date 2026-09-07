@@ -31,6 +31,7 @@ import {
  readCloudConfig,
  readCloudState,
  readMergedAway,
+ readRemovedEntries,
  readSentFingerprints,
  writeCloudState,
  writeSentFingerprints,
@@ -71,6 +72,7 @@ export default function ShopCloudLive(){
      config,now,
      sent:readSentFingerprints(localStorage),
      merged:readMergedAway(localStorage),
+     removedEntries:readRemovedEntries(localStorage),
     });
     if(pushed.ok)writeSentFingerprints(localStorage,pushed.sent);
     const before=readCloudState(localStorage);
@@ -86,12 +88,12 @@ export default function ShopCloudLive(){
        would lay the server's older copy on top of it — and the next sweep would
        push that overwritten version up as though it were the truth. */
     if(!pullToo||!pushed.ok||stopped)return;
-    const got=await cloudPull(config,new Date().toISOString(),readMergedAway(localStorage));
+    const got=await cloudPull(config,new Date().toISOString(),readMergedAway(localStorage),readRemovedEntries(localStorage));
     if(stopped||!got.ok||!got.map||!got.defects||!got.sheet){
      if(!got.ok)writeCloudState(localStorage,{...readCloudState(localStorage),phase:got.phase,lastError:got.message});
      return;
     }
-    const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet,deleted:got.deleted});
+    const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet,deleted:got.deleted,removedEntries:got.removedEntries});
     writeCloudState(localStorage,applied.ok
      ?{phase:"idle",lastSyncedAt:new Date().toISOString(),lastError:"",pending:0}
      :{...readCloudState(localStorage),phase:"error",lastError:applied.error});

@@ -24,6 +24,7 @@ import {
  readCloudConfig,
  readCloudState,
  readMergedAway,
+ readRemovedEntries,
  readSentFingerprints,
  writeCloudConfig,
  writeCloudState,
@@ -81,6 +82,10 @@ export default function CloudSyncControl(){
    /* Tombstones for anything this device folded into another record, so the
       server stops handing the duplicates back to everyone. */
    merged:readMergedAway(localStorage),
+   /* And for anything this device took off the Down Sheet, so a clear or a
+      replacing scan actually removes it instead of being handed straight
+      back on the next pull. */
+   removedEntries:readRemovedEntries(localStorage),
   });
   if(result.ok)writeSentFingerprints(localStorage,result.sent);
   const previous=readCloudState(localStorage);
@@ -158,7 +163,7 @@ export default function CloudSyncControl(){
    alert("This device's own changes could not be sent, so nothing was brought down. Bringing the shop's copy in now could overwrite work that has not left this device yet. Try again when it reconnects.");
    return;
   }
-  const result=await cloudPull(saved,new Date().toISOString(),readMergedAway(localStorage));
+  const result=await cloudPull(saved,new Date().toISOString(),readMergedAway(localStorage),readRemovedEntries(localStorage));
   setBusy(false);
   if(!result.ok||!result.map||!result.defects||!result.sheet){
    remember({...state,phase:result.phase,lastError:result.message});
@@ -169,7 +174,7 @@ export default function CloudSyncControl(){
      background cannot drift apart. Every abandoned path below puts the phase
      back: returning while it still says "syncing" leaves that written to
      storage, and the status line then reads "Syncing…" forever. */
-  const applied=applyCloudPull(localStorage,{map:result.map,defects:result.defects,sheet:result.sheet,deleted:result.deleted});
+  const applied=applyCloudPull(localStorage,{map:result.map,defects:result.defects,sheet:result.sheet,deleted:result.deleted,removedEntries:result.removedEntries});
   if(!applied.ok){
    remember({...state,phase:"error",lastError:applied.error});
    alert(applied.error+", so nothing changed on this device.");
