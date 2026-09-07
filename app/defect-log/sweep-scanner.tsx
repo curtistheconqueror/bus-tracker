@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "../scan-photo";
-import {normalizeSweepRow,sweepFindings,sweepOkAgainstBoard,SWEEP_COLUMN_LABEL,SWEEP_ISSUE_CHOICES,type ScannedSweepRow,type SweepFinding,type SweepFleetBus,type SweepOkBus} from "./sweep-scan-import";
+import {normalizeSweepDocument,normalizeSweepRow,sweepFindings,sweepOkAgainstBoard,sweepPageVerdict,SWEEP_COLUMN_LABEL,SWEEP_ISSUE_CHOICES,type ScannedSweepRow,type SweepFinding,type SweepFleetBus,type SweepOkBus,type SweepPageVerdict} from "./sweep-scan-import";
 
 /* The farebox / Ventra sweep scanner.
 
@@ -26,6 +26,10 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
  const [rows,setRows]=useState<ScannedSweepRow[]>([]);
  const [findings,setFindings]=useState<SweepFinding[]>([]);
  const [okAgainstBoard,setOkAgainstBoard]=useState<SweepOkBus[]>([]);
+ /* Pages the model would not vouch for. A page that is not a sweep sheet at
+    all contributes no rows; a page it was unsure of contributes rows that
+    arrive unticked. Either way the reviewer is told, in red or amber. */
+ const [heldPages,setHeldPages]=useState<{page:number;verdict:SweepPageVerdict}[]>([]);
  const [read,setRead]=useState(false);
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
@@ -56,21 +60,30 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
   if(!photos.length)return;
   setBusy(true);setError("");
   try{
-   const scanned:ScannedSweepRow[]=[];
+   const scanned:ScannedSweepRow[]=[],held:{page:number;verdict:SweepPageVerdict}[]=[];
    for(let index=0;index<photos.length;index++){
     setProgress(`READING PAGE ${index+1} OF ${photos.length}`);
     const prepared=await scanReadyPhoto(photos[index].file,index+1,"sweep-sheet-page"),form=new FormData();form.append("photos",prepared);
     const response=await fetch("/api/sweep-scan",{method:"POST",body:form});
-    let payload:{rows?:unknown[];error?:string}={};
+    let payload:{rows?:unknown[];document?:unknown;error?:string}={};
     try{payload=await response.json() as typeof payload}catch{}
     if(!response.ok){if(response.status===413)throw new Error(`Page ${index+1} is still too large. Retake it closer to the sheet.`);throw new Error(payload.error||`Page ${index+1} could not be processed.`)}
-    scanned.push(...(Array.isArray(payload.rows)?payload.rows:[]).map(row=>normalizeSweepRow(row,index+1)));
+    const pageRows=(Array.isArray(payload.rows)?payload.rows:[]).map(row=>normalizeSweepRow(row,index+1));
+    const verdict=sweepPageVerdict(normalizeSweepDocument(payload.document),pageRows);
+    if(verdict!=="sweep")held.push({page:index+1,verdict});
+    /* A page that is not a sweep sheet files nothing. Its rows are not shown
+       unticked; they are not shown at all — a tick box beside a Down Sheet
+       row is how 24 records got filed the first time. */
+    if(verdict!=="not-a-sweep-sheet")scanned.push(...pageRows);
    }
+   const unsure=new Set(held.filter(item=>item.verdict==="unsure").map(item=>item.page));
    setRows(scanned);
-   setFindings(sweepFindings(scanned,fleet));
+   setFindings(sweepFindings(scanned,fleet).map(finding=>unsure.has(finding.pageNumber)?{...finding,selected:false}:finding));
    setOkAgainstBoard(sweepOkAgainstBoard(scanned,fleet));
+   setHeldPages(held);
    setRead(true);
-   if(!scanned.length)setError("No marked bus rows were found. Try a clearer photo, with the whole sheet in frame.");
+   if(held.length&&held.every(item=>item.verdict==="not-a-sweep-sheet")&&held.length===photos.length)setError("None of these photos is a farebox or Ventra check-off sheet, so nothing can be filed from them. A Vehicle Down Sheet goes through SCAN SHEET on the Down Sheet page.");
+   else if(!scanned.length)setError("No marked bus rows were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
  const approve=()=>{
@@ -96,7 +109,9 @@ export default function SweepScanner({fleet,onClose,onFile}:Props){
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEETS"}</button>
     </>}
     {read&&<>
-     <div className="sweep-review-head"><div><b>REVIEW FINDINGS</b><span>{busesRead} bus{busesRead===1?"":"es"} read · {findings.length} finding{findings.length===1?"":"s"} · {approved.length} ready to file{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRead(false);setRows([]);setFindings([]);setOkAgainstBoard([]);setError("")}}>CHANGE PHOTOS</button></div>
+     <div className="sweep-review-head"><div><b>REVIEW FINDINGS</b><span>{busesRead} bus{busesRead===1?"":"es"} read · {findings.length} finding{findings.length===1?"":"s"} · {approved.length} ready to file{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRead(false);setRows([]);setFindings([]);setOkAgainstBoard([]);setHeldPages([]);setError("")}}>CHANGE PHOTOS</button></div>
+     {heldPages.filter(item=>item.verdict==="not-a-sweep-sheet").map(item=><p className="sweep-error" role="alert" key={"held-"+item.page}>PAGE {item.page} IS NOT A FAREBOX OR VENTRA SHEET. It reads as another document — a Vehicle Down Sheet, most likely. Nothing from it is shown and nothing from it can be filed here. A down sheet goes through SCAN SHEET on the Down Sheet page.</p>)}
+     {heldPages.filter(item=>item.verdict==="unsure").map(item=><p className="sweep-warning" role="alert" key={"unsure-"+item.page}>PAGE {item.page} DOES NOT LOOK LIKE A SWEEP SHEET. Most of its rows could not be placed on the farebox or the Ventra sheet, so nothing from it is ticked. Tick a row only if you can see it on one of the two sheets.</p>)}
      {findings.length>0&&<div className="sweep-rows">{findings.map(finding=><article className={`sweep-row ${finding.fleetMatch}${finding.alreadyOpen?" already":""}`} key={finding.key}>
       <label className="sweep-select"><input type="checkbox" checked={finding.selected} disabled={finding.fleetMatch!=="matched"} onChange={event=>updateFinding(finding.key,{selected:event.target.checked})}/><span/></label>
       <div className="sweep-bus"><small>P{finding.pageNumber}{finding.initial?` · ${finding.initial}`:""}</small><b>{finding.busNumber||"NO BUS"}</b><em>{badge(finding)}</em></div>

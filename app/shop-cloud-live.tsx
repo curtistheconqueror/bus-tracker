@@ -91,7 +91,7 @@ export default function ShopCloudLive(){
      if(!got.ok)writeCloudState(localStorage,{...readCloudState(localStorage),phase:got.phase,lastError:got.message});
      return;
     }
-    const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet});
+    const applied=applyCloudPull(localStorage,{map:got.map,defects:got.defects,sheet:got.sheet,deleted:got.deleted});
     writeCloudState(localStorage,applied.ok
      ?{phase:"idle",lastSyncedAt:new Date().toISOString(),lastError:"",pending:0}
      :{...readCloudState(localStorage),phase:"error",lastError:applied.error});

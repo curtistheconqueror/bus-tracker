@@ -3371,7 +3371,9 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  /* MERGE DUPES moved here with its count on the button, and left the log. */
  assert.match(page,/MERGE DUPES\{duplicateCount\?" \("\+duplicateCount\+"\)":""\}/);
  assert.match(page,/const duplicateCount=useMemo\(\(\)=>mergeDuplicateDefects\(fleet,downEntries\)\.removed/);
- assert.equal(/merge-duplicates|mergeDuplicateDefects|readMergedAway/.test(logPage),false,"the button and the merge left the Defect Log");
+ /* The cloud ledger came back to the log later for a different job — taking a
+    scan sweep out — so it is the merge itself that must stay gone. */
+ assert.equal(/merge-duplicates|mergeDuplicateDefects/.test(logPage),false,"the button and the merge left the Defect Log");
  assert.equal(/merge-duplicates/.test(logCss),false,"and its styling with it");
  assert.match(logPage,/<button className="cleanup-log"[^>]*>CLEAN UP<\/button><button className="sweep-scan-button"/,"CLEAN UP and SCAN SWEEP are now neighbours");
 
@@ -7728,7 +7730,10 @@ test("a failed brake test takes the bus out of service, and MERGE DUPES cannot c
  assert.match(settingsPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
  assert.match(logPage, /const persist=\(nextFleet:DefectLogFleetBus\[\],nextDown:DefectLogDownEntry\[\],options:FleetWriteOptions=\{\}\)/);
  assert.match(logPage, /writeFleetStorageResult\(localStorage,nextFleet,options\)/);
- assert.equal(/allowBulkDefectLoss:true/.test(logPage), false, "nothing left on the Defect Log lifts the guard");
+ /* One thing on the Defect Log lifts the guard now: removeBatch, which takes a
+    whole scan sweep out after a person confirms it. Nothing else does. */
+ assert.equal((logPage.match(/allowBulkDefectLoss:true/g)||[]).length, 1, "exactly one write on the Defect Log lifts the guard");
+ assert.ok(logPage.indexOf("const removeBatch=")<logPage.indexOf("allowBulkDefectLoss:true")&&logPage.indexOf("allowBulkDefectLoss:true")<logPage.indexOf("const restoreBatch="),"and it is the scan-sweep removal");
  // The recovery snapshot is NOT skipped, so the pre-merge board stays restorable.
  assert.doesNotMatch(settingsPage, /allowBulkDefectLoss:true,\s*skipRecoverySnapshot/);
  // The tombstones are written only after the write landed, and undone with it.
@@ -8678,8 +8683,11 @@ test("live sync is a doorbell, not a delivery",async()=>{
  const liveSource=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
  assert.match(liveSource,/new StorageEvent\("storage"/);
  // A merge is never a reason to accept a write the bulk-loss guard refuses,
- // and live sync runs with nobody watching.
- assert.match(liveSource,/allowBulkDefectLoss:false/);
+ // and live sync runs with nobody watching. The one thing that lifts it is a
+ // tombstone — a person's confirmed removal on another device — and only when
+ // one actually applied.
+ assert.match(liveSource,/allowBulkDefectLoss:afterTombstones\.dropped\.length>0/);
+ assert.doesNotMatch(liveSource,/allowBulkDefectLoss:true/);
  assert.equal(typeof announceStoredChange,"function");
 });
 
@@ -8742,4 +8750,282 @@ test("the scan corrects what the camera misread, and never touches what it must 
  assert.match(route,/EVERY bus number written anywhere on the sheet MUST produce a row/);
  assert.match(route,/lineNumber set to "margin"/);
  assert.match(route,/a bus written in the margin and not read reaches nobody/);
+});
+
+test("a scan sweep filed in one press can be found by its stamp and taken back out",async()=>{
+ const {scanBatches,removeScanBatch,restoreScanBatch,touchedScanRecord,scanBatchUndoSnapshot,readScanBatchUndo,describeScanBatch,SCAN_BATCH_ID_PREFIX}=await import("../app/defect-log/scan-batches.ts");
+
+ /* Sep 6, 23:30 UTC: a Down Sheet photo went through SCAN SWEEP and 24 Tech
+    Services records landed on 23 buses in one press. fileSweep takes the clock
+    ONCE for the whole batch, so all 24 share a creation stamp to the
+    millisecond — and no honest record ever has that stamp. That is the
+    fingerprint; the id prefix is the second half of it. */
+ const STAMP="2026-09-06T23:30:14.612Z";
+ const sweep=(bus,source,extra={})=>({id:SCAN_BATCH_ID_PREFIX+bus+"-"+source+"-"+Math.floor(Math.random()*1e13)+"-abc",category:"Tech Services",issue:"Farebox - No power",details:"Sweep sheet p1 · checked by EJ",operability:"service",state:"open",createdAt:STAMP,updatedAt:STAMP,source:"defect-log",reportedBy:"EJ",...extra});
+ const real=(id,extra={})=>({id,category:"Brakes",issue:"Air leak",details:"",operability:"down",state:"open",createdAt:"2026-09-06T23:30:14.612Z",source:"defect-log",...extra});
+ const fleet=[
+  {id:"a",n:"17510",defects:[real("hand-1"),sweep("17510","power")],pendingRepair:""},
+  {id:"b",n:"17512",defects:[sweep("17512","coin"),sweep("17512","bills")],pendingRepair:""},
+  /* Somebody already worked on this one since — it is real to them, it stays. */
+  {id:"c",n:"17520",defects:[sweep("17520","power",{state:"in-progress"})],pendingRepair:""},
+  {id:"d",n:"17530",defects:[sweep("17530","power",{shopNotes:"checked, farebox is dead"})],pendingRepair:""},
+  /* An older, genuine sweep from another day. */
+  {id:"e",n:"17540",defects:[sweep("17540","dt",{createdAt:"2026-08-29T21:00:00.000Z",reportedBy:"BB"})],pendingRepair:""},
+ ];
+ const batches=scanBatches(fleet);
+ assert.equal(batches.length,2,"two presses of FILE APPROVED, two batches");
+ assert.equal(batches[0].key,STAMP,"newest first");
+ assert.equal(batches[0].ids.length,5);
+ assert.deepEqual(batches[0].busNumbers,["17510","17512","17520","17530"]);
+ assert.deepEqual(batches[0].checkedBy,["EJ"]);
+ assert.equal(batches[0].removableIds.length,3,"only the untouched three go");
+ assert.equal(batches[0].keptIds.length,2,"the one in progress and the one with notes stay");
+ assert.match(describeScanBatch(batches[0],()=>"Sep 6, 6:30 PM"),/^5 records on 4 buses · Sep 6, 6:30 PM · checked by EJ · 2 worked on since, kept$/);
+ // A hand-typed record with the same stamp is not a sweep record: the prefix is half the fingerprint.
+ assert.ok(!batches[0].ids.includes("hand-1"));
+
+ assert.equal(touchedScanRecord(sweep("x","dt")),false);
+ for(const touched of [{state:"deferred"},{state:"completed"},{workStates:{testDriven:{at:"2026-09-07T00:00:00Z",initials:"CM"}}},{actionTaken:"replaced"},{partsUsed:true},{finding:"loose plug"}])
+  assert.equal(touchedScanRecord(sweep("x","dt",touched)),true,JSON.stringify(touched)+" is somebody's work");
+
+ const removed=removeScanBatch(fleet,STAMP,"2026-09-07T01:00:00.000Z");
+ assert.equal(removed.removed.length,3);
+ assert.equal(removed.kept,2);
+ assert.deepEqual(removed.fleet[0].defects.map(d=>d.id),["hand-1"],"the real record on 17510 is untouched");
+ assert.equal(removed.fleet[1].defects.length,0);
+ assert.equal(removed.fleet[2].defects.length,1,"in progress stays");
+ assert.equal(removed.fleet[3].defects.length,1,"written on stays");
+ assert.equal(removed.fleet[4].defects.length,1,"the other day's sweep is a different batch");
+ assert.equal(removed.fleet[1].pendingRepair,"","the summary line is rebuilt from what is left");
+ assert.strictEqual(removed.fleet[4],fleet[4],"a bus with nothing to remove is the same object");
+
+ /* The way back survives a reload and works from another page: it is written
+    down, read back, and the records return stamped as new work. */
+ const snapshot=readScanBatchUndo(JSON.stringify(scanBatchUndoSnapshot(removed.removed,"Removed 3 scan sweep records","2026-09-07T01:00:00.000Z")));
+ assert.equal(snapshot.records.length,3);
+ assert.equal(readScanBatchUndo(null),null);
+ assert.equal(readScanBatchUndo("{\"version\":1,\"records\":[]}"),null,"an empty snapshot is no snapshot");
+ const later=removed.fleet.filter(bus=>bus.id!=="b"); // 17512 left the device meanwhile
+ const restored=restoreScanBatch(later,snapshot,"2026-09-07T02:00:00.000Z");
+ assert.equal(restored.restored,1);
+ assert.equal(restored.missing,2,"records whose bus is gone are counted, not invented a home");
+ const back=restored.fleet[0].defects.find(d=>d.id!=="hand-1");
+ assert.equal(back.createdAt,STAMP,"it is the same record");
+ assert.equal(back.updatedAt,"2026-09-07T02:00:00.000Z","stamped newer than the tombstone the removal sent, so the cloud takes it back");
+ // Putting back twice does not double anything.
+ assert.equal(restoreScanBatch(restored.fleet,snapshot,"2026-09-07T03:00:00.000Z").restored,0);
+});
+
+test("the operator reads 'remove the last scan sweep' as the batch it is",async()=>{
+ const STAMP="2026-09-06T23:30:14.612Z";
+ const sweep=(bus,n)=>({id:"sweep-"+bus+"-power-"+n+"-abc",category:"Tech Services",issue:"Farebox - No power",details:"",operability:"service",state:"open",createdAt:STAMP,source:"defect-log",reportedBy:"EJ"});
+ const fleet=[];
+ for(let i=0;i<23;i++)fleet.push({id:"b"+i,n:String(17500+i),s:"service",l:"road-"+i,down:false,pendingRepair:"",defects:[sweep(17500+i,i)]});
+ fleet[0].defects.push({...sweep(17500,99),id:"sweep-17500-coin-99-zzz"}); // 24 records, 23 buses — the real Sep 6 shape
+ const areas=[{name:"IN SERVICE / ON ROAD",slots:fleet.map(bus=>bus.l)}];
+
+ // The exact wording from the chat, and the count is checked against the batch.
+ const exact=planOperatorCommand("Remove the most recent 24 entries from the Defect log",fleet,areas);
+ assert.equal(exact.kind,"plan");
+ assert.equal(exact.plan.kind,"removeScanBatch");
+ assert.equal(exact.plan.requiresConfirmation,true);
+ assert.equal(exact.plan.batchKey,STAMP);
+ assert.equal(exact.plan.count,24);
+ assert.equal(exact.plan.busCount,23);
+ assert.match(exact.plan.summary,/Remove the 24 Tech Services records SCAN SWEEP filed at .* from 23 buses/);
+ assert.match(exact.plan.summary,/shop cloud is told/);
+
+ // No count, but the scan is named.
+ for(const wording of ["Undo the last scan sweep","take the last sweep out of the defect log","delete the sweep that was scanned by mistake","undo the sweep import"]){
+  const plan=planOperatorCommand(wording,fleet,areas);
+  assert.equal(plan.kind,"plan",wording);
+  assert.equal(plan.plan.kind,"removeScanBatch",wording);
+ }
+ // A wrong count is corrected, never silently rounded to the batch.
+ const wrong=planOperatorCommand("Remove the last 20 entries from the defect log",fleet,areas);
+ assert.equal(wrong.kind,"message");
+ assert.match(wrong.message,/filed 24 records, not 20/);
+ // "Undo the most recent change" names no sweep and no count: that is the log's
+ // own UNDO LAST, and the operator says so — and says what it CAN do.
+ const vague=planOperatorCommand("Undo most recent change to defect log",fleet,areas);
+ assert.equal(vague.kind,"message");
+ assert.match(vague.message,/UNDO LAST/);
+ assert.match(vague.message,/24 records on 23 buses/);
+ // Putting it back.
+ for(const wording of ["Put the scan sweep back","restore the last removed sweep","undo the removal of the sweep","bring the sweep back into the defect log"]){
+  const plan=planOperatorCommand(wording,fleet,areas);
+  assert.equal(plan.kind,"plan",wording);
+  assert.equal(plan.plan.kind,"restoreScanBatch",wording);
+ }
+ // A bus named is a bus command, not a batch command — it falls through to the
+ // per-bus paths, which have never removed a record and still do not.
+ const perBus=planOperatorCommand("Remove bus 24 from the defect log",fleet,areas);
+ assert.notEqual(perBus.kind==="plan"&&perBus.plan.kind,"removeScanBatch");
+ const fiveDigit=planOperatorCommand("remove 17505 from the defect log",fleet,areas);
+ assert.notEqual(fiveDigit.kind==="plan"&&fiveDigit.plan.kind,"removeScanBatch");
+ // Nothing to remove, said plainly.
+ const none=planOperatorCommand("Undo the last scan sweep",[{id:"a",n:"17525",s:"service",l:"road-0",down:false,pendingRepair:"",defects:[]}],areas);
+ assert.equal(none.kind,"message");
+ assert.match(none.message,/no scan sweep/);
+ // Every record already worked on: nothing untouched to take out.
+ const worked=fleet.map(bus=>({...bus,defects:bus.defects.map(d=>({...d,state:"in-progress"}))}));
+ const nothing=planOperatorCommand("Undo the last scan sweep",worked,areas);
+ assert.equal(nothing.kind,"message");
+ assert.match(nothing.message,/worked on since/);
+ // The older move and status paths are untouched by the new branch.
+ assert.equal(planOperatorCommand("Move bus 05 to CNG East",fleet,[{name:"CNG EAST LOT",slots:["east-1"]}]).plan?.kind,"move");
+});
+
+test("a scan sweep removed on one device reaches the others, and so does putting it back",async()=>{
+ const {dropTombstonedDefects,applyCloudPull}=await import("../app/cloud-live.ts");
+ const {readTombstones}=await import("../app/cloud-client.ts");
+ const {serializeFleetPayload,FLEET_STORAGE_KEY}=await import("../app/storage.ts");
+ const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Ipad"});
+
+ /* The row a live record sends now says deleted_at:null out loud. Before, a
+    record put back after a removal was upserted without the column, so the
+    tombstone stood and every device's pull went on filtering it out — the
+    restore looked done on the device that made it and reached nobody. */
+ const row=defectRow({id:"sweep-1",category:"Tech Services",issue:"Farebox - No power",details:"",state:"open",operability:"service",createdAt:"2026-09-06T23:30:14.612Z",updatedAt:"2026-09-07T02:00:00.000Z"},"17510",config,"2026-09-07T02:00:00.000Z");
+ assert.strictEqual(row.deleted_at,null);
+ assert.equal(row.updated_at,"2026-09-07T02:00:00.000Z");
+
+ /* A pull returns live rows only and the merge keeps whatever the receiver
+    alone holds, so the iPad's 24 copies would have stayed on the iPad forever.
+    Tombstones now come down as ids, and a copy older than its tombstone goes. */
+ const STAMP="2026-09-06T23:30:14.612Z";
+ const buses=[
+  {id:"a",n:"17510",defects:[{id:"hand-1",createdAt:STAMP},{id:"sweep-1",createdAt:STAMP}]},
+  /* Edited on this device AFTER the other device removed it: real work, kept,
+     and its next push undeletes the row. */
+  {id:"b",n:"17512",defects:[{id:"sweep-2",createdAt:STAMP,updatedAt:"2026-09-07T03:00:00.000Z"}]},
+  {id:"c",n:"17520",defects:[]},
+ ];
+ const deleted={"sweep-1":"2026-09-07T01:00:00.000Z","sweep-2":"2026-09-07T01:00:00.000Z","never-here":"2026-09-07T01:00:00.000Z"};
+ const dropped=dropTombstonedDefects(buses,deleted);
+ assert.deepEqual(dropped.dropped,["sweep-1"]);
+ assert.deepEqual(dropped.buses[0].defects.map(d=>d.id),["hand-1"]);
+ assert.equal(dropped.buses[1].defects.length,1,"work done after the removal wins");
+ assert.strictEqual(dropped.buses[2],buses[2],"an untouched bus is the same object");
+ assert.strictEqual(dropTombstonedDefects(buses,{}).buses,buses,"no tombstones, no work");
+
+ /* Through the real merge path, against real storage, with the bulk-loss
+    guard that would otherwise refuse 24 records leaving. */
+ const many=[];for(let i=0;i<24;i++)many.push({id:"sweep-"+i,category:"Tech Services",issue:"Farebox - No power",details:"",operability:"service",state:"open",createdAt:STAMP,source:"defect-log"});
+ const storage=memoryStorage({[FLEET_STORAGE_KEY]:serializeFleetPayload([{id:"a",n:"17510",s:"service",l:"road-0",defects:[{id:"hand-1",category:"Brakes",issue:"Air leak",details:"",operability:"down",state:"open"},...many],pendingRepair:""}])});
+ const tomb=Object.fromEntries(many.map(d=>[d.id,"2026-09-07T01:00:00.000Z"]));
+ const announced=[];
+ const applied=applyCloudPull(storage,{map:fleetMapPayload([],"2026-09-07T02:00:00.000Z"),defects:defectLogPayload([],"2026-09-07T02:00:00.000Z"),sheet:downSheetPayload([],"2026-09-07T02:00:00.000Z"),deleted:tomb},(key,value)=>announced.push([key,Boolean(value)]));
+ assert.equal(applied.ok,true,applied.error);
+ assert.equal(applied.dropped,24);
+ const after=readFleetPayload(storage.value(FLEET_STORAGE_KEY));
+ assert.deepEqual(after.buses[0].defects.map(d=>d.id),["hand-1"],"the 24 are gone and the real record is not");
+ assert.ok(storage.value("pace-board-recovery-v1"),"the recovery snapshot was taken first — RESTORE LAST GOOD COPY stands behind this");
+ assert.ok(announced.some(([key])=>key===FLEET_STORAGE_KEY),"the page in front of the user hears about it");
+ // With nothing tombstoned, the guard is exactly as it was: still on.
+ const live=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ assert.match(live,/allowBulkDefectLoss:afterTombstones\.dropped\.length>0/);
+
+ /* The tombstones are read as two columns, paged like everything else, and
+    ride on the same pull. */
+ const calls=[];
+ const fake={from(table){return {select(columns){return {not(column,op,value){calls.push([table,columns,column,op,value]);return {range:async(from,_to)=>({data:from===0?[{defect_id:"sweep-1",deleted_at:"2026-09-07T01:00:00.000Z"},{defect_id:"",deleted_at:"x"}]:[],error:null})}}}}}}};
+ const read=await readTombstones(fake,"bus_defects","defect_id");
+ assert.deepEqual(read.deleted,{"sweep-1":"2026-09-07T01:00:00.000Z"});
+ assert.deepEqual(calls,[["bus_defects","defect_id,deleted_at","deleted_at","is",null]]);
+ const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ assert.match(client,/readTombstones\(supabase,"bus_defects","defect_id"\)/);
+ assert.match(client,/deleted:deletedRes\.deleted/);
+ // Both callers hand the tombstones on; a pull that read them and dropped them would change nothing.
+ for(const file of ["../app/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"])
+  assert.match(await readFile(new URL(file,import.meta.url),"utf8"),/applyCloudPull\(localStorage,\{[^}]*deleted:(?:got|result)\.deleted\}\)/,file);
+});
+
+test("SCAN BATCHES on the Defect Log, and the operator on the map, remove a sweep the same way",async()=>{
+ const [logPage,mapPage,panel,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/scan-batches-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ // The door is beside SCAN SWEEP, which is where the mistake was made.
+ assert.match(logPage,/className="sweep-scan-button"[\s\S]{0,400}className="scan-batches-button"[^>]*onClick=\{\(\)=>setBatchesOpen\(true\)\}[^>]*>↶ SCAN BATCHES</);
+ assert.match(logPage,/<ScanBatchesPanel batches=\{batches\} undo=\{batchUndo\} onRemove=\{removeBatch\} onRestore=\{restoreBatch\}/);
+ assert.match(panel,/REMOVE \{batch\.removableIds\.length\}/);
+ assert.match(panel,/disabled=\{!batch\.removableIds\.length\}/,"a sweep every record of which has been worked on cannot be removed");
+ assert.match(panel,/PUT BACK/);
+ assert.match(css,/\.scan-batches-button\{/);
+ assert.match(css,/\.scan-batch-row\{/);
+
+ /* The three writes, in order: the board with the guard lifted for this one
+    confirmed write, then the way back, then the ledger that makes the removal
+    travel — nothing after a refused write. */
+ const remove=logPage.slice(logPage.indexOf("const removeBatch="),logPage.indexOf("const restoreBatch="));
+ assert.match(remove,/if\(!confirm\(/);
+ assert.match(remove,/const written=persist\(result\.fleet,downEntries,\{allowBulkDefectLoss:true\}\);\s*if\(!written\.ok\)return;/);
+ assert.ok(remove.indexOf("persist(")<remove.indexOf("SCAN_BATCH_UNDO_KEY")&&remove.indexOf("SCAN_BATCH_UNDO_KEY")<remove.indexOf("writeMergedAway("),"board, then the way back, then the ledger");
+ assert.match(remove,/writeMergedAway\(localStorage,\{\.\.\.readMergedAway\(localStorage\),\.\.\.Object\.fromEntries\(result\.removed\.map\(record=>\[record\.defect\.id,now\]\)\)\}\)/);
+ assert.match(remove,/setUndoSnapshot\(\{fleet,downEntries,label,scanBatch:true\}\)/);
+ // Putting back restamps, forgets the ids in the ledger, and clears the snapshot.
+ const restore=logPage.slice(logPage.indexOf("const restoreBatch="),logPage.indexOf("const undoLastChange="));
+ assert.match(restore,/restoreScanBatch\(fleet,snapshot,now\)/);
+ assert.match(restore,/for\(const id of result\.restoredIds\)delete ledger\[id\];writeMergedAway\(localStorage,ledger\)/);
+ assert.match(restore,/localStorage\.removeItem\(SCAN_BATCH_UNDO_KEY\)/);
+ // UNDO LAST after a removal hands over to the same path rather than laying the old fleet back with stale stamps.
+ assert.match(logPage,/if\(undoSnapshot\.scanBatch\)\{restoreBatch\(\);return\}/);
+ // The snapshot is read from the device, so PUT BACK works after a reload and after the operator's removal.
+ assert.match(logPage,/setBatchUndo\(readScanBatchUndo\(localStorage\.getItem\(SCAN_BATCH_UNDO_KEY\)\)\)/);
+ assert.match(logPage,/if\(event\.key===SCAN_BATCH_UNDO_KEY\)setBatchUndo\(readScanBatchUndo\(event\.newValue\)\)/);
+
+ /* The map's operator: the batch is found again at apply time, the board is
+    written with the guard lifted BEFORE state changes — the save effect writes
+    with the guard on and would refuse 24 leaving — and the same ledger write. */
+ const executor=mapPage.slice(mapPage.indexOf('if(plan.kind==="removeScanBatch")'),mapPage.indexOf('if(plan.kind==="undoDownSheetClear")'));
+ assert.match(executor,/scanBatches\(buses\)\.find\(item=>item\.key===plan\.batchKey\)/);
+ assert.match(executor,/batch\.ids\.length!==plan\.count\)return \{ok:false/);
+ assert.match(executor,/writeFleetStorageResult\(localStorage,result\.fleet,\{allowBulkDefectLoss:true\}\)/);
+ assert.ok(executor.indexOf("writeFleetStorageResult(")<executor.indexOf("setBuses(result.fleet"),"storage first, then state");
+ assert.match(executor,/writeSetting\(localStorage,SCAN_BATCH_UNDO_KEY/);
+ assert.match(executor,/writeMergedAway\(localStorage,\{\.\.\.readMergedAway\(localStorage\),\.\.\.Object\.fromEntries\(result\.removed\.map\(record=>\[record\.defect\.id,now\]\)\)\}\)/);
+ assert.match(executor,/if\(plan\.kind==="restoreScanBatch"\)/);
+ assert.match(executor,/for\(const id of result\.restoredIds\)delete ledger\[id\];writeMergedAway\(localStorage,ledger\)/);
+});
+
+test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
+ const {sweepPageVerdict,normalizeSweepDocument,normalizeSweepRow}=await import("../app/defect-log/sweep-scan-import.ts");
+ const row=(sheet)=>normalizeSweepRow({pageNumber:1,sheet,busNumber:"17510",dt:"blank",mv:"blank",power:"fault",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""});
+ assert.equal(normalizeSweepDocument("farebox"),"farebox");
+ assert.equal(normalizeSweepDocument(" OTHER "),"other");
+ assert.equal(normalizeSweepDocument(undefined),"unknown","an old route, or a model that did not answer");
+ assert.equal(normalizeSweepDocument("down sheet"),"unknown");
+
+ // The model's own word that the page is something else: nothing from it files.
+ assert.equal(sweepPageVerdict("other",[row("farebox"),row("farebox")]),"not-a-sweep-sheet");
+ // Rows it could not place on either sheet are rows read off something that has neither.
+ assert.equal(sweepPageVerdict("farebox",[row("unknown"),row("unknown"),row("farebox")]),"unsure");
+ assert.equal(sweepPageVerdict("farebox",[row("unknown"),row("farebox"),row("farebox")]),"sweep","one stray row is a stray row");
+ assert.equal(sweepPageVerdict("unknown",[row("farebox")]),"unsure");
+ assert.equal(sweepPageVerdict("mixed",[row("ventra"),row("farebox")]),"sweep");
+ assert.equal(sweepPageVerdict("farebox",[]),"sweep");
+
+ const [route,scanner,css]=await Promise.all([
+  readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ // The route asks what the page IS before what is on it, and the answer is in the schema, not prose.
+ assert.match(route,/NOT A SWEEP SHEET — first decide what the page IS/);
+ assert.match(route,/A Vehicle Down Sheet \(a numbered list of buses with a reason and a mechanic per line\)[^.]*is "other"/);
+ assert.match(route,/For a page that is "other", return NO rows at all/);
+ assert.match(route,/document:\{type:"string",enum:\["ventra","farebox","mixed","other"\]\}/);
+ assert.match(route,/required:\["document","rows"\]/);
+ assert.match(route,/document:typeof parsed\.document==="string"\?parsed\.document:"unknown"/);
+ // The scanner drops a refused page's rows before a tick box ever appears beside them, and unticks an unsure page.
+ assert.match(scanner,/const verdict=sweepPageVerdict\(normalizeSweepDocument\(payload\.document\),pageRows\)/);
+ assert.match(scanner,/if\(verdict!=="not-a-sweep-sheet"\)scanned\.push\(\.\.\.pageRows\)/);
+ assert.match(scanner,/unsure\.has\(finding\.pageNumber\)\?\{\.\.\.finding,selected:false\}:finding/);
+ assert.match(scanner,/IS NOT A FAREBOX OR VENTRA SHEET/);
+ assert.match(scanner,/A down sheet goes through SCAN SHEET on the Down Sheet page/);
+ assert.match(scanner,/DOES NOT LOOK LIKE A SWEEP SHEET/);
+ assert.match(css,/\.sweep-warning\{/);
 });

@@ -46,11 +46,13 @@ type SupabaseLike={
  from(table:string):{
   upsert(rows:CloudRow[],options:{onConflict:string}):Promise<{error:{message:string}|null}>;
   update(patch:CloudRow):{eq(column:string,value:string):Promise<{error:{message:string}|null}>};
-  select(columns:string):{is(column:string,value:null):{
-   range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>;
-  }};
+  select(columns:string):{
+   is(column:string,value:null):Paged;
+   not(column:string,operator:"is",value:null):Paged;
+  };
  };
 };
+type Paged={range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>};
 
 /* PostgREST caps how many rows one request may return, and the cap is silent:
    the response looks complete. This fleet is around four hundred buses and a
@@ -67,6 +69,28 @@ async function readAll(supabase:SupabaseLike,table:string){
   const page=data||[];
   rows.push(...page);
   if(page.length<PAGE)return {rows,error:null};
+ }
+}
+
+/* The records the shop has removed, as id and when.
+
+   Only the two columns: nothing else about a deleted record is wanted, and a
+   deleted record's fields must never be merged back onto a bus. Read so that a
+   removal made on one device reaches the others — a pull of live rows alone
+   tells a device nothing about a record it still holds and the server no longer
+   lists, and the merge keeps whatever only the receiver has, so the record would
+   sit on that device forever. */
+export async function readTombstones(supabase:SupabaseLike,table:string,key:string){
+ const deleted:Record<string,string>={};
+ for(let from=0;;from+=PAGE){
+  const {data,error}=await supabase.from(table).select(key+",deleted_at").not("deleted_at","is",null).range(from,from+PAGE-1);
+  if(error)return {deleted:{},error};
+  const page=data||[];
+  for(const row of page){
+   const id=String(row[key]??""),at=String(row.deleted_at??"");
+   if(id&&at)deleted[id]=at;
+  }
+  if(page.length<PAGE)return {deleted,error:null};
  }
 }
 
@@ -281,21 +305,25 @@ export type PullResult=CloudOutcome&{
  map:ReturnType<typeof fleetMapPayload>|null;
  defects:ReturnType<typeof defectLogPayload>|null;
  sheet:ReturnType<typeof downSheetPayload>|null;
+ /* Defect ids the shop has removed, with when. Applied by applyCloudPull. */
+ deleted:Record<string,string>;
 };
 
 /* Everything not tombstoned, handed back in the same shape a transfer FILE has
-   so the caller can use the merge rules that already shipped. */
+   so the caller can use the merge rules that already shipped — plus the
+   tombstones themselves, as ids only, so a removal travels. */
 export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={}):Promise<PullResult>{
- const empty={map:null,defects:null,sheet:null};
+ const empty={map:null,defects:null,sheet:null,deleted:{}};
  try{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",...empty};
-  const [busRes,defectRes,entryRes]=await Promise.all([
+  const [busRes,defectRes,entryRes,deletedRes]=await Promise.all([
    readAll(supabase,"buses"),
    readAll(supabase,"bus_defects"),
    readAll(supabase,"down_sheet_entries"),
+   readTombstones(supabase,"bus_defects","defect_id"),
   ]);
-  const firstError=busRes.error||defectRes.error||entryRes.error;
+  const firstError=busRes.error||defectRes.error||entryRes.error||deletedRes.error;
   if(firstError)return {...failed(new Error(firstError.message)),...empty};
   return {
    ok:true,phase:"idle",message:"",
@@ -306,6 +334,7 @@ export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayD
       here and undo the merge. */
    defects:withoutMergedAway(defectLogPayload(defectRes.rows,now),merged),
    sheet:downSheetPayload(entryRes.rows,now),
+   deleted:deletedRes.deleted,
   };
  }catch(error){return {...failed(error),...empty}}
 }

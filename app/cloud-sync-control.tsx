@@ -169,7 +169,7 @@ export default function CloudSyncControl(){
      background cannot drift apart. Every abandoned path below puts the phase
      back: returning while it still says "syncing" leaves that written to
      storage, and the status line then reads "Syncing…" forever. */
-  const applied=applyCloudPull(localStorage,{map:result.map,defects:result.defects,sheet:result.sheet});
+  const applied=applyCloudPull(localStorage,{map:result.map,defects:result.defects,sheet:result.sheet,deleted:result.deleted});
   if(!applied.ok){
    remember({...state,phase:"error",lastError:applied.error});
    alert(applied.error+", so nothing changed on this device.");

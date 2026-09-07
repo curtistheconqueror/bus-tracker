@@ -275,6 +275,14 @@ export function defectRow(defect:StructuredDefect,fleetNumber:string,config:Clou
   completed_at:clean(defect.completedAt)||null,
   completed_by:clean(defect.completedBy),
   detail,
+  /* A record a device still carries is, by that fact, not deleted. Sent
+     explicitly, so a record put back after a removal clears the tombstone the
+     removal sent — the upsert writes only the columns it names, and a row that
+     said nothing about deleted_at left the deletion standing while every
+     device's pull went on filtering the record out. The database still keeps
+     the newest write, so a stale copy cannot undelete a record that was
+     removed after it was last touched: it loses on updated_at first. */
+  deleted_at:null,
   updated_at:clean(defect.updatedAt)||clean(defect.createdAt)||now,
   ...signature(config),
  };

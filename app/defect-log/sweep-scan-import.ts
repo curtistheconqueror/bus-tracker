@@ -78,6 +78,44 @@ export const SWEEP_COLUMN_LABEL:Record<SweepColumn,string>={dt:"DT",mv:"MV",powe
 const MARKS=new Set<SweepMark>(["ok","fault","blank","unclear"]);
 const SHEETS=new Set<SweepSheet>(["ventra","farebox","unknown"]);
 
+/* What kind of paper a page turned out to be.
+
+   On Sep 6 a photo of the Vehicle Down Sheet went through this scanner instead
+   of the Down Sheet's, and the model — asked only "which buses have marks" —
+   dutifully found 24 bus numbers on it and called every one a fault. They were
+   filed. A scanner that reads any document as the one it expects cannot be
+   trusted with a FILE button, so the route now asks the model to say what the
+   page is before it says what is on it, and this is where that answer is
+   turned into a decision. */
+export type SweepDocument="ventra"|"farebox"|"mixed"|"other"|"unknown";
+const DOCUMENTS=new Set<SweepDocument>(["ventra","farebox","mixed","other","unknown"]);
+
+export function normalizeSweepDocument(raw:unknown):SweepDocument{
+ const text=typeof raw==="string"?raw.trim().toLowerCase():"";
+ return DOCUMENTS.has(text as SweepDocument)?text as SweepDocument:"unknown";
+}
+
+export type SweepPageVerdict="sweep"|"not-a-sweep-sheet"|"unsure";
+
+/* Two signals, either enough on its own to hold a page back.
+
+   "not-a-sweep-sheet" is the model's own word that the page is something else,
+   and nothing from such a page may be filed — its rows are dropped before a
+   reviewer ever sees a tick box beside them.
+
+   "unsure" is weaker: the model did not say, or could not place most of the
+   rows on either sheet. A row the model cannot assign to the Ventra or the
+   farebox sheet is a row it read off something that has neither, and when
+   that is most of the page the page is suspect. Those rows are shown but
+   arrive unticked, so filing them takes a deliberate tick each. */
+export function sweepPageVerdict(document:SweepDocument,rows:ScannedSweepRow[]):SweepPageVerdict{
+ if(document==="other")return "not-a-sweep-sheet";
+ if(document==="unknown")return "unsure";
+ const unplaced=rows.filter(row=>row.sheet==="unknown").length;
+ if(rows.length&&unplaced*2>rows.length)return "unsure";
+ return "sweep";
+}
+
 function clean(value:unknown){return typeof value==="string"?value.trim():""}
 function busDigits(value:unknown){return clean(value).replace(/\D/g,"").slice(0,5)}
 function mark(value:unknown):SweepMark{const text=clean(value).toLowerCase();return MARKS.has(text as SweepMark)?text as SweepMark:"blank"}

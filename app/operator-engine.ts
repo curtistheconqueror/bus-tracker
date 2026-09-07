@@ -2,6 +2,7 @@ import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver.ts";
 import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "./repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "./fleet-intelligence.ts";
 import type {FleetStatus} from "./smart-status.ts";
+import {describeScanBatch,scanBatches,type ScanBatch} from "./defect-log/scan-batches.ts";
 
 export type OperatorBus=FleetInsightBus;
 
@@ -21,6 +22,8 @@ export type OperatorPlan=
  | {kind:"downsheet";requiresConfirmation:true;busId:string;busNumber:string;selected:boolean;summary:string}
  | {kind:"clearDownSheet";requiresConfirmation:true;summary:string}
  | {kind:"undoDownSheetClear";requiresConfirmation:true;summary:string}
+ | {kind:"removeScanBatch";requiresConfirmation:true;batchKey:string;count:number;busCount:number;summary:string}
+ | {kind:"restoreScanBatch";requiresConfirmation:true;summary:string}
  | {kind:"defect";requiresConfirmation:true;busId:string;busNumber:string;defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler";summary:string};
 
 export type OperatorPlanningResult=
@@ -120,6 +123,63 @@ function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngin
 
 function areaLabel(bus:OperatorBus,areas:OperatorArea[]){return areas.find(area=>area.slots.includes(bus.l))?.name||"an unassigned or overflow location"}
 
+/* "Remove the most recent 24 entries from the defect log." "Undo the last scan
+   sweep." "Put the sweep back."
+
+   What these have in common is a whole batch, not a bus, and the operator has
+   no way to act on one record of the log from the map. What it can act on is
+   the thing that actually went wrong: a scan filed in one press, which the log
+   can find exactly by the stamp every record in it shares. So the command is
+   read as being about a batch, and the answer names the batch — how many
+   records, on how many buses, filed when — before anything is confirmed.
+
+   A number in the command is checked, never assumed. "The most recent 24" when
+   the last sweep filed 24 is that sweep; when it filed 19, the operator says so
+   rather than removing 19 and calling it 24. A command naming a bus is not a
+   batch command at all and falls through to the per-bus paths. */
+type ScanBatchIntent={action:"remove"|"restore";count:number|null;namesScan:boolean};
+
+function scanBatchCommand(text:string):ScanBatchIntent|null{
+ if(/\bbus(?:es)?\s*(?:number|no|#)?\s*\d/.test(text)||/\b\d{5}\b/.test(text))return null;
+ const namesScan=/\b(?:scan|sweep|swept|scanned|photo|import(?:ed)?)\b/.test(text);
+ const namesLog=/\bdefects?\s+log\b|\blog\b/.test(text);
+ if(!namesScan&&!namesLog)return null;
+ const restore=/\b(?:restore|reinstate|unremove)\b|\b(?:put|bring)\b.*\bback\b|\bundo\b.*\b(?:removal|remove|removed|delete|deleted|deletion)\b/.test(text);
+ const remove=/\b(?:remove|delete|undo|reverse|revert|get\s+rid\s+of|roll\s*back|back\s+out)\b|\btake\b.*\b(?:out|off|back)\b/.test(text);
+ if(!restore&&!remove)return null;
+ const counted=text.match(/\b(?:last|most\s+recent|latest|recent|newest)\s+(\d+)\b/)||text.match(/\b(\d+)\s+(?:entries|entry|records?|defects?|rows?|findings?|items?)\b/);
+ const count=counted?parseInt(counted[1],10):null;
+ /* Without a count and without a scan word, "undo the last change to the log"
+    is not a batch — the log's own UNDO LAST is that, and the operator says so. */
+ if(!restore&&!namesScan&&count===null)return {action:"remove",count:null,namesScan:false};
+ return {action:restore?"restore":"remove",count,namesScan};
+}
+
+function batchLine(batch:ScanBatch){return describeScanBatch(batch)}
+
+function planScanBatch(intent:ScanBatchIntent,fleet:OperatorBus[]):OperatorPlanningResult{
+ if(intent.action==="restore")return {kind:"plan",plan:{kind:"restoreScanBatch",requiresConfirmation:true,summary:"Put back the last scan sweep removed on this device — every record goes back on its bus, stamped as new work so the shop cloud accepts it over the deletion"}};
+ const batches=scanBatches(fleet);
+ const newest=batches[0];
+ if(!newest)return {kind:"message",message:"There is no scan sweep on this device's Defect Log to take out. Every record filed by SCAN SWEEP in one press shares one time stamp, and none of the records here carry one."};
+ if(!intent.namesScan&&intent.count===null)return {kind:"message",message:"The Defect Log's own UNDO LAST button reverses its most recent save. From here I can take out a whole scan sweep: the most recent one filed "+batchLine(newest)+". Say “remove the last scan sweep from the defect log” and I will preview exactly that."};
+ if(intent.count!==null&&intent.count!==newest.ids.length){
+  const match=batches.find(batch=>batch.ids.length===intent.count);
+  if(match)return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+". A sweep of "+intent.count+" was filed earlier: "+batchLine(match)+". Say “remove the scan sweep from "+describeWhen(match.filedAt)+"”, or “remove the last scan sweep” for the most recent one."};
+  return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+" — "+batchLine(newest)+". Say “remove the last scan sweep” to take out those "+newest.ids.length+", or open SCAN BATCHES on the Defect Log to see every sweep."};
+ }
+ if(!newest.removableIds.length)return {kind:"message",message:"Every record in the most recent scan sweep ("+batchLine(newest)+") has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to take out. Nothing was changed."};
+ const kept=newest.keptIds.length;
+ return {kind:"plan",plan:{kind:"removeScanBatch",requiresConfirmation:true,batchKey:newest.key,count:newest.ids.length,busCount:newest.busNumbers.length,
+  summary:"Remove the "+newest.removableIds.length+" Tech Services record"+(newest.removableIds.length===1?"":"s")+" SCAN SWEEP filed at "+describeWhen(newest.filedAt)+" from "+newest.busNumbers.length+" bus"+(newest.busNumbers.length===1?"":"es")+" ("+newest.busNumbers.slice(0,6).join(", ")+(newest.busNumbers.length>6?", …":"")+")."+(kept?" "+kept+" record"+(kept===1?"":"s")+" from that sweep "+(kept===1?"has":"have")+" been worked on since and will be kept.":"")+" The shop cloud is told, so the other devices drop them too. The way back is SCAN BATCHES on the Defect Log, or tell me to put the sweep back."}};
+}
+
+function describeWhen(iso:string){
+ const date=new Date(iso);
+ if(Number.isNaN(date.getTime()))return iso;
+ return date.toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+}
+
 export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:OperatorArea[],context:OperatorSelectionContext|null=null,now=Date.now()):OperatorPlanningResult{
  const text=normalized(command);
  if(!text)return {kind:"message",message:"Type a command, such as “Locate bus 25” or “Move bus 17525 to CNG East.”"};
@@ -136,6 +196,11 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
 
  const areaMentions=findOperatorAreaMentions(command,areas),baseMoveAction=/\b(move|relocate|place|send|put|transfer|shift|bring|return|move back|put back)\b/.test(text),moveAction=baseMoveAction||(/\badd\b/.test(text)&&areaMentions.length>0),statusAction=/\b(mark|set|update|change)\b/.test(text)&&/\b(status|blue|green|yellow|red|in service|out of service|work in progress|wip|decommissioned|mystery|unknown)\b/.test(text),desiredStatus=statusFromCommand(command),explicitQueries=busQueries(command);
  const splitFleet=/\b(everything else|all other buses|all others|the rest|remaining buses|everyone else)\b/.test(text);
+ /* Before the move and status paths: "put the last sweep back" contains a move
+    word and "remove the most recent 24" contains something that looks like a
+    bus number, and neither is either. */
+ const batchIntent=scanBatchCommand(text);
+ if(batchIntent)return planScanBatch(batchIntent,fleet);
  if(desiredStatus&&!explicitQueries.length&&!moveAction){
   if(context?.busIds.length){
    const selected=context.busIds.map(id=>fleet.find(bus=>bus.id===id)).filter(Boolean) as OperatorBus[];

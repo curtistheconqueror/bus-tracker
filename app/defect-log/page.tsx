@@ -9,6 +9,9 @@ import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,group
 import {bay12AwarenessBusIds,mysteryBusIds} from "../mystery-buses";
 import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
+import ScanBatchesPanel from "./scan-batches-panel";
+import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,type ScanBatch,type ScanBatchUndo} from "./scan-batches";
+import {readMergedAway,writeMergedAway} from "../cloud-sync";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "../quick-filters";
@@ -27,7 +30,11 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "../facility-areas";
 import ShopCloudLive from "../shop-cloud-live";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string};
+/* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
+   restore of the old fleet: the records have to come back stamped as new work,
+   and the cloud ledger has to forget them, or the shop cloud keeps them deleted.
+   That path lives in restoreBatch and UNDO LAST hands over to it. */
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true};
 
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 const MYSTERY_COLLAPSED_KEY="pace-defect-log-mystery-collapsed-v1";
@@ -490,14 +497,21 @@ export default function DefectLog(){
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
  const [sweepOpen,setSweepOpen]=useState(false);
+ const [batchesOpen,setBatchesOpen]=useState(false);
+ /* The last removed scan sweep, read from the device rather than held only in
+    memory, so PUT BACK works after a reload and after a removal the operator
+    made from the map. */
+ const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
+ useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
  useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
+ const batches=useMemo(()=>scanBatches(fleet),[fleet]);
  const records=useMemo(()=>allRecords.filter(record=>!record.defect.defectLogHiddenAt),[allRecords]);
  const activeDownBusIds=useMemo(()=>downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId),[downEntries]);
  const activeDownBusIdSet=useMemo(()=>new Set(activeDownBusIds),[activeDownBusIds]);
@@ -534,10 +548,12 @@ export default function DefectLog(){
     not advanced on a refusal, on purpose — the screen keeps showing what is
     actually stored rather than a change that did not land. */
  /* Returns the fleet write's result so a caller can tell whether anything was
-    actually stored. Every caller here wants the default write, guard and all.
-    The one operation whose whole purpose is to end with fewer records than it
-    started with — MERGE DUPES — lives on the Settings page now, with the
-    guard lifted there and only there. */
+    actually stored. Every caller here wants the default write, guard and all,
+    with one exception: removeBatch below, whose whole purpose is to end with
+    fewer records than it started with, lifts the guard for that one write the
+    way MERGE DUPES does on the Settings page. Both are a person's confirmed
+    decision about named records, which is what the guard cannot tell from a
+    catastrophe on its own. */
  const persist=(nextFleet:DefectLogFleetBus[],nextDown:DefectLogDownEntry[],options:FleetWriteOptions={}):StorageWriteResult=>{
   const written=writeFleetStorageResult(localStorage,nextFleet,options);
   setSaveProblem(written.reason||"");
@@ -575,7 +591,46 @@ export default function DefectLog(){
   setSweepOpen(false);
   alert(filed+" finding"+(filed===1?"":"s")+" filed as open Tech Services defect"+(filed===1?"":"s")+(skipped?". "+skipped+" skipped — already logged on that bus in the last 48 hours":"")+". UNDO LAST reverses it.");
  };
- const undoLastChange=()=>{if(!undoSnapshot)return;persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
+ /* Takes a whole scan sweep back out. The batch is the set of sweep records
+    sharing one creation stamp — the fingerprint fileSweep leaves by taking the
+    clock once — and only the records nobody has touched since are removed.
+
+    Three writes, in an order that matters. The board first, with the guard
+    lifted, because 24 records leaving is exactly what the guard is for and
+    exactly what a person just confirmed; nothing below runs if that write is
+    refused. Then the way back, on the device. Then the cloud ledger: a push
+    sends only what a bus still carries, so without the ledger the cloud keeps
+    the records and the next pull brings all 24 straight back — the same reason
+    MERGE DUPES writes it. With it, the removal reaches the other devices. */
+ const removeBatch=(batch:ScanBatch)=>{
+  const now=new Date().toISOString(),result=removeScanBatch(fleet,batch.key,now);
+  if(!result.removed.length){alert("Every record in that sweep has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to remove.");return}
+  const buses=new Set(result.removed.map(record=>record.busId)).size;
+  if(!confirm("Remove "+result.removed.length+" record"+(result.removed.length===1?"":"s")+" filed by that scan sweep from "+buses+" bus"+(buses===1?"":"es")+"?"+(result.kept?" "+result.kept+" worked on since will be kept.":"")+"\n\nThe shop cloud is told, so the other devices drop them too. UNDO LAST or PUT BACK reverses it."))return;
+  const written=persist(result.fleet,downEntries,{allowBulkDefectLoss:true});
+  if(!written.ok)return;
+  const label="Removed "+result.removed.length+" scan sweep record"+(result.removed.length===1?"":"s");
+  const snapshot=scanBatchUndoSnapshot(result.removed,label,now);
+  writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
+  writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
+  setUndoSnapshot({fleet,downEntries,label,scanBatch:true});
+  setBatchesOpen(false);
+  alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")+" PUT BACK under SCAN BATCHES reverses it.");
+ };
+ /* The records go back stamped as new work — newer than the tombstones the
+    removal sent — and the ledger forgets them, so the shop cloud accepts them
+    back over the deletion instead of dropping the restore as an older write. */
+ const restoreBatch=()=>{
+  const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
+  if(!snapshot){setBatchUndo(null);alert("There is no removed scan sweep to put back on this device.");return}
+  const now=new Date().toISOString(),result=restoreScanBatch(fleet,snapshot,now);
+  if(result.restored&&!persist(result.fleet,downEntries).ok)return;
+  const ledger=readMergedAway(localStorage);for(const id of result.restoredIds)delete ledger[id];writeMergedAway(localStorage,ledger);
+  localStorage.removeItem(SCAN_BATCH_UNDO_KEY);setBatchUndo(null);
+  if(undoSnapshot?.scanBatch)setUndoSnapshot(null);
+  alert(result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+".");
+ };
+ const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const openMysteryBus=(bus:DefectLogFleetBus)=>{const record=records.find(item=>item.bus.id===bus.id&&isUnresolved(item.defect));setEditing(record?recordDraft(record):{...newDraft(),busId:bus.id})};
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
@@ -664,7 +719,7 @@ export default function DefectLog(){
   </section>
   <section className="log-feed">
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button>{sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}<a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button>{sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}<button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button>{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}<a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div><span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
