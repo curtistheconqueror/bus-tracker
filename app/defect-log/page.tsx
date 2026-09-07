@@ -784,12 +784,39 @@ export default function DefectLog(){
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
+    {/* OUTSIDE the header button, which is why this column moved out of it at
+        all: a select nested in a button is invalid, and every tap on it would
+        have been swallowed by the card's own expand handler.
+
+        The bus number keeps its place and its size; what changed is that the
+        line under it is now the control rather than a label. */}
+    <div className="log-bus-column">
+     <span className="log-bus"><small>BUS</small><span className="log-bus-number" data-status={group.bus.s}><strong>{group.bus.n}</strong></span></span>
+     {/* A BUTTON, NOT A SELECT, and that was measured rather than preferred.
+
+         A native select cannot wrap, and this column is 82px wide - 72px on a
+         phone, 64px under 390. Bound to the location, 13 of the 17 labels
+         locationLabel() can produce were cut off at 390: Main Garage needed
+         49px against 38px of room, Foreman Office 59px. The line exists to say
+         where the bus is, and a control that hides that to become clickable is
+         a worse line than the one it replaced.
+
+         So the label stays exactly what it was - the same text, still free to
+         wrap onto two lines - and the whole of it is the target. It opens the
+         move editor this page already opens from the deferred drawer, which
+         has room for the full area names, their open counts, and which ones
+         are full. */}
+     <button className="log-location" type="button" onClick={()=>setMovingMysteryBusId(group.bus.id)}
+      aria-label={"Facility location for bus "+group.bus.n+": "+locationLabel(group.bus.l)+". Move this bus."}
+      title={"Move bus "+group.bus.n+" on the Facility Map"}>
+      <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
+     </button>
+    </div>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row
          carries its own emoji, where it is accurate to that row. */}
-     <span className="log-bus"><small>BUS</small><span className="log-bus-number" data-status={group.bus.s}><strong>{group.bus.n}</strong></span><em>{locationLabel(group.bus.l)}</em></span>
      {/* Plain text, no inline emoji: the round icon to the left already carries
          the category glyph, and repeating it here made a single-defect title
          start further right than "MULTIPLE DEFECTS" on the card above it. */}
