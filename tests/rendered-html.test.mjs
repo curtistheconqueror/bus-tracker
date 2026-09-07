@@ -10248,3 +10248,47 @@ test("the location under a bus number is the control that moves it on the map", 
   assert.equal((page.match(/<MysteryMoveModal /g)||[]).length,1,"one move form on this page, not two");
   assert.match(page,/if\(!writeFleetStorage\(localStorage,result\.fleet\)\)return false/,"a refused write reports false and the modal stays open");
 });
+
+test("a device that realtime cannot reach goes back to asking, instead of sitting deaf", async () => {
+  const live = await readFile(new URL("../app/shop-cloud-live.tsx", import.meta.url), "utf8");
+  const client = await readFile(new URL("../app/cloud-client.ts", import.meta.url), "utf8");
+
+  /* THE FAULT: subscribe() was called and its answer thrown away, so a channel
+     that never joined handed back a stop-function exactly like one that did.
+     The device then believed realtime was covering it and the sweep stayed
+     push-only — sync(false) — so it uploaded its own work every 45 seconds for
+     a whole shift and never once asked what changed. Reported from the floor:
+     a phone imported a new Down Sheet and the iPad beside it still showed the
+     previous one sixteen hours later. */
+  assert.match(client,/channel\.subscribe\(\(status:string\)=>\{try\{onLive\?\.\(status==="SUBSCRIBED"\)\}/,"the channel must report whether it actually joined");
+  assert.doesNotMatch(client,/\n   channel\.subscribe\(\);/,"subscribe() must not be called for its side effect alone");
+  /* Only SUBSCRIBED counts. CHANNEL_ERROR, TIMED_OUT and CLOSED all mean the
+     shop cannot reach this device. */
+  assert.doesNotMatch(client,/status!=="?CLOSED/,"anything other than SUBSCRIBED is not live");
+  // And a channel torn down says so, rather than leaving the flag stuck on.
+  assert.match(client,/return\(\)=>\{try\{onLive\?\.\(false\);supabase\.removeChannel/);
+
+  /* THE FIX, in three parts. */
+  // 1. Assumed deaf until told otherwise - the expensive mistake is the other way round.
+  assert.match(live,/const live=useRef\(false\);/);
+  // 2. The sweep pulls whenever the channel is not confirmed live, and stays
+  //    push-only when it is - a shop of phones on data plans must not each drag
+  //    the board down every 45 seconds to learn nothing changed.
+  assert.match(live,/const sweep=\(\)=>\{if\(document\.visibilityState==="visible"\)sync\(!live\.current\)\};/);
+  assert.doesNotMatch(live,/const sweep=\(\)=>\{if\(document\.visibilityState==="visible"\)sync\(false\)\};/,"the push-only sweep is the bug");
+  // 3. Coming back to the app, or back onto signal, always asks - the moment a
+  //    person is looking is the cheapest place to spend a pull.
+  assert.match(live,/const resume=\(\)=>\{if\(document\.visibilityState==="visible"\)sync\(true\)\};/);
+  assert.match(live,/document\.addEventListener\("visibilitychange",resume\)/);
+  assert.match(live,/window\.addEventListener\("online",resume\)/);
+  assert.match(live,/\n  resume\(\);/,"and on mount, so opening a page shows the shop's board");
+  // A channel that drops mid-shift puts the device back on pulling sweeps
+  // without waiting for a reload.
+  assert.match(live,/isLive=>\{live\.current=isLive;if\(isLive\)wake\(\)\}/);
+  assert.match(live,/stopped=true;\n   live\.current=false;/);
+
+  /* Unchanged and load-bearing: send before receive still holds, or a pull
+     would lay the server's older copy over unsent work. */
+  assert.ok(live.indexOf("cloudPush(")<live.indexOf("cloudPull("),"send before receive");
+  assert.match(live,/if\(!pullToo\|\|!pushed\.ok\|\|stopped\)return;/);
+});
