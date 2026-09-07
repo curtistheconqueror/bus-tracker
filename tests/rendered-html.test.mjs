@@ -9113,6 +9113,33 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.equal(capped["d0-0"],undefined,"and the oldest, long since landed on the server, are what falls off");
 });
 
+test("the tablet band does not scroll sideways: the nav wraps, and a map rule stops leaking",async()=>{
+ const [down,globals]=await Promise.all([
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Two separate faults put an iPad-width page into sideways scroll.
+
+    The Down Sheet's nav is six links pinned at 108px, so with its gaps it is
+    703px, and above 760px it shares the header's one flex line with the title
+    and REFRESH. Between there and 1024 the three do not fit: REFRESH was
+    measured 194px past the right edge at 820px and the whole page scrolled,
+    not just the header. The header wraps in that band and the nav takes a row
+    of its own. */
+ assert.match(down,/@media\(min-width:761px\) and \(max-width:1023px\)\{[\s\S]{0,400}?\.down-header\{flex-wrap:wrap\}/,"the header has to wrap in the tablet band");
+ assert.match(down,/@media\(min-width:761px\) and \(max-width:1023px\)\{[\s\S]{0,400}?\.down-header nav\{order:3;flex:1 0 100%/,"and the nav takes its own row rather than squeezing the title and REFRESH");
+
+ /* The second was a global rule leaking. Inside the map's @media(max-width:800px)
+    block, `.quick-filter-control,.quick-filter-trigger` were written bare — but
+    that control is shared with the Defect Log, so its trigger was forced to
+    width:100%, grew to 722px inside a no-wrap row and pushed that page 531px
+    sideways at 761-800px. Scoped to the command bar, it cannot reach another
+    page again. */
+ assert.doesNotMatch(globals,/\.command-highlights>\*,\.quick-filter-control,\.quick-filter-trigger\{width:100%\}/,"the bare selectors reached every page that uses the quick filter");
+ assert.match(globals,/\.command-highlights>\*,\.command-bar \.quick-filter-trigger\{width:100%\}/,"scoped to the map's own command bar");
+});
+
 test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
  const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
  const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
@@ -9145,6 +9172,21 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
   ["B-18","B-18 FAILED - BRAKES"],
  ]) assert.equal(downSheetMentionsDefect(row(repair,reason)),true,"a fault written beside maintenance is still a bus down: "+reason);
 
+ /* Curtis: "inspections are their own thing. Don't mix with unscheduled work.
+    Just keep inspections in their own count. Regardless if someone is assigned
+    to the bus or not."
+
+    The scheduled/unscheduled split is decided by whether a name is written in
+    the mechanic column, and that question must never be reached for an
+    inspection — so this is asserted with and without an assignee rather than
+    left to the order the checks happen to run in. A fault written beside the
+    maintenance is a different matter: that bus is down, and it leaves. */
+ for(const [repair,reason] of [["B-18","B-18"],["A-3","A-3"],["Other preventive maintenance","PM'S"],["Oil and filter service",""]]){
+  assert.equal(downSheetGroup(row(repair,reason,"Inspection")),"inspection",repair+" with nobody assigned belongs in its own count");
+  assert.equal(downSheetGroup({...row(repair,reason,"Inspection"),assignedTo:"ARMON"}),"inspection",repair+" stays in its own count when a mechanic is on it");
+ }
+ assert.equal(downSheetGroup({...row("Other preventive maintenance","PM'S / BRAKES GRINDING","Inspection"),assignedTo:"ARMON"}),"scheduled","a fault written beside the PM is a bus down, and leaves the inspection count");
+
  // The tile, beside the total rather than under it, and the count behind it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  assert.match(page,/const downBusCount=useMemo\(\(\)=>visible\.filter\(downSheetMentionsDefect\)\.length,\[visible\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
@@ -9167,6 +9209,8 @@ test("every Down Sheet row carries its own DELETE, on the bus's cell rather than
     sideways to reach. A tenth column at the far right would be the control you
     go looking for, and this is the one pressed by somebody holding a sheet. */
  assert.match(page,/<td className="fleet-number">[\s\S]{0,1400}?<button className="delete-entry" type="button" onClick=\{\(\)=>deleteEntry\(entry\)\}/,"DELETE belongs on the face card, not in a column off the edge");
+ assert.match(page,/<td className="fleet-number">[\s\S]{0,1600}?<button className="fix-entry" type="button" onClick=\{\(\)=>markEntryFixed\(entry\)\}/,"MARK FIXED sits in the same cell, before the destructive one");
+ assert.match(page,/entry\.workflow!=="Completed"&&<button className="fix-entry"/,"and it is not offered on a row that is already closed out");
  assert.match(page,/aria-label=\{"Delete bus "\+\(entry\.busNumber\|\|"entry"\)\+" from the Down Sheet"\}/,"and it has to say which bus it would delete");
 
  // Asked before it happens, and the confirm says what survives it.
@@ -9175,18 +9219,19 @@ test("every Down Sheet row carries its own DELETE, on the bus's cell rather than
 
  /* The way back is on the page, not behind MORE: an accidental delete is
     exactly when nobody opens a menu to look for it. */
- assert.match(page,/deletedEntry&&<p className="down-deleted-note"[\s\S]{0,400}?onClick=\{undoDeleteEntry\}/);
+ assert.match(page,/rowAction&&<p className=\{"down-deleted-note"[\s\S]{0,600}?onClick=\{undoDeleteEntry\}/);
  assert.doesNotMatch(page,/<summary>MORE<\/summary>[\s\S]{0,600}?undoDeleteEntry/,"PUT BACK must not be the thing hidden behind a menu");
 
  /* 26px reads fine under a mouse and misses under a thumb. The sheet is used
     on phones, so the phone block has to give it a real target. */
  assert.match(css,/\.delete-entry\{[^}]*width:26px/);
+ assert.match(css,/\.fix-entry\{[^}]*width:26px/,"MARK FIXED shares DELETE's shape so the pair reads as one group");
  /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
     the map — matched on content rather than position, since the file has many. */
  const at=css.indexOf(".down-deleted-note button{width:100%");
  assert.ok(at>0,"the phone override for the PUT BACK button is gone");
  const phone=css.slice(at);
- assert.match(phone,/\.delete-entry\{width:44px;height:44px/,"the phone block must raise DELETE to a 44px touch target");
+ assert.match(phone,/\.delete-entry,\.fix-entry\{width:44px;height:44px/,"the phone block must raise both row buttons to a 44px touch target");
 });
 
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
@@ -9212,17 +9257,45 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
     one a foreman uses daily. A row merely dropped from this device stays live
     on the server and comes back on the next pull. */
  assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,1800}?rememberRemovedEntries\(localStorage,\[entry\.id\],now\)/,"a deleted row has to be written to the removal ledger or it will not travel");
- assert.match(page,/const undoDeleteEntry=\(\)=>\{[\s\S]{0,1800}?forgetRemovedEntries\(localStorage,\[entry\.id\]\)/);
- assert.match(page,/const undoDeleteEntry=\(\)=>\{[\s\S]{0,2000}?\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
+ /* Sliced rather than matched within a character window: this handler routes
+    two kinds of undo now, and a window wide enough to clear the routing is wide
+    enough to match the wrong function. */
+ const undoDelete=page.slice(page.indexOf("const undoDeleteEntry="));
+ assert.match(undoDelete,/forgetRemovedEntries\(localStorage,\[entry\.id\]\)/);
+ assert.match(undoDelete,/\{\.\.\.entry,updatedAt:restoredAt\}/,"and be restamped, or it loses to its own tombstone on the next pull");
  /* The undo copy is written before the row goes, and the delete gives up if it
     cannot be: a removal with no way back is the door this app does not build. */
  assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,400}?return;/);
+
+ /* MARK FIXED is one press and writes no tombstone: nothing was removed, the
+    row only stopped being active. It goes through saveEntry so a quick close-out
+    takes the same path the editor takes. */
+ const fix=page.slice(page.indexOf("const markEntryFixed="),page.indexOf("const undoFixEntry="));
+ assert.match(fix,/workflow:"Completed",completedAt:now/,"a closed-out row is stamped when it was closed");
+ assert.match(fix,/saveEntry\(normalizeEntry\(/,"one press must not mean a different kind of save");
+ assert.ok(!fix.includes("rememberRemovedEntries"),"marking fixed removes nothing, so it must not write a tombstone");
+ assert.match(fix,/if\(!writeSetting\(localStorage,ENTRY_UNDO_KEY,[\s\S]{0,600}?return;/,"and the way back is written before the change, because there is no confirm");
+
+ /* The undo restores the BUS, not just the entry, and this is the whole reason
+    it is not simply "save the old entry again".
+
+    Completing an entry completes the bus's defect, and a completed defect is
+    resolved — so it is no longer adoptable, the re-saved entry cannot find it,
+    and it mints a SECOND record for the same fault while leaving the first
+    closed. Measured before this was fixed: one press and one undo left the bus
+    carrying d-1 completed and a fresh open duplicate beside it. Two records for
+    one fault is the thing this app must never do. */
+ const unfix=page.slice(page.indexOf("const undoFixEntry="),page.indexOf("const undoDeleteEntry="));
+ assert.match(unfix,/bus\?:\{id:string;s:FleetStatus;defects:StructuredDefect\[\];pendingRepair:string\}/,"the fields the completion changed have to be carried in the copy");
+ assert.match(unfix,/fleet\.map\(item=>item\.id===bus\.id\?\{\.\.\.item,s:bus\.s,defects:bus\.defects,pendingRepair:bus\.pendingRepair\}:item\)/,"and put back as they were rather than re-derived from the entry");
+ assert.ok(!unfix.includes("saveEntry("),"re-saving the entry is exactly what duplicated the defect");
+ assert.match(fix,/const bus=fleet\.find\(item=>item\.id===entry\.busId\)/,"the snapshot is taken before the change, not after");
 
  /* And the tombstone goes only AFTER a write that succeeded. The other order
     reads the same until the device is full, and then it tells the shop cloud to
     drop a row this device still holds — deleted everywhere except where it was
     pressed. Nothing on screen would show that, so it is pinned here. */
- const del=page.slice(page.indexOf("const deleteEntry="),page.indexOf("const undoDeleteEntry="));
+ const del=page.slice(page.indexOf("const deleteEntry="),page.indexOf("const markEntryFixed="));
  assert.ok(del.indexOf("writeDownSheetStorageResult")<del.indexOf("rememberRemovedEntries"),"the sheet has to be written before the removal is recorded");
  assert.match(del,/if\(!written\.ok\)\{[\s\S]{0,300}?return;/,"and a refused write has to stop the delete outright");
  const undo=page.slice(page.indexOf("const undoDeleteEntry="));
@@ -9848,8 +9921,8 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     Each piece owns a slot now. The explicit grid-column on each is what makes
     an empty ON ROAD slot stay empty instead of DELETE sliding left into it. */
  assert.match(page,/<td className="fleet-number"><span className="fleet-number-slots">/,"the cell's contents need a row of fixed slots to sit in");
- assert.match(css,/\.fleet-number-slots\{display:grid;grid-template-columns:\d+px \d+px \d+px/,"three fixed columns: the bus button, the ON ROAD slot, DELETE");
- for(const [sel,col] of [["\\.fleet-number-button","1"],["\\.on-road-badge","2"],["\\.delete-entry","3"]])
+ assert.match(css,/\.fleet-number-slots\{display:grid;grid-template-columns:\d+px \d+px \d+px \d+px/,"four fixed columns: the bus button, the ON ROAD slot, MARK FIXED, DELETE");
+ for(const [sel,col] of [["\\.fleet-number-button","1"],["\\.on-road-badge","2"],["\\.fix-entry","3"],["\\.delete-entry","4"]])
   assert.match(css,new RegExp("\\.fleet-number-slots>"+sel+"\\{grid-column:"+col),"each slot must be pinned to its own column, or it slides when a neighbour is absent");
  assert.doesNotMatch(css,/\.on-road-badge\{[^}]*margin-left/,"the gap comes from the grid, not a margin that only exists when the badge does");
  /* 108px fitted the number and its status label exactly, so the badge beside it

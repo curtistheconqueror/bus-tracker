@@ -59,14 +59,23 @@ const MAX_ENTRIES=98;
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
 const STATS_OPEN_KEY="pace-down-sheet-stats-open-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
-/* One deleted row, kept so it can be put back. Separate from the scan and
-   clear undos on purpose: deleting one bus is daily work and must not consume
-   the copy that a whole cleared sheet is waiting on. */
+/* The last thing done to a single row, kept so it can be taken back. Separate
+   from the scan and clear undos on purpose: deleting or closing out one bus is
+   daily work and must not consume the copy a whole cleared sheet is waiting on.
+
+   One slot covers both actions. They are the two ways a row leaves the active
+   sheet, only one can be the most recent, and a foreman who has just pressed
+   the wrong one wants the same words in the same place either way. */
 const ENTRY_UNDO_KEY="pace-down-sheet-entry-undo-v1";
-function readDeletedEntry(raw:string|null){
+type RowAction={kind:"deleted"|"fixed";id:string;busNumber:string};
+function readRowAction(raw:string|null):RowAction|null{
  if(!raw)return null;
  try{const parsed=JSON.parse(raw);const entry=parsed?.entry;
-  return entry&&typeof entry.id==="string"&&typeof entry.busId==="string"?{id:entry.id,busNumber:String(entry.busNumber||"")}:null}catch{return null}
+  if(!entry||typeof entry.id!=="string"||typeof entry.busId!=="string")return null;
+  /* Anything written before this carried a delete and nothing else, so an
+     absent kind reads as one rather than throwing the copy away. */
+  return {kind:parsed.kind==="fixed"?"fixed":"deleted",id:entry.id,busNumber:String(entry.busNumber||"")};
+ }catch{return null}
 }
 const STATUS_LABELS:Record<FleetStatus,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown"};
 
@@ -174,17 +183,17 @@ export default function DownSheet(){
  const [roadFilter,setRoadFilter]=useState<DownSheetRoadKind|null>(null);
  const [undoClearAvailable,setUndoClearAvailable]=useState(false);
  const [undoScanAvailable,setUndoScanAvailable]=useState(false);
- /* The bus number is held with the id so the PUT BACK line can name the bus it
-    would bring back, rather than saying "the last one". */
- const [deletedEntry,setDeletedEntry]=useState<{id:string;busNumber:string}|null>(null);
+ /* The bus number is held with the id so the notice can name the bus it would
+    take back, rather than saying "the last one". */
+ const [rowAction,setRowAction]=useState<RowAction|null>(null);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setDeletedEntry(readDeletedEntry(localStorage.getItem(ENTRY_UNDO_KEY)));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setOrder(settings.order==="number-desc"||settings.order==="category"?settings.order:"number-asc");setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setOrder(settings.order==="number-desc"||settings.order==="category"?settings.order:"number-asc");setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const reconciled=reconcileDownSheetMembership(current,activeIds);if(reconciled!==current)writeFleetStorage(localStorage,reconciled);return reconciled})},[entries,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,order,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,order,displaySettings,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setDeletedEntry(readDeletedEntry(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  /* Where each bus actually is, which is the first thing the section rules ask.
@@ -309,7 +318,7 @@ export default function DownSheet(){
   /* The copy goes down before the row does, and the delete is abandoned if it
      cannot be written. A removal with no way back is the one-way door this app
      does not build. */
-  if(!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({deletedAt:now,entry})).ok){
+  if(!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({kind:"deleted",deletedAt:now,entry})).ok){
    setSaveProblem("storage-full");
    alert("This device has no room to save an undo copy, so nothing was deleted. Export a backup and clear space, then try again.");
    return;
@@ -333,14 +342,73 @@ export default function DownSheet(){
   rememberRemovedEntries(localStorage,[entry.id],now);
   setSaveProblem("");
   setEntries(remaining);
-  setDeletedEntry({id:entry.id,busNumber:entry.busNumber});
+  setRowAction({kind:"deleted",id:entry.id,busNumber:entry.busNumber});
+ };
+ /* MARK FIXED, one press from the row.
+
+    Closing a bus out meant opening the editor, changing the workflow and
+    saving. For the common case — the mechanic is done and the foreman is
+    walking the sheet — that is three steps for a fact already known. This is
+    the Defect Log's MARK FIXED, on the surface the Down Sheet is read from.
+
+    It goes through saveEntry rather than writing the entry itself, so it takes
+    the same path the editor takes: the repairs are marked done, the bus's
+    defects are completed, its status is recomputed from that, and the findings
+    it taught are learned. One press must not mean a different kind of save. */
+ const markEntryFixed=(entry:DownEntry)=>{
+  const now=new Date().toISOString(),who=(entry.completedBy||(entry.assignmentType==="Mechanic"?entry.assignedTo:"")||defaultInitials||"").trim().toUpperCase();
+  /* The copy goes down first, exactly as the delete does. There is no confirm
+     on this — a foreman closing out a sheet presses it many times in a row and
+     a dialog each time is the reason nobody uses the feature — so the way back
+     has to exist before the change does. */
+  /* The bus goes into the copy as well as the entry, and this is the whole
+     reason the fix undo is not just "save the old entry again".
+
+     Completing an entry completes the bus's defect. Saving the old entry back
+     does NOT re-open it: a completed defect is resolved, and a resolved record
+     is not adoptable, so the entry cannot find it again — it mints a SECOND
+     record for the same fault and leaves the first one closed. Measured: one
+     press and one undo left bus 1101 carrying d-1 completed and a fresh open
+     duplicate beside it, which is the thing this app must never do.
+
+     So the fields the completion actually changes are kept and put back as
+     they were. Location and whoever has the bus are deliberately not, because
+     they may have moved on and are not this undo's business. */
+  const bus=fleet.find(item=>item.id===entry.busId);
+  if(!writeSetting(localStorage,ENTRY_UNDO_KEY,JSON.stringify({kind:"fixed",fixedAt:now,entry,bus:bus&&{id:bus.id,s:bus.s,defects:bus.defects||[],pendingRepair:bus.pendingRepair||""}})).ok){
+   setSaveProblem("storage-full");
+   alert("This device has no room to save an undo copy, so nothing was changed. Export a backup and clear space, then try again.");
+   return;
+  }
+  saveEntry(normalizeEntry({...entry,workflow:"Completed",completedAt:now,completedBy:who,updatedAt:now,updatedBy:who||entry.updatedBy,
+   history:[...(entry.history||[]),{at:now,initials:who||"—",action:"Marked fixed from the Down Sheet"}]}));
+  setRowAction({kind:"fixed",id:entry.id,busNumber:entry.busNumber});
+ };
+ /* Putting a closed-out row back is not the same operation as putting a deleted
+    one back. Nothing was removed, so there is no tombstone to forget and no
+    capacity to check — the row never left the sheet, it only stopped being
+    active. Both halves are restored rather than re-derived: the entry as it
+    was, and the bus fields the completion changed. */
+ const undoFixEntry=(saved:DownEntry,bus?:{id:string;s:FleetStatus;defects:StructuredDefect[];pendingRepair:string})=>{
+  const nextEntries=entries.some(item=>item.id===saved.id)?entries.map(item=>item.id===saved.id?saved:item):[...entries,saved];
+  const written=writeDownSheetStorageResult(localStorage,nextEntries);
+  if(!written.ok){
+   setSaveProblem(written.reason||"failed");
+   alert("This device could not save the change, so the entry was left closed out. Export a backup and clear space, then try again.");
+   return;
+  }
+  const nextFleet=bus?fleet.map(item=>item.id===bus.id?{...item,s:bus.s,defects:bus.defects,pendingRepair:bus.pendingRepair}:item):fleet;
+  if(bus)setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");else setSaveProblem("");
+  localStorage.removeItem(ENTRY_UNDO_KEY);
+  setFleet(nextFleet);setEntries(nextEntries);setRowAction(null);
  };
  const undoDeleteEntry=()=>{
-  let saved:{entry?:Partial<DownEntry>}|null=null;
+  let saved:{kind?:string;entry?:Partial<DownEntry>;bus?:{id:string;s:FleetStatus;defects:StructuredDefect[];pendingRepair:string}}|null=null;
   try{saved=JSON.parse(localStorage.getItem(ENTRY_UNDO_KEY)||"null")}catch{}
-  if(!saved?.entry?.id){localStorage.removeItem(ENTRY_UNDO_KEY);setDeletedEntry(null);alert("There is no deleted entry to put back.");return}
+  if(!saved?.entry?.id){localStorage.removeItem(ENTRY_UNDO_KEY);setRowAction(null);alert("There is nothing on this row to take back.");return}
   const entry=normalizeEntry(saved.entry as DownEntry);
-  if(entries.some(item=>item.id===entry.id)){localStorage.removeItem(ENTRY_UNDO_KEY);setDeletedEntry(null);return}
+  if(saved.kind==="fixed")return undoFixEntry(entry,saved.bus);
+  if(entries.some(item=>item.id===entry.id)){localStorage.removeItem(ENTRY_UNDO_KEY);setRowAction(null);return}
   /* One active row per bus is the sheet's rule and the editor refuses a save
      that breaks it. Putting a row back must not walk around the rule. */
   if(isActive(entry)&&entries.some(item=>isActive(item)&&item.busId===entry.busId)){alert("Bus "+(entry.busNumber||"that bus")+" already has an active entry on the sheet, so the deleted one was not put back.");return}
@@ -361,7 +429,7 @@ export default function DownSheet(){
   forgetRemovedEntries(localStorage,[entry.id]);
   setSaveProblem("");
   localStorage.removeItem(ENTRY_UNDO_KEY);
-  setEntries(restored);setDeletedEntry(null);
+  setEntries(restored);setRowAction(null);
  };
 
  const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
@@ -453,7 +521,7 @@ export default function DownSheet(){
   </section>
   {/* Loud, and on the page rather than behind MORE. An accidental delete is
       exactly when nobody goes hunting through a menu for the way back. */}
-  {deletedEntry&&<p className="down-deleted-note" role="status">Bus <b>{deletedEntry.busNumber||"—"}</b> was deleted from the sheet. Its defects, status and location were kept. <button type="button" onClick={undoDeleteEntry}>PUT BACK</button></p>}
+  {rowAction&&<p className={"down-deleted-note"+(rowAction.kind==="fixed"?" fixed":"")} role="status">Bus <b>{rowAction.busNumber||"—"}</b> {rowAction.kind==="fixed"?"was marked fixed and closed out.":"was deleted from the sheet. Its defects, status and location were kept."} <button type="button" onClick={undoDeleteEntry}>{rowAction.kind==="fixed"?"UNDO":"PUT BACK"}</button></p>}
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   <section className="quick-notes">
@@ -486,6 +554,7 @@ export default function DownSheet(){
           sideways on a phone, and a delete parked off the right edge would be
           the one control you have to go looking for. It sits after the badge so
           the number is still the first thing under a thumb. */}
+      {entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark bus "+(entry.busNumber||"entry")+" fixed"} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span></button>}
       <button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
