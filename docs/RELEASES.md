@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 158 / release 162 | Live | 168f553 | Keeps Down Sheet score tiles stable while road tallies filter the table, adds compact Advanced Actions on both operational pages, makes Deferred status update immediately, and lets a Defect Log location open the Facility Map move workflow |
 | 157 / release 161 | Live | 3b16d45 | Adds row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; preserves independent inspection tallies; moves Mystery Buses to the Down Sheet; and compacts Defect Log controls behind Advanced Actions |
 | 156 / release 160 | Live | bbe33f6 | Adds REFRESH to every page for home-screen use and moves the Main Garage Ready boundary vertically between bays 6 and 7 without moving buses or slots |
 | 155 / release 159 | Live | 2afa491 | Down Sheet removals now travel through Shop Cloud as entry tombstones, so cleared or replaced sheets stay cleared across devices and the settled sheet reconciles map Down Sheet flags |

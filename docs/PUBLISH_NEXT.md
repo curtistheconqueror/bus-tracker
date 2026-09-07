@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSION 162 PENDING — publish from `168f553`. Repository release 161 is live from `3b16d45` as Sites Version 157.**
+**STATUS: NONE PENDING — repository release 162 is live from `168f553` as Sites Version 158.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,7 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **Next** | **162** | `168f553` | **A road tally stops rewriting the sheet's own scoreboard, and both sheets get their controls out of the way** — pressing INSPECTIONS ON ROAD narrowed the sheet AND rewrote every tile above it, so TOTAL ON SHEET read 4 on a 30-bus sheet; the scoreboard is counted from the whole sheet now and only the table follows the filter. SHEET STATS folds into those tiles and its panel is gone. Both surfaces get an ADVANCED ACTIONS panel in the header — the Down Sheet's in its own purple — with ADD DOWN BUS beside SEARCH. The DEFERRED badge follows a change without a refresh, and a held bus can be released from the drawer that lists it. AI OPERATOR and CLEAN UP get back the styling they silently lost in 161, LIVE REPAIR FEED grows to 17px, and the location under a bus number now moves that bus on the Facility Map |
+| Published | **162** | `168f553` | **Live as Sites Version 158.** Road tally filters no longer rewrite the Down Sheet scoreboard; both operational pages use compact Advanced Actions; Deferred updates immediately and can be ended from its drawer; and a Defect Log location opens the Facility Map move workflow |
 | Published | **161** | `3b16d45` | **Live as Sites Version 157.** Row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; independent inspection tallies; Mystery Buses on the Down Sheet; and Defect Log controls behind Advanced Actions |
 | Published | **160** | `bbe33f6` | **Live as Sites Version 156.** REFRESH is available on every page for home-screen use, and the Main Garage Ready boundary runs vertically between bays 6 and 7 without moving buses or slots |
 | Published | **159** | **`2afa491`** | **Live as Sites Version 155.** A Down Sheet removal travels, so a cleared sheet stays cleared: removals are recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's Down Sheet flags follow the sheet the pull settled on |
@@ -39,7 +39,7 @@ commit, no migration, no dependency change.
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**No release is pending.** Repository release 159 went out as Sites Version 155 from `2afa491`, release 160 as Sites Version 156 from `bbe33f6`, and release 161 as Sites Version 157 from `3b16d45`. Their retained handoffs below are release records only.
+**No release is pending.** Repository release 159 went out as Sites Version 155 from `2afa491`, release 160 as Sites Version 156 from `bbe33f6`, release 161 as Sites Version 157 from `3b16d45`, and release 162 as Sites Version 158 from `168f553`. Their retained handoffs below are release records only.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
