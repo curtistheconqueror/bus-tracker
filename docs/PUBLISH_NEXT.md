@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: VERSIONS 153 AND 154 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`. Version 152 is live from `b57dcb5`.**
+**STATUS: VERSIONS 153, 154 AND 155 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, then 155 from `6f8518b`. Version 152 is live from `b57dcb5`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
 | Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
 | Next | **153** | `015e789` | **Shop Cloud now runs on every page and merges shop changes live as they happen** — it includes the Version 152 tombstone/Down Sheet sync repair, improved scan review, catalog additions, and the corrected Deferred badge behavior |
 | Published | **152** | `b57dcb5` | **The shop cloud has been failing on every sweep since Aug 31 and this fixes it** — merged-away tombstones are sent safely, Down Sheet rows can sync, scan review flags missed and uncertain rows, SHOP CLOUD moves to the top of MASTER, A-3/A-21/HAZMAT join the catalog, and the DEFERRED badge opens the matching filter |
@@ -27,11 +28,13 @@
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**Two releases are pending, in order.** 152 is frozen at `015e789` and is not
-moved by anything here; 153 is the three commits on top of it, `dd1b093`,
-`0db855a` and `fd3b326`. Publish 152 first, then 153 — or, if it is simpler to
-publish once, publish 153 from `fd3b326` and record both versions as live from
-it, since 153 contains 152 whole.
+**Three releases are pending, in order.** 153 is frozen at `015e789` — Codex
+split it out from what this file used to call Version 152's own tip, publishing
+152 itself only as far as `b57dcb5` — and is not moved by anything here; 154 is
+the three commits on top of it, `dd1b093`, `0db855a` and `fd3b326`; 155 is one
+commit further, `6f8518b`. Publish in order — or, if it is simpler to publish
+once, publish 155 from `6f8518b` and record all three versions as live from it,
+since 155 contains 154 and 153 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -56,6 +59,140 @@ supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
 
 ---
+
+# Version 155 — Rows 1–6 of the Main Garage are READY ROWS
+
+**Publish this after Version 154.** It is a single, self-contained visual
+change requested directly: "the main garage area is split into 3 parts. The
+ready rows, the service rows, and of course the trouble rows. The one thing
+missing is defining rows 1-6 as ready rows." Only that one part — the ready
+rows — is built here, ahead of the smart tracking system the request named as
+the reason for it. Service rows and trouble rows are not part of this change.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`6f8518b`** |
+| Last code-bearing commit | `6f8518b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 154, pending from `fd3b326` |
+
+**One application commit**, rebased onto Codex's Version 152 release commit
+`d4a26fb` after it landed mid-session — the code is unchanged from the
+original commit, only its parent:
+
+```
+git show --stat 6f8518b
+ app/globals.css              | 13 +++++++++++++
+ app/page.tsx                 |  6 +++---
+ tests/rendered-html.test.mjs | 40 ++++++++++++++++++++++++++++++++++++++++
+
+git diff --name-only fd3b326 6f8518b -- app tests
+app/globals.css
+app/page.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only fd3b326 6f8518b -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **222 tests passing** (221 at Version 154, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None.** No storage key, no payload shape, and no database column changes.
+This release is markup and CSS: a class on one already-rendered `<div>` and an
+optional prop on an existing component, both additive.
+
+## What changed
+
+### The Main Garage's own grid gains a labeled boundary
+
+The Main Garage renders as one 7-row × 12-bay grid with no distinction between
+any of its rows. A thick green line now separates ROW 6 from ROW 7, and the
+section's own title bar — "MAIN GARAGE (BAYS 1-12)" plus its live bus count —
+carries a small matching badge reading **ROWS 1–6 READY**, so the split still
+reads when the section is collapsed and the grid itself is hidden.
+
+The line is a 4px top border on ROW 7's own cells — its sticky row label and
+all 12 of its bays — rather than a bottom border on ROW 6's. `.grow`, the div
+wrapping each row, renders as `display:contents` and paints nothing of its
+own, so any border has to land on the cells themselves, and a line above
+ROW 7 reads identically to one below ROW 6. The green is the same shade the
+drag-and-drop `.ready` highlight already uses elsewhere on this page for
+"this space is fine" — the same word keeps the same color rather than a
+second green meaning something else on the same screen.
+
+The badge is a new optional prop, `badge`, on `T` — the title-bar component
+every section on the Facility Map shares — rendered beside the existing count
+pill. It is additive by construction: a section that never passes one (every
+section except the Main Garage, today) renders exactly as it always has, and
+nothing about how sections count buses, drag-and-drop, collapse, or report
+their name to the operator or to `RELOCATION_AREAS` changes. The existing
+column split — `MAIN GARAGE (BAYS 1-10)` versus `TROUBLE BAY 11` / `TROUBLE
+BAY 12`, used for moves and the AI Operator — is untouched; rows and columns
+are two separate dimensions of the same grid, and only the row one gained a
+label here.
+
+## Validation
+
+- 222 regression tests passing, ESLint clean, production build succeeds
+- **Driven against the PRODUCTION build at 1400×1000 and 390×844, zero console
+  errors:** computed styles confirm ROW 7's row label and every one of its 12
+  bays carry `border-top-width: 4px`, ROW 6 and every other row still carry the
+  ordinary `1px`, and the title bar's `.section-badge` renders the text `ROWS
+  1–6 READY`; a screenshot at both widths shows the pill sitting cleanly next
+  to the bus count and the green line spanning the full width of the grid,
+  under the sticky ROW 7 label and every bay to its right
+- **Scoped to the Main Garage alone:** the new `badge` prop is optional and no
+  other section's `ttl(...)` call passes one; `ready-rows-divider` appears
+  exactly once in the JSX (the one conditional on `r===6`) and its CSS rule is
+  a single selector shared by all seven rows, not one rule per row
+- **The existing bay 11/12 special-slot logic is untouched**, confirmed by the
+  same exact expression this release's test checks alongside the new divider
+  class, in the same `Array.from` call
+
+## After it is live
+
+1. **Open the Facility Map and scroll to MAIN GARAGE (BAYS 1-12).** A green
+   pill reading ROWS 1–6 READY should sit beside the bus count in the title
+   bar, and a visibly thicker green line should separate ROW 6 from ROW 7.
+2. **Collapse the section.** The badge should still be visible in the
+   collapsed title bar even though the grid itself is hidden.
+3. **On a phone**, confirm the title wraps to a second line without the badge
+   being cut off or overlapping the collapse/menu buttons.
+4. **Move a bus into or out of ROW 7 or any bay 11/12 slot** and confirm
+   nothing about moves, the operator, or bay coloring changed — this release
+   only adds a line and a label.
+
+## The way back
+
+Measured in a throwaway worktree from `6f8518b`:
+
+- `git revert 6f8518b` alone is **clean** and removes the badge, the divider,
+  and their CSS, leaving Version 154 exactly as it was.
+- Nothing in this release writes new stored state, so there is nothing to
+  clean up going backwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 155 | Live | <published tip hash> | Rows 1-6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid itself, and a matching badge sits in the section's own title bar next to its bus count so the split still reads when the section is collapsed. This is the first piece of a smart tracking system planned for later — service rows and trouble rows are not part of this change, and the existing bay 1-10 / Trouble Bay 11 / Trouble Bay 12 column split used for moves and the AI Operator is untouched |
+```
+
 
 # Version 154 — A scan sweep can be taken back out, exactly
 
