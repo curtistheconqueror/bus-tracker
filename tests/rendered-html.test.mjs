@@ -10205,3 +10205,46 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
   assert.match(css,/\.down-header-actions\{[^}]*max-width:210px/);
   assert.match(css,/\.down-header-actions\{width:100%;max-width:none\}/,"and uncapped again once the header stacks");
 });
+
+test("the location under a bus number is the control that moves it on the map", async () => {
+  const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+
+  /* THE BUS COLUMN HAD TO COME OUT OF THE CARD'S EXPAND BUTTON. An interactive
+     control nested in a button is invalid markup, and every tap on it would
+     have been eaten by the card's own expand handler. */
+  assert.match(page,/<div className="log-bus-column">/);
+  const header=page.slice(page.indexOf('<button className="log-card-main log-group-header"'),page.indexOf('</button>',page.indexOf("log-meta")));
+  assert.ok(!header.includes("log-location"),"the control must not sit inside the expand button");
+  assert.ok(!header.includes('className="log-bus"'),"and neither must the column it lives in");
+  assert.match(css,/\.log-card-group\{display:grid;grid-template-columns:82px minmax\(0,1fr\)/,"the card is the grid the header used to be");
+  assert.match(css,/\.log-card-group>\.grouped-defect-list,\.log-card-group>\.log-focus-row\{grid-column:1\/-1\}/);
+
+  /* IT IS NOT A SELECT, and that was measured rather than preferred. A native
+     select cannot wrap and this column is 72px on a phone: bound to the
+     location, 13 of the 17 labels locationLabel() can produce were cut off at
+     390 - Main Garage needed 49px against 38px of room, Foreman Office 59px.
+     The label keeps its own type and its freedom to wrap; the whole of it is
+     the target, and the editor it opens has the room the column does not. */
+  assert.doesNotMatch(page,/<select[^>]*moveBusLocation/,"a select here truncates the fact the line exists to carry");
+  assert.match(page,/<button className="log-location" type="button" onClick=\{\(\)=>setMovingMysteryBusId\(group\.bus\.id\)\}/);
+  assert.match(page,/<em>\{locationLabel\(group\.bus\.l\)\}<\/em><i aria-hidden="true">▾<\/i>/);
+  assert.match(page,/aria-label=\{"Facility location for bus "\+group\.bus\.n\+": "\+locationLabel\(group\.bus\.l\)\+"\. Move this bus\."\}/,"a screen reader gets the location and what pressing does");
+  assert.match(css,/\.log-location>em\{[^}]*overflow-wrap:anywhere\}/,"the label may still wrap, which is why it is not truncated");
+
+  /* Touch targets to this project's own standard: 44-ish on phones, 26 above.
+     Measured 40px at 360/390/430 and 26px at 820, 1180 and 1280. */
+  assert.match(css,/\.log-location\{[^}]*min-height:26px/);
+  assert.match(css,/\.log-location\{min-height:40px;padding:4px 2px\}/);
+
+  /* It opens the editor this page ALREADY opens from the deferred drawer, so
+     there is one move form on this page rather than two that drift - and that
+     one writes through moveMysteryBus, which leaves the modal open on a
+     refused write instead of reporting a move that did not happen. Driven:
+     road-1 to body-0 with the bus keeping its defect, its down flag and its
+     Down Sheet membership; then a refused write left the board byte-identical
+     with the modal still open. */
+  assert.match(page,/\{movingMysteryBus&&<MysteryMoveModal bus=\{movingMysteryBus\} fleet=\{fleet\} move=\{moveMysteryBus\}/);
+  assert.equal((page.match(/<MysteryMoveModal /g)||[]).length,1,"one move form on this page, not two");
+  assert.match(page,/if\(!writeFleetStorage\(localStorage,result\.fleet\)\)return false/,"a refused write reports false and the modal stays open");
+});
