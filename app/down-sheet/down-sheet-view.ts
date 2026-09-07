@@ -78,6 +78,14 @@ export const DOWN_SHEET_OFF_PROPERTY_PATTERN=/\boff[\s-]*(?:property|site)\b/i;
    the same data said 16 in isolation, which is why this is measured against the
    built app and not only unit-tested. */
 const REASON_PLACEHOLDERS=/^(?:repair required|repair|driver-reported defect|miscellaneous|repair required\.?)$/i;
+/* Exported because the scan asks the same question before anything is stored:
+   a field holding one of these stand-ins is a field nobody wrote in, and a row
+   that inherits its neighbour's wording has to know the difference between an
+   empty field and a filled one. One definition, two callers. */
+export function isDownSheetReasonPlaceholder(value:unknown){
+ const text=String(value??"").trim();
+ return !text||REASON_PLACEHOLDERS.test(text);
+}
 function reasonText(entry:DownSheetViewEntry){
  const items=(entry.repairItems||[]).flatMap(item=>[item.repair,item.details]);
  return [entry.repair,entry.customReason,...items]

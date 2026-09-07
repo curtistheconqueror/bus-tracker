@@ -9131,3 +9131,102 @@ test("the Main Garage marks rows 1-6 as READY ROWS, with a thick line and a matc
  assert.match(css,/\.section-badge\{[^}]*background:#d7f5e4[^}]*color:#046c3b/);
  assert.match(css,/\.grow\.ready-rows-divider>strong,\.grow\.ready-rows-divider \.spot\{border-top:4px solid #008c4d\}/);
 });
+
+test("every bus on one printed line carries that line's wording, so a PM line is not seven down buses",async()=>{
+ const {reviewScannedRows,mergeReviewedRows,fillPrintedLineSiblings,sectionForScannedRow}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const {downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+
+ const row=(over={})=>({pageNumber:2,lineNumber:"53",busNumber:"",reason:"",assignedTo:"",category:"",repair:"",section:"Pending",shift:"1st",operationalStatus:"out",confidence:.9,reviewNote:"",...over});
+ const band=record=>downSheetGroup({...record,customReason:record.reason,assignmentType:"Mechanic"});
+ const imported=(rows,fleet)=>mergeReviewedRows(reviewScannedRows(rows,fleet).map(item=>({...item,selected:true})));
+
+ /* LINE 53, the shop's standing example: PM'S written once with seven bus
+    numbers after it. The model splits it into seven rows correctly and then
+    carries the words on the FIRST row only, stamping the rest with the band
+    heading they sat under. Six buses arrived saying nothing under UNSCHEDULED
+    and the page read them as six buses down with nobody assigned — the down
+    count up by six and the inspection count down by six, off one line. */
+ const buses=["17514","17556","17525","17530","17545","17549","17552"];
+ const fleet=[...buses,"18501","18502","18503"].map(n=>({id:"b"+n,n}));
+ const line53=buses.map((n,index)=>row({busNumber:n,reason:index===0?"PM'S":"",category:index===0?"Inspection":"",repair:index===0?"A-15":"",section:index===0?"Inspection":"Pending"}));
+ const records=imported(line53,fleet);
+ assert.equal(records.length,7);
+ for(const record of records){
+  assert.equal(record.reason,"PM'S","every bus on the line says what the line says");
+  assert.equal(record.section,"Inspection");
+  assert.equal(band(record),"inspection","not one of these is a down bus");
+ }
+ // And the reviewer is told, on the row, which line it was read from.
+ const reviewed=reviewScannedRows(line53,fleet);
+ assert.match(reviewed[3].reviewNote,/Read from line 53, shared with the other buses on it/);
+ assert.equal(reviewed[0].reviewNote,"","the row that carried the wording is not annotated");
+
+ /* A FAULT written once over two buses is still a fault on both. The rule is
+    "share the line's wording", not "share the line's inspection-ness". */
+ const brakes=imported([row({lineNumber:"21",busNumber:"18501",reason:"NO BRAKES"}),row({lineNumber:"21",busNumber:"18502"})],fleet);
+ assert.deepEqual(brakes.map(record=>record.reason),["NO BRAKES","NO BRAKES"]);
+ assert.deepEqual(brakes.map(band),["unscheduled","unscheduled"]);
+
+ /* PM DEFECTS is the opposite of a PM: faults found while doing one. Both
+    buses stay down, which the inspection pattern's lookahead already ensures
+    and this pins so the sharing rule cannot quietly undo it. */
+ const defects=imported([row({lineNumber:"22",busNumber:"18501",reason:"PM DEFECTS"}),row({lineNumber:"22",busNumber:"18502"})],fleet);
+ assert.deepEqual(defects.map(band),["unscheduled","unscheduled"]);
+
+ /* Only BLANK fields are filled. Two buses on one line that genuinely came
+    back with different wording keep their own — this adds what was missing and
+    never overwrites what was read. */
+ const mixed=imported([row({lineNumber:"23",busNumber:"18501",reason:"PM'S"}),row({lineNumber:"23",busNumber:"18502",reason:"MISFIRES"})],fleet);
+ assert.deepEqual(mixed.map(record=>record.reason),["PM'S","MISFIRES"]);
+ assert.deepEqual(mixed.map(band),["inspection","unscheduled"]);
+
+ /* A bus on the sheet twice — once for a PM, once for a fault — is a bus that
+    is DOWN. The fold keeps both facts and the count picks the fault. */
+ const both=imported([row({lineNumber:"24",busNumber:"18501",reason:"PM'S",section:"Inspection"}),row({lineNumber:"31",busNumber:"18501",reason:"MISFIRES"})],fleet);
+ assert.equal(both.length,1);
+ assert.equal(both[0].reason,"PM'S / MISFIRES","both facts survive on the row");
+ assert.equal(band(both[0]),"unscheduled","and the counting picks the fault");
+
+ /* Where the bus IS still outranks what the work is: a PM line at a vendor is
+    off property, for the bus that inherited the vendor as well as the one it
+    was written on. */
+ const vendor=imported([row({lineNumber:"25",busNumber:"18501",reason:"PM'S",section:"Vendor Repair",assignedTo:"CUMMINS"}),row({lineNumber:"25",busNumber:"18502"})],fleet);
+ assert.deepEqual(vendor.map(record=>record.assignedTo),["CUMMINS","CUMMINS"]);
+ for(const record of vendor)assert.equal(downSheetGroup({...record,customReason:record.reason,assignmentType:"Mechanic"}),"off-property");
+
+ /* MARGIN ROWS INHERIT NOTHING, and that is the whole safety of this. They
+    carry no printed line number, so every pencilled row on a page would share
+    one key and take its wording from whichever came back first — one bus's
+    brake job spreading across unrelated handwritten rows. */
+ const margins=fillPrintedLineSiblings([
+  row({lineNumber:"margin",busNumber:"18501",reason:"BRAKES"}),
+  row({lineNumber:"margin",busNumber:"18502"}),
+  row({lineNumber:"",busNumber:"18503"}),
+ ]);
+ assert.deepEqual(margins.map(item=>item.reason),["BRAKES","",""]);
+ assert.deepEqual(margins.map(item=>item.reviewNote),["","",""]);
+ // A line with only one bus on it has no sibling to take anything from.
+ assert.deepEqual(fillPrintedLineSiblings([row({lineNumber:"9",busNumber:"18501"})]).map(item=>item.reason),[""]);
+ // Same printed number on a different page is a different line.
+ const pages=fillPrintedLineSiblings([row({pageNumber:1,lineNumber:"12",busNumber:"18501",reason:"PM'S"}),row({pageNumber:2,lineNumber:"12",busNumber:"18502"})]);
+ assert.deepEqual(pages.map(item=>item.reason),["PM'S",""]);
+
+ /* The row's own wording beats the band heading it sat under — the rule the
+    prompt has always stated and nothing enforced, because a valid section name
+    short-circuited before the reason was ever read. Only the three headings
+    that say WHO HAS THE BUS can be overruled; where it physically is, a
+    collision and a road call all stand. */
+ assert.equal(sectionForScannedRow("Pending","PM'S"),"Inspection");
+ assert.equal(sectionForScannedRow("Scheduled Repair","A-15"),"Inspection");
+ assert.equal(sectionForScannedRow("Pending","MISFIRES / PM'S"),"Pending","a fault alongside a PM is not maintenance");
+ assert.equal(sectionForScannedRow("Pending","PM DEFECTS"),"Pending");
+ assert.equal(sectionForScannedRow("Pending",""),"Pending");
+ for(const kept of ["Vendor Repair","Accident","Roadcall"])assert.equal(sectionForScannedRow(kept,"PM'S"),kept);
+
+ /* The prompt is the other half: the sharing rule above is the guarantee, but
+    the model should not be dropping the wording in the first place. */
+ const route=await readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8");
+ assert.match(route,/REPEAT THE LINE'S WORDING ON EVERY ONE OF THOSE ROWS/);
+ assert.match(route,/never a reason left empty on the second and later buses/);
+ assert.match(route,/Give every row of a multi-bus line the same lineNumber/);
+});

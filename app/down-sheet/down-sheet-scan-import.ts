@@ -1,4 +1,4 @@
-import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS} from "./down-sheet-view.ts";
+import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS,downSheetScheduledOnly,isDownSheetReasonPlaceholder} from "./down-sheet-view.ts";
 import {correctScannedText} from "./scan-spelling.ts";
 
 export type ScanStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -93,12 +93,81 @@ export function isMarginRow(row:{lineNumber?:string}){
  return line===""||line==="margin";
 }
 
+/* One printed line is one line, however many buses are written on it.
+
+   Line 53 on the shop's sheet is a standing example: PM'S with seven bus
+   numbers after it, and the crew writes it that way most weeks. The model
+   splits it into seven rows correctly, but carries the words "PM'S" on the
+   FIRST row only and leaves the rest blank — then stamps those blank rows with
+   whatever band heading they happened to sit under. Six buses arrive saying
+   nothing, under UNSCHEDULED, and the page has no choice but to read them as
+   six buses that are down with nobody assigned. The down count goes up by six
+   and the inspection count goes down by six, off one line of a paper sheet.
+
+   Asking the model more firmly is part of the fix and not the load-bearing
+   part: the prompt has said "each with the same reason" since multi-bus rows
+   were first handled, and this is what came back anyway. So the line itself
+   settles it here. Rows that share a page and a PRINTED line number describe
+   the same work, and a field nobody filled in takes the value from the sibling
+   that has one.
+
+   Margin rows are excluded, and that exclusion is the whole safety of this:
+   they carry no line number, so every pencilled row on a page would share one
+   key and inherit from whichever came back first — one bus's brake job
+   spreading across unrelated handwritten rows. A row with no printed number
+   inherits nothing.
+
+   Only blank fields are filled. Two buses on one line that genuinely came back
+   with different wording keep it: this can add what was missing, never
+   overwrite what was read. */
+const LINE_SHARED_FIELDS=["reason","assignedTo","category","repair"] as const;
+
+function printedLineKey(row:ScannedDownSheetRow){
+ if(isMarginRow(row))return "";
+ const line=String(row.lineNumber??"").replace(/\D/g,"");
+ return line?`${row.pageNumber||1}|${parseInt(line,10)}`:"";
+}
+
+export function fillPrintedLineSiblings(rows:ScannedDownSheetRow[]):ScannedDownSheetRow[]{
+ const byLine=new Map<string,ScannedDownSheetRow[]>();
+ for(const row of rows){
+  const key=printedLineKey(row);
+  if(key)byLine.set(key,[...(byLine.get(key)||[]),row]);
+ }
+ const shared=new Map<string,Partial<Record<typeof LINE_SHARED_FIELDS[number],string>>>();
+ for(const [key,group] of byLine){
+  if(group.length<2)continue;
+  const values:Partial<Record<typeof LINE_SHARED_FIELDS[number],string>>={};
+  for(const field of LINE_SHARED_FIELDS){
+   const written=group.map(row=>clean(row[field])).find(value=>!isDownSheetReasonPlaceholder(value));
+   if(written)values[field]=written;
+  }
+  shared.set(key,values);
+ }
+ return rows.map(row=>{
+  const values=shared.get(printedLineKey(row));
+  if(!values)return row;
+  const filled=LINE_SHARED_FIELDS.filter(field=>values[field]&&isDownSheetReasonPlaceholder(row[field]));
+  if(!filled.length)return row;
+  const next={...row} as ScannedDownSheetRow;
+  for(const field of filled)next[field]=values[field] as string;
+  /* Said out loud on the review screen rather than done quietly, so the person
+     approving the import can see which rows were read off their line and check
+     that line on the paper. */
+  const note=`Read from line ${String(row.lineNumber??"").trim()||"?"}, shared with the other buses on it`;
+  next.reviewNote=clean(row.reviewNote)?`${clean(row.reviewNote)} · ${note}`:note;
+  return next;
+ });
+}
+
 export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[],vocabulary:string[]=[]):ReviewedScanRow[]{
  const fleetByNumber=new Map<string,ScanFleetBus[]>();
  for(const bus of fleet){const number=busDigits(bus.n);if(!number)continue;fleetByNumber.set(number,[...(fleetByNumber.get(number)||[]),bus])}
  const scanCounts=new Map<string,number>();
  for(const row of rows){const number=busDigits(row.busNumber);if(number)scanCounts.set(number,(scanCounts.get(number)||0)+1)}
- return rows.map((row,index)=>{
+ /* Before anything else reads a row, so the reviewer sees the filled-in
+    wording on screen and approves what will actually be imported. */
+ return fillPrintedLineSiblings(rows).map((row,index)=>{
   const busNumber=busDigits(row.busNumber),matches=fleetByNumber.get(busNumber)||[],fleetMatch=matches.length===1?"matched":matches.length>1?"duplicate":"unknown";
   /* Corrected before anybody reads it, and still editable afterwards. A margin
      row is capped below the review threshold whatever the model claimed: it was
@@ -135,6 +204,33 @@ export function normalizedSection(value:string):ScanImportRecord["section"]{
  return "Pending";
 }
 
+/* The row's own wording beats the band heading it sat under.
+
+   The prompt has always said so — "a row's own wording still wins over the
+   heading it sits under" — but nothing enforced it: normalizedSection takes a
+   valid section name and returns it before the reason is ever consulted, so a
+   PM'S row written under the UNSCHEDULED heading came back Pending and stayed
+   Pending. The paper is not wrong to be laid out that way; a foreman writes the
+   week's PMs wherever there is room.
+
+   Only the three headings that describe WHO HAS THE BUS can be overruled, and
+   that follows the precedence the page itself documents: where a bus physically
+   is outranks what the work is, and what the work is outranks who has it. So
+   Vendor Repair, Accident and Roadcall stand — a bus at Cummins for a PM is off
+   property, and a bus that was towed is a road call whatever else is written on
+   it.
+
+   The question asked is downSheetScheduledOnly, the same predicate the bands
+   use, rather than "does an inspection word appear anywhere". A bus carrying a
+   misfire AND a PM is a bus that is down, and this must not quietly file it as
+   maintenance — which testing "does it mention a PM" would do. */
+const HEADING_SECTIONS=new Set(["Pending","Scheduled Repair","Other"]);
+export function sectionForScannedRow(section:string,reason:string):ScanImportRecord["section"]{
+ const chosen=normalizedSection(clean(section)||reason);
+ if(!HEADING_SECTIONS.has(chosen))return chosen;
+ return downSheetScheduledOnly({busNumber:"",customReason:reason,section:chosen})?"Inspection":chosen;
+}
+
 function normalizedShift(value:string):ScanImportRecord["shift"]{
  const text=clean(value).toLowerCase();
  if(text.includes("3")||text.includes("night"))return "3rd";
@@ -155,14 +251,19 @@ export function mergeReviewedRows(rows:ReviewedScanRow[]):ScanImportRecord[]{
  for(const row of selected)grouped.set(row.busId,[...(grouped.get(row.busId)||[]),row]);
  return [...grouped.values()].map(group=>{
   const first=group[0];
+  /* Everything written about the bus decides its section, not only the first
+     row's share of it. A bus that is on the sheet twice — once for a PM and
+     once for a fault — must be filed by the fault, and reading only the first
+     row would file it by whichever the model happened to return first. */
+  const reason=combineUnique(group.map(row=>row.reason));
   return {
    busId:first.busId,
    busNumber:first.busNumber,
-   reason:combineUnique(group.map(row=>row.reason)),
+   reason,
    assignedTo:combineUnique(group.map(row=>row.assignedTo)),
    category:clean(first.category)||"Miscellaneous",
    repair:clean(first.repair)||"Driver-reported defect",
-   section:normalizedSection(first.section||first.reason),
+   section:sectionForScannedRow(first.section,reason),
    shift:normalizedShift(first.shift),
    operationalStatus:normalizedStatus(first.operationalStatus),
   };
