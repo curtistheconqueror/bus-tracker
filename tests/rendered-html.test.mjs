@@ -9424,4 +9424,18 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.match(page,/SHOW THE WHOLE SHEET/);
  assert.match(css,/\.down-group-counts \.group-count\.group-road\{[^}]*cursor:pointer/);
  assert.match(css,/\.down-group-counts \.group-count\.group-road-down\.active/);
+
+ /* AND THE SAME FACT ON EVERY ROW, beside the bus number, so it reads while
+    scrolling without pressing anything. It sits OUTSIDE the edit button: where
+    a bus is comes from the map and this page does not own it, so the badge must
+    not look like a way to change it. */
+ assert.match(page,/isDownSheetRoadLocation\(locations\[entry\.busId\]\|\|""\)&&<i className="on-road-badge"/);
+ assert.ok(page.includes('</button>{isDownSheetRoadLocation'),"the badge follows the button rather than sitting inside it");
+ assert.match(css,/\.on-road-badge\{[^}]*white-space:nowrap/,"a badge that wrapped would push every row taller");
+ /* 108px fitted the number and its status label exactly, so the badge beside it
+    overflowed into the reason column and was clipped by 21px in the built page.
+    The column is sized for what it now carries, and the table's min-width rose
+    by the same 40px so no other column lost room to it. */
+ assert.match(css,/\.down-table th:nth-child\(2\)\{width:148px\}/);
+ assert.match(css,/\.down-table\{[^}]*min-width:1200px/);
 });

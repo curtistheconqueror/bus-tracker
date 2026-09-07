@@ -15,7 +15,7 @@ import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type Repair
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
-import {downSheetRoadCounts,downSheetRoadEntries,downSheetWorkGroup,groupDownSheetEntries,matchesDownSheetSearch,type DownSheetOrder,type DownSheetRoadKind} from "./down-sheet-view";
+import {downSheetRoadCounts,downSheetRoadEntries,downSheetWorkGroup,groupDownSheetEntries,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetOrder,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -343,7 +343,13 @@ export default function DownSheet(){
        <tr className={"down-group-row group-"+group.key}><td colSpan={9}><b>{group.label}</b><i>{group.entries.length}</i><span>{group.hint}</span></td></tr>
        {group.entries.map((entry,index)=>{const work=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(group.entries[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&work.label!==previous?.label&&<tr className={"work-group-row group-"+work.rank}><td colSpan={9}>{work.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
       <td className="line-number">{String(offset+index+1).padStart(2,"0")}</td>
-      <td className="fleet-number"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button></td>
+      {/* ON ROAD, beside the number, on every row that is out working. The two
+          tallies above give the counts; this is the same fact per bus, so it
+          reads while scrolling without pressing anything. It sits outside the
+          edit button on purpose — it is a fact about where the bus is, which
+          this page reads from the map and does not own, so pressing it must not
+          look like a way to change it. */}
+      <td className="fleet-number"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button>{isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}</td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
