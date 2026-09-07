@@ -59,7 +59,6 @@ type DownEntry={
 
 const MAX_ENTRIES=98;
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
-const STATS_OPEN_KEY="pace-down-sheet-stats-open-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 /* The last thing done to a single row, kept so it can be taken back. Separate
    from the scan and clear undos on purpose: deleting or closing out one bus is
@@ -69,6 +68,7 @@ const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
    sheet, only one can be the most recent, and a foreman who has just pressed
    the wrong one wants the same words in the same place either way. */
 const ENTRY_UNDO_KEY="pace-down-sheet-entry-undo-v1";
+const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1";
 type RowAction={kind:"deleted"|"fixed";id:string;busNumber:string};
 function readRowAction(raw:string|null):RowAction|null{
  if(!raw)return null;
@@ -155,6 +155,7 @@ function isToday(value:string){return Boolean(value)&&new Date(value).toDateStri
 function timeLabel(value:string){if(!value)return "Not updated";return new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value))}
 
 export default function DownSheet(){
+ const [advancedOpen,setAdvancedOpen]=useState(false);
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [fleet,setFleet]=useState<FleetBus[]>([]);
  const [entries,setEntries]=useState<DownEntry[]>([]);
@@ -168,10 +169,9 @@ export default function DownSheet(){
  const [hydrated,setHydrated]=useState(false);
  const [editing,setEditing]=useState<DownEntry|null>(null);
  /* Absent means closed, like the Defect Log's. A device that has never opened
-    the stats does not have to write anything to say so. */
- const [statsOpen,setStatsOpen]=useState(false);
- useEffect(()=>{setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
+    the panel does not have to write anything to say so. */
+ useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
@@ -461,53 +461,57 @@ export default function DownSheet(){
  return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
-   <TrackerNav active="/down-sheet"/><RefreshButton/>
+   <TrackerNav active="/down-sheet"/>
+   {/* One column so ADVANCED ACTIONS sits directly under REFRESH at every
+       width, the same shape the Defect Log's header uses. */}
+   <div className="down-header-actions">
+    <RefreshButton/>
+    <button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
+     <span><b>ADVANCED ACTIONS</b><small>Shifts, completed, scan sheet and clearing</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
+    </button>
+   </div>
   </header>
 
-  {/* Eight tiles were the first thing on the sheet, above the filters and above
-      the button that adds a bus. Behind one bar now, carrying the numbers worth
-      a glance, remembered per device. COMPLETED TODAY stays a button inside —
-      it filters — so it is only reachable with the panel open, same as before
-      it had a bar in front of it. */}
-  <section className={"sheet-stats"+(statsOpen?" open":"")}>
-   <button type="button" className="sheet-stats-toggle" aria-expanded={statsOpen} onClick={()=>setStatsOpen(open=>!open)}>
-    <b>SHEET STATS</b><small>{counters.active} {String(displaySettings.labels.active).toLowerCase()} · {counters.pending} {String(displaySettings.labels.pending).toLowerCase()} · {formatRepairTime(counters.activeMinutes)} est. labor · {active.length}/{MAX_ENTRIES} capacity</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
-   </button>
-   {statsOpen&&<section className="down-summary" aria-label="Down sheet summary">
-   <div className="primary-count"><strong>{counters.active}</strong><span>{displaySettings.labels.active}</span></div>
-   <div><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
-   <div><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
-   <div><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>
-   <button type="button" className={"completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
-   <div className="labor-total"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
-   <div className="labor-total view-total"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>
-   <div className="capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
-   </section>}
-  </section>
+  {/* ADVANCED ACTIONS, the Down Sheet's own.
 
-  <section className="down-controls">
-   {/* The one thing this page is for, first and full width. It used to sit in
-       the bottom-right of a block of six, below CLEAR DOWNSHEET. */}
-   <button className="down-primary-action" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES} title={active.length>=MAX_ENTRIES?"The sheet is full at "+MAX_ENTRIES+" buses":"Add a bus to the Down Sheet"}>+ ADD DOWN BUS</button>
-   <div className="shift-filter" aria-label="Filter down sheet by shift">
-    <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value.toUpperCase()}{value!=="All"&&<b>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</b>}</button>)}
-   </div>
-   <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
-   <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
-   
-   {/* Clearing the sheet and undoing an import are recovery, not daily work.
-       They were the loudest things on the page — a red CLEAR DOWNSHEET beside
-       two amber buttons — sitting above the button that adds a bus. They are
-       behind MORE now, and the undos still appear only when there is something
-       to undo, so the row is usually just the one item. */}
-   <details className="down-more">
-    <summary>MORE</summary>
-    <div>
+      Same idea as the Defect Log's and deliberately not the same colour: both
+      headers are navy, so a translucent-white button on this one would have
+      been indistinguishable from that one at a glance. This wears the purple
+      the Down Sheet already uses for SCAN SHEET, which is the tell for which
+      page you are on.
+
+      What went in: the shift filter and SHOW COMPLETED, which change what the
+      sheet shows, and SCAN SHEET with the recovery buttons, which act on the
+      sheet itself. What stayed out: the two things used on every visit, ADD
+      DOWN BUS and SEARCH, which now sit together instead of with a block of
+      controls wedged between them. */}
+  {advancedOpen&&<section className="down-advanced open" id="down-advanced-drawer">
+   <div className="down-advanced-body">
+    <div className="down-advanced-group">
+     <b className="down-advanced-label">VIEW</b>
+     <div className="shift-filter" aria-label="Filter down sheet by shift">
+      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL":value.toUpperCase()}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
+     </div>
+     <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
+    </div>
+    <div className="down-advanced-group">
+     <b className="down-advanced-label">TOOLS</b>
+     {/* Clearing the sheet and undoing an import are recovery, not daily work.
+         They were the loudest things on the page — a red CLEAR DOWNSHEET beside
+         two amber buttons — sitting above the button that adds a bus. The undos
+         still appear only when there is something to undo. */}
+     <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
      {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
      {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
      <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
     </div>
-   </details>
+   </div>
+  </section>}
+
+  <section className="down-controls">
+   {/* The one thing this page is for, first and full width — and now directly
+       above SEARCH rather than separated from it by six other controls. */}
+   <button className="down-primary-action" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES} title={active.length>=MAX_ENTRIES?"The sheet is full at "+MAX_ENTRIES+" buses":"Add a bus to the Down Sheet"}>+ ADD DOWN BUS</button>
   </section>
 
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
@@ -528,6 +532,29 @@ export default function DownSheet(){
        are on the sheet, and how many of them are actually a bus down. */}
    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
    {sheetGroups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
+   {/* SHEET STATS used to be a second scoreboard behind its own bar, saying
+       most of this again in a different shape. Curtis reads this one — "I like
+       the way it's organized and the color scheme" — so the tiles worth having
+       came down here and that panel is gone.
+
+       ACTIVE DOWN did not come with them. It counted the whole active sheet
+       while TOTAL ON SHEET counts the current view, which is why they read the
+       same number on ALL with no search and looked like a duplicate. Nothing
+       is lost: SHEET CAPACITY still prints the whole-sheet count beside its
+       ceiling. */}
+   <div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
+   <div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
+   <div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>
+   {/* Still a button, because it filters. Same press-to-narrow behaviour the
+       two road tallies have, so it belongs with them rather than looking like
+       a number you cannot touch. */}
+   <button type="button" className={"group-count group-completed completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
+   <div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
+   <div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
+   {/* Only once it has something of its own to say. Unfiltered it is the same
+       number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
+       side by side is exactly the duplication this was meant to clear. */}
+   {visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
    {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
        the sheet?" while looking at the yard; these answer "is this one out
        working?" while looking at the sheet — which the sheet itself could not

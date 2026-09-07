@@ -503,3 +503,60 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .scan-row.unsure{border-color:#d9a441;background:#fffaf1}
 .scan-row .scan-bus u{margin-top:2px;display:block;color:#8a5600;font-size:7px;font-weight:900;letter-spacing:.3px;text-decoration:none}
 @media(max-width:760px){.scan-row .scan-bus u{font-size:9px}}
+
+/* The tiles that came down from SHEET STATS, in the scoreboard's own language.
+
+   They keep the colours they had where that made a point - the labour estimate
+   stays amber, COMPLETED TODAY stays green when it is filtering - and take the
+   neutral slate of the bands where they did not, so the coloured tiles stay the
+   ones that mean something: down is red, scheduled green, inspections purple.
+
+   The labour tiles print a time rather than a count, so their text steps down;
+   at 20px "244h 30m" wrapped mid-value. */
+.down-group-counts .group-count.group-pending,.down-group-counts .group-count.group-accident,.down-group-counts .group-count.group-waiting,.down-group-counts .group-count.group-capacity{border-color:#b7c3d7;background:#f5f7fb}
+.down-group-counts .group-count.group-pending strong,.down-group-counts .group-count.group-accident strong,.down-group-counts .group-count.group-waiting strong,.down-group-counts .group-count.group-capacity strong{color:#3f5573}
+.down-group-counts .group-count.group-capacity strong small{font-size:11px;font-weight:900;color:#7787a2}
+.down-group-counts .group-count.group-labor{border-color:#d8ad42;background:#fff8dd}
+.down-group-counts .group-count.group-labor strong{color:#6f4c00;font-size:15px}
+.down-group-counts .group-count.group-view-labor{border-color:#76acd9;background:#edf7ff}
+.down-group-counts .group-count.group-view-labor strong{color:#075b9f;font-size:15px}
+.down-group-counts .group-count.group-completed{font:inherit;cursor:pointer}
+.down-group-counts .group-count.group-completed:disabled{cursor:default;opacity:.55}
+.down-group-counts .group-count.group-completed.active{border-color:#087347;background:#e8f8ef;box-shadow:inset 0 0 0 1px #087347}
+.down-group-counts .group-count.group-completed.active strong{color:#065c39}
+@media(max-width:760px){.down-group-counts .group-count.group-labor strong,.down-group-counts .group-count.group-view-labor strong{font-size:17px}}
+
+/* ADVANCED ACTIONS on the Down Sheet.
+
+   PURPLE ON PURPOSE. The Defect Log's version of this button is translucent
+   white on navy, and this header is navy too — the same treatment here would
+   have made the two pages' headers read as the same header. #6b31b6 is what
+   SCAN SHEET already wears on this page and nothing on the Defect Log does, so
+   the button says which sheet you are on before you have read a word of it. */
+.down-header-actions{flex:none;display:flex;min-width:0;max-width:210px;flex-direction:column;align-items:stretch;gap:7px}
+.down-advanced-toggle{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #a271e8;border-radius:6px;background:#6b31b6;color:#fff;padding:6px 12px;font:inherit;cursor:pointer;box-shadow:0 0 0 2px #6b31b633}
+.down-advanced-toggle:hover,.down-advanced-toggle:focus-visible{background:#7d3ccd;border-color:#fff;outline:none}
+.down-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
+.down-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.5px}
+.down-advanced-toggle small{min-width:0;color:#e4d3fb;font-size:7px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.down-advanced-toggle>i{flex:none;border:1px solid #ffffff8a;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+/* The drawer opens directly under the header, so it loses the rounded top a
+   card in the middle of the page would have. */
+.down-advanced{margin:0 14px 10px;overflow:hidden;border:1px solid #b7c3d7;border-top:0;border-radius:0 0 9px 9px;background:#fff}
+.down-advanced-body{display:grid;gap:9px;padding:9px;background:#eef2f8}
+.down-advanced-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px;align-items:center;border:1px solid #c4cedd;border-radius:7px;background:#fff;padding:8px}
+.down-advanced-label{grid-column:1/-1;font-size:7px;font-weight:900;letter-spacing:.6px;color:#60728c}
+.down-advanced-group>.shift-filter{display:contents}
+.down-advanced-group>.shift-filter>span{align-self:center;font-size:7px;font-weight:900;letter-spacing:.5px;color:#60728c}
+.down-advanced-group>.shift-filter>button,.down-advanced-group>.completed-toggle,.down-advanced-group>button{width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:5px;margin:0;text-align:center}
+@media(max-width:760px){
+ .down-header-actions{width:100%;max-width:none}
+ .down-advanced-toggle{min-height:44px}
+ .down-advanced{margin:0 8px 8px}
+ .down-advanced-group{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .down-advanced-group>.shift-filter>span{grid-column:1/-1}
+}
+/* ADD DOWN BUS is the only thing left in its row, and SEARCH is the next thing
+   under it rather than six controls away. */
+.down-controls{gap:0}
+.down-controls>.down-primary-action{width:100%}

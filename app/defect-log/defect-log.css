@@ -411,7 +411,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .brake-test-result .brake-test-fail.selected{background:#b3261e;color:#fff}
 .brake-test-result>small{font-size:8px;line-height:1.4;color:#5a6a86}
 @media(max-width:760px){.brake-test-result button{min-height:50px;font-size:13px}}
-.quick-filter-deferred-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 9px;border-top:1px solid var(--log-border);background:color-mix(in srgb,#0e7490 8%,var(--log-surface))}.quick-filter-deferred-row small{font-size:8px;font-weight:900;color:#0b6b80}.quick-filter-deferred-row small.deferred-overdue{color:#b3261e}.quick-filter-deferred-row .mystery-move{min-width:0;min-height:32px;font-size:7px}
+.quick-filter-deferred-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);align-items:center;gap:8px;padding:6px 9px;border-top:1px solid var(--log-border);background:color-mix(in srgb,#0e7490 8%,var(--log-surface))}.quick-filter-deferred-row small{font-size:8px;font-weight:900;color:#0b6b80}.quick-filter-deferred-row small.deferred-overdue{color:#b3261e}.quick-filter-deferred-row .mystery-move{min-width:0;min-height:32px;font-size:7px}
 
 /* Causes learned under this symptom. Chips rather than a dropdown: on a phone a
    select hides its options behind a tap, and the whole point is that the
@@ -721,3 +721,66 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the two things used on every visit and they get their own air. */
 .log-controls{margin-top:12px}
 @media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:44px}.log-controls{margin-top:14px;row-gap:11px}}
+
+/* END DEFERRAL, beside MOVE / LOCATION on a held bus.
+
+   Three slots rather than a flex row with space-between: the timer is as wide
+   as its own text and the two buttons split what is left evenly, so they stay
+   the same size as each other whether the timer reads 1M or 44H 44M. On a
+   phone the timer takes its own line above them - three things across 360px
+   put END DEFERRAL under 90px, which is not a target anybody hits with a
+   glove on.
+
+   It carries the teal that DEFERRED already uses everywhere else in this app,
+   because it is the way out of that state rather than a new kind of thing. */
+.quick-filter-deferred-row .end-deferral{min-width:0;min-height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #0e7490;border-radius:6px;background:#e8f5f8;color:#0b6679;padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap}
+.quick-filter-deferred-row .end-deferral:hover,.quick-filter-deferred-row .end-deferral:focus-visible{background:#d7f0f7;outline:none}
+.quick-filter-deferred-row .end-deferral:disabled{opacity:.55;cursor:default}
+@media(max-width:760px){
+ .quick-filter-deferred-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .quick-filter-deferred-row>small{grid-column:1/-1}
+ .quick-filter-deferred-row .end-deferral,.quick-filter-deferred-row .mystery-move{min-height:44px;font-size:9px}
+}
+
+/* The bus column, now a sibling of the card's expand button.
+
+   It had to come out of that button so the location could become a control -
+   a select nested in a button is invalid markup and every tap on it would have
+   been eaten by the card's expand handler. The card becomes the grid the
+   header used to be, the header keeps the columns that are left, and the
+   expanded list runs the full width under both.
+
+   The column keeps the same widths it had as the header's first column - 82px,
+   72px on a phone, 64px under 390 - so the bus numbers still line up down the
+   page and nothing beside them moved. */
+.log-card-group{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:start}
+.log-card-group>.log-group-header{grid-column:2;grid-template-columns:minmax(0,1fr) 150px}
+.log-card-group>.grouped-defect-list,.log-card-group>.log-focus-row{grid-column:1/-1}
+.log-bus-column{grid-column:1;display:flex;min-width:0;flex-direction:column;gap:4px;padding:10px 0 10px 12px}
+.log-bus-column>.log-bus{min-width:0}
+/* The location line: the same text it always read, now the thing you press.
+
+   IT IS NOT A SELECT, and that was measured rather than preferred. A native
+   select cannot wrap, and this column is 82px wide - 72px on a phone, 64px
+   under 390. Bound to the location, 13 of the 17 labels locationLabel() can
+   produce were cut off at 390: Main Garage needed 49px against 38px of room,
+   Foreman Office 59px. The line exists to say where the bus is; a control that
+   hides that in order to become clickable is a worse line than a plain label.
+
+   So the label keeps its own type and its freedom to wrap, and the whole of it
+   is the target. The caret says it does something; the editor it opens has the
+   room the column does not. */
+.log-location{width:100%;min-width:0;min-height:26px;display:flex;align-items:center;gap:3px;border:1px solid transparent;border-radius:5px;background:transparent;padding:1px 2px;font:inherit;text-align:left;cursor:pointer}
+.log-location>em{min-width:0;color:var(--log-muted,#60728c);font-size:8px;font-style:normal;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.log-location>i{flex:none;color:var(--log-muted,#60728c);font-size:7px;font-style:normal;line-height:1}
+.log-location:hover,.log-location:focus-visible{border-color:var(--log-accent,#0b64bd);background:color-mix(in srgb,var(--log-accent,#0b64bd) 8%,var(--log-surface,#fff));outline:none}
+.log-location:hover>em,.log-location:focus-visible>em,.log-location:hover>i,.log-location:focus-visible>i{color:var(--log-accent,#0b64bd)}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media(max-width:760px){
+ .log-card-group{grid-template-columns:72px minmax(0,1fr)}
+ .log-card-group>.log-group-header{grid-template-columns:minmax(0,1fr)}
+ .log-card-group>.log-group-header .log-meta{grid-column:1/-1}
+ .log-bus-column{padding:10px 0 10px 9px}
+ .log-location{min-height:40px;padding:4px 2px}.log-location>em{font-size:9px}
+}
+@media(max-width:390px){.log-card-group{grid-template-columns:64px minmax(0,1fr)}}

@@ -630,6 +630,36 @@ export default function DefectLog(){
  const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const undoDeferred=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:now},false,now);if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Undid Deferred status for Bus "+record.bus.n});persist(result.fleet,result.downEntries)};
+ /* END DEFERRAL from the drawer itself.
+
+    The drawer listed the held buses and offered no way to release one: the
+    only END DEFERRAL in the app was UNDO DEFERRED inside an expanded Defect
+    Log card, which means finding the bus again in the feed you had just
+    filtered away from. Reported as "where is my (end defer status) or simply
+    remove button for this section?".
+
+    It releases EVERY deferred repair on the bus, not the one whose timer the
+    row happens to show. The drawer is one card per BUS while the deferral is
+    per DEFECT, so a bus held on two repairs would otherwise come back to the
+    drawer still deferred and look like the button had not worked.
+
+    The fold threads each save into the next rather than calling the existing
+    single-record handler in a loop: that one snapshots `fleet` for UNDO on
+    every call, so the second pass would have captured the already-changed
+    board and undo would only have reached the last repair. One snapshot, taken
+    before anything moves, and one write at the end. */
+ const endDeferralForBus=(bus:DefectLogFleetBus,deferred:StructuredDefect[])=>{
+  if(!deferred.length)return;
+  const now=new Date().toISOString();
+  let nextFleet=fleet,nextDown=downEntries;
+  for(const defect of deferred){
+   const result=saveDefectLogRecord(nextFleet,nextDown,bus.id,{...defect,state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:now},false,now);
+   if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}
+   nextFleet=result.fleet;nextDown=result.downEntries;
+  }
+  setUndoSnapshot({fleet,downEntries,label:"Ended Deferred status for Bus "+bus.n});
+  persist(nextFleet,nextDown);
+ };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
 
@@ -745,7 +775,7 @@ export default function DefectLog(){
       the card. The comparisons that matter — the 90-minute alert and the
       evening review — still read the real signed value and correctly ignore
       a stay that has not started yet. */
-   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null;return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
+   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null;return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
   {/* MYSTERY BUSES moved to the Down Sheet. Every bus it lists is a bus that is
       NOT on that sheet, so it belongs beside the sheet rather than here. The
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}
@@ -754,12 +784,39 @@ export default function DefectLog(){
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
+    {/* OUTSIDE the header button, which is why this column moved out of it at
+        all: a select nested in a button is invalid, and every tap on it would
+        have been swallowed by the card's own expand handler.
+
+        The bus number keeps its place and its size; what changed is that the
+        line under it is now the control rather than a label. */}
+    <div className="log-bus-column">
+     <span className="log-bus"><small>BUS</small><span className="log-bus-number" data-status={group.bus.s}><strong>{group.bus.n}</strong></span></span>
+     {/* A BUTTON, NOT A SELECT, and that was measured rather than preferred.
+
+         A native select cannot wrap, and this column is 82px wide - 72px on a
+         phone, 64px under 390. Bound to the location, 13 of the 17 labels
+         locationLabel() can produce were cut off at 390: Main Garage needed
+         49px against 38px of room, Foreman Office 59px. The line exists to say
+         where the bus is, and a control that hides that to become clickable is
+         a worse line than the one it replaced.
+
+         So the label stays exactly what it was - the same text, still free to
+         wrap onto two lines - and the whole of it is the target. It opens the
+         move editor this page already opens from the deferred drawer, which
+         has room for the full area names, their open counts, and which ones
+         are full. */}
+     <button className="log-location" type="button" onClick={()=>setMovingMysteryBusId(group.bus.id)}
+      aria-label={"Facility location for bus "+group.bus.n+": "+locationLabel(group.bus.l)+". Move this bus."}
+      title={"Move bus "+group.bus.n+" on the Facility Map"}>
+      <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
+     </button>
+    </div>
     <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row
          carries its own emoji, where it is accurate to that row. */}
-     <span className="log-bus"><small>BUS</small><span className="log-bus-number" data-status={group.bus.s}><strong>{group.bus.n}</strong></span><em>{locationLabel(group.bus.l)}</em></span>
      {/* Plain text, no inline emoji: the round icon to the left already carries
          the category glyph, and repeating it here made a single-defect title
          start further right than "MULTIPLE DEFECTS" on the card above it. */}

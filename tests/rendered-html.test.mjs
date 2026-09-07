@@ -1193,24 +1193,36 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Interactive Down Sheet/);
-  assert.match(html, /aria-pressed="true">ALL/);
-  assert.match(html, />1ST</);
-  assert.match(html, />2ND</);
-  assert.match(html, />3RD</);
-  assert.match(html, /ACTIVE DOWN/);
+  /* The shift filter moved into ADVANCED ACTIONS, which opens closed, so it is
+     not in the first render at all - and that is the point of the change: what
+     the page opens on is ADD DOWN BUS and SEARCH, not a block of controls. */
+  assert.match(html, /class="down-advanced-toggle"[^>]*aria-expanded="false"/);
+  assert.doesNotMatch(html, /aria-pressed="true">ALL/);
+  for(const shift of [/>1ST</,/>2ND</,/>3RD</,/SHOW COMPLETED/,/SCAN SHEET/,/CLEAR DOWNSHEET/])
+   assert.doesNotMatch(html, shift, "it lives behind the closed panel now");
+  assert.doesNotMatch(html, /ACTIVE DOWN(?! COUNT)/, "the duplicate of TOTAL ON SHEET went with the panel; the footnote's ACTIVE DOWN COUNT is not it");
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
   assert.match(html, /MECHANIC \/ VENDOR/);
-  /* The eight stat tiles are behind SHEET STATS now, closed by default, so the
-     capacity tile is not in the first render. The bar that replaced them
-     carries the capacity figure, and the page opens on the button that adds a
-     bus instead of on a scoreboard. */
-  assert.match(html, /SHEET STATS/);
-  assert.doesNotMatch(html, /SHEET CAPACITY/);
+  /* SHEET STATS is gone. It was a second scoreboard behind its own bar saying
+     most of what the tiles below already said, in a different shape; the ones
+     worth keeping moved down into those tiles and the panel with them.
+
+     ACTIVE DOWN did not move. It counted the whole active sheet while TOTAL ON
+     SHEET counts the current view, which is why they printed the same number
+     on ALL with no search and read as a duplicate. SHEET CAPACITY still prints
+     the whole-sheet count, so no number was actually lost - which is the thing
+     to check here, not the panel's absence. */
+  assert.doesNotMatch(html, /SHEET STATS/);
+  assert.match(html, /SHEET CAPACITY/);
+  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR"])
+   assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" came down into the tiles rather than being dropped");
+  /* What the page opens on: the button that adds a bus, and the search under
+     it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
+     asserted absent above. */
   assert.match(html, /\+ ADD DOWN BUS/);
-  assert.match(html, /SHOW COMPLETED/);
-  assert.match(html, /ADD DOWN BUS/);
-  assert.match(html, /CLEAR DOWNSHEET/);
+  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS is alone in its row now");
+  assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
   assert.match(html, /QUICK NOTES/);
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
@@ -6726,7 +6738,7 @@ test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
  // It counted the right thing and did nothing when pressed, so "what did we
  // actually finish today" could only be reached by turning on SHOW COMPLETED
  // and reading past the whole live sheet.
- assert.match(page,/<button type="button" className=\{"completed-today-tile"/);
+ assert.match(page,/className=\{"group-count group-completed completed-today-tile"/,"it moved into the scoreboard with the rest of SHEET STATS");
  assert.match(page,/aria-pressed=\{fixedToday\}/);
  // Pressing replaces the view rather than adding to it: completed, and today.
  // A repair finished last week is not what the tile counts and must not appear.
@@ -6735,9 +6747,10 @@ test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
  assert.match(page,/fixedToday\?[^;]*\)&&\(filter==="All"\|\|entry\.shift===filter\)&&matchesDownSheetSearch/);
  // Nothing to show and not already showing it means nothing to press.
  assert.match(page,/disabled=\{!counters\.completedToday&&!fixedToday\}/);
- // The tile has to keep looking like the tiles beside it, which are divs.
- assert.match(css,/\.down-summary>div,\.down-summary>button\{min-height:64px/);
- assert.match(css,/\.completed-today-tile\.active\{/);
+ // It has to keep looking like the tiles beside it, which are divs - and like
+ // the two road tallies, which are the other tiles you can press.
+ assert.match(css,/\.down-group-counts \.group-count\.group-completed\{font:inherit;cursor:pointer\}/);
+ assert.match(css,/\.down-group-counts \.group-count\.group-completed\.active\{/);
 });
 
 test("a fixed repair says which surface it came off",async()=>{
@@ -10059,4 +10072,179 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     that was actually measured good. */
  assert.ok(busCol>=238,"the bus column is "+busCol+"px, too narrow for the number, its status label, ON ROAD and DELETE together");
  assert.equal(tableMin,1052+busCol,"the table's min-width has to rise with the bus column, or the extra room is taken from another column");
+});
+
+test("a deferred bus can be released from the drawer that lists it, and the badge moves without a reload", async () => {
+  const storage = await readFile(new URL("../app/storage.ts", import.meta.url), "utf8");
+  /* THE `storage` EVENT DOES NOT FIRE IN THE TAB THAT WROTE. That is the whole
+     bug: defer a bus or end a deferral and the DEFERRED badge sat stale until
+     its own sixty-second tick or a reload. Measured on the old code - the
+     record read "open" while the badge still read 2 DEFERRED. */
+  assert.match(storage,/export const RECORDS_WRITTEN_EVENT="pace-records-written"/);
+  /* Announced from the two record writers, not from each caller: every writer
+     in the app already goes through them, and a caller that forgot is exactly
+     how this goes stale again. */
+  assert.match(storage,/storage\.setItem\(FLEET_STORAGE_KEY,serializeFleetPayload\(buses,current\.envelope\)\);announceWrite\(FLEET_STORAGE_KEY\);return OK/);
+  assert.match(storage,/storage\.setItem\(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload\(entries,current\.envelope\)\);announceWrite\(DOWN_SHEET_STORAGE_KEY\);return OK/);
+  /* Only after a write that SUCCEEDED - a refused write changed nothing and
+     must not make a listener re-read as though it had. Both announcements sit
+     inside the try, ahead of the return, never in the catch. */
+  assert.doesNotMatch(storage,/catch\(error\)\{[^}]*announceWrite/);
+  /* And it must not throw on a server render, where there is no window. */
+  assert.match(storage,/function announceWrite\(key:string\)\{\n if\(typeof window==="undefined"/);
+
+  const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
+  assert.match(watch,/window\.addEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"the badge listens for it");
+  assert.match(watch,/window\.removeEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"and stops listening when it unmounts");
+
+  const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+  /* The drawer listed held buses and offered no way out of the state: the only
+     END DEFERRAL was inside an expanded feed card, which means finding the bus
+     again in the feed you had just filtered away from. */
+  assert.match(page,/className="end-deferral" onClick=\{\(\)=>endDeferralForBus\(bus,defects\)\}/);
+  assert.match(page,/const endDeferralForBus=\(bus:DefectLogFleetBus,deferred:StructuredDefect\[\]\)=>\{/);
+  /* IT RELEASES EVERY DEFERRED REPAIR ON THE BUS. The drawer is one card per
+     BUS and a deferral is per DEFECT, so a bus held on two repairs would come
+     straight back to the drawer and look like the button had not worked. */
+  assert.match(page,/for\(const defect of deferred\)\{/);
+  assert.match(page,/nextFleet=result\.fleet;nextDown=result\.downEntries;/,"each save threads into the next");
+  /* ONE snapshot, taken before anything moves. Calling the single-record
+     handler in a loop would snapshot the already-changed board on the second
+     pass, and UNDO would then only reach the last repair. */
+  const body=page.slice(page.indexOf("const endDeferralForBus="),page.indexOf("const movingMysteryBus="));
+  assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,"exactly one undo snapshot for the whole release");
+  assert.equal((body.match(/persist\(/g)||[]).length,1,"and one write at the end");
+  assert.ok(body.indexOf("setUndoSnapshot")>body.indexOf("for(const defect of deferred)"),"snapshot is of the fleet as it was, taken from the closure not the fold");
+  assert.match(body,/if\(result\.error\)\{alert\([^)]*\);return\}/,"a refused save stops the release rather than writing a half-done board");
+
+  const css = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  /* Three slots, so the two buttons stay the same size as each other whatever
+     the timer reads - and on a phone the timer takes its own line, because
+     three things across 360px put END DEFERRAL under 90px. */
+  assert.match(css,/\.quick-filter-deferred-row\{display:grid;grid-template-columns:auto minmax\(0,1fr\) minmax\(0,1fr\)/);
+  assert.match(css,/\.quick-filter-deferred-row>small\{grid-column:1\/-1\}/);
+  assert.match(css,/\.quick-filter-deferred-row \.end-deferral,\.quick-filter-deferred-row \.mystery-move\{min-height:44px/);
+});
+
+test("SHEET STATS folds into the tiles the foreman actually reads, without losing a number", async () => {
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+
+  /* The panel is gone, not hidden: no toggle, no second summary grid, and no
+     state left behind still writing a key nothing reads. */
+  for(const dead of [/className=\{"sheet-stats"/,/className="sheet-stats-toggle"/,/className="down-summary"/,/STATS_OPEN_KEY/,/statsOpen/])
+   assert.doesNotMatch(page,dead,"SHEET STATS left something behind");
+
+  /* Its numbers came down into the scoreboard. All of them except ACTIVE DOWN,
+     which counted the whole active sheet while TOTAL ON SHEET counts the
+     current view - the same number on ALL with no search, which is why it read
+     as a duplicate. SHEET CAPACITY still carries the whole-sheet count. */
+  for(const tile of ["group-pending","group-accident","group-waiting","group-completed","group-labor","group-capacity"])
+   assert.match(page,new RegExp('className=(\\{)?"?group-count '+tile),tile+" must be in the scoreboard");
+  assert.match(page,/<div className="group-count group-capacity"><strong>\{active\.length\}<small> \/ \{MAX_ENTRIES\}/,"capacity keeps the whole-sheet count ACTIVE DOWN used to carry");
+
+  /* EST. CURRENT VIEW renders only when it has something of its own to say.
+     Unfiltered it equals EST. ACTIVE LABOR to the minute, and printing the
+     same duration twice side by side is the duplication this was clearing.
+     Measured: hidden unfiltered, 35h against 105h on 2nd shift, 28h against
+     105h under the road filter. */
+  assert.match(page,/\{visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+
+  /* The labour tiles print a duration rather than a count, so their text steps
+     down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */
+  assert.match(css,/\.down-group-counts \.group-count\.group-labor strong\{color:#6f4c00;font-size:15px\}/);
+
+  /* And the key that panel used is recorded as retired rather than quietly
+     dropped, because a name this repository has used must not be reused. */
+  const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  assert.match(claude,/pace-down-sheet-stats-open-v1\s+NO LONGER READ/);
+  assert.match(claude,/`pace-down-sheet-stats-open-v1` is no longer read or written/);
+});
+
+test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken for the Defect Log's", async () => {
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+
+  /* In the header, under REFRESH, in a column of its own so it is under it at
+     every width rather than only where the header happens to stack. */
+  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*<button className="down-advanced-toggle"/);
+  assert.match(css,/\.down-header-actions\{[^}]*flex-direction:column/);
+
+  /* UNMISTAKABLY THIS PAGE'S. Both headers are navy, so the Defect Log's
+     translucent white here would have made the two read as one header. This
+     wears #6b31b6 - what SCAN SHEET already wears on this page and nothing on
+     the Defect Log does. */
+  assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/);
+  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:#ffffff1f/);
+  assert.doesNotMatch(logCss,/\.header-advanced-toggle\{[^}]*background:#6b31b6/,"the two toggles must not share a colour");
+
+  /* What went in, and what deliberately stayed out. ADD DOWN BUS and SEARCH
+     are the two things used on every visit and now sit together, instead of
+     with six controls wedged between them. */
+  const drawer=page.slice(page.indexOf('className="down-advanced open"'),page.indexOf('<section className="down-controls">'));
+  for(const inside of ["shift-filter","completed-toggle","scan-sheet-button","clear-downsheet","undo-scan","undo-clear"])
+   assert.ok(drawer.includes(inside),inside+" belongs in ADVANCED ACTIONS");
+  assert.ok(!drawer.includes("down-primary-action"),"ADD DOWN BUS stays out");
+  assert.ok(!drawer.includes("down-search"),"SEARCH stays out");
+  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('<section className="down-view-controls"'));
+  assert.ok(controls.includes("down-primary-action"),"ADD DOWN BUS is what is left in that row");
+  for(const gone of ["shift-filter","completed-toggle","scan-sheet-button","down-more"])
+   assert.ok(!controls.includes(gone),gone+" moved out of the controls row");
+
+  /* Closed by default and remembered per device, under a key of its own -
+     documented, because an undocumented key is how one gets renamed later. */
+  assert.match(page,/const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1"/);
+  assert.match(page,/writeSetting\(localStorage,ADVANCED_OPEN_KEY,advancedOpen\?"1":"0"\)/);
+  const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  assert.match(claude,/pace-down-sheet-advanced-open-v1/);
+
+  /* THE COLUMN IS CAPPED. Uncapped it rendered 285px wide next to a 700px nav
+     and pushed the whole page 40px sideways at 1180 - iPad landscape - which
+     is the exact class of fault this page has already been fixed for twice. */
+  assert.match(css,/\.down-header-actions\{[^}]*max-width:210px/);
+  assert.match(css,/\.down-header-actions\{width:100%;max-width:none\}/,"and uncapped again once the header stacks");
+});
+
+test("the location under a bus number is the control that moves it on the map", async () => {
+  const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+
+  /* THE BUS COLUMN HAD TO COME OUT OF THE CARD'S EXPAND BUTTON. An interactive
+     control nested in a button is invalid markup, and every tap on it would
+     have been eaten by the card's own expand handler. */
+  assert.match(page,/<div className="log-bus-column">/);
+  const header=page.slice(page.indexOf('<button className="log-card-main log-group-header"'),page.indexOf('</button>',page.indexOf("log-meta")));
+  assert.ok(!header.includes("log-location"),"the control must not sit inside the expand button");
+  assert.ok(!header.includes('className="log-bus"'),"and neither must the column it lives in");
+  assert.match(css,/\.log-card-group\{display:grid;grid-template-columns:82px minmax\(0,1fr\)/,"the card is the grid the header used to be");
+  assert.match(css,/\.log-card-group>\.grouped-defect-list,\.log-card-group>\.log-focus-row\{grid-column:1\/-1\}/);
+
+  /* IT IS NOT A SELECT, and that was measured rather than preferred. A native
+     select cannot wrap and this column is 72px on a phone: bound to the
+     location, 13 of the 17 labels locationLabel() can produce were cut off at
+     390 - Main Garage needed 49px against 38px of room, Foreman Office 59px.
+     The label keeps its own type and its freedom to wrap; the whole of it is
+     the target, and the editor it opens has the room the column does not. */
+  assert.doesNotMatch(page,/<select[^>]*moveBusLocation/,"a select here truncates the fact the line exists to carry");
+  assert.match(page,/<button className="log-location" type="button" onClick=\{\(\)=>setMovingMysteryBusId\(group\.bus\.id\)\}/);
+  assert.match(page,/<em>\{locationLabel\(group\.bus\.l\)\}<\/em><i aria-hidden="true">▾<\/i>/);
+  assert.match(page,/aria-label=\{"Facility location for bus "\+group\.bus\.n\+": "\+locationLabel\(group\.bus\.l\)\+"\. Move this bus\."\}/,"a screen reader gets the location and what pressing does");
+  assert.match(css,/\.log-location>em\{[^}]*overflow-wrap:anywhere\}/,"the label may still wrap, which is why it is not truncated");
+
+  /* Touch targets to this project's own standard: 44-ish on phones, 26 above.
+     Measured 40px at 360/390/430 and 26px at 820, 1180 and 1280. */
+  assert.match(css,/\.log-location\{[^}]*min-height:26px/);
+  assert.match(css,/\.log-location\{min-height:40px;padding:4px 2px\}/);
+
+  /* It opens the editor this page ALREADY opens from the deferred drawer, so
+     there is one move form on this page rather than two that drift - and that
+     one writes through moveMysteryBus, which leaves the modal open on a
+     refused write instead of reporting a move that did not happen. Driven:
+     road-1 to body-0 with the bus keeping its defect, its down flag and its
+     Down Sheet membership; then a refused write left the board byte-identical
+     with the modal still open. */
+  assert.match(page,/\{movingMysteryBus&&<MysteryMoveModal bus=\{movingMysteryBus\} fleet=\{fleet\} move=\{moveMysteryBus\}/);
+  assert.equal((page.match(/<MysteryMoveModal /g)||[]).length,1,"one move form on this page, not two");
+  assert.match(page,/if\(!writeFleetStorage\(localStorage,result\.fleet\)\)return false/,"a refused write reports false and the modal stays open");
 });
