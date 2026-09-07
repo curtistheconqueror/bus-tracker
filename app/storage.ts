@@ -151,6 +151,25 @@ function isQuotaError(error:unknown){
   ||raised?.code===22||raised?.code===1014;
 }
 
+/* A same-document signal that the records changed.
+
+   The `storage` event does NOT fire in the tab that did the writing - only in
+   other tabs - so anything that reads LocalStorage on its own rather than
+   through a page's state had no way to know a write had just happened here.
+   The DEFERRED badge is the one that showed: defer a bus or end a deferral and
+   the count sat there stale until its own sixty-second tick or a reload.
+
+   Emitted from the two record writers rather than from each caller, because
+   every writer in the app already goes through them and a caller that forgot
+   is exactly how this goes stale again. Only after a write that SUCCEEDED - a
+   refused write changed nothing and must not make a listener re-read as though
+   it had. */
+export const RECORDS_WRITTEN_EVENT="pace-records-written";
+function announceWrite(key:string){
+ if(typeof window==="undefined"||typeof window.dispatchEvent!=="function")return;
+ try{window.dispatchEvent(new CustomEvent(RECORDS_WRITTEN_EVENT,{detail:{key}}))}catch{/* A browser without CustomEvent still gets the write; it just does not get told. */}
+}
+
 export function writeFleetStorageResult<T>(storage:StorageWriter,buses:T[],options:FleetWriteOptions={}):StorageWriteResult{
  const raw=storage.getItem(FLEET_STORAGE_KEY),current=readFleetPayload<T>(raw);
  if(raw!==null&&(!current.valid||!current.supported))return {ok:false,reason:"unreadable"};
@@ -160,7 +179,7 @@ export function writeFleetStorageResult<T>(storage:StorageWriter,buses:T[],optio
   const snapshot=saveFleetRecoverySnapshot(storage,raw,current.buses);
   if(!snapshot.ok)return snapshot;
  }
- try{storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));return OK}
+ try{storage.setItem(FLEET_STORAGE_KEY,serializeFleetPayload(buses,current.envelope));announceWrite(FLEET_STORAGE_KEY);return OK}
  catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
 }
 
@@ -191,7 +210,7 @@ export function writeDownSheetStorageResult<T>(storage:StorageWriter,entries:T[]
  /* This setItem was not wrapped at all, which is worse than a silent failure: a
     full device threw out of the Down Sheet's save effect and took the render
     with it. */
- try{storage.setItem(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload(entries,current.envelope));return OK}
+ try{storage.setItem(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload(entries,current.envelope));announceWrite(DOWN_SHEET_STORAGE_KEY);return OK}
  catch(error){return {ok:false,reason:isQuotaError(error)?"storage-full":"failed"}}
 }
 
