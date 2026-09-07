@@ -27,6 +27,7 @@
 
 import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import TrackerNav from "../tracker-nav";
+import RefreshButton from "../refresh-button";
 /* Every page's own stylesheet, so each panel here looks exactly as it did
    behind that page's gear. settings.css comes LAST: all three of these, and
    globals.css before them, style html, body, header and nav, and the last word
@@ -328,7 +329,7 @@ export default function SettingsPage(){
 
  return <main className="settings-app"><ShopCloudLive/>
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
-  <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/></header>
+  <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
   <nav className="settings-jump" aria-label="Settings sections">
    <a href="#master" onClick={()=>reveal("master")}>MASTER</a><a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
   </nav>

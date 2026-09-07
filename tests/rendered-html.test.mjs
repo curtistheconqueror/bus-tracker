@@ -838,7 +838,10 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(panel, /Mystery Spaces/);
   assert.match(page, /bay12AwarenessBusIds/);
   assert.match(css, /\.spot\.awareness-slot/);
-  assert.match(page, /className=\{c>=10\?"garage-special-slot":undefined\}/);
+  /* Bays 11 and 12 still take the special-slot colour. The expression now also
+     carries the ready-bay divider, so both classes are composed rather than one
+     replacing the other — asserted on the composition, not on the old shape. */
+  assert.match(page, /className=\{\[c>=10\?"garage-special-slot":"",c===6\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
   assert.match(page, /"--garage-special",visuals\.garageSpecial/);
   assert.match(page, /"--garage-frame",visuals\.garageFrame/);
   assert.match(css, /\.garage\{border-color:var\(--garage-frame\)\}/);
@@ -1074,8 +1077,13 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   const modalZ = Number(css.match(/modal-scroll-locked \.shade\{z-index:(\d+)/)?.[1] || 0);
   assert.ok(modalZ > commandZ, `Bus editor layer ${modalZ} must exceed command strip ${commandZ}`);
   assert.match(backup, /pace-south-fleet-board-backup/);
-  assert.match(page, /registration\?\.update\(\)/);
-  assert.match(page, /window\.location\.reload\(\)/);
+  /* REFRESH still behaves the same, but the behaviour lives in one shared
+     module now that all six pages carry the button — the map delegates rather
+     than keeping its own copy. */
+  assert.match(page, /<RefreshButton className="refresh-command"\/>/);
+  const refreshModule = await readFile(new URL("../app/refresh-button.tsx", import.meta.url), "utf8");
+  assert.match(refreshModule, /registration\?\.update\(\)/);
+  assert.match(refreshModule, /window\.location\.reload\(\)/);
   /* The whole-app pair moved to MASTER EXPORT / MASTER IMPORT in Settings, and
      the confirm in front of the replace went with it. The map keeps only the
      Fleet Map transfer, and points at the new home. */
@@ -9266,7 +9274,7 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  assert.match(logCss,/\.sweep-notes textarea\{/);
 });
 
-test("the Main Garage marks rows 1-6 as READY ROWS, with a thick line and a matching heading badge",async()=>{
+test("the Main Garage marks BAYS 1-6 as ready, with a line down the grid and a matching heading badge",async()=>{
  const [page,css]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
@@ -9280,30 +9288,79 @@ test("the Main Garage marks rows 1-6 as READY ROWS, with a thick line and a matc
  assert.match(page,/const ttl=\(x:string,badge\?:string\)=><T name=\{x\} count=\{sectionBusCount\(buses,SECTION_SLOTS\[x\]\|\|\[\]\)\} badge=\{badge\}/);
 
  /* Main Garage is the only section passing one right now — this is a labeled
-    boundary ahead of the smart tracking system, not a general re-theming. */
- assert.match(page,/\{ttl\("MAIN GARAGE \(BAYS 1-12\)","ROWS 1–6 READY"\)\}/);
- assert.equal((page.match(/"ROWS 1–6 READY"/g)||[]).length,1,"only the Main Garage passes this badge");
+    boundary ahead of the smart tracking system, not a general re-theming.
 
- /* The divider is a class on ROW 7's wrapping div, not ROW 6's — .grow
-    renders as display:contents and paints nothing itself, so the line has to
-    be a border on ROW 7's own cells, and a line above ROW 7 reads the same as
-    one below ROW 6. Row index 6 is ROW 7 (rows are 1-indexed on screen). The
-    existing bay 11/12 special-slot logic sits untouched in the same
-    expression. */
- assert.match(page,/\{Array\.from\(\{length:7\},\(_,r\)=><div className=\{"grow"\+\(r===6\?" ready-rows-divider":""\)\} key=\{r\}><strong>ROW \{r\+1\}<\/strong>\{Array\.from\(\{length:12\},\(_,c\)=><Spot key=\{c\} id=\{"garage-"\+\(r\*12\+c\)\} buses=\{show\} move=\{move\} edit=\{setEdit\} relocateAt=\{setRelocateSpot\} className=\{c>=10\?"garage-special-slot":undefined\}\/>\)\}<\/div>\)\}/);
- assert.equal((page.match(/ready-rows-divider/g)||[]).length,1,"one row is ever given the class — the rest stay plain \"grow\"");
- // Named twice in one rule (the row label and the bays each need the border),
- // not once per row: seven rows share this single selector.
- assert.equal((css.match(/ready-rows-divider/g)||[]).length,2);
+    BAYS, not ROWS. A bay in this shop runs front to back and is numbered 1 to
+    12 across the top of the grid; each numbered column is one bay however many
+    rows deep the grid is drawn. There is no such thing as a row in the shop,
+    so the badge must not name one. */
+ assert.match(page,/\{ttl\("MAIN GARAGE \(BAYS 1-12\)","BAYS 1–6 READY"\)\}/);
+ assert.equal((page.match(/"BAYS 1–6 READY"/g)||[]).length,1,"only the Main Garage passes this badge");
+ assert.equal((page.match(/ROWS 1–6 READY/g)||[]).length,0,"the row wording is gone — it named a thing the shop does not have");
 
- /* The badge is a small pill, not a full section re-theme, and reuses the
-    drag-and-drop .ready green rather than inventing a second "this is fine"
-    color. The divider is 4px — thick enough to read as a boundary next to
-    the grid's 1px spot borders — and lands on both the row label and every
-    bay in ROW 7, so it reads as a full-width line under the scrollable grid,
-    not just under the sticky label column. */
- assert.match(css,/\.section-badge\{[^}]*background:#d7f5e4[^}]*color:#046c3b/);
- assert.match(css,/\.grow\.ready-rows-divider>strong,\.grow\.ready-rows-divider \.spot\{border-top:4px solid #008c4d\}/);
+ /* The line runs DOWN between bay 6 and bay 7, which is column index 6 in a
+    0-indexed row of twelve, and it is drawn on the column header AND on that
+    column's cell in every row — .grow renders as display:contents and paints
+    nothing itself, so the border has to land on the actual cells. Nothing here
+    disturbs the existing bay 11/12 special-slot logic, which shares the same
+    className expression. */
+ assert.match(page,/\{Array\.from\(\{length:12\},\(_,i\)=><b key=\{i\} className=\{i===6\?"ready-bay-divider":undefined\}>\{String\(i\+1\)\.padStart\(2,"0"\)\}<\/b>\)\}/);
+ assert.match(page,/className=\{\[c>=10\?"garage-special-slot":"",c===6\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
+ assert.equal((page.match(/ready-bay-divider/g)||[]).length,2,"the column header and the cell, and nothing else");
+ assert.equal((page.match(/ready-rows-divider/g)||[]).length,0,"the row divider is gone");
+ assert.equal((css.match(/ready-rows-divider/g)||[]).length,0);
+
+ /* In the frame color rather than a green of its own: the barrier belongs to
+    the structure of the garage, which is what --garage-frame already draws —
+    the grid's borders, its numbers and its row labels. The badge follows the
+    same variable, so recoloring the garage in Settings recolors both. 4px is
+    thick enough to read as a boundary beside the grid's 1px spot borders. */
+ assert.match(css,/\.garagegrid>b\.ready-bay-divider,\.grow \.spot\.ready-bay-divider\{border-left:4px solid var\(--garage-frame\)\}/);
+ assert.match(css,/\.section-badge\{[^}]*color:var\(--garage-frame\)/);
+ assert.doesNotMatch(css,/\.section-badge\{[^}]*#d7f5e4/,"the standalone green is gone; the badge follows the garage");
+});
+
+test("REFRESH is on every page, because a home-screen app has no address bar to reload from",async()=>{
+ const [button,css,map,...pages]=await Promise.all([
+  readFile(new URL("../app/refresh-button.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  ...["down-sheet","defect-log","fixed-repairs","lists","settings"].map(page=>
+   readFile(new URL("../app/"+page+"/page.tsx",import.meta.url),"utf8")),
+ ]);
+
+ /* Saved to a home screen there is no browser chrome — no address bar, no
+    reload — so a bad page state or a stale version could only be cleared by
+    closing and reopening the app, which does not even force the service worker
+    to look for an update. The map had this button in its command bar; the other
+    five pages had nothing. */
+ for(const [name,source] of [["down-sheet",pages[0]],["defect-log",pages[1]],["fixed-repairs",pages[2]],["lists",pages[3]],["settings",pages[4]]]){
+  assert.match(source,/import RefreshButton from "\.\.\/refresh-button"/,name+" must import the shared button");
+  assert.match(source,/<TrackerNav active="\/[a-z-]+"\/><RefreshButton\/>/,name+" puts it beside the nav in its header");
+ }
+ // The map keeps the command-bar look it already had, by passing its own class.
+ assert.match(map,/<RefreshButton className="refresh-command"\/>/);
+ /* Its own copy of the behaviour is gone — it registers the service worker and
+    nothing else. Two copies of "what refreshing means" is how one of them ends
+    up reloading without checking for a new version first. */
+ assert.doesNotMatch(map,/registration\?\.update\(\)/);
+ assert.equal((map.match(/serviceWorker/g)||[]).length,2,"only the registration effect mentions it now");
+ // Its phone menu offers the same thing, and goes through the same function rather than keeping a second copy.
+ assert.match(map,/import RefreshButton,\{refreshTrackerApp\} from "\.\/refresh-button"/);
+ assert.match(map,/const refreshApp=async\(\)=>\{if\(refreshing\)return;setRefreshing\(true\);if\(!await refreshTrackerApp\(\)\)setRefreshing\(false\)\}/);
+
+ /* Ask the service worker for a new version FIRST, then reload. A bare reload
+    serves the cached shell again and looks like the button did nothing, which
+    is the whole failure this exists to fix. */
+ assert.ok(button.indexOf("registration?.update()")<button.indexOf("window.location.reload()"),"update before reload");
+ // Only a failure clears the flag: after a successful reload the component is gone, and a button stuck on UPDATING reads as a freeze.
+ assert.match(button,/if\(!await refreshTrackerApp\(\)\)setRefreshing\(false\)/);
+ assert.match(button,/disabled=\{refreshing\}/);
+ assert.match(button,/aria-label="Refresh and check for app updates"/);
+
+ // Styled once, for the dark header band all five of those pages share, and given a real phone target.
+ assert.match(css,/\.app-refresh\{[^}]*min-height:34px/);
+ assert.match(css,/@media\(max-width:760px\)\{\.app-refresh\{[^}]*min-height:44px/);
 });
 
 test("every bus on one printed line carries that line's wording, so a PM line is not seven down buses",async()=>{

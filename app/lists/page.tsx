@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState} from "react";
 import TrackerNav from "../tracker-nav";
+import RefreshButton from "../refresh-button";
 import "./lists.css";
 import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
@@ -137,7 +138,7 @@ export default function Lists(){
 
  return <main className="lists-app"><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
-   <TrackerNav active="/lists"/>
+   <TrackerNav active="/lists"/><RefreshButton/>
   </header>
 
   <WorkTimePanel lists={lists} buses={fleet} defaultPerson={initials.trim().toUpperCase()}/>
