@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: VERSIONS 153, 154 AND 155 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, then 155 from `6f8518b`. Version 152 is live from `b57dcb5`.**
+**STATUS: VERSIONS 153, 154, 155 AND 156 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, then 155 from `6f8518b`, then 156 from `103b005`. Version 152 is live from `b57dcb5`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Last | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
 | After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
 | Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
 | Next | **153** | `015e789` | **Shop Cloud now runs on every page and merges shop changes live as they happen** — it includes the Version 152 tombstone/Down Sheet sync repair, improved scan review, catalog additions, and the corrected Deferred badge behavior |
@@ -28,13 +29,13 @@
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**Three releases are pending, in order.** 153 is frozen at `015e789` — Codex
+**Four releases are pending, in order.** 153 is frozen at `015e789` — Codex
 split it out from what this file used to call Version 152's own tip, publishing
 152 itself only as far as `b57dcb5` — and is not moved by anything here; 154 is
 the three commits on top of it, `dd1b093`, `0db855a` and `fd3b326`; 155 is one
-commit further, `6f8518b`. Publish in order — or, if it is simpler to publish
-once, publish 155 from `6f8518b` and record all three versions as live from it,
-since 155 contains 154 and 153 whole.
+commit further, `6f8518b`; 156 is one more, `103b005`. Publish in order — or,
+if it is simpler to publish once, publish 156 from `103b005` and record all
+four versions as live from it, since 156 contains 155, 154 and 153 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -59,6 +60,172 @@ supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
 
 ---
+
+# Version 156 — A PM line with seven buses on it is not seven down buses
+
+**Publish this after Version 155.** It fixes a counting error the foreman
+reported off a real sheet: line 53 reads PM'S with seven bus numbers after it,
+and six of those seven were landing in UNSCHEDULED instead of INSPECTIONS,
+inflating the down count by six off one line of paper. The crew writes the
+week's PMs on one line most weeks, so this is not a one-off.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`103b005`** |
+| Last code-bearing commit | `103b005` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 155, pending from `6f8518b` |
+
+**One application commit** on top of 155's `6f8518b`:
+
+```
+git show --stat 103b005
+ app/api/down-sheet-scan/route.ts         |   2 +-
+ app/down-sheet/down-sheet-scan-import.ts | 109 +++++++++++++++++++++++++++++--
+ app/down-sheet/down-sheet-view.ts        |   8 +++
+ tests/rendered-html.test.mjs             |  99 ++++++++++++++++++++++++++++
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 6f8518b 103b005 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **223 tests passing** (222 at Version 155, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload
+shape or database change. This changes what a SCAN produces, so it reaches a
+sheet only when one is scanned — which is exactly how the foreman will use it,
+by rescanning. A sheet already imported wrongly is corrected by rescanning it:
+the scan is an authoritative replacement of the sheet, as it always has been.
+
+## What changed
+
+### 1. Why six buses on one line became six down buses
+
+The model splits a multi-bus line into one row per bus correctly. What it does
+not do reliably is repeat the line's wording on each of them: it carries the
+words on the FIRST row and leaves the rest blank, then stamps those blank rows
+with whatever band heading they sat under. On line 53 that heading is
+UNSCHEDULED, so six buses arrived carrying no reason and a section of Pending.
+
+With nothing written to read, the page falls back to the section, sees Pending,
+and files each one as a bus that is down with nobody assigned. **Measured on
+the old code against that exact model output: 1 inspection, 6 unscheduled.**
+Both counts on the sheet were wrong by six, in opposite directions.
+
+The prompt has said "each with the same reason" since multi-bus rows were first
+handled. This is what came back anyway, which is why the fix is not another
+sentence in the prompt.
+
+### 2. A printed line is one line
+
+Rows that share a page and a **printed** line number describe the same work —
+that is what a line on paper means. A field nobody filled in now takes its
+value from the sibling on that line that has one: reason, mechanic, category,
+repair.
+
+- **Only blank fields are filled.** Two buses on one line that genuinely came
+  back with different wording keep it. This can add what was missing and can
+  never overwrite what was read.
+- **Margin rows inherit nothing**, and that exclusion is the whole safety of
+  it. They carry no line number, so every pencilled row on a page would share
+  one key and take its wording from whichever came back first — one bus's brake
+  job spreading across unrelated handwritten rows.
+- **The review screen says so**, on each row it filled, naming the line: "Read
+  from line 53, shared with the other buses on it". The inference is visible
+  and checkable against the paper before anything is imported, not silent.
+
+### 3. The row's own wording outranks the band heading
+
+The prompt has always claimed this — "a row's own wording still wins over the
+heading it sits under" — and nothing enforced it: `normalizedSection` takes a
+valid section name and returns it before the reason is ever consulted, so a PM
+written under the UNSCHEDULED heading came back Pending and stayed Pending. A
+foreman writes the week's PMs wherever there is room on the page, so the paper
+is not wrong to be laid out that way.
+
+Only the three headings that describe **who has the bus** can be overruled —
+Pending, Scheduled Repair, Other. Vendor Repair, Accident and Roadcall stand,
+which follows the precedence the page already documents: where a bus physically
+is outranks what the work is, and what the work is outranks who has it. A bus at
+Cummins for a PM is off property; a bus that was towed is a road call whatever
+else is written on it.
+
+The question asked is `downSheetScheduledOnly`, the same predicate the bands
+themselves use, rather than "does an inspection word appear anywhere". A bus
+carrying a misfire **and** a PM is a bus that is down, and testing for the word
+would have quietly filed it as maintenance — the one thing this page must never
+do.
+
+## Validation
+
+- 223 regression tests passing, ESLint clean, production build succeeds
+- **The failure was reproduced before it was fixed**, against the old code and
+  the model's exact response shape for line 53: 1 inspection, 6 unscheduled
+- **Driven end to end against the PRODUCTION build** with that same response
+  stubbed into `/api/down-sheet-scan`, zero console errors: all seven buses
+  read `PM'S` on the review screen and each says GOES TO INSPECTIONS &
+  SCHEDULED MAINTENANCE **before** anything is imported; the six inherited rows
+  carry the note naming line 53 and the row that already had the wording does
+  not; the imported sheet counts **UNSCHEDULED 2** — two real faults on other
+  lines, untouched — against **INSPECTIONS 7**
+- **Every rule that must not bend is pinned by its own assertion:** a fault
+  written once over two buses stays a fault on both; PM DEFECTS stays down; a
+  bus on the sheet twice for a PM and a misfire is counted down and keeps both
+  facts on the row; a PM line at a vendor stays off property for the bus that
+  inherited the vendor as well as the one it was written on; two buses on one
+  line with different wording keep their own; margin rows and single-bus lines
+  inherit nothing; and the same printed number on a different page is a
+  different line
+
+## After it is live
+
+1. **Rescan the sheet that has line 53 on it.** On the review screen, before
+   importing, every bus on that line should read PM'S and say GOES TO
+   INSPECTIONS & SCHEDULED MAINTENANCE, with the later ones noting which line
+   the wording came from.
+2. **Check the counts bar after importing.** The seven PM buses belong under
+   INSPECTIONS & SCHEDULED MAINTENANCE, and the down count should drop by the
+   number that used to be stranded in UNSCHEDULED.
+3. **Check a line that is not a PM** — a fault written once over two bus
+   numbers. Both buses should carry that fault and both should stay in the down
+   count. The rule is "share the line's wording", not "share its inspection-ness".
+4. **Check a PM DEFECTS line.** Those are faults found while doing a PM and
+   the buses are down; they must not have moved into INSPECTIONS.
+5. **Check any bus that is on the sheet for both a PM and a fault.** The row
+   should still show both, and the bus should still be counted as down.
+
+## The way back
+
+Measured in a throwaway worktree from `103b005`:
+
+- `git revert 103b005` alone is **clean** and restores the previous scan
+  behaviour, leaving Version 155 exactly as it was.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards. Sheets imported while it was live keep the wording they
+  were imported with, which is the wording the paper carries.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 156 | Live | <published tip hash> | A line reading PM'S with seven bus numbers after it stops counting as seven buses that are down. The scan split the line into seven rows correctly but carried the words on the first row only, leaving six blank under whatever band heading they sat under, so six buses arrived saying nothing and were read as down with nobody assigned — the down count up by six and the inspection count down by six off one line of paper. Every bus on a printed line now takes that line's wording from the sibling that has it, filling only blank fields so wording that was actually read is never overwritten, and the review screen names the line it read each one from. Margin rows, which carry no line number, inherit nothing. A row's own wording now also outranks the band heading it sat under, so a PM written under UNSCHEDULED is filed as an inspection, while Vendor Repair, Accident and Roadcall still stand and a bus carrying both a PM and a fault is still counted as down |
+```
+
 
 # Version 155 — Rows 1–6 of the Main Garage are READY ROWS
 
