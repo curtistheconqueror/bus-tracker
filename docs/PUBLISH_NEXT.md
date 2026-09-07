@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 161 is live from `3b16d45` as Sites Version 157.**
+**STATUS: VERSION 162 PENDING — publish from `168f553`. Repository release 161 is live from `3b16d45` as Sites Version 157.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,6 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| **Next** | **162** | `168f553` | **A road tally stops rewriting the sheet's own scoreboard, and both sheets get their controls out of the way** — pressing INSPECTIONS ON ROAD narrowed the sheet AND rewrote every tile above it, so TOTAL ON SHEET read 4 on a 30-bus sheet; the scoreboard is counted from the whole sheet now and only the table follows the filter. SHEET STATS folds into those tiles and its panel is gone. Both surfaces get an ADVANCED ACTIONS panel in the header — the Down Sheet's in its own purple — with ADD DOWN BUS beside SEARCH. The DEFERRED badge follows a change without a refresh, and a held bus can be released from the drawer that lists it. AI OPERATOR and CLEAN UP get back the styling they silently lost in 161, LIVE REPAIR FEED grows to 17px, and the location under a bus number now moves that bus on the Facility Map |
 | Published | **161** | `3b16d45` | **Live as Sites Version 157.** Row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; independent inspection tallies; Mystery Buses on the Down Sheet; and Defect Log controls behind Advanced Actions |
 | Published | **160** | `bbe33f6` | **Live as Sites Version 156.** REFRESH is available on every page for home-screen use, and the Main Garage Ready boundary runs vertically between bays 6 and 7 without moving buses or slots |
 | Published | **159** | **`2afa491`** | **Live as Sites Version 155.** A Down Sheet removal travels, so a cleared sheet stays cleared: removals are recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's Down Sheet flags follow the sheet the pull settled on |
@@ -61,6 +62,183 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 162 — A road tally stops rewriting the sheet's own scoreboard, and both surfaces get their controls out of the way
+
+**On `main` and publishable now.** `168f553` is the head of `main`; PR #2 merged as a clean linear rebase onto `19ad355`, so this is the SHA to publish.
+
+## Source
+
+Release source: `168f553`
+
+The commit list — `git log --oneline 19ad355..168f553`:
+
+```
+168f553 Make the location under a bus number the control that moves it on the map
+ea5f4dd Give the Down Sheet its own ADVANCED ACTIONS, and put ADD DOWN BUS next to SEARCH
+4b43ab8 Fold SHEET STATS into the tiles the Down Sheet is actually read from
+d29f95c End a deferral from the drawer that lists it, and stop the badge going stale
+8b70f37 Stop a road tally rewriting the sheet's own scoreboard, and clean up the Defect Log
+```
+
+The changed files — `git diff --name-only 19ad355..168f553 -- app tests`:
+
+```
+app/defect-log/defect-log-display-settings.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/deferred-watch.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/storage.ts
+tests/rendered-html.test.mjs
+```
+
+The size — `git diff --shortstat 19ad355..168f553`:
+
+```
+9 files changed, 682 insertions(+), 131 deletions(-)
+```
+
+Proof of no infra change — this returns nothing:
+
+```
+git diff --name-only 19ad355..168f553 -- supabase package.json package-lock.json .github public worker
+```
+(empty)
+
+## Migrations
+
+None.
+
+One **new** LocalStorage key, `pace-down-sheet-advanced-open-v1` — whether the
+Down Sheet's ADVANCED ACTIONS panel is open. Documented in `CLAUDE.md`.
+
+⚠️ **One key stops being read, and it is not a rename.**
+`pace-down-sheet-stats-open-v1` no longer appears in `app/` because the SHEET
+STATS panel it opened is gone. The key is still listed in `CLAUDE.md`, marked
+`NO LONGER READ`, and values already on devices are left alone. Nothing is
+renamed and nothing is rewritten — a diff of the key sets reachable in `app/`
+at each end of the range shows exactly one added and that one removed.
+
+## What was wrong
+
+**Pressing a road tally rewrote the whole scoreboard above it.** INSPECTIONS ON
+ROAD and DOWNED BUSES ON ROAD narrow the sheet to what they count — but the
+tally and the six tiles above shared one grouping, so pressing one recomputed
+all of them. Measured on a 30-row sheet: TOTAL ON SHEET fell 30 → 4, DOWN BUSES
+19 → 0, UNSCHEDULED 19 → 0. A foreman who pressed it to read the list off the
+sheet lost the numbers he had pressed it from. Reported off the live sheet.
+
+**The DEFERRED badge did not move until a refresh.** The browser's `storage`
+event fires in OTHER tabs, never in the tab that did the writing, so anything
+reading LocalStorage on its own went stale. Measured on the old code: press
+UNDO DEFERRED, the record reads "open" in storage, and the badge still reads
+2 DEFERRED until a reload turns it into 1.
+
+**A held bus could not be released from the drawer that listed it.** The only
+END DEFERRAL was inside an expanded Defect Log card — which means finding the
+bus again in the feed you had just filtered away from.
+
+**SHEET STATS was a second scoreboard.** It sat behind its own bar saying most
+of what the tiles below already said, in a different shape.
+
+**Both pages opened on their controls rather than their work.** The Down Sheet
+put six controls between the button that adds a bus and the search box.
+
+**Three Defect Log buttons had silently lost their styling.** AI OPERATOR,
+CLEAN UP and the two scan buttons' disabled states were styled through
+`.feed-title` selectors; carried into ADVANCED ACTIONS in release 161, those
+selectors matched nothing. Nobody removed the gradient or the border — they
+stopped applying, and a green suite had nothing to say about it.
+
+**The location on a Defect Log card was read-only.** It was the one fact on the
+card a mechanic reads and then has to go to another page to act on.
+
+## What changed
+
+**The Down Sheet scoreboard is grouped from the whole sheet.** Only the table,
+the row count in view, the estimate and the note follow the road filter,
+because those describe the view. Pressing a tally again to clear it is
+unchanged. Same fixture after: TOTAL 30, DOWN BUSES 19 and UNSCHEDULED 19 all
+hold while the table narrows to 4.
+
+**SHEET STATS folded into those tiles and the panel is gone.** PENDING,
+ACCIDENT, WAITING PARTS, COMPLETED TODAY, EST. ACTIVE LABOR and SHEET CAPACITY
+are tiles in that grid now; COMPLETED TODAY stays a button because it filters.
+ACTIVE DOWN did not come with them — it counted the whole ACTIVE sheet while
+TOTAL ON SHEET counts the CURRENT VIEW, which is what made them look identical
+on ALL with no search. SHEET CAPACITY still prints the whole-sheet count.
+EST. CURRENT VIEW now renders only when it differs from EST. ACTIVE LABOR.
+
+**Both surfaces have an ADVANCED ACTIONS panel in the header, under REFRESH.**
+The Down Sheet's holds the shift filter and SHOW COMPLETED under VIEW, and SCAN
+SHEET with the recovery buttons under TOOLS; ADD DOWN BUS and SEARCH now sit
+together. **Its button is purple, `#6b31b6`, on purpose** — both headers are
+navy, and the Defect Log's translucent white here would have made the two
+pages' headers read as the same header.
+
+**The DEFERRED badge follows a write in the same page.** The two record writers
+announce a successful write in this document as well — only inside the try,
+because a refused write changed nothing.
+
+**END DEFERRAL is in the drawer, beside MOVE / LOCATION.** It releases every
+deferred repair on the bus rather than the one whose timer the row shows: the
+drawer is one card per BUS and a deferral is per DEFECT.
+
+**The three Defect Log buttons have their paint back**, and LIVE REPAIR FEED
+goes from 12px to 17px. A stored value equal to the *superseded* default is
+read as no choice — otherwise raising the default would have reached nobody,
+since the whole Settings blob is written whenever anything in it is saved.
+
+**The location under a bus number moves the bus on the Facility Map.** It opens
+the move editor this page already opens from the deferred drawer. It is a tap
+target rather than a dropdown, and that was measured: a native select cannot
+wrap, and bound to the location it truncated 13 of the 17 labels at 390px —
+Main Garage needed 49px against 38px of room.
+
+## Verified
+
+Gates re-run on `168f553` itself: `npm test` **237 pass, 0 fail** (it builds
+first), `npm run lint` clean, `npm run build` succeeds. CI green on the same
+tree.
+
+Measured in Chromium at 360, 390, 430, 844 and 932 landscape, 820 and 1180
+iPad, and 1280, reproducing each fault first:
+
+| | before | after |
+| --- | --- | --- |
+| TOTAL ON SHEET under a road filter | 30 → **4** | 30 → **30** |
+| DOWN BUSES under a road filter | 19 → **0** | 19 → **19** |
+| DEFERRED badge after ending a deferral | **2**, until a reload | **1**, no reload |
+| AI OPERATOR background | `none` | `linear-gradient(120deg,#4a2389,#7138c5)` |
+| CLEAN UP border | `0px` | `1px solid` |
+| LIVE REPAIR FEED | 12px | 17px |
+| Location labels truncated at 390 | 13 of 17 as a select | **0** |
+| Down Sheet page overflow at 1180 | **40px** with the column uncapped | **0** |
+
+Failure paths driven on purpose: a refused fleet write leaves the move editor
+open, the card showing the old location, and the stored board byte-identical;
+a refused save stops a deferral release rather than writing a half-done board.
+
+## What to check once it is live
+
+1. On the Down Sheet press **INSPECTIONS ON ROAD**. The sheet narrows; TOTAL ON
+   SHEET, DOWN BUSES and the four bands must not move. Press again to clear.
+2. SHEET STATS is gone — PENDING, ACCIDENT, WAITING PARTS, COMPLETED TODAY,
+   EST. ACTIVE LABOR and SHEET CAPACITY are tiles in the block below.
+3. **ADVANCED ACTIONS** in the Down Sheet header is purple; the Defect Log's is
+   not. ADD DOWN BUS and SEARCH sit together underneath.
+4. Open the DEFERRED badge, press **END DEFERRAL** on a bus: it leaves the list
+   and the badge count drops immediately, with no refresh.
+5. On the Defect Log, ADVANCED ACTIONS: **AI OPERATOR** is purple again and
+   **CLEAN UP** has a border.
+6. Press the location under a bus number — the move editor opens, and the bus
+   lands where you put it on the Facility Map with its defects untouched.
+7. Turn the phone sideways and check on the iPad: nothing should slide
+   sideways on either page.
 
 ---
 
