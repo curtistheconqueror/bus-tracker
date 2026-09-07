@@ -9091,3 +9091,43 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  assert.match(downCss,/\.scan-notes textarea\{/);
  assert.match(logCss,/\.sweep-notes textarea\{/);
 });
+
+test("the Main Garage marks rows 1-6 as READY ROWS, with a thick line and a matching heading badge",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+
+ /* T is the title bar every section on this page shares, so the new prop is
+    optional and lives beside the existing count badge rather than replacing
+    it — a section that never passes one renders exactly as it did. */
+ assert.match(page,/function T\(\{name,menu,drop,count=0,badge,onAdd,onRemove,collapsed,onToggle\}/);
+ assert.match(page,/<b className="section-count"[^>]*>\{count\}<\/b>\{badge&&<i className="section-badge">\{badge\}<\/i>\}/);
+ assert.match(page,/const ttl=\(x:string,badge\?:string\)=><T name=\{x\} count=\{sectionBusCount\(buses,SECTION_SLOTS\[x\]\|\|\[\]\)\} badge=\{badge\}/);
+
+ /* Main Garage is the only section passing one right now — this is a labeled
+    boundary ahead of the smart tracking system, not a general re-theming. */
+ assert.match(page,/\{ttl\("MAIN GARAGE \(BAYS 1-12\)","ROWS 1–6 READY"\)\}/);
+ assert.equal((page.match(/"ROWS 1–6 READY"/g)||[]).length,1,"only the Main Garage passes this badge");
+
+ /* The divider is a class on ROW 7's wrapping div, not ROW 6's — .grow
+    renders as display:contents and paints nothing itself, so the line has to
+    be a border on ROW 7's own cells, and a line above ROW 7 reads the same as
+    one below ROW 6. Row index 6 is ROW 7 (rows are 1-indexed on screen). The
+    existing bay 11/12 special-slot logic sits untouched in the same
+    expression. */
+ assert.match(page,/\{Array\.from\(\{length:7\},\(_,r\)=><div className=\{"grow"\+\(r===6\?" ready-rows-divider":""\)\} key=\{r\}><strong>ROW \{r\+1\}<\/strong>\{Array\.from\(\{length:12\},\(_,c\)=><Spot key=\{c\} id=\{"garage-"\+\(r\*12\+c\)\} buses=\{show\} move=\{move\} edit=\{setEdit\} relocateAt=\{setRelocateSpot\} className=\{c>=10\?"garage-special-slot":undefined\}\/>\)\}<\/div>\)\}/);
+ assert.equal((page.match(/ready-rows-divider/g)||[]).length,1,"one row is ever given the class — the rest stay plain \"grow\"");
+ // Named twice in one rule (the row label and the bays each need the border),
+ // not once per row: seven rows share this single selector.
+ assert.equal((css.match(/ready-rows-divider/g)||[]).length,2);
+
+ /* The badge is a small pill, not a full section re-theme, and reuses the
+    drag-and-drop .ready green rather than inventing a second "this is fine"
+    color. The divider is 4px — thick enough to read as a boundary next to
+    the grid's 1px spot borders — and lands on both the row label and every
+    bay in ROW 7, so it reads as a full-width line under the scrollable grid,
+    not just under the sticky label column. */
+ assert.match(css,/\.section-badge\{[^}]*background:#d7f5e4[^}]*color:#046c3b/);
+ assert.match(css,/\.grow\.ready-rows-divider>strong,\.grow\.ready-rows-divider \.spot\{border-top:4px solid #008c4d\}/);
+});

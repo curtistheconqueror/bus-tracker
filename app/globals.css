@@ -336,6 +336,19 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .garage{border-color:var(--garage-frame)}
 .garagegrid>i,.garagegrid>b,.grow>strong{background:var(--garage-frame)}
 .grow .spot.garage-special-slot{background:var(--garage-special);border-color:color-mix(in srgb,var(--garage-frame) 55%,#aeb8cc)}
+/* Rows 1-6 of the Main Garage are READY ROWS, ahead of a smart tracking
+   system that will use the distinction - for now it is a labeled boundary
+   and nothing more. A thick line marks it in the grid itself, on ROW 7 (the
+   remaining row) rather than under ROW 6, since .grow renders as
+   display:contents and paints nothing of its own: the border has to land on
+   the actual cells, and a border on the row AFTER the boundary reads the
+   same as one under the row before it. The badge carries the same label into
+   the collapsed header, so the split still reads with the grid hidden.
+   Green matches the drag-and-drop .ready highlight already used on this page
+   for "this space is fine" - the same word keeps the same color rather than
+   introducing a second meaning for it. */
+.section-badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:9px;background:#d7f5e4;color:#046c3b;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.3px;white-space:nowrap}
+.grow.ready-rows-divider>strong,.grow.ready-rows-divider .spot{border-top:4px solid #008c4d}
 .spot.awareness-slot{background:var(--mystery-slot)!important;border-color:color-mix(in srgb,var(--garage-frame) 68%,#8b5cf6)!important;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--garage-frame) 25%,transparent)}
 .garage-color-settings>p{margin-bottom:10px}
 /* Seven-field multi-locate and capacity-safe bulk area relocation */
