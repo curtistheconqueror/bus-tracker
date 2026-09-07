@@ -9405,6 +9405,13 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.match(claudeMd,/Read `docs\/NEXT_SESSION\.md` first/);
  assert.ok(nextSession.length>2000,"the entry point must actually say something");
 
+ /* No number in here that another file owns or that the next commit moves.
+    Both of these were wrong inside an hour: the live version (Codex publishes
+    while sessions run) and the test count (written as 229 by the same commit
+    that added the 230th test). Point at the source instead of copying it. */
+ assert.doesNotMatch(nextSession,/\b\d{2,}\s+tests?\s+passing/i,"NEXT_SESSION.md must not quote a passing-test count - it goes stale on the next commit that adds a test");
+ assert.doesNotMatch(nextSession,/Sites Version\s+\d+\s*=/i,"NEXT_SESSION.md must not name the live version - Codex owns that, in PUBLISH_NEXT.md and RELEASES.md");
+
  /* It must not promise files that are not there — a dead pointer in the first
     thing a session reads costs more than no pointer at all. */
  for(const path of [...nextSession.matchAll(/`((?:docs\/|app\/|\.claude\/)[A-Za-z0-9_./-]+)`/g)].map(m=>m[1])){
