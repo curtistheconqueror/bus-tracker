@@ -44,7 +44,7 @@ something the shop does not have.
 | Live | Sites Version 154 = repository release 158 = commit `a444242` |
 | Pending publication | See the STATUS line of `docs/PUBLISH_NEXT.md` |
 | Working tree at handoff | Clean. Nothing stashed, nothing uncommitted. |
-| Gate at handoff | 229 tests passing, ESLint clean, production build succeeds |
+| Gate at handoff | 230 tests passing, ESLint clean, production build succeeds |
 
 **There is no stash and there are no uncommitted changes.** If you find some,
 somebody left them there after this file was written — read them before doing
