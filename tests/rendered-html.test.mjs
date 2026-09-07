@@ -9316,3 +9316,41 @@ test("the words written on a scanned row outrank the catalog repair the scan gue
  assert.match(route,/A bus is OFF PROPERTY or Vendor Repair only when the sheet says so/);
  assert.match(route,/Never infer it from the kind of repair/);
 });
+
+test("Fixed Repairs takes a typed bus number, not only a dropdown",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Logging a stack of work orders means one bus number after another, off the
+    paper in front of you. A dropdown of the whole fleet is the slow path for
+    that, and every other page in this app already lets the number be typed. */
+ assert.match(page,/<label className="fixed-type-bus"><span>TYPE BUS #<\/span><input autoFocus inputMode="numeric" value=\{busQuery\}/);
+ assert.match(page,/placeholder="Full # or last 2"/);
+ // The list stays for the times somebody is looking rather than typing.
+ assert.match(page,/<label>OR PICK FROM THE LIST<select value=\{record\.bus\.id\}/);
+
+ /* The same resolver the rest of the app uses, so two ending digits work here
+    exactly as they do on the map and in the Defect Log. */
+ assert.match(page,/import \{candidateBusNumbers,resolveBusNumber\} from "\.\.\/bus-number-resolver"/);
+ assert.match(page,/const resolution=resolveBusNumber\(fleet,value\);\s*if\(resolution\.kind!=="exact"&&resolution\.kind!=="suffix"\)return;/);
+
+ /* A number that resolves to nothing must not clear a bus already chosen —
+    a half-typed number would otherwise wipe a selection made from the list. */
+ assert.match(page,/setNewRepair\(current=>current\?\{\.\.\.current,bus:resolution\.bus\}:current\)/);
+ /* And the box says what it did, because silently landing on the wrong bus is
+    how a repair gets logged against somebody else's work order. */
+ assert.match(page,/resolution\.kind==="ambiguous"\)return busQuery\+" matches "\+candidateBusNumbers\(resolution\.matches\)\.join\(", "\)/);
+ assert.match(page,/No bus matches "\+busQuery/);
+
+ /* Exactly one field may claim the focus. FIX / STEPS TAKEN renders later in
+    the DOM and had it unconditionally, so on a new repair it silently won the
+    race and the cursor landed two boxes past where the typing was headed. */
+ assert.match(page,/<textarea autoFocus=\{!isNew\}/);
+ assert.equal((page.match(/autoFocus(?![=\w])/g)||[]).length,1,"only the typed bus number takes focus outright");
+
+ // It is the biggest control in the box, the way the Defect Log's typed number is.
+ assert.match(css,/\.fixed-new-bus \.fixed-type-bus>input\{[^}]*font-size:26px/);
+ assert.match(css,/\.fixed-new-bus \.fixed-type-bus>input\{[^}]*min-height:52px/);
+});

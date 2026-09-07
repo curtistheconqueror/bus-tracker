@@ -175,4 +175,11 @@
 .fixed-new-bus label{display:grid;gap:4px;font-size:9px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted,#5a6a86)}
 .fixed-new-bus select{width:100%;min-height:42px;border:1px solid var(--fixed-border,#b8c4d6);border-radius:6px;background:var(--fixed-surface,#fff);padding:6px 9px;color:var(--fixed-ink,#172b4d);font-size:13px;font-weight:800}
 .fixed-new-bus>small{font-size:10px;line-height:1.4;color:var(--fixed-muted,#5a6a86)}
-@media(max-width:760px){.fixed-feed>header .log-repair-button{width:100%;min-height:46px;font-size:13px}.fixed-new-bus{margin:0 10px}}
+/* TYPE BUS # is the fast way in — a mechanic working through work orders has
+   the number in front of them — so it is the biggest control in the box, the
+   same shape and for the same reason as the Defect Log's typed number. The
+   list stays underneath for the times somebody is looking rather than typing. */
+.fixed-new-bus .fixed-type-bus>input{width:100%;min-height:52px;border:1px solid var(--fixed-green,#0d7a45);border-radius:6px;background:var(--fixed-surface,#fff);padding:6px 11px;color:var(--fixed-ink,#172b4d);font-size:26px;font-weight:900;letter-spacing:1px}
+.fixed-new-bus .fixed-type-bus>input::placeholder{font-size:13px;font-weight:700;letter-spacing:0;color:var(--fixed-muted,#8b97ab)}
+.fixed-bus-feedback{font-size:10px;font-weight:800;color:var(--fixed-green,#0d7a45)}
+@media(max-width:760px){.fixed-feed>header .log-repair-button{width:100%;min-height:46px;font-size:13px}.fixed-new-bus{margin:0 10px}.fixed-new-bus .fixed-type-bus>input{font-size:24px;min-height:56px}}

@@ -18,6 +18,7 @@ import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorageResult,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
 import ShopCloudLive from "../shop-cloud-live";
+import {candidateBusNumbers,resolveBusNumber} from "../bus-number-resolver";
 
 /* How many completed repairs render at once.
 
@@ -47,7 +48,7 @@ function timeLabel(value:string){const date=new Date(value);return Number.isNaN(
 function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return "";return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}
 function locationLabel(location:string){const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not recorded"}
 
-function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void}){
+function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange,busQuery="",busFeedback="",onBusQuery}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void;busQuery?:string;busFeedback?:string;onBusQuery?:(value:string)=>void}){
  const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
  const remembered=recallPart(partsMemory,draft.category,draft.issue);
  /* Checking the box offers the remembered part and never overwrites typing. */
@@ -65,7 +66,17 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
   <header><span><small>{isNew?"LOG A REPAIR":"FIXED REPAIR"}</small><h2>{isNew?"Fixed without a defect":"Bus "+record.bus.n}</h2></span><button type="button" onClick={close} aria-label="Close fixed repair editor">×</button></header>
   {/* A repair done without a defect ever being logged has no bus yet, so the
       bus is picked here. Every other field on this form already applies. */}
-  {isNew&&<section className="fixed-new-bus"><label>BUS<select value={record.bus.id} onChange={event=>onBusChange?.(event.target.value)}>{fleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} — {locationLabel(bus.l)}</option>)}</select></label><small>Pick the bus, then fill in the repair below. It saves straight to this page as a completed record.</small></section>}
+  {isNew&&<section className="fixed-new-bus">
+   {/* Typing the number is the fast way in and the way every other page
+       already works, so it comes first and is the biggest control here. A
+       mechanic logging a stack of work orders knows the number off the paper;
+       hunting for it in a four-hundred-bus list is the slow path. The list
+       stays for the times somebody is looking rather than typing. */}
+   <label className="fixed-type-bus"><span>TYPE BUS #</span><input autoFocus inputMode="numeric" value={busQuery} onChange={event=>onBusQuery?.(event.target.value.replace(/\D/g,"").slice(0,5))} placeholder="Full # or last 2" aria-describedby="fixed-bus-feedback"/></label>
+   {busFeedback&&<small className="fixed-bus-feedback" id="fixed-bus-feedback" role="status">{busFeedback}</small>}
+   <label>OR PICK FROM THE LIST<select value={record.bus.id} onChange={event=>onBusChange?.(event.target.value)}>{fleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} — {locationLabel(bus.l)}</option>)}</select></label>
+   <small>Type the number or pick the bus, then fill in the repair below. It saves straight to this page as a completed record.</small>
+  </section>}
   <div className="fixed-editor-body">
    <section className="fixed-original"><b>EDIT THE FULL REPAIR RECORD</b><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · Reported by "+record.defect.reportedBy:""}</small></section>
    <label>CATEGORY<select value={draft.category} onChange={event=>setDraft(current=>({...current,category:event.target.value,issue:"",quantity:"",partsUsed:false,partNumber:"",partName:"",rememberScope:undefined}))}>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
@@ -76,7 +87,12 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
    {countField&&<label>{countField.label}<select value={draft.quantity} onChange={event=>update("quantity",event.target.value)}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={String(count)} key={count}>{count}</option>)}</select></label>}
    <label className="wide">ORIGINAL DESCRIPTION<textarea value={draft.details} onChange={event=>update("details",event.target.value)} placeholder="Original defect, symptom, or report"/></label>
    <label className="wide">BUS AVAILABILITY<select value={draft.operability} onChange={event=>update("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
-   <label className="wide">FIX / STEPS TAKEN<textarea autoFocus value={draft.actionTaken} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced, or reset? Include useful steps for the next diagnosis."/></label>
+   {/* On a NEW repair the bus number takes the focus instead — it is the first
+       thing a mechanic working through work orders types, and this textarea
+       renders later in the DOM, so leaving both would silently win the race and
+       land the cursor two boxes past where the typing was headed. Editing an
+       existing record shows no bus box, so it keeps the focus there. */}
+   <label className="wide">FIX / STEPS TAKEN<textarea autoFocus={!isNew} value={draft.actionTaken} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced, or reset? Include useful steps for the next diagnosis."/></label>
    <label className="wide">DIAGNOSIS / TEST / VERIFICATION<textarea value={draft.diagnosticNote} onChange={event=>update("diagnosticNote",event.target.value)} placeholder="Codes, tests, root cause, or how the repair was verified"/></label>
    {/* Editable here as well as in the Defect Log: a fault is very often only
        properly named once the bus is apart, and that is the moment this page is
@@ -124,7 +140,7 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
 }
 
 export default function FixedRepairs(){
- const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null);
+ const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[busQuery,setBusQuery]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
@@ -201,8 +217,35 @@ if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fix
  const logRepair=()=>{
   if(!fleet.length){alert("This device has no buses yet. Open the Facility Map first.");return}
   const now=new Date().toISOString();
+  setBusQuery("");
   setNewRepair({bus:fleet[0],defect:{id:"fixed-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"Miscellaneous",issue:"",details:"",operability:"service",state:"completed",source:"fixed-log",createdAt:now,updatedAt:now,completedAt:now} as StructuredDefect});
  };
+ /* Typing the number picks the bus, using the same resolver the rest of the app
+    uses: a full fleet number, or the last two digits when that is unambiguous.
+    The record follows the box as it is typed, so there is nothing to press —
+    and the box says what it did, because silently landing on the wrong bus is
+    how a repair gets logged against somebody else's work order.
+
+    A number that resolves to nothing leaves the record on whatever bus it was
+    already on rather than clearing it, so a half-typed number never wipes a
+    selection the mechanic made from the list. */
+ const applyBusQuery=(value:string)=>{
+  setBusQuery(value);
+  if(value.length<2)return;
+  const resolution=resolveBusNumber(fleet,value);
+  if(resolution.kind!=="exact"&&resolution.kind!=="suffix")return;
+  setNewRepair(current=>current?{...current,bus:resolution.bus}:current);
+ };
+ const busFeedback=(()=>{
+  if(!newRepair)return "";
+  if(!busQuery)return "";
+  if(busQuery.length<2)return "Keep typing — a full fleet number, or the last two digits.";
+  const resolution=resolveBusNumber(fleet,busQuery);
+  if(resolution.kind==="exact"||resolution.kind==="suffix")return "Bus "+resolution.bus.n+" — "+locationLabel(resolution.bus.l);
+  if(resolution.kind==="ambiguous")return busQuery+" matches "+candidateBusNumbers(resolution.matches).join(", ")+". Type the full number.";
+  if(resolution.kind==="not-found")return "No bus matches "+busQuery+".";
+  return "Use a full fleet number or exactly two ending digits.";
+ })();
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null);setNewRepair(null)};
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
 /* Where a completed repair came from, said plainly.
@@ -247,7 +290,7 @@ function repairOrigin(source:string|undefined){
   {/* No key on the bus id: it would remount the editor on every bus change and
       reset the whole form, so a mechanic who picked the bus last lost the
       record they had just typed. The bus select is controlled by the prop. */}
-  {newRepair&&<CompletionEditor record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);return current&&bus?{...current,bus}:current})}/>}
+  {newRepair&&<CompletionEditor record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} busQuery={busQuery} busFeedback={busFeedback} onBusQuery={applyBusQuery} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);setBusQuery("");return current&&bus?{...current,bus}:current})}/>}
   
  </main>
 }
