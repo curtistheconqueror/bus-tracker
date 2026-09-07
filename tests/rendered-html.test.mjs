@@ -9230,3 +9230,89 @@ test("every bus on one printed line carries that line's wording, so a PM line is
  assert.match(route,/never a reason left empty on the second and later buses/);
  assert.match(route,/Give every row of a multi-bus line the same lineNumber/);
 });
+
+test("the words written on a scanned row outrank the catalog repair the scan guessed at",async()=>{
+ const {reconcileScannedRepair,catalogPickFromWords,repairNamedInWords}=await import("../app/down-sheet/scan-catalog-match.ts");
+ const {reviewScannedRows,mergeReviewedRows}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const {REPAIR_OPTIONS,migrateRepairIdentity}=await import("../app/repair-catalog.ts");
+
+ /* BUS 15508, LINE 25 of the 09/6 sheet. Written on the paper: MISFIRE CYL # 5
+    / MDT SCREEN. Filed by the scan as Engine / Stabilizer link — a suspension
+    part, on a row that mentions no suspension. The catalog was never the
+    problem: Misfire is an Engine option, sitting there to be picked. */
+ const row={pageNumber:2,lineNumber:"25",busNumber:"15508",reason:"MISFIRE CYL # 5 / MDT SCREEN",assignedTo:"",category:"Engine",repair:"Stabilizer link",section:"Pending",shift:"1st",operationalStatus:"out",confidence:.88,reviewNote:""};
+ const reviewed=reviewScannedRows([row],[{id:"b","n":"15508"}]);
+ assert.equal(reviewed[0].category,"Engine");
+ assert.equal(reviewed[0].repair,"Misfire");
+ assert.match(reviewed[0].reviewNote,/Repair read from the words on the row: Engine — Misfire/);
+ // The written words themselves are never rewritten; only the catalog pick is.
+ assert.equal(reviewed[0].reason,"MISFIRE CYL # 5 / MDT SCREEN");
+ const stored=mergeReviewedRows(reviewed.map(item=>({...item,selected:true})))[0];
+ assert.equal(stored.category,"Engine");
+ assert.equal(stored.repair,"Misfire");
+
+ /* WHAT IS APPROVED IS WHAT IS FILED. A repair from outside the category the
+    scan named cannot be shown by that category's dropdown, so the box fell back
+    to displaying its first option while the import stored the original: the
+    reviewer approved "Check engine light" and the sheet recorded "Stabilizer
+    link". Whatever is on the row now, the category owns it. */
+ assert.ok(REPAIR_OPTIONS[reviewed[0].category].includes(reviewed[0].repair),
+  "the review screen can display the repair that will actually be filed");
+
+ /* The earliest fault written is the primary one — the crew writes what matters
+    first and lists the rest after a slash. Both readings are pinned so the
+    order is not accidental. */
+ assert.deepEqual(catalogPickFromWords("MISFIRE CYL # 5 / MDT SCREEN"),{category:"Engine",repair:"Misfire"});
+ assert.deepEqual(catalogPickFromWords("MDT SCREEN / MISFIRE"),migrateRepairIdentity("Tech Services","MDT Screen")&&{category:"Tech Services",repair:"IBS Screen - INOP (general)"});
+
+ /* MDT SCREEN is what the shop writes and the catalog renamed it to IBS Screen,
+    so the model is handed a list with no "MDT" in it anywhere and cannot match
+    the phrase however plainly it is written. The translation comes from the
+    app's own rename table rather than a second copy of it. */
+ assert.deepEqual(catalogPickFromWords("MDT SCREEN"),{category:"Tech Services",repair:"IBS Screen - INOP (general)"});
+ assert.equal(migrateRepairIdentity("Tech Services","MDT Screen").issue,"IBS Screen - INOP (general)");
+
+ /* A pick the words DO support is the scan reading the same row a person did,
+    and is left alone. */
+ for(const [category,repair,reason] of [["Engine","Coolant leak","COOLANT LEAK AT WATER PUMP"],["Engine","Misfire","MISFIRE CYL 3"],["Engine","Check engine light","CHECK ENGINE LIGHT ON"]])
+  assert.deepEqual(reconcileScannedRepair(category,repair,reason),{category,repair,corrected:false},reason);
+ assert.equal(repairNamedInWords("Coolant leak","COOLANT LEAK AT WATER PUMP"),true);
+ assert.equal(repairNamedInWords("Stabilizer link","MISFIRE CYL # 5"),false);
+
+ /* Words that name no catalog repair leave the scan's own pick standing. This
+    is a correction, not a second guesser. */
+ assert.deepEqual(reconcileScannedRepair("Engine","Check engine light","WONT START"),{category:"Engine",repair:"Check engine light",corrected:false});
+ assert.deepEqual(reconcileScannedRepair("Miscellaneous","Unknown diagnosis",""),{category:"Miscellaneous",repair:"Unknown diagnosis",corrected:false});
+
+ /* A repair that is real but filed under the wrong category moves to the
+    category that owns it, rather than being thrown away. */
+ assert.deepEqual(reconcileScannedRepair("Brakes","Stabilizer link","SOMETHING ELSE"),{category:"Suspension and Steering",repair:"Stabilizer link",corrected:true});
+ /* A repair this app does not have at all becomes Miscellaneous rather than
+    some invented specific one — the written reason still carries the words. */
+ assert.deepEqual(reconcileScannedRepair("Engine","Flux capacitor","SOMETHING ODD"),{category:"Miscellaneous",repair:"Driver-reported defect",corrected:true});
+
+ /* THE TIMID RULES, each read off the generated needle list before shipping.
+    A confident wrong match is worse than none. */
+ assert.equal(catalogPickFromWords("LOOSE MIRROR"),null,"a condition word is not a Bodywork repair name");
+ assert.equal(catalogPickFromWords("BROKEN SEAT"),null);
+ assert.equal(catalogPickFromWords("DAMAGED TRIM"),null);
+ assert.equal(catalogPickFromWords("PM'S"),null,"a service line names no repair");
+ assert.equal(catalogPickFromWords(""),null);
+ assert.equal(catalogPickFromWords("NO CRANKING NOISE FROM REAR"),null,"whole phrases only, never a substring");
+
+ /* Filing a bus OFF PROPERTY takes it out of the yard's down count, and unlike
+    every other band nothing on the row has to justify it. A row that reaches
+    for it with no vendor and no location named is called out for a look. */
+ const note=input=>reviewScannedRows([{...row,...input}],[{id:"b",n:"15508"}])[0].reviewNote;
+ assert.match(note({section:"Vendor Repair",reason:"BRAKES",repair:"Air leak"}),/Filed OFF PROPERTY with no vendor or location named/);
+ assert.equal(/OFF PROPERTY/.test(note({section:"Vendor Repair",reason:"ENGINE REPLACEMENT",repair:"Engine replacement",assignedTo:"CUMMINS"})),false,"a named vendor is the sheet saying where the bus is");
+ assert.equal(/OFF PROPERTY/.test(note({section:"Vendor Repair",reason:"OFF PROPERTY AT BODY SHOP",repair:"Engine replacement"})),false,"and so are the words themselves");
+ assert.equal(note({section:"Pending",reason:"COOLANT LEAK",repair:"Coolant leak"}),"","an ordinary row says nothing");
+
+ /* The prompt is asked for the same things the code now guarantees. */
+ const route=await readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8");
+ assert.match(route,/THE REPAIR YOU CHOOSE MUST MATCH THE WORDS ON THE ROW/);
+ assert.match(route,/never a repair from one category paired with the name of another/);
+ assert.match(route,/A bus is OFF PROPERTY or Vendor Repair only when the sheet says so/);
+ assert.match(route,/Never infer it from the kind of repair/);
+});

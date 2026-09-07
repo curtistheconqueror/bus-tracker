@@ -1,5 +1,6 @@
 import {DOWN_SHEET_INSPECTION_PATTERN,DOWN_SHEET_OFF_PROPERTY_PATTERN,DOWN_SHEET_VENDORS,downSheetScheduledOnly,isDownSheetReasonPlaceholder} from "./down-sheet-view.ts";
 import {correctScannedText} from "./scan-spelling.ts";
+import {reconcileScannedRepair} from "./scan-catalog-match.ts";
 
 export type ScanStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -173,8 +174,33 @@ export function reviewScannedRows(rows:ScannedDownSheetRow[],fleet:ScanFleetBus[
      row is capped below the review threshold whatever the model claimed: it was
      handwritten and unnumbered, and those are the rows that come back wrong. */
   const confidence=isMarginRow(row)?Math.min(Number(row.confidence)||0,0.6):row.confidence;
-  return {...row,busNumber,confidence,
-   reason:correctScannedText(row.reason,vocabulary),
+  const reason=correctScannedText(row.reason,vocabulary);
+  /* The written words decide the catalog pick, and they decide it HERE so the
+     review screen shows what will actually be filed. It used to show something
+     else: a repair the scan chose from outside the category it named could not
+     be displayed by that category's dropdown, so the box fell back to showing
+     its first option while the import stored the original — the reviewer
+     approved "Check engine light" and the sheet recorded "Stabilizer link". */
+  const picked=reconcileScannedRepair(row.category,row.repair,reason);
+  const notes=picked.corrected?[`Repair read from the words on the row: ${picked.category} — ${picked.repair}`]:[];
+  /* Filing a bus OFF PROPERTY takes it out of the yard's down count entirely,
+     which is the most consequential thing a single field on this row can do —
+     and unlike every other band, nothing on the row has to justify it. The
+     sheet says a bus is away by naming where it went in the MECHANIC/LOCATION
+     column, or by the OFF PROPERTY heading above it. When the scan reaches for
+     that band with neither a vendor named nor a word about it anywhere on the
+     row, that is the model's unexplained say-so about a bus that may well be
+     sitting in the yard, so it is called out for a look rather than trusted
+     silently. The row is still ticked: under a genuine OFF PROPERTY heading the
+     location column is often blank, and making a foreman re-tick that whole
+     band would cost more than it saves. */
+  const offSite=normalizedSection(clean(row.section)||reason)==="Vendor Repair";
+  const named=DOWN_SHEET_VENDORS.some(([pattern])=>pattern.test(row.assignedTo||""))
+   ||DOWN_SHEET_OFF_PROPERTY_PATTERN.test([row.assignedTo,reason,row.section].filter(Boolean).join(" "));
+  if(offSite&&!named)notes.push("Filed OFF PROPERTY with no vendor or location named on the row — check the sheet");
+  const note=notes.join(" · ");
+  return {...row,busNumber,confidence,reason,category:picked.category,repair:picked.repair,
+   reviewNote:clean(row.reviewNote)&&note?`${clean(row.reviewNote)} · ${note}`:note||clean(row.reviewNote),
    assignedTo:correctScannedText(row.assignedTo,vocabulary),key:`scan-${row.pageNumber||1}-${row.lineNumber||index+1}-${index}`,selected:fleetMatch==="matched",fleetMatch,busId:fleetMatch==="matched"?matches[0].id:"",repeatedCount:scanCounts.get(busNumber)||1};
  });
 }
