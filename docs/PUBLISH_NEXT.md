@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSIONS 153–157 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, 155 from `6f8518b`, 156 from `103b005`, then 157 from `e8cc258`. Version 152 is live from `b57dcb5`.**
+**STATUS: VERSIONS 153–157 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, 155 from `6f8518b`, 156 from `103b005`, then 157 from `17ccbc5`. Version 152 is live from `b57dcb5`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Last | **157** | `e8cc258` | **What the sheet says now outranks what the scan guessed it meant** — a row reading MISFIRE CYL # 5 was filed as a suspension part, and the review screen could not even display it, so the reviewer approved one repair and the sheet stored another; the written words now choose the catalog entry, MDT SCREEN resolves through the app's own rename, and an unexplained OFF PROPERTY filing is called out. Fixed Repairs also takes a typed bus number instead of only a dropdown |
+| Last | **157** | `17ccbc5` | **The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant** — two pressable tallies join the five, counting a bus with both a PM and a fault in both; a row reading MISFIRE CYL # 5 had been filed as a suspension part the review screen could not even display, so the reviewer approved one repair and the sheet stored another; MDT SCREEN resolves through the app's own rename, an unexplained OFF PROPERTY filing is called out, and Fixed Repairs takes a typed bus number instead of only a dropdown |
 | Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
 | After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
 | Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
@@ -34,10 +34,10 @@
 split it out from what this file used to call Version 152's own tip, publishing
 152 itself only as far as `b57dcb5` — and is not moved by anything here; 154 is
 the three commits on top of it, `dd1b093`, `0db855a` and `fd3b326`; 155 is one
-commit further, `6f8518b`; 156 is one more, `103b005`; 157 is the two after
-that, `62bb58d` and `e8cc258`. Publish in order — or, if it is simpler to
-publish once, publish 157 from `e8cc258` and record all five versions as live
-from it, since 157 contains 156, 155, 154 and 153 whole.
+commit further, `6f8518b`; 156 is one more, `103b005`; 157 is the three after
+that, `62bb58d`, `e8cc258` and `17ccbc5`. Publish in order — or, if it is
+simpler to publish once, publish 157 from `17ccbc5` and record all five
+versions as live from it, since 157 contains 156, 155, 154 and 153 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -63,31 +63,36 @@ what to check once it is live.
 
 ---
 
-# Version 157 — The sheet's own words outrank what the scan guessed they meant
+# Version 157 — The sheet says who is on the road, and its words outrank the scan's guess
 
-**Publish this after Version 156.** Two things reported off the same morning's
-work: a scanned row filed as a repair the row never mentions, and the Fixed
-Repairs form offering no way to type a bus number.
+**Publish this after Version 156.** Three things reported off the same morning's
+work: no way to tell from the Down Sheet whether a bus is actually out working,
+a scanned row filed as a repair the row never mentions, and the Fixed Repairs
+form offering no way to type a bus number.
 
 ## Source
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`e8cc258`** |
-| Last code-bearing commit | `e8cc258` — the release source is this commit |
+| **Release source** | **`17ccbc5`** |
+| Last code-bearing commit | `17ccbc5` — the release source is this commit |
 | Branch | `main` on the private `origin` remote |
 | Previous | Version 156, pending from `103b005` |
 
-**Two application commits** on top of 156's `103b005`:
+**Three application commits** on top of 156's `103b005`:
 
 ```
-git log --oneline 103b005..e8cc258      # docs-only commits omitted
+git log --oneline 103b005..17ccbc5      # docs-only commits omitted
+17ccbc5 Say on the Down Sheet which of its buses are out on the road
 e8cc258 Let Fixed Repairs take a typed bus number instead of only a dropdown
 62bb58d Let the words written on a scanned row outrank the catalog repair the scan guessed at
 
-git diff --name-only 103b005 e8cc258 -- app tests
+git diff --name-only 103b005 17ccbc5 -- app tests
 app/api/down-sheet-scan/route.ts
 app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-view.ts
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
 app/down-sheet/scan-catalog-match.ts     (new)
 app/fixed-repairs/fixed-repairs.css
 app/fixed-repairs/page.tsx
@@ -97,10 +102,10 @@ tests/rendered-html.test.mjs
 No dependency, database, CI, worker, or service-worker change:
 
 ```
-git diff --name-only 103b005 e8cc258 -- supabase package.json package-lock.json .github public worker   # returns nothing
+git diff --name-only 103b005 17ccbc5 -- supabase package.json package-lock.json .github public worker   # returns nothing
 ```
 
-Gate: **225 tests passing** (223 at Version 156, two added), ESLint clean,
+Gate: **226 tests passing** (223 at Version 156, three added), ESLint clean,
 production build succeeds.
 
 ## Migrations
@@ -112,7 +117,41 @@ or retired.
 
 ## What changed
 
-### 1. A row filed as a repair it never mentioned — and a review screen that could not show it
+### 1. The Down Sheet can say which of its buses are out on the road
+
+The map's down-sheet badges answer "is this bus on the sheet?" while you are
+looking at the yard. Standing at the sheet there was no way to ask the inverse —
+"is this one actually out working?" — which is the question behind deciding what
+can be caught this shift and what has to wait for the bus to come in. The sheet
+could not answer it on its own, because where a bus is belongs to the map.
+
+Two tallies join the five, making seven: **INSPECTIONS ON ROAD** and **DOWNED
+BUSES ON ROAD**. Both are pressable, and pressing one holds the sheet below down
+to exactly the buses it counts, so the number can be read as a list. Pressing it
+again gives the whole sheet back, and a line under the tiles says which one is
+holding it, with the way out.
+
+**A bus carrying both is counted in both**, which is why these are not simply the
+existing bands filtered by location. The sheet folds a bus into the one row it is
+allowed, so a bus that came due for a PM and is also missing on cylinder 5 has a
+single row reading `PM'S / MISFIRES`. The bands must pick one and they pick the
+fault, correctly — a bus with a live misfire is down. But somebody still owes it
+a PM, and neither errand disappears because the other exists. So these ask what
+the row **mentions** rather than where it was filed. PM DEFECTS stays out of the
+inspection tally and in the down one, since those are the faults found while
+doing a PM.
+
+The counts are taken **before** the filter is applied, so pressing one tally does
+not empty the other out from under the person reading it: both keep saying what
+they always said and only the sheet narrows. "On the road" is the same test
+`smart-status.ts` uses to decide a bus is in service, written once so the sheet
+and the map cannot disagree; a bus the map has never placed is not asserted to be
+anywhere.
+
+The five existing tiles are unchanged and remain a scoreboard — only the two new
+ones are pressable, and they are shaped like buttons to say so.
+
+### 2. A row filed as a repair it never mentioned — and a review screen that could not show it
 
 Line 25 of the 09/6 sheet reads `MISFIRE CYL # 5 / MDT SCREEN` against bus
 15508. The scan kept those words — it always does, verbatim — and filed the row
@@ -144,7 +183,7 @@ missing, damaged, paint, trace — because "LOOSE MIRROR" is not a Bodywork/Loos
 row. Four phrases name two catalog entries each; the scan's own category breaks
 the tie.
 
-### 2. MDT SCREEN is a word the catalog no longer has
+### 3. MDT SCREEN is a word the catalog no longer has
 
 The other half of that row exposed a gap of its own. The shop still writes **MDT
 SCREEN**; the catalog renamed it to **IBS Screen** some releases ago. So the
@@ -154,7 +193,7 @@ existing rename table rather than copied into a second one, so `MDT SCREEN`
 resolves to `Tech Services / IBS Screen - INOP (general)` — the same answer a
 stored record gets when it is read back.
 
-### 3. An OFF PROPERTY filing with nothing behind it
+### 4. An OFF PROPERTY filing with nothing behind it
 
 The same row was also filed OFF PROPERTY, which takes a bus out of the yard's
 down count entirely — and alone among the four bands, nothing on the row has to
@@ -170,7 +209,7 @@ misfiling was not determined** — the scan output that produced it was not
 available — so this is a guard that makes it visible before import, not a fix
 for a diagnosed bug.
 
-### 4. Fixed Repairs takes a typed bus number
+### 5. Fixed Repairs takes a typed bus number
 
 LOG A REPAIR offered only a dropdown of the whole fleet — the one place in the
 app where a bus number could not simply be typed, and the slow path for working
@@ -192,7 +231,19 @@ there is no bus box, and yields it on a new one.
 
 ## Validation
 
-- 225 regression tests passing, ESLint clean, production build succeeds
+- 226 regression tests passing, ESLint clean, production build succeeds
+- **The road tallies driven against the PRODUCTION build**, zero console errors:
+  eight entries across road, garage and vendor locations give INSPECTIONS ON
+  ROAD **3** and DOWNED BUSES ON ROAD **3** with one bus in both; pressing the
+  first narrows the sheet to 17510, 17512 and 17516 **while both tallies stay at
+  3**; pressing the second shows 17511, 17512 and 17513; pressing it again
+  restores all eight rows and clears the note. Seven tiles lay out as five and
+  two at 1280px and stack full width at 390px
+- **The counting rules are pinned by their own assertions:** a bus reading
+  `PM'S / MISFIRES` is in both tallies while its band stays UNSCHEDULED; PM
+  DEFECTS is in the down tally only; a row with nothing written falls back to how
+  it was filed; buses in the garage and at a vendor are in neither; and a bus the
+  map has never placed counts nowhere
 - **The 15508 row driven through the real scanner against the PRODUCTION
   build**, its exact response stubbed, zero console errors: the review screen
   shows **Engine / Misfire**, its dropdown can display that value, the reason
@@ -216,31 +267,40 @@ there is no bus box, and yields it on a new one.
 
 ## After it is live
 
-1. **Rescan the sheet with line 25 on it.** Bus 15508 should read Engine /
+1. **Open the Down Sheet.** There should be seven tiles. Press INSPECTIONS ON
+   ROAD and the sheet should hold down to just those buses; press it again for
+   the whole sheet. A bus on the sheet for both a PM and a fault should appear
+   under both tallies, with its row still sitting in its own band.
+2. **Cross-check one against the map.** Every bus the road tallies list should
+   be sitting in IN SERVICE / ON ROAD on the Facility Map, and none of them in
+   the garage or off property. This is the check that the two pages agree.
+3. **Rescan the sheet with line 25 on it.** Bus 15508 should read Engine /
    Misfire, with the written words still saying `MISFIRE CYL # 5 / MDT SCREEN`,
    and a note on the row saying where the repair was read from.
-2. **Look at the notes on the review screen generally.** Rows whose repair was
+4. **Look at the notes on the review screen generally.** Rows whose repair was
    corrected, and rows headed OFF PROPERTY with nothing on them to justify it,
    both say so now. The off-property one is worth a glance at the paper.
-3. **Scan a sheet with an MDT SCREEN row.** It should land under Tech Services
+5. **Scan a sheet with an MDT SCREEN row.** It should land under Tech Services
    as IBS Screen rather than being guessed at.
-4. **Open Fixed Repairs → LOG A REPAIR.** The cursor should already be in TYPE
+6. **Open Fixed Repairs → LOG A REPAIR.** The cursor should already be in TYPE
    BUS #; type a full number or the last two digits and watch the bus underneath
    follow, then fill in the repair as before.
-5. **Type two digits that match more than one bus.** It should say which buses
+7. **Type two digits that match more than one bus.** It should say which buses
    and wait for the full number rather than picking one.
 
 ## The way back
 
-Measured in a throwaway worktree from `e8cc258`:
+Measured in a throwaway worktree from `17ccbc5`:
 
-- `git revert e8cc258` alone is **clean** and removes the Fixed Repairs typed
-  field, leaving the scan work in place.
-- `git revert e8cc258 62bb58d` (newest first) is **clean** and takes the whole
-  release out, back to 156.
-- `git revert 62bb58d` alone **conflicts in `tests/rendered-html.test.mjs`
-  only**, because the later commit appended to the same file; revert the pair
-  above, or keep both sides.
+- `git revert 17ccbc5` alone is **clean** and removes the two road tallies,
+  leaving the scan work and the typed bus number in place.
+- `git revert 17ccbc5 e8cc258` (newest first) is **clean** and also removes the
+  Fixed Repairs typed field.
+- `git revert 17ccbc5 e8cc258 62bb58d` (newest first) is **clean** and takes the
+  whole release out, back to 156.
+- Reverting either of the earlier two **on its own** conflicts in
+  `tests/rendered-html.test.mjs`, because the later commits appended to the same
+  file. Revert from the newest down, as above.
 - Nothing in this release writes new stored state, so there is nothing to clean
   up going backwards. Rows imported while it was live keep the repair they were
   imported with.
@@ -256,7 +316,7 @@ Measured in a throwaway worktree from `e8cc258`:
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 157 | Live | <published tip hash> | What the sheet says now outranks what the scan guessed it meant. A row reading MISFIRE CYL # 5 / MDT SCREEN was filed as Engine / Stabilizer link — a suspension part on a row that mentions none — and because that repair does not exist under that category, the review screen's dropdown could not display it and showed the category's first option instead, so the reviewer approved one repair and the sheet stored another. The written words now choose the catalog entry, the earliest fault written winning, with the reason itself never altered and the result always displayable by its own category. The matching is deliberately timid: nothing under five characters, no "Other" entries, and generic condition words like loose and broken skipped by name. MDT SCREEN, which the shop still writes and the catalog renamed to IBS Screen, resolves through the app's own rename table. And a row filed OFF PROPERTY with no vendor or location named anywhere on it is now called out on the review screen, since that band alone takes a bus out of the yard's down count without anything on the row having to justify it. Fixed Repairs also takes a typed bus number — full number or last two digits, through the same resolver as the rest of the app — instead of only a dropdown of the whole fleet |
+| 157 | Live | <published tip hash> | The Down Sheet can now say which of its buses are actually out on the road — the inverse of the map's down-sheet badges, and a question the sheet could not answer on its own because where a bus is belongs to the map. Two pressable tallies join the five, INSPECTIONS ON ROAD and DOWNED BUSES ON ROAD, and pressing one holds the sheet down to exactly the buses it counts so the number can be read as a list. A bus carrying both a PM and a fault is counted in both, because the sheet folds a bus into one row and the bands must pick one for it: they pick the fault, correctly, but somebody still owes it a PM. The counts are taken before the filter is applied so pressing one does not empty the other, and "on the road" is the same test the map uses to decide a bus is in service. What the sheet says now also outranks what the scan guessed it meant. A row reading MISFIRE CYL # 5 / MDT SCREEN was filed as Engine / Stabilizer link — a suspension part on a row that mentions none — and because that repair does not exist under that category, the review screen's dropdown could not display it and showed the category's first option instead, so the reviewer approved one repair and the sheet stored another. The written words now choose the catalog entry, the earliest fault written winning, with the reason itself never altered and the result always displayable by its own category. The matching is deliberately timid: nothing under five characters, no "Other" entries, and generic condition words like loose and broken skipped by name. MDT SCREEN, which the shop still writes and the catalog renamed to IBS Screen, resolves through the app's own rename table. And a row filed OFF PROPERTY with no vendor or location named anywhere on it is now called out on the review screen, since that band alone takes a bus out of the yard's down count without anything on the row having to justify it. Fixed Repairs also takes a typed bus number — full number or last two digits, through the same resolver as the rest of the app — instead of only a dropdown of the whole fleet |
 ```
 
 
