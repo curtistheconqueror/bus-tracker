@@ -1604,11 +1604,29 @@ test("repair catalog exposes robust category and issue choices", () => {
      moved into its group. A record from the MDT era lands at the end of both. */
   assert.equal(normalizeDefects([{id:"legacy-screen",category:"Tech Services",issue:"MDT Screen",details:"Blank",state:"open"}])[0].issue,"IBS Screen - INOP (general)");
   assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS.Amerex), ["Fire Suppression", "Gas Concentration", "CNG"]);
-  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 1 Roof 2", "Trouble Mod 2 Roof 1", "Trouble Mod 2 Roof 2", "Control head no power", "Other Fire Suppression Trouble"]);
+  /* Each module reports Roof 1, Roof 2 and the engine. The engine positions
+     were missing, so a mechanic reading TROUBLE MOD 1 ENGINE off the panel had
+     nothing in the picker to file it as. */
+  assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Fire Suppression"], ["FIRE alarm (system discharged)", "Heat sensor communication fault", "Trouble Mod 1 Roof 1", "Trouble Mod 1 Roof 2", "Trouble Mod 1 Engine", "Trouble Mod 2 Roof 1", "Trouble Mod 2 Roof 2", "Trouble Mod 2 Engine", "Control head no power", "Other Fire Suppression Trouble"]);
   assert.deepEqual(REPAIR_OPTION_GROUPS.Amerex["Gas Concentration"], ["Trace", "Significant Leak", "Other Gas Concentration Alert"]);
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 1"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Roof 2"));
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 2 Roof 2"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 1 Engine"));
+  assert.ok(REPAIR_OPTIONS.Amerex.includes("Fire Suppression - Trouble Mod 2 Engine"));
+  /* The stored identity and the names the picker draws are two structures that
+     have to stay in step: add to one only, and the picker offers an option that
+     saves as nothing, or a saved record has no option to reach it. Checked for
+     the whole category rather than for the entries just added. */
+  for(const [group, issues] of Object.entries(REPAIR_OPTION_GROUPS.Amerex))
+   for(const issue of issues)
+    assert.ok(REPAIR_OPTIONS.Amerex.includes(group + " - " + issue), group + " - " + issue + " is in the picker but not in REPAIR_OPTIONS");
+  for(const option of REPAIR_OPTIONS.Amerex){
+   // first separator only: an issue name is allowed to contain " - " itself
+   const at = option.indexOf(" - ");
+   const group = option.slice(0, at), issue = option.slice(at + 3);
+   assert.ok(REPAIR_OPTION_GROUPS.Amerex[group]?.includes(issue), option + " is a stored option the picker cannot offer");
+  }
   assert.ok(REPAIR_OPTIONS.Amerex.includes("Gas Concentration - Significant Leak"));
   // Amerex keeps the wording printed on the panel; every other grouped
   // category gets plain wording that names its own groups.
