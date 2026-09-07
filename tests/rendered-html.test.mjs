@@ -9095,6 +9095,50 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.equal(capped["d0-0"],undefined,"and the oldest, long since landed on the server, are what falls off");
 });
 
+test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
+ const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+ const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
+
+ /* The PM half of the maintenance wording was missing, and the omission was
+    invisible because `pm's` itself matched: the catalog words written beside it
+    did not, so "Other preventive maintenance - PM'S" had `pm's` struck out and
+    "other preventive maintenance" left standing, which reads as a complaint.
+    Every one of the eight Preventive Maintenance catalog items behaved that
+    way — a PM bus counted as a bus down, and sat in UNSCHEDULED rather than
+    under INSPECTIONS & SCHEDULED MAINTENANCE. */
+ for(const repair of ["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"]){
+  assert.equal(downSheetMentionsDefect(row(repair,"PM'S","Inspection")),false,repair+" with PM'S beside it is scheduled maintenance, not a bus down");
+  assert.equal(downSheetGroup(row(repair,"PM'S","Inspection")),"inspection",repair+" belongs under INSPECTIONS & SCHEDULED MAINTENANCE");
+ }
+ for(const repair of ["B-18","B-12","A-3","A-21"])
+  assert.equal(downSheetMentionsDefect(row(repair,repair,"Inspection")),false,"an inspection code on its own is not a bus down");
+
+ /* The whole risk of widening that wording is that it starts swallowing
+    complaints. A fault written ALONGSIDE the maintenance still has to survive
+    the strip — this is the half that must never regress. */
+ for(const [repair,reason] of [
+  ["Other preventive maintenance","PM DEFECTS - Trans Leak"],
+  ["Other preventive maintenance","PM'S / BRAKES GRINDING"],
+  ["Misfire","MISFIRES / PM'S"],
+  ["Fluid service","FLUID LEAK"],
+  ["Lubrication","LUBE + AIR LEAK"],
+  ["Add engine oil","OIL LEAK REAR MAIN"],
+  ["Other repair","BIKE RACK BENT"],
+  ["B-18","B-18 FAILED - BRAKES"],
+ ]) assert.equal(downSheetMentionsDefect(row(repair,reason)),true,"a fault written beside maintenance is still a bus down: "+reason);
+
+ // The tile, beside the total rather than under it, and the count behind it.
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const downBusCount=useMemo\(\(\)=>visible\.filter\(downSheetMentionsDefect\)\.length,\[visible\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
+ assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{downBusCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+
+ /* The total used to take a whole row by itself on a phone. It is one of a pair
+    now, so it takes half like every other tile. */
+ const css=await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
+ assert.doesNotMatch(css,/\.down-group-counts \.group-count\.total\{grid-column:1\/-1\}/,"the total must not span the whole row any more");
+ assert.match(css,/\.down-group-counts\{margin:0 14px 9px;display:grid;grid-template-columns:repeat\(6,/,"six tiles across the first row");
+});
+
 test("every Down Sheet row carries its own DELETE, on the bus's cell rather than off the right edge",async()=>{
  const [page,css]=await Promise.all([
   readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),

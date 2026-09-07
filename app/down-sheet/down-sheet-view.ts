@@ -55,7 +55,21 @@ export function downSheetGroupLabel(key:DownSheetGroupKey){return DOWN_SHEET_GRO
    - TRANS HUB DIFF is a fluid service written as three assemblies with no
      symptom. All three words are required, because a bus with a roaring
      differential is a repair and says so. */
-export const DOWN_SHEET_INSPECTION_PATTERN=/\binspections?\b|\b[abc](?:\s*-\s*)?\d{1,2}\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b|\bpm'?s?\b(?!\s*defects?\b)|\btrans(?:mission)?[\s/,&-]*hubs?[\s/,&-]*diff/i;
+/* The wording of scheduled work, so that a row carrying ONLY this reads as
+   maintenance rather than as a bus being broken.
+
+   The PM half of it was missing and the omission was invisible: `pm's` matched,
+   but the catalog wording written beside it did not, so "Other preventive
+   maintenance — PM'S" had `pm's` struck out and the words "other preventive
+   maintenance" left standing — which reads as somebody having written a
+   complaint. Every one of the eight Preventive Maintenance catalog items
+   behaved that way, so a PM bus counted as a down bus and sat in UNSCHEDULED
+   rather than under INSPECTIONS & SCHEDULED MAINTENANCE.
+
+   These are whole phrases on purpose. A complaint written alongside still
+   survives the strip and still reads as a fault: "fluid service" is struck out
+   and "fluid leak" is not, and "bike rack bent" keeps its "bent". */
+export const DOWN_SHEET_INSPECTION_PATTERN=/\binspections?\b|\b[abc](?:\s*-\s*)?\d{1,2}\b|\bspark\s*plugs?\b|\bvalve\s*adjust(?:ment)?\b|\bpm'?s?\b(?!\s*defects?\b)|\btrans(?:mission)?[\s/,&-]*hubs?[\s/,&-]*diff|\b(?:other\s+)?preventive\s*maintenance\b|\badd\s*engine\s*oil\b|\boil\s*(?:and|&|\/)\s*filter\s*service\b|\blubrication\b|\bfluid\s*service\b|\bscheduled\s*campaign\b|\bseasonal\s*preparation\b|\bbike\s*rack\b[\s\-]*(?:arms?)?[\s/,&-]*pivot\s*adjust(?:ment)?/i;
 
 /* The vendors the shop actually sends buses to. Kept as one list because two
    places ask about them: the work-category ordering names which vendor has it,

@@ -363,12 +363,17 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    `@media(max-width:760px)` block earlier in this file silently landed INSIDE
    it, and a divider that only has a colour on a phone is worse than none. The
    phone overrides below open their own block. */
-.down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .down-group-counts .group-count{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1px solid #b7c3d7;border-radius:7px;background:#fff;text-align:center}
 .down-group-counts .group-count strong{font-size:20px;font-weight:900;line-height:1;color:#173e73}
 .down-group-counts .group-count span{font-size:7px;font-weight:900;letter-spacing:.5px;color:#526481;line-height:1.15}
 .down-group-counts .group-count.total{border-color:#0b63ce;background:#eaf4ff}
 .down-group-counts .group-count.total strong{color:#075dbb;font-size:23px}
+/* Paired with the total by size and with the down numbers by colour: it is the
+   red one because it is the count of buses actually broken, and it shares the
+   red of UNSCHEDULED and DOWNED BUSES ON ROAD so the eye groups the three. */
+.down-group-counts .group-count.down-buses{border-color:#c15a55;background:#fdeeed}
+.down-group-counts .group-count.down-buses strong{color:#992722;font-size:23px}
 .down-group-counts .group-count.group-off-property{border-color:#c78a2a;background:#fdf5e6}
 .down-group-counts .group-count.group-off-property strong{color:#8a5600}
 .down-group-counts .group-count.group-scheduled{border-color:#4f9a63;background:#eef8f0}
@@ -414,16 +419,19 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-table .down-group-row.group-inspection td{border-color:#8a6bbf;background:#e8dffa!important;color:#4b2a80}
 .down-table .down-group-row.group-inspection td>i{background:#4b2a80}
 
-/* Seven tiles: four bands and the total on the first row, the two road tallies
-   sharing the second so the pressable pair reads as its own thing. */
-.down-group-counts{grid-template-columns:repeat(5,minmax(0,1fr))}
-.down-group-counts .group-count.group-road{grid-column:span 2}
+/* Eight tiles: four bands, the total and DOWN BUSES on the first row, the two
+   road tallies sharing the second so the pressable pair reads as its own
+   thing. */
+.down-group-counts{grid-template-columns:repeat(6,minmax(0,1fr))}
+.down-group-counts .group-count.group-road{grid-column:span 3}
 .down-group-counts .group-count.group-road-inspection{grid-column:2/4}
 .down-group-counts .group-count.group-road-down{grid-column:4/6}
 @media(max-width:900px){.down-group-counts{grid-template-columns:repeat(3,minmax(0,1fr))}.down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:auto/span 3}}
 @media(max-width:760px){
  .down-group-counts{margin:0 8px 8px;grid-template-columns:repeat(2,minmax(0,1fr))}
- .down-group-counts .group-count.total{grid-column:1/-1}
+ /* The total used to take the whole width on its own. It is one of a pair now —
+    rows on the sheet beside buses actually down — so it takes half like every
+    other tile and the two read side by side. */
  /* Full width each on a phone: they are the two a foreman presses, and a
     thumb-sized target matters more here than fitting the row. */
  .down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:1/-1;min-height:56px}
