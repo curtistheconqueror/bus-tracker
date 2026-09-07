@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 156 / release 160 | Live | bbe33f6 | Adds REFRESH to every page for home-screen use and moves the Main Garage Ready boundary vertically between bays 6 and 7 without moving buses or slots |
 | 155 / release 159 | Live | 2afa491 | Down Sheet removals now travel through Shop Cloud as entry tombstones, so cleared or replaced sheets stay cleared across devices and the settled sheet reconciles map Down Sheet flags |
 | 154 / release 158 | Live | a444242 | Adds a persistent UNDO DEFERRED action to expanded Defect Log repair cards and Focus view; it returns a held-back repair to Open while retaining its dated deferred history, and never appears for Down Sheet-owned Deferred work |
 | 153 / release 157 | Live | baffc24 | Carries repository releases 153–157: Shop Cloud sync and scan-review repairs, reversible scan sweeps, Ready Rows, corrected Down Sheet scan wording and road tallies, improved catalog matching, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
