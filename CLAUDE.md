@@ -1,7 +1,12 @@
 # Working on this project
 
-Read this first, then `PROJECT_HANDOFF.md` for the domain detail. This file is
-the short version: what will get you in trouble, and how to check your work.
+**New session? Read `docs/NEXT_SESSION.md` first.** It is the entry point: where
+things stand, what is queued with enough detail to start, the workflow with
+Codex, and the traps this project has actually fallen into.
+
+This file is the short version of the rules: what will get you in trouble, and
+how to check your work. `PROJECT_HANDOFF.md` has the domain detail, surface by
+surface.
 
 ## What it is
 
@@ -17,12 +22,18 @@ is a copy going somewhere else, never the place the data lives.
 
 **Codex publishes. Claude Code does not.** Claude never runs a deploy, never
 tags a release, never edits `.openai/hosting.json`, and never touches Sites
-credentials.
+credentials — not once, not to check, not because a build succeeded.
 
 The handoff between them is `docs/PUBLISH_NEXT.md`, at that exact path, always
 describing the next unpublished release. Claude keeps it current with every push
-to `main`; Codex publishes from it and then resets it. Read its status line
-before assuming anything is or is not live.
+to `main`; Codex publishes from it, updates `PROJECT_HANDOFF.md` and
+`docs/RELEASES.md`, and resets it. Read its STATUS line before assuming anything
+is or is not live.
+
+The full procedure — what a version section must contain, and what to do when
+Codex has published (or taken your version number) while you were working — is
+in `docs/NEXT_SESSION.md`. Codex publishing mid-session is normal: rebase onto
+its work, re-run the gates, renumber. Never merge over it, never force-push.
 
 Claude pushes to `main` and mirrors the same tree to `claude-contributions`:
 
@@ -89,19 +100,57 @@ machine, because these sessions run in containers that are thrown away.
 
 ## Storage keys
 
+Adding a key is fine. Renaming one is not, ever.
+
 ```
-pace-board-v1                 the fleet: buses, locations, status, defects
-pace-down-sheet-v1            Down Sheet entries
-pace-bus-lists-v1             Fleet Campaigns
-pace-bus-list-templates-v1    campaign column formats
-pace-parts-memory-v1          learned part numbers
-pace-findings-memory-v1       learned causes, per symptom
-pace-board-recovery-v1        local undo snapshot, never synced
-pace-board-settings-v1        per-device settings, never synced
-pace-down-sheet-settings-v1   per-device
-pace-defect-log-settings-v1   per-device
-pace-board-backup-reminder-v1 per-device
+the records
+  pace-board-v1                    the fleet: buses, locations, status, defects
+  pace-down-sheet-v1               Down Sheet entries
+  pace-bus-lists-v1                Fleet Campaigns
+  pace-bus-list-templates-v1       campaign column formats
+
+what the shop has taught it
+  pace-parts-memory-v1             learned part numbers
+  pace-findings-memory-v1          learned causes, per symptom
+  pace-scan-notes-v1               notes for the next scan, 500 chars
+
+undo and recovery, never synced
+  pace-board-recovery-v1           last known good board
+  pace-down-sheet-clear-undo-v1    UNDO CLEAR
+  pace-down-sheet-scan-undo-v1     UNDO IMPORT
+  pace-scan-batch-undo-v1          PUT BACK, for a Defect Log scan sweep
+  pace-facility-defect-clear-undo-v1  UNDO MAP CLEANUP
+
+the cloud's bookkeeping, per device
+  pace-cloud-config-v1             project, account, initials, device label
+  pace-cloud-state-v1              sync phase and last error
+  pace-cloud-sent-v1               fingerprints of rows already sent
+  pace-cloud-auth-v1               Supabase's own session
+  pace-cloud-merged-v1             defects this device merged away  (tombstones)
+  pace-cloud-removed-entries-v1    Down Sheet entries taken off    (tombstones)
+
+per-device settings, never synced
+  pace-board-settings-v1
+  pace-down-sheet-settings-v1
+  pace-defect-log-settings-v1
+  pace-board-backup-reminder-v1
+
+per-device view state — which panel is open, what has been dismissed
+  pace-tracker-collapsed-sections-v1
+  pace-down-sheet-stats-open-v1
+  pace-defect-log-stats-open-v1
+  pace-defect-log-mystery-collapsed-v1
+  pace-deferred-review-dismissed-v1
 ```
+
+`pace-locate-ack`, `pace-touch-drop` and `pace-open-quick-filter` look like keys
+and are not — they are CustomEvent names.
+
+**The two tombstone ledgers are load-bearing.** The merges are additive by
+design — they keep every record the receiver alone holds — so a removal can
+never travel as an absence. It has to be recorded in one of these and pushed as
+a tombstone, or the record comes straight back on the next pull. See
+`app/cloud-sync.ts`.
 
 Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
@@ -136,9 +185,18 @@ app/repair-catalog.ts      the defect catalog, rename maps, count fields
 app/section-transfer.ts    per-section device transfers and their merge rules
 app/storage.ts             storage keys, envelopes, recovery snapshots
 app/globals.css            the whole facility map, all breakpoints
+app/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
+app/cloud-client.ts        the Supabase calls, and how a push is planned
+app/cloud-live.ts          the one set of merge rules a pull is applied through
+docs/NEXT_SESSION.md       start here: state, queue, Codex workflow, traps
 docs/PUBLISH_NEXT.md       the standing Codex handoff
 docs/roadmap/              work that is designed but not built
-supabase/                  cloud sync schema, not yet applied to any database
+supabase/                  the cloud schema — APPLIED, and the shop is using it
 supabase/run-tests.sh      applies the migrations to a throwaway Postgres
 PROJECT_HANDOFF.md         domain ownership and surface-by-surface detail
 ```
+
+The Supabase project is live and holds the shop's real records. Reading it to
+diagnose something is fine and has been useful. **Writing to it is Curtis's
+call, every time — ask first.** The project ref is deliberately not in this
+repository.

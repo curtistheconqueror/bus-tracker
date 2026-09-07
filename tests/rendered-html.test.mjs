@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../app/defect-log/sweep-scan-import.ts";
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../app/cloud-sync.ts";
@@ -9318,6 +9318,59 @@ test("the Main Garage marks BAYS 1-6 as ready, with a line down the grid and a m
  assert.match(css,/\.garagegrid>b\.ready-bay-divider,\.grow \.spot\.ready-bay-divider\{border-left:4px solid var\(--garage-frame\)\}/);
  assert.match(css,/\.section-badge\{[^}]*color:var\(--garage-frame\)/);
  assert.doesNotMatch(css,/\.section-badge\{[^}]*#d7f5e4/,"the standalone green is gone; the badge follows the garage");
+});
+
+test("the handoff files stay true: every storage key is documented, and the entry point points at what exists",async()=>{
+ const [claudeMd,nextSession,publishNext,readme]=await Promise.all([
+  readFile(new URL("../CLAUDE.md",import.meta.url),"utf8"),
+  readFile(new URL("../docs/NEXT_SESSION.md",import.meta.url),"utf8"),
+  readFile(new URL("../docs/PUBLISH_NEXT.md",import.meta.url),"utf8"),
+  readFile(new URL("../README.md",import.meta.url),"utf8"),
+ ]);
+
+ /* A key that exists and is written down nowhere is how the next session
+    renames one — the single change that silently orphans a mechanic's board.
+    So the list in CLAUDE.md is checked against the code rather than trusted.
+
+    Only `-v1` names: the transfer payload kinds and the backup filename prefix
+    share the "pace-" prefix and are not storage. */
+ const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(entry=>
+  entry.isDirectory()?walk(new URL(entry.name+"/",dir)):/\.(ts|tsx)$/.test(entry.name)?[new URL(entry.name,dir)]:[]))).flat();
+ const sources=await Promise.all((await walk(new URL("../app/",import.meta.url))).map(file=>readFile(file,"utf8")));
+ const inCode=new Set();
+ for(const source of sources)
+  for(const found of source.matchAll(/"(pace-[a-z0-9-]*-v\d+)"/g))inCode.add(found[1]);
+ assert.ok(inCode.size>20,"the scan found "+inCode.size+" keys, which is too few to be a real scan");
+ const undocumented=[...inCode].filter(key=>!claudeMd.includes(key)).sort();
+ assert.deepEqual(undocumented,[],"storage keys in the code but not in CLAUDE.md — add them there, and never rename one");
+
+ /* The two tombstone ledgers are the ones a future change is most likely to
+    break by accident, because nothing on screen shows them working. */
+ for(const ledger of ["pace-cloud-merged-v1","pace-cloud-removed-entries-v1"])
+  assert.ok(claudeMd.includes(ledger),ledger+" must stay named in CLAUDE.md");
+
+ // A fresh session is told where to start, and the file it is sent to exists.
+ assert.match(claudeMd,/Read `docs\/NEXT_SESSION\.md` first/);
+ assert.ok(nextSession.length>2000,"the entry point must actually say something");
+
+ /* It must not promise files that are not there — a dead pointer in the first
+    thing a session reads costs more than no pointer at all. */
+ for(const path of [...nextSession.matchAll(/`((?:docs\/|app\/|\.claude\/)[A-Za-z0-9_./-]+)`/g)].map(m=>m[1])){
+  await assert.doesNotReject(stat(new URL("../"+path,import.meta.url)),"NEXT_SESSION.md points at "+path+", which does not exist");
+ }
+
+ /* The Codex boundary, stated in both places a session might look. It is the
+    one rule where being wrong publishes something. */
+ for(const [name,text] of [["CLAUDE.md",claudeMd],["NEXT_SESSION.md",nextSession]]){
+  assert.match(text,/Codex publishes/,name+" must state who publishes");
+  assert.match(text,/docs\/PUBLISH_NEXT\.md/,name+" must name the handoff file");
+ }
+ assert.match(nextSession,/[Nn]ever force-push/);
+ assert.match(nextSession,/rebase onto/i);
+
+ // PUBLISH_NEXT.md is only useful if its first job — saying what is pending — is done.
+ assert.match(publishNext,/^\*\*STATUS: /m,"PUBLISH_NEXT.md must open with a STATUS line");
+ assert.ok(readme.length>0);
 });
 
 test("REFRESH is on every page, because a home-screen app has no address bar to reload from",async()=>{
