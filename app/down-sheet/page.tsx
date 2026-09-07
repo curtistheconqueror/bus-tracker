@@ -15,7 +15,7 @@ import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type Repair
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
-import {downSheetWorkGroup,groupDownSheetEntries,matchesDownSheetSearch,type DownSheetOrder} from "./down-sheet-view";
+import {downSheetRoadCounts,downSheetRoadEntries,downSheetWorkGroup,groupDownSheetEntries,matchesDownSheetSearch,type DownSheetOrder,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -158,6 +158,9 @@ export default function DownSheet(){
  const [savedQuickNotes,setSavedQuickNotes]=useState("");
  const [search,setSearch]=useState("");
  const [order,setOrder]=useState<DownSheetOrder>("number-asc");
+ /* Which of the two road tallies is being read, if either. Not persisted: it is
+    a question somebody asks of the sheet in the moment, not a preference. */
+ const [roadFilter,setRoadFilter]=useState<DownSheetRoadKind|null>(null);
  const [undoClearAvailable,setUndoClearAvailable]=useState(false);
  const [undoScanAvailable,setUndoScanAvailable]=useState(false);
 
@@ -175,7 +178,12 @@ export default function DownSheet(){
     rather than copied onto the entry, where it would go stale the moment
     somebody moved the bus on the map. */
  const locations=useMemo(()=>Object.fromEntries(fleet.map(bus=>[bus.id,bus.l||""])),[fleet]);
- const groups=useMemo(()=>groupDownSheetEntries(entries.filter(entry=>(fixedToday?entry.workflow==="Completed"&&isToday(entry.completedAt):(showCompleted||isActive(entry)))&&(filter==="All"||entry.shift===filter)&&matchesDownSheetSearch(entry,search)),order,locations),[entries,filter,showCompleted,search,order,fixedToday,locations]);
+ const shown=useMemo(()=>entries.filter(entry=>(fixedToday?entry.workflow==="Completed"&&isToday(entry.completedAt):(showCompleted||isActive(entry)))&&(filter==="All"||entry.shift===filter)&&matchesDownSheetSearch(entry,search)),[entries,filter,showCompleted,search,fixedToday]);
+ /* Counted BEFORE the road filter is applied, so pressing one tally does not
+    empty the other one out from under the person reading it. Both stay on
+    screen saying what they always said; only the sheet below narrows. */
+ const roadCounts=useMemo(()=>downSheetRoadCounts(shown,locations),[shown,locations]);
+ const groups=useMemo(()=>groupDownSheetEntries(roadFilter?downSheetRoadEntries(shown,locations,roadFilter):shown,order,locations),[shown,order,locations,roadFilter]);
  const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
@@ -298,7 +306,22 @@ export default function DownSheet(){
   <section className="down-group-counts" aria-label="Down sheet section counts">
    <div className="group-count total"><strong>{visible.length}</strong><span>TOTAL ON SHEET</span></div>
    {groups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
+   {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
+       the sheet?" while looking at the yard; these answer "is this one out
+       working?" while looking at the sheet — which the sheet itself could not
+       say, because where a bus is belongs to the map. A bus carrying both an
+       inspection and a fault is in both counts on purpose.
+
+       Pressed, they narrow the sheet below to exactly what they count, so the
+       number can be read as a list. They are buttons rather than tiles for
+       that reason; the five above are a scoreboard and stay one. */}
+   {([["inspection","INSPECTIONS ON ROAD",roadCounts.inspection],["down","DOWNED BUSES ON ROAD",roadCounts.down]] as [DownSheetRoadKind,string,number][]).map(([kind,label,count])=>
+    <button type="button" className={"group-count group-road group-road-"+kind+(roadFilter===kind?" active":"")} key={kind} aria-pressed={roadFilter===kind}
+     onClick={()=>setRoadFilter(current=>current===kind?null:kind)}
+     title={roadFilter===kind?"Showing only these buses — press again to show the whole sheet":"Show only the "+count+" bus"+(count===1?"":"es")+" this counts"}>
+     <strong>{count}</strong><span>{label}</span></button>)}
   </section>
+  {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   <section className="quick-notes">
    <label htmlFor="down-quick-notes"><b>{displaySettings.labels.quickNotes}</b><span>{quickNotes===savedQuickNotes?"Saved on this device":"Unsaved changes"}</span></label>

@@ -119,6 +119,61 @@ export function downSheetScheduledOnly(entry:DownSheetViewEntry){
  return !/[a-z]{3}/.test(remainder);
 }
 
+/* Out on the road, right now.
+
+   The same test smart-status.ts uses to decide a bus is in service: the map
+   owns where a bus is, and a road slot is where it puts one that is out
+   working. Written once here so the sheet and the map cannot disagree about
+   what "on the road" means. */
+export function isDownSheetRoadLocation(location:string){return String(location||"").startsWith("road-")}
+
+/* What a row MENTIONS, which is a different question from which band it lands
+   in — and the reason these two are not simply the bands filtered by location.
+
+   The sheet folds a bus into the one row it is allowed, so a bus that came due
+   for a PM and is also missing on cylinder 5 has a single row reading
+   "PM'S / MISFIRES". The bands must pick one for it and they pick the fault,
+   because a bus with a live misfire is a bus that is down. But a foreman
+   counting what is out on the road wants that bus in BOTH tallies: somebody
+   owes it a PM, and somebody owes it a misfire diagnosis, and neither errand
+   disappears because the other exists.
+
+   So these ask what is written rather than where the row was filed. An empty
+   row falls back to its section, the same way downSheetScheduledOnly does. */
+export function downSheetMentionsInspection(entry:DownSheetViewEntry){
+ const written=reasonText(entry);
+ if(!written)return entry.section==="Inspection";
+ return DOWN_SHEET_INSPECTION_PATTERN.test(written);
+}
+/* Anything beyond scheduled maintenance is a fault, which is exactly the
+   question the bands already answer — asked here from the other side. PM
+   DEFECTS lands here rather than in inspections, which is correct: those are
+   the faults found while doing a PM. */
+export function downSheetMentionsDefect(entry:DownSheetViewEntry){return !downSheetScheduledOnly(entry)}
+
+export type DownSheetRoadKind="inspection"|"down";
+
+export function downSheetRoadMatch(entry:DownSheetViewEntry,location:string,kind:DownSheetRoadKind){
+ if(!isDownSheetRoadLocation(location))return false;
+ return kind==="inspection"?downSheetMentionsInspection(entry):downSheetMentionsDefect(entry);
+}
+
+export function downSheetRoadEntries<T extends DownSheetViewEntry>(entries:T[],locations:Record<string,string>,kind:DownSheetRoadKind){
+ return entries.filter(entry=>downSheetRoadMatch(entry,locations[entry.busId||""]||"",kind));
+}
+
+/* Both tallies in one pass. A bus carrying an inspection and a fault is counted
+   in both, on purpose — see above. */
+export function downSheetRoadCounts<T extends DownSheetViewEntry>(entries:T[],locations:Record<string,string>={}){
+ let inspection=0,down=0;
+ for(const entry of entries){
+  if(!isDownSheetRoadLocation(locations[entry.busId||""]||""))continue;
+  if(downSheetMentionsInspection(entry))inspection++;
+  if(downSheetMentionsDefect(entry))down++;
+ }
+ return {inspection,down};
+}
+
 /* Precedence, which is deliberately NOT the reading order above.
 
    Where the bus physically is beats everything: a bus sitting at Bus & Truck is

@@ -9354,3 +9354,74 @@ test("Fixed Repairs takes a typed bus number, not only a dropdown",async()=>{
  assert.match(css,/\.fixed-new-bus \.fixed-type-bus>input\{[^}]*font-size:26px/);
  assert.match(css,/\.fixed-new-bus \.fixed-type-bus>input\{[^}]*min-height:52px/);
 });
+
+test("the Down Sheet says which of its buses are out on the road, the inverse of the map's badges",async()=>{
+ const {downSheetRoadCounts,downSheetRoadEntries,downSheetMentionsInspection,downSheetMentionsDefect,isDownSheetRoadLocation,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+
+ /* The map's down-sheet badges answer "is this bus on the sheet?" while you
+    look at the yard. These answer the inverse — "is this one out working?" —
+    while you look at the sheet, which the sheet could not say on its own
+    because where a bus is belongs to the map. */
+ const entry=(busId,busNumber,customReason,section="Pending")=>({busId,busNumber,category:"Miscellaneous",repair:"Driver-reported defect",customReason,assignmentType:section==="Vendor Repair"?"Vendor":"Mechanic",assignedTo:section==="Vendor Repair"?"CUMMINS":"",section});
+ const entries=[
+  entry("a","17510","PM'S","Inspection"),
+  entry("b","17511","MISFIRES"),
+  entry("c","17512","PM'S / MISFIRES"),
+  entry("d","17513","PM DEFECTS"),
+  entry("e","17514","PM'S","Inspection"),
+  entry("f","17515","NO BRAKES"),
+  entry("g","17516","","Inspection"),
+  entry("h","17517","AT CUMMINS","Vendor Repair"),
+ ];
+ const locations={a:"road-0",b:"road-1",c:"road-2",d:"road-3",e:"garage-4",f:"garage-5",g:"road-6",h:"offsite-0"};
+
+ assert.deepEqual(downSheetRoadCounts(entries,locations),{inspection:3,down:3});
+ assert.deepEqual(downSheetRoadEntries(entries,locations,"inspection").map(item=>item.busNumber),["17510","17512","17516"]);
+ assert.deepEqual(downSheetRoadEntries(entries,locations,"down").map(item=>item.busNumber),["17511","17512","17513"]);
+
+ /* A BUS CARRYING BOTH IS IN BOTH. The sheet folds a bus into the one row it
+    is allowed, so 17512 reads "PM'S / MISFIRES" and the bands must pick one —
+    they pick the fault, because a bus with a live misfire is down. But both
+    errands are real and neither disappears because the other exists. */
+ assert.equal(downSheetGroup(entries[2],locations.c),"unscheduled","the band still counts it as down");
+ assert.equal(downSheetMentionsInspection(entries[2]),true);
+ assert.equal(downSheetMentionsDefect(entries[2]),true);
+
+ /* PM DEFECTS is the faults found while doing a PM, so it belongs in the down
+    tally and not the inspection one — the same lookahead the bands rely on. */
+ assert.equal(downSheetMentionsInspection(entries[3]),false);
+ assert.equal(downSheetMentionsDefect(entries[3]),true);
+ // A row with nothing written falls back to how it was filed.
+ assert.equal(downSheetMentionsInspection(entries[6]),true);
+ assert.equal(downSheetMentionsDefect(entries[6]),false);
+
+ /* Only buses actually on the road. A bus in the garage and a bus at a vendor
+    are both on the sheet and neither is out working. */
+ for(const yard of ["17514","17515","17517"])
+  for(const kind of ["inspection","down"])
+   assert.equal(downSheetRoadEntries(entries,locations,kind).some(item=>item.busNumber===yard),false,yard+" is not on the road");
+ assert.equal(isDownSheetRoadLocation("road-0"),true);
+ assert.equal(isDownSheetRoadLocation("garage-4"),false);
+ assert.equal(isDownSheetRoadLocation("offsite-0"),false);
+ assert.equal(isDownSheetRoadLocation(""),false);
+ // A bus the map has never placed is not asserted to be anywhere.
+ assert.deepEqual(downSheetRoadCounts([entry("z","17599","MISFIRES")],{}),{inspection:0,down:0});
+
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+ /* Seven tiles: the five that were there, plus the two that do something. */
+ assert.match(page,/\["inspection","INSPECTIONS ON ROAD",roadCounts\.inspection\],\["down","DOWNED BUSES ON ROAD",roadCounts\.down\]/);
+ assert.match(page,/onClick=\{\(\)=>setRoadFilter\(current=>current===kind\?null:kind\)\}/,"pressing the same one again shows the whole sheet");
+ assert.match(page,/aria-pressed=\{roadFilter===kind\}/);
+ /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
+    the other out from under the person reading it. */
+ assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
+ assert.match(page,/groupDownSheetEntries\(roadFilter\?downSheetRoadEntries\(shown,locations,roadFilter\):shown,order,locations\)/);
+ assert.ok(page.indexOf("const roadCounts=")<page.indexOf("const groups=useMemo"),"counted from the unfiltered set");
+ // And it says what it is showing, with a way back.
+ assert.match(page,/SHOW THE WHOLE SHEET/);
+ assert.match(css,/\.down-group-counts \.group-count\.group-road\{[^}]*cursor:pointer/);
+ assert.match(css,/\.down-group-counts \.group-count\.group-road-down\.active/);
+});

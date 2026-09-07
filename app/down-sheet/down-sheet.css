@@ -339,6 +339,23 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-group-counts .group-count.group-unscheduled strong{color:#992722}
 .down-group-counts .group-count.group-inspection{border-color:#8a6bbf;background:#f4effc}
 .down-group-counts .group-count.group-inspection strong{color:#5a3491}
+/* THE TWO ROAD TALLIES — the inverse of the map's down-sheet badges, and the
+   only two tiles here that do something when pressed, so they are shaped like
+   buttons: a pointer, a hover, and a filled state while one is holding the
+   sheet down to what it counts. They keep their band's colour so the eye pairs
+   INSPECTIONS ON ROAD with INSPECTIONS above it, with a heavier border to say
+   these are the pressable pair. */
+.down-group-counts .group-count.group-road{font:inherit;cursor:pointer;border-width:2px;border-style:dashed}
+.down-group-counts .group-count.group-road:hover,.down-group-counts .group-count.group-road:focus-visible{border-style:solid}
+.down-group-counts .group-count.group-road-inspection{border-color:#8a6bbf;background:#faf7ff}
+.down-group-counts .group-count.group-road-inspection strong{color:#5a3491}
+.down-group-counts .group-count.group-road-down{border-color:#c15a55;background:#fff6f5}
+.down-group-counts .group-count.group-road-down strong{color:#992722}
+.down-group-counts .group-count.group-road.active{border-style:solid;box-shadow:inset 0 0 0 2px #fff}
+.down-group-counts .group-count.group-road-inspection.active{background:#e8dffa}
+.down-group-counts .group-count.group-road-down.active{background:#f8dcda}
+.down-road-filter-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #7d90ad;border-left:4px solid #0b63ce;border-radius:6px;background:#eaf2fd;font-size:10px;font-weight:800;color:#12325f}
+.down-road-filter-note button{min-height:32px;border:1px solid #0b63ce;border-radius:5px;background:#fff;color:#0b4f9e;padding:0 10px;font-size:9px;font-weight:900;cursor:pointer}
 
 .down-table .down-group-row td{height:34px;padding:6px 10px;border-top:3px solid #7d90ad;border-bottom:1px solid #7d90ad;background:#d3e0f2!important;color:#12325f;font-size:10px;font-weight:900;letter-spacing:.7px}
 .down-table .down-group-row td>b{font-size:11px;font-weight:900}
@@ -353,10 +370,21 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-table .down-group-row.group-inspection td{border-color:#8a6bbf;background:#e8dffa!important;color:#4b2a80}
 .down-table .down-group-row.group-inspection td>i{background:#4b2a80}
 
-@media(max-width:900px){.down-group-counts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Seven tiles: four bands and the total on the first row, the two road tallies
+   sharing the second so the pressable pair reads as its own thing. */
+.down-group-counts{grid-template-columns:repeat(5,minmax(0,1fr))}
+.down-group-counts .group-count.group-road{grid-column:span 2}
+.down-group-counts .group-count.group-road-inspection{grid-column:2/4}
+.down-group-counts .group-count.group-road-down{grid-column:4/6}
+@media(max-width:900px){.down-group-counts{grid-template-columns:repeat(3,minmax(0,1fr))}.down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:auto/span 3}}
 @media(max-width:760px){
  .down-group-counts{margin:0 8px 8px;grid-template-columns:repeat(2,minmax(0,1fr))}
  .down-group-counts .group-count.total{grid-column:1/-1}
+ /* Full width each on a phone: they are the two a foreman presses, and a
+    thumb-sized target matters more here than fitting the row. */
+ .down-group-counts .group-count.group-road-inspection,.down-group-counts .group-count.group-road-down{grid-column:1/-1;min-height:56px}
+ .down-road-filter-note{margin:0 8px 8px}
+ .down-road-filter-note button{width:100%;min-height:44px}
  .down-group-counts .group-count span{font-size:9px}
  .down-group-counts .group-count strong{font-size:22px}
  .down-table .down-group-row td{height:auto;padding:8px 10px}
