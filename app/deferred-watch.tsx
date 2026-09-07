@@ -11,8 +11,8 @@
    Two pieces close that gap, both self-contained so they can be dropped into
    every page's nav without any page threading fleet state through props:
 
-     - DeferredNavBadge: a pulsing count of buses deferred past 90 minutes,
-       visible everywhere.
+     - DeferredNavBadge: appears once a bus passes 90 minutes, visible
+       everywhere, and opens the Deferred filter showing the buses it counts.
      - DeferredReviewPrompt: from 8:30pm on — when third shift buses are
        usually being decided — asks about any bus still deferred past an
        hour, one at a time, with three ways out: keep it deferred until a
@@ -27,11 +27,12 @@
 
 import {useEffect,useMemo,useState} from "react";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetStorage,writeDownSheetStorageResult,writeFleetStorageResult} from "./storage";
-import {defectLabel,deferredMinutesElapsed,isHeldDeferred,isUnresolved,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
+import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
 import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
+import {QUICK_FILTER_EVENT,quickFilterHref} from "./quick-filters";
+import {deferredBadgeCounts,heldDeferredRows} from "./deferred-counts";
 
-const OVERDUE_MINUTES=90;
 const REVIEW_MINUTES=60;
 const REVIEW_HOUR=20,REVIEW_MINUTE=30;
 const DISMISS_KEY="pace-deferred-review-dismissed-v1";
@@ -50,16 +51,6 @@ function readDown():DefectLogDownEntry[]{
  if(typeof window==="undefined")return [];
  const payload=readDownSheetStorage<DefectLogDownEntry>(localStorage);
  return payload.valid?payload.entries:[];
-}
-
-/* Every currently-deferred defect paired with its bus, narrowed to the ones
-   genuinely held back — no active Down Sheet entry for that bus. */
-function heldDeferredRows(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
- const onSheetIds=new Set(downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId));
- const rows:{bus:DefectLogFleetBus;defect:StructuredDefect}[]=[];
- for(const bus of fleet)for(const defect of bus.defects||[])
-  if(isUnresolved(defect)&&isHeldDeferred(defect,onSheetIds.has(bus.id)))rows.push({bus,defect});
- return rows;
 }
 
 function todayKey(){return new Date().toDateString()}
@@ -84,28 +75,46 @@ function durationLabel(minutes:number){
  return whole>=60?Math.floor(whole/60)+"h "+(whole%60)+"m":whole+"m";
 }
 
-/* Pulsing count in the shared nav. Only ever shows buses over the 90-minute
-   line — under that, DEFERRED is working exactly as intended and nothing
-   needs to flash. */
 export function DeferredNavBadge(){
- const [count,setCount]=useState(0);
+ /* Two numbers, because the badge answers two questions at once: whether to
+    appear, and what it will show you when pressed.
+
+    It appears only once a bus has crossed the ninety-minute line — under that,
+    DEFERRED is working as intended and nothing needs to flash. But the number
+    printed on it is the count of BUSES the filter will list, so the badge and
+    the drawer it opens can never disagree.
+
+    It used to print the overdue count, which was wrong twice over. It disagreed
+    with the list — press 3 DEFERRED, get four buses — and because these rows
+    are one per DEFECT, a single bus held on two repairs counted as two. Both
+    counts are deduplicated by bus now, and the drawer's own exclusions are the
+    same ones heldDeferredRows already applies. */
+ const [state,setState]=useState({listed:0,overdue:0});
  useEffect(()=>{
-  const recompute=()=>{
-   const now=new Date();
-   const overdue=heldDeferredRows(readFleet(),readDown()).filter(row=>{
-    const minutes=deferredMinutesElapsed(row.defect,now);
-    return minutes!==null&&minutes>=OVERDUE_MINUTES;
-   });
-   setCount(overdue.length);
-  };
+  const recompute=()=>setState(deferredBadgeCounts(readFleet(),readDown()));
   recompute();
   const interval=setInterval(recompute,60000);
   const onStorage=(event:StorageEvent)=>{if(!event.key||event.key===FLEET_KEY||event.key===DOWN_KEY)recompute()};
   window.addEventListener("storage",onStorage);
   return ()=>{clearInterval(interval);window.removeEventListener("storage",onStorage)};
  },[]);
- if(!count)return null;
- return <a href="/defect-log" className="deferred-nav-badge" role="status" aria-label={count+" bus"+(count===1?"":"es")+" deferred over 90 minutes — open Defect Log"}><span aria-hidden="true">🚨</span> {count} DEFERRED</a>;
+ /* Pressing it has to actually show the buses it is counting.
+
+    It used to be a bare link to /defect-log, which meant that on the Defect Log
+    — where this badge also renders — it pointed at the page already on screen
+    and did nothing at all. Even from elsewhere it only landed on the log with
+    no filter, leaving the overdue buses wherever they happened to sit in the
+    list, which is the one thing a 90-minute alarm must not do.
+
+    It now opens the Deferred quick filter, which already lists exactly these
+    buses, longest-held first, and marks the ones past 90 minutes. */
+ const openDeferredFilter=(event:React.MouseEvent<HTMLAnchorElement>)=>{
+  if(window.location.pathname!=="/defect-log")return;
+  event.preventDefault();
+  window.dispatchEvent(new CustomEvent(QUICK_FILTER_EVENT,{detail:"deferred"}));
+ };
+ if(!state.overdue)return null;
+ return <a href={quickFilterHref("deferred")} onClick={openDeferredFilter} className="deferred-nav-badge" role="status" aria-label={state.listed+" bus"+(state.listed===1?"":"es")+" held from service, "+state.overdue+" over 90 minutes — show them in the Defect Log"}><span aria-hidden="true">🚨</span> {state.listed} DEFERRED</a>;
 }
 
 type ReviewAction="keep"|"downsheet"|"return";

@@ -1,8 +1,9 @@
-import {isDownSheetRecommended,isUnresolved,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
+import {hasWorkState,isDownSheetRecommended,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
+import {hasRecentRoadCall,ROAD_CALL_WINDOW_DAYS,type RoadCallEvent} from "./road-calls.ts";
 
-export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred";
+export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred"|"road-call";
 export type QuickFilterBus={
- id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];
+ id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];roadCalls?:RoadCallEvent[];
 };
 
 export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]=[
@@ -19,6 +20,15 @@ export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]
     because nothing about the bus is wrong until the first cold morning, and by
     then the list is a queue rather than a plan. */
  {key:"no-cabin-heat",label:"No Heat Buses",shortLabel:"No Heat Buses"},
+ /* This week's breakdowns, and the one list here that empties itself. A bus
+    joins the moment it road-calls and leaves on its own as that road call ages
+    past seven days: no clearing, no end-of-week reset, and nothing deleted to
+    make it happen. The list is a window onto the history, not the history.
+
+    It sits with the other "what is broken" lists rather than at the end,
+    because that is the question it answers - the last three are about what
+    somebody still has to decide. */
+ {key:"road-call",label:"Road Calls (Last "+ROAD_CALL_WINDOW_DAYS+" Days)",shortLabel:"Road Calls"},
  {key:"not-duplicated",label:"Defect / Condition Not Duplicated",shortLabel:"Not Duplicated"},
  /* First in the list is tempting and wrong: the others answer "what is broken",
     this one answers "what am I asking somebody to schedule". It sits at the end
@@ -47,7 +57,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
     fleet. A winter list that pulls in an overheating bus is a list somebody
     checks once and then stops trusting. */
  if(key==="no-cabin-heat")return /\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)||/\bheater\s*\/\s*defroster\b/i.test(text);
- if(key==="not-duplicated"||key==="down-sheet-recommended"||key==="deferred")return false;
+ if(key==="not-duplicated"||key==="down-sheet-recommended"||key==="deferred"||key==="road-call")return false;
  return /\b(?:add(?:ed|ing)?|needs?|low)\s+(?:(?:\d+(?:\.\d+)?\s*)?(?:qt|qts|quart|quarts)\s+(?:of\s+)?)?(?:engine\s+)?oil\b|\b(?:engine\s+)?oil\s+(?:low|needed|required)\b/i.test(text);
 }
 
@@ -55,9 +65,20 @@ function defectText(defect:StructuredDefect){
  return [defect.category,defect.issue,...(defect.symptoms||[]),defect.details,defect.diagnosticNote,defect.actionTaken,defect.shopNotes].filter(Boolean).join(" ");
 }
 
-export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey){
+/* Whether a work-state stamp falls inside the road-call window. */
+function recentStamp(at:string|undefined,now:string){
+ const stamped=Date.parse(String(at||""));
+ return !Number.isNaN(stamped)&&stamped>=new Date(now).getTime()-ROAD_CALL_WINDOW_DAYS*24*60*60*1000;
+}
+
+export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString()){
  const normalized=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id),matches=normalized.filter(defect=>
-  key==="not-duplicated"?Boolean(defect.conditionNotDuplicated)
+  /* Which repair the bus road-called on, so the list names the fault and not
+     only the bus. Fixed ones count here: a bus that broke down on Tuesday and
+     was repaired on Wednesday still broke down this week, and hiding it would
+     put this list at odds with the badge on the card. */
+  key==="road-call"?hasWorkState(defect,ROAD_CALL_KEY)&&recentStamp(defect.workStates?.[ROAD_CALL_KEY]?.at,now)
+  :key==="not-duplicated"?Boolean(defect.conditionNotDuplicated)
   /* Only repairs still outstanding. A recommendation on a repair that has since
      been fixed is a job nobody needs scheduled, and leaving it in the list is
      how a shared list stops being trusted. */
@@ -72,7 +93,12 @@ export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey){
  return [{id:bus.id+"-quick-filter-legacy",category:"Miscellaneous",issue:"Manual entry",details:legacy,operability:"service",state:"open"} as StructuredDefect];
 }
 
-export function quickFilterFlagMatch(bus:QuickFilterBus,key:QuickFilterKey){
+export function quickFilterFlagMatch(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString()){
+ /* The bus's own road-call history decides this list, not its defects. A road
+    call is a fact about the bus and outlives the repair it was ticked on, so a
+    defect that is later merged away or removed must not quietly take this
+    week's breakdown off the board with it. */
+ if(key==="road-call")return hasRecentRoadCall(bus.roadCalls,now);
  if(key==="check-engine")return Boolean(bus.checkEngine);
  if(key==="bad-ramp")return Boolean(bus.badRampKneeler);
  if(key==="no-horn")return Boolean(bus.noHorn);
@@ -95,11 +121,27 @@ export function quickFilterFallbackLabel(key:QuickFilterKey){
   "not-duplicated":"Defect / condition not duplicated",
   "down-sheet-recommended":"Recommended for the Down Sheet",
   deferred:"Deferred, held back from service",
+  "road-call":"Road call in the last "+ROAD_CALL_WINDOW_DAYS+" days",
  } as Record<QuickFilterKey,string>)[key];
 }
 
-export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey){
- return quickFilterFlagMatch(bus,key)||quickFilterDefects(bus,key).length>0;
+export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString()){
+ return quickFilterFlagMatch(bus,key,now)||quickFilterDefects(bus,key,now).length>0;
 }
 
-export function quickFilterBusIds<T extends QuickFilterBus>(fleet:T[],key:QuickFilterKey){return fleet.filter(bus=>quickFilterMatch(bus,key)).map(bus=>bus.id)}
+export function quickFilterBusIds<T extends QuickFilterBus>(fleet:T[],key:QuickFilterKey,now=new Date().toISOString()){return fleet.filter(bus=>quickFilterMatch(bus,key,now)).map(bus=>bus.id)}
+
+/* How the pulsing DEFERRED badge asks the Defect Log to open a filter.
+
+   Two routes, because the badge renders on all six pages — the Defect Log
+   included. From another page it is an ordinary link carrying the key in the
+   query string. From the Defect Log itself a link points at the page you are
+   already standing on, which does nothing visible and is exactly why pressing
+   the badge read as broken; there it fires the event instead and the open page
+   raises the filter in place. */
+export const QUICK_FILTER_PARAM="quick";
+export const QUICK_FILTER_EVENT="pace-open-quick-filter";
+export function quickFilterFromValue(value:unknown):QuickFilterKey|null{
+ return QUICK_FILTERS.some(item=>item.key===value)?value as QuickFilterKey:null;
+}
+export function quickFilterHref(key:QuickFilterKey,path="/defect-log"){return path+"?"+QUICK_FILTER_PARAM+"="+encodeURIComponent(key)}

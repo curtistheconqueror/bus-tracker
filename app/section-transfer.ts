@@ -112,7 +112,7 @@ export function readTransferPayload(text:string,expected:TransferKind):TransferR
  if(kind===TRANSFER_KINDS[expected].payloadKind)return {ok:true,kind:expected,payload:parsed};
  const other=(Object.keys(TRANSFER_KINDS) as TransferKind[]).find(key=>TRANSFER_KINDS[key].payloadKind===kind);
  if(other)return {ok:false,error:"That is a "+TRANSFER_KINDS[other].label+" file. Import it on the "+TRANSFER_KINDS[other].label+" page instead."};
- if(kind==="pace-south-fleet-board-backup")return {ok:false,error:"That is a full backup, not a "+TRANSFER_KINDS[expected].label+" transfer. Use IMPORT ALL DATA in Facility Map settings, which replaces everything on this device."};
+ if(kind==="pace-south-fleet-board-backup")return {ok:false,error:"That is a full backup, not a "+TRANSFER_KINDS[expected].label+" transfer. Use MASTER IMPORT in Settings, which replaces everything on this device."};
  if(kind.startsWith("fleet-"))return {ok:false,error:"That is a report, not a transfer. Reports are for reading and cannot be imported. Use EXPORT "+TRANSFER_KINDS[expected].label.toUpperCase()+" on the other device instead."};
  return {ok:false,error:"That file is not a "+TRANSFER_KINDS[expected].label+" transfer, and nothing was changed."};
 }

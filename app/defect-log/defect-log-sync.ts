@@ -1,22 +1,35 @@
-import {defectSupportingDetails,defectSummary,isUnresolved,normalizeDefects,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
+import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 
 export type DefectLogFleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;shift?:string;roadcall?:boolean;down?:boolean;
  parkedAt?:string;lastLocationChangeAt?:string;lastStatusChangeAt?:string;pendingRepair?:string;defects?:StructuredDefect[];bay12Watch?:boolean;
+ /* Dated breakdowns out on the road, appended and never rewritten. The card
+    shows the last seven days of them; the rest stay for the pattern. */
+ roadCalls?:RoadCallEvent[];
 };
 
 export type DefectLogDownEntry={
  id:string;defectId?:string;busId:string;busNumber:string;category:string;repair:string;customReason:string;
+ /* Carried through because a modern entry writes one record per card, so the
+    cards are what say which defects the sheet has. Optional: an entry stored
+    before cards existed has none. */
+ repairItems?:{id:string;category:string;repair:string;details:string;done?:boolean}[];
  assignmentType:"Mechanic"|"Vendor";assignedTo:string;section:"Pending"|"Accident"|"Scheduled Repair"|"Inspection"|"Vendor Repair"|"Roadcall"|"Other";
  shift:"1st"|"2nd"|"3rd";workflow:"Scheduled"|"In Progress"|"Waiting for Parts"|"On Hold"|"Completed"|"Deferred";
  operationalStatus:FleetStatus;priority:"Routine"|"High"|"Critical";timeEstimate:ReturnType<typeof normalizeRepairTimeEstimate>;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:{at:string;initials:string;action:string}[];
 };
 
-export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean};
+export type DefectLogRecord={bus:DefectLogFleetBus;defect:StructuredDefect;createdAt:string;updatedAt:string;onDownSheet:boolean;
+ /* The entry that has this exact defect on the sheet, when one does. Carried on
+    the record so a card can say WHICH defect put the bus on the sheet, and what
+    the sheet says about it, without re-deriving the link at render time. */
+ downSheetEntry?:DefectLogDownEntry};
 export type DefectLogBusGroup={bus:DefectLogFleetBus;records:DefectLogRecord[];updatedAt:string};
 
 export function isPendingDownSheetRecord(record:DefectLogRecord,activeDownBusIds:ReadonlySet<string>){
@@ -61,15 +74,79 @@ function repairStatus(bus:DefectLogFleetBus,defects:StructuredDefect[],state:Def
 export function activeDefectLogCount(fleet:DefectLogFleetBus[]){
  return fleet.reduce((count,bus)=>count+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log"&&isUnresolved(defect)&&!defect.defectLogHiddenAt).length,0);
 }
-const RECENT_DUPLICATE_WINDOW_MS=48*60*60*1000;
+/* How far back the form looks before calling a new report a repeat of one the
+   bus is already carrying.
+
+   It was 48 hours, and the live board proved that too short: of the 25
+   duplicate records found on it, two were typed into this form by hand on
+   different days, the second one landing after the two-day window had closed.
+   A fault reported Monday and reported again Thursday is the same fault; a
+   week is not.
+
+   Widening is safe because the guard only ever matches a record that is STILL
+   UNRESOLVED. A repair that was finished and came back does not match - the
+   finished one is resolved - so a genuine recurrence still gets its own record
+   no matter how soon it returns.
+
+   The label is exported beside the number so the wording a mechanic reads
+   cannot drift away from the rule the code enforces. */
+export const RECENT_DUPLICATE_WINDOW_HOURS=120;
+export const RECENT_DUPLICATE_WINDOW_LABEL="5 days";
+const RECENT_DUPLICATE_WINDOW_MS=RECENT_DUPLICATE_WINDOW_HOURS*60*60*1000;
 function sameDefectChoice(left:StructuredDefect,right:StructuredDefect){return left.category.trim().toLowerCase()===right.category.trim().toLowerCase()&&left.issue.trim().toLowerCase()===right.issue.trim().toLowerCase()}
 export function recentDefectDuplicate(bus:DefectLogFleetBus,incoming:StructuredDefect,now=new Date().toISOString()){const currentTime=Date.parse(now);if(!Number.isFinite(currentTime)||!incoming.category.trim()||!incoming.issue.trim())return null;return normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).find(defect=>{if(defect.id===incoming.id||!isUnresolved(defect)||!sameDefectChoice(defect,incoming))return false;const loggedTime=Date.parse(defect.createdAt||defect.updatedAt||"");const age=currentTime-loggedTime;return Number.isFinite(loggedTime)&&age>=0&&age<RECENT_DUPLICATE_WINDOW_MS})||null}
+/* Every defect an active sheet entry is writing to, and the entry doing it.
+
+   It used to read only the entry's STATED defectId, which named at most one
+   record and is empty on every entry typed in by hand. A bus could sit on the
+   sheet for a fault open in the log and no record would know it. Asking the
+   sheet's own downSheetDefectIds covers all four doors — the stated id, the
+   ids an entry mints per card, and the record a card adopts because the bus
+   already had it. */
+function downSheetEntryByDefectId(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
+ const linked=new Map<string,DefectLogDownEntry>();
+ for(const entry of downEntries){
+  if(entry.workflow==="Completed")continue;
+  const bus=fleet.find(item=>item.id===entry.busId);
+  if(!bus)continue;
+  for(const id of downSheetDefectIds(entry,normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)))
+   /* First entry wins. Two active entries for one bus is already blocked on
+      save, so this only decides a tie that should not exist. */
+   if(!linked.has(id))linked.set(id,entry);
+ }
+ return linked;
+}
+
 export function defectLogRecords(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]):DefectLogRecord[]{
- const activeDownIds=new Set(downEntries.filter(entry=>entry.workflow!=="Completed"&&entry.defectId).map(entry=>entry.defectId));
+ const linked=downSheetEntryByDefectId(fleet,downEntries);
  return fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.source==="defect-log").map(defect=>{
   const createdAt=defect.createdAt||bus.parkedAt||new Date(0).toISOString();
-  return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:activeDownIds.has(defect.id)};
+  const downSheetEntry=linked.get(defect.id);
+  return {bus,defect,createdAt,updatedAt:defect.updatedAt||createdAt,onDownSheet:Boolean(downSheetEntry),
+   ...(downSheetEntry?{downSheetEntry}:{})};
  })).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/* What the sheet says about a repair, in one line, for the banner on the
+   defect. The workflow leads because it answers "is anybody on it"; the shift
+   and the name answer "who". */
+export function downSheetEntryLabel(entry:DefectLogDownEntry){
+ const who=entry.assignmentType==="Vendor"
+  ?(entry.assignedTo.trim()?"Vendor: "+entry.assignedTo.trim():"Vendor")
+  :entry.assignedTo.trim().toUpperCase();
+ return [entry.workflow,entry.shift?entry.shift+" shift":"",entry.section,who].map(part=>String(part||"").trim()).filter(Boolean).join(" · ");
+}
+
+/* The active entries for a bus that no defect listed under it accounts for.
+
+   A bus can be on the sheet for something that was never typed into the Defect
+   Log — a scan, or a repair logged straight onto the sheet — and in that case
+   the DS badge on the card is true while none of the defects under it carries
+   the banner. Saying so is the difference between "the app is not telling me
+   which one" and "none of these is the one". */
+export function unexplainedDownSheetEntries(records:DefectLogRecord[],busId:string,downEntries:DefectLogDownEntry[]){
+ const named=new Set(records.filter(record=>record.downSheetEntry).map(record=>record.downSheetEntry!.id));
+ return downEntries.filter(entry=>entry.busId===busId&&entry.workflow!=="Completed"&&!named.has(entry.id));
 }
 export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGroup[]{
  const groups=new Map<string,DefectLogBusGroup>();
@@ -96,7 +173,18 @@ export function saveDefectLogRecord(
  const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  const existing=current.find(defect=>defect.id===incoming.id);
  const state=incoming.state;
- const defect:StructuredDefect={...existing,...incoming,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
+ /* workStates is taken from the incoming record rather than left to the
+   spread, because unticking the LAST box produces a defect with no workStates
+   KEY AT ALL - setDefectWorkState deletes it rather than leaving an undefined
+   behind, to keep stored records clean - and a missing key cannot override the
+   one `existing` still carries. Unticking your only ticked box therefore did
+   not stick: it came back on the next read.
+
+   Every caller passes a complete defect built from the record it is editing,
+   never a partial patch, so reading this field straight off the incoming copy
+   is what the callers already mean. A future caller that passes a patch would
+   have to carry workStates with it. */
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
@@ -110,7 +198,30 @@ export function saveDefectLogRecord(
  const hasActiveDown=nextDown.some(entry=>entry.busId===bus.id&&entry.workflow!=="Completed");
  const nextBusBase={...bus,defects,pendingRepair:defectSummary(defects),down:hasActiveDown};
  const nextBus=stampOperationalChange(bus,{...nextBusBase,s:repairStatus(nextBusBase,defects,state)},now) as DefectLogFleetBus;
- return {fleet:fleet.map(item=>item.id===bus.id?nextBus:item),downEntries:nextDown,error:null};
+ const nextFleet=fleet.map(item=>item.id===bus.id?nextBus:item);
+
+ /* A road call is recorded the moment the box goes from unticked to ticked,
+    and only then.
+
+    The transition is what matters, not the box's state: re-saving a repair
+    that road-called last week must not record a second breakdown, or the
+    count that makes a pattern visible becomes a count of how many times
+    somebody opened the form. `existing` is the record as it was stored before
+    this save, which is the only place that answer can come from. */
+ const wasRoadCall=Boolean(existing&&hasWorkState(existing,ROAD_CALL_KEY)),isRoadCall=hasWorkState(defect,ROAD_CALL_KEY);
+ if(isRoadCall&&!wasRoadCall){
+  const applied=applyRoadCall(nextFleet,bus.id,
+   {id:"road-call-"+defect.id+"-"+now,at:now,by:defect.reportedBy||undefined,defectId:defect.id},undefined,now);
+  return {fleet:applied.fleet,downEntries:nextDown,error:null,roadCall:{moved:applied.moved,target:applied.target}};
+ }
+ /* Taking the tick back. Inside the undo window the whole thing is withdrawn -
+    the event and the move it caused - because a wrong tap never happened.
+    Outside it the flag still comes off, but the breakdown stays recorded. */
+ if(!isRoadCall&&wasRoadCall){
+  const cleared=clearRoadCall(nextFleet,bus.id,now);
+  return {fleet:cleared.fleet,downEntries:nextDown,error:null,roadCall:{withdrawn:cleared.withdrawn,restored:cleared.restored}};
+ }
+ return {fleet:nextFleet,downEntries:nextDown,error:null};
 }
 
 export function returnDefectLogBusToService(
@@ -140,4 +251,12 @@ export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(ent
   if(!changed)return entry;
   return {...entry,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:completed?roadServiceStatus({...bus,defects,pendingRepair:defectSummary(defects)}):defect.operability==="down"?"out":defect.state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:updatedBy||defect.reportedBy||entry.updatedBy,completedAt:completed?(entry.completedAt||now):"",history:[...(entry.history||[]),{at:now,initials:updatedBy||defect.reportedBy||"",action:completed?"Completed from Bus Settings":"Updated from Bus Settings"}]} as T;
  });
+}
+
+/* The plain name of a parking space, for reports that leave the app. Lived on
+   the Defect Log page; moved here so the report export can be built from the
+   shared Settings page as well. */
+export function locationLabel(location:string){
+ const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
+ const found=labels.find(([prefix])=>location.startsWith(prefix));return found?found[1]:location||"Location not set";
 }

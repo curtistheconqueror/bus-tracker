@@ -19,6 +19,9 @@ export default function OfflineBackupReminder({buses,interval=FLEET_BACKUP_INTER
  return <aside className="offline-backup-reminder" role="status">
   <b>OFFLINE BACKUP DUE</b>
   <small>{status.newLogs} new Defect Log {status.newLogs===1?"entry has":"entries have"} been saved since the last full backup. Export now so this device&rsquo;s storage is not the only copy.</small>
-  <button type="button" onClick={exportBackup}>EXPORT FULL BACKUP</button>
+  {/* The same file MASTER EXPORT writes, so it carries the same name. Two
+      labels for one action is how somebody ends up with two backups and no
+      idea which one restores. */}
+  <button type="button" onClick={exportBackup}>MASTER EXPORT</button>
  </aside>;
 }

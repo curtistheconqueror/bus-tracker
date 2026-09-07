@@ -1,3 +1,5 @@
+import {cleanScanNotes,scanNotesPrompt} from "../../scan-notes";
+
 export const runtime="edge";
 
 /* Reads the shop's farebox and Ventra check-off sheets from photos.
@@ -55,6 +57,8 @@ WRITTEN WORDS — a phrase written across a row's cells (for example "coin off l
 
 HANDWRITTEN ADDITIONS — a bus number written by hand outside the printed grid (at the bottom, in a margin, in red) is a real row; return it. A note at the foot of a sheet that begins with a bus number (for example "15506 coin off line") belongs to that bus: return a row for that bus with the note and the described column set to "fault", sheet "farebox".
 
+NOT A SWEEP SHEET — first decide what the page IS and answer it in "document": "ventra", "farebox", "mixed" when one photo shows both, or "other". A Vehicle Down Sheet (a numbered list of buses with a reason and a mechanic per line), a work order, a parts list, a whiteboard, or anything else that is not one of the two sheets described above is "other". For a page that is "other", return NO rows at all — an empty rows array. Bus numbers on another kind of document are not farebox or Ventra findings, and turning them into faults files repairs that do not exist.
+
 Bus numbers are five digits. Never invent a bus, a mark, or a fault. When in doubt between "ok" and "fault", answer "unclear" rather than guess.`;
 
 export async function POST(request:Request){
@@ -72,9 +76,12 @@ export async function POST(request:Request){
   if(file.size>MAX_BYTES)return json({error:"Each photo must be 8 MB or smaller."},400);
  }
  const images=await Promise.all(files.map(async(file,index)=>({imageUrl:`data:${file.type};base64,${arrayBufferToBase64(await file.arrayBuffer())}`,page:index+1})));
- const content:Record<string,unknown>[]=[{type:"text",text:INSTRUCTIONS}];
+ /* The scanner's notes ride behind the fixed instructions, never in front of
+    them, so what a mark means is still decided by the description above. */
+ const notes=cleanScanNotes(form.get("notes"));
+ const content:Record<string,unknown>[]=[{type:"text",text:INSTRUCTIONS+scanNotesPrompt(notes)}];
  for(const image of images){content.push({type:"text",text:`PAGE ${image.page}`});content.push({type:"image_url",image_url:{url:image.imageUrl,detail:"high"}})}
- const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json","HTTP-Referer":"https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site","X-Title":"Fleet Maintenance Bus Tracker"},body:JSON.stringify({model:runtimeEnv.SWEEP_SCAN_MODEL||runtimeEnv.DOWN_SHEET_SCAN_MODEL||"google/gemini-2.5-flash",messages:[{role:"user",content}],response_format:{type:"json_schema",json_schema:{name:"sweep_sheet_scan",strict:true,schema:{type:"object",additionalProperties:false,properties:{rows:{type:"array",items:rowSchema}},required:["rows"]}}}})});
+ const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json","HTTP-Referer":"https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site","X-Title":"Fleet Maintenance Bus Tracker"},body:JSON.stringify({model:runtimeEnv.SWEEP_SCAN_MODEL||runtimeEnv.DOWN_SHEET_SCAN_MODEL||"google/gemini-2.5-flash",messages:[{role:"user",content}],response_format:{type:"json_schema",json_schema:{name:"sweep_sheet_scan",strict:true,schema:{type:"object",additionalProperties:false,properties:{document:{type:"string",enum:["ventra","farebox","mixed","other"]},rows:{type:"array",items:rowSchema}},required:["document","rows"]}}}})});
  if(!response.ok){
   const detail=await response.text();let upstreamCode="";
   try{const parsed=JSON.parse(detail) as {error?:{code?:string|number;type?:string}};upstreamCode=String(parsed.error?.code||parsed.error?.type||"")}catch{}
@@ -84,5 +91,8 @@ export async function POST(request:Request){
  }
  const payload=await response.json() as {choices?:Array<{message?:{content?:string|Array<{type?:string;text?:string}>}}>},messageContent=payload.choices?.[0]?.message?.content,outputText=typeof messageContent==="string"?messageContent:Array.isArray(messageContent)?messageContent.map(part=>part.text||"").join(""):"";
  if(!outputText)return json({error:"No readable rows were returned."},422);
- try{const parsed=JSON.parse(outputText) as {rows?:unknown[]};return json({rows:Array.isArray(parsed.rows)?parsed.rows:[]})}catch{return json({error:"The scan result could not be reviewed."},502)}
+ /* The document verdict travels with the rows. The client decides what to do
+    with it — sweep-scan-import.ts owns that rule — so a page the model calls
+    "other" is refused there, not silently here. */
+ try{const parsed=JSON.parse(outputText) as {rows?:unknown[];document?:unknown};return json({rows:Array.isArray(parsed.rows)?parsed.rows:[],document:typeof parsed.document==="string"?parsed.document:"unknown"})}catch{return json({error:"The scan result could not be reviewed."},502)}
 }

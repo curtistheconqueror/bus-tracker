@@ -24,6 +24,7 @@ import {
  readCloudConfig,
  readCloudState,
  readMergedAway,
+ readRemovedEntries,
  readSentFingerprints,
  writeCloudConfig,
  writeCloudState,
@@ -31,18 +32,8 @@ import {
  type CloudConfig,
  type CloudState,
 } from "./cloud-sync";
-import {mergeDefectLog,mergeDownSheet,mergeFleetMap} from "./section-transfer";
-import {
- readDownSheetStorage,
- readFleetStorage,
- writeDownSheetStorage,
- writeFleetStorage,
-} from "./storage";
-
-/* How often a connected device looks for its own unsent work. Long enough that
-   a phone on its owner's data plan is not paying for a chatty app, short enough
-   that walking from the shop to the lot does not lose an afternoon. */
-const SWEEP_MS=45000;
+import {applyCloudPull} from "./cloud-live";
+import {readDownSheetStorage,readFleetStorage} from "./storage";
 
 export default function CloudSyncControl(){
  const [config,setConfig]=useState<CloudConfig>(EMPTY_CLOUD_CONFIG);
@@ -91,6 +82,10 @@ export default function CloudSyncControl(){
    /* Tombstones for anything this device folded into another record, so the
       server stops handing the duplicates back to everyone. */
    merged:readMergedAway(localStorage),
+   /* And for anything this device took off the Down Sheet, so a clear or a
+      replacing scan actually removes it instead of being handed straight
+      back on the next pull. */
+   removedEntries:readRemovedEntries(localStorage),
   });
   if(result.ok)writeSentFingerprints(localStorage,result.sent);
   const previous=readCloudState(localStorage);
@@ -104,21 +99,11 @@ export default function CloudSyncControl(){
   return result.ok;
  },[]);
 
- /* A sweep rather than a hook into every save. Each pass sends only what
-    changed, so a quiet shop costs one request that finds nothing. */
- /* Depends on a boolean, not on the config object. Depending on the object
-    re-subscribed the interval and fired a push on every keystroke in the
-    settings fields, because typing replaces the object each time. */
- const ready=!cloudConfigProblem(config);
- useEffect(()=>{
-  if(!ready)return;
-  const tick=()=>{if(document.visibilityState==="visible")push(true)};
-  const timer=window.setInterval(tick,SWEEP_MS);
-  document.addEventListener("visibilitychange",tick);
-  window.addEventListener("online",tick);
-  tick();
-  return()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",tick);window.removeEventListener("online",tick)};
- },[ready,push]);
+ /* The sweep is NOT here any more. It ran inside this component, which is
+    mounted on the Settings page and nowhere else, so a shift spent on the
+    Facility Map or the Defect Log synced nothing at all. ShopCloudLive carries
+    it now and is dropped into all six pages; running it here as well would give
+    a device two sweepers racing whenever Settings happened to be open. */
 
  const save=()=>{
   const problem=cloudConfigProblem(config);
@@ -178,32 +163,23 @@ export default function CloudSyncControl(){
    alert("This device's own changes could not be sent, so nothing was brought down. Bringing the shop's copy in now could overwrite work that has not left this device yet. Try again when it reconnects.");
    return;
   }
-  const result=await cloudPull(saved,new Date().toISOString(),readMergedAway(localStorage));
+  const result=await cloudPull(saved,new Date().toISOString(),readMergedAway(localStorage),readRemovedEntries(localStorage));
   setBusy(false);
   if(!result.ok||!result.map||!result.defects||!result.sheet){
    remember({...state,phase:result.phase,lastError:result.message});
    alert(result.message||"The shop's copy could not be reached. Nothing on this device changed.");
    return;
   }
-  const fleet=readFleetStorage<Record<string,unknown>>(localStorage);
-  /* Every abandoned path below puts the phase back. Returning while it still
-     says "syncing" leaves that written to storage, and the status line then
-     reads "Syncing…" forever — on a device that is not syncing at all. */
-  if(!fleet.valid){
-   remember({...state,phase:"error",lastError:"This device's board could not be read"});
-   alert("This device's board could not be read, so nothing was merged.");
+  /* The same merge live sync performs, from one module, so the button and the
+     background cannot drift apart. Every abandoned path below puts the phase
+     back: returning while it still says "syncing" leaves that written to
+     storage, and the status line then reads "Syncing…" forever. */
+  const applied=applyCloudPull(localStorage,{map:result.map,defects:result.defects,sheet:result.sheet,deleted:result.deleted,removedEntries:result.removedEntries});
+  if(!applied.ok){
+   remember({...state,phase:"error",lastError:applied.error});
+   alert(applied.error+", so nothing changed on this device.");
    return;
   }
-  const afterMap=mergeFleetMap(fleet.buses,result.map);
-  const afterDefects=mergeDefectLog(afterMap.buses,result.defects);
-  if(!writeFleetStorage(localStorage,afterDefects.buses,{allowBulkDefectLoss:false})){
-   remember({...state,phase:"error",lastError:"The merged board could not be saved"});
-   alert("The merged board could not be saved, so nothing changed on this device.");
-   return;
-  }
-  const sheet=readDownSheetStorage<{id?:string}>(localStorage);
-  const afterSheet=mergeDownSheet(sheet.valid?sheet.entries:[],result.sheet,afterDefects.buses);
-  writeDownSheetStorage(localStorage,afterSheet.entries);
   remember({phase:"idle",lastSyncedAt:new Date().toISOString(),lastError:"",pending:0});
   alert("The shop's copy was merged in. The tracker will reload now.");
   window.location.reload();

@@ -275,6 +275,14 @@ export function defectRow(defect:StructuredDefect,fleetNumber:string,config:Clou
   completed_at:clean(defect.completedAt)||null,
   completed_by:clean(defect.completedBy),
   detail,
+  /* A record a device still carries is, by that fact, not deleted. Sent
+     explicitly, so a record put back after a removal clears the tombstone the
+     removal sent — the upsert writes only the columns it names, and a row that
+     said nothing about deleted_at left the deletion standing while every
+     device's pull went on filtering the record out. The database still keeps
+     the newest write, so a stale copy cannot undelete a record that was
+     removed after it was last touched: it loses on updated_at first. */
+  deleted_at:null,
   updated_at:clean(defect.updatedAt)||clean(defect.createdAt)||now,
   ...signature(config),
  };
@@ -312,6 +320,14 @@ export function downSheetRow(entry:SyncEntry,config:CloudConfig,now:string):Clou
   entry_created_at:clean(entry.createdAt)||null,
   completed_at:clean(entry.completedAt)||null,
   detail,
+  /* An entry the sheet still carries is, by that fact, not removed. Sent
+     explicitly for the same reason the defect row sends it: an upsert writes
+     only the columns it names, so a row that said nothing about deleted_at
+     would leave a removal standing and UNDO CLEAR would put an entry back on
+     this device that every device's pull went on filtering out. The database
+     still keeps the newest write, so a week-old copy cannot undo a removal made
+     after it was last touched — it loses on updated_at first. */
+  deleted_at:null,
   updated_at:clean(entry.updatedAt)||now,
   ...signature(config),
  };
@@ -413,7 +429,13 @@ export function writeMergedAway(storage:StorageWriter,merged:MergedAwayDefects){
 
    Only the key, the tombstone and the signature. Writing the record's own
    fields back while deleting it would let a stale copy of a repair overwrite
-   the version that survived. */
+   the version that survived.
+
+   No fleet_number, and none is wanted here — but that means this row can never
+   ride in an upsert: bus_defects requires fleet_number on the insert half, and
+   Postgres refuses the whole chunk. cloud-client's pushPlan routes any row
+   without a fleet number as an UPDATE by id for exactly this reason. Putting
+   these into the upsert batch is what left the shop cloud red for a week. */
 export function mergedAwayRows(merged:MergedAwayDefects,config:CloudConfig,now:string):CloudRow[]{
  return Object.entries(merged).map(([defectId,at])=>({
   defect_id:defectId,
@@ -439,6 +461,119 @@ export function withoutMergedAway<P extends {buses?:{defects?:unknown}[]}|null|u
   const kept=defects.filter(defect=>!merged[String(defect?.id??"")]);
   return kept.length===defects.length?bus:{...bus,defects:kept};
  })} as P;
+}
+
+/* Down Sheet entries this device took off the sheet, and when.
+
+   Same shape and same reason as the defect ledger above. It is here because the
+   Down Sheet went without one, and the arithmetic showed up on the screen: a
+   scan came back correct at 57 buses and about fifteen seconds later — one live
+   sync round trip — the sheet said 92. Clearing the sheet first changed nothing,
+   because clearing is precisely the operation that was not travelling.
+
+   A push only ever sends what the sheet still carries, so an entry taken off is
+   simply not sent — it is not removed anywhere. The row stays live on the
+   server, the next pull reads it back, and mergeDownSheet keeps every incoming
+   entry the receiver lacks, by design. So nine days of sheets — Aug 30, Sep 5,
+   Sep 6 — came back down on top of Sep 7's, the map reconciled the buses they
+   named as down, and the count grew on every sweep. Nothing was wrong with the
+   scan; the sheet was being handed its own history back.
+
+   Hence this. A removal is recorded, pushed as a tombstone so the other devices
+   stop being sent it, and refused on the way back in. Kept rather than cleared
+   once pushed, because a device that has been offline for a week will still
+   hand back the sheet it has when it reconnects, and this is what refuses it. */
+export const CLOUD_REMOVED_ENTRIES_KEY="pace-cloud-removed-entries-v1";
+
+/* The sheet holds 98 entries, so a full replacement is at most that many
+   removals. Twenty of those is far more history than the ledger needs: a
+   tombstone that has landed is kept by the SERVER for good, and this only has
+   to survive long enough to push it and to refuse the entry while a stale
+   device is still handing it back. Bounded because a scan a day, forever, is
+   otherwise a LocalStorage key that only grows — and this app's storage is
+   shared with a four-hundred-bus board that must never be the thing that
+   fails to save. */
+export const REMOVED_ENTRY_LEDGER_LIMIT=2000;
+
+export type RemovedEntries=Record<string,string>;
+
+export function readRemovedEntries(storage:StorageReader):RemovedEntries{
+ try{
+  const raw=storage.getItem(CLOUD_REMOVED_ENTRIES_KEY);
+  const parsed=raw?JSON.parse(raw):null;
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))return {};
+  const out:RemovedEntries={};
+  for(const [key,value] of Object.entries(parsed as Record<string,unknown>))
+   if(typeof value==="string")out[key]=value;
+  return out;
+ }catch{return {}}
+}
+
+export function writeRemovedEntries(storage:StorageWriter,removed:RemovedEntries){
+ try{storage.setItem(CLOUD_REMOVED_ENTRIES_KEY,JSON.stringify(removed));return true}
+ catch{return false}
+}
+
+/* Record a removal. Returns the ledger it wrote, so a caller that needs to push
+   immediately does not have to read it back. */
+export function rememberRemovedEntries(storage:StorageWriter,ids:Iterable<string>,at:string):RemovedEntries{
+ const next={...readRemovedEntries(storage)};
+ for(const id of ids){const key=clean(id);if(key)next[key]=at}
+ const keys=Object.keys(next);
+ if(keys.length>REMOVED_ENTRY_LEDGER_LIMIT){
+  /* Oldest dropped first, which is the safe end: an un-pushed tombstone is by
+     definition one of the newest, and anything old enough to fall off here
+     landed on the server days ago and is kept there. */
+  keys.sort((a,b)=>(Date.parse(next[a])||0)-(Date.parse(next[b])||0));
+  for(const key of keys.slice(0,keys.length-REMOVED_ENTRY_LEDGER_LIMIT))delete next[key];
+ }
+ writeRemovedEntries(storage,next);
+ return next;
+}
+
+/* Take entries back off the ledger — UNDO CLEAR and UNDO IMPORT. An id that was
+   never on it is a no-op, so a caller may hand over a whole snapshot rather than
+   working out which entries actually came back. */
+export function forgetRemovedEntries(storage:StorageWriter,ids:Iterable<string>):RemovedEntries{
+ const next={...readRemovedEntries(storage)};
+ let changed=false;
+ for(const id of ids){const key=clean(id);if(key&&key in next){delete next[key];changed=true}}
+ if(changed)writeRemovedEntries(storage,next);
+ return next;
+}
+
+/* Tombstones for the entries this device took off the sheet.
+
+   Only the key, the removal stamp and the signature — writing the entry's own
+   fields back while deleting it would let a stale copy of a repair overwrite the
+   version that survived.
+
+   No fleet_number, and that is deliberate, but it means this row can never ride
+   in an upsert: down_sheet_entries requires fleet_number on the insert half and
+   Postgres refuses the whole chunk before it ever reaches the conflict on
+   entry_id. cloud-client's pushPlan routes a row without a fleet number as an
+   UPDATE by id, exactly as it does for a merged-away defect. */
+export function removedEntryRows(removed:RemovedEntries,config:CloudConfig,now:string):CloudRow[]{
+ return Object.entries(removed).map(([entryId,at])=>({
+  entry_id:entryId,
+  deleted_at:at||now,
+  updated_at:at||now,
+  ...signature(config),
+ }));
+}
+
+/* An incoming sheet with the removed entries taken out.
+
+   The tombstone push handles the server, but not a second device that still
+   holds yesterday's sheet and pushes it back before this one's removal has
+   landed. Whatever arrives, an entry this device has taken off does not come
+   back. */
+export function withoutRemovedEntries<P extends {entries?:{id?:string}[]}|null|undefined>(
+ payload:P,removed:RemovedEntries
+):P{
+ if(!payload||!Array.isArray(payload.entries)||!Object.keys(removed).length)return payload;
+ const kept=payload.entries.filter(entry=>!removed[String(entry?.id??"")]);
+ return kept.length===payload.entries.length?payload:{...payload,entries:kept} as P;
 }
 
 export function changedRows(rows:CloudRow[],key:string,sent:SentFingerprints){

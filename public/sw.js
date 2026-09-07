@@ -4,12 +4,14 @@
    without a bump the old ones sit on the phone forever, never requested and
    never removed. The cost is one re-download of the shell, online, on first
    launch after an update. */
-const CACHE_NAME = "pace-bus-tracker-shell-v4";
+const CACHE_NAME = "pace-bus-tracker-shell-v5";
 const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg"];
 /* Every page the app has. Fleet Campaigns was missing until Version 137, so a
    phone that had never opened it while online got nothing when it lost signal
-   in a bay — which is the one situation this whole file exists for. */
-const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists"];
+   in a bay — which is the one situation this whole file exists for. Settings
+   is a page now too, and one somebody may well open for the first time in a
+   bay to turn a theme on. */
+const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/settings"];
 
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);

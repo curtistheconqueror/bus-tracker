@@ -9,6 +9,7 @@
 
 import {
  changedRows,
+ cloudConfigProblem,
  cloudFailureMessage,
  cloudFailurePhase,
  defectLogPayload,
@@ -18,8 +19,11 @@ import {
  fleetMapPayload,
  busRow,
  mergedAwayRows,
+ removedEntryRows,
  withoutMergedAway,
+ withoutRemovedEntries,
  type MergedAwayDefects,
+ type RemovedEntries,
  type CloudConfig,
  type CloudRow,
  type CloudState,
@@ -27,8 +31,16 @@ import {
  type SyncBus,
  type SyncEntry,
 } from "./cloud-sync.ts";
+import {LIVE_TABLES,type LiveChange} from "./cloud-live.ts";
 
+type LiveChannel={
+ on(event:"postgres_changes",filter:{event:string;schema:string;table:string},handler:(payload:{new?:Record<string,unknown>})=>void):LiveChannel;
+ subscribe(callback?:(status:string)=>void):LiveChannel;
+ unsubscribe():Promise<unknown>;
+};
 type SupabaseLike={
+ channel(name:string):LiveChannel;
+ removeChannel(channel:LiveChannel):unknown;
  auth:{
   signInWithPassword(credentials:{email:string;password:string}):Promise<{data:unknown;error:{message:string}|null}>;
   signOut(options?:{scope:"local"|"global"}):Promise<{error:{message:string}|null}>;
@@ -36,11 +48,14 @@ type SupabaseLike={
  };
  from(table:string):{
   upsert(rows:CloudRow[],options:{onConflict:string}):Promise<{error:{message:string}|null}>;
-  select(columns:string):{is(column:string,value:null):{
-   range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>;
-  }};
+  update(patch:CloudRow):{eq(column:string,value:string):Promise<{error:{message:string}|null}>};
+  select(columns:string):{
+   is(column:string,value:null):Paged;
+   not(column:string,operator:"is",value:null):Paged;
+  };
  };
 };
+type Paged={range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>};
 
 /* PostgREST caps how many rows one request may return, and the cap is silent:
    the response looks complete. This fleet is around four hundred buses and a
@@ -57,6 +72,28 @@ async function readAll(supabase:SupabaseLike,table:string){
   const page=data||[];
   rows.push(...page);
   if(page.length<PAGE)return {rows,error:null};
+ }
+}
+
+/* The records the shop has removed, as id and when.
+
+   Only the two columns: nothing else about a deleted record is wanted, and a
+   deleted record's fields must never be merged back onto a bus. Read so that a
+   removal made on one device reaches the others — a pull of live rows alone
+   tells a device nothing about a record it still holds and the server no longer
+   lists, and the merge keeps whatever only the receiver has, so the record would
+   sit on that device forever. */
+export async function readTombstones(supabase:SupabaseLike,table:string,key:string){
+ const deleted:Record<string,string>={};
+ for(let from=0;;from+=PAGE){
+  const {data,error}=await supabase.from(table).select(key+",deleted_at").not("deleted_at","is",null).range(from,from+PAGE-1);
+  if(error)return {deleted:{},error};
+  const page=data||[];
+  for(const row of page){
+   const id=String(row[key]??""),at=String(row.deleted_at??"");
+   if(id&&at)deleted[id]=at;
+  }
+  if(page.length<PAGE)return {deleted,error:null};
  }
 }
 
@@ -125,6 +162,33 @@ export async function cloudSignedIn(config:CloudConfig):Promise<boolean>{
  }catch{return false}
 }
 
+/* Listen for another device's work.
+
+   Realtime is a doorbell, not a delivery: the handler is told only that a table
+   changed and by whom, and the caller then syncs down the ordinary path. No row
+   from a notification is ever written to the board — the merge rules are argued
+   out in one place and this does not become a second one.
+
+   Returns a function that stops listening, or null when the device is not
+   connected. Nothing here throws into the app: a shop with no realtime simply
+   falls back to the sweep it already had. */
+export function subscribeToShopCloud(config:CloudConfig,onChange:(change:LiveChange)=>void):Promise<(()=>void)|null>{
+ return (async()=>{
+  try{
+   if(cloudConfigProblem(config))return null;
+   const supabase=await cloudClient(config);
+   if(!supabase||typeof supabase.channel!=="function")return null;
+   let channel=supabase.channel("shop-cloud-live");
+   for(const table of LIVE_TABLES)
+    channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
+     onChange({table,deviceLabel:String(payload?.new?.device_label??"")});
+    });
+   channel.subscribe();
+   return()=>{try{supabase.removeChannel(channel)}catch{/* nothing to stop */}};
+  }catch{return null}
+ })();
+}
+
 export type PushInput={
  buses:SyncBus[];
  entries:SyncEntry[];
@@ -134,9 +198,74 @@ export type PushInput={
  /* Records this device folded into another. Optional so a caller that has
     never merged anything is unchanged. */
  merged?:MergedAwayDefects;
+ /* Down Sheet entries this device took off the sheet — a clear, a scan that
+    replaced it, or a row deleted by hand. Same shape, same reason. */
+ removedEntries?:RemovedEntries;
 };
 
 export type PushResult=CloudOutcome&{sent:SentFingerprints;pushed:number;pending:number};
+
+/* One table's worth of writes, split by the one distinction Postgres enforces.
+
+   A row carrying its fleet number is a repair and is upserted. A row without
+   one is a tombstone — mergedAwayRows deliberately sends only the key, the
+   deletion stamp and the signature — and it MUST go as an UPDATE by id, never
+   inside an upsert.
+
+   The reason is how ON CONFLICT works. PostgREST's upsert is an INSERT that
+   falls through to UPDATE only after the insert half is rejected as a
+   duplicate, and NOT NULL checks run on that insert half first. bus_defects
+   requires fleet_number, so a tombstone in an upsert batch is refused with
+   `null value in column "fleet_number" … violates not-null constraint` before
+   the conflict on defect_id is ever reached — and the whole 200-row chunk rolls
+   back with it. That is what the shop cloud failed on every 45-second sweep
+   from the day MERGE DUPES was first pressed until this was found on Sep 6: the
+   Phone's status stuck red at "62 changes waiting", zero tombstones ever
+   landed, the 37 duplicate groups it had cleaned locally stayed alive in the
+   cloud, and the Down Sheet — queued behind the failing defects — never reached
+   the cloud after Aug 31.
+
+   down_sheet_entries splits the same way and for the same reason: its
+   fleet_number is NOT NULL too, so an entry tombstone is an UPDATE by entry_id.
+
+   An UPDATE touches no required column, is what the shop's edit policy allows,
+   and against an id the server never had it changes nothing, which is right:
+   there is nothing to delete. The roadmap always described a delete as "an
+   ordinary update"; this is that sentence, kept.
+
+   Buses first. A defect or a sheet entry naming a bus the server has never
+   heard of is not an error here — nothing has a foreign key to buses, on
+   purpose, because a fleet number is a name both devices already agree on and
+   making it a key would let one device's missing bus reject another's work. */
+export type PushStep={table:string;conflict:string;upserts:CloudRow[];updates:CloudRow[]};
+export function pushPlan(busChanged:CloudRow[],defectChanged:CloudRow[],entryChanged:CloudRow[]):PushStep[]{
+ const tombstone=(row:CloudRow)=>!String((row as Record<string,unknown>).fleet_number??"").trim();
+ return [
+  {table:"buses",conflict:"fleet_number",upserts:busChanged,updates:[]},
+  {table:"bus_defects",conflict:"defect_id",upserts:defectChanged.filter(row=>!tombstone(row)),updates:defectChanged.filter(tombstone)},
+  {table:"down_sheet_entries",conflict:"entry_id",upserts:entryChanged.filter(row=>!tombstone(row)),updates:entryChanged.filter(tombstone)},
+ ];
+}
+
+/* Chunked so one bad afternoon on a slow connection does not turn into a
+   single request the phone cannot finish. The first error stops everything, and
+   the caller leaves the fingerprints un-advanced so the same work is sent again
+   next sweep rather than believed to have gone. */
+export async function executePushPlan(supabase:SupabaseLike,plan:PushStep[]):Promise<{message:string}|null>{
+ for(const step of plan){
+  for(let at=0;at<step.upserts.length;at+=200){
+   const {error}=await supabase.from(step.table).upsert(step.upserts.slice(at,at+200),{onConflict:step.conflict});
+   if(error)return error;
+  }
+  for(const row of step.updates){
+   const record=row as Record<string,unknown>;
+   const patch=Object.fromEntries(Object.entries(record).filter(([key])=>key!==step.conflict)) as CloudRow;
+   const {error}=await supabase.from(step.table).update(patch).eq(step.conflict,String(record[step.conflict]??""));
+   if(error)return error;
+  }
+ }
+ return null;
+}
 
 /* Only what changed since this device last got through. A phone that has been
    in a basement all morning sends its morning's work and nothing else. */
@@ -158,10 +287,21 @@ export async function cloudPush(input:PushInput):Promise<PushResult>{
     is cleared, and it means a stale entry can never delete a live repair. */
  const tombstones=mergedAwayRows(input.merged||{},config,now)
   .filter(row=>!defectRows.some(live=>live.defect_id===row.defect_id));
+ /* And the same for the sheet. Without these a removal never left the device:
+    the entry was simply not sent, the row stayed live, and the next pull handed
+    it straight back — which is how a 57-bus sheet read 92 fifteen seconds after
+    a correct scan.
+
+    An entry the sheet still carries is never tombstoned, whatever the ledger
+    says. That is what makes UNDO CLEAR and UNDO IMPORT safe in the window before
+    the ledger is cleared, and it means a stale ledger can never delete a live
+    repair. */
+ const entryTombstones=removedEntryRows(input.removedEntries||{},config,now)
+  .filter(row=>!entryRows.some(live=>live.entry_id===row.entry_id));
 
  const busChange=changedRows(busRows,"fleet_number",sent);
  const defectChange=changedRows([...defectRows,...tombstones],"defect_id",sent);
- const entryChange=changedRows(entryRows,"entry_id",sent);
+ const entryChange=changedRows([...entryRows,...entryTombstones],"entry_id",sent);
  const outstanding=busChange.changed.length+defectChange.changed.length+entryChange.changed.length;
  const fingerprints={...busChange.fingerprints,...defectChange.fingerprints,...entryChange.fingerprints};
 
@@ -171,24 +311,8 @@ export async function cloudPush(input:PushInput):Promise<PushResult>{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",sent,pushed:0,pending:outstanding};
 
-  /* Buses first. A defect or a sheet entry naming a bus the server has never
-     heard of is not an error here — nothing has a foreign key to buses, on
-     purpose, because a fleet number is a name both devices already agree on and
-     making it a key would let one device's missing bus reject another's work. */
-  const writes:[string,CloudRow[],string][]=[
-   ["buses",busChange.changed,"fleet_number"],
-   ["bus_defects",defectChange.changed,"defect_id"],
-   ["down_sheet_entries",entryChange.changed,"entry_id"],
-  ];
-  for(const [table,rows,conflict] of writes){
-   if(!rows.length)continue;
-   /* Chunked so one bad afternoon on a slow connection does not turn into a
-      single request the phone cannot finish. */
-   for(let at=0;at<rows.length;at+=200){
-    const {error}=await supabase.from(table).upsert(rows.slice(at,at+200),{onConflict:conflict});
-    if(error)return {...failed(new Error(error.message)),sent,pushed:0,pending:outstanding};
-   }
-  }
+  const error=await executePushPlan(supabase,pushPlan(busChange.changed,defectChange.changed,entryChange.changed));
+  if(error)return {...failed(new Error(error.message)),sent,pushed:0,pending:outstanding};
   return {ok:true,phase:"idle",message:"",sent:fingerprints,pushed:outstanding,pending:0};
  }catch(error){
   /* The fingerprints are NOT advanced on failure, so the next attempt sends the
@@ -201,21 +325,30 @@ export type PullResult=CloudOutcome&{
  map:ReturnType<typeof fleetMapPayload>|null;
  defects:ReturnType<typeof defectLogPayload>|null;
  sheet:ReturnType<typeof downSheetPayload>|null;
+ /* Defect ids the shop has removed, with when. Applied by applyCloudPull. */
+ deleted:Record<string,string>;
+ /* Down Sheet entry ids the shop has taken off, with when. Same job, other
+    table — a pull of live rows alone can never tell a device that an entry it
+    still holds is gone, because the merge keeps whatever only the receiver has. */
+ removedEntries:Record<string,string>;
 };
 
 /* Everything not tombstoned, handed back in the same shape a transfer FILE has
-   so the caller can use the merge rules that already shipped. */
-export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={}):Promise<PullResult>{
- const empty={map:null,defects:null,sheet:null};
+   so the caller can use the merge rules that already shipped — plus the
+   tombstones themselves, as ids only, so a removal travels. */
+export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayDefects={},removedEntries:RemovedEntries={}):Promise<PullResult>{
+ const empty={map:null,defects:null,sheet:null,deleted:{},removedEntries:{}};
  try{
   const supabase=await cloudClient(config);
   if(!supabase)return {ok:false,phase:"error",message:"The connection details are not usable.",...empty};
-  const [busRes,defectRes,entryRes]=await Promise.all([
+  const [busRes,defectRes,entryRes,deletedRes,removedRes]=await Promise.all([
    readAll(supabase,"buses"),
    readAll(supabase,"bus_defects"),
    readAll(supabase,"down_sheet_entries"),
+   readTombstones(supabase,"bus_defects","defect_id"),
+   readTombstones(supabase,"down_sheet_entries","entry_id"),
   ]);
-  const firstError=busRes.error||defectRes.error||entryRes.error;
+  const firstError=busRes.error||defectRes.error||entryRes.error||deletedRes.error||removedRes.error;
   if(firstError)return {...failed(new Error(firstError.message)),...empty};
   return {
    ok:true,phase:"idle",message:"",
@@ -225,7 +358,12 @@ export async function cloudPull(config:CloudConfig,now:string,merged:MergedAwayD
       the cleanup yet will go on pushing its own copies, and those would arrive
       here and undo the merge. */
    defects:withoutMergedAway(defectLogPayload(defectRes.rows,now),merged),
-   sheet:downSheetPayload(entryRes.rows,now),
+   /* And minus the entries this device has taken off the sheet, for the same
+      reason: another device holding yesterday's sheet pushes it back up, and
+      without this the clear undoes itself on the very next pull. */
+   sheet:withoutRemovedEntries(downSheetPayload(entryRes.rows,now),removedEntries),
+   deleted:deletedRes.deleted,
+   removedEntries:removedRes.deleted,
   };
  }catch(error){return {...failed(error),...empty}}
 }

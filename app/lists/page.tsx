@@ -1,6 +1,8 @@
 "use client";
 
 import {useEffect,useMemo,useRef,useState} from "react";
+import TrackerNav from "../tracker-nav";
+import RefreshButton from "../refresh-button";
 import "./lists.css";
 import "../work-time.css";
 import WorkTimePanel from "../work-time-panel";
@@ -11,6 +13,7 @@ import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
+import ShopCloudLive from "../shop-cloud-live";
 
 function readLists(raw:string|null):BusList[]{
  try{return normalizeBusLists(JSON.parse(raw||"[]"))}catch{return []}
@@ -133,9 +136,9 @@ export default function Lists(){
   void shareOrDownloadFile(blob,open.name.replace(/[^a-z0-9]+/gi,"-").toLowerCase()+".txt",open.name+" report");
  };
 
- return <main className="lists-app"><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="lists-app"><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
-   <nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a href="/fixed-repairs">FIXED REPAIRS</a><a className="active" href="/lists" aria-current="page">FLEET CAMPAIGNS</a></nav>
+   <TrackerNav active="/lists"/><RefreshButton/>
   </header>
 
   <WorkTimePanel lists={lists} buses={fleet} defaultPerson={initials.trim().toUpperCase()}/>

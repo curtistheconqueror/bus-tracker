@@ -1,9 +1,15 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
+import TrackerNav from "../tracker-nav";
+import RefreshButton from "../refresh-button";
 import "./fixed-repairs.css";
-import {FixedAppearanceModal,useFixedAppearance} from "./fixed-repairs-settings";
-import {defectCountField,defectLabel,defectWorkStates,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "../repair-catalog";
+import {useFixedAppearance} from "./fixed-repairs-settings";
+import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,hasWorkState,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,PARTS_ON_ORDER_KEY,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "../repair-catalog";
+
+/* Drawn from the catalog rather than typed here, so the label on this page and
+   the label a record was stamped with can never drift apart. */
+const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES[0].label;
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
 import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
@@ -12,6 +18,8 @@ import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readFleetPayload,writeFleetStorageResult,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
+import ShopCloudLive from "../shop-cloud-live";
+import {candidateBusNumbers,resolveBusNumber} from "../bus-number-resolver";
 
 /* How many completed repairs render at once.
 
@@ -32,7 +40,7 @@ import SaveAlert from "../save-alert";
 const PAGE_SIZE=50;
 
 type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
-type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
+type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;partsOnOrder:boolean;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
 type UndoSnapshot={fleet:DefectLogFleetBus[];label:string};
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
@@ -41,8 +49,8 @@ function timeLabel(value:string){const date=new Date(value);return Number.isNaN(
 function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return "";return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}
 function locationLabel(location:string){const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not recorded"}
 
-function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void}){
- const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
+function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange,busQuery="",busFeedback="",onBusQuery}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void;busQuery?:string;busFeedback?:string;onBusQuery?:(value:string)=>void}){
+ const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
  const remembered=recallPart(partsMemory,draft.category,draft.issue);
  /* Checking the box offers the remembered part and never overwrites typing. */
  const togglePartsUsed=(checked:boolean)=>setDraft(current=>{
@@ -59,7 +67,17 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
   <header><span><small>{isNew?"LOG A REPAIR":"FIXED REPAIR"}</small><h2>{isNew?"Fixed without a defect":"Bus "+record.bus.n}</h2></span><button type="button" onClick={close} aria-label="Close fixed repair editor">×</button></header>
   {/* A repair done without a defect ever being logged has no bus yet, so the
       bus is picked here. Every other field on this form already applies. */}
-  {isNew&&<section className="fixed-new-bus"><label>BUS<select value={record.bus.id} onChange={event=>onBusChange?.(event.target.value)}>{fleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} — {locationLabel(bus.l)}</option>)}</select></label><small>Pick the bus, then fill in the repair below. It saves straight to this page as a completed record.</small></section>}
+  {isNew&&<section className="fixed-new-bus">
+   {/* Typing the number is the fast way in and the way every other page
+       already works, so it comes first and is the biggest control here. A
+       mechanic logging a stack of work orders knows the number off the paper;
+       hunting for it in a four-hundred-bus list is the slow path. The list
+       stays for the times somebody is looking rather than typing. */}
+   <label className="fixed-type-bus"><span>TYPE BUS #</span><input autoFocus inputMode="numeric" value={busQuery} onChange={event=>onBusQuery?.(event.target.value.replace(/\D/g,"").slice(0,5))} placeholder="Full # or last 2" aria-describedby="fixed-bus-feedback"/></label>
+   {busFeedback&&<small className="fixed-bus-feedback" id="fixed-bus-feedback" role="status">{busFeedback}</small>}
+   <label>OR PICK FROM THE LIST<select value={record.bus.id} onChange={event=>onBusChange?.(event.target.value)}>{fleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} — {locationLabel(bus.l)}</option>)}</select></label>
+   <small>Type the number or pick the bus, then fill in the repair below. It saves straight to this page as a completed record.</small>
+  </section>}
   <div className="fixed-editor-body">
    <section className="fixed-original"><b>EDIT THE FULL REPAIR RECORD</b><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · Reported by "+record.defect.reportedBy:""}</small></section>
    <label>CATEGORY<select value={draft.category} onChange={event=>setDraft(current=>({...current,category:event.target.value,issue:"",quantity:"",partsUsed:false,partNumber:"",partName:"",rememberScope:undefined}))}>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
@@ -70,7 +88,12 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
    {countField&&<label>{countField.label}<select value={draft.quantity} onChange={event=>update("quantity",event.target.value)}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={String(count)} key={count}>{count}</option>)}</select></label>}
    <label className="wide">ORIGINAL DESCRIPTION<textarea value={draft.details} onChange={event=>update("details",event.target.value)} placeholder="Original defect, symptom, or report"/></label>
    <label className="wide">BUS AVAILABILITY<select value={draft.operability} onChange={event=>update("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
-   <label className="wide">FIX / STEPS TAKEN<textarea autoFocus value={draft.actionTaken} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced, or reset? Include useful steps for the next diagnosis."/></label>
+   {/* On a NEW repair the bus number takes the focus instead — it is the first
+       thing a mechanic working through work orders types, and this textarea
+       renders later in the DOM, so leaving both would silently win the race and
+       land the cursor two boxes past where the typing was headed. Editing an
+       existing record shows no bus box, so it keeps the focus there. */}
+   <label className="wide">FIX / STEPS TAKEN<textarea autoFocus={!isNew} value={draft.actionTaken} onChange={event=>update("actionTaken",event.target.value)} placeholder="What was repaired, adjusted, replaced, or reset? Include useful steps for the next diagnosis."/></label>
    <label className="wide">DIAGNOSIS / TEST / VERIFICATION<textarea value={draft.diagnosticNote} onChange={event=>update("diagnosticNote",event.target.value)} placeholder="Codes, tests, root cause, or how the repair was verified"/></label>
    {/* Editable here as well as in the Defect Log: a fault is very often only
        properly named once the bus is apart, and that is the moment this page is
@@ -89,6 +112,11 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
    {defectWorkStates(record.defect).length>0&&<p className="wide completion-work-states"><b>WORK RECORDED</b><span>{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <i className={"work-state-badge "+state.key} key={state.key}>{state.label}{who?" — "+who:""}</i>})}</span></p>}
    <div className="parts-used-block wide">
     <label className="parts-used-toggle"><input type="checkbox" checked={draft.partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this repair. Leave it off if none were used.</small></span></label>
+    {/* Moved here from the Defect Log's work-state boxes. It says what a repair
+        is waiting on rather than what the shop did, so it belongs with the part
+        it is about. Records that were ticked on the old form keep the tick and
+        show it here. */}
+    <label className="parts-used-toggle parts-on-order-toggle"><input type="checkbox" checked={draft.partsOnOrder} onChange={event=>update("partsOnOrder",event.target.checked)}/><span><b>{PARTS_ON_ORDER_LABEL}</b><small>Waiting on a part to arrive. Stays on the record with who ticked it and when.</small></span></label>
     {draft.partsUsed&&<div className="parts-used-fields">
      <label>PART NUMBER<input value={draft.partNumber} onChange={event=>update("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
      <label>PART NAME (OPTIONAL)<input value={draft.partName} onChange={event=>update("partName",event.target.value)} placeholder="Exact catalog name"/></label>
@@ -113,14 +141,14 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
 }
 
 export default function FixedRepairs(){
- const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[settingsOpen,setSettingsOpen]=useState(false);
+ const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[busQuery,setBusQuery]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
  const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
- const {settings,update:updateSettings,style:appearanceStyle}=useFixedAppearance();
+ const {style:appearanceStyle}=useFixedAppearance();
  useEffect(()=>{setFleet(readFleet(localStorage.getItem(FLEET_KEY)))},[]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
@@ -164,7 +192,11 @@ const countUnit=countField?countField.unit:hadCount?undefined:record.defect.unit
 const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime())?(record.defect.completedAt||new Date().toISOString()):parsed.toISOString(),now=new Date().toISOString();
 /* The saved shape, applied whether this record already exists on the bus or
    is being created here by LOG A REPAIR. */
-const saved=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),partNumber:draft.partNumber.trim(),partsUsed:draft.partsUsed,partName:draft.partName.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
+const savedFields=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),partNumber:draft.partNumber.trim(),partsUsed:draft.partsUsed,partName:draft.partName.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
+/* PARTS ON ORDER rides through the same stamping every work state uses, so it
+   carries who ticked it and when, and unticking clears the stamp outright
+   rather than leaving a false behind. */
+const saved=(defect:StructuredDefect):StructuredDefect=>setDefectWorkState(savedFields(defect),PARTS_ON_ORDER_KEY,draft.partsOnOrder,now,draft.completedBy.trim().toUpperCase());
 /* A repair logged straight to this page has no defect on the bus yet, so it is
    appended rather than mapped over. Mapping alone would have written nothing
    and reported success — the record simply would not appear. */
@@ -186,8 +218,35 @@ if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fix
  const logRepair=()=>{
   if(!fleet.length){alert("This device has no buses yet. Open the Facility Map first.");return}
   const now=new Date().toISOString();
+  setBusQuery("");
   setNewRepair({bus:fleet[0],defect:{id:"fixed-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"Miscellaneous",issue:"",details:"",operability:"service",state:"completed",source:"fixed-log",createdAt:now,updatedAt:now,completedAt:now} as StructuredDefect});
  };
+ /* Typing the number picks the bus, using the same resolver the rest of the app
+    uses: a full fleet number, or the last two digits when that is unambiguous.
+    The record follows the box as it is typed, so there is nothing to press —
+    and the box says what it did, because silently landing on the wrong bus is
+    how a repair gets logged against somebody else's work order.
+
+    A number that resolves to nothing leaves the record on whatever bus it was
+    already on rather than clearing it, so a half-typed number never wipes a
+    selection the mechanic made from the list. */
+ const applyBusQuery=(value:string)=>{
+  setBusQuery(value);
+  if(value.length<2)return;
+  const resolution=resolveBusNumber(fleet,value);
+  if(resolution.kind!=="exact"&&resolution.kind!=="suffix")return;
+  setNewRepair(current=>current?{...current,bus:resolution.bus}:current);
+ };
+ const busFeedback=(()=>{
+  if(!newRepair)return "";
+  if(!busQuery)return "";
+  if(busQuery.length<2)return "Keep typing — a full fleet number, or the last two digits.";
+  const resolution=resolveBusNumber(fleet,busQuery);
+  if(resolution.kind==="exact"||resolution.kind==="suffix")return "Bus "+resolution.bus.n+" — "+locationLabel(resolution.bus.l);
+  if(resolution.kind==="ambiguous")return busQuery+" matches "+candidateBusNumbers(resolution.matches).join(", ")+". Type the full number.";
+  if(resolution.kind==="not-found")return "No bus matches "+busQuery+".";
+  return "Use a full fleet number or exactly two ending digits.";
+ })();
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null);setNewRepair(null)};
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
 /* Where a completed repair came from, said plainly.
@@ -218,10 +277,10 @@ function repairOrigin(source:string|undefined){
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
  /* This page had no save banner at all, alone among the four. A refused write
     here is the one that can lose the only copy of a record. */
- return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><DeferredNavBadge/><DeferredReviewPrompt/>
-  <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><nav aria-label="Tracker pages"><a href="/">FACILITY MAP</a><a href="/down-sheet">DOWN SHEET</a><a href="/defect-log">DEFECT LOG</a><a className="active" href="/fixed-repairs" aria-current="page">FIXED REPAIRS</a><a href="/lists">FLEET CAMPAIGNS</a></nav></header>
+ return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+  <header className="fixed-header"><div><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><TrackerNav active="/fixed-repairs"/><RefreshButton/></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
-  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button><button type="button" className="fixed-settings-button" onClick={()=>setSettingsOpen(true)} aria-label="Open Fixed Repairs settings">&#9881; SETTINGS</button></section>
+  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>
   <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{hiddenCount?windowed.length+" OF "+visible.length+" SHOWN":visible.length+" REPAIR"+(visible.length===1?"":"S")+" SHOWN"}</small></span><button className="log-repair-button" type="button" onClick={logRepair} disabled={!fleet.length} title="Record a repair that was done without a defect being logged first">+ LOG A REPAIR</button>{hiddenCount>0&&<div className="fixed-load-more"><button type="button" onClick={()=>setVisibleCount(current=>current+PAGE_SIZE)}>SHOW {Math.min(PAGE_SIZE,hiddenCount)} MORE</button><button type="button" onClick={()=>setVisibleCount(visible.length)}>SHOW ALL {visible.length}</button></div>}</header>{visible.length?<div className="fixed-list">{windowed.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
    {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}
@@ -232,7 +291,7 @@ function repairOrigin(source:string|undefined){
   {/* No key on the bus id: it would remount the editor on every bus change and
       reset the whole form, so a mechanic who picked the bus last lost the
       record they had just typed. The bus select is controlled by the prop. */}
-  {newRepair&&<CompletionEditor record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);return current&&bus?{...current,bus}:current})}/>}
-  {settingsOpen&&<FixedAppearanceModal settings={settings} setSettings={updateSettings} close={()=>setSettingsOpen(false)}/>}
+  {newRepair&&<CompletionEditor record={newRepair} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setNewRepair(null)} isNew fleet={fleet} busQuery={busQuery} busFeedback={busFeedback} onBusQuery={applyBusQuery} onBusChange={busId=>setNewRepair(current=>{const bus=fleet.find(item=>item.id===busId);setBusQuery("");return current&&bus?{...current,bus}:current})}/>}
+  
  </main>
 }

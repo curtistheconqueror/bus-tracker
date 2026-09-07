@@ -1,10 +1,28 @@
 # Publish next
 
-**STATUS: VERSION 146 PENDING — publish from `acf86c2`. Versions 144 and 145 are live.**
+**STATUS: VERSIONS 159–160 PENDING — publish 159 from `2afa491`, then 160 from `bbe33f6`. Repository release 158 is live from `a444242` as Sites Version 154.**
+
+**159 repairs a live data fault the shop is looking at on the floor today** — the
+Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
+commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Next | **146** | `acf86c2` | The Facility Map has a heading a screen reader can announce, and the Down Sheet opens on + ADD DOWN BUS |
+| Then | **160** | `bbe33f6` | **REFRESH on every page, and the Main Garage split by bay instead of by row** — saved to a home screen there is no address bar to reload from, so all six pages get the button the Facility Map already had, sharing one definition of refreshing: ask the service worker for a new version first, then reload; and Version 155's ready-bay line, which ran across under ROW 6, now runs down between bay 6 and bay 7 in the grid's own frame colour, because a bay in this shop runs front to back and there is no such thing as a row on the floor |
+| **Next** | **159** | **`2afa491`** | **A Down Sheet removal travels, so a cleared sheet stays cleared** — a correct 57-bus scan read 92 one sync later, and clearing the sheet did not help, because a row taken off was never removed anywhere: the entry simply stopped being sent, stayed live in the cloud, and came back on the next pull along with every sheet before it; removals are now recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's down flags follow the sheet the pull settled on |
+| Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
+| Published | **158** | `a444242` | **Live as Sites Version 154.** Deferred no longer hides its way back: every genuinely held-back Defect Log repair has a visible UNDO DEFERRED action in its expanded card and Focus view; it returns the repair to Open, stamps the return as history, and never changes Down Sheet-owned Deferred work |
+| Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
+| After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
+| Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
+| Next | **153** | `015e789` | **Shop Cloud now runs on every page and merges shop changes live as they happen** — it includes the Version 152 tombstone/Down Sheet sync repair, improved scan review, catalog additions, and the corrected Deferred badge behavior |
+| Published | **152** | `b57dcb5` | **The shop cloud has been failing on every sweep since Aug 31 and this fixes it** — merged-away tombstones are sent safely, Down Sheet rows can sync, scan review flags missed and uncertain rows, SHOP CLOUD moves to the top of MASTER, A-3/A-21/HAZMAT join the catalog, and the DEFERRED badge opens the matching filter |
+| Previous live | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
+| Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
+| Previous live | **149** | `011bb09` | The Defect Log looks back five days for a duplicate report instead of two, and a repair can record that the operator reported it |
+| Published | **148** | `60c2a01` | Bus List appears before Type Bus #, and Amerex has both Trouble Mod 1 Roof 2 and Trouble Mod 2 Roof 2 defects |
+| Published | **147** | `9d69a9b` | The defect form names its bus boxes for what they do, and the typed bus number becomes the biggest control on the screen |
+| Published | **146** | `1d5454b` | The Facility Map has a heading a screen reader can announce, the Down Sheet opens on + ADD DOWN BUS, a repair the bus already has is no longer logged twice, the Defect Log names which defect has the bus down, and Air System becomes Pneumatic System |
 | Published | **144** | `9f1f73f` | The four save-screen choices are readable on a phone, and the search is called SEARCH |
 | Published | **145** | `5aab35f` | The Defect Log opens on LOG DEFECT instead of a scoreboard, and Fixed Repairs can log a repair that never had a defect |
 | Published | **143** | `f94608b` | The collapsed bus card carries no category glyph; each expanded defect row keeps its own |
@@ -17,7 +35,27 @@
 | Published | **136** | `dccf431` | Bus Controls splits into Operator/Driver Controls and Bus Accessories, and the stop request is named what the floor calls it |
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
-**Version 145 is live from `5aab35f`.** The 136–145 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+**Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+
+**One release is pending: 159, from `2afa491`.** Releases 153 through 157 went
+out together in `baffc24` as Sites Version 153 — 157 contained 156, 155, 154 and
+153 whole — and 158 followed from `a444242` as Sites Version 154. Their handoffs
+are kept below as release records.
+
+159 is one commit on top of Codex's release commit `909f482`. It was written
+against `baffc24` and rebased onto `909f482` after 157 and 158 published; the
+test, lint and build gates were re-run on the rebased commit. 160 is one commit
+on top of 159.
+
+Publish in order — or, if it is simpler to publish once, publish 160 from
+`bbe33f6` and record both as live from it, since 160 contains 159 whole. **If
+only one goes out, make it 159:** it repairs a live data fault the shop is
+looking at on the floor, while 160 is two corrections to how pages are
+operated.
+
+Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
+
+Version 147 sits on top of the published 146 — it was rebased onto Codex's release commit `4c1e502`, never merged over it.
 
 This file always describes the unpublished releases, and it lives at this exact
 path on `main` so nobody has to be told where to look. Curtis approves a release
@@ -36,6 +74,2730 @@ window.
 Follow `docs/SITES_PUBLISHING_RUNBOOK.md` for the lifecycle itself; this file
 supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
+
+---
+
+# Version 160 — REFRESH on every page, and the garage split by bay instead of by row
+
+**Publish this after Version 159.** Two things reported in one message, both
+about pages that could not be operated the way they are actually used.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`bbe33f6`** |
+| Last code-bearing commit | `bbe33f6` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 159, pending from `2afa491` |
+
+**One application commit** on top of 159's `2afa491`:
+
+```
+git log --oneline 2afa491..bbe33f6     # docs-only commits omitted
+bbe33f6 Put REFRESH on every page, and split the garage by bay instead of by row
+
+git diff --name-only 2afa491 bbe33f6 -- app tests
+app/defect-log/page.tsx
+app/down-sheet/page.tsx
+app/fixed-repairs/page.tsx
+app/globals.css
+app/lists/page.tsx
+app/page.tsx
+app/refresh-button.tsx      (new)
+app/settings/page.tsx
+tests/rendered-html.test.mjs
+
+git diff --shortstat 2afa491 bbe33f6
+ 10 files changed, 400 insertions(+), 58 deletions(-)
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 2afa491 bbe33f6 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **230 tests passing** (228 at Version 159, one added for REFRESH and one
+for the handoff files; the garage test was rewritten in place), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload shape
+or database change. The garage change is presentation only: no slot id moves, no
+bus moves, and `garage-0` through `garage-83` mean exactly what they meant
+before.
+
+## What changed
+
+### 1. REFRESH is on all six pages
+
+Saved to a home screen the app runs standalone, with no browser chrome — no
+address bar and no reload. A stale version, or a page that had got itself into a
+bad state, could only be cleared by closing and reopening the app, and even that
+does not force the service worker to look for an update. The Facility Map had a
+REFRESH button in its command bar; the other five pages had nothing.
+
+> "The refresh button is for when I make it a bookmark. I noticed I cannot
+> simply refresh like the browser version. That is why I want it"
+
+It is the map's own button, made shareable rather than copied, so there is one
+definition of what refreshing means: **ask the service worker for a new version
+first, then reload.** A bare reload serves the cached shell again and looks like
+the button did nothing, which is the whole failure this exists to fix.
+
+The map passes its own class and keeps the command-bar look it already had; the
+other five take the header shape, beside the page nav. The map's phone menu
+offers the same action and now goes through the same function, so the two cannot
+drift apart. On a phone the button is full width and 44px tall.
+
+### 2. The Main Garage divider runs down, not across
+
+Version 155 marked bays 1–6 as ready with a thick green line — and drew it the
+wrong way, horizontally, under ROW 6.
+
+> "when we referred to a bay it was actually going front to back up. It's going
+> front to back not side to side... there's no such thing as rows in the shop.
+> It's either bay one through 12."
+
+A bay in this shop runs front to back and is numbered 1 to 12 across the top of
+the grid. Each numbered column is one bay, however many rows deep the grid is
+drawn. The line across named a thing the floor does not have.
+
+The line now runs **down, between bay 6 and bay 7** — on the column header and
+on that column's cell in every row. It is drawn in the frame colour rather than
+a green of its own, because `--garage-frame` already draws this grid's borders,
+its numbers and its row labels, and a barrier belongs to the structure of the
+garage rather than competing with it. The heading badge reads **BAYS 1–6 READY**
+and takes the same colour, so recolouring the garage in Settings recolours both.
+
+The row labels stay. The app still needs a way to say *which space in a bay*, but
+they are a grid coordinate now rather than a place anybody would name out loud.
+
+## Verified
+
+Measured in a browser against the production build, not read off the CSS:
+
+- The divider class lands on the **bay 07** column header and on column index 6
+  in **all seven rows** — one continuous vertical line, 4px, `rgb(6,45,102)`,
+  which is `--garage-frame`.
+- **No horizontal border remains anywhere in the grid**: the old line under
+  ROW 6 is gone, not merely overpainted.
+- The heading badge renders `BAYS 1–6 READY` in the same colour.
+- REFRESH on the Down Sheet at 390px: 44px tall, full width, not overlapped by
+  any fixed element, and the document does not scroll horizontally.
+
+## What to check once it is live
+
+1. **REFRESH appears on all six pages** — Facility Map (command bar), Down
+   Sheet, Defect Log, Fixed Repairs, Fleet Campaigns and Settings (beside the
+   page nav).
+2. **It works from the home screen.** Open the bookmarked app, press REFRESH,
+   and it reloads and picks up this version. That is the case it was built for.
+3. **The Main Garage line runs top to bottom**, between bay 06 and bay 07, in
+   the same dark blue as the grid's numbers and borders — and there is no
+   horizontal line across the middle of the grid any more.
+4. **The heading badge says BAYS 1–6 READY**, not ROWS.
+5. **No bus moved.** The grid is the same grid; only the line and the badge
+   changed.
+
+---
+
+# Version 159 — A Down Sheet removal travels, so a cleared sheet stays cleared
+
+**The only pending release.** This is not a feature. It is a live data fault the
+shop is looking at on the floor: the Down Sheet inflates itself on every sync, a
+cleared sheet refills, and it gets worse the longer it runs — every sheet that is
+scanned adds rows the cloud never lets go of.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`2afa491`** |
+| Last code-bearing commit | `2afa491` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Repository release 158, live from `a444242` as Sites Version 154 |
+
+**One application commit** on top of Codex's release commit `909f482`:
+
+```
+git log --oneline 909f482..2afa491     # docs-only commits omitted
+2afa491 Make a Down Sheet removal travel, so a cleared sheet stays cleared
+
+git diff --name-only 909f482 2afa491 -- app tests
+app/cloud-client.ts
+app/cloud-live.ts
+app/cloud-sync-control.tsx
+app/cloud-sync.ts
+app/down-sheet/page.tsx
+app/page.tsx
+app/shop-cloud-live.tsx
+tests/rendered-html.test.mjs
+
+git diff --shortstat 909f482 2afa491
+ 8 files changed, 440 insertions(+), 27 deletions(-)
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 909f482 2afa491 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **228 tests passing** (226 before this, two added), ESLint clean,
+production build succeeds. Rebased onto `909f482` after Codex published 157 and
+158; the gates were re-run on the rebased commit, not only on the original.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No schema change: the
+`deleted_at` column this uses has been on `down_sheet_entries` since migration
+`0002_shared_records.sql`, unused by the Down Sheet until now.
+
+One new LocalStorage key, `pace-cloud-removed-entries-v1`, written on a removal
+and read on a sync. No existing key is renamed, reshaped or read differently. A
+device that has never removed anything has no such key and behaves as it did.
+
+## What was wrong
+
+Reported from the floor on Sep 7: a Down Sheet photo was scanned, the total came
+back correct at **57**, and about fifteen seconds later — one live-sync round
+trip — the same sheet read **92**. Clearing the sheet first changed nothing; it
+refilled the same way. With nothing on the sheet at all, the page still reported
+"26 other buses".
+
+Nothing was wrong with the scan, and the ON ROAD tallies added in 157 had
+nothing to do with it. The Down Sheet had no way to say that a row was gone.
+
+A push only ever sends what the sheet still carries. An entry taken off was
+therefore simply not sent — it was not removed anywhere. The row stayed live on
+the server, the next pull read it back, and `mergeDownSheet` keeps every
+incoming entry the receiver lacks, which is correct and deliberate: it is what
+lets two devices each add buses without either one erasing the other's. Applied
+to a removal, it means the removal loses every time.
+
+Counted in the shop's own table, `down_sheet_entries` holds **93 rows, none of
+them tombstoned**, the oldest stamped `2026-08-30 19:24`:
+
+| Day | Rows | Buses |
+| --- | --- | --- |
+| Aug 30 | 23 | 23 |
+| Sep 5 | 4 | 4 |
+| Sep 6 | 6 | 6 |
+| Sep 7 | 60 | 57 |
+
+Thirty-three of those rows are sheets that were replaced days ago. **57 + 33 =
+90**, which is the number the screen was adding up — the two either side are
+rows the sheet counts and hides.
+
+The second half of the symptom follows from the first. Once a stale entry is
+merged back in, the map marks that bus down again; and a bus left marked down
+with no entry behind it is not inert, because `entriesFromFleet` mints a **brand
+new** entry for it the next time the Down Sheet page loads — under an id nothing
+has ever removed. That is the "26 other buses" on a sheet that was just cleared.
+
+## What changed
+
+The same three parts that already fixed exactly this for merged-away defects in
+release 152, applied one table over.
+
+### 1. A removal is written down
+
+A new ledger, `pace-cloud-removed-entries-v1`, records the entry id and when it
+came off. It is written wherever a removal actually happens, which is three
+places, not one:
+
+* **CLEAR DOWNSHEET** on the Down Sheet.
+* **A scan that replaces the sheet** — every bus the new sheet does not name.
+  This is the commonest removal in the shop and it was the one that travelled
+  least.
+* **The AI Operator's own clear**, issued from the Facility Map. Same operation,
+  different door, same ledger.
+
+Bounded at 2000 entries, oldest dropped first, because a scan a day forever is
+otherwise a key that only grows — and this app shares LocalStorage with a
+four-hundred-bus board that must never be the thing that fails to save. The
+oldest end is the safe end: a tombstone that has landed is kept by the server
+for good, and anything old enough to fall off here landed days ago.
+
+### 2. The removal goes up as a tombstone, as an UPDATE
+
+`down_sheet_entries.fleet_number` is `NOT NULL`, and Postgres checks that on the
+INSERT half of an upsert **before** it reaches the conflict on `entry_id`. So a
+tombstone — which deliberately carries no fleet number, because writing a
+repair's fields back while deleting it would let a stale copy overwrite the
+version that survived — can never ride in an upsert; it would take the whole
+200-row chunk down with it. That is the precise failure that kept the shop cloud
+red for a week on `bus_defects`, and the planner already knew how to route
+around it. It now splits `down_sheet_entries` the same way: repairs are
+upserted, tombstones are `UPDATE … WHERE entry_id = …`.
+
+An entry the sheet still carries is **never** tombstoned, whatever the ledger
+says. That is what keeps UNDO safe in the window before the ledger is cleared,
+and it means a stale ledger can never delete a live repair.
+
+### 3. They come back down, and take the local copies with them
+
+A pull now reads the entry tombstones alongside the defect ones and drops the
+matching entries from this device — **unless this device has touched one since
+the removal.** Work done on a repair after somebody else cleared the sheet is
+real work, and it is what wins: the copy stays, its next push puts the row back
+for everyone, which is the honest outcome when two people disagreed about
+whether a bus was still down.
+
+### 4. The map follows the sheet a pull settled on
+
+`applyCloudPull` now reconciles the board's `down` flags against the sheet it
+just wrote. Leaving that to the Down Sheet page is what let this survive a
+clear — the page only reconciles when it is the page you are on, and
+`entriesFromFleet` re-mints an entry for any bus still flagged down. The rule
+enforced here is the schema's own: the Down Sheet says which buses are down and
+the map reads it back.
+
+### 5. Putting a sheet back still works
+
+A live entry now sends `deleted_at: null` out loud, the way a live defect
+already did, so restoring an entry clears the tombstone the removal sent instead
+of leaving it standing. **UNDO CLEAR** and **UNDO IMPORT** both take the entries
+back off the ledger and restamp them as touched now — both halves are needed,
+because the server compares `updated_at` to decide whether a write beats a
+tombstone, and an entry put back carrying its old stamp would lose that
+comparison and be deleted again on the next pull, silently. Restoring a sheet is
+touching it, so the stamp is honest.
+
+UNDO IMPORT also removes, in the other direction: rows the scan itself created
+come off everywhere, not just here.
+
+## Verified
+
+Replayed through the real merge path against real storage, using the shop's own
+numbers — a 57-bus sheet on the device, 33 stale rows in the cloud:
+
+| | Sheet total after one pull | Buses marked down on the map |
+| --- | --- | --- |
+| Without the ledger (what the shop is running now) | **90** | 57 |
+| With removals recorded | **57** | 57 |
+
+Two tests were added, covering the tombstone's shape, its routing as an UPDATE
+against a fake server that rejects the old shape in the server's own words, the
+"never tombstone an entry the sheet still carries" rule, the newer-copy
+tie-break, the end-to-end drop through `applyCloudPull` including the map
+reconcile, the ledger's cap, and every place a removal or an undo is recorded.
+
+## What to check once it is live
+
+1. **The count holds.** Scan a Down Sheet, note the TOTAL ON SHEET, and leave
+   the page open for a minute. It must not move on its own.
+2. **Clearing sticks.** CLEAR DOWNSHEET, wait through a sync, and the sheet must
+   stay empty — on this device and on any other device signed in.
+3. **The stale days are gone.** After the first scan or clear on the fixed
+   build, the Aug 30 / Sep 5 / Sep 6 buses do not come back. They are removed by
+   the ordinary replacement the scan already performs; nothing has to be done to
+   the database by hand.
+4. **Undo still works both ways.** UNDO CLEAR and UNDO IMPORT put the sheet back
+   and it stays back through a sync, rather than emptying again a few seconds
+   later.
+5. **The map agrees.** A bus taken off the sheet loses its DS badge on the
+   Facility Map, and no bus wears the badge without a row on the sheet.
+
+---
+
+# Version 157 — The sheet says who is on the road, and its words outrank the scan's guess
+
+**Publish this after Version 156.** Three things reported off the same morning's
+work: no way to tell from the Down Sheet whether a bus is actually out working,
+a scanned row filed as a repair the row never mentions, and the Fixed Repairs
+form offering no way to type a bus number.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`baffc24`** |
+| Last code-bearing commit | `baffc24` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 156, pending from `103b005` |
+
+**Four application commits** on top of 156's `103b005`:
+
+```
+git log --oneline 103b005..baffc24      # docs-only commits omitted
+baffc24 Put an ON ROAD badge beside the bus number on every Down Sheet row
+17ccbc5 Say on the Down Sheet which of its buses are out on the road
+e8cc258 Let Fixed Repairs take a typed bus number instead of only a dropdown
+62bb58d Let the words written on a scanned row outrank the catalog repair the scan guessed at
+
+git diff --name-only 103b005 baffc24 -- app tests
+app/api/down-sheet-scan/route.ts
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-view.ts
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/down-sheet/scan-catalog-match.ts     (new)
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 103b005 baffc24 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **226 tests passing** (223 at Version 156, three added; the road test grew to cover the badge), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload
+shape or database change. The scan half changes what a scan produces, so it
+reaches a sheet only when one is scanned. No catalog entry was added, renamed
+or retired.
+
+## What changed
+
+### 1. The Down Sheet can say which of its buses are out on the road
+
+The map's down-sheet badges answer "is this bus on the sheet?" while you are
+looking at the yard. Standing at the sheet there was no way to ask the inverse —
+"is this one actually out working?" — which is the question behind deciding what
+can be caught this shift and what has to wait for the bus to come in. The sheet
+could not answer it on its own, because where a bus is belongs to the map.
+
+Two tallies join the five, making seven: **INSPECTIONS ON ROAD** and **DOWNED
+BUSES ON ROAD**. Both are pressable, and pressing one holds the sheet below down
+to exactly the buses it counts, so the number can be read as a list. Pressing it
+again gives the whole sheet back, and a line under the tiles says which one is
+holding it, with the way out.
+
+**A bus carrying both is counted in both**, which is why these are not simply the
+existing bands filtered by location. The sheet folds a bus into the one row it is
+allowed, so a bus that came due for a PM and is also missing on cylinder 5 has a
+single row reading `PM'S / MISFIRES`. The bands must pick one and they pick the
+fault, correctly — a bus with a live misfire is down. But somebody still owes it
+a PM, and neither errand disappears because the other exists. So these ask what
+the row **mentions** rather than where it was filed. PM DEFECTS stays out of the
+inspection tally and in the down one, since those are the faults found while
+doing a PM.
+
+The counts are taken **before** the filter is applied, so pressing one tally does
+not empty the other out from under the person reading it: both keep saying what
+they always said and only the sheet narrows. "On the road" is the same test
+`smart-status.ts` uses to decide a bus is in service, written once so the sheet
+and the map cannot disagree; a bus the map has never placed is not asserted to be
+anywhere.
+
+The five existing tiles are unchanged and remain a scoreboard — only the two new
+ones are pressable, and they are shaped like buttons to say so.
+
+And the same fact rides on every row: an **ON ROAD** badge beside the bus
+number, so it reads while scrolling without pressing anything. It sits outside
+the row's edit button deliberately — where a bus is comes from the map and this
+page only reads it, so a badge inside the button would look like a way to change
+it. Two things about it were measured in the built page rather than assumed: it
+never wraps, and with it hidden by CSS every row height is byte-for-byte what it
+was, so it costs no vertical space; and it was clipped by exactly 21px on first
+render, because the bus column's 108px fitted the number and its status label
+precisely. That column is 148px now and the table's min-width rose by the same
+40px, so widening it takes no room from any other column — the table simply gets
+40px longer inside the scroller it already lives in.
+
+### 2. A row filed as a repair it never mentioned — and a review screen that could not show it
+
+Line 25 of the 09/6 sheet reads `MISFIRE CYL # 5 / MDT SCREEN` against bus
+15508. The scan kept those words — it always does, verbatim — and filed the row
+as **Engine / Stabilizer link**. A stabilizer link is a suspension part and
+nothing on that row mentions one. The catalog was never the problem: Misfire is
+an Engine option, sitting there to be picked.
+
+There was a second failure underneath, and it is the one that let this reach the
+sheet. "Stabilizer link" is not in the Engine list at all, so the answer named a
+category and a repair that cannot go together — and the review screen's REPAIR
+dropdown can only display an option its category actually contains. It fell back
+to showing that category's **first** option while the import stored the original.
+**The reviewer approved "Check engine light" and the sheet recorded "Stabilizer
+link".** What was approved was not what was filed, for any row where the scan
+crossed a category, and nothing on screen said so.
+
+The written words now choose the catalog entry. The catalog becomes a set of
+phrases to look for; when the shop's wording names a repair, that is the repair —
+unless the scan's own pick is also named there, in which case it was reading the
+same row and is left alone. The earliest fault written wins, because the crew
+writes what matters first and lists the rest after a slash. **The reason itself
+is never altered.** Whatever ends up on the row, its category can display it, so
+the review screen and the import can no longer disagree.
+
+It is deliberately timid, and every phrase was read off the generated list before
+this shipped: nothing under five characters, no "Other …" entries, no names with
+brackets, and six generic Bodywork words skipped by name — broken, loose,
+missing, damaged, paint, trace — because "LOOSE MIRROR" is not a Bodywork/Loose
+row. Four phrases name two catalog entries each; the scan's own category breaks
+the tie.
+
+### 3. MDT SCREEN is a word the catalog no longer has
+
+The other half of that row exposed a gap of its own. The shop still writes **MDT
+SCREEN**; the catalog renamed it to **IBS Screen** some releases ago. So the
+model is handed a list with no "MDT" in it anywhere and cannot match the phrase
+however plainly it is written. The translation is now asked of the app's
+existing rename table rather than copied into a second one, so `MDT SCREEN`
+resolves to `Tech Services / IBS Screen - INOP (general)` — the same answer a
+stored record gets when it is read back.
+
+### 4. An OFF PROPERTY filing with nothing behind it
+
+The same row was also filed OFF PROPERTY, which takes a bus out of the yard's
+down count entirely — and alone among the four bands, nothing on the row has to
+justify it. The sheet says a bus is away by naming where it went in the
+MECHANIC/LOCATION column, or by the OFF PROPERTY heading above it.
+
+A row that reaches for that band with **no vendor named and no location or
+off-property wording anywhere** is now called out on the review screen. It is
+flagged rather than overridden: under a genuine OFF PROPERTY heading the
+location column is often blank, and making a foreman re-tick that whole band
+would cost more than it saves. **The root cause of this particular
+misfiling was not determined** — the scan output that produced it was not
+available — so this is a guard that makes it visible before import, not a fix
+for a diagnosed bug.
+
+### 5. Fixed Repairs takes a typed bus number
+
+LOG A REPAIR offered only a dropdown of the whole fleet — the one place in the
+app where a bus number could not simply be typed, and the slow path for working
+through a stack of work orders. **TYPE BUS #** now comes first and is the
+biggest control in the box, taking a full fleet number or the last two digits
+through the same resolver the map and the Defect Log use. The dropdown stays
+underneath.
+
+The box reports on every keystroke — which bus it landed on, that two digits
+matched more than one and need the full number, or that nothing matches —
+because silently landing on the wrong bus is how a repair gets logged against
+somebody else's work order. A number that resolves to nothing leaves the record
+on the bus it was already on, so a half-typed number never wipes a selection.
+
+FIX / STEPS TAKEN had `autoFocus` unconditionally and renders later in the DOM,
+so it silently won the race and the cursor landed two boxes past where the
+typing was headed. It keeps the focus when editing an existing record, where
+there is no bus box, and yields it on a new one.
+
+## Validation
+
+- 226 regression tests passing, ESLint clean, production build succeeds
+- **The road tallies driven against the PRODUCTION build**, zero console errors:
+  eight entries across road, garage and vendor locations give INSPECTIONS ON
+  ROAD **3** and DOWNED BUSES ON ROAD **3** with one bus in both; pressing the
+  first narrows the sheet to 17510, 17512 and 17516 **while both tallies stay at
+  3**; pressing the second shows 17511, 17512 and 17513; pressing it again
+  restores all eight rows and clears the note. Seven tiles lay out as five and
+  two at 1280px and stack full width at 390px
+- **The ON ROAD badges measured on the same run:** they appear on the five buses
+  in road slots and on none of the three in the garage or at a vendor, each to
+  the right of its number and on the same line, with 20px of headroom left in
+  the cell; hiding the badge leaves every row height unchanged, so the taller
+  row in that fixture is its longer reason text wrapping and not the badge
+- **The counting rules are pinned by their own assertions:** a bus reading
+  `PM'S / MISFIRES` is in both tallies while its band stays UNSCHEDULED; PM
+  DEFECTS is in the down tally only; a row with nothing written falls back to how
+  it was filed; buses in the garage and at a vendor are in neither; and a bus the
+  map has never placed counts nowhere
+- **The 15508 row driven through the real scanner against the PRODUCTION
+  build**, its exact response stubbed, zero console errors: the review screen
+  shows **Engine / Misfire**, its dropdown can display that value, the reason
+  still reads `MISFIRE CYL # 5 / MDT SCREEN`, and the row carries both notes —
+  what the repair was read from, and that the OFF PROPERTY filing has nothing on
+  the row behind it
+- **Fixed Repairs driven against the PRODUCTION build**, zero console errors:
+  the form opens with the cursor in TYPE BUS #; typing `17525` moves the record
+  off the bus it opened on; `25` resolves to the same bus; `08` reports matching
+  15508 and 17508 and moves nothing; `99` reports no match and leaves the
+  previous bus in place
+- **The timid rules are pinned by their own assertions:** LOOSE MIRROR, BROKEN
+  SEAT and DAMAGED TRIM name no repair; a substring never fires ("no crank" does
+  not match "NO CRANKING NOISE"); a pick the words support is left alone; a real
+  repair under the wrong category moves to the category that owns it; a repair
+  this app does not have at all becomes Miscellaneous rather than an invented
+  specific one; and a named vendor or off-property wording silences the
+  off-property flag
+- **Only one field claims focus**, asserted by count, so the race that caused
+  the cursor to land in the wrong box cannot come back
+
+## After it is live
+
+1. **Open the Down Sheet.** There should be seven tiles. Press INSPECTIONS ON
+   ROAD and the sheet should hold down to just those buses; press it again for
+   the whole sheet. A bus on the sheet for both a PM and a fault should appear
+   under both tallies, with its row still sitting in its own band.
+2. **Scroll the sheet.** Every bus that is out should carry a green ON ROAD
+   badge beside its number, and no row should have grown taller for it.
+3. **Cross-check one against the map.** Every bus the road tallies list should
+   be sitting in IN SERVICE / ON ROAD on the Facility Map, and none of them in
+   the garage or off property. This is the check that the two pages agree.
+4. **Rescan the sheet with line 25 on it.** Bus 15508 should read Engine /
+   Misfire, with the written words still saying `MISFIRE CYL # 5 / MDT SCREEN`,
+   and a note on the row saying where the repair was read from.
+5. **Look at the notes on the review screen generally.** Rows whose repair was
+   corrected, and rows headed OFF PROPERTY with nothing on them to justify it,
+   both say so now. The off-property one is worth a glance at the paper.
+6. **Scan a sheet with an MDT SCREEN row.** It should land under Tech Services
+   as IBS Screen rather than being guessed at.
+7. **Open Fixed Repairs → LOG A REPAIR.** The cursor should already be in TYPE
+   BUS #; type a full number or the last two digits and watch the bus underneath
+   follow, then fill in the repair as before.
+8. **Type two digits that match more than one bus.** It should say which buses
+   and wait for the full number rather than picking one.
+
+## The way back
+
+Measured in a throwaway worktree from `baffc24`:
+
+- `git revert baffc24` alone is **clean** and removes the ON ROAD badge and the
+  bus column's extra width, leaving the two tallies in place.
+- `git revert baffc24 17ccbc5` (newest first) is **clean** and removes the road
+  work entirely, leaving the scan work and the typed bus number in place.
+- `git revert baffc24 17ccbc5 e8cc258 62bb58d` (newest first) is **clean** and
+  takes the whole release out, back to 156.
+- Reverting any of the earlier three **on its own** conflicts in
+  `tests/rendered-html.test.mjs`, because the later commits appended to the same
+  file. Revert from the newest down, as above.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards. Rows imported while it was live keep the repair they were
+  imported with.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 157 | Live | <published tip hash> | The Down Sheet can now say which of its buses are actually out on the road — the inverse of the map's down-sheet badges, and a question the sheet could not answer on its own because where a bus is belongs to the map. Two pressable tallies join the five, INSPECTIONS ON ROAD and DOWNED BUSES ON ROAD, and pressing one holds the sheet down to exactly the buses it counts so the number can be read as a list. A bus carrying both a PM and a fault is counted in both, because the sheet folds a bus into one row and the bands must pick one for it: they pick the fault, correctly, but somebody still owes it a PM. The counts are taken before the filter is applied so pressing one does not empty the other, and "on the road" is the same test the map uses to decide a bus is in service. Every row also carries an ON ROAD badge beside its bus number, outside the edit button because where a bus is belongs to the map, sized so it costs no row height and clips nothing. What the sheet says now also outranks what the scan guessed it meant. A row reading MISFIRE CYL # 5 / MDT SCREEN was filed as Engine / Stabilizer link — a suspension part on a row that mentions none — and because that repair does not exist under that category, the review screen's dropdown could not display it and showed the category's first option instead, so the reviewer approved one repair and the sheet stored another. The written words now choose the catalog entry, the earliest fault written winning, with the reason itself never altered and the result always displayable by its own category. The matching is deliberately timid: nothing under five characters, no "Other" entries, and generic condition words like loose and broken skipped by name. MDT SCREEN, which the shop still writes and the catalog renamed to IBS Screen, resolves through the app's own rename table. And a row filed OFF PROPERTY with no vendor or location named anywhere on it is now called out on the review screen, since that band alone takes a bus out of the yard's down count without anything on the row having to justify it. Fixed Repairs also takes a typed bus number — full number or last two digits, through the same resolver as the rest of the app — instead of only a dropdown of the whole fleet |
+```
+
+
+# Version 156 — A PM line with seven buses on it is not seven down buses
+
+**Publish this after Version 155.** It fixes a counting error the foreman
+reported off a real sheet: line 53 reads PM'S with seven bus numbers after it,
+and six of those seven were landing in UNSCHEDULED instead of INSPECTIONS,
+inflating the down count by six off one line of paper. The crew writes the
+week's PMs on one line most weeks, so this is not a one-off.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`103b005`** |
+| Last code-bearing commit | `103b005` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 155, pending from `6f8518b` |
+
+**One application commit** on top of 155's `6f8518b`:
+
+```
+git show --stat 103b005
+ app/api/down-sheet-scan/route.ts         |   2 +-
+ app/down-sheet/down-sheet-scan-import.ts | 109 +++++++++++++++++++++++++++++--
+ app/down-sheet/down-sheet-view.ts        |   8 +++
+ tests/rendered-html.test.mjs             |  99 ++++++++++++++++++++++++++++
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 6f8518b 103b005 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **223 tests passing** (222 at Version 155, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload
+shape or database change. This changes what a SCAN produces, so it reaches a
+sheet only when one is scanned — which is exactly how the foreman will use it,
+by rescanning. A sheet already imported wrongly is corrected by rescanning it:
+the scan is an authoritative replacement of the sheet, as it always has been.
+
+## What changed
+
+### 1. Why six buses on one line became six down buses
+
+The model splits a multi-bus line into one row per bus correctly. What it does
+not do reliably is repeat the line's wording on each of them: it carries the
+words on the FIRST row and leaves the rest blank, then stamps those blank rows
+with whatever band heading they sat under. On line 53 that heading is
+UNSCHEDULED, so six buses arrived carrying no reason and a section of Pending.
+
+With nothing written to read, the page falls back to the section, sees Pending,
+and files each one as a bus that is down with nobody assigned. **Measured on
+the old code against that exact model output: 1 inspection, 6 unscheduled.**
+Both counts on the sheet were wrong by six, in opposite directions.
+
+The prompt has said "each with the same reason" since multi-bus rows were first
+handled. This is what came back anyway, which is why the fix is not another
+sentence in the prompt.
+
+### 2. A printed line is one line
+
+Rows that share a page and a **printed** line number describe the same work —
+that is what a line on paper means. A field nobody filled in now takes its
+value from the sibling on that line that has one: reason, mechanic, category,
+repair.
+
+- **Only blank fields are filled.** Two buses on one line that genuinely came
+  back with different wording keep it. This can add what was missing and can
+  never overwrite what was read.
+- **Margin rows inherit nothing**, and that exclusion is the whole safety of
+  it. They carry no line number, so every pencilled row on a page would share
+  one key and take its wording from whichever came back first — one bus's brake
+  job spreading across unrelated handwritten rows.
+- **The review screen says so**, on each row it filled, naming the line: "Read
+  from line 53, shared with the other buses on it". The inference is visible
+  and checkable against the paper before anything is imported, not silent.
+
+### 3. The row's own wording outranks the band heading
+
+The prompt has always claimed this — "a row's own wording still wins over the
+heading it sits under" — and nothing enforced it: `normalizedSection` takes a
+valid section name and returns it before the reason is ever consulted, so a PM
+written under the UNSCHEDULED heading came back Pending and stayed Pending. A
+foreman writes the week's PMs wherever there is room on the page, so the paper
+is not wrong to be laid out that way.
+
+Only the three headings that describe **who has the bus** can be overruled —
+Pending, Scheduled Repair, Other. Vendor Repair, Accident and Roadcall stand,
+which follows the precedence the page already documents: where a bus physically
+is outranks what the work is, and what the work is outranks who has it. A bus at
+Cummins for a PM is off property; a bus that was towed is a road call whatever
+else is written on it.
+
+The question asked is `downSheetScheduledOnly`, the same predicate the bands
+themselves use, rather than "does an inspection word appear anywhere". A bus
+carrying a misfire **and** a PM is a bus that is down, and testing for the word
+would have quietly filed it as maintenance — the one thing this page must never
+do.
+
+## Validation
+
+- 223 regression tests passing, ESLint clean, production build succeeds
+- **The failure was reproduced before it was fixed**, against the old code and
+  the model's exact response shape for line 53: 1 inspection, 6 unscheduled
+- **Driven end to end against the PRODUCTION build** with that same response
+  stubbed into `/api/down-sheet-scan`, zero console errors: all seven buses
+  read `PM'S` on the review screen and each says GOES TO INSPECTIONS &
+  SCHEDULED MAINTENANCE **before** anything is imported; the six inherited rows
+  carry the note naming line 53 and the row that already had the wording does
+  not; the imported sheet counts **UNSCHEDULED 2** — two real faults on other
+  lines, untouched — against **INSPECTIONS 7**
+- **Every rule that must not bend is pinned by its own assertion:** a fault
+  written once over two buses stays a fault on both; PM DEFECTS stays down; a
+  bus on the sheet twice for a PM and a misfire is counted down and keeps both
+  facts on the row; a PM line at a vendor stays off property for the bus that
+  inherited the vendor as well as the one it was written on; two buses on one
+  line with different wording keep their own; margin rows and single-bus lines
+  inherit nothing; and the same printed number on a different page is a
+  different line
+
+## After it is live
+
+1. **Rescan the sheet that has line 53 on it.** On the review screen, before
+   importing, every bus on that line should read PM'S and say GOES TO
+   INSPECTIONS & SCHEDULED MAINTENANCE, with the later ones noting which line
+   the wording came from.
+2. **Check the counts bar after importing.** The seven PM buses belong under
+   INSPECTIONS & SCHEDULED MAINTENANCE, and the down count should drop by the
+   number that used to be stranded in UNSCHEDULED.
+3. **Check a line that is not a PM** — a fault written once over two bus
+   numbers. Both buses should carry that fault and both should stay in the down
+   count. The rule is "share the line's wording", not "share its inspection-ness".
+4. **Check a PM DEFECTS line.** Those are faults found while doing a PM and
+   the buses are down; they must not have moved into INSPECTIONS.
+5. **Check any bus that is on the sheet for both a PM and a fault.** The row
+   should still show both, and the bus should still be counted as down.
+
+## The way back
+
+Measured in a throwaway worktree from `103b005`:
+
+- `git revert 103b005` alone is **clean** and restores the previous scan
+  behaviour, leaving Version 155 exactly as it was.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards. Sheets imported while it was live keep the wording they
+  were imported with, which is the wording the paper carries.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 156 | Live | <published tip hash> | A line reading PM'S with seven bus numbers after it stops counting as seven buses that are down. The scan split the line into seven rows correctly but carried the words on the first row only, leaving six blank under whatever band heading they sat under, so six buses arrived saying nothing and were read as down with nobody assigned — the down count up by six and the inspection count down by six off one line of paper. Every bus on a printed line now takes that line's wording from the sibling that has it, filling only blank fields so wording that was actually read is never overwritten, and the review screen names the line it read each one from. Margin rows, which carry no line number, inherit nothing. A row's own wording now also outranks the band heading it sat under, so a PM written under UNSCHEDULED is filed as an inspection, while Vendor Repair, Accident and Roadcall still stand and a bus carrying both a PM and a fault is still counted as down |
+```
+
+
+# Version 155 — Rows 1–6 of the Main Garage are READY ROWS
+
+**Publish this after Version 154.** It is a single, self-contained visual
+change requested directly: "the main garage area is split into 3 parts. The
+ready rows, the service rows, and of course the trouble rows. The one thing
+missing is defining rows 1-6 as ready rows." Only that one part — the ready
+rows — is built here, ahead of the smart tracking system the request named as
+the reason for it. Service rows and trouble rows are not part of this change.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`6f8518b`** |
+| Last code-bearing commit | `6f8518b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 154, pending from `fd3b326` |
+
+**One application commit**, rebased onto Codex's Version 152 release commit
+`d4a26fb` after it landed mid-session — the code is unchanged from the
+original commit, only its parent:
+
+```
+git show --stat 6f8518b
+ app/globals.css              | 13 +++++++++++++
+ app/page.tsx                 |  6 +++---
+ tests/rendered-html.test.mjs | 40 ++++++++++++++++++++++++++++++++++++++++
+
+git diff --name-only fd3b326 6f8518b -- app tests
+app/globals.css
+app/page.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only fd3b326 6f8518b -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **222 tests passing** (221 at Version 154, one added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None.** No storage key, no payload shape, and no database column changes.
+This release is markup and CSS: a class on one already-rendered `<div>` and an
+optional prop on an existing component, both additive.
+
+## What changed
+
+### The Main Garage's own grid gains a labeled boundary
+
+The Main Garage renders as one 7-row × 12-bay grid with no distinction between
+any of its rows. A thick green line now separates ROW 6 from ROW 7, and the
+section's own title bar — "MAIN GARAGE (BAYS 1-12)" plus its live bus count —
+carries a small matching badge reading **ROWS 1–6 READY**, so the split still
+reads when the section is collapsed and the grid itself is hidden.
+
+The line is a 4px top border on ROW 7's own cells — its sticky row label and
+all 12 of its bays — rather than a bottom border on ROW 6's. `.grow`, the div
+wrapping each row, renders as `display:contents` and paints nothing of its
+own, so any border has to land on the cells themselves, and a line above
+ROW 7 reads identically to one below ROW 6. The green is the same shade the
+drag-and-drop `.ready` highlight already uses elsewhere on this page for
+"this space is fine" — the same word keeps the same color rather than a
+second green meaning something else on the same screen.
+
+The badge is a new optional prop, `badge`, on `T` — the title-bar component
+every section on the Facility Map shares — rendered beside the existing count
+pill. It is additive by construction: a section that never passes one (every
+section except the Main Garage, today) renders exactly as it always has, and
+nothing about how sections count buses, drag-and-drop, collapse, or report
+their name to the operator or to `RELOCATION_AREAS` changes. The existing
+column split — `MAIN GARAGE (BAYS 1-10)` versus `TROUBLE BAY 11` / `TROUBLE
+BAY 12`, used for moves and the AI Operator — is untouched; rows and columns
+are two separate dimensions of the same grid, and only the row one gained a
+label here.
+
+## Validation
+
+- 222 regression tests passing, ESLint clean, production build succeeds
+- **Driven against the PRODUCTION build at 1400×1000 and 390×844, zero console
+  errors:** computed styles confirm ROW 7's row label and every one of its 12
+  bays carry `border-top-width: 4px`, ROW 6 and every other row still carry the
+  ordinary `1px`, and the title bar's `.section-badge` renders the text `ROWS
+  1–6 READY`; a screenshot at both widths shows the pill sitting cleanly next
+  to the bus count and the green line spanning the full width of the grid,
+  under the sticky ROW 7 label and every bay to its right
+- **Scoped to the Main Garage alone:** the new `badge` prop is optional and no
+  other section's `ttl(...)` call passes one; `ready-rows-divider` appears
+  exactly once in the JSX (the one conditional on `r===6`) and its CSS rule is
+  a single selector shared by all seven rows, not one rule per row
+- **The existing bay 11/12 special-slot logic is untouched**, confirmed by the
+  same exact expression this release's test checks alongside the new divider
+  class, in the same `Array.from` call
+
+## After it is live
+
+1. **Open the Facility Map and scroll to MAIN GARAGE (BAYS 1-12).** A green
+   pill reading ROWS 1–6 READY should sit beside the bus count in the title
+   bar, and a visibly thicker green line should separate ROW 6 from ROW 7.
+2. **Collapse the section.** The badge should still be visible in the
+   collapsed title bar even though the grid itself is hidden.
+3. **On a phone**, confirm the title wraps to a second line without the badge
+   being cut off or overlapping the collapse/menu buttons.
+4. **Move a bus into or out of ROW 7 or any bay 11/12 slot** and confirm
+   nothing about moves, the operator, or bay coloring changed — this release
+   only adds a line and a label.
+
+## The way back
+
+Measured in a throwaway worktree from `6f8518b`:
+
+- `git revert 6f8518b` alone is **clean** and removes the badge, the divider,
+  and their CSS, leaving Version 154 exactly as it was.
+- Nothing in this release writes new stored state, so there is nothing to
+  clean up going backwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 155 | Live | <published tip hash> | Rows 1-6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid itself, and a matching badge sits in the section's own title bar next to its bus count so the split still reads when the section is collapsed. This is the first piece of a smart tracking system planned for later — service rows and trouble rows are not part of this change, and the existing bay 1-10 / Trouble Bay 11 / Trouble Bay 12 column split used for moves and the AI Operator is untouched |
+```
+
+
+# Version 154 — A scan sweep can be taken back out, exactly
+
+**Publish this after Version 152.** It answers a mistake made on Sep 6 that the
+app had no way to undo: a photo of the Vehicle Down Sheet went through SCAN
+SWEEP, 24 Tech Services records landed on 23 buses in one press, the log went
+from 178 active defects to 202, and an export/import from the other device did
+not take them out — nor could it have (section 1).
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`fd3b326`** |
+| Last code-bearing commit | `fd3b326` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 152, pending from `015e789` |
+
+**Three application commits** on top of 152's `015e789`:
+
+```
+git log --oneline 015e789..fd3b326      # docs-only commits omitted
+fd3b326 Let the person holding the sheet tell the scanner what the camera will get wrong
+0db855a Take a whole scan sweep back out of the Defect Log, and stop the next one going in
+dd1b093 Correct what the camera misread, and stop the margin rows slipping out
+
+git diff --name-only 015e789 fd3b326 -- app tests
+app/api/down-sheet-scan/route.ts
+app/api/sweep-scan/route.ts
+app/cloud-client.ts
+app/cloud-live.ts
+app/cloud-sync-control.tsx
+app/cloud-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/defect-log/scan-batches-panel.tsx   (new)
+app/defect-log/scan-batches.ts          (new)
+app/defect-log/sweep-scan-import.ts
+app/defect-log/sweep-scanner.tsx
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/scan-spelling.ts         (new)
+app/operator-engine.ts
+app/page.tsx
+app/scan-notes.ts                       (new)
+app/shop-cloud-live.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 015e789 fd3b326 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+**No database change.** The two cloud changes in section 4 are in what the app
+sends and asks for: a defect row now carries `deleted_at: null` explicitly, and
+a pull additionally selects `defect_id, deleted_at` where `deleted_at is not
+null`. Both columns have existed since migration 0002; the read is covered by
+the existing "shop reads" policy; **no table, column, trigger or policy
+changes.** No new route and no service-worker bump.
+
+Gate: **221 tests passing** (214 at Version 152, seven added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing is rewritten.** No storage key changes and no payload shape
+changes.
+
+**Two new storage keys, both additive.** `pace-scan-batch-undo-v1` holds the
+last removed scan sweep so PUT BACK works after a reload; absent means nothing
+to put back; written only by a removal, cleared by a restore.
+`pace-scan-notes-v1` holds the scan notes a person asked to keep, one text per
+scanner; absent means none; written on every READ, with the text or with
+nothing, according to the tick.
+
+**One new form field on both scan routes,** `notes`, optional; a request
+without it is the request it was.
+
+**One first-sweep cost, harmless and once per device.** A defect row's
+fingerprint now includes `deleted_at: null`, so every fingerprint changes and
+the first shop-cloud sweep after the update re-sends the device's whole defect
+table — around three hundred rows in two 200-row upserts. The server's
+keep-newest trigger lets an equal timestamp through, and the rows are
+identical, so nothing on the server changes; after that sweep the fingerprints
+are current and pushes are incremental again.
+
+## What changed
+
+### 1. Why the import did not remove them — and never could
+
+A Defect Log import merges by defect id: a record both devices have takes the
+incoming version, and **a record only the receiving device has is kept.** That
+rule exists because the alternative — an import that deletes repairs the
+sending device never saw — is the data loss the merge rules were argued out to
+prevent. The iPad had never had the 24, so the phone kept them. Nothing was
+wrong with the import; it is not, and cannot be, the way to take records out.
+The "202" the phone shows is 178 real records plus the 24 filed by the sweep.
+
+### 2. The fingerprint, and SCAN BATCHES
+
+Everything a sweep files in one press of FILE APPROVED shares **one creation
+stamp** — `fileSweep` takes the clock once and hands the same value to every
+record — and every id it mints begins with `sweep-`. No honest record carries
+that stamp, so the pair identifies a press exactly. The 24 carry
+`2026-09-06T23:30` to the millisecond. `scan-batches.ts` groups by it.
+
+**SCAN BATCHES**, a new button beside SCAN SWEEP on the Defect Log, lists every
+press on the device — when, how many records on how many buses, who checked,
+the bus numbers — and REMOVE takes one out. Two rules:
+
+- **Only what nobody has touched.** A record from the batch that has since been
+  marked fixed, deferred or in progress, ticked, or written on (shop notes,
+  action taken, a finding, a part) is somebody's decision that it was real. It
+  stays, and the row says how many stayed.
+- **The way back is kept.** What was removed is written to the device, and PUT
+  BACK returns every record to its bus. UNDO LAST covers a removal too, by the
+  same path. A record put back is stamped `updatedAt: now`, which section 4
+  explains is not cosmetic.
+
+The board is written with the bulk-loss guard lifted for this one confirmed
+write, the way MERGE DUPES does on Settings; the recovery snapshot is still
+taken first, so RESTORE LAST GOOD COPY stands behind it. The cloud ledger is
+written after the board write lands, never before: a removal that reached the
+cloud but not the device would be worse than either alone.
+
+### 3. The operator understands the request
+
+Said exactly as it was said in chat: **"Remove the most recent 24 entries from
+the Defect log"** previews the batch — 24 Tech Services records filed at that
+time on 23 buses, the first six numbers listed — and applies on confirmation
+with the same three writes as the button. The number is checked, never
+assumed: "the last 20" when the sweep filed 24 is answered with the correction,
+not with 20 records quietly removed. "Undo the last scan sweep" and "take the
+sweep out of the defect log" need no number.
+
+**"Undo most recent change to defect log"** names no sweep and no number. That
+is the log's own UNDO LAST, and the operator says so — and says what it can do
+from here, naming the batch. "Put the scan sweep back" restores. A command that
+names a bus is a bus command and falls through to the paths that were there.
+
+### 4. A removal reaches the other devices, and so does a restore
+
+Removing already wrote the cloud ledger, so the phone would have sent
+tombstones. What did not exist was any way for the iPad to learn of them: a
+pull returns live rows only, and the merge keeps whatever the receiver alone
+holds, so the iPad's 24 copies would have stayed for good, pushed back up every
+sweep (harmlessly — the server keeps the newest write, and the tombstone is
+newer). **The pull now reads the tombstones as well, as ids and dates only**,
+and a copy older than its tombstone is dropped from the device. A copy edited
+AFTER the removal is real work: it stays, and its next push undeletes the row.
+The bulk-loss guard is lifted for that write exactly when a tombstone applied
+and only then; the recovery snapshot is taken first.
+
+Putting a sweep back had a matching hole. A restored record was upserted with
+no `deleted_at` column, so the tombstone stood and every device's pull went on
+filtering the record out — the restore looked done on the device that made it
+and reached nobody. **A live defect row now says `deleted_at: null` out loud**,
+and a restored record is stamped newer than its tombstone, so the restore wins
+on `updated_at` and clears the deletion. A stale copy still cannot undelete a
+record removed after it was last touched: it loses on `updated_at` first.
+
+### 5. The scanner will not do it again
+
+The sweep route now asks the model **what the page is before what is on it**,
+in the schema: `document` is one of `ventra`, `farebox`, `mixed`, `other`, and
+a Vehicle Down Sheet is named in the prompt as the example of `other`, with
+the instruction to return no rows for it. On the client a page called `other`
+contributes no rows — they are not shown unticked, they are not shown, since a
+tick box beside a Down Sheet row is how 24 records got filed — and a red notice
+points at SCAN SHEET on the Down Sheet page. A page the model would not vouch
+for, or where most rows could not be placed on either sheet, arrives with
+nothing ticked and an amber notice.
+
+### 6. Tell the scanner what the camera will get wrong, before it does
+
+The photo reader is not pattern matching. It is a vision-language model reading
+the page under written instructions, and it follows a sentence the way a person
+would. So both scanners now carry **NOTES FOR THIS SCAN** — up to 500
+characters, a counter beside it — sent with every page and appended to the
+prompt **behind** the fixed instructions, never in front of them. "Line 23 is
+17565." "The margin name is Carlos." "TIROS means tires." "HAZMAT means a
+biohazard on board." The person who knows the row is ambiguous says so before
+the photo is read, instead of fixing the row afterwards on the review screen
+(which still works; every field there is still editable).
+
+The block that carries the notes bounds them in the same breath: a note can
+correct HOW something written on the sheet is read; it can **never add a bus, a
+row or a repair that is not on the paper**, and a note that contradicts what is
+clearly printed loses to the paper and is called out in reviewNote. Empty notes
+add nothing, so a scan without them is byte-for-byte the scan it was.
+
+**Keep these notes on this device for the next scan** remembers them with one
+tick — the shop's shorthand and the mechanics' names are not retyped every
+morning — and a one-off left unticked is forgotten, so a correction about line
+30 today does not come back tomorrow as a standing instruction. Each scanner
+remembers its own. The cap and the cleaning are applied on the server as well
+as in the box.
+
+### 7. From `dd1b093`: FRONT TIROS, and the margin rows
+
+A scanned row now has its words corrected against the shop's own vocabulary and
+the mechanics' names already on the device — TIROS becomes TIRES, CAROS becomes
+CARLOS — under rules deliberately timid: nothing already a shop word, nothing
+with a digit, nothing under four letters, and nothing with two equally close
+candidates. And the prompt now names the handwritten margin rows as loudly as
+the printed lines, after a previous prompt change about printed line numbers
+plausibly taught the model to favour the table over the margin; margin rows are
+capped below the review threshold so they always arrive amber and marked
+MARGIN.
+
+## Validation
+
+- 221 regression tests passing, ESLint clean, production build succeeds
+- **The notes box, driven against the PRODUCTION build at 390 px with the scan
+  routes stubbed, zero page errors:** a 700-character paste clamps at 500/500;
+  the request carries `name="notes"` with the text beside the page; ticked
+  notes are stored and come back pre-filled and ticked on the next open;
+  unticked notes are forgotten; the sweep scanner keeps its own; and a stubbed
+  `document: "other"` answer produces the red refusal with no FILE button —
+  which is the section 5 path measured in a browser, with the model's answer
+  the only thing stubbed
+- **Driven against the PRODUCTION build, zero page errors,** with the real Sep
+  6 shape seeded — 24 sweep records on 23 buses among 30 defects:
+  - SCAN BATCHES lists one row reading **24 RECORDS ON 23 BUSES · CHECKED BY
+    EJ** with the 23 numbers, and a button reading REMOVE 24
+  - REMOVE, confirmed: the board holds **6** defects (the six hand-typed
+    records, untouched), the cloud ledger holds **24** ids, the snapshot holds
+    **24** records, the recovery snapshot was taken, UNDO LAST reads "Undo
+    Removed 24 scan sweep records", and no save banner appears
+  - PUT BACK **after a reload**: 30 defects again, all 24 restamped newer than
+    their creation, ledger back to 0 ids, snapshot cleared
+  - The operator, with the exact chat wording: "Undo most recent change to
+    defect log" answers with UNDO LAST and names the batch; "Remove the last 20
+    entries" answers "filed 24 records, not 20"; "Remove the most recent 24
+    entries from the Defect log" previews and applies — 6 defects, 24 ledger
+    ids, 24 in the snapshot; "Put the scan sweep back" restores all 24
+  - After an operator removal, the Defect Log's SCAN BATCHES offers PUT BACK
+    for it and lists no remaining sweep
+  - At 390 px the four feed actions sit in a 2×2 grid
+- **The cloud path is tested against the merge rules that shipped**, not
+  mocked around them: 24 tombstoned records leave storage through
+  `applyCloudPull` with the recovery snapshot written and the page notified,
+  a copy edited after its tombstone stays, and the tombstone read issues
+  exactly `select("defect_id,deleted_at").not("deleted_at","is",null)`
+- **Every rule was confirmed to fail without it:** a touched record removed, a
+  wrong count rounded to the batch, a five-digit number read as a batch
+  command, tombstones ignored on pull, the guard lifted with nothing
+  tombstoned, and a `document: other` page still producing findings each fail
+  their own test
+- **Not measured here, and cannot be:** the model's answer to a real Down Sheet
+  photo through the sweep route. The schema forces it to choose; the prompt
+  names the Down Sheet; the review step is the last line either way.
+
+## After it is live
+
+1. **On the phone, open the Defect Log and press ↶ SCAN BATCHES.** One row
+   should read 24 RECORDS ON 23 BUSES for Sep 6. Press REMOVE 24 and confirm.
+   The active count should drop from 202 to 178 — or a little less than 24 if
+   any of them were touched since, and the row will say how many were kept.
+2. **Watch the iPad.** Within the live-sync window its Defect Log should lose
+   the same 24 with nobody touching it. If the iPad is offline, they leave on
+   its next sync.
+3. **Check the cloud if you want the receipt:** in the Supabase SQL editor,
+   `select count(*) from bus_defects where defect_id like 'sweep-%' and
+   deleted_at is not null` should say 24 once the phone has synced.
+4. **Try the operator once, on purpose:** "Remove the last scan sweep from the
+   defect log" should now answer that there is no scan sweep to take out.
+5. **Press PUT BACK once, then REMOVE again**, to see the way back work — the
+   records should return on both devices, then leave both again.
+6. **Photograph a Down Sheet through SCAN SWEEP deliberately.** It should
+   refuse the page in red and point at SCAN SHEET, with nothing to tick.
+7. **SCAN SHEET a page with a margin row.** The row arrives amber and marked
+   MARGIN whatever the model claimed, and a misspelt shop word reads corrected.
+8. **Write a note before reading a sheet you know is ambiguous** — "line 23 is
+   17565" or "the margin name is Carlos" — and see whether the row comes back
+   right the first time. Tick KEEP for something standing like "HAZMAT means
+   biohazard" and confirm it is there the next morning; leave a one-off
+   unticked and confirm it is not.
+
+## The way back
+
+Measured in a throwaway worktree from `fd3b326`:
+
+- `git revert fd3b326` alone is **clean** and takes out the notes box (section
+  6), leaving everything else in place.
+- `git revert fd3b326 0db855a` (newest first) is **clean** and takes out
+  sections 2–6, leaving `dd1b093`'s scan corrections in place.
+- `git revert fd3b326 0db855a dd1b093` (newest first) is **clean** and takes
+  the whole release out, back to 152.
+- **Single reverts of `0db855a` and `dd1b093` conflict** — `0db855a` in
+  `sweep-scanner.tsx` and the test file, `dd1b093` in the down-sheet scan route
+  and the test file — because the later commits touched the same lines. None is
+  a code disagreement; revert from the newest down, as above.
+- Going back leaves `pace-scan-batch-undo-v1` and `pace-scan-notes-v1` on any
+  device that used them; nothing reads them and they are harmless. Ledger
+  entries a removal wrote stay, by the ledger's own design.
+- Nothing in the cloud needs undoing. A tombstone is data, not an absence:
+  the older app goes on filtering tombstoned rows out of its pulls exactly as
+  it did before.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 153 | Live | <published tip hash> | A whole scan sweep can be taken back out of the Defect Log. On Sep 6 a photo of the Vehicle Down Sheet went through SCAN SWEEP and 24 Tech Services records landed on 23 buses in one press, and importing the other device's log could not remove them because an import keeps every record only the receiver has, by design. Every record a sweep files in one press shares one creation stamp, and SCAN BATCHES, beside SCAN SWEEP, lists each press and REMOVEs one — keeping any record marked fixed, deferred, ticked or written on since — with PUT BACK as the way back, surviving a reload. The AI Operator reads "remove the most recent 24 entries from the defect log" as that batch, checks the number rather than rounding to it, explains that "undo the most recent change" is the log's own UNDO LAST, and puts a sweep back on request. A removal now reaches the other devices, because a pull reads the tombstones as well as the live rows and drops a copy older than its tombstone while keeping one edited since, and a restore reaches them because a live defect row now says deleted_at is null and returns stamped newer than the deletion. The sweep scanner asks the model what the page is before what is on it and refuses a Down Sheet outright, pointing at SCAN SHEET. Both scanners take up to 500 characters of NOTES FOR THIS SCAN — "line 23 is 17565", "the margin name is Carlos", "HAZMAT means biohazard" — read with the photo under a rule that a note can correct how a row is read but never add a bus, and remembered on the device only when asked. And a scanned FRONT TIROS reads FRONT TIRES, with handwritten margin rows named as loudly as printed lines and always arriving amber |
+```
+
+
+# Version 153 — The shop cloud starts working again
+
+**Publish this next, after Version 151.** It carries a week-long outage fix:
+every shop-cloud sweep has failed since Aug 31 (section 2), which is also why
+the cloud's Down Sheet is still Aug 30.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`015e789`** |
+| Last code-bearing commit | `015e789` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 151, published from `f5939df` |
+
+**Seven application commits.** The first was cherry-picked onto Codex's release
+commit `e493516`, not merged over it:
+
+```
+git log --oneline e493516..015e789      # docs-only commits omitted
+015e789 Run the shop cloud on every page, and merge the shop's changes as they happen
+b57dcb5 Flag a scanned row the model guessed at, not only one that missed the fleet
+413daab Catch a scan that drops a row, and give A-3, A-21 and HAZMAT somewhere to go
+393b47f Put SHOP CLOUD first in MASTER, where nobody has to look for it
+e3b33e4 Send a merged-away tombstone as an UPDATE, not inside an upsert
+9436f22 Make the DEFERRED badge count the same buses its filter lists
+a8e7e2a Make the DEFERRED badge show the buses it is counting
+
+git diff --name-only e493516 015e789 -- app tests
+app/api/down-sheet-scan/route.ts
+app/cloud-client.ts
+app/cloud-live.ts               (new)
+app/cloud-sync-control.tsx
+app/cloud-sync.ts
+app/fixed-repairs/page.tsx
+app/lists/page.tsx
+app/page.tsx
+app/shop-cloud-live.tsx         (new)
+app/defect-log/page.tsx
+app/deferred-counts.ts          (new)
+app/deferred-watch.tsx
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet.css
+app/map-settings-panel.tsx
+app/quick-filters.ts
+app/repair-catalog.ts
+app/settings/page.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, or service-worker change:
+
+```
+git diff --name-only e493516 015e789 -- supabase package.json package-lock.json .github public   # returns nothing
+```
+
+**One database change, already applied** (section 5): `buses`, `bus_defects` and
+`down_sheet_entries` were added to the `supabase_realtime` publication, without
+which the app subscribes successfully and receives nothing forever. It is
+additive and reversible, changes no data and no column, and RLS still gates it.
+**No table, column or constraint changed.** The tombstone fix in section 2
+changes how the app writes to Supabase, not what the database holds. **No new route and no service-worker
+bump,** so no shell re-download.
+
+Gate: **214 tests passing** (206 at Version 151, eight added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing is rewritten.** No storage key changes and no payload shape
+changes.
+
+**Two catalog additions, which are additions only.** `A-3` and `A-21` join the
+Inspection list and a biohazard condition joins Interior Cleaning. Adding an
+option cannot disturb a stored record — the renames that would are read-time by
+design and untouched here.
+
+## What changed
+
+### 1. The DEFERRED badge shows, and counts, the buses it is alarming about
+
+The pulsing 90-minute badge was a bare link to `/defect-log`. It renders on all
+six pages — the Defect Log included — so pressing it there pointed at the page
+already on screen and **did nothing at all**; from elsewhere it landed with no
+filter, leaving the overdue buses wherever they sat in the list.
+
+It opens the **Deferred (Held from Service)** quick filter now, which already
+listed exactly those buses, longest-held first. Two routes, because the badge
+renders on the page it points at: a query string from elsewhere, an event from
+the Defect Log itself. The drawer is scrolled to, and the query string is
+stripped once applied so closing it and reloading does not reopen it.
+
+**The number on it was also wrong, in two ways.** It counted overdue *defects*
+while the drawer lists held-back *buses* — so a bus held on two repairs counted
+as two, and a badge reading 3 could open a list of 4. It now prints the count of
+buses the filter will list, deduplicated, using the drawer's own exclusions. The
+badge still only *appears* past ninety minutes, and the overdue figure survives
+in the aria-label: *"4 buses held from service, 3 over 90 minutes"*.
+
+### 2. The shop cloud has been failing every sweep since Aug 31
+
+**This is the one to publish for.** The Phone's status has read *"62 changes
+waiting"* in red for a week.
+
+MERGE DUPES writes a tombstone for each record it folds away — the key, the
+deletion stamp and the signature, deliberately carrying **no fleet number**,
+since writing a repair's fields back while deleting it would let a stale copy
+overwrite the version that survived. Those tombstones were appended to the
+ordinary defect rows and upserted with them.
+
+Postgres will not accept that. An upsert is an INSERT that falls through to
+UPDATE only after the insert half is rejected as a duplicate, and NOT NULL is
+checked on that insert half **first**. `bus_defects` requires `fleet_number`, so
+the tombstone is refused with `null value in column "fleet_number" ... violates
+not-null constraint` before the conflict on `defect_id` is ever reached, and the
+whole 200-row chunk rolls back with it.
+
+**The damage ran past the defects.** `cloudPush` returns on the first error and
+`down_sheet_entries` is written *after* `bus_defects`, so the Down Sheet was
+never attempted at all — the cloud's copy is still **Aug 30**. Not one tombstone
+ever landed, so the 37 duplicate groups the Phone cleaned locally are still live
+in the cloud.
+
+`pushPlan` now partitions each table's rows by whether they carry a fleet
+number. Repairs are upserted as before; a tombstone goes as an **UPDATE by
+`defect_id`**, which touches no required column, is what the shop's edit policy
+allows, and against an id the server never had changes nothing — correct, since
+there is nothing to delete. The roadmap always described a delete as *"an
+ordinary update"*; this is that sentence, kept.
+
+### 3. SHOP CLOUD moves to the top of MASTER
+
+It was inside FACILITY MAP — a page's settings — while being the only control
+that decides whether the map, the Defect Log **and** the Down Sheet reach the
+other devices at all. Setting up a new iPad meant knowing to open a collapsed
+section titled "Board settings" and scrolling past bus markers and the DS badge.
+
+It is the **first group in MASTER** now, the section that opens by default,
+ahead of MASTER EXPORT, RESTORE LAST GOOD COPY and the theme picker.
+
+### 4. A photographed sheet says what it failed to read
+
+Checked the 09/5 4:24pm sheet against the export the phone produced from it.
+
+**Two buses vanished without a word.** Line 23 (18501, high oil usage) and line
+30 (20504, IDOT-ABS light, JEVELL) are on the paper and reached nothing, and
+nothing on screen said a row had been missed. A bus that is down and not on the
+sheet is a bus that goes back out broken.
+
+OCR cannot be trusted never to drop a line, but **the sheet numbers its rows
+01..55**, so a missing number can be found exactly. The review screen names them
+— *"LINES NOT READ: 23, 30"* — before anything is imported, collapsing runs to
+`37–41`. It reports rather than blocks: blank lines are ordinary, and only the
+person holding the paper can tell a blank line from a missed one. Counting stops
+at the highest line actually read.
+
+**A-3 and A-21 were not in the catalog.** The sheet has A3 and A21; with nowhere
+to put them the scan picked the nearest thing it had, so **A3 was recorded as
+A-6 and A21 as A-15** — two buses credited with a service they never had. The
+band rules already accepted any one- or two-digit code; the catalog had not
+caught up.
+
+**HAZMAT had nowhere to go and read as "Unknown diagnosis".** On this sheet it
+means a biohazard on board — blood, vomit or faeces. It is its own entry under
+Interior Cleaning now and, like Cleaning Required, **takes the bus out of
+service on its own**.
+
+**And the review flagged the wrong kind of doubt.** It flagged only rows whose
+bus number matched no bus in the fleet — but a misread digit usually lands on
+*another real bus*: 17565 came back as 17563, which exists, so the row resolved
+cleanly, showed FLEET MATCH and arrived pre-selected. Every row that scan got
+wrong was pencilled into the margin, and the model had been reporting its doubt
+all along in a `confidence` field nothing read. Below 0.75 a row now carries
+**CHECK THIS ROW** with the percentage and an amber border, and counts toward
+the flagged total. This does not make the OCR read a digit correctly; it makes
+the rows most likely to be wrong the ones that stand out.
+
+### 5. The shop cloud runs everywhere, and the shop's changes arrive live
+
+**The sync barely ran.** Every part of it — the 45-second sweep included — lived
+inside `CloudSyncControl`, which is mounted on **exactly one page**. A mechanic
+could move buses around the Facility Map for a whole shift, or log defects all
+night, and none of it left the device: the only moments anything synced were the
+moments somebody happened to have Settings open. Section 2's bug is why the
+sweeps that did run failed; this is why so few ran at all.
+
+The engine moves into `ShopCloudLive`, which renders nothing and is dropped into
+all six pages the way the DEFERRED badge already is. Settings keeps the buttons,
+the fields and the status line, and no longer keeps the sweep — two sweepers on
+one device would race whenever Settings was open.
+
+**Live sync is then one more trigger on that engine.** A Supabase realtime
+notification means *the shop has news*; the news is fetched and merged down the
+ordinary path with the same rules GET THE SHOP'S COPY uses. **Realtime is a
+doorbell, not a delivery** — no row from a notification is ever written to the
+board, because those merge rules were argued out once and do not get a second
+copy. The merge moved into `cloud-live.ts` so the button and the background
+share one implementation and cannot drift.
+
+Three things keep it safe. It **still sends before it receives**, so someone
+else's burst cannot land on top of unsent local work. It keeps
+`allowBulkDefectLoss:false`, because a merge is never a reason to accept a write
+the guard refuses and this runs with nobody watching. And a device **ignores the
+echo of its own writes**, matched on device label.
+
+**The screen keeps up without a reload.** Every page already listens for
+`storage` to pick up another tab's work — but the browser fires that only for
+OTHER tabs, so a merge performed in this tab would leave the board right on disk
+and stale in front of the user. `cloud-live` dispatches the event itself after a
+merge, and every existing handler then does the correct thing. That is why live
+sync needed **no change to any page's own code**.
+
+## Validation
+
+- 214 regression tests passing, ESLint clean, production build succeeds
+- **The shop-cloud failure was diagnosed against the live database, not
+  guessed:** the Postgres logs carry seven `null value in column "fleet_number"`
+  errors, the newest at 22:23 today, each naming the exact PostgREST upsert; the
+  live tables show `bus_defects` with **0 tombstoned rows** and **37 live
+  duplicate groups**, and `down_sheet_entries` last updated **Aug 30** while
+  buses and defects are current
+- **The DEFERRED badge driven against the PRODUCTION build, both routes:**
+  pressing it on the Defect Log opens the drawer in place with 17510 at 6h 40m,
+  17511 at 3h 20m and 17512 at 1h 35m flagged overdue and 17513 at 20m below
+  them; from the Down Sheet it lands already filtered; closing and reloading
+  leaves it closed. A fleet with one bus held on **two** deferred repairs renders
+  a badge reading 4 against a drawer of exactly four buses, that bus listed once
+- **SHOP CLOUD measured at 1024×1366 and 390×844:** the heading is on screen
+  **without scrolling** on both, MASTER is open by default so it costs no taps,
+  it is first in MASTER, and nothing named Shop Cloud is left in Board settings
+- **The scan findings come from a real sheet and its real export**, compared row
+  by row: 55 entries against two photographed pages
+- **Every fix was confirmed to fail without it:** tombstones back inside the
+  upsert, gap detection disabled, `A-3`/`A-21` removed, the badge counting
+  overdue defects again, and dropping the per-bus deduplication each fail their
+  own test
+- **Live sync's one novel mechanism measured in the PRODUCTION build:** adding a
+  bus to storage and dispatching the synthetic `storage` event took the Facility
+  Map from 8 drawn buses to 9 **with no navigation and no reload** — the event
+  was heard, and the page's existing handler did the rest
+- **All six pages load with the engine mounted and zero console errors**
+- **The publication was empty before this.** `supabase_realtime` existed and
+  carried no tables, so the subscription would have connected and received
+  nothing forever. Verified after the migration: all three tables present
+- **A harness limitation worth keeping written down:** Playwright will not click
+  the DEFERRED badge — `position:fixed` with an infinite pulse means the element
+  is never "stable", and a coordinate click misses even with `force:true`. Drive
+  it with `element.click()`
+
+## After it is live
+
+1. **Open ⚙ SETTINGS.** SHOP CLOUD is the first thing under MASTER, no scrolling.
+2. **On the device that has been showing changes waiting, press SEND MY
+   CHANGES.** The count should go to zero and the banner should stop being red.
+   This is the whole point of the release.
+3. **Then press GET THE SHOP'S COPY on the other device.** The Down Sheet should
+   finally arrive; the cloud's copy has been stuck at Aug 30.
+4. **Check the duplicates you merged are gone from the other devices too.** The
+   tombstones have never landed, so they will travel for the first time.
+5. **Leave a bus DEFERRED past ninety minutes and press the red badge** — from
+   another page and from the Defect Log itself, where it used to do nothing. The
+   number on the badge must equal the number on the drawer.
+6. **Defer two repairs on one bus.** It counts as one bus, not two.
+7. **SCAN SHEET a full paper sheet.** If any numbered line was not read, the
+   review says so before you import. Rows the model guessed at are amber and say
+   CHECK THIS ROW.
+8. **Check an A3 or A21 row** records as A-3 and A-21, not A-6 and A-15.
+9. **The real test of this release: two devices, side by side.** Move a bus on
+   one and watch the other's map follow within a few seconds, with nobody
+   pressing anything and no page reloading. Then log a defect on one and watch it
+   reach the other's Defect Log.
+10. **Leave the Facility Map open and work for a while, never opening Settings.**
+   The changes must reach the cloud on their own — before this release they never
+   did.
+11. **Log a HAZMAT bus.** Interior Cleaning → Biohazard, and it takes the bus out
+   of service on its own.
+
+## The way back
+
+Measured in a throwaway worktree from `015e789`:
+
+- `git revert 015e789 b57dcb5 413daab 393b47f e3b33e4 9436f22 a8e7e2a` (newest
+  first) takes the whole release out together.
+- **Do not revert `e3b33e4` on its own unless the intent is to stop the shop
+  cloud working.** It reverts cleanly, and that is the only reason to mention it:
+  taking it out puts every sweep back to failing.
+- `git revert 015e789` alone is **clean** and takes live sync out, putting the
+  sweep back inside the Settings page — which means back to syncing only while
+  Settings is open. The publication change can stay: with no subscriber it costs
+  nothing. To undo that too, `alter publication supabase_realtime drop table
+  public.buses, public.bus_defects, public.down_sheet_entries;`
+- `git revert b57dcb5` alone is **clean.** `git revert b57dcb5 413daab` (newest
+  first) is **clean** and takes the scan work out as a unit.
+- **Single reverts of `413daab`, `393b47f`, and the DEFERRED pair conflict** —
+  in `down-sheet-scanner.tsx` and `down-sheet.css` for the first, and in
+  `tests/rendered-html.test.mjs` for all three, because later commits appended to
+  the same files. None of these is a code disagreement; revert the stacked pair
+  above, or resolve the test file by keeping both sides.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 152 | Live | <published tip hash> | The shop cloud now runs on every page instead of only while the Settings page was open — the sweep lived inside the settings control, so a shift spent on the Facility Map or the Defect Log synced nothing at all — and the shop's changes now arrive live, a Supabase realtime notification triggering the same merge GET THE SHOP'S COPY performs, with the screen keeping up without a reload because the merge announces itself to the listeners every page already had. The shop cloud also works again — every sweep had failed since Aug 31 because a merged-away tombstone, which carries no fleet number by design, was being sent inside an upsert that checks NOT NULL before it reaches the conflict, rolling back the whole chunk and, since the Down Sheet is written after the defects, keeping the Down Sheet out of the cloud entirely; tombstones now go as an ordinary UPDATE by id. SHOP CLOUD moves to the top of MASTER, the first thing on the Settings page, since it decides whether the map, the Defect Log and the Down Sheet reach the other devices at all. A photographed down sheet now names any numbered line it failed to read before anything is imported, and flags rows the model had to guess at rather than only rows whose bus number matched no bus — a misread digit usually lands on another real bus and looked certain. A-3 and A-21 join the Inspection catalog, so a sheet reading A3 or A21 is no longer recorded as A-6 or A-15, and HAZMAT becomes a biohazard condition that takes the bus out of service instead of reading as an unknown diagnosis. The pulsing 90-minute DEFERRED badge opens the Deferred filter showing the buses it counts, longest-held first, from every page including the one it points at, and its number now matches that list where it had counted deferred repairs and shown a bus held on two of them twice |
+```
+
+
+# Version 151 — A road call is a fact about the bus, not a sentence in a description
+
+**Publish this next, after Version 150.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`f5939df`** |
+| Last code-bearing commit | `f5939df` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 150, published from `6d62787` |
+
+**Seven application commits.** The first was rebased onto Codex's release
+commit `e8f9515`, not merged over it:
+
+```
+git log --oneline e8f9515..f5939df
+f5939df Count a bus with a fault as down, even when a PM is on the same row
+51d3d54 Move Version 151 to 4bca6d7: the band rules corrected against a real sheet   <- docs only
+4bca6d7 Correct the Down Sheet band rules against a real sheet
+8736fd3 Move Version 151 to dda0661: the Down Sheet divides itself into four bands   <- docs only
+dda0661 Divide the Down Sheet into off property, scheduled, unscheduled and inspections
+c5ca8d6 Move Version 151 to 415fe96, and correct the revert advice that was wrong   <- docs only
+415fe96 Move RESTORE LAST GOOD COPY into MASTER, and fix the pointers the move broke
+eb5f9a3 Move Version 151 to 4241dd7: MASTER settings and the whole-app transfer   <- docs only
+4241dd7 Put a MASTER section at the top of Settings, with MASTER EXPORT and IMPORT
+4b154d9 Move Version 151 to ef5add7: the map's checkbox counts, and a minute to undo   <- docs only
+ef5add7 Count road calls ticked on the map, and give every tick a minute to be taken back
+a74d750 Queue Version 151 from 27891d9: road calls as dated events    <- docs only
+27891d9 Record road calls as dated events, and move PARTS ON ORDER to Fixed Repairs
+
+git diff --name-only e8f9515 ef5add7 -- app
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/fixed-repairs/page.tsx
+app/quick-filters.ts
+app/repair-catalog.ts
+app/road-calls.ts          (new)
+
+git diff --name-only 27891d9 ef5add7 -- app
+app/defect-log/defect-log-sync.ts
+app/page.tsx
+app/road-calls.ts
+
+git diff --name-only ef5add7 4241dd7 -- app
+app/fleet-backup.ts
+app/fleet-restore.ts       (new)
+app/page.tsx
+app/settings/page.tsx
+app/settings/settings.css
+
+git diff --name-only 4241dd7 415fe96 -- app
+app/defect-log/offline-backup-reminder.tsx
+app/page.tsx
+app/section-transfer.ts
+app/settings/page.tsx
+app/storage.ts
+
+git diff --name-only 415fe96 dda0661 -- app
+app/api/down-sheet-scan/route.ts
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/down-sheet-view.ts
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+
+git diff --name-only dda0661 4bca6d7 -- app
+app/api/down-sheet-scan/route.ts
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-view.ts
+
+git diff --name-only 4bca6d7 f5939df -- app
+app/down-sheet/down-sheet-view.ts
+```
+
+No dependency, database, CI, or service-worker change:
+
+```
+git diff --name-only e8f9515 f5939df -- supabase package.json package-lock.json .github public   # returns nothing
+```
+
+**No service-worker bump this time,** so no shell re-download: `/settings` was
+the last new route and it went out with 150.
+
+Gate: **206 tests passing** (201 at Version 150, five added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and no rewrite.** No storage key changes and no payload shape changes.
+Buses gain an optional `roadCalls` array; a bus without one reads exactly as it
+does today, which is what "never road-called" has always looked like.
+
+**The Down Sheet's four bands are read-time only.** Nothing is written to say
+which band an entry is in — the band is worked out on every read from the bus's
+location, the entry's section and its assigned mechanic, all of which are
+already stored. An existing sheet divides itself the first time it is opened,
+and a device rolled back reads it as the single list it was.
+
+**The one thing that would have been silent data loss, and was not.** Removing
+`parts-on-order` from the Defect Log's six boxes could not mean removing it
+from the vocabulary the read-time normalizer uses, because that normalizer
+drops any key it does not recognise — every record already ticked PARTS ON
+ORDER would have lost it on the next read. The catalog now carries two lists:
+the full vocabulary, and the six the form draws from it. A test pins that the
+stored key stays legal and still shows on the records that carry it.
+
+## What changed
+
+### 1. ROAD CALL, in the box PARTS ON ORDER used to hold
+
+Third box, top right, so the grid is still six across three columns with a full
+bottom row.
+
+Ticking it does **three things at once**, because doing one without the others
+is how the board starts disagreeing with itself:
+
+1. **A dated event is appended to the bus** — append-only, never rewritten, the
+   same shape the odometer readings and maintenance events already use. It
+   carries who ticked it and which fault it was.
+2. **The map's own ROADCALL flag goes on,** so the orange badge and the pulsing
+   dot appear where the shop already looks for them.
+3. **The bus is parked on the road,** in the first open space, because that is
+   where it is. It goes through the same helper the relocation tools use, so
+   the status follows the existing rules: a bus with a downing defect on the
+   road reads Out of Service, which is what a broken-down bus is.
+
+**A full road lot is not a failure.** The event and the flag still land and the
+bus keeps its space — losing the record of a breakdown because 75 slots were
+taken would be far worse than a bus parked in the wrong place.
+
+**Only the transition from unticked to ticked records a breakdown.** Re-saving
+a repair that road-called last week must not record a second one, or the
+counter counts how many times somebody opened the form.
+
+### 2. Seven days on the card, forever in the history
+
+The Defect Log card carries the note **under the LATEST line**, in the **DS
+badge's purple** — both answer "what else do I need to know about this bus",
+and a second colour would say they were different kinds of thing. One road call
+reads as a date; two or more lead with the count.
+
+It shows for **seven days and then falls off on its own**. Nothing is deleted
+to make that happen: the event stays on the bus permanently, because four road
+calls in six months is a pattern and only an intact history shows it. The
+counter behind it counts every road call the bus has ever had.
+
+### 3. The quick filter, which empties itself
+
+**Road Calls (Last 7 Days)**, sitting with the other "what is broken" lists
+rather than at the end with the three that are about what somebody still has to
+decide. A bus joins the moment it road-calls and leaves as that road call ages
+past seven days. No clearing, no end-of-week reset.
+
+The **bus's own history** decides the list, not its defects — a road call
+outlives the repair it was ticked on, so a defect later merged away must not
+take this week's breakdown off the board with it.
+
+### 4. PARTS ON ORDER moved to Fixed Repairs
+
+Beside the part it is about. It says what a repair is waiting on rather than
+what the shop did, which is why it never sat comfortably with the other five.
+It is stamped through the same path every work state uses, so it carries who
+ticked it and when.
+
+### 5. Unticking your only ticked box now sticks
+
+**Found by building this, and it hit all six boxes.** `setDefectWorkState`
+deletes the `workStates` key when the last tick goes, to keep stored records
+clean — so the spread that merges an edit over the stored record had nothing to
+override with, and the box came back on the next read. Unticking one of several
+always worked; unticking your last one did not.
+
+It matters most here, because ticking ROAD CALL moves a bus and writes a
+permanent record, so a mis-tick has to be reversible. The breakdown itself is
+not unwritten by unticking, because it happened — **UNDO LAST** is the way back
+from a genuine mis-tick, and it already works, because road calls live on the
+bus record it restores.
+
+### 6. The map's own ROADCALL checkbox counts too
+
+The Facility Map has had a ROADCALL checkbox on every bus for a long time. It
+said the bus was out on one right now and said nothing once it was back, and
+it knew nothing about the Defect Log's box.
+
+Ticking it now writes **the same dated event**, so a road call logged on the
+map reaches the badge on the Defect Log card, the running counter and the
+seven-day filter. The two places can no longer disagree.
+
+It parks the bus on the road **only when that same save did not set a location
+itself.** The Defect Log's box has no location field to argue with, so it
+always parks; on the map, somebody who has just chosen a space means it.
+
+### 7. Sixty seconds to take a tick back
+
+A tick is a permanent record of a breakdown. It does not come off because
+somebody changed their mind an hour later — a counter that can be tidied stops
+meaning anything. But a wrong tap is a wrong tap, and the person who made it
+knows within seconds.
+
+**Unticking within sixty seconds withdraws the whole thing:** the event, and
+the move it caused. The event carries the location the bus came from, so the
+undo puts it back. This works from either box.
+
+**Outside the window the flag still comes off** — the bus is not out on a road
+call now — **and the breakdown stays recorded,** because it happened.
+
+**An undo never fights a person.** A bus somebody has since moved themselves
+stays where they put it, and a space another bus has taken is not reclaimed.
+The event is still withdrawn either way.
+
+### 8. Settings opens on MASTER, with the whole-app transfer in it
+
+The Settings page opened on FACILITY MAP, which is a page's settings rather
+than the app's. **MASTER is the first section now, and the one that starts
+open**; the four page sections stay closed.
+
+**MASTER EXPORT and MASTER IMPORT** move the whole app in one file — the
+board, the Defect Log, the Down Sheet, Fleet Campaigns, the remembered parts
+and findings, and every page's settings. They were EXPORT ALL DATA and IMPORT
+ALL DATA behind ACTIONS on the Facility Map, reachable from that one page;
+Settings is in the nav on all six. The map keeps its Fleet Map transfer and
+points at where they went.
+
+The reading and writing **moved into `fleet-restore.ts` rather than being
+copied**, so there is one answer to what a valid backup is. It keeps all four
+of the map's refusals — not a backup, no buses, something that is not a bus,
+and two buses under one id, which would silently merge two real buses — and
+keeps the rule that made them safe: **a key the file does not carry is left
+alone, not cleared.** Campaigns were missing from the backup until version 4,
+so restoring an older file must not wipe the campaigns this device holds. The
+board is written first and its result decides everything, so a refused write
+leaves nothing half-restored.
+
+**RESTORE LAST GOOD COPY moved into MASTER too**, beside MASTER IMPORT. Both
+answer "this device is wrong, put it right", and leaving one on the map split
+one job across two pages. It is described as the smaller step: it restores the
+buses and their repairs, while the Down Sheet, campaigns and settings stay as
+they are, where MASTER IMPORT replaces everything.
+
+**The app was already promising this.** The save-failure notice has said
+*"restore the last-known-good copy from Settings"* for as long as it has
+existed, and the safety-stop alert sent people to *"Fleet Tracker Settings"*.
+Neither was true until now.
+
+**Three more pointers the move had broken, found by auditing what travels with
+a whole-app transfer rather than by waiting for somebody to hit them:**
+
+- the wrong-file message on every section transfer told people to *"Use IMPORT
+  ALL DATA in Facility Map settings"* — a button that no longer exists, on a
+  page that no longer has it. It names MASTER IMPORT in Settings now.
+- the offline backup reminder's button said EXPORT FULL BACKUP while the
+  Settings button said MASTER EXPORT. One file, one function, two names, which
+  is how somebody ends up with two backups and no idea which one restores.
+- the map's section was still titled BOARD BACKUP & TRANSFER while holding only
+  the Fleet Map transfer. It is FLEET MAP TRANSFER, and its note names all
+  three whole-device controls and where they live.
+
+**ONE LOOK FOR EVERY PAGE** sets the map and the Defect Log / Fixed Repairs
+pair together. It is a **writer, not a layer**: one press writes into each
+page's own settings, so the sections below show what happened and can still be
+tuned one at a time, and there is never a second value to decide between. It
+reads back as active only when every page actually agrees.
+
+### 9. The Down Sheet divides itself into four bands
+
+The sheet gave one long ranked list. The two questions it is actually read for
+— **how many buses are down, and how many of those are not even on the
+property** — could only be answered by scrolling and counting, and inspections,
+spark plugs and valve adjustments counted as breakdowns, which is what made the
+down count read high.
+
+It now divides itself **by default**, not only when an ordering is picked:
+
+| Band | What is in it |
+| --- | --- |
+| **OFF PROPERTY** | Away at a vendor or otherwise not in the yard |
+| **SCHEDULED** | Down in the yard with a mechanic or vendor named |
+| **UNSCHEDULED** | Down in the yard with nobody assigned yet |
+| **INSPECTIONS & SCHEDULED MAINTENANCE** | Inspections, spark plugs and valve adjustments |
+
+Every divider carries **its own count**, and the four counts sit **above the
+sheet beside the total**, so no number has to be arrived at by scrolling.
+
+**The precedence is deliberately not the reading order.** Where the bus
+physically is beats everything, so a bus at Bus & Truck is off property whether
+it went there for an inspection or a transmission. The page reads that from
+**the map's own location, looked up by bus id** — not from anything copied onto
+the entry, which would go stale the moment somebody moved the bus on the map.
+What the work *is* comes next, so an inspection is an inspection with or
+without a name beside it. **Only then does it come down to who has it,** which
+is what puts the pencilled-in overflow rows at the bottom of a paper sheet into
+UNSCHEDULED instead of leaving them indistinguishable from assigned work — the
+floor's own definition of unscheduled is a row with no name attached.
+
+**ORDER sorts inside a band now** rather than dissolving the bands, so the
+counts on the dividers never change with the sort. WORK CATEGORIES still
+sub-groups within each band, exactly as it did across the whole sheet before.
+
+**The photo import is taught the same structure,** because a sheet organized
+this way is the sheet that gets photographed. The scan prompt names the four
+headings, says a heading is **never a bus row** and applies to every row
+beneath it until the next one, and says a row's own wording still wins over the
+band it sits in — a collision is an Accident and an R/C is a Roadcall wherever
+it is written. Pencilled-in rows are called out as real rows to read, with the
+mechanic left empty when no name is written beside them. The section normalizer
+learns the heading words, with **inspection decided before scheduled** because
+INSPECTIONS & SCHEDULED MAINTENANCE contains the word "scheduled".
+
+**Each scan-review row now says which band it will land in before the import**,
+read from the same two functions the sheet itself uses so the two cannot drift,
+and it follows the MECHANIC / VENDOR field live as that field is typed — which
+is the field that decides scheduled from unscheduled.
+
+**The rules were then corrected against a real sheet** — the Vehicle Down Sheet
+of 09/5/2026, 55 rows over two pages — and three of them were wrong on it:
+
+- **The service codes are whatever the interval is.** That morning's sheet
+  carries A3, A15, A21, B12, B18 and C24. The rule listed the intervals it had
+  been shown — 6, 12, 15, 18, 24 — so **A21 and A3 were counted as buses that
+  broke.** It now takes any one- or two-digit code.
+- **The letter and the number are written together or hyphenated, never spaced.**
+  Tightening that was the price of widening the number: under the old loose
+  spacing, "needs a 12 volt battery" would have become an inspection.
+- **PM'S heads a row carrying six buses at once** and was counted as six
+  breakdowns. It is scheduled maintenance. **PM DEFECTS is the opposite** — the
+  faults found while doing a PM, on a bus that is genuinely down — and the sheet
+  carries two of those, so the rule has to tell them apart. It does.
+- **TRANS HUB DIFF** is a fluid service written as three assemblies with no
+  symptom. All three words are required, so a roaring differential stays a
+  repair.
+- **A vendor in the MECHANIC/LOCATION column means the bus is there.** Two rows
+  carry "Bus & Truck" in that column, and one writes "Off Property" into the
+  reason as well. **Only that column counts:** a note saying "waiting on a call
+  back from Cummins" is a bus sitting in the yard, and reading vendor names out
+  of the whole row would have sent it off property.
+
+**A bus can be on the sheet twice, and the fold must not lose the fault.**
+Bus 17514 appears once for MISFIRES with JEVELL on it and again on the PM'S
+line. A bus gets one row, so those merge — and asking only whether the row
+mentioned a PM sent the merged row to INSPECTIONS, dropping a live misfire out
+of the down count. **A row is scheduled maintenance only when that is ALL it
+carries now:** the maintenance wording is struck out and whatever is left is
+examined, and if anything with words in it survives, somebody wrote a complaint
+and the bus is down. Leftover punctuation and the bus numbers on a PM line are
+not a complaint. Both facts still show on the row — the reason still reads
+MISFIRES / PM'S — it is only the counting that has to pick one, and it picks the
+fault. Which row was photographed first does not decide it. This also moves
+17550, written as "B12 / STEERING SHAKES AT 35 MPH": the B12 does not stop the
+shake from being a fault.
+
+The scan prompt learned the same sheet: a **struck-through bus number** has come
+off the sheet and is skipped, a **row carrying several bus numbers becomes one
+row per bus** sharing the reason, and the **MECHANIC/LOCATION column** is
+described for what it is. The scan's own idea of an inspection was replaced by
+the sheet's, because two copies had already drifted — the scanner took any
+number after the letter while the page took a list of five, so A21 was an
+inspection to one and a breakdown to the other.
+
+## Validation
+
+- 206 regression tests passing, ESLint clean, production build succeeds
+- **The Down Sheet bands driven against the PRODUCTION build at 1440 and 390,
+  zero console errors:** the four counts read 1 / 1 / 2 / 2 against a total of
+  6 and summed to it; the four dividers rendered in order carrying those same
+  counts; line numbers ran 01–06 continuously across the bands; and **a bus
+  parked at `offsite-0` with a mechanic named and section Pending still landed
+  in OFF PROPERTY**, which only the location rule can do — that case is in the
+  seed precisely because nothing else in the row would put it there. On a
+  390px phone the total spans the row above a 2×2 of bands and the page does
+  not scroll sideways (`scrollWidth` 390 = `clientWidth` 390)
+- **The scan review driven against the PRODUCTION build** with the four
+  headings stubbed in place of the model: each row showed GOES TO with its own
+  band and colour, full width across the row's grid, and typing a mechanic into
+  the third row moved it live from UNSCHEDULED to SCHEDULED
+- **Each band divider resolves its own colour at the top level,** asserted by
+  stripping every media block out of the stylesheet and re-matching — the same
+  trap that put the road-call card note inside the phone breakpoint earlier in
+  this release
+- **The whole 09/5/2026 sheet is a test fixture**, transcribed row by row with
+  the band each row belongs in, including the two PM DEFECTS rows, the six-bus
+  PM'S row, both vendor rows, the double-listed 17514 and the three handwritten
+  margin entries. Driven against the PRODUCTION build it renders **54 rows as 2
+  off property, 9 scheduled, 28 unscheduled and 15 inspections** — so the sheet
+  that reads as 54 buses down is **39 buses actually down, two of them not on
+  the property.** That is the count the sheet could not give before
+- **A production bug the unit tests could not have found.** `normalizeEntry`
+  stamps `Repair required` into the repair field and into every repair item of
+  an entry that arrives without one, so a row whose whole reason is `A15` comes
+  back off storage carrying that phrase. Read as a written complaint it put
+  every inspection back in the down count — **the built app showed INSPECTIONS 0
+  against data that scored 16 in isolation.** The app's own stand-ins are now
+  excluded the way the catalog category already was, and the exact
+  post-storage shape of an inspection row is pinned by a test that was confirmed
+  to fail without the fix
+- **Every rule the real sheet corrected was confirmed to fail without it:**
+  restoring the old interval list, dropping PM, dropping the PM DEFECTS guard,
+  and loosening the code spacing each fail the fixture on their own
+- **Both new Down Sheet tests were confirmed to fail with the rules they cover
+  removed:** deleting the location rule from `downSheetGroup` fails the band
+  test, and moving inspection below scheduled in the scan normalizer fails the
+  photo-import test
+- **Sharing one definition of an inspection immediately caught its own
+  regression:** the shared pattern required the singular, so the scan stopped
+  recognising its own INSPECTIONS heading. The photo-import test failed on it
+  before it could ship
+- **RESTORE LAST GOOD COPY driven against the PRODUCTION build, 13 checks,
+  zero console errors:** it renders inside MASTER reading "1 DEFECTS" off the
+  stored snapshot; the map's ACTIONS no longer carries it, is titled FLEET MAP
+  TRANSFER, names all three controls and where they went, and has no dead
+  button names left; pressing it put both buses and the saved defect back
+- **The MASTER section driven against the PRODUCTION build, 23 checks, zero
+  console errors:** MASTER first and open with the other four closed; Midnight
+  set the map's key and the log's key in one press; MASTER EXPORT wrote a
+  backup carrying the board and all seven side keys; emptying the board and
+  importing that file back restored two buses, the log's theme and the
+  campaigns, and the open page refreshed without a reload; a file that is not
+  a backup changed nothing and never even asked
+- **Driven against the PRODUCTION build, 19 checks, zero console errors:**
+  - tick then untick at 30 seconds put bus 17505 back in `garage-4` with no
+    event and no card note
+  - the same untick against a three-hour-old road call left the event, the road
+    slot and the card note alone, and only cleared the flag
+  - ticking ROADCALL on the Facility Map recorded an event that showed up in
+    the Defect Log's filter, and unticking it there put the bus back in
+    `garage-5`
+  - the exact edge is pinned by unit tests: 59 seconds is inside the window, 60
+    exactly is outside
+- **Driven in Chromium at 390 and 1180, 21 checks, zero console errors:**
+  - ticking ROAD CALL on bus 17505 moved it to `road-0`, set the map flag, and
+    stamped one event with `by:"CJ"` and `defectId:"d1"`
+  - saving that repair again left the count at one
+  - a road call two days old showed `ROAD CALL Sep 4, 12:36 AM` under the
+    LATEST line; a nine-day-old one showed nothing; a bus that never
+    road-called showed nothing
+  - the note measured `rgb(124, 58, 237)` from `--downsheet-badge`, the DS
+    badge's own purple, at both widths, and sat under and left-aligned with the
+    time on a phone
+  - the quick filter counted exactly 2 and listed 17505 and 17506, not the
+    nine-day-old 17507
+  - the map drew the bus on the road
+- The unticking fix and the seven-day edge are pinned by unit tests: exactly
+  seven days still shows, a second past it does not, and the window plus the
+  backlog always equals the whole history
+- **The card styling was caught by measuring, not reading.** It first landed
+  inside the phone breakpoint, so on a desktop the note drew as bare text with
+  no background at all; the browser reported no matching CSS rule, which is how
+  it was found. The visual rule is top level now, and the grid row stays in the
+  breakpoint that owns the grid.
+
+## After it is live
+
+1. **Open ⚙ SETTINGS.** It opens on **MASTER**, with MASTER EXPORT and MASTER
+   IMPORT and a theme picker that sets every page at once. The four page
+   sections are closed below it.
+2. **Press MASTER EXPORT, then MASTER IMPORT with the file it just wrote.** It
+   asks first, then reports what it restored. Do this on a phone too — it is
+   the phone move-to-a-new-device path, and it is no longer on the map.
+3. **Look just below it for RESTORE LAST GOOD COPY**, with a date and a defect
+   count on it. It used to be on the map. Do not press it unless the board is
+   actually wrong — it steps the buses back to before the last save.
+4. **Open LOG DEFECT on any bus.** WORK DONE SO FAR still has six boxes, with
+   **ROAD CALL** third, where PARTS ON ORDER used to be.
+5. **Tick ROAD CALL and save.** The bus should move to the road on the Facility
+   Map, wear its orange ROADCALL badge, and the Defect Log card should show a
+   purple **ROAD CALL** note with the date and time under the LATEST line.
+6. **Open that repair and save it again.** The note must still say one road
+   call, not two.
+7. **Untick ROAD CALL and save straight away.** Within a minute of ticking it,
+   the whole thing comes back out: no note, no count, and the bus returns to
+   the space it came from.
+8. **Do it again on a road call from yesterday.** The box unticks and the flag
+   clears, but the note and the count stay, because that breakdown happened.
+9. **Tick ROADCALL on the Facility Map** in the bus editor. It should count
+   toward the same note, counter and filter as one ticked on the Defect Log.
+10. **QUICK FILTERS → Road Calls (Last 7 Days).** Every bus that road-called this
+   week, and nothing older.
+11. **Open a bus you had already ticked PARTS ON ORDER on** before this release.
+   The tick is still there, now shown on **Fixed Repairs** rather than the
+   Defect Log.
+12. **A bus that road-called eight days ago** should have no note and should not
+   be in the filter.
+13. **Open DOWN SHEET.** Above the sheet there is now a row of counts — TOTAL ON
+   SHEET, then OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS &
+   SCHEDULED MAINTENANCE. The four should add up to the total.
+14. **Look down the sheet.** It is divided by four coloured dividers in that
+   same order, each carrying its own count. The line numbers keep running
+   across them.
+15. **Find a bus parked in OFF PROPERTY on the Facility Map** and check it sits
+   in the OFF PROPERTY band even though the sheet says a mechanic has it —
+   where the bus is beats what the sheet says.
+16. **Take the mechanic's name off a row** and save. It should move from
+   SCHEDULED to UNSCHEDULED. Put the name back and it returns.
+17. **Check a spark plug or valve adjustment row** sits with the inspections
+   rather than counting as a bus that broke.
+18. **Change ORDER to WORK CATEGORIES.** The four bands and their counts must
+   stay exactly as they were; only the order of rows inside each band changes.
+19. **SCAN SHEET a photographed down sheet.** Each review row now says GOES TO
+   with the band it will land in. Type a mechanic into a row and watch it move
+   from UNSCHEDULED to SCHEDULED before you import.
+20. **Check the inspection block at the bottom of a real sheet.** Every service
+   code should be in INSPECTIONS — A3 and A21 included, not just the common
+   intervals — along with TRANS HUB DIFF and every bus on the PM'S line.
+21. **Check the two PM DEFECTS rows are NOT in inspections.** Those are faults
+   found while doing a PM, so those buses are down.
+22. **Check a bus with a vendor in the MECHANIC/LOCATION column** sits in OFF
+   PROPERTY even though it is parked in the yard on the map.
+23. **Find a bus written on the sheet twice** — once for a fault and once on the
+   PM'S line — and check it counts as a bus that is DOWN, not as an inspection.
+   The row should still say both, something like MISFIRES / PM'S.
+
+## The way back
+
+Measured in a throwaway worktree from `f5939df`:
+
+- **Do not revert `f5939df` on its own.** It is the rule that keeps a bus with a
+  live fault in the down count when a PM is written on the same row; without it
+  a folded row goes to INSPECTIONS and a real breakdown leaves the count. It
+  does revert cleanly, which is the only reason to say so.
+- `git revert f5939df 4bca6d7 dda0661` (newest first) is **clean** and takes the
+  Down Sheet bands out as a unit, which is the right set if they have to go.
+- `git revert 4bca6d7` alone is **clean**, and leaves the four bands in place
+  with the rules as they were before the real sheet corrected them — which
+  means A21, A3, TRANS HUB DIFF and every bus on a PM'S line go back to being
+  counted as breakdowns. There is no reason to revert this one on its own.
+- `git revert dda0661` alone is **clean.** The Down Sheet goes back to one
+  ranked list and the scan prompt forgets the four headings. Nothing else in
+  the release depends on it — it shares **no application file** with the other
+  four commits, only the test file and this one, and both reverted cleanly when
+  measured.
+- `git revert f5939df 4bca6d7 dda0661 415fe96 4241dd7 ef5add7 27891d9` (newest
+  first) is **clean** and takes the whole release out together.
+- `git revert 415fe96` alone is **clean.** RESTORE LAST GOOD COPY goes back to
+  the map and the three corrected pointers revert with it — including the
+  wrong-file message, which would again name a button that does not exist.
+  Prefer reverting the pair below over this one alone.
+- `git revert 415fe96 4241dd7` (newest first) is **clean** and is the right
+  pair if the MASTER section has to go: it puts the whole-app transfer and the
+  recovery control back on the map together, which is where they both were.
+  **Reverting `4241dd7` alone would leave the app with no way to move
+  everything to another device**, since MASTER IMPORT is the only one now.
+- `git revert ef5add7` alone is **clean.** The map's checkbox stops recording
+  events and the sixty-second window goes, leaving the Defect Log's box working
+  as it did in the first commit.
+- `git revert ef5add7 27891d9` (newest first) is **clean.** ROAD CALL leaves
+  the boxes, PARTS ON ORDER returns to them, and the card note and the filter
+  go with it.
+- **Road-call events already written stay on their buses,** harmlessly ignored,
+  and reappear if the feature comes back. Nothing is destroyed by going
+  backwards. The same is true of the flags and the moves: a bus parked on the
+  road stays there, which is where it was put.
+- Reverting also takes the unticking fix with it. That fix is independent and
+  worth keeping — if the road-call work has to go but the fix should stay,
+  revert this commit and re-apply the one-line `workStates:incoming.workStates`
+  in `saveDefectLogRecord`.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 151 | Live | <published tip hash> | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default rather than giving one long ranked list, with the band rules checked row by row against a real 55-row sheet so that every service code counts as scheduled maintenance rather than only the common intervals, a PM'S line carrying several buses counts as the service it is while PM DEFECTS stays a bus that is down, and a bus written on the sheet twice — once for a fault and once for a PM — folds into the one row a bus gets and is counted as down rather than as maintenance, so a real breakdown cannot drop out of the count, and a vendor written in the MECHANIC/LOCATION column puts the bus off property while the same name in a note does not, each divider carrying its own count with the four counts and the total sitting above the sheet, so how many buses are down and how many are not even on the property can both be read at a glance and inspections, spark plugs and valve adjustments stop counting as breakdowns; where the bus physically is decides the band ahead of anything the sheet says, read from the Facility Map's own location by bus id, then what the work is, then who has it, which puts the pencilled-in overflow rows with no name attached into UNSCHEDULED; ORDER now sorts inside a band instead of dissolving the bands, so the counts never change with the sort; and the photo import reads the same four headings, treating a heading as a heading rather than a bus row and applying it to every row beneath it while a row's own wording still wins, with each scan-review row saying which band it will land in before the import; Settings opens on a MASTER section carrying every whole-device control together — MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY, which the save-failure and safety-stop notices had already been pointing at Settings for — and the wrong-file message, the backup reminder's button name and the map's section title were corrected to match; MASTER EXPORT and MASTER IMPORT which move the whole app between devices in one file and replace EXPORT ALL DATA and IMPORT ALL DATA on the Facility Map, with the reading and writing shared in one module that keeps every refusal and leaves any key the file does not carry alone, plus one theme that sets every page at once by writing into each page's own settings; ROAD CALL replaces PARTS ON ORDER as the third work box on the Defect Log, and the Facility Map's own ROADCALL checkbox records the same event so the two can no longer disagree; either tick can be taken back whole within sixty seconds, event and bus move together, while an older one leaves the breakdown recorded and only clears the flag: ticking it appends a dated, append-only event to the bus, turns on the Facility Map's own ROADCALL flag, and parks the bus in the first open space on the road, with only the unticked-to-ticked transition counting so re-saving a repair cannot record a second breakdown; the Defect Log card shows the road call under its LATEST line in the DS badge's purple for seven days, leading with a count when there is more than one, while the event itself stays on the bus permanently so a pattern of breakdowns remains visible; a Road Calls (Last 7 Days) quick filter lists this week's and empties itself as they age out, driven by the bus's own history rather than its defects; PARTS ON ORDER moves to Fixed Repairs beside the part it is about, keeping its stored key readable on every record that already carries it; and unticking the only ticked work-state box now sticks, which had silently failed for all six |
+```
+
+---
+
+# Version 150 — One Settings page for everything, and IMPORT ALL DATA works again
+
+**Publish this next, after Version 149.** It carries a data-safety fix: the
+map's IMPORT ALL DATA button has thrown on every press since Aug 31 (section 6).
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`6d62787`** |
+| Last code-bearing commit | `6d62787` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 149, published from `011bb09` |
+
+**Six application commits.** Three were written before Codex published 149
+and have been **rebased onto the release commit `b7da27a`**, not merged over
+it; the last three came after it:
+
+```
+git log --oneline 011bb09..6d62787
+6d62787 Import the writer IMPORT ALL DATA calls, so restoring a backup works again   <- app code
+484b525 Move Version 150 to ca5cec0: the Settings sections collapse                  <- docs only
+ca5cec0 Collapse the Settings sections, and make the title row the thing you press   <- app code
+6acf869 Queue Version 150 from e89d17b                                                <- docs only
+e89d17b Put every setting in the app on one page, behind the gear in the nav   <- app code
+e9bfc30 Draw the page nav from one list instead of five copies                 <- app code
+38e3365 Make ALL mean everything, search box included                          <- app code
+35f9006 Give a repair a service bulletin, and name the sensor that shuts buses down   <- app code
+b7da27a Record Sites Version 149 release                                       <- Codex, docs only
+074ad4d Fold the sixth work state into the Version 149 handoff                 <- docs only
+```
+
+Application files touched, in full — a **new route, `app/settings/`**, and the
+service worker:
+
+```
+git diff --name-only 011bb09 6d62787 -- app public
+app/defect-log/defect-log-settings-modal.tsx   (new)
+app/defect-log/defect-log-settings.ts          (new)
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet-settings-store.ts    (new)
+app/down-sheet/down-sheet-settings.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/fixed-repairs/fixed-repairs-settings.tsx
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
+app/fleet-backup.ts
+app/globals.css
+app/lists/page.tsx
+app/map-settings-panel.tsx                     (new)
+app/map-settings.ts                            (new)
+app/page.tsx
+app/repair-catalog.ts
+app/settings/page.tsx                          (new)
+app/settings/settings.css                      (new)
+app/status-icon.tsx                            (new)
+app/tracker-nav.tsx                            (new)
+app/tracker-pages.ts                           (new)
+public/sw.js
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 011bb09 6d62787 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: **201 tests passing** (196 at Version 149, five added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and no rewrite.** No storage key is renamed and no payload shape
+changes. `app/storage.ts` is untouched. The seven keys read exactly as they
+did; the Settings page writes each one by **merging over what it already
+holds**, so the Down Sheet's quick note and sort order, the DS badge view the
+map's menu sets, and any field a later release adds all survive a change made
+there.
+
+**One thing phones will notice once:** `public/sw.js` gains `/settings` in
+`CORE_PAGES`, which bumps the shell cache name from `pace-bus-tracker-shell-v4`
+to **`v5`**. The first online launch after the update re-downloads the shell,
+once; after that `/settings` works offline like every other page. This is the
+same bump Fleet Campaigns needed in Version 137.
+
+MERGE DUPES still runs only when a person presses it and confirms.
+
+## What changed
+
+### 1. The gear is a page
+
+Every page kept its own settings behind its own gear — the Facility Map's
+modal held fifteen sections, the Down Sheet's five, the Defect Log's eight, and
+Fixed Repairs re-read the Defect Log's key to show three of those again.
+
+**⚙ SETTINGS is now the sixth link in the nav on every page**, and `/settings`
+holds one large section per page: FACILITY MAP, DOWN SHEET, DEFECT LOG, FIXED
+REPAIRS, with a jump row at the top. Each section renders that page's **own
+panel inline** — the same component the gear used to open, with the shade and
+the close button switched off — so nothing was copied and nothing can drift.
+The Defect Log and Fixed Repairs sections are drawn in the theme you pick, so
+what you see there is what the page will look like.
+
+**The sections collapse.** Open, all four ran to fourteen phone screens.
+FACILITY MAP starts open; DOWN SHEET, DEFECT LOG and FIXED REPAIRS start
+closed, each a single bold title row until it is pressed. The whole row is
+the button, not a chevron to aim for. The jump links at the top open what
+they jump to. A closed section is hidden rather than unmounted, so its state
+is where you left it when it opens again.
+
+**The per-page gears are gone** from the Down Sheet, the Defect Log and Fixed
+Repairs. The Facility Map's button is **ACTIONS** (☰ on a phone, under MORE)
+and opens only what acts on the board rather than describes it: backup and
+transfer, repair cleanup, creating a bus, renumbering one. Two map hints that
+said *"in Settings"* now say *"under ACTIONS"*, and the report tooltip points
+at *EXPORT ALL DATA under ACTIONS on the Facility Map*.
+
+**Fixed Repairs has no settings of its own** — it reads the Defect Log's
+theme, font and colours off the same key — so its section is driven from the
+same state as the Defect Log's and either one changes both. The section says so.
+
+### 2. MERGE DUPES lives on the Settings page
+
+Under DEFECT LOG, with **the live count on the button** — from the same
+function that does the merging, so the number is by construction the number
+the button will act on. The bulk-loss guard is lifted there and only there, as
+it was on the Defect Log since 135. **UNDO MERGE** appears after a merge and
+puts every record back, cloud tombstones included, until you leave the page.
+The Defect Log's feed row is now CLEAN UP · SCAN SWEEP · AI OPERATOR.
+
+The Defect Log's report button and both section transfers (Down Sheet, Defect
+Log) came with their panels. An imported Down Sheet marks its buses down on
+the map at once rather than waiting for the sheet to be opened.
+
+### 3. A repair can carry a Technical Service Bulletin
+
+**LOW OIL** and **COOLANT LEVEL SENSOR** join Misfire and Loss of power as
+check-engine symptoms — four boxes in two columns, bottom row full. The sensor
+is named in full because it is not the coolant temp sensor.
+
+**TSB — TECHNICAL SERVICE BULLETIN** is a second, permanent note under the
+existing amber one, in warm tan: what this fleet has learned about a repair,
+keyed on category and issue and read through the same migration as notes. The
+first bulletin is the coolant level sensor, written down from Curtis — which
+sensor it is, that it shuts the bus down below a tight glycol threshold, that
+a bus which shut down and restarts fine is usually this, that high engine
+temperature is a severe leak and not this, and that a bus running with it
+unplugged has its low-glycol shutdown bypassed.
+
+### 4. ALL means everything, search box included
+
+Pressing ALL on the Defect Log clears the search box too. Only ALL does; IN
+PROGRESS and FIXED TODAY keep the search, because narrowing a search by state
+is their whole point.
+
+### 5. One nav list
+
+The page nav is drawn from one list in `tracker-pages.ts`; five hand-written
+copies had drifted (the map called itself FLEET TRACKER). Adding the sixth
+page was one line because of this.
+
+### 6. IMPORT ALL DATA restores a backup again
+
+**Found by the type checker while checking this release, and confirmed in the
+source and in a browser.** The commit of Aug 31 that added the save-failure
+banner swapped the map's storage import to `writeFleetStorageResult` and left
+three bare `writeFleetStorage(...)` calls behind: **IMPORT ALL DATA**, and the
+AI operator's clear-down-sheet plan and its undo. A bundler does not check
+free identifiers, so every build since has passed, and every press of IMPORT
+ALL DATA has thrown `ReferenceError: writeFleetStorage is not defined` — caught
+into *"This file is not a valid fleet board backup. No changes were made."*
+The one button that restores a phone from a backup restored nothing, and said
+the file was at fault.
+
+**The fix is the missing name in the import.** Nothing else changes: the same
+guarded writer, the same confirm, the same `allowBulkDefectLoss:true` a
+deliberate restore has always carried.
+
+**The test is the rule it broke,** not the one line: every file under `app/`
+that calls a storage function must import it, checked against the storage
+module's own export list rather than a copy. It was **confirmed to fail** with
+the import line stashed and to pass with it restored, so the next missing
+import fails the suite instead of the first person to press the button.
+
+## Validation
+
+- 201 regression tests passing, ESLint clean, production build succeeds
+- **IMPORT ALL DATA round-tripped in Chromium against the dev server:**
+  EXPORT ALL DATA wrote a 62-bus backup; two buses were removed from storage
+  and the reload drew 60; IMPORT ALL DATA from that file asked first, then
+  reported *"Board backup imported successfully. All 62 buses are now
+  available on this device."*, storage held 62 and the map drew 62, with no
+  page error. **The same run against the pre-fix code produced the "not a
+  valid fleet board backup" alert and left the board at 60** — the failure the
+  live site has been giving
+- **Driven in a 390px, 800px and 1180px Chromium, 56 checks, zero console
+  errors** — a script, not a test suite, so the tests carry the guarantees:
+  - six links in one row at 1180 and **two full rows of three at 390**; no
+    horizontal overflow at either width, collapsed or with everything open;
+    the four panels inline with no shade
+  - **collapsed by default the way the page ships:** FACILITY MAP open, the
+    other three closed; **4,647px tall at 390 against 11,879px with everything
+    open**; every title row at least 58px tall; pressing a title opens it and
+    pressing it again closes it; the DEFECT LOG jump link opens its section
+    and lands it under the sticky jump row
+  - changing DEFAULT SHIFT on the Settings page left the Down Sheet's
+    `quickNotes` and `order` in the key untouched
+  - picking the Midnight theme for the map kept `downSheetBadgeView` and an
+    unknown future field in the key, and stamped `statusVersion:3`
+  - a manual map colour set the theme to custom **and** the colour — two
+    updates in one tick, which is the case a state-only implementation lost
+  - picking Dark under DEFECT LOG turned both that section and FIXED REPAIRS
+    dark, **reached an open Defect Log tab**, and that tab did not write its
+    old theme back; picking Tactical under FIXED REPAIRS drove the log panel
+  - MERGE DUPES on a seeded exact repeat: count `(1)`, confirm, 3 records → 2
+    with the earliest date kept, tombstone written; UNDO MERGE: 3 records,
+    count back, tombstone withdrawn
+  - every other page at 390: no gear button, SETTINGS in the nav, ACTIONS on
+    the map (under MORE on a phone) opens backup/cleanup/create/renumber only
+- Two things were caught by measuring rather than reading: the map's
+  relabelled button had no glyph and the phone command bar hides button text,
+  so it was invisible on phones until the glyph went back; and the map page had
+  lost a line in the extraction (`applyTheme`) that the type checker found
+  before the build did
+- A test asserts `sw.js` pre-caches every real route under `app/`, so a page
+  added without the service worker fails the suite — that is what forced the
+  cache bump
+
+## After it is live
+
+1. **Open any page.** Six links in the nav, ⚙ SETTINGS last; on a phone, two
+   rows of three.
+2. **Open ⚙ SETTINGS.** FACILITY MAP is open; DOWN SHEET, DEFECT LOG and
+   FIXED REPAIRS are single bold title rows. Press a title and it opens in
+   place — nothing pops up, nothing to close. The jump links at the top open a
+   section too.
+3. **Under DEFECT LOG pick Dark.** That section and FIXED REPAIRS turn dark
+   together. Open the Defect Log: dark. Open Fixed Repairs: dark.
+4. **Under DOWN SHEET change DEFAULT SHIFT**, then open the Down Sheet. The
+   quick note is still there and + ADD DOWN BUS defaults to the new shift.
+5. **Look at MERGE DUPES.** The live board was cleaned up in 135, so expect it
+   disabled with the hover text *Every open repair on this board is recorded
+   once* — or a count, if repeats have crept back. Pressing it still asks first.
+6. **On the Facility Map** the gear is gone; ACTIONS (☰ under MORE on a phone)
+   opens backup and transfer, repair cleanup, create and renumber — and nothing
+   else.
+7. **On the Down Sheet, the Defect Log and Fixed Repairs** there is no gear
+   button anywhere.
+8. **On a phone**, the first launch online after the update re-downloads the
+   shell once. Then put it in airplane mode and open ⚙ SETTINGS: it loads.
+9. **Open LOG DEFECT, choose Engine → Check engine light.** Four symptom
+   boxes; tick COOLANT LEVEL SENSOR and the tan TSB appears under the note.
+10. **On the Facility Map, ACTIONS → EXPORT ALL DATA, then IMPORT ALL DATA
+    with the file it just wrote.** It asks first, then says *Board backup
+    imported successfully* with the bus count. Before this release the same
+    press said the file was not a valid backup. Do this on a phone too — it
+    is the phone restore path.
+
+## The way back
+
+Measured in a throwaway worktree from `6d62787`, not assumed:
+
+- **Do not revert `6d62787`.** It is the import fix; taking it out puts IMPORT
+  ALL DATA back to throwing. It does revert cleanly on its own, which is the
+  only reason to say so.
+- `git revert ca5cec0` alone is **clean** — the sections stop collapsing and
+  everything else stays.
+- `git revert 6d62787 ca5cec0 e89d17b` (newest first) is **clean** — it removes
+  the Settings page, puts every gear and MERGE DUPES back where they were, and
+  drops the cache name to `v4`. Phones re-download the shell once more.
+  `e89d17b` alone conflicts, because `ca5cec0` edited the same files; if the
+  Settings page has to go, keep the fix by reverting the pair and then
+  re-applying `6d62787` — it is one word in one import line.
+- `git revert 6d62787 ca5cec0 e89d17b e9bfc30` is clean.
+- **`38e3365` or `35f9006` alone conflict** in `tests/rendered-html.test.mjs`
+  (and `35f9006` in `app/defect-log/page.tsx`) because later commits edited the
+  same lines — measured from `e89d17b`; no later commit touches those files. To
+  take those out, revert **all six, newest first**:
+  `git revert 6d62787 ca5cec0 e89d17b e9bfc30 38e3365 35f9006` — clean.
+
+No migration to undo in any case. A record that already carries a symptom
+added in `35f9006` keeps the stored string, harmlessly ignored, and it
+reappears if the box comes back.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 150 | Live | <published tip hash> | IMPORT ALL DATA on the Facility Map restores a backup again — since Aug 31 it had thrown on a missing import and reported the file as invalid, and a test now checks that every storage function a file calls is one it imports; every setting in the app lives on one Settings page, the sixth link in the nav behind the gear, one collapsible section per page rendering that page's own panel inline with FACILITY MAP open by default, with every write merging over what the key already holds; the per-page gears are gone and the Facility Map's button is ACTIONS, holding only backup and transfer, repair cleanup, create and renumber; MERGE DUPES moves to the Settings page with its live count on the button and an UNDO MERGE; Fixed Repairs' appearance is shown to be the Defect Log's, driven from one state so neither can overwrite the other; the service worker pre-caches /settings (shell cache v5, one re-download); a repair can carry a Technical Service Bulletin under its note, the first one for the coolant level sensor, and Low oil and Coolant level sensor are check-engine symptoms; ALL on the Defect Log clears the search box; and the page nav is drawn from one list instead of five copies |
+```
+
+---
+
+# Version 149 — Five days is the same fault, and the operator's report is a fact worth keeping
+
+**Publish this next, after Version 148.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`011bb09`** |
+| Last code-bearing commit | `011bb09` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 148, published from `60c2a01` |
+
+**Two application commits.** The first was written before Codex published 148
+and has been **rebased onto the release commit `2b34c52`**, not merged over it:
+
+```
+git log --oneline 60c2a01..011bb09
+011bb09 Record that the operator reported it, alongside whatever the shop did   <- app code
+13835c8 Queue Version 149 from 9b4e14b, and put the 147 row back                <- docs only
+9b4e14b Look back five days for a duplicate defect, not two                     <- app code
+2b34c52 Record Sites Version 148 release                                        <- Codex, docs only
+
+git diff --name-only 60c2a01 011bb09 -- app
+app/defect-log/defect-log-sync.ts
+app/defect-log/page.tsx
+app/duplicate-defects.ts
+app/repair-catalog.ts
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 60c2a01 011bb09 -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 196 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None, and no rewrite.** No storage key and no payload shape changes. The
+catalog gains a work-state key; it does not rename or retire one, so every
+record already on the board reads exactly as it did.
+
+`operator-reported` is simply absent from every existing record, which is what
+"not ticked" has always looked like in this field — `workStates` is a partial
+record, so a missing key is the normal state, not a gap to fill.
+
+## What changed
+
+### 1. Five days, not two
+
+The Defect Log's duplicate guard looked back **48 hours**. It now looks back
+**120 hours — five days.**
+
+**The live board is the reason.** Of the 25 duplicate records found on it, two
+were typed into this form by hand on different days, with the second landing
+after the two-day window had already shut. A fault reported Monday and reported
+again Thursday is the same fault. Both of those would now be caught before they
+were written.
+
+### Why widening cannot suppress real work
+
+The guard **only ever matches a record that is still unresolved.** A repair that
+was finished and came back does not match, because the finished one is resolved
+— so a genuine recurrence still gets its own record no matter how soon it
+returns. The rule that decides a match is unchanged: same bus, same category,
+same issue.
+
+### The number and the wording now come from one place
+
+`RECENT_DUPLICATE_WINDOW_HOURS` and `RECENT_DUPLICATE_WINDOW_LABEL` are exported
+together from `defect-log-sync.ts`, and the four messages that used to hardcode
+"48 hours" read the label. The copy can no longer drift away from the rule the
+code enforces, and the next change to this window is one line.
+
+The note in `duplicate-defects.ts` recording how those two duplicates reached
+the board was **updated rather than rewritten** — it still says the guard looked
+back 48 hours at the time, and now adds what it looks back today.
+
+## Validation
+
+- 196 regression tests passing, ESLint clean, production build succeeds
+- **Driven in a browser against a defect logged three days ago** — past the old
+  window, inside the new one:
+  `ALREADY LOGGED Sep 1, 12:53 AM · Use the existing defect. A new report is
+  allowed after 5 days.` with the save button disabled
+- The boundary test moved to the new line and **was confirmed to fail** with the
+  window put back to 48, so it checks the change rather than passing on the
+  fixture
+- The test also asserts the day the old 48-hour window used to expire is now
+  still caught
+- **The six boxes were driven, not assumed.** They render in grid order with
+  OPERATOR REPORTED bottom-right; ticking OPERATOR REPORTED, INSPECTED and TEST
+  DRIVEN leaves all three checked; saving stores
+  `["operator-reported","inspected","test-driven"]` on the record
+- The checkbox assertion **was confirmed to fail against a radio conversion**
+
+### 2. A repair can record that the operator reported it
+
+WORK DONE SO FAR gains a **sixth box, OPERATOR REPORTED**, in the bottom-right
+of the three-column grid. Six also fills the bottom row, so no box sits alone.
+
+It was already a fact people recorded — *"Operator Reported Defect"* typed into
+the description by hand — it just could not be counted, filtered, or read off a
+badge while it lived in free text.
+
+It is **last on purpose**: it says where the report came from rather than work
+the shop did, which is what the other five describe.
+
+**Several boxes at once already worked, and still do.** `workStates` is a record
+keyed per state rather than one chosen value, so an operator report, an
+inspection and a road test are all true of the same repair. What this release
+adds is a **test**, because that only stays true while the picker draws
+checkboxes — turning them into radios, or adding mutual exclusion, would
+silently start throwing away recorded work and nothing else in the app would
+complain.
+
+The one control that IS exclusive stays exclusive and is now pinned too: a brake
+test is a pass or a fail, never both, held as one stored result behind a pair of
+`aria-pressed` buttons rather than two independent boxes.
+
+## After it is live
+
+1. **Find a bus with an open defect logged two to four days ago.** Try to log
+   the same category and repair again. It should refuse, and the message should
+   say *five days*, not 48 hours.
+2. **Check a defect that was fixed and came back.** It should still be allowed
+   through — the guard only holds back reports of faults that are still open.
+3. **Open LOG DEFECT and look at WORK DONE SO FAR.** Six boxes now, with
+   OPERATOR REPORTED in the bottom-right corner.
+4. **Tick three of them at once** — say OPERATOR REPORTED, INSPECTED and TEST
+   DRIVEN. All three should stay ticked, save together, and show on the record.
+5. **Tick BRAKE TEST.** The pass/fail choice should still appear, and still be
+   one or the other.
+6. **Nothing else on the Defect Log should look different.**
+
+## The way back
+
+`git revert 011bb09 9b4e14b` — two commits, newest first, no migration to undo.
+
+Either reverts alone. Reverting `9b4e14b` narrows the window to 48 hours again.
+Reverting `011bb09` removes the sixth box; **any record that already ticked it
+keeps the stored key**, harmlessly ignored, and it reappears if the box comes
+back — nothing is destroyed by going backwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 149 | Live | <published tip hash> | The Defect Log's duplicate guard looks back five days instead of two, so a fault reported Monday and typed in again Thursday is recognised as the same fault rather than becoming a second record; the window only ever matches records that are still unresolved, so a repair that was fixed and came back still gets its own record; the window and the wording that reports it now come from one exported constant so they cannot drift apart; and WORK DONE SO FAR gains a sixth box, OPERATOR REPORTED, in the bottom-right, recording as structured data what was being typed into the description by hand, alongside any of the other five rather than instead of them |
+```
+
+---
+
+# Version 147 — The defect form asks for the bus the way a mechanic reaches for it
+
+**Publish this next, after Version 146.**
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`9d69a9b`** |
+| Last code-bearing commit | `9d69a9b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 146, published from `1d5454b` |
+
+**One application commit.** It was written before Codex published 146 and has
+been **rebased onto the release commit `4c1e502`**, not merged over it, so the
+history stays a straight line:
+
+```
+git log --oneline 1d5454b..9d69a9b
+9d69a9b Name the bus boxes for what they do, and make the typed number the big one   <- app code
+4c1e502 Record Sites Version 146 release                                             <- Codex, docs only
+afbcc83 Queue Version 146 from 1d5454b                                               <- docs only
+
+git diff --name-only 1d5454b 9d69a9b -- app
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+```
+
+No dependency, database, or CI change:
+
+```
+git diff --name-only 1d5454b 9d69a9b -- supabase package.json package-lock.json .github   # returns nothing
+```
+
+Gate: 196 tests passing, ESLint clean, production build succeeds.
+
+## Migrations
+
+**None.** No storage key, no payload shape, no catalog identity. This release
+changes only what the LOG DEFECT form looks like; every record it writes is
+identical to what Version 146 wrote.
+
+## What changed
+
+All of it is in the LOG DEFECT / edit-defect form on the Defect Log, which is
+the screen a mechanic uses more than any other.
+
+### 1. The bus boxes are named for what they do
+
+| | Version 146 | Version 147 |
+| --- | --- | --- |
+| First box | `BUS NUMBER`, and the first thing in it was a row of generations | **`BUS GENERATIONS`** — the chips, and the count |
+| Second box | — | **`BUS NUMBER`** — TYPE BUS # and BUS LIST together |
+
+One box called BUS NUMBER whose opening row was 15s / 17s / 18s / 20s was
+telling a new person the wrong thing about both halves. The generations narrow
+the fleet; the number names one bus. Each box now says which job it is doing.
+
+### 2. TYPE BUS # is the biggest control on the screen
+
+It is the way in that actually gets used, and it was rendering at the same 16px
+as every other field. It is now **full width above the list, 26px, weight 800,
+in the page's own `--log-text`** instead of the muted grey the other inputs
+inherit — 27px on a phone.
+
+It stays on `--log-text` rather than a hardcoded `#000` on purpose: that token
+is a user setting in Defect Log COLORS, and black would be invisible in the dark,
+midnight and tactical themes.
+
+### 3. The LOGGED stamp moves to the bottom
+
+It sat between the bus and the category, where it read like a field somebody had
+to deal with. It is a fact about the record, so it is now the last thing in the
+form, above the save buttons.
+
+### 4. The bus list says why it is disabled
+
+BUS LIST is disabled until a generation is chosen, and that control now lives in
+a different box. Without a reason stated where the list is, it reads as a broken
+dropdown, so it now says *"Pick a generation above to use the bus list, or type
+the full number."*
+
+### The wiring did not change
+
+Worth writing down because it is a **three-way** binding and the split makes it
+look like two:
+
+- a generation filters the bus list **and** the type-ahead behind TYPE BUS #
+  (both read the same `candidates` array);
+- typing two digits lights the matching generation chip, and an exact number
+  selects the bus;
+- picking from the list fills the number **and** lights the generation.
+
+The split is what a person reads. Nothing about how the three controls talk to
+each other moved.
+
+## Validation
+
+- 196 regression tests passing, ESLint clean, production build succeeds
+- **Driven at 414px**, the width of the reported screenshot: legends read
+  `BUS GENERATIONS` then `BUS NUMBER`; picking 15s and typing `15505` selects
+  Bus 15505 - On Road; the stamp reports as `child 15 of 15 (LAST)`
+- One new test covering all four changes, plus the wiring's box membership
+- **A CSS trap was found by measuring, not by reading.**
+  `.log-form input,.log-form select{font-size:16px}` sits **later** in
+  `defect-log.css` at the **same specificity** as an unscoped
+  `.type-bus-number>input`, so the first attempt lost the tie and rendered at
+  16px with no error anywhere — it looked applied and was not. Measured at 16px,
+  scoped to `.log-form .type-bus-number>input`, measured again at 27px. The test
+  pins the scoping and **was confirmed to fail without it**
+
+## After it is live
+
+1. **Open LOG DEFECT on a phone.** Two boxes: BUS GENERATIONS with the chips,
+   then BUS NUMBER with a large typed field above the bus list.
+2. **Type a full bus number without touching the chips.** The matching
+   generation should light up on its own and the bus should be selected.
+3. **Tap a generation, then the bus list.** It should be enabled and filtered to
+   that generation.
+4. **Open the form on a fresh bus and look at the bus list before picking a
+   generation.** It should be disabled with the line telling you why.
+5. **Scroll to the bottom of the form.** LOGGED should be the last thing above
+   the save buttons, not up by the category.
+
+## The way back
+
+`git revert 9d69a9b` — one commit, two application files, no migration to undo.
+
+Nothing stored depends on it, so a revert is purely cosmetic: every defect
+logged while 147 was live reads identically afterwards.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 147 | Live | <published tip hash> | The LOG DEFECT form splits its one mislabelled BUS NUMBER box into BUS GENERATIONS for the 15s/17s/18s/20s chips and BUS NUMBER for the two ways of naming one bus; TYPE BUS # becomes the biggest control on the screen at 26px in the page's own text colour rather than 16px muted grey; the LOGGED stamp moves from between the bus and the category down to the bottom of the form; and the bus list now says it needs a generation instead of looking like a broken dropdown |
+```
 
 ---
 
@@ -1525,7 +4287,7 @@ Suggested `docs/RELEASES.md` row:
 
 ---
 
-# Version 146 — A page a screen reader can name, and a sheet that opens on its job
+# Version 146 — A page a screen reader can name, a sheet that opens on its job, one repair kept as one record that says why the bus is down, and the air system named the way the shop names it
 
 **Publish this next, after Version 145.**
 
@@ -1533,31 +4295,46 @@ Suggested `docs/RELEASES.md` row:
 
 | Field | Value |
 | --- | --- |
-| **Release source** | **`acf86c2`** |
-| Last code-bearing commit | `acf86c2` — the release source is this commit |
-| Branch | `main` on the private `origin` remote |
+| **Release source** | **`1d5454b`** |
+| Last code-bearing commit | `1d5454b` — the release source is this commit |
+| Branch | `main` on the private `origin` remote — **pushed**, `origin/main` carries this commit |
 | Previous | Version 145, published from `5aab35f` |
 
-```
-git log --oneline 5aab35f..acf86c2
-acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet header
-84164ff Record Sites Versions 144 and 145 releases
-651c61f Record the sixth fix in the 145 handoff
+Eight commits sit in this range and **four of them touch application code**:
 
-git diff --name-only 5aab35f acf86c2 -- app
+```
+git log --oneline 5aab35f..1d5454b
+1d5454b Say which defect has the bus on the down sheet                       <- app code
+834d76a Queue Version 146 from 21a0d06, and correct what the handoff claimed <- docs only
+21a0d06 Name the air system what the shop calls it, and the rear valves for what they do   <- app code
+3c1f800 Write to the repair a bus already has, instead of logging it twice   <- app code
+eeab372 Queue Version 146                                                    <- docs only
+acf86c2 Name the Facility Map for a screen reader, and clear out the Down Sheet header   <- app code
+84164ff Record Sites Versions 144 and 145 releases                           <- docs only
+651c61f Record the sixth fix in the 145 handoff                              <- docs only
+
+git diff --name-only 5aab35f 1d5454b -- app
+app/defect-identity.ts
+app/defect-log/defect-log-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet-sync.ts
 app/down-sheet/down-sheet.css
 app/down-sheet/page.tsx
+app/down-sheet/repair-time-estimates.ts
+app/duplicate-defects.ts
 app/globals.css
 app/page.tsx
+app/repair-catalog.ts
 ```
 
 No dependency, database, or CI change:
 
 ```
-git diff --name-only 5aab35f acf86c2 -- supabase package.json package-lock.json .github   # returns nothing
+git diff --name-only 5aab35f 1d5454b -- supabase package.json package-lock.json .github   # returns nothing
 ```
 
-Gate: 192 tests passing, ESLint clean, production build succeeds.
+Gate: 195 tests passing, ESLint clean, production build succeeds.
 
 ## Migrations
 
@@ -1594,17 +4371,147 @@ buttons still appear only when there is something to undo, so MORE is usually a
 single item. COMPLETED TODAY is still a button inside the panel and still
 filters.
 
-### 3. A disclosure that was not hiding anything
+### 3. A note on the MORE disclosure — nothing to review in the diff
 
-Caught while verifying the above. A bare `display:grid` on the disclosure's
-contents overrode the browser's own rule that hides a closed `<details>`, so
-**CLEAR DOWNSHEET was fully visible while the panel reported itself closed** —
-the disclosure was decorative. Scoped to the open state now; measured closed,
-then open.
+**This is not a shipped fix; it never reached a commit.** While building the
+disclosure above, a bare `display:grid` on its contents overrode the browser's
+own rule that hides a closed `<details>`, leaving CLEAR DOWNSHEET fully visible
+while the panel reported itself closed. It was caught and scoped to `[open]`
+before `acf86c2` was written, so every committed state of `down-sheet.css`
+already carries `.down-more[open]>div` and `.down-more:not([open])>div`. Recorded
+only so the `[open]` scoping is not mistaken for an accident and simplified
+away later.
+
+### 4. A repair the bus already has is written to, not logged a second time
+
+**Curtis asked the right question and the answer was yes, it duplicated.** A bus
+logged for a check engine light, then put on the Down Sheet by hand for that
+same fault, ended up carrying it twice — once from the log, once from the sheet,
+each under a different id, each looking to the app like a separate problem.
+MERGE DUPES caught it afterwards, which is what it is for, but it should not
+have had to.
+
+The rule already existed and two of the four doors skipped it:
+
+| How a repair reaches the sheet | Before | Now |
+| --- | --- | --- |
+| Defect Log → tick DOWN SHEET | writes to the logged record | same, plus the widening below |
+| SCAN SHEET photo import | asks first, adopts the record | same, plus the widening below |
+| **+ ADD DOWN BUS, typed by hand** | **minted a second record** | **writes to the one that is there** |
+| **Pulled on by the app when a bus is marked down** | **minted a second record** | **writes to the one that is there** |
+
+The question is now asked at both doors that write repairs — `importScan` in
+`app/down-sheet/page.tsx` and `defectTargets` in `down-sheet-sync.ts` — against
+**one shared rule** in `app/defect-identity.ts`, so all four behave the same way.
+**Only an exact repeat is adopted, and only one still unresolved.** A genuinely
+different fault on the same bus is still its own record, and a repair finished
+last month is not reopened by new work that reads like it. A card that already
+wrote its own record keeps it, so editing a card updates what it wrote rather
+than wandering onto a neighbouring fault.
+
+Two spellings count as the same record. A card the app builds from a defect
+carries that defect's **supporting text** — the diagnostic lamp and its alarm
+number, then the reported symptoms, then the note — rather than the bare details
+field, because on a sheet that is the line that decides what the bus needs.
+Without matching both, a bus the app pulls onto the sheet comes back carrying
+its own defects a second time. An adopted record then keeps its own details:
+writing the spelled-out card back would flatten the lamp and the symptoms into
+free text and then repeat them, leaving a record reading `Misfire — Misfire — …`.
+
+The identity rule moves to a new `app/defect-identity.ts` so the sheet and the
+duplicate cleanup share one copy instead of importing each other. Two copies
+would drift and the symptom is silent — duplicates quietly returning on a board
+nobody is auditing. **Merging keeps the stricter rule**, matching only on what
+the record itself says, because merging deletes a record and adoption only
+updates one.
+
+#### What else this widening touches — read before publishing
+
+Adoption is now looser than it was, and two paths this section first described
+as untouched do change. Neither is a regression, but neither is nothing:
+
+- **MERGE DUPES is genuinely unchanged.** `defectFingerprint`, the placeholder
+  guard and `mergeDuplicateDefects` moved between files without a change to what
+  they do — verified by diffing the function across `acf86c2..21a0d06`.
+- **The scan matcher matches more than it did.** `matchingUnresolvedDefectId`
+  compared one fingerprint before; it now accepts the supporting spelling too.
+  So a scanned row whose reason column carries the app's own spelled-out line —
+  which is exactly what the Down Sheet PRINT puts on the paper — now adopts the
+  existing record where it previously minted a new one. That is the intended
+  direction for print-then-rescan, but it is a change to the scan path.
+- **A DOWN SHEET tick entry with more than one card changes.** A single-card
+  tick is identical. Add a second card that repeats another record already on
+  the bus and it now writes to that record instead of minting a third: measured
+  three records before, two after.
+
+### 5. The air system is named what the shop names it
+
+**Air System becomes Pneumatic System.** Under it, two options were listed by
+valve model and where the valve sits, which says nothing about what the valve
+does or whether the bus can move:
+
+| Was | Is |
+| --- | --- |
+| `R-12 relay valve (C/S rear)` | **`R-12 service valve (C/S rear)`** |
+| `R-14 relay valve (R/S rear)` | **`R-14 parking brake valve (R/S rear)`** |
+
+Both keep the side, because that is still how you find them on the bus.
+
+**Nothing stored is rewritten.** Every record on the live board was logged under
+`Air System`, so this is a read-time rename like every other one in
+`repair-catalog.ts`: the category goes in `LEGACY_CATEGORY_RENAMES`, the two
+valves in `CATEGORY_ISSUE_RENAMES` keyed by the category the record has *after*
+the rename has run. A defect logged in January keeps its id, its details and its
+first-seen date, and simply reads as its new home.
+
+Three things are keyed on the category name and would have gone quiet if only
+the picker had changed — **the air-bag replacement counts, the category glyph,
+and the repair-time estimate.** The counts follow the migrated category. The
+glyph and the estimate keep an `Air System` entry too, the way this codebase
+already does for `No Start` and `Doors, Ramp and Lift`, so a caller holding an
+unmigrated category lands on the right value instead of the catch-all.
+
+Two options still read `Air-system warning` and `Other air-system repair`, and
+that is deliberate: they name the physical system on the bus, which is still the
+air system, rather than referring to the category title. Say the word and they
+change too.
+
+### 6. The Defect Log says WHICH defect has the bus down
+
+**This is the other half of section 4, and it is the half you can see.** A card
+with three defects showed one purple `DS` badge. That badge is true of the
+*bus*, so with more than one defect under it nothing said which one was the
+reason — bus 17526 carrying a rear door, a horn and an IBS screen, all open,
+under a single DS.
+
+The specific defect now carries a **full-width banner** reading `ON THE DOWN
+SHEET` with what the sheet says about it: workflow, shift, section and who has
+it. A banner rather than a fourth badge — with three defects the answer has to
+attach to one row, and another small badge in a row of small badges would not
+have closed the question. The FOCUS view says the same thing spelled out, the
+way it spells out everything else.
+
+**The link is asked of the sheet itself.** `defectLogRecords` read only the
+entry's *stated* `defectId`, which names at most one record and is empty on
+every entry typed in through + ADD DOWN BUS. So a bus could sit on the sheet for
+a fault open in the log and no record would know it. It now calls
+`downSheetDefectIds`, a new export wrapping the same `defectTargets` the save
+uses, so the badge cannot disagree with what the sheet actually writes to — the
+stated id, the ids an entry mints per card, and the record a card adopts because
+the bus already had it.
+
+**And when none of them is the one.** A bus can be on the sheet for work never
+typed into this log — scanned off paper, or logged straight onto the sheet.
+Then the DS badge is true and no defect below carries a banner, which reads like
+the app declining to answer. That case now names the sheet entry in amber and
+says it is not one of the defects below.
+
+The banner takes the shop's own DS badge colour, so recolouring the badge
+recolours this too rather than leaving two purples side by side.
 
 ## Validation
 
-- 192 regression tests passing, ESLint clean, production build succeeds
+- 195 regression tests passing, ESLint clean, production build succeeds
 - **Driven at 390 and 1180.** Stats closed on first load, opened, remembered
   across a reload, closed again. + ADD DOWN BUS present exactly once, visible
   without scrolling, full width at 390. Each shift filter pressed on and back
@@ -1613,6 +4520,56 @@ then open.
 - **The h1 was measured, not assumed** — 11px inside a 40px banner, no overflow
 - One rendered-HTML test asserted on a stat tile now behind the toggle; it
   asserts the bar and the add button instead
+- **The duplicate was reproduced in a browser before it was fixed and re-driven
+  after.** Bus 17563 open on the Defect Log for a check engine light, added to
+  the Down Sheet by hand for the same fault: two records before, one after, and
+  MERGE DUPES goes from offering a cleanup to having nothing to clean. Adding
+  the same bus for a *different* fault still produces two records
+- **The app's own pull was driven too** — a bus marked down, pulled onto the
+  sheet by the app and saved back unchanged: one record, and its details still
+  read `Loses power on the hill` rather than swallowing the card's spelling
+- One new test for the duplicate: the reported case, a different fault,
+  completing through the sheet, a resolved record not being reopened, both
+  spellings, two cards never landing on one record, a card keeping the record it
+  owns, and a blank card adopting nothing
+- **The rename was driven against records stored the old way**, not just against
+  the picker. Two defects written as `Air System` — one an R-12 valve, one an
+  air-bag leak carrying a count of 4 — read back as
+  `Pneumatic System — R-12 service valve (C/S rear)` and
+  `Pneumatic System — Leaking air bag - Rear — 4 replaced`, with ids and
+  first-seen dates intact. The picker offers `💨 Pneumatic System` and no
+  `Air System`
+- One new test for the rename covers the migration in both directions, the
+  counts, the glyph and the estimate under both spellings, and asserts the new
+  name is not quietly falling through to the Miscellaneous defaults
+- Three existing tests named `Air System` directly and now name the new
+  category; the many tests that pass `"Air System"` as *stored* input were left
+  exactly as they were, because they now exercise the migration
+- **The two behaviour changes above were measured against the old code**, by
+  loading `acf86c2`'s own modules beside the new ones rather than reasoning
+  about the diff:
+
+  ```
+  two-card DOWN SHEET tick   BEFORE: 3 records -> ["d1","d2","downsheet-repair-tick-1-item-b"]
+                             AFTER : 2 records -> ["d1","d2"]
+  one-card DOWN SHEET tick   BEFORE: 2 records   AFTER: 2 records   (identical)
+
+  scan reason = stored spelling      OLD -> defect-A   NEW -> defect-A
+  scan reason = supporting spelling  OLD -> undefined  NEW -> defect-A
+  ```
+- **The banner was driven at 390 and 1180** on a bus shaped like 17526, against
+  an entry storing no `defectId` at all. The horn carries the banner; the door
+  and the screen do not. On desktop the banner claims a whole line — 1099px of
+  the row's 1101 — leaving the row's columns intact below it, and the body never
+  scrolls sideways. The "none of these is the one" case was driven separately
+- **That test was confirmed to fail against the old rule.** Putting the
+  `defectId`-only lookup back turns it red, so it is checking the fix rather
+  than passing on the fixture
+- A cold review of this handoff found five wrong claims in an earlier draft —
+  a "no behaviour change" that was not true of the scan or of a multi-card tick,
+  an assertion count, a door count, and a fix described in "What changed" that
+  had never reached a commit. All are corrected above; the review is the reason
+  the section-4 caveat block exists
 
 ## After it is live
 
@@ -1625,10 +4582,43 @@ then open.
    something to undo. With MORE closed, none of them is on screen.
 5. **The Facility Map should look exactly as it did.** The change is for screen
    readers.
+6. **Take a bus that is open on the Defect Log and add it to the Down Sheet by
+   hand for that same repair.** The Defect Log should still show one line for
+   it, now carrying the DS badge — not two lines. Then do it again for a
+   different fault on the same bus and confirm that one *does* get its own line.
+7. **Open LOG DEFECT and look at the category list.** It should read
+   💨 Pneumatic System, with no Air System anywhere, and the two rear valves
+   should read *service valve* and *parking brake valve*.
+8. **Find a bus already logged under the old Air System.** It should now read
+   Pneumatic System with the same details and the same date, and any air-bag
+   count on it should still show.
+9. **Open a bus with several defects that is on the Down Sheet — 17526 is the
+   one this came from.** Exactly one defect should carry the purple ON THE DOWN
+   SHEET banner, and it should be the repair the sheet actually has. If the
+   sheet has that bus for something not in the log, an amber banner at the top
+   should name it and say it is not one of the defects below.
 
 ## The way back
 
-`git revert acf86c2` — one commit.
+`git revert 1d5454b 21a0d06 3c1f800 acf86c2` — four application commits, newest
+first. Driven: the set reverts clean and leaves 192 tests passing.
+
+Each can also be reverted alone; all four touch `tests/rendered-html.test.mjs`
+but different parts of it, so git auto-merges. **No ordering constraint** —
+`1d5454b`'s `downSheetDefectIds` only calls `defectTargets`, which exists either
+way, so reverting `3c1f800` alone while keeping the banner still builds
+(verified). It just puts the duplicate back: the banner would then point at the
+second record the sheet mints instead of the one already on the bus.
+
+Reverting `21a0d06` alone puts the category back to Air System and the valves
+back to their model-number wording. **No record is stranded either way**: the
+rename is read-time, so a defect logged while Pneumatic System was live still
+carries `Air System` in storage and reads correctly once the rename is gone.
+
+Reverting `3c1f800` alone restores the old behaviour, in which a repair typed
+onto the Down Sheet for a fault the bus is already logged for becomes a second
+record. That is not data loss — MERGE DUPES folds them back together — but the
+counts read high until somebody runs it.
 
 ## Publishing constraints that still apply
 
@@ -1641,5 +4631,5 @@ then open.
 Suggested `docs/RELEASES.md` row:
 
 ```
-| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it |
+| 146 | Live | <published tip hash> | The Facility Map title becomes an h1 so the page has a name a screen reader can announce and jump to, inheriting the banner's size so nothing changes visually; the Down Sheet's eight stat tiles collapse into a SHEET STATS bar closed by default, + ADD DOWN BUS moves to the top full width from its old place beneath CLEAR DOWNSHEET, the clear and undo actions move behind MORE, and a shift filter can be pressed again to clear it; a repair added to the Down Sheet for a fault the bus is already logged for now writes to the record that is there instead of logging it a second time, matching only exact repeats that are still unresolved; a bus card with several defects now marks the specific defect that has it on the Down Sheet with a banner saying what the sheet says, and names the sheet entry when none of the listed defects is the reason; and the Air System category is renamed Pneumatic System with its two rear valves named for what they do rather than their model number, read-time so nothing stored is rewritten |
 ```

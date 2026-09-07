@@ -24,22 +24,59 @@ export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
    the outcome left to prose is exactly the ambiguity that costs most on a
    safety item, and a failed brake test is the first thing anybody would want
    to pull as a list — which free text cannot answer. */
-export type WorkStateKey="inspected"|"diagnosed"|"parts-on-order"|"test-driven"|"brake-test";
+export type WorkStateKey="inspected"|"diagnosed"|"road-call"|"parts-on-order"|"test-driven"|"brake-test"|"operator-reported";
 export type BrakeTestResult="pass"|"fail";
 /* result is only ever set on the brake-test key. Optional everywhere else so
    one stamp shape still covers every state. */
 export type WorkStateStamp={at?:string;by?:string;result?:BrakeTestResult};
-export const WORK_STATES:{key:WorkStateKey;label:string;short:string;hint:string}[]=[
+type WorkStateDefinition={key:WorkStateKey;label:string;short:string;hint:string};
+
+/* Every work state the app has ever stored, in reading order.
+
+   This is the NORMALIZER'S vocabulary, and it is deliberately longer than the
+   six boxes the Defect Log draws. A key dropped from here is a key dropped
+   from every stored record on read, so a state that moves off a form stays in
+   this list and the work somebody recorded under it survives the move. */
+export const ALL_WORK_STATES:WorkStateDefinition[]=[
  {key:"inspected",label:"INSPECTED",short:"INSP",hint:"Looked at, nothing found yet"},
  {key:"diagnosed",label:"DIAGNOSED",short:"DIAG",hint:"Cause found, not fixed yet"},
+ /* A breakdown out on the road, and a different kind of fact from the rest of
+    this list: the others say what the shop did, this says what the bus did and
+    where it is. Ticking it records a dated event on the bus, turns the map's
+    own ROADCALL flag on, and parks the bus on the road, because that is where
+    it is. The rules live in road-calls.ts. */
+ {key:"road-call",label:"ROAD CALL",short:"ROAD",hint:"Broke down on the road — parks the bus on the road"},
+ /* Kept in the vocabulary, off the Defect Log's boxes. It says what is holding
+    a repair up rather than what the shop did, and it now sits with the parts
+    on Fixed Repairs. Records already carrying it read exactly as before. */
  {key:"parts-on-order",label:"PARTS ON ORDER",short:"PARTS",hint:"Waiting on a part to arrive"},
  {key:"test-driven",label:"TEST DRIVEN",short:"DRIVEN",hint:"Road tested, details in the notes"},
  {key:"brake-test",label:"BRAKE TEST",short:"BRAKE",hint:"Record the result below"},
+ /* Where the report came from rather than work the shop did, which is why it
+    sits last. It was being typed into the description as "Operator Reported
+    Defect", so it was already a fact people recorded - it just could not be
+    counted, filtered, or read off a badge while it lived in free text.
+
+    It conflicts with nothing. An operator reports a fault, the shop inspects
+    it and road tests it, and all three are true of the same repair. */
+ {key:"operator-reported",label:"OPERATOR REPORTED",short:"OPERATOR",hint:"Came in from the operator, not the shop"},
 ];
+
+/* The six on the Defect Log, three across, so the bottom row is full and no
+   box sits alone. PARTS ON ORDER is the one missing; ROAD CALL stands where it
+   stood, third, at the end of the top row. */
+export const WORK_STATES:WorkStateDefinition[]=ALL_WORK_STATES.filter(state=>state.key!=="parts-on-order");
+
+/* And the one that moved, shown on Fixed Repairs beside the part it is about. */
+export const FIXED_REPAIR_WORK_STATES:WorkStateDefinition[]=ALL_WORK_STATES.filter(state=>state.key==="parts-on-order");
+
+export const ROAD_CALL_KEY:WorkStateKey="road-call";
+export const PARTS_ON_ORDER_KEY:WorkStateKey="parts-on-order";
 export const BRAKE_TEST_KEY:WorkStateKey="brake-test";
 export function brakeTestResult(defect:StructuredDefect){return defect.workStates?.[BRAKE_TEST_KEY]?.result}
 export function brakeTestFailed(defect:StructuredDefect){return brakeTestResult(defect)==="fail"}
-export const WORK_STATE_KEYS=WORK_STATES.map(state=>state.key);
+/* Every key, not just the six on the form, for the reason above. */
+export const WORK_STATE_KEYS=ALL_WORK_STATES.map(state=>state.key);
 
 export type StructuredDefect={
  id:string;
@@ -147,15 +184,21 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     live records under them are untouched. Nothing is retired: every old wording
     reads as its new home. */
  "Tech Services":["Farebox - INOP (general)","Farebox - No power","Farebox - Blank / black screen","Farebox - Bill transport INOP","Farebox - Coin mech INOP","Farebox - Coin off line","Farebox - Coin bin missing","Farebox - Unlocked / won't lock","Farebox - Can't unlock top / coin bypass reset","Farebox - Loose from floor mounts","Farebox - Other farebox defect","Ventra - INOP (general)","Ventra - Other Ventra defect","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","CUBIC Screen - Screen black","IBS Screen - INOP (general)","IBS Screen - Screen black","Signs, Cameras and Other - Destination Sign","Signs, Cameras and Other - Dash cam","Signs, Cameras and Other - Camera / DVR system","Signs, Cameras and Other - Other Tech Services"],
- "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
+ "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 1 Roof 2","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Trouble Mod 2 Roof 2","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
  "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
- "Air System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 relay valve (C/S rear)","R-14 relay valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
- "Inspection":["A-6","A-15","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
+ "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
+ /* A-3 and A-21 are on the sheet and were not on this list, so a scan of a real
+    morning had to pick the nearest thing: A3 became A-6 and A21 became A-15, and
+    the bus was recorded as having had a service it never had. */
+ "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
- "Interior Cleaning":["Scheduled Cleaning","Cleaning Required"],
+ /* HAZMAT on the sheet means a biohazard on board — blood, vomit or faeces. It
+    had nowhere to go and landed as "Unknown diagnosis", which is the one thing
+    it must not read as: nobody boards or cleans that bus without knowing. */
+ "Interior Cleaning":["Scheduled Cleaning","Cleaning Required","Biohazard - blood, vomit or faeces (HAZMAT)"],
  "Miscellaneous":["Missing road hazard triangles (3 required)","Fire extinguisher missing","Driver-reported defect","Roadcall follow-up","Cleaning / sanitation","Noise / vibration","Unknown diagnosis","Manual entry","Other repair"],
 };
 
@@ -181,7 +224,8 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  "Doors, Ramp and ADA":"♿",
  "Lights and Fixtures":"💡",
  Bodywork:"🚌",
- "Air System":"💨",
+ "Pneumatic System":"💨",
+ "Air System":"💨", /* legacy category, kept so an unmigrated read still finds its glyph */
  Inspection:"🔍",
  "Preventive Maintenance":"🛠️",
  "Interior Cleaning":"🧽",
@@ -253,8 +297,8 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
  },
  "Suspension and Steering":{
   "NVH (noise, vibration, harshness)":"Say where and when in the description: front or rear, curbside or roadside, turning or straight, and at what speed. A vibration at 45 straight and a clunk on a left turn are different repairs, and the noise itself is rarely where the fault is.",
-  "Bus leaning - C/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
-  "Bus leaning - R/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Air System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
+  "Bus leaning - C/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Pneumatic System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
+  "Bus leaning - R/S":"A leaning bus is commonly caused by a leaking air bag or a leveling-valve fault. Note the affected end in the description. Once confirmed, edit this same defect to the exact Pneumatic System air-bag leak or Leveling valve repair so the history and replacement count stay together.",
  },
  "Amerex":{
   "CNG - PRD cap missing":"Check for a leak before you close this out. Fit a balloon over the vent and watch whether it inflates: the cap being gone can mean gas has been venting past it. If it inflates, log PRD leaking as well.",
@@ -264,6 +308,36 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
   "Fire Suppression - FIRE alarm (system discharged)":"The system fires on its own with no operator input, so this means the bottles have already gone off. The bus does not move until it is recharged and inspected.",
  },
 };
+/* TECHNICAL SERVICE BULLETINS.
+
+   DEFECT_NOTES says what to do in the next five minutes. A bulletin says what
+   this fleet has learned about a repair, and it stays true long after the bus
+   in front of you is fixed. Both are shown, one under the other, because they
+   answer different questions and folding them together would bury one.
+
+   Keyed on category and issue the same way notes are, and read through the same
+   migration, so a bulletin written today still reaches a record logged under an
+   older wording.
+
+   Everything in here is knowledge that otherwise lives in one person's head. */
+const COOLANT_LEVEL_SENSOR_TSB="The coolant LEVEL sensor is not the coolant temp sensor. It shuts the bus down when glycol in the surge tank drops below a tight threshold, and it is the highest point of failure on this fleet. A bus that shut down and then restarts and runs fine is usually this sensor. High engine temperature will also shut a bus down, and that is a severe leak, not this. A bus running with the sensor unplugged has its low-glycol shutdown bypassed - say so in the description, because nothing else on the record will.";
+
+const DEFECT_TSBS:Record<string,Record<string,string>>={
+ Engine:{
+  /* Written down from Curtis: the single highest-failure item on this fleet,
+     and the one most often mistaken for a different sensor with a similar name. */
+  "Check engine light":COOLANT_LEVEL_SENSOR_TSB,
+  "Stop engine light":COOLANT_LEVEL_SENSOR_TSB,
+  "Check engine and stop engine light":COOLANT_LEVEL_SENSOR_TSB,
+ },
+};
+
+/* The bulletin for a repair, or "" when this fleet has nothing to say about it. */
+export function defectTsb(category:unknown,issue:unknown){
+ const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
+ return DEFECT_TSBS[moved.category]?.[moved.issue]||"";
+}
+
 export function defectNote(category:unknown,issue:unknown){
  const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
  return DEFECT_NOTES[moved.category]?.[moved.issue]||"";
@@ -292,7 +366,7 @@ const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
   "Surge tank - heating side low":coolantAdded,
   "Surge tank - both sides low":coolantAdded,
  },
- "Air System":{
+ "Pneumatic System":{
   "Leaking air bag - Front C/S":airBagCount(2),
   "Leaking air bag - Front R/S":airBagCount(2),
   "Leaking air bag - Rear":airBagCount(4),
@@ -426,10 +500,11 @@ export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at
 
 export function hasWorkState(defect:StructuredDefect,key:WorkStateKey){return Boolean(defect.workStates?.[key])}
 
-/* Ordered as WORK_STATES is, so a record always reads the same way round
-   however the boxes were ticked. */
+/* Ordered as ALL_WORK_STATES is, so a record always reads the same way round
+   however the boxes were ticked - and so a state no longer drawn on the Defect
+   Log's form still shows on every record that carries it. */
 export function defectWorkStates(defect:StructuredDefect){
- return WORK_STATES.filter(state=>hasWorkState(defect,state.key));
+ return ALL_WORK_STATES.filter(state=>hasWorkState(defect,state.key));
 }
 
 /* "CJ, Aug 27" where both are known, either alone where one is, and nothing
@@ -484,7 +559,15 @@ export function diagLightLabel(defect:{diagLight?:DiagLight;alarmCode?:string}){
  return DIAG_LIGHT_LABELS[light]+(code?" alarm "+code:"");
 }
 
-export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power"] as const;
+/* What the bus is doing, beyond the lamp on the dash.
+
+   The last one is not a symptom in the strict sense, and it is here on purpose.
+   The picker's job is to narrow "check engine light" into something the next
+   person can act on, and on this fleet the coolant LEVEL sensor is the highest
+   point of failure that ends in a shutdown - so ticking it says where to look
+   better than any true symptom would. It is named in full because it is not the
+   coolant TEMP sensor, and a count that mixes the two is worse than no count. */
+export const CHECK_ENGINE_SYMPTOMS=["Misfire","Loss of power","Low oil","Coolant level sensor"] as const;
 
 /* The three dash-light entries that carry the symptom picker. Kept as a list so
    a fourth cannot be added to the catalog and quietly lose its symptoms. */
@@ -530,7 +613,7 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "Signs, Cameras and Other":["Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  },
  "Amerex":{
-  "Fire Suppression":["FIRE alarm (system discharged)","Heat sensor communication fault","Trouble Mod 1 Roof 1","Trouble Mod 2 Roof 1","Control head no power","Other Fire Suppression Trouble"],
+  "Fire Suppression":["FIRE alarm (system discharged)","Heat sensor communication fault","Trouble Mod 1 Roof 1","Trouble Mod 1 Roof 2","Trouble Mod 2 Roof 1","Trouble Mod 2 Roof 2","Control head no power","Other Fire Suppression Trouble"],
   "Gas Concentration":["Trace","Significant Leak","Other Gas Concentration Alert"],
   "CNG":["Check CNG valves light","PRD cap missing","PRD leaking","Other CNG defect"],
  },
@@ -562,7 +645,7 @@ const DOWNING_ISSUES:Record<string,readonly string[]>={
     picker must not open on May Stay In Service. Running hot is the opposite
     case and stays in service on purpose: eight or ten over finishes the day. */
  "Engine":["Overheat shutdown (235-240F)"],
- "Interior Cleaning":["Cleaning Required"],
+ "Interior Cleaning":["Cleaning Required","Biohazard - blood, vomit or faeces (HAZMAT)"],
  "Amerex":["Gas Concentration - Significant Leak","Fire Suppression - FIRE alarm (system discharged)","CNG - PRD leaking"],
 };
 export function defaultDefectOperability(category:string,issue:string):DefectOperability{
@@ -600,7 +683,7 @@ export const RETIRED_ISSUES:Record<string,readonly string[]>={
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain","Air System":"Pneumatic System"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -664,6 +747,16 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
      read as the new one; nothing stored is rewritten. */
   "System Switches - Mirror heater switch":"System Switches - Mirror heater switch - C/S",
   "System Switches - C/S adjuster switch":"System Switches - Mirror adjuster switch - C/S",
+ },
+ /* Both were listed by valve model and where it sits, which says nothing about
+    what the valve does. R-12 is the service valve and R-14 the parking brake
+    valve, which is what gets said on the floor and what decides whether a bus
+    can move. The side stays, because that is still how you find it. Keyed by
+    "Pneumatic System" because the category rename above has already run by the
+    time this lookup happens. */
+ "Pneumatic System":{
+  "R-12 relay valve (C/S rear)":"R-12 service valve (C/S rear)",
+  "R-14 relay valve (R/S rear)":"R-14 parking brake valve (R/S rear)",
  },
  /* The floor says Freon, the catalog said Refrigerant, and somebody searching
     the Defect Log for "freon" found nothing. Both words are in the wording now

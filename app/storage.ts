@@ -114,7 +114,7 @@ function saveFleetRecoverySnapshot(storage:StorageWriter,raw:string,buses:unknow
 function warnBulkLoss(currentDefects:number,nextDefects:number,currentBuses:number,nextBuses:number){
  if(typeof window==="undefined")return;
  const removedDefects=Math.max(0,currentDefects-nextDefects),removedBuses=Math.max(0,currentBuses-nextBuses),loss=[removedDefects?removedDefects+" saved defect"+(removedDefects===1?"":"s"):"",removedBuses?removedBuses+" bus record"+(removedBuses===1?"":"s"):""].filter(Boolean).join(" and ");
- window.setTimeout(()=>window.alert("SAFETY STOP: This change would remove "+loss+" at once. Nothing was overwritten. Reload the page, then export or restore the last-known-good copy from Fleet Tracker Settings."),0);
+ window.setTimeout(()=>window.alert("SAFETY STOP: This change would remove "+loss+" at once. Nothing was overwritten. Reload the page, then use MASTER EXPORT or RESTORE LAST GOOD COPY in Settings."),0);
 }
 
 /* WHY a write did not happen, not just that it did not.
