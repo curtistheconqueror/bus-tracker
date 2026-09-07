@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 160 is live from `bbe33f6` as Sites Version 156.**
+**STATUS: NONE PENDING — repository release 161 is live from `3b16d45` as Sites Version 157.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,6 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Published | **161** | `3b16d45` | **Live as Sites Version 157.** Row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; independent inspection tallies; Mystery Buses on the Down Sheet; and Defect Log controls behind Advanced Actions |
 | Published | **160** | `bbe33f6` | **Live as Sites Version 156.** REFRESH is available on every page for home-screen use, and the Main Garage Ready boundary runs vertically between bays 6 and 7 without moving buses or slots |
 | Published | **159** | **`2afa491`** | **Live as Sites Version 155.** A Down Sheet removal travels, so a cleared sheet stays cleared: removals are recorded, pushed as tombstones by `entry_id`, refused on the way back in, and the map's Down Sheet flags follow the sheet the pull settled on |
 | Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
@@ -37,7 +38,7 @@ commit, no migration, no dependency change.
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**No release is pending.** Repository release 159 went out as Sites Version 155 from `2afa491`, and repository release 160 followed as Sites Version 156 from `bbe33f6`. Their retained handoffs below are release records only.
+**No release is pending.** Repository release 159 went out as Sites Version 155 from `2afa491`, release 160 as Sites Version 156 from `bbe33f6`, and release 161 as Sites Version 157 from `3b16d45`. Their retained handoffs below are release records only.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
