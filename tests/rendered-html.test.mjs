@@ -757,20 +757,42 @@ test("server-renders the live fleet command dashboard", async () => {
 
 });
 
-test("renders the mobile Mystery list on the Defect Log", async () => {
+test("the Mystery list renders on the Down Sheet, and the Defect Log packs its controls away", async () => {
+  /* MYSTERY BUSES moved: every bus it lists is a bus that is NOT on the Down
+     Sheet, so it belongs beside that sheet rather than on the Defect Log. */
+  const downResponse=await render("/down-sheet");
+  assert.equal(downResponse.status,200);
+  const downHtml=await downResponse.text();
+  assert.match(downHtml,/MYSTERY BUSES/);
+  assert.match(downHtml,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
+  assert.match(downHtml,/class="mystery-board"/);
+  assert.match(downHtml,/class="mystery-toggle"/);
+
   const response=await render("/defect-log");
   assert.equal(response.status,200);
   const html=await response.text();
-  assert.match(html,/MYSTERY BUSES/);
-  assert.match(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
-  assert.match(html,/class="mystery-board"/);
-  assert.match(html,/class="mystery-toggle"/);
-  assert.match(html,/aria-expanded="true"/);
-  assert.match(html,/>QUICK FILTERS</);
+  assert.doesNotMatch(html,/class="mystery-board"/,"the board left this page");
+  assert.doesNotMatch(html,/ON-SITE WORK AREAS NOT ON DOWN SHEET/);
+
+  /* Nine controls were loose above the feed. Only the two used on every visit
+     stay out — LOG DEFECT and SEARCH — and the rest sit behind one button,
+     closed until it is opened. */
+  assert.match(html,/ADVANCED ACTIONS/);
+  assert.match(html,/class="log-advanced-toggle"/);
+  assert.match(html,/aria-expanded="false"/,"it opens closed, which is the point of it");
+  assert.match(html,/\+ LOG DEFECT/);
+  assert.match(html,/>SEARCH</);
+  for(const label of ["QUICK FILTERS","UNDO LAST","CLEAN UP","SCAN SWEEP","SCAN BATCHES","AI OPERATOR"])
+   assert.doesNotMatch(html,new RegExp(">"+label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"<"),label+" must be inside the closed section, not loose on the page");
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
    /* Four boxes in a two-column grid: two full rows, nothing sitting alone. */
    assert.match(css,/\.engine-symptom-picker>div\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css,/@media\(max-width:760px\)\{\.mystery-board/);
+  /* The board's phone rules moved to globals.css with the board itself — that
+     is the one stylesheet both pages load, and the Defect Log still needs the
+     MOVE / LOCATION editor's styles for its deferred drawer. */
+  const shared=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+  assert.match(shared,/@media\(max-width:760px\)\{\.mystery-board/);
+  assert.doesNotMatch(css,/\.mystery-board\{/,"the board's own styles must not be left behind on a page it no longer renders");
   assert.match(css,/\.quick-filter-drawer\{position:fixed/);
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
@@ -787,8 +809,8 @@ test("renders the mobile Mystery list on the Defect Log", async () => {
   assert.match(css,/@media\(max-width:760px\)\{\.quick-filter-share-actions button\{min-height:44px/);
   assert.match(css,/\.quick-filter-drawer>\.quick-filter-results\{min-height:0;grid-auto-rows:max-content/);
   assert.match(css,/inset:max\(8px,env\(safe-area-inset-top\)\) 8px max\(8px,env\(safe-area-inset-bottom\)\)/);
-  assert.match(css,/\.mystery-board\.collapsed>\.mystery-head\{border-bottom:0\}/);
-  assert.match(css,/\.mystery-toggle\{width:38px;height:38px/);
+  assert.match(shared,/\.mystery-board\.collapsed>\.mystery-head\{border-bottom:0\}/);
+  assert.match(shared,/\.mystery-toggle\{width:38px;height:38px/);
 });
 
 test("removes prospective customer branding from visible app titles", async () => {
@@ -1548,10 +1570,18 @@ test("Mystery Buses can change facility location without changing defects or Dow
   assert.equal(moved.target,"garage-0");
   assert.equal(moved.fleet[0].down,true);
   assert.deepEqual(moved.fleet[0].defects,[defect]);
-  const [page,css]=await Promise.all([readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8")]);
-  assert.match(page,/MOVE \/ LOCATION/);
-  assert.match(page,/defects and Down Sheet membership are not changed/);
-  assert.match(css,/\.mystery-move\{[^}]*min-height:44px/);
+  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+  /* The editor moved into the shared board module — the Down Sheet's MYSTERY
+     BUSES opens it, and so does the Defect Log's deferred drawer, which is why
+     there is one copy rather than two that drift. */
+  const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
+  assert.match(board,/MOVE \/ LOCATION/);
+  assert.match(board,/defects and Down Sheet membership are not changed/);
+  assert.match(page,/MOVE \/ LOCATION/,"the deferred drawer still offers it");
+  assert.match(page,/import \{MysteryMoveModal\} from "\.\.\/mystery-board"/,"and opens the shared one");
+  /* MOVE / LOCATION is shared: the Down Sheet's board and the Defect Log's
+     deferred drawer both open it, so its styles sit in globals.css. */
+  assert.match(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"),/\.mystery-move\{[^}]*min-height:44px/);
 });
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
@@ -5973,10 +6003,12 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
 });
 
 test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
- const [logPage,logSettings,logCss]=await Promise.all([
+ const [logPage,logSettings,logCss,mysteryBoard,globalCss]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
  ]);
  // globals.css styles bare <header> as a 38px dark banner and bare <footer> as
  // a pill fixed to the bottom of the viewport. The editor's action bar had a
@@ -5986,13 +6018,26 @@ test("no element in the Defect Log relies on the global bare header and footer s
  // panel is its own module now, rendered on the Settings page, and the rule
  // holds there too - that page loads globals.css like every other.
  const logMarkup=logPage+logSettings;
- assert.equal(/<header>|<footer>/.test(logMarkup),false,"no bare header or footer may come back");
- for(const className of ["log-editor-head","log-settings-head","quick-filter-head","mystery-head","grouped-defect-head","log-editor-actions","mystery-move-head","mystery-move-actions","part-prompt-head"])
+ assert.equal(/<header>|<footer>/.test(logMarkup+mysteryBoard),false,"no bare header or footer may come back");
+ for(const className of ["log-editor-head","log-settings-head","quick-filter-head","grouped-defect-head","log-editor-actions","part-prompt-head"])
   assert.ok(logMarkup.includes('className="'+className+'"'),className+" must be applied in the markup");
+
+ /* MYSTERY BUSES moved to the Down Sheet, and its markup went with it into a
+    module both pages render — the board on the Down Sheet, the MOVE / LOCATION
+    editor from the Defect Log's deferred drawer. Its header and footer are
+    still bare <header> and <footer> tags underneath, so the same trap applies;
+    the reset that neutralises them just has to live in the one stylesheet both
+    pages load. */
+ for(const className of ["mystery-head","mystery-move-head","mystery-move-actions"])
+  assert.ok(mysteryBoard.includes('className="'+className+'"'),className+" must be applied in the shared board markup");
+ const sharedReset=globalCss.match(/\.mystery-head,\.mystery-move-head,\.mystery-move-actions\{([^}]*)\}/);
+ assert.ok(sharedReset,"globals.css must reset the board's header and footer, or it wears the 38px banner and the fixed pill");
+ for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
+  assert.ok(sharedReset[1].includes(property),"the shared reset must clear "+property);
 
  // the element selectors still match these tags, so the global properties are
  // neutralised before each one is styled deliberately
- const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.mystery-head,\.grouped-defect-head,\.log-editor-actions,\.mystery-move-head,\.mystery-move-actions,\.part-prompt-head\{([^}]*)\}/);
+ const reset=logCss.match(/\.log-editor-head,\.log-settings-head,\.quick-filter-head,\.grouped-defect-head,\.log-editor-actions,\.part-prompt-head\{([^}]*)\}/);
  assert.ok(reset,"the reset block must exist");
  for(const property of ["position:static","height:auto","transform:none","background:none","box-shadow:none","white-space:normal","z-index:auto"])
   assert.ok(reset[1].includes(property),"the reset must clear "+property);
