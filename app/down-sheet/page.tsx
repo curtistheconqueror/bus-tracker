@@ -59,7 +59,6 @@ type DownEntry={
 
 const MAX_ENTRIES=98;
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
-const STATS_OPEN_KEY="pace-down-sheet-stats-open-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 /* The last thing done to a single row, kept so it can be taken back. Separate
    from the scan and clear undos on purpose: deleting or closing out one bus is
@@ -169,9 +168,6 @@ export default function DownSheet(){
  const [editing,setEditing]=useState<DownEntry|null>(null);
  /* Absent means closed, like the Defect Log's. A device that has never opened
     the stats does not have to write anything to say so. */
- const [statsOpen,setStatsOpen]=useState(false);
- useEffect(()=>{setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1")},[]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
@@ -464,27 +460,6 @@ export default function DownSheet(){
    <TrackerNav active="/down-sheet"/><RefreshButton/>
   </header>
 
-  {/* Eight tiles were the first thing on the sheet, above the filters and above
-      the button that adds a bus. Behind one bar now, carrying the numbers worth
-      a glance, remembered per device. COMPLETED TODAY stays a button inside —
-      it filters — so it is only reachable with the panel open, same as before
-      it had a bar in front of it. */}
-  <section className={"sheet-stats"+(statsOpen?" open":"")}>
-   <button type="button" className="sheet-stats-toggle" aria-expanded={statsOpen} onClick={()=>setStatsOpen(open=>!open)}>
-    <b>SHEET STATS</b><small>{counters.active} {String(displaySettings.labels.active).toLowerCase()} · {counters.pending} {String(displaySettings.labels.pending).toLowerCase()} · {formatRepairTime(counters.activeMinutes)} est. labor · {active.length}/{MAX_ENTRIES} capacity</small><i aria-hidden="true">{statsOpen?"CLOSE":"OPEN"}</i>
-   </button>
-   {statsOpen&&<section className="down-summary" aria-label="Down sheet summary">
-   <div className="primary-count"><strong>{counters.active}</strong><span>{displaySettings.labels.active}</span></div>
-   <div><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
-   <div><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
-   <div><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>
-   <button type="button" className={"completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
-   <div className="labor-total"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
-   <div className="labor-total view-total"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>
-   <div className="capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
-   </section>}
-  </section>
-
   <section className="down-controls">
    {/* The one thing this page is for, first and full width. It used to sit in
        the bottom-right of a block of six, below CLEAR DOWNSHEET. */}
@@ -528,6 +503,29 @@ export default function DownSheet(){
        are on the sheet, and how many of them are actually a bus down. */}
    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
    {sheetGroups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
+   {/* SHEET STATS used to be a second scoreboard behind its own bar, saying
+       most of this again in a different shape. Curtis reads this one — "I like
+       the way it's organized and the color scheme" — so the tiles worth having
+       came down here and that panel is gone.
+
+       ACTIVE DOWN did not come with them. It counted the whole active sheet
+       while TOTAL ON SHEET counts the current view, which is why they read the
+       same number on ALL with no search and looked like a duplicate. Nothing
+       is lost: SHEET CAPACITY still prints the whole-sheet count beside its
+       ceiling. */}
+   <div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
+   <div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
+   <div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>
+   {/* Still a button, because it filters. Same press-to-narrow behaviour the
+       two road tallies have, so it belongs with them rather than looking like
+       a number you cannot touch. */}
+   <button type="button" className={"group-count group-completed completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
+   <div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
+   <div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
+   {/* Only once it has something of its own to say. Unfiltered it is the same
+       number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
+       side by side is exactly the duplication this was meant to clear. */}
+   {visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
    {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
        the sheet?" while looking at the yard; these answer "is this one out
        working?" while looking at the sheet — which the sheet itself could not
