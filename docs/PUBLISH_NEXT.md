@@ -1,9 +1,10 @@
 # Publish next
 
-**STATUS: VERSION 152 PENDING — publish from `015e789`. Version 151 is live from `f5939df`.**
+**STATUS: VERSIONS 152 AND 153 PENDING — publish 152 from `015e789`, then 153 from `0db855a`. Version 151 is live from `f5939df`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Then | **153** | `0db855a` | **A scan sweep can be taken back out of the Defect Log, exactly** — 24 Tech Services records landed on 23 buses when a Down Sheet photo went through SCAN SWEEP, and an import could not remove them because an import never removes; every record a sweep files in one press shares one time stamp, and SCAN BATCHES lists each press and REMOVEs one, keeping anything worked on since, with PUT BACK as the way back; the AI Operator reads "remove the most recent 24 entries from the defect log" as that batch and checks the count; the removal reaches the other devices, because a pull now reads the tombstones too, and a restore reaches them because a live row now says deleted_at is null; the sweep scanner asks what the page IS before what is on it and refuses a Down Sheet; and a scanned FRONT TIROS reads FRONT TIRES while the margin rows stop slipping out |
 | Next | **152** | `015e789` | **The shop cloud barely ran and then failed when it did, and this fixes both** — the sync engine lived only on the Settings page so a shift spent on the map synced nothing, and it now runs on every page and merges the shop's changes live as they happen; — a merged-away tombstone was being upserted into a column it cannot fill, which also kept the Down Sheet out of the cloud entirely; SHOP CLOUD moves to the top of MASTER where nobody has to look for it; a photographed sheet now says which numbered lines it failed to read, and flags the rows it had to guess at; A-3, A-21 and a HAZMAT biohazard condition join the catalog; and the pulsing DEFERRED badge opens the filter showing the buses it counts, with a count that matches that list |
 | Published | **151** | `f5939df` | The Down Sheet divides itself into OFF PROPERTY, SCHEDULED, UNSCHEDULED and INSPECTIONS & SCHEDULED MAINTENANCE by default, each divider carrying its own count with the four counts and the total above the sheet, and the photo import reads the same four headings; Settings opens on a MASTER section holding MASTER EXPORT, MASTER IMPORT and RESTORE LAST GOOD COPY — every whole-device control in one place — and one theme for every page; ROAD CALL replaces PARTS ON ORDER in the Defect Log's work boxes: ticking it stamps a dated event on the bus, turns on the map's ROADCALL flag and parks the bus on the road, and the map's own ROADCALL checkbox records the same event; either can be taken back within sixty seconds; the card shows it under LATEST for seven days and a quick filter lists this week's road calls; PARTS ON ORDER moves to Fixed Repairs; unticking your only ticked box now sticks |
 | Previous live | **150** | `6d62787` | **IMPORT ALL DATA restores a backup again** — it had thrown since Aug 31; every setting in the app lives on one Settings page, sixth in the nav behind the gear, one collapsible section per page with FACILITY MAP open by default, and the per-page gears are gone; MERGE DUPES moves there with its count on the button; a repair can carry a Technical Service Bulletin, and Low oil and Coolant level sensor are check-engine symptoms; ALL clears the search box; the page nav is drawn from one list |
@@ -24,6 +25,12 @@
 | Published | 135 | `d3c05c3` | MERGE DUPES now completes its authorized cleanup, and repairs can record TEST DRIVEN and BRAKE TEST |
 
 **Version 151 is live from `f5939df`.** The 136–151 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
+
+**Two releases are pending, in order.** 152 is frozen at `015e789` and is not
+moved by anything here; 153 is the two commits on top of it, `dd1b093` and
+`0db855a`. Publish 152 first, then 153 — or, if it is simpler to publish once,
+publish 153 from `0db855a` and record both versions as live from it, since 153
+contains 152 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -48,6 +55,273 @@ supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
 
 ---
+
+# Version 153 — A scan sweep can be taken back out, exactly
+
+**Publish this after Version 152.** It answers a mistake made on Sep 6 that the
+app had no way to undo: a photo of the Vehicle Down Sheet went through SCAN
+SWEEP, 24 Tech Services records landed on 23 buses in one press, the log went
+from 178 active defects to 202, and an export/import from the other device did
+not take them out — nor could it have (section 1).
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`0db855a`** |
+| Last code-bearing commit | `0db855a` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 152, pending from `015e789` |
+
+**Two application commits** on top of 152's `015e789`:
+
+```
+git log --oneline 015e789..0db855a      # docs-only commits omitted
+0db855a Take a whole scan sweep back out of the Defect Log, and stop the next one going in
+dd1b093 Correct what the camera misread, and stop the margin rows slipping out
+
+git diff --name-only 015e789 0db855a -- app tests
+app/api/down-sheet-scan/route.ts
+app/api/sweep-scan/route.ts
+app/cloud-client.ts
+app/cloud-live.ts
+app/cloud-sync-control.tsx
+app/cloud-sync.ts
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/defect-log/scan-batches-panel.tsx   (new)
+app/defect-log/scan-batches.ts          (new)
+app/defect-log/sweep-scan-import.ts
+app/defect-log/sweep-scanner.tsx
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/down-sheet-scanner.tsx
+app/down-sheet/scan-spelling.ts         (new)
+app/operator-engine.ts
+app/page.tsx
+app/shop-cloud-live.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 015e789 0db855a -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+**No database change.** The two cloud changes in section 4 are in what the app
+sends and asks for: a defect row now carries `deleted_at: null` explicitly, and
+a pull additionally selects `defect_id, deleted_at` where `deleted_at is not
+null`. Both columns have existed since migration 0002; the read is covered by
+the existing "shop reads" policy; **no table, column, trigger or policy
+changes.** No new route and no service-worker bump.
+
+Gate: **220 tests passing** (214 at Version 152, six added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing is rewritten.** No storage key changes and no payload shape
+changes.
+
+**One new storage key, additive:** `pace-scan-batch-undo-v1` holds the last
+removed scan sweep so PUT BACK works after a reload. Absent means nothing to
+put back. It is written only by a removal and cleared by a restore.
+
+**One first-sweep cost, harmless and once per device.** A defect row's
+fingerprint now includes `deleted_at: null`, so every fingerprint changes and
+the first shop-cloud sweep after the update re-sends the device's whole defect
+table — around three hundred rows in two 200-row upserts. The server's
+keep-newest trigger lets an equal timestamp through, and the rows are
+identical, so nothing on the server changes; after that sweep the fingerprints
+are current and pushes are incremental again.
+
+## What changed
+
+### 1. Why the import did not remove them — and never could
+
+A Defect Log import merges by defect id: a record both devices have takes the
+incoming version, and **a record only the receiving device has is kept.** That
+rule exists because the alternative — an import that deletes repairs the
+sending device never saw — is the data loss the merge rules were argued out to
+prevent. The iPad had never had the 24, so the phone kept them. Nothing was
+wrong with the import; it is not, and cannot be, the way to take records out.
+The "202" the phone shows is 178 real records plus the 24 filed by the sweep.
+
+### 2. The fingerprint, and SCAN BATCHES
+
+Everything a sweep files in one press of FILE APPROVED shares **one creation
+stamp** — `fileSweep` takes the clock once and hands the same value to every
+record — and every id it mints begins with `sweep-`. No honest record carries
+that stamp, so the pair identifies a press exactly. The 24 carry
+`2026-09-06T23:30` to the millisecond. `scan-batches.ts` groups by it.
+
+**SCAN BATCHES**, a new button beside SCAN SWEEP on the Defect Log, lists every
+press on the device — when, how many records on how many buses, who checked,
+the bus numbers — and REMOVE takes one out. Two rules:
+
+- **Only what nobody has touched.** A record from the batch that has since been
+  marked fixed, deferred or in progress, ticked, or written on (shop notes,
+  action taken, a finding, a part) is somebody's decision that it was real. It
+  stays, and the row says how many stayed.
+- **The way back is kept.** What was removed is written to the device, and PUT
+  BACK returns every record to its bus. UNDO LAST covers a removal too, by the
+  same path. A record put back is stamped `updatedAt: now`, which section 4
+  explains is not cosmetic.
+
+The board is written with the bulk-loss guard lifted for this one confirmed
+write, the way MERGE DUPES does on Settings; the recovery snapshot is still
+taken first, so RESTORE LAST GOOD COPY stands behind it. The cloud ledger is
+written after the board write lands, never before: a removal that reached the
+cloud but not the device would be worse than either alone.
+
+### 3. The operator understands the request
+
+Said exactly as it was said in chat: **"Remove the most recent 24 entries from
+the Defect log"** previews the batch — 24 Tech Services records filed at that
+time on 23 buses, the first six numbers listed — and applies on confirmation
+with the same three writes as the button. The number is checked, never
+assumed: "the last 20" when the sweep filed 24 is answered with the correction,
+not with 20 records quietly removed. "Undo the last scan sweep" and "take the
+sweep out of the defect log" need no number.
+
+**"Undo most recent change to defect log"** names no sweep and no number. That
+is the log's own UNDO LAST, and the operator says so — and says what it can do
+from here, naming the batch. "Put the scan sweep back" restores. A command that
+names a bus is a bus command and falls through to the paths that were there.
+
+### 4. A removal reaches the other devices, and so does a restore
+
+Removing already wrote the cloud ledger, so the phone would have sent
+tombstones. What did not exist was any way for the iPad to learn of them: a
+pull returns live rows only, and the merge keeps whatever the receiver alone
+holds, so the iPad's 24 copies would have stayed for good, pushed back up every
+sweep (harmlessly — the server keeps the newest write, and the tombstone is
+newer). **The pull now reads the tombstones as well, as ids and dates only**,
+and a copy older than its tombstone is dropped from the device. A copy edited
+AFTER the removal is real work: it stays, and its next push undeletes the row.
+The bulk-loss guard is lifted for that write exactly when a tombstone applied
+and only then; the recovery snapshot is taken first.
+
+Putting a sweep back had a matching hole. A restored record was upserted with
+no `deleted_at` column, so the tombstone stood and every device's pull went on
+filtering the record out — the restore looked done on the device that made it
+and reached nobody. **A live defect row now says `deleted_at: null` out loud**,
+and a restored record is stamped newer than its tombstone, so the restore wins
+on `updated_at` and clears the deletion. A stale copy still cannot undelete a
+record removed after it was last touched: it loses on `updated_at` first.
+
+### 5. The scanner will not do it again
+
+The sweep route now asks the model **what the page is before what is on it**,
+in the schema: `document` is one of `ventra`, `farebox`, `mixed`, `other`, and
+a Vehicle Down Sheet is named in the prompt as the example of `other`, with
+the instruction to return no rows for it. On the client a page called `other`
+contributes no rows — they are not shown unticked, they are not shown, since a
+tick box beside a Down Sheet row is how 24 records got filed — and a red notice
+points at SCAN SHEET on the Down Sheet page. A page the model would not vouch
+for, or where most rows could not be placed on either sheet, arrives with
+nothing ticked and an amber notice.
+
+### 6. From `dd1b093`: FRONT TIROS, and the margin rows
+
+A scanned row now has its words corrected against the shop's own vocabulary and
+the mechanics' names already on the device — TIROS becomes TIRES, CAROS becomes
+CARLOS — under rules deliberately timid: nothing already a shop word, nothing
+with a digit, nothing under four letters, and nothing with two equally close
+candidates. And the prompt now names the handwritten margin rows as loudly as
+the printed lines, after a previous prompt change about printed line numbers
+plausibly taught the model to favour the table over the margin; margin rows are
+capped below the review threshold so they always arrive amber and marked
+MARGIN.
+
+## Validation
+
+- 220 regression tests passing, ESLint clean, production build succeeds
+- **Driven against the PRODUCTION build, zero page errors,** with the real Sep
+  6 shape seeded — 24 sweep records on 23 buses among 30 defects:
+  - SCAN BATCHES lists one row reading **24 RECORDS ON 23 BUSES · CHECKED BY
+    EJ** with the 23 numbers, and a button reading REMOVE 24
+  - REMOVE, confirmed: the board holds **6** defects (the six hand-typed
+    records, untouched), the cloud ledger holds **24** ids, the snapshot holds
+    **24** records, the recovery snapshot was taken, UNDO LAST reads "Undo
+    Removed 24 scan sweep records", and no save banner appears
+  - PUT BACK **after a reload**: 30 defects again, all 24 restamped newer than
+    their creation, ledger back to 0 ids, snapshot cleared
+  - The operator, with the exact chat wording: "Undo most recent change to
+    defect log" answers with UNDO LAST and names the batch; "Remove the last 20
+    entries" answers "filed 24 records, not 20"; "Remove the most recent 24
+    entries from the Defect log" previews and applies — 6 defects, 24 ledger
+    ids, 24 in the snapshot; "Put the scan sweep back" restores all 24
+  - After an operator removal, the Defect Log's SCAN BATCHES offers PUT BACK
+    for it and lists no remaining sweep
+  - At 390 px the four feed actions sit in a 2×2 grid
+- **The cloud path is tested against the merge rules that shipped**, not
+  mocked around them: 24 tombstoned records leave storage through
+  `applyCloudPull` with the recovery snapshot written and the page notified,
+  a copy edited after its tombstone stays, and the tombstone read issues
+  exactly `select("defect_id,deleted_at").not("deleted_at","is",null)`
+- **Every rule was confirmed to fail without it:** a touched record removed, a
+  wrong count rounded to the batch, a five-digit number read as a batch
+  command, tombstones ignored on pull, the guard lifted with nothing
+  tombstoned, and a `document: other` page still producing findings each fail
+  their own test
+- **Not measured here, and cannot be:** the model's answer to a real Down Sheet
+  photo through the sweep route. The schema forces it to choose; the prompt
+  names the Down Sheet; the review step is the last line either way.
+
+## After it is live
+
+1. **On the phone, open the Defect Log and press ↶ SCAN BATCHES.** One row
+   should read 24 RECORDS ON 23 BUSES for Sep 6. Press REMOVE 24 and confirm.
+   The active count should drop from 202 to 178 — or a little less than 24 if
+   any of them were touched since, and the row will say how many were kept.
+2. **Watch the iPad.** Within the live-sync window its Defect Log should lose
+   the same 24 with nobody touching it. If the iPad is offline, they leave on
+   its next sync.
+3. **Check the cloud if you want the receipt:** in the Supabase SQL editor,
+   `select count(*) from bus_defects where defect_id like 'sweep-%' and
+   deleted_at is not null` should say 24 once the phone has synced.
+4. **Try the operator once, on purpose:** "Remove the last scan sweep from the
+   defect log" should now answer that there is no scan sweep to take out.
+5. **Press PUT BACK once, then REMOVE again**, to see the way back work — the
+   records should return on both devices, then leave both again.
+6. **Photograph a Down Sheet through SCAN SWEEP deliberately.** It should
+   refuse the page in red and point at SCAN SHEET, with nothing to tick.
+7. **SCAN SHEET a page with a margin row.** The row arrives amber and marked
+   MARGIN whatever the model claimed, and a misspelt shop word reads corrected.
+
+## The way back
+
+Measured in a throwaway worktree from `0db855a`:
+
+- `git revert 0db855a` alone is **clean** and takes out everything in sections
+  2–5, leaving `dd1b093`'s scan corrections in place.
+- `git revert 0db855a dd1b093` (newest first) is **clean** and takes the whole
+  release out, back to 152.
+- `git revert dd1b093` alone **conflicts in `tests/rendered-html.test.mjs`
+  only**, because `0db855a` appended to the same file; keep both sides, or
+  revert the pair above.
+- Going back leaves `pace-scan-batch-undo-v1` on any device that removed a
+  sweep; nothing reads it and it is harmless. Ledger entries a removal wrote
+  stay, by the ledger's own design.
+- Nothing in the cloud needs undoing. A tombstone is data, not an absence:
+  the older app goes on filtering tombstoned rows out of its pulls exactly as
+  it did before.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 153 | Live | <published tip hash> | A whole scan sweep can be taken back out of the Defect Log. On Sep 6 a photo of the Vehicle Down Sheet went through SCAN SWEEP and 24 Tech Services records landed on 23 buses in one press, and importing the other device's log could not remove them because an import keeps every record only the receiver has, by design. Every record a sweep files in one press shares one creation stamp, and SCAN BATCHES, beside SCAN SWEEP, lists each press and REMOVEs one — keeping any record marked fixed, deferred, ticked or written on since — with PUT BACK as the way back, surviving a reload. The AI Operator reads "remove the most recent 24 entries from the defect log" as that batch, checks the number rather than rounding to it, explains that "undo the most recent change" is the log's own UNDO LAST, and puts a sweep back on request. A removal now reaches the other devices, because a pull reads the tombstones as well as the live rows and drops a copy older than its tombstone while keeping one edited since, and a restore reaches them because a live defect row now says deleted_at is null and returns stamped newer than the deletion. The sweep scanner asks the model what the page is before what is on it and refuses a Down Sheet outright, pointing at SCAN SHEET. And a scanned FRONT TIROS reads FRONT TIRES, with handwritten margin rows named as loudly as printed lines and always arriving amber |
+```
+
 
 # Version 152 — The shop cloud starts working again
 
