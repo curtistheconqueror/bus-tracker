@@ -658,8 +658,58 @@ export default function DefectLog(){
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="log-header">
    <div><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
-   <TrackerNav active="/defect-log"/><RefreshButton/>
+   <TrackerNav active="/defect-log"/>
+   {/* One column so ADVANCED ACTIONS sits directly under REFRESH at every
+       width, not only on a phone where the header happens to stack. */}
+   <div className="log-header-actions">
+    <RefreshButton/>
+    {/* aria-controls only while the drawer exists: the panel is not rendered
+        at all when closed, and pointing at an id that is not in the document
+        tells a screen reader about a thing it cannot go to. */}
+    <button className="header-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"log-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
+     <span><b>ADVANCED ACTIONS</b><small>Filters, undo, scan sweeps and the operator</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
+    </button>
+   </div>
   </header>
+  {/* ADVANCED ACTIONS.
+
+      This block used to be nine controls loose on the page: three filter
+      buttons, QUICK FILTERS, UNDO LAST, and four more under the mystery board
+      — all of them above the feed a foreman actually came to read. Only the
+      two things used on every visit stay out: LOG DEFECT and SEARCH.
+
+      The toggle sits in the header with the nav and REFRESH, drawn like them,
+      because that is where this page keeps the controls that are about the
+      page rather than about a defect. The panel it opens is a drawer directly
+      under the header rather than inside it: the groups are light surfaces and
+      the header is not, and a white panel dropped into the navy read as a card
+      somebody had left there.
+
+      The two groups are the ones the buttons already formed. VIEW changes what
+      the feed shows; TOOLS acts on the log itself. Collapsed by default, and
+      the choice is remembered per device. */}
+  {advancedOpen&&<section className="log-advanced open" id="log-advanced-drawer">
+    <div className="log-advanced-body">
+     <div className="log-advanced-group">
+      <b className="log-advanced-label">VIEW</b>
+   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
+    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
+       default view. Somebody whose default is one of them would otherwise see a
+       filtered board with no button lit and nothing saying why — and no way back
+       without opening settings. The button appears only while its own filter is
+       the active one, so it explains the view and clears it, without adding two
+       buttons back for everybody else. */
+    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
+    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+      <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("")}}/>
+      <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
+     </div>
+     <div className="log-advanced-group">
+      <b className="log-advanced-label">TOOLS</b>
+      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
+     </div>
+    </div>
+  </section>}
   {/* Closed by default. Five tiles were the first thing the page said, above
       the filters and the button that logs a defect, so a first-time user had
       to scroll past a scoreboard to reach the thing the page is for. The
@@ -684,41 +734,6 @@ export default function DefectLog(){
        view of either keeps filtering — the button is what was removed, not
        the filter. Pressing the active one clears back to ALL. */}
    <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/></label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
-   {/* ADVANCED ACTIONS.
-
-       This block used to be nine controls loose on the page: three filter
-       buttons, QUICK FILTERS, UNDO LAST, and four more under the mystery board
-       — all of them above the feed a foreman actually came to read. Only the
-       two things used on every visit stay out: LOG DEFECT and SEARCH.
-
-       The rest are here, in the two groups they already formed. VIEW changes
-       what the feed shows; TOOLS acts on the log itself. Collapsed by default,
-       and the choice is remembered per device. */}
-   <section className={"log-advanced"+(advancedOpen?" open":"")}>
-    <button className="log-advanced-toggle" type="button" aria-expanded={advancedOpen} onClick={()=>setAdvancedOpen(value=>!value)}>
-     <span><b>ADVANCED ACTIONS</b><small>Filters, undo, scan sweeps and the operator</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>
-    {advancedOpen&&<div className="log-advanced-body">
-     <div className="log-advanced-group">
-      <b className="log-advanced-label">VIEW</b>
-   <div className="log-filters">{([["all","ALL"],["in-progress","IN PROGRESS"],["fixed","FIXED TODAY"],
-    /* OPEN and DOWN SHEET are not offered, but both remain choosable as a saved
-       default view. Somebody whose default is one of them would otherwise see a
-       filtered board with no button lit and nothing saying why — and no way back
-       without opening settings. The button appears only while its own filter is
-       the active one, so it explains the view and clears it, without adding two
-       buttons back for everybody else. */
-    ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
-    ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
-      <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("")}}/>
-      <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
-     </div>
-     <div className="log-advanced-group">
-      <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
-     </div>
-    </div>}
-   </section>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
     decoration, so it carries its name and is shaped like the buttons beside it. */}
