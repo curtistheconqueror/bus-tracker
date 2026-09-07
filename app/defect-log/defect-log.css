@@ -411,7 +411,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .brake-test-result .brake-test-fail.selected{background:#b3261e;color:#fff}
 .brake-test-result>small{font-size:8px;line-height:1.4;color:#5a6a86}
 @media(max-width:760px){.brake-test-result button{min-height:50px;font-size:13px}}
-.quick-filter-deferred-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 9px;border-top:1px solid var(--log-border);background:color-mix(in srgb,#0e7490 8%,var(--log-surface))}.quick-filter-deferred-row small{font-size:8px;font-weight:900;color:#0b6b80}.quick-filter-deferred-row small.deferred-overdue{color:#b3261e}.quick-filter-deferred-row .mystery-move{min-width:0;min-height:32px;font-size:7px}
+.quick-filter-deferred-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);align-items:center;gap:8px;padding:6px 9px;border-top:1px solid var(--log-border);background:color-mix(in srgb,#0e7490 8%,var(--log-surface))}.quick-filter-deferred-row small{font-size:8px;font-weight:900;color:#0b6b80}.quick-filter-deferred-row small.deferred-overdue{color:#b3261e}.quick-filter-deferred-row .mystery-move{min-width:0;min-height:32px;font-size:7px}
 
 /* Causes learned under this symptom. Chips rather than a dropdown: on a phone a
    select hides its options behind a tap, and the whole point is that the
@@ -721,3 +721,23 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the two things used on every visit and they get their own air. */
 .log-controls{margin-top:12px}
 @media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:44px}.log-controls{margin-top:14px;row-gap:11px}}
+
+/* END DEFERRAL, beside MOVE / LOCATION on a held bus.
+
+   Three slots rather than a flex row with space-between: the timer is as wide
+   as its own text and the two buttons split what is left evenly, so they stay
+   the same size as each other whether the timer reads 1M or 44H 44M. On a
+   phone the timer takes its own line above them - three things across 360px
+   put END DEFERRAL under 90px, which is not a target anybody hits with a
+   glove on.
+
+   It carries the teal that DEFERRED already uses everywhere else in this app,
+   because it is the way out of that state rather than a new kind of thing. */
+.quick-filter-deferred-row .end-deferral{min-width:0;min-height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #0e7490;border-radius:6px;background:#e8f5f8;color:#0b6679;padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap}
+.quick-filter-deferred-row .end-deferral:hover,.quick-filter-deferred-row .end-deferral:focus-visible{background:#d7f0f7;outline:none}
+.quick-filter-deferred-row .end-deferral:disabled{opacity:.55;cursor:default}
+@media(max-width:760px){
+ .quick-filter-deferred-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .quick-filter-deferred-row>small{grid-column:1/-1}
+ .quick-filter-deferred-row .end-deferral,.quick-filter-deferred-row .mystery-move{min-height:44px;font-size:9px}
+}

@@ -10060,3 +10060,55 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.ok(busCol>=238,"the bus column is "+busCol+"px, too narrow for the number, its status label, ON ROAD and DELETE together");
  assert.equal(tableMin,1052+busCol,"the table's min-width has to rise with the bus column, or the extra room is taken from another column");
 });
+
+test("a deferred bus can be released from the drawer that lists it, and the badge moves without a reload", async () => {
+  const storage = await readFile(new URL("../app/storage.ts", import.meta.url), "utf8");
+  /* THE `storage` EVENT DOES NOT FIRE IN THE TAB THAT WROTE. That is the whole
+     bug: defer a bus or end a deferral and the DEFERRED badge sat stale until
+     its own sixty-second tick or a reload. Measured on the old code - the
+     record read "open" while the badge still read 2 DEFERRED. */
+  assert.match(storage,/export const RECORDS_WRITTEN_EVENT="pace-records-written"/);
+  /* Announced from the two record writers, not from each caller: every writer
+     in the app already goes through them, and a caller that forgot is exactly
+     how this goes stale again. */
+  assert.match(storage,/storage\.setItem\(FLEET_STORAGE_KEY,serializeFleetPayload\(buses,current\.envelope\)\);announceWrite\(FLEET_STORAGE_KEY\);return OK/);
+  assert.match(storage,/storage\.setItem\(DOWN_SHEET_STORAGE_KEY,serializeDownSheetPayload\(entries,current\.envelope\)\);announceWrite\(DOWN_SHEET_STORAGE_KEY\);return OK/);
+  /* Only after a write that SUCCEEDED - a refused write changed nothing and
+     must not make a listener re-read as though it had. Both announcements sit
+     inside the try, ahead of the return, never in the catch. */
+  assert.doesNotMatch(storage,/catch\(error\)\{[^}]*announceWrite/);
+  /* And it must not throw on a server render, where there is no window. */
+  assert.match(storage,/function announceWrite\(key:string\)\{\n if\(typeof window==="undefined"/);
+
+  const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
+  assert.match(watch,/window\.addEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"the badge listens for it");
+  assert.match(watch,/window\.removeEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"and stops listening when it unmounts");
+
+  const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+  /* The drawer listed held buses and offered no way out of the state: the only
+     END DEFERRAL was inside an expanded feed card, which means finding the bus
+     again in the feed you had just filtered away from. */
+  assert.match(page,/className="end-deferral" onClick=\{\(\)=>endDeferralForBus\(bus,defects\)\}/);
+  assert.match(page,/const endDeferralForBus=\(bus:DefectLogFleetBus,deferred:StructuredDefect\[\]\)=>\{/);
+  /* IT RELEASES EVERY DEFERRED REPAIR ON THE BUS. The drawer is one card per
+     BUS and a deferral is per DEFECT, so a bus held on two repairs would come
+     straight back to the drawer and look like the button had not worked. */
+  assert.match(page,/for\(const defect of deferred\)\{/);
+  assert.match(page,/nextFleet=result\.fleet;nextDown=result\.downEntries;/,"each save threads into the next");
+  /* ONE snapshot, taken before anything moves. Calling the single-record
+     handler in a loop would snapshot the already-changed board on the second
+     pass, and UNDO would then only reach the last repair. */
+  const body=page.slice(page.indexOf("const endDeferralForBus="),page.indexOf("const movingMysteryBus="));
+  assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,"exactly one undo snapshot for the whole release");
+  assert.equal((body.match(/persist\(/g)||[]).length,1,"and one write at the end");
+  assert.ok(body.indexOf("setUndoSnapshot")>body.indexOf("for(const defect of deferred)"),"snapshot is of the fleet as it was, taken from the closure not the fold");
+  assert.match(body,/if\(result\.error\)\{alert\([^)]*\);return\}/,"a refused save stops the release rather than writing a half-done board");
+
+  const css = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  /* Three slots, so the two buttons stay the same size as each other whatever
+     the timer reads - and on a phone the timer takes its own line, because
+     three things across 360px put END DEFERRAL under 90px. */
+  assert.match(css,/\.quick-filter-deferred-row\{display:grid;grid-template-columns:auto minmax\(0,1fr\) minmax\(0,1fr\)/);
+  assert.match(css,/\.quick-filter-deferred-row>small\{grid-column:1\/-1\}/);
+  assert.match(css,/\.quick-filter-deferred-row \.end-deferral,\.quick-filter-deferred-row \.mystery-move\{min-height:44px/);
+});

@@ -630,6 +630,36 @@ export default function DefectLog(){
  const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
  const undoDeferred=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:now},false,now);if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Undid Deferred status for Bus "+record.bus.n});persist(result.fleet,result.downEntries)};
+ /* END DEFERRAL from the drawer itself.
+
+    The drawer listed the held buses and offered no way to release one: the
+    only END DEFERRAL in the app was UNDO DEFERRED inside an expanded Defect
+    Log card, which means finding the bus again in the feed you had just
+    filtered away from. Reported as "where is my (end defer status) or simply
+    remove button for this section?".
+
+    It releases EVERY deferred repair on the bus, not the one whose timer the
+    row happens to show. The drawer is one card per BUS while the deferral is
+    per DEFECT, so a bus held on two repairs would otherwise come back to the
+    drawer still deferred and look like the button had not worked.
+
+    The fold threads each save into the next rather than calling the existing
+    single-record handler in a loop: that one snapshots `fleet` for UNDO on
+    every call, so the second pass would have captured the already-changed
+    board and undo would only have reached the last repair. One snapshot, taken
+    before anything moves, and one write at the end. */
+ const endDeferralForBus=(bus:DefectLogFleetBus,deferred:StructuredDefect[])=>{
+  if(!deferred.length)return;
+  const now=new Date().toISOString();
+  let nextFleet=fleet,nextDown=downEntries;
+  for(const defect of deferred){
+   const result=saveDefectLogRecord(nextFleet,nextDown,bus.id,{...defect,state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:now},false,now);
+   if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}
+   nextFleet=result.fleet;nextDown=result.downEntries;
+  }
+  setUndoSnapshot({fleet,downEntries,label:"Ended Deferred status for Bus "+bus.n});
+  persist(nextFleet,nextDown);
+ };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
 
@@ -745,7 +775,7 @@ export default function DefectLog(){
       the card. The comparisons that matter — the 90-minute alert and the
       evening review — still read the real signed value and correctly ignore
       a stay that has not started yet. */
-   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null;return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
+   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null;return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
   {/* MYSTERY BUSES moved to the Down Sheet. Every bus it lists is a bus that is
       NOT on that sheet, so it belongs beside the sheet rather than here. The
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}

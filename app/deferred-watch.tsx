@@ -26,7 +26,7 @@
    this app already has, not a new one. */
 
 import {useEffect,useMemo,useState} from "react";
-import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetStorage,writeDownSheetStorageResult,writeFleetStorageResult} from "./storage";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,RECORDS_WRITTEN_EVENT,readDownSheetStorage,readFleetStorage,writeDownSheetStorageResult,writeFleetStorageResult} from "./storage";
 import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
 import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
@@ -96,7 +96,12 @@ export function DeferredNavBadge(){
   const interval=setInterval(recompute,60000);
   const onStorage=(event:StorageEvent)=>{if(!event.key||event.key===FLEET_KEY||event.key===DOWN_KEY)recompute()};
   window.addEventListener("storage",onStorage);
-  return ()=>{clearInterval(interval);window.removeEventListener("storage",onStorage)};
+  /* `storage` fires in OTHER tabs only, so on the page that did the writing
+     this badge went stale: defer a bus, or end a deferral, and the count did
+     not move until the minute tick or a reload. Curtis reported exactly that.
+     The writers announce a successful write in this document too. */
+  window.addEventListener(RECORDS_WRITTEN_EVENT,recompute);
+  return ()=>{clearInterval(interval);window.removeEventListener("storage",onStorage);window.removeEventListener(RECORDS_WRITTEN_EVENT,recompute)};
  },[]);
  /* Pressing it has to actually show the buses it is counting.
 
