@@ -1,10 +1,11 @@
 # Publish next
 
-**STATUS: VERSIONS 153, 154, 155 AND 156 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, then 155 from `6f8518b`, then 156 from `103b005`. Version 152 is live from `b57dcb5`.**
+**STATUS: VERSIONS 153–157 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, 155 from `6f8518b`, 156 from `103b005`, then 157 from `e8cc258`. Version 152 is live from `b57dcb5`.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Last | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
+| Last | **157** | `e8cc258` | **What the sheet says now outranks what the scan guessed it meant** — a row reading MISFIRE CYL # 5 was filed as a suspension part, and the review screen could not even display it, so the reviewer approved one repair and the sheet stored another; the written words now choose the catalog entry, MDT SCREEN resolves through the app's own rename, and an unexplained OFF PROPERTY filing is called out. Fixed Repairs also takes a typed bus number instead of only a dropdown |
+| Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
 | After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
 | Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
 | Next | **153** | `015e789` | **Shop Cloud now runs on every page and merges shop changes live as they happen** — it includes the Version 152 tombstone/Down Sheet sync repair, improved scan review, catalog additions, and the corrected Deferred badge behavior |
@@ -29,13 +30,14 @@
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**Four releases are pending, in order.** 153 is frozen at `015e789` — Codex
+**Five releases are pending, in order.** 153 is frozen at `015e789` — Codex
 split it out from what this file used to call Version 152's own tip, publishing
 152 itself only as far as `b57dcb5` — and is not moved by anything here; 154 is
 the three commits on top of it, `dd1b093`, `0db855a` and `fd3b326`; 155 is one
-commit further, `6f8518b`; 156 is one more, `103b005`. Publish in order — or,
-if it is simpler to publish once, publish 156 from `103b005` and record all
-four versions as live from it, since 156 contains 155, 154 and 153 whole.
+commit further, `6f8518b`; 156 is one more, `103b005`; 157 is the two after
+that, `62bb58d` and `e8cc258`. Publish in order — or, if it is simpler to
+publish once, publish 157 from `e8cc258` and record all five versions as live
+from it, since 157 contains 156, 155, 154 and 153 whole.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
@@ -60,6 +62,203 @@ supplies only what that runbook asks for — the exact source, what changed, and
 what to check once it is live.
 
 ---
+
+# Version 157 — The sheet's own words outrank what the scan guessed they meant
+
+**Publish this after Version 156.** Two things reported off the same morning's
+work: a scanned row filed as a repair the row never mentions, and the Fixed
+Repairs form offering no way to type a bus number.
+
+## Source
+
+| Field | Value |
+| --- | --- |
+| **Release source** | **`e8cc258`** |
+| Last code-bearing commit | `e8cc258` — the release source is this commit |
+| Branch | `main` on the private `origin` remote |
+| Previous | Version 156, pending from `103b005` |
+
+**Two application commits** on top of 156's `103b005`:
+
+```
+git log --oneline 103b005..e8cc258      # docs-only commits omitted
+e8cc258 Let Fixed Repairs take a typed bus number instead of only a dropdown
+62bb58d Let the words written on a scanned row outrank the catalog repair the scan guessed at
+
+git diff --name-only 103b005 e8cc258 -- app tests
+app/api/down-sheet-scan/route.ts
+app/down-sheet/down-sheet-scan-import.ts
+app/down-sheet/scan-catalog-match.ts     (new)
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
+tests/rendered-html.test.mjs
+```
+
+No dependency, database, CI, worker, or service-worker change:
+
+```
+git diff --name-only 103b005 e8cc258 -- supabase package.json package-lock.json .github public worker   # returns nothing
+```
+
+Gate: **225 tests passing** (223 at Version 156, two added), ESLint clean,
+production build succeeds.
+
+## Migrations
+
+**None, and nothing already stored is rewritten.** No storage key, payload
+shape or database change. The scan half changes what a scan produces, so it
+reaches a sheet only when one is scanned. No catalog entry was added, renamed
+or retired.
+
+## What changed
+
+### 1. A row filed as a repair it never mentioned — and a review screen that could not show it
+
+Line 25 of the 09/6 sheet reads `MISFIRE CYL # 5 / MDT SCREEN` against bus
+15508. The scan kept those words — it always does, verbatim — and filed the row
+as **Engine / Stabilizer link**. A stabilizer link is a suspension part and
+nothing on that row mentions one. The catalog was never the problem: Misfire is
+an Engine option, sitting there to be picked.
+
+There was a second failure underneath, and it is the one that let this reach the
+sheet. "Stabilizer link" is not in the Engine list at all, so the answer named a
+category and a repair that cannot go together — and the review screen's REPAIR
+dropdown can only display an option its category actually contains. It fell back
+to showing that category's **first** option while the import stored the original.
+**The reviewer approved "Check engine light" and the sheet recorded "Stabilizer
+link".** What was approved was not what was filed, for any row where the scan
+crossed a category, and nothing on screen said so.
+
+The written words now choose the catalog entry. The catalog becomes a set of
+phrases to look for; when the shop's wording names a repair, that is the repair —
+unless the scan's own pick is also named there, in which case it was reading the
+same row and is left alone. The earliest fault written wins, because the crew
+writes what matters first and lists the rest after a slash. **The reason itself
+is never altered.** Whatever ends up on the row, its category can display it, so
+the review screen and the import can no longer disagree.
+
+It is deliberately timid, and every phrase was read off the generated list before
+this shipped: nothing under five characters, no "Other …" entries, no names with
+brackets, and six generic Bodywork words skipped by name — broken, loose,
+missing, damaged, paint, trace — because "LOOSE MIRROR" is not a Bodywork/Loose
+row. Four phrases name two catalog entries each; the scan's own category breaks
+the tie.
+
+### 2. MDT SCREEN is a word the catalog no longer has
+
+The other half of that row exposed a gap of its own. The shop still writes **MDT
+SCREEN**; the catalog renamed it to **IBS Screen** some releases ago. So the
+model is handed a list with no "MDT" in it anywhere and cannot match the phrase
+however plainly it is written. The translation is now asked of the app's
+existing rename table rather than copied into a second one, so `MDT SCREEN`
+resolves to `Tech Services / IBS Screen - INOP (general)` — the same answer a
+stored record gets when it is read back.
+
+### 3. An OFF PROPERTY filing with nothing behind it
+
+The same row was also filed OFF PROPERTY, which takes a bus out of the yard's
+down count entirely — and alone among the four bands, nothing on the row has to
+justify it. The sheet says a bus is away by naming where it went in the
+MECHANIC/LOCATION column, or by the OFF PROPERTY heading above it.
+
+A row that reaches for that band with **no vendor named and no location or
+off-property wording anywhere** is now called out on the review screen. It is
+flagged rather than overridden: under a genuine OFF PROPERTY heading the
+location column is often blank, and making a foreman re-tick that whole band
+would cost more than it saves. **The root cause of this particular
+misfiling was not determined** — the scan output that produced it was not
+available — so this is a guard that makes it visible before import, not a fix
+for a diagnosed bug.
+
+### 4. Fixed Repairs takes a typed bus number
+
+LOG A REPAIR offered only a dropdown of the whole fleet — the one place in the
+app where a bus number could not simply be typed, and the slow path for working
+through a stack of work orders. **TYPE BUS #** now comes first and is the
+biggest control in the box, taking a full fleet number or the last two digits
+through the same resolver the map and the Defect Log use. The dropdown stays
+underneath.
+
+The box reports on every keystroke — which bus it landed on, that two digits
+matched more than one and need the full number, or that nothing matches —
+because silently landing on the wrong bus is how a repair gets logged against
+somebody else's work order. A number that resolves to nothing leaves the record
+on the bus it was already on, so a half-typed number never wipes a selection.
+
+FIX / STEPS TAKEN had `autoFocus` unconditionally and renders later in the DOM,
+so it silently won the race and the cursor landed two boxes past where the
+typing was headed. It keeps the focus when editing an existing record, where
+there is no bus box, and yields it on a new one.
+
+## Validation
+
+- 225 regression tests passing, ESLint clean, production build succeeds
+- **The 15508 row driven through the real scanner against the PRODUCTION
+  build**, its exact response stubbed, zero console errors: the review screen
+  shows **Engine / Misfire**, its dropdown can display that value, the reason
+  still reads `MISFIRE CYL # 5 / MDT SCREEN`, and the row carries both notes —
+  what the repair was read from, and that the OFF PROPERTY filing has nothing on
+  the row behind it
+- **Fixed Repairs driven against the PRODUCTION build**, zero console errors:
+  the form opens with the cursor in TYPE BUS #; typing `17525` moves the record
+  off the bus it opened on; `25` resolves to the same bus; `08` reports matching
+  15508 and 17508 and moves nothing; `99` reports no match and leaves the
+  previous bus in place
+- **The timid rules are pinned by their own assertions:** LOOSE MIRROR, BROKEN
+  SEAT and DAMAGED TRIM name no repair; a substring never fires ("no crank" does
+  not match "NO CRANKING NOISE"); a pick the words support is left alone; a real
+  repair under the wrong category moves to the category that owns it; a repair
+  this app does not have at all becomes Miscellaneous rather than an invented
+  specific one; and a named vendor or off-property wording silences the
+  off-property flag
+- **Only one field claims focus**, asserted by count, so the race that caused
+  the cursor to land in the wrong box cannot come back
+
+## After it is live
+
+1. **Rescan the sheet with line 25 on it.** Bus 15508 should read Engine /
+   Misfire, with the written words still saying `MISFIRE CYL # 5 / MDT SCREEN`,
+   and a note on the row saying where the repair was read from.
+2. **Look at the notes on the review screen generally.** Rows whose repair was
+   corrected, and rows headed OFF PROPERTY with nothing on them to justify it,
+   both say so now. The off-property one is worth a glance at the paper.
+3. **Scan a sheet with an MDT SCREEN row.** It should land under Tech Services
+   as IBS Screen rather than being guessed at.
+4. **Open Fixed Repairs → LOG A REPAIR.** The cursor should already be in TYPE
+   BUS #; type a full number or the last two digits and watch the bus underneath
+   follow, then fill in the repair as before.
+5. **Type two digits that match more than one bus.** It should say which buses
+   and wait for the full number rather than picking one.
+
+## The way back
+
+Measured in a throwaway worktree from `e8cc258`:
+
+- `git revert e8cc258` alone is **clean** and removes the Fixed Repairs typed
+  field, leaving the scan work in place.
+- `git revert e8cc258 62bb58d` (newest first) is **clean** and takes the whole
+  release out, back to 156.
+- `git revert 62bb58d` alone **conflicts in `tests/rendered-html.test.mjs`
+  only**, because the later commit appended to the same file; revert the pair
+  above, or keep both sides.
+- Nothing in this release writes new stored state, so there is nothing to clean
+  up going backwards. Rows imported while it was live keep the repair they were
+  imported with.
+
+## Publishing constraints that still apply
+
+- Do not create a replacement Sites project, change the live URL, or overwrite
+  newer work with an older checkout.
+- Update `docs/RELEASES.md` and `PROJECT_HANDOFF.md` in the same follow-up commit
+  once the version is saved and deployed, and replace this file with the next
+  handoff or reset it to `STATUS: NONE PENDING`.
+
+Suggested `docs/RELEASES.md` row:
+
+```
+| 157 | Live | <published tip hash> | What the sheet says now outranks what the scan guessed it meant. A row reading MISFIRE CYL # 5 / MDT SCREEN was filed as Engine / Stabilizer link — a suspension part on a row that mentions none — and because that repair does not exist under that category, the review screen's dropdown could not display it and showed the category's first option instead, so the reviewer approved one repair and the sheet stored another. The written words now choose the catalog entry, the earliest fault written winning, with the reason itself never altered and the result always displayable by its own category. The matching is deliberately timid: nothing under five characters, no "Other" entries, and generic condition words like loose and broken skipped by name. MDT SCREEN, which the shop still writes and the catalog renamed to IBS Screen, resolves through the app's own rename table. And a row filed OFF PROPERTY with no vendor or location named anywhere on it is now called out on the review screen, since that band alone takes a bus out of the yard's down count without anything on the row having to justify it. Fixed Repairs also takes a typed bus number — full number or last two digits, through the same resolver as the rest of the app — instead of only a dropdown of the whole fleet |
+```
+
 
 # Version 156 — A PM line with seven buses on it is not seven down buses
 
