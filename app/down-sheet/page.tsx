@@ -467,11 +467,11 @@ export default function DownSheet(){
           edit button on purpose — it is a fact about where the bus is, which
           this page reads from the map and does not own, so pressing it must not
           look like a way to change it. */}
-      <td className="fleet-number"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button>{isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}{/* On the bus's own cell rather than in a tenth column: this table scrolls
+      <td className="fleet-number"><span className="fleet-number-slots"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button>{isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}{/* On the bus's own cell rather than in a tenth column: this table scrolls
           sideways on a phone, and a delete parked off the right edge would be
           the one control you have to go looking for. It sits after the badge so
           the number is still the first thing under a thumb. */}
-      <button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></td>
+      <button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>

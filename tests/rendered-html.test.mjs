@@ -9775,6 +9775,21 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.match(page,/isDownSheetRoadLocation\(locations\[entry\.busId\]\|\|""\)&&<i className="on-road-badge"/);
  assert.ok(page.includes('</button>{isDownSheetRoadLocation'),"the badge follows the button rather than sitting inside it");
  assert.match(css,/\.on-road-badge\{[^}]*white-space:nowrap/,"a badge that wrapped would push every row taller");
+
+ /* Fixed tab stops, the same fix the Defect Log's badge slot got. Laid out
+    inline the badge follows the bus button, and that button is as wide as the
+    status label under it — so ON ROAD sat at three x positions on neighbouring
+    rows (measured 145, 161 and 185 for OUT OF SERVICE, WORK IN PROGRESS and IN
+    SERVICE WITH DEFECTS), and the longest label pushed it onto the reason text
+    in the next column. Curtis photographed it on the live sheet.
+
+    Each piece owns a slot now. The explicit grid-column on each is what makes
+    an empty ON ROAD slot stay empty instead of DELETE sliding left into it. */
+ assert.match(page,/<td className="fleet-number"><span className="fleet-number-slots">/,"the cell's contents need a row of fixed slots to sit in");
+ assert.match(css,/\.fleet-number-slots\{display:grid;grid-template-columns:\d+px \d+px \d+px/,"three fixed columns: the bus button, the ON ROAD slot, DELETE");
+ for(const [sel,col] of [["\\.fleet-number-button","1"],["\\.on-road-badge","2"],["\\.delete-entry","3"]])
+  assert.match(css,new RegExp("\\.fleet-number-slots>"+sel+"\\{grid-column:"+col),"each slot must be pinned to its own column, or it slides when a neighbour is absent");
+ assert.doesNotMatch(css,/\.on-road-badge\{[^}]*margin-left/,"the gap comes from the grid, not a margin that only exists when the badge does");
  /* 108px fitted the number and its status label exactly, so the badge beside it
     overflowed into the reason column and was clipped by 21px in the built page.
     DELETE later landed exactly the same way, hanging 13px into that column at
