@@ -138,12 +138,19 @@ per-device settings, never synced
 
 per-device view state — which panel is open, what has been dismissed
   pace-tracker-collapsed-sections-v1
-  pace-down-sheet-stats-open-v1
+  pace-down-sheet-stats-open-v1        NO LONGER READ — SHEET STATS is gone
   pace-defect-log-stats-open-v1
   pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
+STATS panel it opened was a second scoreboard saying most of what the tiles
+below already said; those tiles absorbed the numbers worth keeping and the
+panel went. The key is left listed, and left alone on devices that hold it,
+because it is still a name this repository has used — removing the line is how
+somebody later reuses the name for something else.
 
 **`pace-defect-log-mystery-collapsed-v1` is read and written by the Down Sheet**,
 not the Defect Log. The MYSTERY BUSES board moved there — every bus it lists is

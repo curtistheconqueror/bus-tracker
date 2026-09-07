@@ -1197,16 +1197,23 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, />1ST</);
   assert.match(html, />2ND</);
   assert.match(html, />3RD</);
-  assert.match(html, /ACTIVE DOWN/);
+  assert.doesNotMatch(html, /ACTIVE DOWN(?! COUNT)/, "the duplicate of TOTAL ON SHEET went with the panel; the footnote's ACTIVE DOWN COUNT is not it");
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
   assert.match(html, /MECHANIC \/ VENDOR/);
-  /* The eight stat tiles are behind SHEET STATS now, closed by default, so the
-     capacity tile is not in the first render. The bar that replaced them
-     carries the capacity figure, and the page opens on the button that adds a
-     bus instead of on a scoreboard. */
-  assert.match(html, /SHEET STATS/);
-  assert.doesNotMatch(html, /SHEET CAPACITY/);
+  /* SHEET STATS is gone. It was a second scoreboard behind its own bar saying
+     most of what the tiles below already said, in a different shape; the ones
+     worth keeping moved down into those tiles and the panel with them.
+
+     ACTIVE DOWN did not move. It counted the whole active sheet while TOTAL ON
+     SHEET counts the current view, which is why they printed the same number
+     on ALL with no search and read as a duplicate. SHEET CAPACITY still prints
+     the whole-sheet count, so no number was actually lost - which is the thing
+     to check here, not the panel's absence. */
+  assert.doesNotMatch(html, /SHEET STATS/);
+  assert.match(html, /SHEET CAPACITY/);
+  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR"])
+   assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" came down into the tiles rather than being dropped");
   assert.match(html, /\+ ADD DOWN BUS/);
   assert.match(html, /SHOW COMPLETED/);
   assert.match(html, /ADD DOWN BUS/);
@@ -6726,7 +6733,7 @@ test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
  // It counted the right thing and did nothing when pressed, so "what did we
  // actually finish today" could only be reached by turning on SHOW COMPLETED
  // and reading past the whole live sheet.
- assert.match(page,/<button type="button" className=\{"completed-today-tile"/);
+ assert.match(page,/className=\{"group-count group-completed completed-today-tile"/,"it moved into the scoreboard with the rest of SHEET STATS");
  assert.match(page,/aria-pressed=\{fixedToday\}/);
  // Pressing replaces the view rather than adding to it: completed, and today.
  // A repair finished last week is not what the tile counts and must not appear.
@@ -6735,9 +6742,10 @@ test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
  assert.match(page,/fixedToday\?[^;]*\)&&\(filter==="All"\|\|entry\.shift===filter\)&&matchesDownSheetSearch/);
  // Nothing to show and not already showing it means nothing to press.
  assert.match(page,/disabled=\{!counters\.completedToday&&!fixedToday\}/);
- // The tile has to keep looking like the tiles beside it, which are divs.
- assert.match(css,/\.down-summary>div,\.down-summary>button\{min-height:64px/);
- assert.match(css,/\.completed-today-tile\.active\{/);
+ // It has to keep looking like the tiles beside it, which are divs - and like
+ // the two road tallies, which are the other tiles you can press.
+ assert.match(css,/\.down-group-counts \.group-count\.group-completed\{font:inherit;cursor:pointer\}/);
+ assert.match(css,/\.down-group-counts \.group-count\.group-completed\.active\{/);
 });
 
 test("a fixed repair says which surface it came off",async()=>{
@@ -10111,4 +10119,39 @@ test("a deferred bus can be released from the drawer that lists it, and the badg
   assert.match(css,/\.quick-filter-deferred-row\{display:grid;grid-template-columns:auto minmax\(0,1fr\) minmax\(0,1fr\)/);
   assert.match(css,/\.quick-filter-deferred-row>small\{grid-column:1\/-1\}/);
   assert.match(css,/\.quick-filter-deferred-row \.end-deferral,\.quick-filter-deferred-row \.mystery-move\{min-height:44px/);
+});
+
+test("SHEET STATS folds into the tiles the foreman actually reads, without losing a number", async () => {
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+
+  /* The panel is gone, not hidden: no toggle, no second summary grid, and no
+     state left behind still writing a key nothing reads. */
+  for(const dead of [/className=\{"sheet-stats"/,/className="sheet-stats-toggle"/,/className="down-summary"/,/STATS_OPEN_KEY/,/statsOpen/])
+   assert.doesNotMatch(page,dead,"SHEET STATS left something behind");
+
+  /* Its numbers came down into the scoreboard. All of them except ACTIVE DOWN,
+     which counted the whole active sheet while TOTAL ON SHEET counts the
+     current view - the same number on ALL with no search, which is why it read
+     as a duplicate. SHEET CAPACITY still carries the whole-sheet count. */
+  for(const tile of ["group-pending","group-accident","group-waiting","group-completed","group-labor","group-capacity"])
+   assert.match(page,new RegExp('className=(\\{)?"?group-count '+tile),tile+" must be in the scoreboard");
+  assert.match(page,/<div className="group-count group-capacity"><strong>\{active\.length\}<small> \/ \{MAX_ENTRIES\}/,"capacity keeps the whole-sheet count ACTIVE DOWN used to carry");
+
+  /* EST. CURRENT VIEW renders only when it has something of its own to say.
+     Unfiltered it equals EST. ACTIVE LABOR to the minute, and printing the
+     same duration twice side by side is the duplication this was clearing.
+     Measured: hidden unfiltered, 35h against 105h on 2nd shift, 28h against
+     105h under the road filter. */
+  assert.match(page,/\{visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+
+  /* The labour tiles print a duration rather than a count, so their text steps
+     down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */
+  assert.match(css,/\.down-group-counts \.group-count\.group-labor strong\{color:#6f4c00;font-size:15px\}/);
+
+  /* And the key that panel used is recorded as retired rather than quietly
+     dropped, because a name this repository has used must not be reused. */
+  const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  assert.match(claude,/pace-down-sheet-stats-open-v1\s+NO LONGER READ/);
+  assert.match(claude,/`pace-down-sheet-stats-open-v1` is no longer read or written/);
 });
