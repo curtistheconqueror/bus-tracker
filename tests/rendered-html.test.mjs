@@ -778,8 +778,19 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
      stay out — LOG DEFECT and SEARCH — and the rest sit behind one button,
      closed until it is opened. */
   assert.match(html,/ADVANCED ACTIONS/);
-  assert.match(html,/class="log-advanced-toggle"/);
-  assert.match(html,/aria-expanded="false"/,"it opens closed, which is the point of it");
+  /* The toggle lives in the header now, in the same column as REFRESH, drawn
+     like the header's own controls rather than like a card on the page. */
+  assert.match(html,/class="log-header-actions"><button class="app-refresh"[\s\S]*?class="header-advanced-toggle"/,"ADVANCED ACTIONS sits directly under REFRESH, inside the header");
+  assert.match(html,/class="header-advanced-toggle"[^>]*aria-expanded="false"/,"it opens closed, which is the point of it");
+  /* Closed, the drawer is not in the document at all, so the button must not
+     point a screen reader at it. */
+  assert.doesNotMatch(html,/aria-controls="log-advanced-drawer"/);
+  const css2=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+  assert.doesNotMatch(css2,/\.log-advanced-toggle/,"the card-style toggle rules died with the card; nothing carries that class now");
+  assert.doesNotMatch(html,/class="log-advanced /,"closed, the drawer must not render an empty bordered box");
+  /* Closed, the header button is the last thing in the header - the drawer it
+     opens is a sibling below, not a light panel dropped into the navy. */
+  assert.match(html,/<\/button><\/div><\/header>/);
   assert.match(html,/\+ LOG DEFECT/);
   assert.match(html,/>SEARCH</);
   for(const label of ["QUICK FILTERS","UNDO LAST","CLEAN UP","SCAN SWEEP","SCAN BATCHES","AI OPERATOR"])
@@ -787,6 +798,22 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
    /* Four boxes in a two-column grid: two full rows, nothing sitting alone. */
    assert.match(css,/\.engine-symptom-picker>div\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+
+  /* MOVING A BUTTON MOVES IT OUT OF ITS OWN RULES. These four were written
+     against .feed-title, which is where they used to live; carried into
+     ADVANCED ACTIONS they matched nothing and quietly lost their paint - the
+     AI OPERATOR link came out as plain dark text with no gradient and CLEAN UP
+     came out with no border at all, both reported off the live site. The
+     buttons render in one place now and the rules must reach it. */
+  for(const rule of [/\.log-advanced \.feed-operator\{/,/\.log-advanced \.cleanup-log\{/,
+                     /\.log-advanced \.sweep-scan-button:disabled/,/\.log-advanced \.scan-batches-button:disabled/])
+   assert.match(css,rule,"a rule that only names .feed-title cannot reach a button that no longer renders there");
+  assert.match(css,/\.log-advanced \.feed-operator\{[^}]*linear-gradient\(120deg,#4a2389,#7138c5\)/,"AI OPERATOR keeps its purple");
+  assert.match(css,/\.log-advanced \.cleanup-log\{border:1px solid/,"CLEAN UP has a border you can see");
+  /* The toggle is drawn from the header's own translucent-white pair, not the
+     light-surface one it had as a card - that was invisible against navy. */
+  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff5c;[^}]*background:#ffffff1f/);
+  assert.match(css,/\.log-header-actions\{[^}]*flex-direction:column/,"REFRESH and ADVANCED ACTIONS stack in one column");
   /* The board's phone rules moved to globals.css with the board itself — that
      is the one stylesheet both pages load, and the Defect Log still needs the
      MOVE / LOCATION editor's styles for its deferred drawer. */
@@ -2504,6 +2531,25 @@ test("Version 85 stores Shop Notes and persists editable interface wording and s
   assert.equal(logDisplay.labels.shopNotes,"SHIFT NOTES");
   assert.deepEqual(logDisplay.styles.shopNotes,{color:"#123456",fontSize:12});
   assert.equal(normalizeDefectLogDisplay(null).labels.pageTitle,DEFAULT_DEFECT_LOG_DISPLAY.labels.pageTitle);
+
+  /* LIVE REPAIR FEED is read on a phone at arm's length across a shop floor and
+     shipped at 12px. Raising the default alone would reach nobody: the whole
+     Settings blob is written whenever anything in it is saved, so any device
+     that has ever opened Settings is carrying 12 as if it were a choice.
+
+     A stored value equal to the SUPERSEDED default is treated as no choice.
+     Anything else is a choice and is left alone - checked in both directions,
+     because a fallback that swallowed a real setting would be worse than the
+     stale default it replaces. */
+  assert.equal(DEFAULT_DEFECT_LOG_DISPLAY.styles.feedTitle.fontSize,17,"the shipped default");
+  assert.equal(normalizeDefectLogDisplay(null).styles.feedTitle.fontSize,17,"nothing stored");
+  assert.equal(normalizeDefectLogDisplay({styles:{feedTitle:{fontSize:12}}}).styles.feedTitle.fontSize,17,"a device carrying only the old default gets the new one");
+  for(const chosen of [9,11,13,24])
+   assert.equal(normalizeDefectLogDisplay({styles:{feedTitle:{fontSize:chosen}}}).styles.feedTitle.fontSize,chosen,chosen+"px is a choice and must survive");
+  /* And it applies to that one field, not as a general mechanism: 12 is a
+     perfectly ordinary stored size everywhere else. */
+  assert.equal(normalizeDefectLogDisplay({styles:{shopNotes:{fontSize:12}}}).styles.shopNotes.fontSize,12);
+  assert.equal(normalizeDefectLogDisplay({styles:{repairDetails:{fontSize:12}}}).styles.repairDetails.fontSize,12);
 
   const defect={id:"shop-note-1",category:"Engine",issue:"Misfire",details:"Cylinder 1",operability:"down",state:"open",source:"defect-log",shopNotes:"Bay 12 follow-up"};
   const fleet=[{id:"bus-1",n:"20501",s:"out",l:"west-0",defects:[]}];
@@ -9234,7 +9280,7 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
 
  // The tile, beside the total rather than under it, and the count behind it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/const downBusCount=useMemo\(\(\)=>visible\.filter\(downSheetMentionsDefect\)\.length,\[visible\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
+ assert.match(page,/const downBusCount=useMemo\(\(\)=>shown\.filter\(downSheetMentionsDefect\)\.length,\[shown\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
  assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{downBusCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
 
  /* The total used to take a whole row by itself on a phone. It is one of a pair
@@ -9628,7 +9674,17 @@ test("REFRESH is on every page, because a home-screen app has no address bar to 
     five pages had nothing. */
  for(const [name,source] of [["down-sheet",pages[0]],["defect-log",pages[1]],["fixed-repairs",pages[2]],["lists",pages[3]],["settings",pages[4]]]){
   assert.match(source,/import RefreshButton from "\.\.\/refresh-button"/,name+" must import the shared button");
-  assert.match(source,/<TrackerNav active="\/[a-z-]+"\/><RefreshButton\/>/,name+" puts it beside the nav in its header");
+  /* Straight after the nav in the header. The Defect Log stacks ADVANCED
+     ACTIONS under it in a column of its own, so a wrapper is allowed between
+     the two - what must not drift is REFRESH ending up somewhere other than
+     the header, which is where a home-screen user goes looking for it. */
+  assert.match(source,/<TrackerNav active="\/[a-z-]+"\/>[\s\S]{0,600}?<RefreshButton\/>/,name+" puts it beside the nav in its header");
+  /* The page header is the one holding the nav - these files define modals
+     with headers of their own further up, so the first <header> in the file is
+     not it. */
+  const nav=source.indexOf("<TrackerNav");
+  const header=source.slice(source.lastIndexOf("<header",nav),source.indexOf("</header>",nav));
+  assert.match(header,/<RefreshButton\/>/,name+" keeps it inside the header itself");
  }
  // The map keeps the command-bar look it already had, by passing its own class.
  assert.match(map,/<RefreshButton className="refresh-command"\/>/);
@@ -9941,8 +9997,23 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
- assert.match(page,/groupDownSheetEntries\(roadFilter\?downSheetRoadEntries\(shown,locations,roadFilter\):shown,order,locations\)/);
+ assert.match(page,/const sheetGroups=useMemo\(\(\)=>groupDownSheetEntries\(shown,order,locations\)/,"the scoreboard is grouped from the whole sheet");
+ assert.match(page,/const groups=useMemo\(\(\)=>roadFilter\?groupDownSheetEntries\(downSheetRoadEntries\(shown,locations,roadFilter\),order,locations\):sheetGroups/,"only the table follows the filter");
  assert.ok(page.indexOf("const roadCounts=")<page.indexOf("const groups=useMemo"),"counted from the unfiltered set");
+
+ /* AND SO IS EVERY OTHER TILE. Pressing INSPECTIONS ON ROAD is a request to
+    SEE those buses, not a claim that the sheet now holds seven of them.
+    Sharing one grouping made the tally rewrite the scoreboard above it - press
+    it on a 57-bus sheet and TOTAL ON SHEET read 7 - so the foreman lost the
+    numbers he had pressed it from. Reported off the live sheet. */
+ assert.match(page,/<div className="group-count total"><strong>\{shown\.length\}<\/strong><span>TOTAL ON SHEET<\/span><\/div>/,"TOTAL ON SHEET counts the sheet, not the filtered view");
+ assert.match(page,/\{sheetGroups\.map\(group=><div className=\{"group-count group-"\+group\.key\}/,"the four band tiles count the sheet too");
+ for(const filtered of [/<div className="group-count total"><strong>\{visible\.length\}/,/\{groups\.map\(group=><div className=\{"group-count group-"/])
+  assert.doesNotMatch(page,filtered,"no scoreboard tile may be recomputed from the road-filtered set");
+ /* What DOES follow the filter: the row count in view, the estimate, and the
+    note that says so - each of those describes the view rather than the sheet. */
+ assert.match(page,/<span className="view-results"><b>\{visible\.length\}<\/b> IN VIEW<\/span>/);
+ assert.match(page,/\{visible\.length\} of \{shown\.length\} on the sheet/);
  // And it says what it is showing, with a way back.
  assert.match(page,/SHOW THE WHOLE SHEET/);
  assert.match(css,/\.down-group-counts \.group-count\.group-road\{[^}]*cursor:pointer/);

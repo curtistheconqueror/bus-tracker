@@ -220,7 +220,17 @@ export default function DownSheet(){
     empty the other one out from under the person reading it. Both stay on
     screen saying what they always said; only the sheet below narrows. */
  const roadCounts=useMemo(()=>downSheetRoadCounts(shown,locations),[shown,locations]);
- const groups=useMemo(()=>groupDownSheetEntries(roadFilter?downSheetRoadEntries(shown,locations,roadFilter):shown,order,locations),[shown,order,locations,roadFilter]);
+ /* The scoreboard is grouped from the whole sheet and the table from the road
+    filter, which is why these are two groupings rather than one.
+
+    Pressing INSPECTIONS ON ROAD is a request to SEE those buses, not a claim
+    that the sheet now holds seven. Sharing one grouping made the tally rewrite
+    every tile above it — TOTAL ON SHEET read 7 while 57 buses were down — so a
+    foreman who pressed it to read the list off the sheet lost the numbers he
+    had pressed it from. The row count, the estimate and the note below still
+    follow the filter, because those describe the view. */
+ const sheetGroups=useMemo(()=>groupDownSheetEntries(shown,order,locations),[shown,order,locations]);
+ const groups=useMemo(()=>roadFilter?groupDownSheetEntries(downSheetRoadEntries(shown,locations,roadFilter),order,locations):sheetGroups,[sheetGroups,shown,order,locations,roadFilter]);
  const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
  /* Down buses: on the sheet for a fault rather than only for maintenance.
 
@@ -232,7 +242,7 @@ export default function DownSheet(){
     Same question the DOWNED BUSES ON ROAD tally already asks, asked of the
     whole sheet instead of only the buses out on the road, so the two numbers
     are defined the same way and the smaller can never exceed the larger. */
- const downBusCount=useMemo(()=>visible.filter(downSheetMentionsDefect).length,[visible]);
+ const downBusCount=useMemo(()=>shown.filter(downSheetMentionsDefect).length,[shown]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
@@ -512,12 +522,12 @@ export default function DownSheet(){
       one long list, and that list could not tell anyone how many of each there
       were. Same four bands, same order, as the dividers below. */}
   <section className="down-group-counts" aria-label="Down sheet section counts">
-   <div className="group-count total"><strong>{visible.length}</strong><span>TOTAL ON SHEET</span></div>
+   <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
    {/* Beside the total rather than under it, and the same size as every other
        tile: the two headline numbers a foreman reads together — how many rows
        are on the sheet, and how many of them are actually a bus down. */}
    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
-   {groups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
+   {sheetGroups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
    {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
        the sheet?" while looking at the yard; these answer "is this one out
        working?" while looking at the sheet — which the sheet itself could not
