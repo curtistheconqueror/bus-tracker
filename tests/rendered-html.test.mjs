@@ -9303,7 +9303,7 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
  assert.match(css,/\.down-group-counts\{margin:0 14px 9px;display:grid;grid-template-columns:repeat\(6,/,"six tiles across the first row");
 });
 
-test("every Down Sheet row carries its own DELETE, on the bus's cell rather than off the right edge",async()=>{
+test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of the row and behind a confirm",async()=>{
  const [page,css]=await Promise.all([
   readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
@@ -9312,13 +9312,36 @@ test("every Down Sheet row carries its own DELETE, on the bus's cell rather than
  /* In the bus's own cell, which is the one column a phone never has to scroll
     sideways to reach. A tenth column at the far right would be the control you
     go looking for, and this is the one pressed by somebody holding a sheet. */
- assert.match(page,/<td className="fleet-number">[\s\S]{0,1400}?<button className="delete-entry" type="button" onClick=\{\(\)=>deleteEntry\(entry\)\}/,"DELETE belongs on the face card, not in a column off the edge");
- assert.match(page,/<td className="fleet-number">[\s\S]{0,1600}?<button className="fix-entry" type="button" onClick=\{\(\)=>markEntryFixed\(entry\)\}/,"MARK FIXED sits in the same cell, before the destructive one");
+ /* THEY MOVED OUT OF THE BUS'S CELL, and that is a deliberate reversal of
+    where they started. Keeping them there meant a phone never had to scroll
+    sideways to reach them — but it put a one-press close-out directly under
+    the thumb that scrolls the sheet, and Curtis closed out a bus he did not
+    mean to. It also held the bus column at 288px, which pushed REASON DOWN,
+    the thing the sheet is read for, off the side of the screen.
+
+    They are the last cell of the row now: a deliberate scroll to reach, and
+    both ask before they act. */
+ assert.match(page,/<td className="row-actions"><span className="row-actions-slots">/);
+ assert.doesNotMatch(page,/<td className="fleet-number">[\s\S]{0,1400}?className="delete-entry"/,"the bus cell must not carry the buttons any more");
+ assert.match(page,/<th className="row-actions-head">ACTIONS<\/th><\/tr><\/thead>/,"and the column is the last one, with a header of its own");
+ assert.match(page,/colSpan=\{10\}/,"the divider and empty rows span the new column");
+ assert.doesNotMatch(page,/colSpan=\{9\}/);
+ /* The bus cell stacks instead: number, then the badge under it. */
+ assert.match(page,/<\/button>\{\/\* UNDER the number rather than beside it/);
+ assert.match(css,/\.fleet-number-slots\{display:flex;min-width:0;flex-direction:column/);
+ assert.match(css,/\.down-table th:nth-child\(2\)\{width:124px\}/,"288px was the cost of putting four things on one line");
  assert.match(page,/entry\.workflow!=="Completed"&&<button className="fix-entry"/,"and it is not offered on a row that is already closed out");
  assert.match(page,/aria-label=\{"Delete bus "\+\(entry\.busNumber\|\|"entry"\)\+" from the Down Sheet"\}/,"and it has to say which bus it would delete");
 
  // Asked before it happens, and the confirm says what survives it.
  assert.match(page,/const deleteEntry=\(entry:DownEntry\)=>\{[\s\S]{0,600}?if\(!confirm\(/);
+ /* AND SO DOES MARK FIXED NOW. It closed out on one press, on the reasoning
+    that a dialog every time is what stops people using a button — which held
+    while it sat under a thumb in the bus's own cell, and is exactly how a bus
+    got closed out by accident. Marking fixed is a claim about the work: it
+    completes the defect, recomputes the status and teaches the findings. */
+ assert.match(page,/const markEntryFixed=\(entry:DownEntry\)=>\{[\s\S]{0,900}?if\(!confirm\("Mark bus "/);
+ assert.match(page,/The repair is marked done and the bus's defect is completed\. UNDO puts it back\./);
  assert.match(page,/The bus keeps its defects, status and location/,"deleting a row is not a claim that anything was repaired");
 
  /* The way back is on the page, not behind MORE: an accidental delete is
@@ -9330,6 +9353,7 @@ test("every Down Sheet row carries its own DELETE, on the bus's cell rather than
     on phones, so the phone block has to give it a real target. */
  assert.match(css,/\.delete-entry\{[^}]*width:26px/);
  assert.match(css,/\.fix-entry\{[^}]*width:26px/,"MARK FIXED shares DELETE's shape so the pair reads as one group");
+ assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:36px 36px/);
  /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
     the map — matched on content rather than position, since the file has many. */
  const at=css.indexOf(".down-deleted-note button{width:100%");
@@ -10037,7 +10061,13 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     a bus is comes from the map and this page does not own it, so the badge must
     not look like a way to change it. */
  assert.match(page,/isDownSheetRoadLocation\(locations\[entry\.busId\]\|\|""\)&&<i className="on-road-badge"/);
- assert.ok(page.includes('</button>{isDownSheetRoadLocation'),"the badge follows the button rather than sitting inside it");
+ /* OUTSIDE the edit button, checked by looking inside that button rather than
+    by adjacency - the badge sits under the number now, with a comment between
+    the two, and an adjacency test would have failed on the comment while the
+    thing it protects was still true. */
+ const busButton=page.slice(page.indexOf('<button className="fleet-number-button"'),page.indexOf('</button>',page.indexOf('<button className="fleet-number-button"')));
+ assert.ok(!busButton.includes("on-road-badge"),"the badge must not sit inside the button that opens the editor");
+ assert.match(page,/<\/button>\{\/\*[\s\S]{0,600}?\*\/\}\s*\{isDownSheetRoadLocation\(locations\[entry\.busId\]\|\|""\)&&<i className="on-road-badge"/,"and it follows the number, stacked under it");
  assert.match(css,/\.on-road-badge\{[^}]*white-space:nowrap/,"a badge that wrapped would push every row taller");
 
  /* Fixed tab stops, the same fix the Defect Log's badge slot got. Laid out
@@ -10050,28 +10080,48 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     Each piece owns a slot now. The explicit grid-column on each is what makes
     an empty ON ROAD slot stay empty instead of DELETE sliding left into it. */
  assert.match(page,/<td className="fleet-number"><span className="fleet-number-slots">/,"the cell's contents need a row of fixed slots to sit in");
- assert.match(css,/\.fleet-number-slots\{display:grid;grid-template-columns:\d+px \d+px \d+px \d+px/,"four fixed columns: the bus button, the ON ROAD slot, MARK FIXED, DELETE");
- for(const [sel,col] of [["\\.fleet-number-button","1"],["\\.on-road-badge","2"],["\\.fix-entry","3"],["\\.delete-entry","4"]])
-  assert.match(css,new RegExp("\\.fleet-number-slots>"+sel+"\\{grid-column:"+col),"each slot must be pinned to its own column, or it slides when a neighbour is absent");
- assert.doesNotMatch(css,/\.on-road-badge\{[^}]*margin-left/,"the gap comes from the grid, not a margin that only exists when the badge does");
+ /* THE FOUR-SLOT ROW IS GONE, and with it the problem it was solving. Fixed
+    tab stops existed because four things shared one line and an absent one let
+    its neighbours slide. Only two things are in this cell now — the number and
+    the badge — and they are STACKED, so there is no line for anything to slide
+    along and nothing to pin. The badge cannot wander because it starts where
+    the number starts.
+
+    The buttons that made this cell four wide are a column of their own at the
+    end of the row. */
+ assert.match(css,/\.fleet-number-slots\{display:flex;min-width:0;flex-direction:column;align-items:flex-start/);
+ assert.doesNotMatch(css,/\.fleet-number-slots\{display:grid/,"the four-slot row is what made this column 288px wide");
+ for(const gone of [/\.fleet-number-slots>\.fix-entry/,/\.fleet-number-slots>\.delete-entry/])
+  assert.doesNotMatch(css,gone,"the buttons do not live in this cell any more");
+ assert.doesNotMatch(css,/\.on-road-badge\{[^}]*margin-left/,"the gap comes from the stack, not a margin that only exists when the badge does");
  /* 108px fitted the number and its status label exactly, so the badge beside it
     overflowed into the reason column and was clipped by 21px in the built page.
     DELETE later landed exactly the same way, hanging 13px into that column at
     every phone width, because table-layout is fixed and the column does not
     grow for what you put in it.
 
-    So the rule rather than the number: the column is sized for the worst row it
-    can hold — longest status label, ON ROAD, and a 44px delete target, measured
-    at 253px on a 390px phone — and the table's min-width rises with it, which
-    is what keeps the widening from coming out of another column. */
+    That reasoning drove the column to 288px, sized for the worst row it could
+    hold — longest status label, ON ROAD, and a 44px delete target. It is no
+    longer the right shape: the buttons left, the badge went under the number,
+    and 288px of the screen was being spent on a five-digit number while REASON
+    DOWN, the column the sheet is actually read for, sat off the side of the
+    phone. Reported from the floor.
+
+    So the cell holds two stacked things and the column is the width of the
+    wider of them, and the room that frees goes to the reason. */
  const busCol=Number(css.match(/\.down-table th:nth-child\(2\)\{width:(\d+)px\}/)?.[1]);
+ const actionsCol=Number(css.match(/\.down-table th\.row-actions-head\{width:(\d+)px\}/)?.[1]);
  const tableMin=Number(css.match(/\.down-table\{[^}]*min-width:(\d+)px/)?.[1]);
- /* 238 declared renders as a 261px box once padding and borders are on it,
-    against the 253px the worst row measured — 8px of headroom. Declared width
-    and measured box are not the same number, so this floor is the declared one
-    that was actually measured good. */
- assert.ok(busCol>=238,"the bus column is "+busCol+"px, too narrow for the number, its status label, ON ROAD and DELETE together");
- assert.equal(tableMin,1052+busCol,"the table's min-width has to rise with the bus column, or the extra room is taken from another column");
+ /* Wide enough for the number and its status label stacked, and no wider - the
+    old 288px is the bug now, not the floor. */
+ assert.ok(busCol>=110&&busCol<=160,"the bus column is "+busCol+"px; it holds a number and a badge, stacked");
+ /* Two 44px phone targets and the gap between them. */
+ assert.ok(actionsCol>=98,"the actions column is "+actionsCol+"px, too narrow for two 44px targets");
+ /* The other seven columns total 1052px and must not pay for either of these. */
+ assert.equal(tableMin,1052+busCol+actionsCol,"every column's width has to be in the table's min-width, or one of them is being squeezed");
+ /* And the net is NARROWER than before, which is the point: 288 became 124 and
+    the actions took 104 back, so the sheet got 60px less wide, not more. */
+ assert.ok(tableMin<1340,"moving the buttons out must not make the sheet wider than it was");
 });
 
 test("a deferred bus can be released from the drawer that lists it, and the badge moves without a reload", async () => {

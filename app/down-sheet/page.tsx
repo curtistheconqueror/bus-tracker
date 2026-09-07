@@ -380,6 +380,15 @@ export default function DownSheet(){
     defects are completed, its status is recomputed from that, and the findings
     it taught are learned. One press must not mean a different kind of save. */
  const markEntryFixed=(entry:DownEntry)=>{
+  /* It used to close out on one press, on the reasoning that a foreman working
+     down a sheet presses it many times in a row and a dialog each time is the
+     thing that makes people stop using a button. That held while it sat in the
+     bus's own cell under a thumb — and it is exactly why Curtis closed out a
+     bus he did not mean to. Marking a bus fixed is a claim about the work: it
+     completes the defect, recomputes the status and teaches the findings. It
+     asks now, the same as the delete beside it always did. */
+  const reason=reasonLabel(entry);
+  if(!confirm("Mark bus "+(entry.busNumber||"this bus")+" fixed and close it out?"+(reason?"\n\n"+reason:"")+"\n\nThe repair is marked done and the bus's defect is completed. UNDO puts it back."))return;
   const now=new Date().toISOString(),who=(entry.completedBy||(entry.assignmentType==="Mechanic"?entry.assignedTo:"")||defaultInitials||"").trim().toUpperCase();
   /* The copy goes down first, exactly as the delete does. There is no confirm
      on this — a foreman closing out a sheet presses it many times in a row and
@@ -594,7 +603,7 @@ export default function DownSheet(){
    <div className="sheet-title"><div><b>{displaySettings.labels.sheetKicker||"MAINTENANCE FACILITY"}</b><span>{displaySettings.labels.sheetTitle}</span></div><p>{filter==="All"?"ALL SHIFTS":filter+" SHIFT"} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p></div>
    <div className="sheet-scroll">
     <table className="down-table">
-     <thead><tr><th>{displaySettings.labels.line}</th><th>{displaySettings.labels.busNumber}</th><th>{displaySettings.labels.reasonDown}</th><th>{displaySettings.labels.assignment}</th><th>{displaySettings.labels.section}</th><th>{displaySettings.labels.shift}</th><th>{displaySettings.labels.workStatus}</th><th>{displaySettings.labels.estimatedTime}</th><th>{displaySettings.labels.updatedBy}</th></tr></thead>
+     <thead><tr><th>{displaySettings.labels.line}</th><th>{displaySettings.labels.busNumber}</th><th>{displaySettings.labels.reasonDown}</th><th>{displaySettings.labels.assignment}</th><th>{displaySettings.labels.section}</th><th>{displaySettings.labels.shift}</th><th>{displaySettings.labels.workStatus}</th><th>{displaySettings.labels.estimatedTime}</th><th>{displaySettings.labels.updatedBy}</th><th className="row-actions-head">ACTIONS</th></tr></thead>
      {/* The sheet divides itself, always — not only when an ordering is chosen.
          Each band carries its own count on the divider so the number never has
          to be arrived at by scrolling and adding. Line numbers keep running
@@ -603,8 +612,8 @@ export default function DownSheet(){
       if(!group.entries.length)return null;
       const offset=groups.slice(0,groupIndex).reduce((sum,item)=>sum+item.entries.length,0);
       return <Fragment key={group.key}>
-       <tr className={"down-group-row group-"+group.key}><td colSpan={9}><b>{group.label}</b><i>{group.entries.length}</i><span>{group.hint}</span></td></tr>
-       {group.entries.map((entry,index)=>{const work=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(group.entries[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&work.label!==previous?.label&&<tr className={"work-group-row group-"+work.rank}><td colSpan={9}>{work.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
+       <tr className={"down-group-row group-"+group.key}><td colSpan={10}><b>{group.label}</b><i>{group.entries.length}</i><span>{group.hint}</span></td></tr>
+       {group.entries.map((entry,index)=>{const work=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(group.entries[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&work.label!==previous?.label&&<tr className={"work-group-row group-"+work.rank}><td colSpan={10}>{work.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
       <td className="line-number">{String(offset+index+1).padStart(2,"0")}</td>
       {/* ON ROAD, beside the number, on every row that is out working. The two
           tallies above give the counts; this is the same fact per bus, so it
@@ -612,12 +621,12 @@ export default function DownSheet(){
           edit button on purpose — it is a fact about where the bus is, which
           this page reads from the map and does not own, so pressing it must not
           look like a way to change it. */}
-      <td className="fleet-number"><span className="fleet-number-slots"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button>{isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}{/* On the bus's own cell rather than in a tenth column: this table scrolls
-          sideways on a phone, and a delete parked off the right edge would be
-          the one control you have to go looking for. It sits after the badge so
-          the number is still the first thing under a thumb. */}
-      {entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark bus "+(entry.busNumber||"entry")+" fixed"} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span></button>}
-      <button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
+      <td className="fleet-number"><span className="fleet-number-slots"><button className="fleet-number-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit down-sheet entry for bus "+entry.busNumber}><b>{entry.busNumber||"—"}</b><small>{STATUS_LABELS[entry.operationalStatus]}</small></button>{/* UNDER the number rather than beside it. Beside it, the badge and
+          the two row buttons held this column at 288px and pushed REASON DOWN
+          — the thing the sheet is read for — off the side of a phone. Stacked,
+          the column is the width of a bus number and the reason arrives on
+          screen. */}
+      {isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}</span></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>
@@ -625,9 +634,16 @@ export default function DownSheet(){
       <td><b className={"workflow "+entry.workflow.toLowerCase().replaceAll(" ","-")}>{entry.workflow}</b></td>
       <td className="estimate-cell"><b>{isQuarantineEntry(entry)?"N/A":entryEstimateMinutes(entry)?formatRepairTime(entryEstimateMinutes(entry)):"NOT SET"}</b><small>{isQuarantineEntry(entry)?"QUARANTINE":"MECHANIC PLAN"}</small></td>
       <td className="updated"><b>{entry.updatedBy||"—"}</b><small>{timeLabel(entry.updatedAt)}</small></td>
+           {/* AT THE END OF THE ROW, which is a deliberate reversal. They sat in the
+          bus's cell so a phone would not have to scroll sideways to reach
+          them — and that put a one-press close-out under the thumb that scrolls
+          the sheet. Curtis closed out a bus he did not mean to. Out here they
+          take a deliberate scroll AND a confirm, and the first column shrinks
+          by 164px, which is what makes the reason readable. */}
+      <td className="row-actions"><span className="row-actions-slots">{entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark bus "+(entry.busNumber||"entry")+" fixed"} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span></button>}<button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
      </tr></Fragment>})}
       </Fragment>;
-     }):<tr><td className="empty-sheet" colSpan={9}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>
+     }):<tr><td className="empty-sheet" colSpan={10}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>
     </table>
    </div>
   </section>
