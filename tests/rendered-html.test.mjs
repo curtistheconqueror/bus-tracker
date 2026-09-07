@@ -1193,10 +1193,13 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Interactive Down Sheet/);
-  assert.match(html, /aria-pressed="true">ALL/);
-  assert.match(html, />1ST</);
-  assert.match(html, />2ND</);
-  assert.match(html, />3RD</);
+  /* The shift filter moved into ADVANCED ACTIONS, which opens closed, so it is
+     not in the first render at all - and that is the point of the change: what
+     the page opens on is ADD DOWN BUS and SEARCH, not a block of controls. */
+  assert.match(html, /class="down-advanced-toggle"[^>]*aria-expanded="false"/);
+  assert.doesNotMatch(html, /aria-pressed="true">ALL/);
+  for(const shift of [/>1ST</,/>2ND</,/>3RD</,/SHOW COMPLETED/,/SCAN SHEET/,/CLEAR DOWNSHEET/])
+   assert.doesNotMatch(html, shift, "it lives behind the closed panel now");
   assert.doesNotMatch(html, /ACTIVE DOWN(?! COUNT)/, "the duplicate of TOTAL ON SHEET went with the panel; the footnote's ACTIVE DOWN COUNT is not it");
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
@@ -1214,10 +1217,12 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /SHEET CAPACITY/);
   for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR"])
    assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" came down into the tiles rather than being dropped");
+  /* What the page opens on: the button that adds a bus, and the search under
+     it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
+     asserted absent above. */
   assert.match(html, /\+ ADD DOWN BUS/);
-  assert.match(html, /SHOW COMPLETED/);
-  assert.match(html, /ADD DOWN BUS/);
-  assert.match(html, /CLEAR DOWNSHEET/);
+  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS is alone in its row now");
+  assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
   assert.match(html, /QUICK NOTES/);
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
@@ -10154,4 +10159,49 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
   const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
   assert.match(claude,/pace-down-sheet-stats-open-v1\s+NO LONGER READ/);
   assert.match(claude,/`pace-down-sheet-stats-open-v1` is no longer read or written/);
+});
+
+test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken for the Defect Log's", async () => {
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+
+  /* In the header, under REFRESH, in a column of its own so it is under it at
+     every width rather than only where the header happens to stack. */
+  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*<button className="down-advanced-toggle"/);
+  assert.match(css,/\.down-header-actions\{[^}]*flex-direction:column/);
+
+  /* UNMISTAKABLY THIS PAGE'S. Both headers are navy, so the Defect Log's
+     translucent white here would have made the two read as one header. This
+     wears #6b31b6 - what SCAN SHEET already wears on this page and nothing on
+     the Defect Log does. */
+  assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/);
+  const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:#ffffff1f/);
+  assert.doesNotMatch(logCss,/\.header-advanced-toggle\{[^}]*background:#6b31b6/,"the two toggles must not share a colour");
+
+  /* What went in, and what deliberately stayed out. ADD DOWN BUS and SEARCH
+     are the two things used on every visit and now sit together, instead of
+     with six controls wedged between them. */
+  const drawer=page.slice(page.indexOf('className="down-advanced open"'),page.indexOf('<section className="down-controls">'));
+  for(const inside of ["shift-filter","completed-toggle","scan-sheet-button","clear-downsheet","undo-scan","undo-clear"])
+   assert.ok(drawer.includes(inside),inside+" belongs in ADVANCED ACTIONS");
+  assert.ok(!drawer.includes("down-primary-action"),"ADD DOWN BUS stays out");
+  assert.ok(!drawer.includes("down-search"),"SEARCH stays out");
+  const controls=page.slice(page.indexOf('<section className="down-controls">'),page.indexOf('<section className="down-view-controls"'));
+  assert.ok(controls.includes("down-primary-action"),"ADD DOWN BUS is what is left in that row");
+  for(const gone of ["shift-filter","completed-toggle","scan-sheet-button","down-more"])
+   assert.ok(!controls.includes(gone),gone+" moved out of the controls row");
+
+  /* Closed by default and remembered per device, under a key of its own -
+     documented, because an undocumented key is how one gets renamed later. */
+  assert.match(page,/const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1"/);
+  assert.match(page,/writeSetting\(localStorage,ADVANCED_OPEN_KEY,advancedOpen\?"1":"0"\)/);
+  const claude = await readFile(new URL("../CLAUDE.md", import.meta.url), "utf8");
+  assert.match(claude,/pace-down-sheet-advanced-open-v1/);
+
+  /* THE COLUMN IS CAPPED. Uncapped it rendered 285px wide next to a 700px nav
+     and pushed the whole page 40px sideways at 1180 - iPad landscape - which
+     is the exact class of fault this page has already been fixed for twice. */
+  assert.match(css,/\.down-header-actions\{[^}]*max-width:210px/);
+  assert.match(css,/\.down-header-actions\{width:100%;max-width:none\}/,"and uncapped again once the header stacks");
 });
