@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 152
-Live feature checkpoint: commit b57dcb5
+Live release: Sites Version 153 (repository release 157)
+Live feature checkpoint: commit baffc24
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Version 152 is the current user-approved live release. Its source checkpoint is commit b57dcb5. Shop Cloud sync now sends tombstones safely and reaches the Down Sheet, scan review flags missed or uncertain rows, and the Deferred badge opens the matching bus filter. No migration or storage rewrite was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 157 is the current user-approved live release, deployed by Sites as Version 153. Its source checkpoint is commit baffc24. It carries the Shop Cloud sync and scan-review work from releases 153–154, Main Garage Ready Rows, corrected Down Sheet row semantics and road tallies, improved scan catalog matching, and an ON ROAD badge on every Down Sheet row. No storage-key or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

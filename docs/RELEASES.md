@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 153 / release 157 | Live | baffc24 | Carries repository releases 153–157: Shop Cloud sync and scan-review repairs, reversible scan sweeps, Ready Rows, corrected Down Sheet scan wording and road tallies, improved catalog matching, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | 152 | Live | b57dcb5 | Shop Cloud sync safely sends merged-defect tombstones and reaches Down Sheet rows; scan review flags missing and uncertain rows; the Deferred badge opens its matching bus filter; Shop Cloud is first under Settings MASTER; A-3, A-21, and a biohazard catalog condition are added |
 | 151 | Previous live | f5939df | Dated ROAD CALL events sync between Defect Log and Facility Map, remain in history while driving a seven-day filter, and permit a short mis-tick undo; Down Sheet bands distinguish off-property, scheduled, unscheduled and inspection work; master backup and restore controls move to Settings |
 | 150 | Previous live | 6d62787 | IMPORT ALL DATA on the Facility Map restores backups again; settings are centralized on an offline-capable Settings page, MERGE DUPES moves there with its live count and undo, Technical Service Bulletins attach to repairs, ALL clears search, and navigation comes from one shared list |

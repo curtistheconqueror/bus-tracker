@@ -1,10 +1,10 @@
 # Publish next
 
-**STATUS: VERSIONS 153–157 PENDING — publish 153 from `015e789`, then 154 from `fd3b326`, 155 from `6f8518b`, 156 from `103b005`, then 157 from `baffc24`. Version 152 is live from `b57dcb5`.**
+**STATUS: NONE PENDING — repository release 157 is live from `baffc24` as Sites Version 153.**
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| Last | **157** | `baffc24` | **The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant** — two pressable tallies join the five, counting a bus with both a PM and a fault in both; a row reading MISFIRE CYL # 5 had been filed as a suspension part the review screen could not even display, so the reviewer approved one repair and the sheet stored another; MDT SCREEN resolves through the app's own rename, an unexplained OFF PROPERTY filing is called out, and Fixed Repairs takes a typed bus number instead of only a dropdown |
+| Published | **157** | `baffc24` | **Live as Sites Version 153.** The Down Sheet says which of its buses are out on the road, and the sheet's own words outrank what the scan guessed they meant; it includes road tallies, corrected catalog matching, MDT SCREEN normalization, OFF PROPERTY review callouts, typed Fixed Repairs bus entry, and the ON ROAD badge on every Down Sheet row |
 | Then | **156** | `103b005` | **A PM line with seven buses on it stops counting as seven down buses** — the scan carried the words "PM'S" on the first bus of the line only and left the other six blank under the UNSCHEDULED heading, inflating the down count by six off one line of paper; every bus on a printed line now takes that line's wording, and a row's own wording outranks the band heading it sat under |
 | After | **155** | `6f8518b` | Rows 1–6 of the Main Garage are marked READY ROWS: a thick green line separates ROW 6 from ROW 7 in the grid, and a matching badge sits in the section's own title bar next to its bus count, ahead of a smart tracking system planned for later |
 | Then | **154** | `fd3b326` | **A scan sweep can be taken back out of the Defect Log exactly** — sweep batches can be removed and restored safely across devices, both scanners accept contextual notes, and scan recognition and margin rows are corrected |
