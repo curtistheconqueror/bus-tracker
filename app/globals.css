@@ -872,3 +872,41 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    Down Sheet passes them through rather than resetting them: a foreman who
    renamed this panel keeps the name he gave it. */
 .mystery-head b{color:var(--log-mystery-color,var(--log-accent,#0b64bd));font-size:var(--log-mystery-size,11px)}
+
+/* THE APP'S NAME, top-left of every page header.
+
+   One rule for all six pages. Each page styles its own header in its own
+   stylesheet, so the name carries its own look here rather than being restyled
+   six times — the same reason the MYSTERY BUSES panel lives in this file: it is
+   the one stylesheet every page loads.
+
+   It sits above the kicker each header already has (FLEET MAINTENANCE,
+   MAINTENANCE FACILITY), so the existing block moves down rather than making
+   room sideways. Colour is inherited from the header it lands in, at 62%
+   against that header's own background, so it reads as the name of the thing
+   rather than competing with the page title under it.
+
+   text-align:left is not decoration and not redundant: the Facility Map's
+   header is centre-aligned, and without this the name rendered centred there
+   and flush left on the other five - measured at x198 on a 1280 map against
+   x18 everywhere else. The name is the one thing that must sit in the same
+   corner on every page. */
+.app-name{display:block;text-align:left;margin:0 0 3px;font-size:11px;font-weight:900;letter-spacing:1.4px;line-height:1;color:currentColor;opacity:.62}
+@media(max-width:760px){.app-name{font-size:12px;letter-spacing:1.1px}}
+
+/* THE FACILITY MAP'S HEADER IS A BARE <header>, and bare headers in this file
+   are given a FIXED height:38px. The phone block below already releases it with
+   height:auto; above 620px it did not, so adding the name line would have
+   pushed the h1 straight through the header's own bottom edge — silently, the
+   way the Fixed Repairs feed header once overflowed by 37.5px.
+
+   min-height cannot undo a fixed height. height:auto is what releases it, and
+   it is not redundant next to the min-height: delete it and the map's header
+   goes back to being 38px tall whatever is inside it. */
+.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:7px 10px}
+/* The map's header is a centring flex row, so the name landed BESIDE the h1
+   and centred with it - measured at x198 on a 1280 screen against x18 on every
+   other page, and text-align could not touch it because flex was centring the
+   ITEMS, not the text. Stacking is what "the structure moves down to fit the
+   name" actually means here; the title keeps its centre on its own line. */
+.app>header>h1{text-align:center}

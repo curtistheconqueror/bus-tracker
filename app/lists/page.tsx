@@ -14,6 +14,7 @@ import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
 import ShopCloudLive from "../shop-cloud-live";
+import AppName from "../app-name";
 
 function readLists(raw:string|null):BusList[]{
  try{return normalizeBusLists(JSON.parse(raw||"[]"))}catch{return []}
@@ -137,7 +138,7 @@ export default function Lists(){
  };
 
  return <main className="lists-app"><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
-  <header className="lists-header"><div><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
+  <header className="lists-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
    <TrackerNav active="/lists"/><RefreshButton/>
   </header>
 

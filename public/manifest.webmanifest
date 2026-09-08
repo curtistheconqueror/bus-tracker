@@ -1,6 +1,6 @@
 {
-  "name": "Fleet Maintenance Bus Tracking System",
-  "short_name": "Fleet Bus Tracker",
+  "name": "TransitKey — Fleet Maintenance",
+  "short_name": "TransitKey",
   "description": "Offline-capable facility-wide fleet location and maintenance tracking board.",
   "start_url": "/",
   "scope": "/",

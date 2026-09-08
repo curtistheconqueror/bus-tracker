@@ -685,7 +685,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
 
-  assert.match(html, /<title>Fleet Maintenance Bus Tracking System<\/title>/i);
+  assert.match(html, /<title>TransitKey — Fleet Maintenance<\/title>/i);
   assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
@@ -849,9 +849,22 @@ test("removes prospective customer branding from visible app titles", async () =
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   const manifest = JSON.parse(manifestText);
-  assert.equal(manifest.name, "Fleet Maintenance Bus Tracking System");
-  assert.equal(manifest.short_name, "Fleet Bus Tracker");
-  assert.match(layout, /title:"Fleet Maintenance Bus Tracking System"/);
+  /* THE APP HAS A NAME NOW: TransitKey. Curtis chose it, and it is drawn in the
+     top-left of all six page headers by `app/app-name.tsx`.
+
+     The manifest has to agree with that header. short_name is what a phone
+     prints under the home-screen icon, so a header saying one thing and an icon
+     saying another would give one app two names on one device. All three are
+     pinned together here for that reason, and the component exports the string
+     rather than each page spelling it - five copies of the nav once drifted
+     until the Facility Map called itself something the other pages did not, and
+     a name is the last string that should be allowed to do that. */
+  const appName = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  assert.match(appName, /export const APP_NAME="TransitKey"/);
+  assert.equal(manifest.short_name, "TransitKey");
+  assert.equal(manifest.name, "TransitKey — Fleet Maintenance");
+  assert.match(layout, /title:"TransitKey — Fleet Maintenance"/);
+  assert.match(layout, /title:"TransitKey"/, "the iOS home-screen title too");
   assert.match(operator, /FLEET INTELLIGENT COMMAND CONSOLE/);
   assert.match(downSheet, /FLEET MAINTENANCE/);
   assert.match(downSheet, /MAINTENANCE FACILITY/);
@@ -10415,4 +10428,50 @@ test("no Down Sheet cell is a flex container, or it stops stretching to its row"
   assert.match(css,/\.updated\{display:table-cell\}/);
   assert.match(css,/\.updated b\{display:block/,"the children stack as blocks, which needs no flex");
   assert.match(css,/\.estimate-cell\{display:table-cell/,"the precedent this follows");
+});
+
+test("the app's name is drawn top-left on every page, from one place", async () => {
+  /* Curtis named it: TransitKey. It goes in the top-left of every page header,
+     above the kicker each one already carries, so the existing block moves
+     down rather than making room sideways. */
+  const component = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  assert.match(component,/export const APP_NAME="TransitKey"/);
+
+  /* ONE SHARED PIECE, not six copies. Five copies of the nav drifted until the
+     Facility Map called itself something the other pages did not - that is why
+     tracker-pages.ts exists - and a name is the last string that should be
+     allowed to disagree with itself across six screens. */
+  for(const [file,importPath] of [["../app/page.tsx","./app-name"],["../app/down-sheet/page.tsx","../app-name"],
+      ["../app/defect-log/page.tsx","../app-name"],["../app/fixed-repairs/page.tsx","../app-name"],
+      ["../app/lists/page.tsx","../app-name"],["../app/settings/page.tsx","../app-name"]]){
+    const src = await readFile(new URL(file, import.meta.url), "utf8");
+    assert.match(src,new RegExp('import AppName from "'+importPath.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+'"'),file+" must import the shared name");
+    assert.match(src,/<AppName\/>/,file+" must draw it");
+    assert.doesNotMatch(src,/"TransitKey"/,file+" must not spell the name itself");
+  }
+
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  /* Every page loads globals.css, so the name is styled once. */
+  assert.match(css,/\.app-name\{display:block;text-align:left/);
+
+  /* THE MAP'S HEADER FOUGHT THIS TWICE, and both rules are load-bearing.
+
+     First: it is a bare <header>, and bare headers in this file get a FIXED
+     height:38px. The phone block released it with height:auto; above 620px it
+     did not, so the name would have pushed the h1 through the header's own
+     bottom edge - silently, the way the Fixed Repairs feed header once
+     overflowed by 37.5px. min-height cannot undo a fixed height.
+
+     Second: it is a centring flex ROW, so the name landed BESIDE the h1 and
+     centred with it - measured at x198 on a 1280 screen against x18 on every
+     other page. text-align could not touch that, because flex was centring the
+     items rather than the text. Stacking is what fixed it.
+
+     Delete either and the map breaks in a way no test but this one would say. */
+  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch/);
+  assert.match(css,/\.app>header>h1\{text-align:center\}/,"the title keeps its centre on its own line");
+
+  /* Measured across all six pages at 360, 390, 820 and 1280: the name renders,
+     sits 12-18px from the left on every one, and nothing overflows its header
+     or scrolls the page sideways. 24 combinations, 0 failures. */
 });
