@@ -27,10 +27,16 @@ If Lite ever needs its own record shape, its own key, or its own sync rule, the
 design is wrong and should be stopped rather than worked around. Everything
 below is about what is DRAWN, never about what is STORED.
 
-**Not a permission system.** Lite hides complexity, not authority. It is not a
-way to stop somebody doing something; anyone on Lite can reach everything by
-turning it off. If the shop ever needs to actually prevent an action, that is a
-different feature and it does not belong here.
+**Not a permission system.** Settled with Curtis: *"It's not so much a
+permissions thing as it is a training purpose."* Lite hides complexity, not
+authority. Anyone holding a device can turn it on and off themselves, and
+nothing about it stops a person doing anything.
+
+Management control — options granted by login credentials — is a real and
+separate phase, and Curtis has placed it deliberately: *"Those will be the very
+last commits and changes to the app."* Lite must not become the half-built
+version of it. If a decision here would only make sense as a permission, it
+belongs in that later phase and not in this one.
 
 ## Where it plugs in
 
@@ -54,9 +60,22 @@ The groundwork is already there, which is most of why this is worth doing.
 
 ### The nav
 
-Facility Map, Down Sheet, Defect Log, Settings. Fixed Repairs and Fleet
-Campaigns are hidden — both are read after the fact rather than during a shift,
-and neither is how a new person meets the app.
+Facility Map, Down Sheet, Defect Log, Fixed Repairs, Settings. Only Fleet
+Campaigns is hidden — it is planned work read a campaign at a time, not
+something a new person meets on a shift.
+
+**Fixed Repairs stays, and the first draft of this document had it wrong.** It
+argued Fixed Repairs is read after the fact. Curtis: keep it. Writing down a
+job you just finished is a beginner's FIRST action, not an advanced one — often
+the only thing a new mechanic does in the app all day — and LOG REPAIR exists
+precisely because that is how it happens on the floor.
+
+What Lite draws on it needs Curtis's eye before anyone builds it. The proposal:
+keep LOG REPAIR, the history list and SEARCH HISTORY; hide EXPORT HISTORY
+REPORT and UNDO LAST; and inside a record, hide the same detail fields the
+Defect Log form hides, for the same reason. That last part is a guess about how
+much a new person should be asked to fill in, and it should be checked rather
+than assumed.
 
 ### The Down Sheet
 
@@ -68,8 +87,8 @@ COMPLETED, SCAN SHEET, UNDO IMPORT, UNDO CLEAR and CLEAR DOWNSHEET with it. Also
 hidden: EST. ACTIVE LABOR, EST. CURRENT VIEW, SHEET CAPACITY, PENDING, ACCIDENT,
 WAITING PARTS and COMPLETED TODAY.
 
-The row's own ✓ and × stay. They are the two things a person does to a row, and
-both already ask before they act.
+The row's own ✓ and × stay — confirmed by Curtis. They are the two things a
+person does to a row, and since release 163 both ask before they act.
 
 ### The Defect Log
 
@@ -112,8 +131,9 @@ Pressing it turns Lite off for that device, permanently, and says so. There is
 no confirm and no ceremony. Somebody who presses it by accident presses the
 switch in Settings to go back.
 
-Whether Lite should also be turnable on for another device from a foreman's
-phone is an open question below. It should not be built in the first pass.
+Anyone holding the device can turn it on and off. There is no foreman-only
+version of this switch and there should not be one — see the note on
+permissions above.
 
 ## What this costs, permanently
 
@@ -131,26 +151,58 @@ so the answer is a line in a list rather than a condition scattered across six
 files. If the hiding ends up as `mode==="lite" &&` sprinkled through the pages,
 this feature has failed regardless of how it looks on day one.
 
-## Open questions for Curtis
+## The header, and the name
 
-1. **Who turns it on?** Per device by the person holding it, or set by a foreman
-   for somebody else? The second needs the setting to sync, which means a new
-   synced field and a schema change — a materially bigger job, and his call
-   every time.
-2. **Does Lite hide the Down Sheet's ✓ and ×, or keep them?** Kept above,
-   because they are the daily verbs and both confirm. Worth confirming.
-3. **Is Fixed Repairs really out?** It is where a mechanic writes down a job
-   they finished, which is arguably a beginner's first action, not an advanced
-   one.
-4. **Should a Lite device be visibly Lite** — a small marker in the header — so
-   a foreman looking over a shoulder knows why a control is missing?
+Settled, and it is a bigger change than a marker.
+
+**The app's name goes in the top-left corner of every page**, with **LITE**
+behind it when the device is in Lite. The current header contents move down to
+make room, so this is a header restructure on all six pages rather than a badge
+dropped into a corner — and it is worth doing on its own, before or alongside
+Lite, because the app's name is nowhere on the screen today.
+
+Every header already carries a kicker of its own (`FLEET MAINTENANCE`, `MAINTENANCE FACILITY`)
+above a per-page title, and each page styles its own header in its own
+stylesheet. The name has to sit above that in a way that reads the same on six
+pages that deliberately do not share a header component — so the honest first
+step is one shared piece for the name, the way `tracker-nav.tsx` is one shared
+piece for the nav, rather than six more copies to drift.
+
+The Lite switch also lives in Settings, but Curtis is explicit that Settings is
+not where it belongs long term: it ends up on the landing / home page, which is
+the next piece of work after this. **Anything built here should assume the
+landing page is coming** and not make the switch hard to move.
+
+### Still open
+
+1. **Which name goes in the corner?** The app is already named in two places,
+   neither of which is drawn on any page:
+
+   | where | value |
+   | --- | --- |
+   | `public/manifest.webmanifest` → `name` | Fleet Maintenance Bus Tracking System |
+   | `public/manifest.webmanifest` → `short_name` | Fleet Bus Tracker |
+
+   `short_name` is what a phone already prints under the home-screen icon, so a
+   header that disagrees with it would give the same app two names on one
+   device. That argues for **Fleet Bus Tracker** — but the full name is far too
+   long for a header, and Curtis may want a third thing entirely. One answer
+   from him settles it; this blocks the header work and nothing else.
+2. **What Lite draws on Fixed Repairs**, per the section above. A proposal is
+   written there; it is a guess until he looks at it.
 
 ## What to build first
 
-One setting, the nav filter, and the two ADVANCED ACTIONS sections hidden. That
-is a small change to files that already exist, it can be measured in a browser
-the way everything else here is, and it is enough to put in front of one new
-person and find out whether the idea survives contact with the floor.
+One setting, the nav filter hiding Fleet Campaigns, and the two ADVANCED ACTIONS
+sections hidden. That is a small change to files that already exist, it can be
+measured in a browser the way everything else here is, and it is enough to put
+in front of one new person and find out whether the idea survives contact with
+the floor.
 
-The defect form is the second pass and the one with real judgement in it. Do not
+**The header and the name are their own piece of work** and should not be
+bolted onto that first pass. They touch six stylesheets, they are wanted whether
+or not Lite ever ships, and they are blocked on a question only Curtis can
+answer.
+
+The defect form is the third pass and the one with real judgement in it. Do not
 start there.
