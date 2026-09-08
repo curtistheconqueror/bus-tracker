@@ -1,6 +1,34 @@
-# Future Phase: Lite Mode
+# Lite Mode
 
-**Designed, not built.** Nothing in this document exists in the app yet.
+**Partly built.** The first-run welcome and the per-device mode exist as of the
+commit that added `app/app-mode.ts` and `app/welcome-gate.tsx`. Nothing yet
+READS the mode to draw less — that is the next step, and everything below the
+"What Lite draws" heading is still design rather than code.
+
+## How a device gets asked
+
+A device that has never opened the app — no `pace-app-mode-v1` **and** no
+`pace-board-v1` — sees the welcome once and picks FULL or LITE. Two conditions,
+not one, because everybody in the shop today has a board and nobody mid-shift
+should meet a screen asking them to choose something they never asked for.
+
+The board is checked through `getItem`, never through `readFleetStorage`: a
+missing key and a saved board holding zero buses come back identically from the
+payload reader, so asking it "is the board empty" would put the welcome in front
+of somebody who had just cleared theirs.
+
+There is no login, so this cannot know WHO — cleared site data, a private
+window, a second browser and a reinstalled home-screen app all look like a new
+device. That is why it asks a question once rather than inferring anything: the
+worst outcome of a false positive is being asked again.
+
+**Settings can re-ask.** MASTER SETTINGS carries FIRST-TIME WELCOME · SHOW IT,
+which reopens the same screen on a device that has already answered. Curtis
+asked for it so he can see exactly what a new person sees on his own phone.
+
+**Full is the fallback** — when nothing is stored, when what is stored is
+unreadable, and when the answer cannot be written. Taking pages away from a
+mechanic mid-shift because a write failed once is how trust in an app ends.
 
 ## Product intent
 
@@ -89,6 +117,24 @@ WAITING PARTS and COMPLETED TODAY.
 
 The row's own ✓ and × stay — confirmed by Curtis. They are the two things a
 person does to a row, and since release 163 both ask before they act.
+
+### DEFERRED is not in Lite
+
+Settled with Curtis: *"Deferred feature is definitely not something for Lite."*
+
+It is the right test for everything else on this list. Deferring a bus is a
+judgement about whether a bus can run — held back without being escalated — and
+it carries a clock, an evening prompt, a 90-minute alarm and a board of its own.
+None of that is workflow a new person is learning; all of it is a decision
+somebody with standing makes. So Lite hides the DEFERRED tick in the defect
+form, the 🚨 DEFERRED badge, the evening review prompt and the DEFERRED board on
+the Down Sheet.
+
+Nothing about the RECORDS changes. A Lite device that receives a deferred bus
+from the cloud stores it exactly as a full device does; it simply does not draw
+the controls for it. Curtis: *"this is just an example and I'm sure it's plenty
+more" —* so the rest of this section should be read as a first pass rather than
+a finished list.
 
 ### The Defect Log
 

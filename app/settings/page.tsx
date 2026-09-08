@@ -59,6 +59,7 @@ import FleetRecoveryControl from "../fleet-recovery-control";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "../storage";
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
+import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -328,7 +329,7 @@ export default function SettingsPage(){
  const fixedStyle={"--fixed-page":log.appearance.page,"--fixed-surface":log.appearance.surface,"--fixed-ink":log.appearance.text,"--fixed-muted":log.appearance.muted,"--fixed-header":log.appearance.header,"--fixed-header-text":log.appearance.headerText,"--fixed-accent":log.appearance.accent,"--fixed-font":FONT_STACKS[log.fontFamily],"--fixed-scale":fixedScale} as CSSProperties;
  const sectionClass=(key:SectionKey,name:string)=>"settings-section settings-section-"+name+(open[key]?" open":" closed");
 
- return <main className="settings-app"><ShopCloudLive/>
+ return <main className="settings-app"><WelcomeGate/><ShopCloudLive/>
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
   <header className="settings-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
   <nav className="settings-jump" aria-label="Settings sections">
@@ -339,6 +340,14 @@ export default function SettingsPage(){
     <SectionHead id="master" kicker="EVERY PAGE" title="Master settings" open={open.master} onToggle={()=>toggle("master")}/>
     <SectionBody id="master" open={open.master}>
      <p className="settings-section-blurb">The settings that are about the whole app rather than one page: connecting this device to the shop, moving everything to another device, and one look across all four pages. Each page's own settings are in its section below, and anything set here can still be tuned there afterwards.</p>
+     {/* Curtis asked for this so he can see on his own phone exactly what a new
+         person sees: the welcome only appears by itself on a device that has
+         never opened the app, and everybody in the shop already has a board.
+         Pressing it does not change the mode — it re-asks the question. */}
+     <section className="settings-welcome-again">
+      <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>
+      <button type="button" className="show-welcome-again" onClick={()=>window.dispatchEvent(new CustomEvent(WELCOME_REQUEST_EVENT))}>SHOW IT</button>
+     </section>
      {/* First thing on the page, above everything.
 
          It was inside FACILITY MAP, which is a page's settings — and it is the

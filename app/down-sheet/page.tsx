@@ -30,6 +30,7 @@ import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-lo
 import {answerDeferredBus} from "../deferred-actions";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
 import AppName from "../app-name";
+import WelcomeGate from "../welcome-gate";
 import {OPTIONAL_DOWN_TILES,type OptionalDownTile} from "./down-sheet-settings-store";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -533,7 +534,7 @@ export default function DownSheet(){
 
  const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 
- return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>

@@ -34,6 +34,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import {moveBusToArea} from "../facility-areas";
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
+import WelcomeGate from "../welcome-gate";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
    restore of the old fleet: the records have to come back stamped as new work,
@@ -731,7 +732,7 @@ export default function DefectLog(){
  
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
 
- return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="log-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <TrackerNav active="/defect-log"/>

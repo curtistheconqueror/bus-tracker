@@ -7915,6 +7915,64 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
  assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
 });
 
+test("the welcome asks once, on a device that has never opened the app, and Full is the fallback", async () => {
+ const { isFirstRun, readAppMode, serializeAppMode, APP_MODE_STORAGE_KEY, DEFAULT_APP_MODE } = await import("../app/app-mode.ts");
+ const store = map => ({ getItem: key => (key in map ? map[key] : null) });
+
+ // Nothing on the device at all: the one case that gets the welcome by itself.
+ assert.equal(isFirstRun(store({})), true);
+ // Answered already — never again, whatever else is or is not there.
+ assert.equal(isFirstRun(store({ [APP_MODE_STORAGE_KEY]: serializeAppMode({ mode: "lite", answered: true }) })), false);
+
+ /* The trap this function exists for. A MISSING board and a SAVED board holding
+    zero buses come back identically from readFleetStorage — storage.ts returns
+    {items:[],valid:true} for both — so asking it "is the board empty" would put
+    the welcome in front of somebody who had just cleared theirs. isFirstRun
+    reads getItem directly, so an empty-but-present board is not a first run. */
+ assert.equal(isFirstRun(store({ "pace-board-v1": JSON.stringify({ kind: "buses", version: 4, buses: [] }) })), false,
+  "a device that cleared its board has still opened this app");
+ assert.equal(isFirstRun(store({ "pace-board-v1": JSON.stringify({ kind: "buses", version: 4, buses: [{ id: "b1", n: "17501" }] }) })), false);
+ // A storage that throws (private mode, blocked site data) is not a first run:
+ // better to skip the welcome than to show it on every single page load.
+ assert.equal(isFirstRun({ getItem() { throw new Error("blocked") } }), false);
+
+ /* Full when nothing is stored, and when what is stored is unreadable. Somebody
+    who never answers, or whose device loses the answer, keeps every surface —
+    the other default takes pages away from a mechanic mid-shift because a write
+    failed once. */
+ assert.deepEqual(readAppMode(null), DEFAULT_APP_MODE);
+ assert.equal(readAppMode(null).mode, "full");
+ assert.equal(readAppMode("not json").mode, "full");
+ assert.equal(readAppMode(JSON.stringify({ mode: "nonsense", answered: true })).mode, "full");
+ assert.deepEqual(readAppMode(serializeAppMode({ mode: "lite", answered: true })), { mode: "lite", answered: true });
+});
+
+test("the welcome is on every page, re-openable from Settings, and does not render before mount", async () => {
+ const [gate, css, settings] = await Promise.all([
+  readFile(new URL("../app/welcome-gate.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
+ ]);
+ // A first-timer can land on any URL, so it mounts everywhere the nav goes.
+ for (const file of ["../app/page.tsx", "../app/down-sheet/page.tsx", "../app/defect-log/page.tsx", "../app/fixed-repairs/page.tsx", "../app/lists/page.tsx", "../app/settings/page.tsx"]) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(source, /<WelcomeGate\/>/, file + " is missing the welcome gate");
+ }
+ /* The answer lives in localStorage, so it opens closed and decides on mount.
+    Rendering it before then would put a full-screen overlay into the HTML of
+    every page for every device and take it away a frame later. */
+ assert.match(gate, /const \[open,setOpen\]=useState\(false\)/);
+ assert.match(gate, /if\(isFirstRun\(localStorage\)\)setOpen\(true\)/);
+ // Curtis sees what a new person sees, from his own phone.
+ assert.match(settings, /new CustomEvent\(WELCOME_REQUEST_EVENT\)/);
+ assert.match(gate, /window\.addEventListener\(WELCOME_REQUEST_EVENT,onRequest\)/);
+ // A device that cannot store the answer still gets the app it chose.
+ assert.match(gate, /catch\{\/\* A device that cannot store the answer/);
+ // Somebody who told their phone they do not want motion is not asking for an
+ // exception on a shop tool.
+ assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\s*\n\s*\.welcome-name span/);
+});
+
 test("the Down Sheet's bands are read in the order the shop chose, and the ORDER control is gone", async () => {
  const { normalizeDownSheetSectionOrder, orderDownSheetGroups, DOWN_SHEET_GROUPS } = await import("../app/down-sheet/down-sheet-view.ts");
  const { readDownSheetSettings } = await import("../app/down-sheet/down-sheet-settings-store.ts");

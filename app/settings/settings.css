@@ -120,3 +120,14 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .master-transfer-row>button,.master-transfer-row>label{min-height:56px}
  .master-font-grid{grid-template-columns:1fr}
 }
+
+/* Re-asking the first-run question, from the page that owns every other
+   per-device choice. It re-opens the welcome rather than switching anything:
+   the mode changes only when somebody picks one. */
+.settings-welcome-again{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:11px 13px}
+.settings-welcome-again>div{display:grid;gap:3px;min-width:0}
+.settings-welcome-again b{color:#173e73;font-size:9px;font-weight:900;letter-spacing:.5px}
+.settings-welcome-again small{color:#5a6b84;font-size:8px;line-height:1.45}
+.show-welcome-again{flex-shrink:0;min-height:34px;border:1px solid #0b64bd;border-radius:6px;background:#0b64bd;color:#fff;padding:0 14px;font-size:8px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+.show-welcome-again:hover{background:#09539d}
+@media(max-width:760px){.settings-welcome-again b{font-size:10px}.settings-welcome-again small{font-size:9px}.show-welcome-again{min-height:44px;font-size:10px;padding:0 16px}}

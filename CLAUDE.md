@@ -131,6 +131,7 @@ the cloud's bookkeeping, per device
   pace-cloud-removed-entries-v1    Down Sheet entries taken off    (tombstones)
 
 per-device settings, never synced
+  pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
