@@ -4,8 +4,8 @@ Updated: 2026-09-07
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 162 (repository release 166)
-Live feature checkpoint: commit 1de3d68
+Live release: Sites Version 163 (repository release 167)
+Live feature checkpoint: commit 09a69aa
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 166 is the current user-approved live release, deployed by Sites as Version 162. Its source checkpoint is commit 1de3d68. Moving a Defect Log repair now moves it to the selected bus rather than copying it, and removal stays limited to its selected record. The ALREADY LOGGED banner can open the matching repair, and tapping Search clears it with a visible CLEAR tag. No storage key, payload, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 167 is the current user-approved live release, deployed by Sites as Version 163. Its source checkpoint is commit 09a69aa. The app is now named FLEETSTEP, and the Down Sheet shows one total by default with its detailed scoreboard available on request. The added display preference is backward-compatible device-local settings data; no fleet, repair, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

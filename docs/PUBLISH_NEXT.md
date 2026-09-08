@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 166 is live from `1de3d68` as Sites Version 162.**
+**STATUS: NONE PENDING — repository release 167 is live from `09a69aa` as Sites Version 163.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,6 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
 | Published | **165** | `ba3fb13` | **Live as Sites Version 161.** Deferred buses can check in once with a switchable prompt; TransitKey naming, Lite Mode groundwork, and Farebox Won't probe & open are included |
 | Published | **164** | `945cc29` | **Live as Sites Version 160.** The Down Sheet UPDATED BY cell's divider now extends cleanly across the full row |

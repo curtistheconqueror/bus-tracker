@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 163 / release 167 | Live | 09a69aa | Renames the application FLEETSTEP and collapses the Down Sheet scoreboard to its total, with the detailed counts available on request |
 | 162 / release 166 | Live | 1de3d68 | Moves a defect to its selected bus instead of copying it, keeps removal scoped, adds OPEN IT for already-logged work, and makes tapping Search clear it with a CLEAR tag |
 | 161 / release 165 | Live | ba3fb13 | Adds a one-time deferred-bus check-in that can be switched off, TransitKey app naming, Lite Mode groundwork, and Farebox Won't probe & open |
 | 160 / release 164 | Live | 945cc29 | Fixes the Down Sheet UPDATED BY cell so its row divider runs cleanly across the full row |
