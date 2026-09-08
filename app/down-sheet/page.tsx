@@ -16,7 +16,7 @@ import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type Repair
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
-import {downSheetMentionsDefect,downSheetRoadCounts,downSheetRoadEntries,downSheetWorkGroup,groupDownSheetEntries,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetOrder,type DownSheetRoadKind} from "./down-sheet-view";
+import {downSheetMentionsDefect,downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -25,6 +25,9 @@ import {exportFleetBoardBackup} from "../fleet-backup";
 import ShopCloudLive from "../shop-cloud-live";
 import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
+import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
+import {answerDeferredBus} from "../deferred-actions";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
 import AppName from "../app-name";
 import {OPTIONAL_DOWN_TILES,type OptionalDownTile} from "./down-sheet-settings-store";
@@ -194,11 +197,12 @@ export default function DownSheet(){
  const [extraTiles,setExtraTiles]=useState<OptionalDownTile[]>([]);
  const [showQuickNotes,setShowQuickNotes]=useState(false);
  const [countsOpen,setCountsOpen]=useState(false);
+ const [deferredCollapsed,setDeferredCollapsed]=useState(true);
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
  const [savedQuickNotes,setSavedQuickNotes]=useState("");
  const [search,setSearch]=useState("");
- const [order,setOrder]=useState<DownSheetOrder>("number-asc");
+ const [sectionOrder,setSectionOrder]=useState<DownSheetGroupKey[]>(()=>normalizeDownSheetSectionOrder(null));
  /* Which of the two road tallies is being read, if either. Not persisted: it is
     a question somebody asks of the sheet in the moment, not a preference. */
  const [roadFilter,setRoadFilter]=useState<DownSheetRoadKind|null>(null);
@@ -220,14 +224,18 @@ export default function DownSheet(){
  const [mysteryDisplay,setMysteryDisplay]=useState(DEFAULT_DEFECT_LOG_DISPLAY);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
  useEffect(()=>{setCountsOpen(localStorage.getItem(COUNTS_OPEN_KEY)==="1")},[]);
+ /* Absent means COLLAPSED, like the count board: it is a second panel above the
+    rows, and a foreman who never opened it should not have to scroll past it. */
+ useEffect(()=>{setDeferredCollapsed(localStorage.getItem(DEFERRED_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,DEFERRED_BOARD_COLLAPSED_KEY,deferredCollapsed?"1":"0")},[deferredCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setOrder(settings.order==="number-desc"||settings.order==="category"?settings.order:"number-asc");setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const reconciled=reconcileDownSheetMembership(current,activeIds);if(reconciled!==current)writeFleetStorage(localStorage,reconciled);return reconciled})},[entries,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,order,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,order,extraTiles,showQuickNotes,displaySettings,hydrated]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,displaySettings,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
@@ -250,14 +258,22 @@ export default function DownSheet(){
     foreman who pressed it to read the list off the sheet lost the numbers he
     had pressed it from. The row count, the estimate and the note below still
     follow the filter, because those describe the view. */
- const sheetGroups=useMemo(()=>groupDownSheetEntries(shown,order,locations),[shown,order,locations]);
+ /* Bus number, always. The ORDER control offered BUS NUMBER up, down and WORK
+    CATEGORIES beside the search box, and Curtis took it out: the sheet is
+    already numerical inside each band, and nobody was going to pick anything
+    else standing at a bus. What people DO want to change is which band they
+    read first, and that is a setting rather than a control on the page.
+
+    The sort helper keeps its parameter — the Defect Log's own views still pass
+    other orders through it. */
+ const sheetGroups=useMemo(()=>orderDownSheetGroups(groupDownSheetEntries(shown,"number-asc",locations),sectionOrder),[shown,locations,sectionOrder]);
  /* The band tiles used to render straight off sheetGroups, so their order on
     the board was whatever DOWN_SHEET_GROUPS happened to be in. They are placed
     by name now, because the order Curtis set interleaves them with tiles that
     are not bands at all - COMPLETED TODAY sits between SCHEDULED and
     UNSCHEDULED. The bands below the sheet still read sheetGroups directly. */
  const tileFor=(key:string)=>{const group=sheetGroups.find(item=>item.key===key);return group?<div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>:null};
- const groups=useMemo(()=>roadFilter?groupDownSheetEntries(downSheetRoadEntries(shown,locations,roadFilter),order,locations):sheetGroups,[sheetGroups,shown,order,locations,roadFilter]);
+ const groups=useMemo(()=>roadFilter?orderDownSheetGroups(groupDownSheetEntries(downSheetRoadEntries(shown,locations,roadFilter),"number-asc",locations),sectionOrder):sheetGroups,[sheetGroups,shown,locations,roadFilter,sectionOrder]);
  const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
  /* Down buses: on the sheet for a fault rather than only for maintenance.
 
@@ -273,7 +289,32 @@ export default function DownSheet(){
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
- const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,order,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,order,display:displaySettings}))}};
+ const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}};
+ /* The DEFERRED board hands its answer back here rather than writing, so a
+    refused write is reported by this page like every other one and the board
+    never saves behind it — the same contract the mystery board's onMoved has.
+
+    The rules themselves live in deferred-actions.ts, shared with the evening
+    review prompt: the same decision about the same bus, and two copies of it
+    would drift into a bus that is half returned on one screen and still held on
+    the other.
+
+    The FLEET goes first and alone. A fleet that saved and a sheet that did not
+    is a real outcome — the bus is off DEFERRED either way — and telling
+    somebody nothing was saved when the bus already moved is its own kind of
+    wrong. Nothing is written at all if the board's answer would not save. */
+ const answerDeferred=(busId:string,defects:StructuredDefect[],action:"downsheet"|"return")=>{
+  const now=new Date().toISOString(),bus=fleet.find(item=>item.id===busId),label=bus?.n||busId;
+  const applied=answerDeferredBus(fleet as DefectLogFleetBus[],entries as DownEntry[] as DefectLogDownEntry[],busId,defects,action,{now});
+  if(!applied.saved){alert("Nothing on Bus "+label+" would save — the repairs holding it are no longer where the board expected them. Open the bus on the Defect Log.");return}
+  const wroteFleet=writeFleetStorageResult(localStorage,applied.fleet as FleetBus[]);
+  setSaveProblem(wroteFleet.reason||"");
+  if(!wroteFleet.ok){alert("This device could not save the change, so Bus "+label+" is still deferred. Export a backup and clear space, then try again.");return}
+  const wroteDown=writeDownSheetStorageResult(localStorage,applied.downEntries as DownEntry[]);
+  setFleet(applied.fleet as FleetBus[]);setEntries(applied.downEntries as DownEntry[]);
+  if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" came off DEFERRED, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
+  if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
+ };
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);
   /* MOVE BUS TO is an instruction, not a property of the repair, so it is
      cleared once it has been carried out. Left on the entry it would re-run on
@@ -554,7 +595,6 @@ export default function DownSheet(){
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
    <label className="down-search"><b>SEARCH</b><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, repair, mechanic or vendor" aria-label="Search Down Sheet"/></label>
    {search&&<button className="clear-search" type="button" onClick={()=>setSearch("")}>CLEAR</button>}
-   <label className="down-order"><b>ORDER</b><select value={order} onChange={event=>setOrder(event.target.value as DownSheetOrder)}><option value="number-asc">BUS NUMBER ↑</option><option value="number-desc">BUS NUMBER ↓</option><option value="category">WORK CATEGORIES</option></select></label>
    <span className="view-results"><b>{visible.length}</b> IN VIEW</span>
   </section>
 
@@ -629,6 +669,13 @@ export default function DownSheet(){
       inside the board, so a refused write is reported here like every other
       one and the board never saves behind the page's back. */
    onMoved={nextFleet=>{const result=writeFleetStorageResult(localStorage,nextFleet);setSaveProblem(result.reason||"");if(!result.ok)return false;setFleet(nextFleet);return true}}/>
+  {/* Directly under MYSTERY BUSES, because between them they answer one
+      question: a bus on property that the sheet does not explain is very often
+      a bus somebody deferred. Separate lists on purpose — a mystery is
+      unexplained and a deferral is a decision, and folding them together would
+      dilute the one thing MYSTERY BUSES is for. */}
+  <DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet
@@ -653,7 +700,9 @@ export default function DownSheet(){
       const offset=groups.slice(0,groupIndex).reduce((sum,item)=>sum+item.entries.length,0);
       return <Fragment key={group.key}>
        <tr className={"down-group-row group-"+group.key}><td colSpan={10}><b>{group.label}</b><i>{group.entries.length}</i><span>{group.hint}</span></td></tr>
-       {group.entries.map((entry,index)=>{const work=downSheetWorkGroup(entry),previous=index?downSheetWorkGroup(group.entries[index-1]):null;return <Fragment key={entry.id}>{order==="category"&&work.label!==previous?.label&&<tr className={"work-group-row group-"+work.rank}><td colSpan={10}>{work.label}</td></tr>}<tr className={entry.workflow==="Completed"?"completed":""}>
+       {/* The WORK CATEGORIES subheading rows went with the ORDER control that was
+           the only thing that ever turned them on. */}
+       {group.entries.map((entry,index)=>{return <Fragment key={entry.id}><tr className={entry.workflow==="Completed"?"completed":""}>
       <td className="line-number">{String(offset+index+1).padStart(2,"0")}</td>
       {/* ON ROAD, beside the number, on every row that is out working. The two
           tallies above give the counts; this is the same fact per bus, so it

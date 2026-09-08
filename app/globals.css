@@ -806,6 +806,18 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 /* The bus is what the question is about, so the count of what else is holding
    it belongs on the card. Amber rather than the teal above: it is the reason
    one answer is about to move more than the repair being read. */
+/* DEFERRED reuses the mystery board's classes on purpose — Curtis asked for the
+   same look — and adds only what it needs: the two answers, and the amber the
+   rest of the app already uses for a held bus. */
+.deferred-board .mystery-head{border-left:4px solid #d08700}
+.deferred-card-actions{display:flex;gap:7px;padding:0 9px 9px}
+.deferred-card-actions button{flex:1;min-height:36px;border-radius:6px;font-size:8px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+.deferred-to-sheet{border:1px solid #0b64bd;background:#0b64bd;color:#fff}
+.deferred-return{border:1px solid #b7c4d7;background:#f3f6fa;color:#344a69}
+.deferred-card-actions button:disabled{opacity:.5;cursor:not-allowed}
+.deferred-card .mystery-badges i{background:#fdf0dc;border-color:#f0cf9a;color:#8a4b06}
+.deferred-card .mystery-badges i.deferred-overdue{background:#fde2e2;border-color:#f2b6b6;color:#96131f}
+@media(max-width:760px){.deferred-card-actions button{min-height:46px;font-size:10px}}
 .deferred-review-also{color:#8a4b06;background:#fdf0dc;border:1px solid #f0cf9a;border-radius:5px;padding:4px 6px;font-size:9px;line-height:1.4}
 .deferred-review-choices{display:grid;gap:8px}
 .deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}
@@ -905,8 +917,8 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    invisible on every page that draws it. currentColor at full opacity is the
    strongest this can read against them, and it stays correct if a header is
    ever re-themed. */
-.app-name{display:block;text-align:left;margin:0 0 4px;font-size:17px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
-@media(max-width:760px){.app-name{font-size:19px;letter-spacing:1.3px}}
+.app-name{display:block;text-align:left;margin:0 0 5px;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
+@media(max-width:760px){.app-name{font-size:24px;letter-spacing:1.4px}}
 
 /* THE FACILITY MAP'S HEADER IS A BARE <header>, and bare headers in this file
    are given a FIXED height:38px. The phone block below already releases it with
