@@ -2430,13 +2430,118 @@ test("defect log cleanup preserves active log-origin repairs and fleet state", (
   assert.equal(isDefectLogCleanupCandidate(trackerRecord,new Set(["bus-1"])), true);
   const fixedRecord = {...logRecord,defect:{...activeDefect,state:"completed"}};
   assert.equal(isDefectLogCleanupCandidate(fixedRecord,new Set()), true);
-  const archived = hideDefectLogRecords([bus],[activeDefect.id],"2026-08-22T12:00:00.000Z");
+  const archived = hideDefectLogRecords([bus],[{busId:"bus-1",defectId:activeDefect.id}],"2026-08-22T12:00:00.000Z");
   assert.equal(archived[0].s,"out");
   assert.equal(archived[0].l,"west-0");
   assert.equal(archived[0].down,true);
   assert.equal(archived[0].defects[0].state,"open");
   assert.equal(archived[0].defects[0].defectLogHiddenAt,"2026-08-22T12:00:00.000Z");
 });
+test("changing a defect's bus number MOVES the record, and a removal never travels between buses", () => {
+ // Curtis's sequence, exactly. He logged a battery fault on the wrong bus, went
+ // back in, changed the bus number, and saved. The save used to COPY: it looked
+ // for the id on the bus it was handed, did not find it, and appended - so the
+ // original stayed put and two buses held one defect id. He then tidied the
+ // leftover off the wrong bus, and because the hide walked the whole fleet by
+ // id it took the good copy with it: a defect on 17532 the log would not draw,
+ // could not remove, and would not let him log again.
+ const t0 = "2026-09-07T22:11:00.000Z", t1 = "2026-09-07T22:19:00.000Z";
+ const fleet = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [] },
+ ];
+ const logged = saveDefectLogRecord(fleet, [], "bus-a", { id: "d1", category: "Battery, Starting and Charging", issue: "Flashing battery light", details: "", operability: "service", state: "open", source: "defect-log", reportedBy: "CJ" }, false, t0);
+ assert.equal(logged.error, null);
+ assert.deepEqual(logged.fleet.map(bus => (bus.defects || []).length), [1, 0]);
+
+ // Change the bus number and save — the same call the editor makes.
+ const moved = saveDefectLogRecord(logged.fleet, logged.downEntries, "bus-b", { ...logged.fleet[0].defects[0] }, false, t1);
+ assert.equal(moved.error, null);
+ assert.deepEqual(moved.fleet.map(bus => (bus.defects || []).map(d => d.id)), [[], ["d1"]], "the record moves; it must not be left on the bus it came from");
+ assert.equal(moved.fleet[0].pendingRepair, "", "the old bus stops advertising a repair it no longer holds");
+ // Where it came from is on the record, so the arrival is not a mystery.
+ assert.equal(moved.fleet[1].defects[0].movedFromBusNumber, "17530");
+ assert.equal(moved.fleet[1].defects[0].movedAt, t1);
+ // The old bus's own status is left alone — a repair moving off it is not new
+ // information about whether it can run.
+ assert.equal(moved.fleet[0].s, logged.fleet[0].s);
+
+ // And the second half: hiding a record on one bus must never reach another.
+ const shared = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [{ id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "service", state: "open", source: "defect-log" }] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [{ id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "service", state: "open", source: "defect-log" }] },
+ ];
+ const hidden = hideDefectLogRecords(shared, [{ busId: "bus-a", defectId: "d1" }], t1);
+ assert.equal(hidden[0].defects[0].defectLogHiddenAt, t1);
+ assert.equal(hidden[1].defects[0].defectLogHiddenAt, undefined, "removing a record on 17530 must not hide 17532's");
+ assert.equal(defectLogRecords(hidden, []).filter(r => !r.defect.defectLogHiddenAt).map(r => r.bus.n).join(), "17532");
+
+ // Saving either copy of a pair that already went wrong collapses them to one.
+ const repaired = saveDefectLogRecord(shared, [], "bus-b", { ...shared[1].defects[0] }, false, t1);
+ assert.deepEqual(repaired.fleet.map(bus => (bus.defects || []).length), [0, 1]);
+});
+
+test("a one-bus search ends when you reach the bus; a worklist of several survives", async () => {
+ const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ // Searching one bus number is a lens you look through to get AT that bus. It
+ // used to end only when the box was emptied by hand, so Curtis tapped the bus,
+ // did the work, came back, and the board was still held to one bus with
+ // nothing on screen saying so. Several numbers is a worklist, not a lens.
+ assert.match(page, /const singleBusSearch=busSearch\.kind==="numbers"&&busSearch\.tokens\.length===1&&busSearch\.buses\.length===1/);
+ assert.match(page, /const clearSearchOnReach=\(\)=>\{if\(singleBusSearch\)setSearch\(""\)\}/);
+ // Both ways into a bus clear it, and on the TAP rather than on a save —
+ // looking at a bus is a finished errand too.
+ assert.match(page, /log-card-main log-group-header[\s\S]{0,240}?onClick=\{\(\)=>\{clearSearchOnReach\(\);setExpandedBusIds/);
+ assert.match(page, /log-focus-button[\s\S]{0,320}?clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)/);
+ // And a way out that is not backspacing four digits. ALL still clears the
+ // search too, but it drags the state filter back with it.
+ assert.match(page, /className="clear-log-search" onClick=\{\(\)=>setSearch\(""\)\}/);
+});
+
+test("ALREADY LOGGED can reach the record it is blocking on", async () => {
+ const [page, css] = await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
+ ]);
+ // The banner named an existing defect and gave no way to reach it, which is
+ // fine until that defect is one the log is not drawing — then it is a locked
+ // door with the key on the other side. OPEN IT clears the hide flag and opens
+ // the record, whatever put it out of sight.
+ assert.match(page, /className="open-existing-defect" onClick=\{\(\)=>showExisting\(value\.busId,recentDuplicate\)\}/);
+ assert.match(page, /const showExistingDefect=\(busId:string,defect:StructuredDefect\)=>\{/);
+ assert.match(page, /defectLogHiddenAt:undefined/);
+ // It writes before it opens, and says so when the write is refused, rather
+ // than opening a record the device never took.
+ const handler = page.slice(page.indexOf("const showExistingDefect="), page.indexOf("const removeFromLog="));
+ assert.match(handler, /const written=persist\(revealed,downEntries\);\s*\n\s*if\(!written\.ok\)return;/);
+ assert.ok(handler.includes('setSearch("")'), "it opens a bus the search may be hiding, so the search stands down");
+ assert.match(css, /\.open-existing-defect\{/);
+ assert.match(css, /\.open-existing-defect\{min-height:44px/);
+});
+
+test("a repair already on the Down Sheet follows its record when the bus number changes", () => {
+ const t0 = "2026-09-07T22:11:00.000Z", t1 = "2026-09-07T22:19:00.000Z";
+ const fleet = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [] },
+ ];
+ const defect = { id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "down", state: "open", source: "defect-log", reportedBy: "CJ" };
+ const onSheet = saveDefectLogRecord(fleet, [], "bus-a", defect, true, t0);
+ assert.equal(onSheet.downEntries.length, 1);
+ assert.equal(onSheet.downEntries[0].busId, "bus-a");
+
+ const moved = saveDefectLogRecord(onSheet.fleet, onSheet.downEntries, "bus-b", { ...onSheet.fleet[0].defects[0] }, true, t1);
+ assert.equal(moved.downEntries.length, 1, "moving a repair must not open a second sheet entry for it");
+ // The update branch renamed the entry's bus and left its id behind, so a moved
+ // repair showed the new number on a row still filed under the bus it left.
+ assert.equal(moved.downEntries[0].busNumber, "17532");
+ assert.equal(moved.downEntries[0].busId, "bus-b");
+ // The DS badge is read off the sheet, never decided by the bus. The entry went
+ // with the repair, so the bus it left is no longer on the sheet.
+ assert.equal(moved.fleet[0].down, false, "the old bus must not keep a DS flag for work now filed under another bus");
+ assert.equal(moved.fleet[1].down, true);
+});
+
 test("down-sheet repair items keep independent optional estimates and a bus total", () => {
   const first = {...blankRepairItem(0), category:"Engine", repair:"Check engine light", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check engine light")};
   const second = {...blankRepairItem(1), category:"A/C and HVAC", repair:"Compressor", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"A/C and HVAC","Compressor")};
@@ -5736,7 +5841,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  ]);
 
  // one control per bus card, and it must not be nested inside the card's expand button
- assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+ assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
  const focusButtonAt=page.indexOf('className="log-focus-button"'),headerAt=page.indexOf('className="log-card-main log-group-header"');
  assert.ok(focusButtonAt>0&&headerAt>focusButtonAt,"focus button must precede the header button as a sibling");
  assert.equal(/log-card-main log-group-header[\s\S]{0,600}?log-focus-button/.test(page),false);

@@ -133,6 +133,12 @@ export type StructuredDefect={
  alarmCode?:string;
  reportedLocation?:string;
  defectLogHiddenAt?:string;
+ /* Where this record came from when its bus number was changed, and when. Kept
+    because a repair arriving on a bus with no history of how it got there is
+    the thing that makes a move look like a mistake. Read-only trail - nothing
+    reads these to decide anything. */
+ movedFromBusNumber?:string;
+ movedAt?:string;
  /* Stamped the moment a repair is put into DEFERRED from the Defect Log's own
     toggle — held back from service without going on the Down Sheet. The Down
     Sheet's own "Deferred" workflow writes this same state without ever
