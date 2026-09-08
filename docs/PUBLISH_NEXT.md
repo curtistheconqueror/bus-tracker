@@ -1,12 +1,13 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 163 is live from `5381dd2` as Sites Version 159.**
+**STATUS: NONE PENDING — repository release 164 is live from `945cc29` as Sites Version 160.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
 commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
+| Published | **164** | `945cc29` | **Live as Sites Version 160.** The Down Sheet UPDATED BY cell's divider now extends cleanly across the full row |
 | --- | --- | --- | --- |
 | Published | **163** | `5381dd2` | **Live as Sites Version 159.** Realtime falls back to polling if unreachable; Down Sheet actions sit at the row end and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists |
 | Published | **162** | `168f553` | **Live as Sites Version 158.** Road tally filters no longer rewrite the Down Sheet scoreboard; both operational pages use compact Advanced Actions; Deferred updates immediately and can be ended from its drawer; and a Defect Log location opens the Facility Map move workflow |
