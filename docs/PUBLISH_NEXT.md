@@ -1,10 +1,8 @@
 # Publish next
 
-**STATUS: 168 IS PENDING — publish from `64ec7d2`.** Release 167 is live from
-`09a69aa` as Sites Version 163.
+**STATUS: NONE PENDING — repository release 168 is live from `64ec7d2` as Sites Version 164.**
 
-**168 is one commit on the Down Sheet, no migration and no dependency change.**
-Curtis asked for all of it and has seen none of it live yet.
+**Version 168 is live.** It is one Down Sheet feature commit with no fleet, repair, database, dependency, or infrastructure migration.
 
 - **DEFERRED BUSES gets its own board**, directly under MYSTERY BUSES and in the
   same shape. The two answer one question between them: a bus on property the
@@ -22,7 +20,7 @@ clean; measured in Chromium at 390 and 1180.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **168** | **`64ec7d2`** | **A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name** |
+| Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
 | Published | **165** | `ba3fb13` | **Live as Sites Version 161.** Deferred buses can check in once with a switchable prompt; TransitKey naming, Lite Mode groundwork, and Farebox Won't probe & open are included |
