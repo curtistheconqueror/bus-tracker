@@ -10475,3 +10475,29 @@ test("the app's name is drawn top-left on every page, from one place", async () 
      sits 12-18px from the left on every one, and nothing overflows its header
      or scrolls the page sideways. 24 combinations, 0 failures. */
 });
+
+test("the farebox knows the fault that stops it being probed", async () => {
+  const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS} = await import("../app/repair-catalog.ts");
+
+  /* Reported off the floor: a farebox that will not probe and open. Probing is
+     how the vault is emptied and its fare data pulled, so a box that refuses is
+     down for a reason none of the existing wordings covered - it has power, it
+     is not INOP, and it is not the lock. */
+  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Won't probe & open"),
+    "the stored identity, which is what a saved record carries");
+  assert.ok(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].includes("Won't probe & open"),
+    "and the bare name the picker draws");
+
+  /* A GROUPED CATEGORY IS HELD IN TWO STRUCTURES AND THEY MUST STAY IN STEP.
+     An entry in one and not the other is either a picker option that saves as
+     nothing, or a stored record the picker cannot reach - and neither shows up
+     until somebody is standing at a bus trying to log it. Checked in both
+     directions, and in order, for the whole group. */
+  const prefixed=REPAIR_OPTIONS["Tech Services"].filter(o=>o.startsWith("Farebox - ")).map(o=>o.slice("Farebox - ".length));
+  assert.deepEqual(prefixed,[...REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"]],
+    "REPAIR_OPTIONS and REPAIR_OPTION_GROUPS disagree about the Farebox group");
+
+  /* Other farebox defect stays last: it is the catch-all, and a catch-all that
+     is not at the end reads as just another item. */
+  assert.equal(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].at(-1),"Other farebox defect");
+});
