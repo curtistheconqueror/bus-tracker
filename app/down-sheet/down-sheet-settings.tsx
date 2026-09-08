@@ -2,11 +2,12 @@
 
 import {DEFAULT_DOWN_SHEET_DISPLAY,DOWN_SHEET_LABEL_NAMES,DOWN_SHEET_STYLE_LABELS,normalizeDownSheetDisplay,type DownSheetDisplaySettings,type DownSheetLabels,type DownSheetStyleKey} from "./down-sheet-display-settings";
 
-import type {Shift} from "./down-sheet-settings-store";
+import {OPTIONAL_DOWN_TILES,type OptionalDownTile,type Shift} from "./down-sheet-settings-store";
 export type {Shift};
-type Props={transfer:React.ReactNode;defaultInitials:string;setDefaultInitials:(value:string)=>void;defaultShift:Shift;setDefaultShift:(value:Shift)=>void;showCompleted:boolean;setShowCompleted:(value:boolean)=>void;display:DownSheetDisplaySettings;setDisplay:(value:DownSheetDisplaySettings)=>void;onClose:()=>void;/* Rendered on the shared Settings page without the shade or the close and DONE buttons; every change there saves as it is made. */inline?:boolean};
+type Props={transfer:React.ReactNode;defaultInitials:string;setDefaultInitials:(value:string)=>void;defaultShift:Shift;setDefaultShift:(value:Shift)=>void;showCompleted:boolean;setShowCompleted:(value:boolean)=>void;extraTiles:OptionalDownTile[];setExtraTiles:(value:OptionalDownTile[])=>void;showQuickNotes:boolean;setShowQuickNotes:(value:boolean)=>void;display:DownSheetDisplaySettings;setDisplay:(value:DownSheetDisplaySettings)=>void;onClose:()=>void;/* Rendered on the shared Settings page without the shade or the close and DONE buttons; every change there saves as it is made. */inline?:boolean};
 
-export default function DownSheetSettings({transfer,defaultInitials,setDefaultInitials,defaultShift,setDefaultShift,showCompleted,setShowCompleted,display,setDisplay,onClose,inline=false}:Props){
+export default function DownSheetSettings({transfer,defaultInitials,setDefaultInitials,defaultShift,setDefaultShift,showCompleted,setShowCompleted,extraTiles,setExtraTiles,showQuickNotes,setShowQuickNotes,display,setDisplay,onClose,inline=false}:Props){
+ const toggleTile=(key:OptionalDownTile,on:boolean)=>setExtraTiles(on?[...extraTiles.filter(item=>item!==key),key]:extraTiles.filter(item=>item!==key));
  const setLabel=(key:keyof DownSheetLabels,value:string)=>setDisplay({...display,labels:{...display.labels,[key]:value}});
  const setStyle=(key:DownSheetStyleKey,field:"color"|"fontSize",value:string)=>setDisplay({...display,styles:{...display.styles,[key]:{...display.styles[key],[field]:field==="fontSize"?Number(value):value}}});
  const panel=<>
@@ -16,6 +17,19 @@ export default function DownSheetSettings({transfer,defaultInitials,setDefaultIn
     <label>DEFAULT INITIALS<input maxLength={6} autoCapitalize="characters" value={defaultInitials} onChange={event=>setDefaultInitials(event.target.value.replace(/[^a-z0-9]/gi,"").toUpperCase())} placeholder="Example: JD"/><small>Pre-fills initials for each update.</small></label>
     <label>DEFAULT SHIFT<select value={defaultShift} onChange={event=>setDefaultShift(event.target.value as Shift)}><option>1st</option><option>2nd</option><option>3rd</option></select></label>
     <label className="settings-check"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span>SHOW COMPLETED</span></label>
+    {/* The eight tiles the shop reads are always on the board, in the order
+        Curtis set. These six are real numbers that most days nobody needs, so
+        they are asked for rather than assumed — the scoreboard had grown into
+        a wall you scroll past to reach the sheet. Per device, like every other
+        view preference here. */}
+    <section className="down-settings-group"><h3>EXTRA COUNT TILES</h3>
+     <p className="down-settings-hint">TOTAL ON SHEET, DOWN BUSES, SCHEDULED, COMPLETED TODAY, UNSCHEDULED, INSPECTIONS &amp; SCHEDULED MAINTENANCE and the two road counts are always on the board. Tick anything else you want beside them.</p>
+     <div className="down-tile-choices">{OPTIONAL_DOWN_TILES.map(tile=>
+      <label className="settings-check" key={tile.key}><input type="checkbox" checked={extraTiles.includes(tile.key)} onChange={event=>toggleTile(tile.key,event.target.checked)}/><span>{tile.label}</span></label>)}</div>
+    </section>
+    {/* Off by default. It was a permanent panel between the counts and the
+        sheet on a page whose whole problem was how much sits above the rows. */}
+    <label className="settings-check"><input type="checkbox" checked={showQuickNotes} onChange={event=>setShowQuickNotes(event.target.checked)}/><span>SHOW QUICK NOTES</span></label>
     <section className="down-settings-group"><h3>WORDING</h3><div className="down-wording-grid">{(Object.keys(DOWN_SHEET_LABEL_NAMES) as (keyof DownSheetLabels)[]).map(key=><label key={key}>{DOWN_SHEET_LABEL_NAMES[key]}<input value={display.labels[key]} onChange={event=>setLabel(key,event.target.value)}/></label>)}</div></section>
     <section className="down-settings-group"><h3>TEXT STYLE</h3><div className="down-style-grid">{(Object.keys(DOWN_SHEET_STYLE_LABELS) as DownSheetStyleKey[]).map(key=><div key={key}><b>{DOWN_SHEET_STYLE_LABELS[key]}</b><label>COLOR<input type="color" value={display.styles[key].color} onChange={event=>setStyle(key,"color",event.target.value)}/></label><label>SIZE<input type="number" min="7" max="32" value={display.styles[key].fontSize} onChange={event=>setStyle(key,"fontSize",event.target.value)}/></label></div>)}</div><button type="button" className="reset-down-text" onClick={()=>setDisplay(normalizeDownSheetDisplay(DEFAULT_DOWN_SHEET_DISPLAY))}>RESET TEXT</button></section>
     <section className="down-settings-group"><h3>MOVE THE SHEET BETWEEN DEVICES</h3>{transfer}</section>

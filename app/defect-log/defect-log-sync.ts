@@ -48,13 +48,55 @@ export function isDefectLogCleanupCandidate(record:DefectLogRecord,activeDownBus
  return record.bus.s==="out"||activeDownBusIds.has(record.bus.id);
 }
 
-export function hideDefectLogRecords(fleet:DefectLogFleetBus[],defectIds:Iterable<string>,now=new Date().toISOString()){
- const hiddenIds=new Set(defectIds);
- if(!hiddenIds.size)return fleet;
+/* Which record on which bus. It used to take bare defect ids and walk the WHOLE
+   fleet hiding every match, which is only safe while no two buses can hold the
+   same id - and changing a bus number used to make exactly that pair. Curtis
+   moved a defect to the right bus, tidied the leftover off the wrong one, and
+   the tidy-up reached across and hid the good copy too: two defects on Bus
+   17532 the log would not draw and the duplicate check would not let him log
+   again. Saying the bus out loud is what stops a removal travelling. */
+export type DefectLogHideTarget={busId:string;defectId:string};
+export function hideDefectLogRecords(fleet:DefectLogFleetBus[],targets:Iterable<DefectLogHideTarget>,now=new Date().toISOString()){
+ const byBus=new Map<string,Set<string>>();
+ for(const target of targets)(byBus.get(target.busId)||byBus.set(target.busId,new Set()).get(target.busId)!).add(target.defectId);
+ if(!byBus.size)return fleet;
  return fleet.map(bus=>{
+  const hiddenIds=byBus.get(bus.id);
+  if(!hiddenIds)return bus;
   const defects=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
   if(!defects.some(defect=>hiddenIds.has(defect.id)))return bus;
   return {...bus,defects:defects.map(defect=>hiddenIds.has(defect.id)?{...defect,defectLogHiddenAt:now}:defect)};
+ });
+}
+
+/* The bus a record is leaving, if it is leaving one.
+
+   A defect id belongs to exactly ONE bus. Changing the bus number in the editor
+   used to COPY rather than move: the save looked for the id on the bus it was
+   handed, did not find it, and appended - leaving the original in place on the
+   old bus under the same id. Two buses holding one id is corruption everywhere
+   it touches, because the Down Sheet link map, the log's hide flag and the
+   cloud's own row key are all keyed by defect id alone. */
+function busHoldingDefect(fleet:DefectLogFleetBus[],defectId:string,exceptBusId:string){
+ return fleet.find(bus=>bus.id!==exceptBusId&&normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).some(defect=>defect.id===defectId));
+}
+/* Takes the record off the bus it came from and leaves that bus otherwise
+   alone. pendingRepair is rebuilt because it is a summary of the defects that
+   are left; `s` is deliberately NOT recomputed, because a bus's status is a
+   call somebody made about the bus and a repair moving off it is not new
+   information about whether it can run. */
+function takeDefectOffBus(fleet:DefectLogFleetBus[],busId:string,defectId:string,downEntries:DefectLogDownEntry[]){
+ return fleet.map(bus=>{
+  if(bus.id!==busId)return bus;
+  const kept=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.id!==defectId);
+  /* down is re-read off the sheet, never decided here. If the repair that left
+     was this bus's only active sheet entry, that entry has gone with it and the
+     bus is no longer on the sheet - the DS badge has to follow, or the old bus
+     keeps a flag for work now filed under another one. `s` is a different
+     matter and is deliberately left alone: a bus's status is a call somebody
+     made about the bus, and a repair moving off it is not new information
+     about whether it can run. */
+  return {...bus,defects:kept,pendingRepair:defectSummary(kept),down:downEntries.some(entry=>entry.busId===bus.id&&entry.workflow!=="Completed")};
  });
 }
 
@@ -172,6 +214,13 @@ export function saveDefectLogRecord(
  if(duplicate)return {fleet,downEntries,error:"recent-duplicate" as const,duplicate};
  const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
  const existing=current.find(defect=>defect.id===incoming.id);
+ /* Any OTHER bus still holding this id. Checked on every save, not only when
+    the bus number changed, because the invariant is "one bus per defect id"
+    and a pair that already went wrong has to be able to heal: saving either
+    copy collapses them back to one. Only the arrival is called a move - a
+    stray copy being swept up is a repair, not a decision somebody made. */
+ const strayOn=busHoldingDefect(fleet,incoming.id,bus.id);
+ const leaving=existing?undefined:strayOn;
  const state=incoming.state;
  /* workStates is taken from the incoming record rather than left to the
    spread, because unticking the LAST box produces a defect with no workStates
@@ -184,13 +233,16 @@ export function saveDefectLogRecord(
    never a partial patch, so reading this field straight off the incoming copy
    is what the callers already mean. A future caller that passes a patch would
    have to carry workStates with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log"},supportingDetails=defectSupportingDetails(defect);
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
  if(onDownSheet&&state!=="completed"){
   const workflow=workflowForState(state),historyItem={at:now,initials:defect.reportedBy||"",action:existingDown?"Updated from Defect Log":"Added from Defect Log"};
-  const linked:DefectLogDownEntry=existingDown?{...existingDown,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
+  /* busId as well as busNumber. The update branch renamed the entry's bus and
+     left its id pointing at the old one, so a moved repair showed the new
+     number on a sheet row still filed under the bus it left. */
+  const linked:DefectLogDownEntry=existingDown?{...existingDown,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:defect.reportedBy||existingDown.updatedBy,completedAt:"",history:[...(existingDown.history||[]),historyItem]}:{id:"repair-"+defect.id,defectId:defect.id,busId:bus.id,busNumber:bus.n,category:defect.category,repair:defect.issue,customReason:supportingDetails,assignmentType:"Mechanic",assignedTo:bus.mechanic||"",section:bus.roadcall?"Roadcall":"Pending",shift:shiftFromFleet(bus.shift),workflow,operationalStatus:defect.operability==="down"?"out":state==="in-progress"?"shop":"defect",priority:defect.operability==="down"?"High":"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue),createdAt:defect.createdAt||now,updatedAt:now,updatedBy:defect.reportedBy||"",completedAt:"",history:[historyItem]};
   nextDown=existingDown?downEntries.map(entry=>entry.id===existingDown.id?linked:entry):[linked,...downEntries];
  }else if(existingDown&&existingDown.workflow!=="Completed"){
   nextDown=downEntries.map(entry=>entry.id===existingDown.id?{...entry,workflow:"Completed",completedAt:now,updatedAt:now,updatedBy:defect.reportedBy||entry.updatedBy,history:[...(entry.history||[]),{at:now,initials:defect.reportedBy||"",action:state==="completed"?"Repair completed from Defect Log":"Removed from active Down Sheet"}]}:entry);
@@ -198,7 +250,8 @@ const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workS
  const hasActiveDown=nextDown.some(entry=>entry.busId===bus.id&&entry.workflow!=="Completed");
  const nextBusBase={...bus,defects,pendingRepair:defectSummary(defects),down:hasActiveDown};
  const nextBus=stampOperationalChange(bus,{...nextBusBase,s:repairStatus(nextBusBase,defects,state)},now) as DefectLogFleetBus;
- const nextFleet=fleet.map(item=>item.id===bus.id?nextBus:item);
+ const placed=fleet.map(item=>item.id===bus.id?nextBus:item);
+ const nextFleet=strayOn?takeDefectOffBus(placed,strayOn.id,defect.id,nextDown):placed;
 
  /* A road call is recorded the moment the box goes from unticked to ticked,
     and only then.

@@ -58,6 +58,7 @@ import SaveAlert from "../save-alert";
 import FleetRecoveryControl from "../fleet-recovery-control";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "../storage";
 import ShopCloudLive from "../shop-cloud-live";
+import AppName from "../app-name";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -329,7 +330,7 @@ export default function SettingsPage(){
 
  return <main className="settings-app"><ShopCloudLive/>
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
-  <header className="settings-header"><div><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
+  <header className="settings-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
   <nav className="settings-jump" aria-label="Settings sections">
    <a href="#master" onClick={()=>reveal("master")}>MASTER</a><a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
   </nav>
@@ -401,7 +402,7 @@ export default function SettingsPage(){
     <SectionHead id="down-sheet" kicker="DOWN SHEET" title="Sheet settings" open={open.down} onToggle={()=>toggle("down")}/>
     <SectionBody id="down-sheet" open={open.down}>
      <p className="settings-section-blurb">Defaults for new entries, the sheet's wording and text style, and moving the sheet to another device.</p>
-     <DownSheetSettings inline transfer={downTransfer} defaultInitials={down.defaultInitials} setDefaultInitials={value=>updateDown({defaultInitials:value})} defaultShift={down.defaultShift} setDefaultShift={value=>updateDown({defaultShift:value})} showCompleted={down.showCompleted} setShowCompleted={value=>updateDown({showCompleted:value})} display={down.display} setDisplay={value=>updateDown({display:value})} onClose={noop}/>
+     <DownSheetSettings inline transfer={downTransfer} defaultInitials={down.defaultInitials} setDefaultInitials={value=>updateDown({defaultInitials:value})} defaultShift={down.defaultShift} setDefaultShift={value=>updateDown({defaultShift:value})} showCompleted={down.showCompleted} setShowCompleted={value=>updateDown({showCompleted:value})} extraTiles={down.extraTiles} setExtraTiles={value=>updateDown({extraTiles:value})} showQuickNotes={down.showQuickNotes} setShowQuickNotes={value=>updateDown({showQuickNotes:value})} display={down.display} setDisplay={value=>updateDown({display:value})} onClose={noop}/>
     </SectionBody>
    </section>
    <section id="defect-log" className={sectionClass("log","log")} aria-labelledby="defect-log-heading" style={logStyle}>

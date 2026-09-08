@@ -37,7 +37,8 @@ import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusId
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
-import { deferredBadgeCounts } from "../app/deferred-counts.ts";
+import { deferredBadgeCounts, heldDeferredBuses } from "../app/deferred-counts.ts";
+import { readSettings } from "../app/defect-log/defect-log-settings.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -685,7 +686,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
 
-  assert.match(html, /<title>Fleet Maintenance Bus Tracking System<\/title>/i);
+  assert.match(html, /<title>FLEETSTEP — Fleet Maintenance<\/title>/i);
   assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
@@ -849,9 +850,22 @@ test("removes prospective customer branding from visible app titles", async () =
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   const manifest = JSON.parse(manifestText);
-  assert.equal(manifest.name, "Fleet Maintenance Bus Tracking System");
-  assert.equal(manifest.short_name, "Fleet Bus Tracker");
-  assert.match(layout, /title:"Fleet Maintenance Bus Tracking System"/);
+  /* THE APP HAS A NAME NOW: FLEETSTEP. Curtis chose it, and it is drawn in the
+     top-left of all six page headers by `app/app-name.tsx`.
+
+     The manifest has to agree with that header. short_name is what a phone
+     prints under the home-screen icon, so a header saying one thing and an icon
+     saying another would give one app two names on one device. All three are
+     pinned together here for that reason, and the component exports the string
+     rather than each page spelling it - five copies of the nav once drifted
+     until the Facility Map called itself something the other pages did not, and
+     a name is the last string that should be allowed to do that. */
+  const appName = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  assert.match(appName, /export const APP_NAME="FLEETSTEP"/);
+  assert.equal(manifest.short_name, "FLEETSTEP");
+  assert.equal(manifest.name, "FLEETSTEP — Fleet Maintenance");
+  assert.match(layout, /title:"FLEETSTEP — Fleet Maintenance"/);
+  assert.match(layout, /title:"FLEETSTEP"/, "the iOS home-screen title too");
   assert.match(operator, /FLEET INTELLIGENT COMMAND CONSOLE/);
   assert.match(downSheet, /FLEET MAINTENANCE/);
   assert.match(downSheet, /MAINTENANCE FACILITY/);
@@ -1214,9 +1228,18 @@ test("renders the interactive down sheet with All as the default shift view", as
      the whole-sheet count, so no number was actually lost - which is the thing
      to check here, not the panel's absence. */
   assert.doesNotMatch(html, /SHEET STATS/);
-  assert.match(html, /SHEET CAPACITY/);
-  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR"])
-   assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" came down into the tiles rather than being dropped");
+  // SHEET CAPACITY is one of the six opt-in tiles now, so it is absent on a
+  // fresh device and present only once somebody ticks it in the settings.
+  assert.doesNotMatch(html, /SHEET CAPACITY/, "the extra tiles are asked for, not assumed");
+  /* The board is collapsed on a fresh device and only DOWN BUSES is drawn, so
+     none of these are in the markup — including COMPLETED TODAY, which is one
+     of the eight that appear the moment it is expanded. Not dropped: opt-in for
+     four of them, one press away for the other. The source below is what holds
+     which is which; the HTML here only proves the page opens quiet. */
+  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR","TOTAL ON SHEET"])
+   assert.doesNotMatch(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" must not be drawn while the count board is collapsed");
+  assert.match(html, /class="down-counts-toggle" aria-expanded="false"/, "the count board opens collapsed");
+  assert.match(html, /class="down-counts-lead"><strong>0<\/strong><span>DOWN BUSES<\/span>/, "DOWN BUSES is the one number it keeps while collapsed");
   /* What the page opens on: the button that adds a bus, and the search under
      it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
      asserted absent above. */
@@ -1224,7 +1247,9 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS is alone in its row now");
   assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
-  assert.match(html, /QUICK NOTES/);
+  // QUICK NOTES is off by default now — a permanent panel between the counts
+  // and the sheet, on the page whose problem was how much sits above the rows.
+  assert.doesNotMatch(html, /QUICK NOTES/, "quick notes is opt-in, so a fresh device does not draw it");
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   assert.match(source, /knownActive/);
   assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
@@ -2416,13 +2441,118 @@ test("defect log cleanup preserves active log-origin repairs and fleet state", (
   assert.equal(isDefectLogCleanupCandidate(trackerRecord,new Set(["bus-1"])), true);
   const fixedRecord = {...logRecord,defect:{...activeDefect,state:"completed"}};
   assert.equal(isDefectLogCleanupCandidate(fixedRecord,new Set()), true);
-  const archived = hideDefectLogRecords([bus],[activeDefect.id],"2026-08-22T12:00:00.000Z");
+  const archived = hideDefectLogRecords([bus],[{busId:"bus-1",defectId:activeDefect.id}],"2026-08-22T12:00:00.000Z");
   assert.equal(archived[0].s,"out");
   assert.equal(archived[0].l,"west-0");
   assert.equal(archived[0].down,true);
   assert.equal(archived[0].defects[0].state,"open");
   assert.equal(archived[0].defects[0].defectLogHiddenAt,"2026-08-22T12:00:00.000Z");
 });
+test("changing a defect's bus number MOVES the record, and a removal never travels between buses", () => {
+ // Curtis's sequence, exactly. He logged a battery fault on the wrong bus, went
+ // back in, changed the bus number, and saved. The save used to COPY: it looked
+ // for the id on the bus it was handed, did not find it, and appended - so the
+ // original stayed put and two buses held one defect id. He then tidied the
+ // leftover off the wrong bus, and because the hide walked the whole fleet by
+ // id it took the good copy with it: a defect on 17532 the log would not draw,
+ // could not remove, and would not let him log again.
+ const t0 = "2026-09-07T22:11:00.000Z", t1 = "2026-09-07T22:19:00.000Z";
+ const fleet = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [] },
+ ];
+ const logged = saveDefectLogRecord(fleet, [], "bus-a", { id: "d1", category: "Battery, Starting and Charging", issue: "Flashing battery light", details: "", operability: "service", state: "open", source: "defect-log", reportedBy: "CJ" }, false, t0);
+ assert.equal(logged.error, null);
+ assert.deepEqual(logged.fleet.map(bus => (bus.defects || []).length), [1, 0]);
+
+ // Change the bus number and save — the same call the editor makes.
+ const moved = saveDefectLogRecord(logged.fleet, logged.downEntries, "bus-b", { ...logged.fleet[0].defects[0] }, false, t1);
+ assert.equal(moved.error, null);
+ assert.deepEqual(moved.fleet.map(bus => (bus.defects || []).map(d => d.id)), [[], ["d1"]], "the record moves; it must not be left on the bus it came from");
+ assert.equal(moved.fleet[0].pendingRepair, "", "the old bus stops advertising a repair it no longer holds");
+ // Where it came from is on the record, so the arrival is not a mystery.
+ assert.equal(moved.fleet[1].defects[0].movedFromBusNumber, "17530");
+ assert.equal(moved.fleet[1].defects[0].movedAt, t1);
+ // The old bus's own status is left alone — a repair moving off it is not new
+ // information about whether it can run.
+ assert.equal(moved.fleet[0].s, logged.fleet[0].s);
+
+ // And the second half: hiding a record on one bus must never reach another.
+ const shared = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [{ id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "service", state: "open", source: "defect-log" }] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [{ id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "service", state: "open", source: "defect-log" }] },
+ ];
+ const hidden = hideDefectLogRecords(shared, [{ busId: "bus-a", defectId: "d1" }], t1);
+ assert.equal(hidden[0].defects[0].defectLogHiddenAt, t1);
+ assert.equal(hidden[1].defects[0].defectLogHiddenAt, undefined, "removing a record on 17530 must not hide 17532's");
+ assert.equal(defectLogRecords(hidden, []).filter(r => !r.defect.defectLogHiddenAt).map(r => r.bus.n).join(), "17532");
+
+ // Saving either copy of a pair that already went wrong collapses them to one.
+ const repaired = saveDefectLogRecord(shared, [], "bus-b", { ...shared[1].defects[0] }, false, t1);
+ assert.deepEqual(repaired.fleet.map(bus => (bus.defects || []).length), [0, 1]);
+});
+
+test("a one-bus search ends when you reach the bus; a worklist of several survives", async () => {
+ const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ // Searching one bus number is a lens you look through to get AT that bus. It
+ // used to end only when the box was emptied by hand, so Curtis tapped the bus,
+ // did the work, came back, and the board was still held to one bus with
+ // nothing on screen saying so. Several numbers is a worklist, not a lens.
+ assert.match(page, /const singleBusSearch=busSearch\.kind==="numbers"&&busSearch\.tokens\.length===1&&busSearch\.buses\.length===1/);
+ assert.match(page, /const clearSearchOnReach=\(\)=>\{if\(singleBusSearch\)setSearch\(""\)\}/);
+ // Both ways into a bus clear it, and on the TAP rather than on a save —
+ // looking at a bus is a finished errand too.
+ assert.match(page, /log-card-main log-group-header[\s\S]{0,240}?onClick=\{\(\)=>\{clearSearchOnReach\(\);setExpandedBusIds/);
+ assert.match(page, /log-focus-button[\s\S]{0,320}?clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)/);
+ // And a way out that is not backspacing four digits. ALL still clears the
+ // search too, but it drags the state filter back with it.
+ assert.match(page, /className="clear-log-search" onClick=\{\(\)=>setSearch\(""\)\}/);
+});
+
+test("ALREADY LOGGED can reach the record it is blocking on", async () => {
+ const [page, css] = await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
+ ]);
+ // The banner named an existing defect and gave no way to reach it, which is
+ // fine until that defect is one the log is not drawing — then it is a locked
+ // door with the key on the other side. OPEN IT clears the hide flag and opens
+ // the record, whatever put it out of sight.
+ assert.match(page, /className="open-existing-defect" onClick=\{\(\)=>showExisting\(value\.busId,recentDuplicate\)\}/);
+ assert.match(page, /const showExistingDefect=\(busId:string,defect:StructuredDefect\)=>\{/);
+ assert.match(page, /defectLogHiddenAt:undefined/);
+ // It writes before it opens, and says so when the write is refused, rather
+ // than opening a record the device never took.
+ const handler = page.slice(page.indexOf("const showExistingDefect="), page.indexOf("const removeFromLog="));
+ assert.match(handler, /const written=persist\(revealed,downEntries\);\s*\n\s*if\(!written\.ok\)return;/);
+ assert.ok(handler.includes('setSearch("")'), "it opens a bus the search may be hiding, so the search stands down");
+ assert.match(css, /\.open-existing-defect\{/);
+ assert.match(css, /\.open-existing-defect\{min-height:44px/);
+});
+
+test("a repair already on the Down Sheet follows its record when the bus number changes", () => {
+ const t0 = "2026-09-07T22:11:00.000Z", t1 = "2026-09-07T22:19:00.000Z";
+ const fleet = [
+  { id: "bus-a", n: "17530", s: "shop", l: "bay-1", defects: [] },
+  { id: "bus-b", n: "17532", s: "shop", l: "garage-1", defects: [] },
+ ];
+ const defect = { id: "d1", category: "Brakes", issue: "Air leak", details: "", operability: "down", state: "open", source: "defect-log", reportedBy: "CJ" };
+ const onSheet = saveDefectLogRecord(fleet, [], "bus-a", defect, true, t0);
+ assert.equal(onSheet.downEntries.length, 1);
+ assert.equal(onSheet.downEntries[0].busId, "bus-a");
+
+ const moved = saveDefectLogRecord(onSheet.fleet, onSheet.downEntries, "bus-b", { ...onSheet.fleet[0].defects[0] }, true, t1);
+ assert.equal(moved.downEntries.length, 1, "moving a repair must not open a second sheet entry for it");
+ // The update branch renamed the entry's bus and left its id behind, so a moved
+ // repair showed the new number on a row still filed under the bus it left.
+ assert.equal(moved.downEntries[0].busNumber, "17532");
+ assert.equal(moved.downEntries[0].busId, "bus-b");
+ // The DS badge is read off the sheet, never decided by the bus. The entry went
+ // with the repair, so the bus it left is no longer on the sheet.
+ assert.equal(moved.fleet[0].down, false, "the old bus must not keep a DS flag for work now filed under another bus");
+ assert.equal(moved.fleet[1].down, true);
+});
+
 test("down-sheet repair items keep independent optional estimates and a bus total", () => {
   const first = {...blankRepairItem(0), category:"Engine", repair:"Check engine light", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"Engine","Check engine light")};
   const second = {...blankRepairItem(1), category:"A/C and HVAC", repair:"Compressor", estimateEnabled:true, timeEstimate:normalizeRepairTimeEstimate(undefined,"A/C and HVAC","Compressor")};
@@ -5722,7 +5852,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  ]);
 
  // one control per bus card, and it must not be nested inside the card's expand button
- assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+ assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
  const focusButtonAt=page.indexOf('className="log-focus-button"'),headerAt=page.indexOf('className="log-card-main log-group-header"');
  assert.ok(focusButtonAt>0&&headerAt>focusButtonAt,"focus button must precede the header button as a sibling");
  assert.equal(/log-card-main log-group-header[\s\S]{0,600}?log-focus-button/.test(page),false);
@@ -7715,7 +7845,7 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
  assert.match(counts, /minutes>=DEFERRED_OVERDUE_MINUTES/);
  assert.match(watch, /const REVIEW_MINUTES=60/);
  assert.match(watch, /const REVIEW_HOUR=20,REVIEW_MINUTE=30/);
- assert.match(watch, /minutes<REVIEW_MINUTES/);
+ assert.match(watch, /minutes>=REVIEW_MINUTES/);
  // Every page drops in both pieces, so the alert reaches wherever the app is
  // actually open rather than only the page that happened to log the defect.
  for (const file of ["../app/page.tsx", "../app/down-sheet/page.tsx", "../app/defect-log/page.tsx", "../app/fixed-repairs/page.tsx", "../app/lists/page.tsx"]) {
@@ -7723,6 +7853,62 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
   assert.match(source, /<DeferredNavBadge\/>/, file + " is missing the deferred nav badge");
   assert.match(source, /<DeferredReviewPrompt\/>/, file + " is missing the evening review prompt");
  }
+});
+
+test("the evening prompt asks once per BUS, and one answer covers every repair holding it", () => {
+ // The bug Curtis reported: the prompt was per DEFECT under a "Bus 9911"
+ // heading, so answering it handed back the same bus with the next repair
+ // underneath, over and over, and again on the next app open. Measured in a
+ // browser at 21:00 with a three-defect bus: three prompts, then a fourth
+ // after a reload. heldDeferredBuses is what stops that — one entry per bus.
+ const at = "2026-09-08T18:00:00.000Z";
+ const defect = (id, category, issue, extra = {}) => ({ id, category, issue, details: "", operability: "service", state: "deferred", deferredAt: at, createdAt: at, updatedAt: at, source: "defect-log", ...extra });
+ const fleet = [
+  { id: "bus-1", n: "9911", s: "shop", l: "bay-1", defects: [defect("d1", "Tech Services", "Farebox - Won't probe & open"), defect("d2", "Brakes", "Air leak"), defect("d3", "Lighting", "Headlight out")] },
+  { id: "bus-2", n: "9912", s: "shop", l: "bay-2", defects: [defect("d4", "Engine", "Check engine light")] },
+ ];
+
+ const buses = heldDeferredBuses(fleet, []);
+ assert.equal(buses.length, 2, "three deferred repairs on one bus are one question, not three");
+ assert.deepEqual(buses.map(held => held.bus.n), ["9911", "9912"]);
+ assert.deepEqual(buses[0].defects.map(item => item.id), ["d1", "d2", "d3"]);
+
+ // A bus already on the Down Sheet is the sheet's problem, not the prompt's.
+ assert.deepEqual(
+  heldDeferredBuses(fleet, [{ id: "e1", defectId: "d1", busId: "bus-1", workflow: "In Progress" }]).map(held => held.bus.n),
+  ["9912"],
+ );
+
+ // And the prompt's own gate: a bus drops out entirely once ANY of its repairs
+ // carries a keep-until in the future, because that answer was about the bus.
+ const now = new Date("2026-09-08T21:00:00.000Z");
+ const snoozed = heldDeferredBuses(
+  [{ ...fleet[0], defects: [defect("d1", "Tech Services", "Farebox - Won't probe & open", { deferredUntil: "2026-09-08T23:00:00.000Z" }), defect("d2", "Brakes", "Air leak")] }, fleet[1]],
+  [],
+ ).filter(held => !held.defects.some(item => item.deferredUntil && new Date(item.deferredUntil).getTime() > now.getTime()));
+ assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
+});
+
+test("the evening deferred prompt has an off switch, and turning it off leaves the alert badge alone", async () => {
+ const [model, panel, watch] = await Promise.all([
+  readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8"),
+ ]);
+ // Absent means on: every device already in the shop has a settings blob with
+ // no such field, and none of them should go quiet on upgrade.
+ assert.equal(readSettings(null).deferredReviewPrompt, true);
+ assert.equal(readSettings(JSON.stringify({})).deferredReviewPrompt, true);
+ assert.equal(readSettings(JSON.stringify({ deferredReviewPrompt: false })).deferredReviewPrompt, false);
+ assert.equal(readSettings("not json").deferredReviewPrompt, true);
+ assert.ok(model.includes("deferredReviewPrompt:true"), "the default has to be on");
+ assert.match(panel, /checked=\{settings\.deferredReviewPrompt\}/);
+ // The prompt reads the switch; the badge does not, so the 🚨 banner Curtis
+ // already relies on stays whichever way the switch is set.
+ assert.match(watch, /const \[enabled,setEnabled\]=useState\(true\)/);
+ assert.match(watch, /!now\|\|!enabled\|\|!isReviewWindowOpen\(now\)/);
+ const badge = watch.slice(watch.indexOf("export function DeferredNavBadge"), watch.indexOf("type ReviewAction"));
+ assert.ok(!badge.includes("enabled"), "the nav badge must not be gated by the prompt switch");
 });
 
 test("hasDeferredHistory remembers a repair that was deferred, returned to service, and is still open", () => {
@@ -10028,7 +10214,9 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
  ]);
  /* Seven tiles: the five that were there, plus the two that do something. */
- assert.match(page,/\["inspection","INSPECTIONS ON ROAD",roadCounts\.inspection\],\["down","DOWNED BUSES ON ROAD",roadCounts\.down\]/);
+ // DOWNED BUSES ON ROAD leads the pair now — Curtis set the tile order and put
+ // it ahead of the inspections tally.
+ assert.match(page,/\["down","DOWNED BUSES ON ROAD",roadCounts\.down\],\["inspection","INSPECTIONS ON ROAD",roadCounts\.inspection\]/);
  assert.match(page,/onClick=\{\(\)=>setRoadFilter\(current=>current===kind\?null:kind\)\}/,"pressing the same one again shows the whole sheet");
  assert.match(page,/aria-pressed=\{roadFilter===kind\}/);
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
@@ -10044,7 +10232,26 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     it on a 57-bus sheet and TOTAL ON SHEET read 7 - so the foreman lost the
     numbers he had pressed it from. Reported off the live sheet. */
  assert.match(page,/<div className="group-count total"><strong>\{shown\.length\}<\/strong><span>TOTAL ON SHEET<\/span><\/div>/,"TOTAL ON SHEET counts the sheet, not the filtered view");
- assert.match(page,/\{sheetGroups\.map\(group=><div className=\{"group-count group-"\+group\.key\}/,"the four band tiles count the sheet too");
+ /* The band tiles are placed by name now rather than mapped off sheetGroups in
+    whatever order that array happens to be in: Curtis set the tile order, and
+    it interleaves bands with tiles that are not bands at all — COMPLETED TODAY
+    sits between SCHEDULED and UNSCHEDULED. */
+ assert.match(page,/const tileFor=\(key:string\)=>\{const group=sheetGroups\.find\(item=>item\.key===key\)/,"the band tiles still count the sheet");
+ /* Every wording the board draws has to name a label that exists. Moving the
+    tiles into their new order, I typed labels.completedToday - there is no such
+    key, the label is `completed` - and the tile rendered a number over a blank
+    line. It looked fine in the source and only showed up when the box was
+    measured in a browser. */
+ const {DEFAULT_DOWN_SHEET_DISPLAY:DOWN_LABELS}=await import("../app/down-sheet/down-sheet-display-settings.ts");
+ for(const key of [...page.matchAll(/displaySettings\.labels\.([A-Za-z]+)/g)].map(match=>match[1]))
+  assert.ok(key in DOWN_LABELS.labels, "displaySettings.labels."+key+" is not a label that exists, so it would draw blank");
+ const board=page.slice(page.indexOf('<div className="down-group-counts" id="down-counts-tiles">'),page.indexOf("</div>}\n  </section>"));
+ assert.deepEqual(
+  [...board.matchAll(/tileFor\("([a-z-]+)"\)|<span>(TOTAL ON SHEET|DOWN BUSES)<\/span>|completed-today-tile|"(DOWNED BUSES ON ROAD|INSPECTIONS ON ROAD)"/g)]
+   .map(match=>match[1]||match[2]||match[3]||"completed").filter((value,index,all)=>all.indexOf(value)===index),
+  ["TOTAL ON SHEET","DOWN BUSES","scheduled","completed","unscheduled","inspection","DOWNED BUSES ON ROAD","INSPECTIONS ON ROAD","off-property"],
+  "the eight always-on tiles are in the order Curtis set, with the opt-in ones after them",
+ );
  for(const filtered of [/<div className="group-count total"><strong>\{visible\.length\}/,/\{groups\.map\(group=><div className=\{"group-count group-"/])
   assert.doesNotMatch(page,filtered,"no scoreboard tile may be recomputed from the road-filtered set");
  /* What DOES follow the filter: the row count in view, the estimate, and the
@@ -10198,7 +10405,9 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
      same duration twice side by side is the duplication this was clearing.
      Measured: hidden unfiltered, 35h against 105h on 2nd shift, 28h against
      105h under the road filter. */
-  assert.match(page,/\{visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+  // Still only when it differs from EST. ACTIVE LABOR — and now only when that
+  // tile was asked for at all, since a view total beside no total says nothing.
+  assert.match(page,/\{extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
 
   /* The labour tiles print a duration rather than a count, so their text steps
      down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */
@@ -10388,4 +10597,103 @@ test("UNDO FIX returns a repair to where it came from, or does not offer itself"
      absent on a fixed-log record and present on a defect-log one, with DELETE
      on both. */
   assert.match(page,/\{record\.defect\.source!=="fixed-log"&&<button type="button" className="reopen-repair"/);
+});
+
+test("no Down Sheet cell is a flex container, or it stops stretching to its row", async () => {
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+
+  /* display:flex takes a cell out of table layout, and a cell that is not a
+     table-cell stops stretching to its row. `.updated` was flex to stack the
+     initials over the timestamp: on any row where the reason wrapped to a
+     second line the cell stayed 55px while the row grew to 63 or 76, and its
+     bottom border drew a stray line partway up the row beside an ACTIONS cell
+     that did stretch. Curtis photographed it. `.estimate-cell` already carried
+     display:table-cell for the same reason, so this was the second time.
+
+     Measured after: rows of 55, 76, 55 and 63px, every cell matching its row. */
+  const tdClasses=[...new Set([...page.matchAll(/<td className="([a-z- ]+)"/g)].map(m=>m[1]))]
+    .flatMap(names=>names.split(" ")).filter(Boolean);
+  assert.ok(tdClasses.includes("updated")&&tdClasses.includes("row-actions"),"the cells this is about are still cells");
+  for(const name of tdClasses){
+    const rule=css.match(new RegExp("\\."+name+"\\{([^}]*)\\}"));
+    if(!rule)continue;
+    assert.doesNotMatch(rule[1],/display:(flex|grid|inline-flex|inline-grid)/,
+      "."+name+" is a <td>; making it "+rule[1].match(/display:[a-z-]+/)?.[0]+" takes it out of table layout and it stops stretching to its row");
+  }
+  assert.match(css,/\.updated\{display:table-cell\}/);
+  assert.match(css,/\.updated b\{display:block/,"the children stack as blocks, which needs no flex");
+  assert.match(css,/\.estimate-cell\{display:table-cell/,"the precedent this follows");
+});
+
+test("the app's name is drawn top-left on every page, from one place", async () => {
+  /* Curtis named it: FLEETSTEP. It goes in the top-left of every page header,
+     above the kicker each one already carries, so the existing block moves
+     down rather than making room sideways. */
+  const component = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  assert.match(component,/export const APP_NAME="FLEETSTEP"/);
+
+  /* ONE SHARED PIECE, not six copies. Five copies of the nav drifted until the
+     Facility Map called itself something the other pages did not - that is why
+     tracker-pages.ts exists - and a name is the last string that should be
+     allowed to disagree with itself across six screens. */
+  for(const [file,importPath] of [["../app/page.tsx","./app-name"],["../app/down-sheet/page.tsx","../app-name"],
+      ["../app/defect-log/page.tsx","../app-name"],["../app/fixed-repairs/page.tsx","../app-name"],
+      ["../app/lists/page.tsx","../app-name"],["../app/settings/page.tsx","../app-name"]]){
+    const src = await readFile(new URL(file, import.meta.url), "utf8");
+    assert.match(src,new RegExp('import AppName from "'+importPath.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+'"'),file+" must import the shared name");
+    assert.match(src,/<AppName\/>/,file+" must draw it");
+    assert.doesNotMatch(src,/"FLEETSTEP"/,file+" must not spell the name itself");
+  }
+
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  /* Every page loads globals.css, so the name is styled once. */
+  assert.match(css,/\.app-name\{display:block;text-align:left/);
+
+  /* THE MAP'S HEADER FOUGHT THIS TWICE, and both rules are load-bearing.
+
+     First: it is a bare <header>, and bare headers in this file get a FIXED
+     height:38px. The phone block released it with height:auto; above 620px it
+     did not, so the name would have pushed the h1 through the header's own
+     bottom edge - silently, the way the Fixed Repairs feed header once
+     overflowed by 37.5px. min-height cannot undo a fixed height.
+
+     Second: it is a centring flex ROW, so the name landed BESIDE the h1 and
+     centred with it - measured at x198 on a 1280 screen against x18 on every
+     other page. text-align could not touch that, because flex was centring the
+     items rather than the text. Stacking is what fixed it.
+
+     Delete either and the map breaks in a way no test but this one would say. */
+  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch/);
+  assert.match(css,/\.app>header>h1\{text-align:center\}/,"the title keeps its centre on its own line");
+
+  /* Measured across all six pages at 360, 390, 820 and 1280: the name renders,
+     sits 12-18px from the left on every one, and nothing overflows its header
+     or scrolls the page sideways. 24 combinations, 0 failures. */
+});
+
+test("the farebox knows the fault that stops it being probed", async () => {
+  const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS} = await import("../app/repair-catalog.ts");
+
+  /* Reported off the floor: a farebox that will not probe and open. Probing is
+     how the vault is emptied and its fare data pulled, so a box that refuses is
+     down for a reason none of the existing wordings covered - it has power, it
+     is not INOP, and it is not the lock. */
+  assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Won't probe & open"),
+    "the stored identity, which is what a saved record carries");
+  assert.ok(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].includes("Won't probe & open"),
+    "and the bare name the picker draws");
+
+  /* A GROUPED CATEGORY IS HELD IN TWO STRUCTURES AND THEY MUST STAY IN STEP.
+     An entry in one and not the other is either a picker option that saves as
+     nothing, or a stored record the picker cannot reach - and neither shows up
+     until somebody is standing at a bus trying to log it. Checked in both
+     directions, and in order, for the whole group. */
+  const prefixed=REPAIR_OPTIONS["Tech Services"].filter(o=>o.startsWith("Farebox - ")).map(o=>o.slice("Farebox - ".length));
+  assert.deepEqual(prefixed,[...REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"]],
+    "REPAIR_OPTIONS and REPAIR_OPTION_GROUPS disagree about the Farebox group");
+
+  /* Other farebox defect stays last: it is the catch-all, and a catch-all that
+     is not at the end reads as just another item. */
+  assert.equal(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].at(-1),"Other farebox defect");
 });

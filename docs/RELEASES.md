@@ -4,6 +4,10 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 163 / release 167 | Live | 09a69aa | Renames the application FLEETSTEP and collapses the Down Sheet scoreboard to its total, with the detailed counts available on request |
+| 162 / release 166 | Live | 1de3d68 | Moves a defect to its selected bus instead of copying it, keeps removal scoped, adds OPEN IT for already-logged work, and makes tapping Search clear it with a CLEAR tag |
+| 161 / release 165 | Live | ba3fb13 | Adds a one-time deferred-bus check-in that can be switched off, TransitKey app naming, Lite Mode groundwork, and Farebox Won't probe & open |
+| 160 / release 164 | Live | 945cc29 | Fixes the Down Sheet UPDATED BY cell so its row divider runs cleanly across the full row |
 | 159 / release 163 | Live | 5381dd2 | Realtime Shop Cloud falls back to polling if unreachable; Down Sheet actions sit at the row end and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists |
 | 158 / release 162 | Live | 168f553 | Keeps Down Sheet score tiles stable while road tallies filter the table, adds compact Advanced Actions on both operational pages, makes Deferred status update immediately, and lets a Defect Log location open the Facility Map move workflow |
 | 157 / release 161 | Live | 3b16d45 | Adds row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; preserves independent inspection tallies; moves Mystery Buses to the Down Sheet; and compacts Defect Log controls behind Advanced Actions |

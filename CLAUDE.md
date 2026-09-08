@@ -140,6 +140,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-tracker-collapsed-sections-v1
   pace-down-sheet-stats-open-v1        NO LONGER READ — SHEET STATS is gone
   pace-down-sheet-advanced-open-v1     ADVANCED ACTIONS on the DOWN SHEET
+  pace-down-sheet-counts-open-v1       the DOWN SHEET count tiles, collapsed by default
   pace-defect-log-stats-open-v1
   pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET

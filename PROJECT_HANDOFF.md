@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-09-01
+Updated: 2026-09-07
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 159 (repository release 163)
-Live feature checkpoint: commit 5381dd2
+Live release: Sites Version 163 (repository release 167)
+Live feature checkpoint: commit 09a69aa
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 163 is the current user-approved live release, deployed by Sites as Version 159. Its source checkpoint is commit 5381dd2. Realtime Shop Cloud now falls back to polling if a device cannot reach the realtime service; Down Sheet actions sit at the end of each row and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists. No storage key, payload, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 167 is the current user-approved live release, deployed by Sites as Version 163. Its source checkpoint is commit 09a69aa. The app is now named FLEETSTEP, and the Down Sheet shows one total by default with its detailed scoreboard available on request. The added display preference is backward-compatible device-local settings data; no fleet, repair, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

@@ -1,6 +1,6 @@
 {
-  "name": "Fleet Maintenance Bus Tracking System",
-  "short_name": "Fleet Bus Tracker",
+  "name": "FLEETSTEP — Fleet Maintenance",
+  "short_name": "FLEETSTEP",
   "description": "Offline-capable facility-wide fleet location and maintenance tracking board.",
   "start_url": "/",
   "scope": "/",

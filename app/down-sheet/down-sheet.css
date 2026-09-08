@@ -108,7 +108,19 @@ button,input,select,textarea{font:inherit}
 .section-tag{background:#e8edf5;color:#384c6c}.section-tag.pending{background:#fff1bd;color:#705200}.section-tag.accident{background:#ffdede;color:#8a151c}.section-tag.inspection{background:#e3efff;color:#124f9a}.section-tag.vendor-repair{background:#f3e5ff;color:#67368c}
 .shift-tag{min-width:36px;background:#e5edf8;color:#173f72}
 .workflow{background:#e9edf4;color:#394b68}.workflow.in-progress{background:#fff0b8;color:#705300}.workflow.waiting-for-parts{background:#ffe1be;color:#834500}.workflow.completed{background:#d9f3e2;color:#12663a}.workflow.on-hold{background:#e5dffd;color:#4f3885}
-.updated{display:flex;flex-direction:column}.updated b{font-size:10px;color:#183c70}.updated small{margin-top:3px;font-size:7px;color:#7d899d}
+/* A <td> MUST NOT BE A FLEX CONTAINER.
+
+   display:flex takes the cell out of table layout, and a cell that is not a
+   table-cell stops stretching to its row. `.updated` was flex to stack the
+   initials over the timestamp, so on any row the reason column wrapped onto a
+   second line the cell stayed 55px while the row grew to 63 or 76 — its bottom
+   border drawing a stray line partway up the row, next to an ACTIONS cell that
+   did stretch. Curtis photographed exactly that.
+
+   `.estimate-cell` already carries `display:table-cell` for the same reason, so
+   this is the second time. The children stack as blocks instead, which needs no
+   flex at all. */
+.updated{display:table-cell}.updated b{display:block;font-size:10px;color:#183c70}.updated small{display:block;margin-top:3px;font-size:7px;color:#7d899d}
 .empty-sheet{height:260px!important;text-align:center;color:#687791}.empty-sheet b,.empty-sheet span{display:block}.empty-sheet b{font-size:14px;color:#294566}.empty-sheet span{margin-top:6px;font-size:9px}
 .down-footnote{display:flex;justify-content:space-between;margin:8px 18px 0;color:#687791;font-size:7px;font-weight:900;letter-spacing:.5px}
 .down-shade{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:18px;background:#06152cbb}
@@ -382,6 +394,23 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    `@media(max-width:760px)` block earlier in this file silently landed INSIDE
    it, and a divider that only has a colour on a phone is worse than none. The
    phone overrides below open their own block. */
+/* The board's own header: DOWN BUSES reads as the headline number whether the
+   rest is open or not, so collapsing never takes away the one figure the page
+   is opened for. The whole row is the control — a foreman on a phone should not
+   have to find a caret. */
+.down-counts-board{margin:0 0 9px}
+.down-counts-head{margin:0 14px}
+.down-counts-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:10px 13px;color:inherit;text-align:left;cursor:pointer}
+.down-counts-toggle:hover{border-color:#0b64bd}
+.down-counts-lead{display:flex;align-items:baseline;gap:9px;min-width:0}
+.down-counts-lead strong{color:#a01722;font-size:26px;font-weight:900;line-height:1}
+.down-counts-lead>span{color:#5a6b84;font-size:9px;font-weight:900;letter-spacing:.6px}
+.down-counts-more{flex-shrink:0;display:flex;align-items:center;gap:6px;color:#0b64bd;font-size:8px;font-weight:900;letter-spacing:.5px}
+.down-counts-more i{font-style:normal;font-size:7px}
+.down-counts-board .down-group-counts{margin-top:8px}
+.down-settings-hint{margin:0 0 7px;color:#5a6b84;font-size:8px;line-height:1.5}
+.down-tile-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media(max-width:760px){.down-counts-head{margin:0 8px}.down-counts-toggle{min-height:56px;padding:11px 12px}.down-counts-lead strong{font-size:30px}.down-counts-lead>span{font-size:10px}.down-counts-more{font-size:9px}.down-tile-choices{grid-template-columns:1fr}.down-settings-hint{font-size:9px}}
 .down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .down-group-counts .group-count{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1px solid #b7c3d7;border-radius:7px;background:#fff;text-align:center}
 .down-group-counts .group-count strong{font-size:20px;font-weight:900;line-height:1;color:#173e73}

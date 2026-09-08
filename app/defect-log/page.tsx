@@ -33,6 +33,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 
 import {moveBusToArea} from "../facility-areas";
 import ShopCloudLive from "../shop-cloud-live";
+import AppName from "../app-name";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
    restore of the old fleet: the records have to come back stamped as new work,
@@ -149,7 +150,7 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;close:()=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,close}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;close:()=>void}){
  const [value,setValue]=useState(draft);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
     that already had a diagnosis, an action, or a part recorded. React warned
@@ -303,7 +304,13 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         fleet has learned about the repair. Same size, so neither outranks the
         other, and separate, so neither buries the other. */}
     {defectTsb(value.defect.category,value.quickIssue||value.defect.issue)&&<p className="defect-tsb"><b>TSB — TECHNICAL SERVICE BULLETIN</b>{defectTsb(value.defect.category,value.quickIssue||value.defect.issue)}</p>}
-    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert"><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after {RECENT_DUPLICATE_WINDOW_LABEL}.</p>}
+    {/* The banner told you to use the existing defect and gave you no way to
+        reach it, which is fine until the existing defect is one the log is not
+        drawing - then it is a locked door with the key on the other side.
+        Curtis hit exactly that: two records on Bus 17532 he could not see, could
+        not remove, and could not log again. OPEN IT puts the record back in the
+        log and opens it, whatever put it out of sight. */}
+    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert"><span><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after {RECENT_DUPLICATE_WINDOW_LABEL}.</span><button type="button" className="open-existing-defect" onClick={()=>showExisting(value.busId,recentDuplicate)}>OPEN IT</button></p>}
     {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
     {diagLightMode&&<fieldset className="wide diag-light-picker"><legend>HVAC DIAG LIGHT (OPTIONAL)</legend><div className="diag-light-choices">{DIAG_LIGHTS.map(light=><label className={"diag-light-"+light+(diagLight===light?" selected":"")} key={light}><input type="checkbox" checked={diagLight===light} onChange={()=>setDiagLight(light)}/><span>{DIAG_LIGHT_LABELS[light]}</span></label>)}<label className="diag-alarm-code">ALARM #<input inputMode="numeric" maxLength={2} placeholder="00" value={value.defect.alarmCode||""} onChange={event=>updateDefect("alarmCode",event.target.value.replace(/\D/g,"").slice(0,2))}/></label></div><small className={typedAlarmDigits.length===1?"diag-alarm-warning":undefined}>{
      /* A single digit is the trap. It sits in the field looking entered and
@@ -516,6 +523,16 @@ export default function DefectLog(){
  const activeDownBusIds=useMemo(()=>downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId),[downEntries]);
  const activeDownBusIdSet=useMemo(()=>new Set(activeDownBusIds),[activeDownBusIds]);
  const busSearch=resolveBusNumberList(fleet,search),busSearchIds=new Set(busSearch.kind==="numbers"?busSearch.buses.map(bus=>bus.id):[]);
+ /* Searching one bus number is a lens you look through to get AT that bus, and
+    it should end when you reach it. It used to end only when you emptied the
+    box by hand: tap the bus, do the work, come back, and the board was still
+    held down to one bus with nothing on screen saying so.
+
+    So tapping a bus clears it - on the tap, not on a save, because looking is
+    a finished errand too. A search naming SEVERAL buses is a worklist rather
+    than a lens, and survives: you are working down it. */
+ const singleBusSearch=busSearch.kind==="numbers"&&busSearch.tokens.length===1&&busSearch.buses.length===1;
+ const clearSearchOnReach=()=>{if(singleBusSearch)setSearch("")};
  const searchFeedback=busSearch.kind==="numbers"?[...busSearch.ambiguous.map(item=>item.query+" matches "+candidateBusNumbers(item.matches).join(", ")+" — enter the full bus number"),...(busSearch.invalid.length?["Use a full bus number or two ending digits: "+busSearch.invalid.join(", ")]:[]),...(busSearch.missing.length?["No bus matches: "+busSearch.missing.join(", ")]:[])].join(" · "):"";
  const active=records.filter(record=>isUnresolved(record.defect));
  const visible=records.filter(record=>{
@@ -562,10 +579,10 @@ export default function DefectLog(){
  };
  const saveShopNotes=(record:DefectLogRecord,value:string)=>{const nextFleet=fleet.map(bus=>bus.id!==record.bus.id?bus:{...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).map(defect=>defect.id===record.defect.id?{...defect,shopNotes:value}:defect)});persist(nextFleet,downEntries)};
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[draft.defect.id],now):result.fleet,result.downEntries);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
- const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[record.defect.id],now),result.downEntries)};
+ const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[{busId:record.bus.id,defectId:record.defect.id}],now),result.downEntries)};
  /* Files the findings a reviewer approved from a scanned farebox / Ventra
     sweep sheet. Each goes through the same single-record save as LOG DEFECT,
     so the duplicate guard applies to every one: a fault somebody
@@ -663,8 +680,25 @@ export default function DefectLog(){
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
 
- const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[record.defect.id]),downEntries)};
- const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>record.defect.id)),downEntries)};
+ /* Opening the record the duplicate banner is pointing at, and putting it back
+    in the log on the way. A record can be out of sight for two reasons - it was
+    removed from the log, or a fix hid it - and from behind the banner neither
+    is distinguishable or recoverable. Clearing the flag is safe: it takes
+    nothing off the bus and changes no repair state, it only lets the log draw
+    a record it already holds. */
+ const showExistingDefect=(busId:string,defect:StructuredDefect)=>{
+  const bus=fleet.find(item=>item.id===busId);
+  if(!bus){alert("That bus is no longer available. Refresh and try again.");return}
+  const revealed=fleet.map(item=>item.id!==busId?item:{...item,defects:normalizeDefects(item.defects,item.pendingRepair||"",item.id).map(entry=>entry.id!==defect.id?entry:{...entry,defectLogHiddenAt:undefined})});
+  const written=persist(revealed,downEntries);
+  if(!written.ok)return;
+  const record=defectLogRecords(revealed,downEntries).find(item=>item.bus.id===busId&&item.defect.id===defect.id);
+  if(!record){alert("That defect is on Bus "+bus.n+" but the log cannot open it. Check the bus on the Facility Map.");return}
+  setSearch("");
+  setEditing(recordDraft(record));
+ };
+ const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
+ const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
  const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterLabel,quickFilterBuses,quickFilter));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
 /* The same list as a page rather than a paragraph.
 
@@ -687,7 +721,7 @@ export default function DefectLog(){
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="log-header">
-   <div><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
+   <div><AppName/><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <TrackerNav active="/defect-log"/>
    {/* One column so ADVANCED ACTIONS sits directly under REFRESH at every
        width, not only on a phone where the header happens to stack. */}
@@ -763,7 +797,7 @@ export default function DefectLog(){
        says which buses are on it. Both KEYS still work, so a saved default
        view of either keeps filtering — the button is what was removed, not
        the filter. Pressing the active one clears back to ALL. */}
-   <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/></label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
+   <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/>{search&&<button type="button" className="clear-log-search" onClick={()=>setSearch("")} aria-label="Clear the search and show every bus">CLEAR</button>}</label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
     decoration, so it carries its name and is shaped like the buttons beside it. */}
@@ -783,7 +817,7 @@ export default function DefectLog(){
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
-    <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
+    <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();clearSearchOnReach();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
         all: a select nested in a button is invalid, and every tap on it would
         have been swallowed by the card's own expand handler.
@@ -812,7 +846,7 @@ export default function DefectLog(){
       <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
      </button>
     </div>
-    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}>
+    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{clearSearchOnReach();setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row
@@ -875,7 +909,7 @@ export default function DefectLog(){
     </article>)}</div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} close={closeEditor}/>}
+  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} close={closeEditor}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
