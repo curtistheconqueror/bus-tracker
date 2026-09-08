@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: VERSION 163 PENDING — publish from `5381dd2`. Repository release 162 is live from `168f553` as Sites Version 158.**
+**STATUS: NONE PENDING — repository release 163 is live from `5381dd2` as Sites Version 159.**
 
 **159 repairs a live data fault the shop is looking at on the floor today** — the
 Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
@@ -8,7 +8,7 @@ commit, no migration, no dependency change.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **Next** | **163** | `5381dd2` | **Reliable cloud fallback, safer Down Sheet actions, and correct UNDO FIX routing** — a device whose realtime connection cannot reach the service returns to polling; row actions move off the bus-number cell and MARK FIXED asks first; and Undo Fix returns a repair to its originating workflow or is not offered when no open workflow exists |
+| Published | **163** | `5381dd2` | **Live as Sites Version 159.** Realtime falls back to polling if unreachable; Down Sheet actions sit at the row end and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists |
 | Published | **162** | `168f553` | **Live as Sites Version 158.** Road tally filters no longer rewrite the Down Sheet scoreboard; both operational pages use compact Advanced Actions; Deferred updates immediately and can be ended from its drawer; and a Defect Log location opens the Facility Map move workflow |
 | Published | **161** | `3b16d45` | **Live as Sites Version 157.** Row-level Down Sheet DELETE, PUT BACK, MARK FIXED and undo actions; independent inspection tallies; Mystery Buses on the Down Sheet; and Defect Log controls behind Advanced Actions |
 | Published | **160** | `bbe33f6` | **Live as Sites Version 156.** REFRESH is available on every page for home-screen use, and the Main Garage Ready boundary runs vertically between bays 6 and 7 without moving buses or slots |
@@ -40,7 +40,7 @@ commit, no migration, no dependency change.
 
 **Version 152 is live from `b57dcb5`.** The 136–152 handoffs are retained as release records; 141 was Codex's own change and has no handoff here.
 
-**One release is pending: 163, from `5381dd2`.** Repository release 162 is live as Sites Version 158 from `168f553`; 163 is its three-commit continuation, rebased onto the release record so main remains linear.
+**No release is pending.** Repository release 162 went out as Sites Version 158 from `168f553`, and release 163 followed as Sites Version 159 from `5381dd2`. Their retained handoffs below are release records only.
 
 Version 152 sits on top of the published 151 — its first commit was cherry-picked onto Codex's release commit `e493516`, never merged over it.
 
