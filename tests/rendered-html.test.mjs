@@ -303,8 +303,14 @@ test("Down Sheet supports search, bus ordering, work groups, and explicit note s
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
   assert.match(page, /aria-label="Search Down Sheet"/);
-  assert.match(page, /BUS NUMBER ↑/);
-  assert.match(page, /WORK CATEGORIES/);
+  /* The ORDER control beside the search box is gone. The sheet is numerical
+     inside each band either way, nobody standing at a bus was going to pick
+     WORK CATEGORIES, and what people actually want to change — which band they
+     read first — is a setting rather than a control on the page. */
+  assert.doesNotMatch(page, /<option value="number-asc">/, "the ORDER dropdown is gone");
+  assert.doesNotMatch(page, /<option value="category">/, "and the sort it was the only way to reach");
+  assert.doesNotMatch(page, /className="down-order"/);
+  assert.doesNotMatch(page, /work-group-row/, "the subheading rows that sort drew go with it");
   assert.match(page, /SAVE NOTE/);
   assert.match(page, /Unsaved changes/);
   assert.match(css, /\.down-view-controls\{/);
@@ -358,7 +364,7 @@ test("Down Sheet divides itself into off property, scheduled, unscheduled and in
   // own location by bus id. Grouping on the entry alone would silently drop the
   // off-property rule to whatever the paper sheet happened to say.
   assert.match(page, /fleet\.map\(bus=>\[bus\.id,bus\.l\|\|""\]\)/);
-  assert.match(page, /groupDownSheetEntries\([\s\S]{0,400}?,order,locations\)/);
+  assert.match(page, /groupDownSheetEntries\([\s\S]{0,400}?,"number-asc",locations\)/, "bus number, always");
   // The dividers are not conditional on an ordering the way the work-category ones are.
   assert.doesNotMatch(page, /order==="category"&&group\.label/);
   assert.match(css, /\.down-table \.down-group-row td\{/);
@@ -7889,6 +7895,73 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
  assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
 });
 
+test("the Down Sheet's bands are read in the order the shop chose, and the ORDER control is gone", async () => {
+ const { normalizeDownSheetSectionOrder, orderDownSheetGroups, DOWN_SHEET_GROUPS } = await import("../app/down-sheet/down-sheet-view.ts");
+ const { readDownSheetSettings } = await import("../app/down-sheet/down-sheet-settings-store.ts");
+ const groups = DOWN_SHEET_GROUPS.map(group => ({ key: group.key }));
+
+ // Absent means the default order, so no device changes on upgrade.
+ assert.deepEqual(readDownSheetSettings(null).sectionOrder, DOWN_SHEET_GROUPS.map(g => g.key));
+ assert.deepEqual(normalizeDownSheetSectionOrder(null), DOWN_SHEET_GROUPS.map(g => g.key));
+
+ // A chosen order is honoured.
+ const chosen = ["inspection", "unscheduled", "scheduled", "off-property"];
+ assert.deepEqual(orderDownSheetGroups(groups, chosen).map(g => g.key), chosen);
+ assert.deepEqual(readDownSheetSettings(JSON.stringify({ sectionOrder: chosen })).sectionOrder, chosen);
+
+ // A partial or dirty saved order still names every band: anything it does not
+ // mention keeps its default position at the end, so a band added later appears
+ // rather than silently vanishing off a board that renders by this list.
+ assert.deepEqual(normalizeDownSheetSectionOrder(["inspection"]), ["inspection", "off-property", "scheduled", "unscheduled"]);
+ assert.deepEqual(normalizeDownSheetSectionOrder(["inspection", "inspection", "nonsense", 7]), ["inspection", "off-property", "scheduled", "unscheduled"]);
+ assert.deepEqual(normalizeDownSheetSectionOrder("not an array"), DOWN_SHEET_GROUPS.map(g => g.key));
+});
+
+test("DEFERRED sits under MYSTERY BUSES on the Down Sheet, and both answers write the whole bus", async () => {
+ const [board, page, css] = await Promise.all([
+  readFile(new URL("../app/deferred-board.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+ ]);
+ // Same classes as MYSTERY BUSES on purpose — Curtis asked for the same look,
+ // and a second board that looked like a different kind of thing would read as
+ // a different kind of thing.
+ assert.match(board, /className=\{"mystery-board deferred-board"/);
+ assert.match(board, /mystery-card deferred-card/);
+ assert.match(css, /\.deferred-card-actions\{/);
+ // Under it, not merged into it: a mystery is unexplained and a deferral is a
+ // decision, and folding them together would dilute what MYSTERY BUSES is for.
+ assert.ok(page.indexOf("<MysteryBoard fleet=") < page.indexOf("<DeferredBoard fleet="), "DEFERRED goes under MYSTERY BUSES");
+ assert.match(board, /PUT ON DOWN SHEET/);
+ assert.match(board, /RETURN TO SERVICE/);
+ // It hands the answer back rather than writing, like the mystery board's
+ // onMoved, so a refused write is the page's to report.
+ assert.match(board, /onAnswer:\(busId:string,defects:StructuredDefect\[\],action:"downsheet"\|"return"\)=>void/);
+ assert.match(page, /const wroteFleet=writeFleetStorageResult\(localStorage,applied\.fleet as FleetBus\[\]\)/);
+
+ const { answerDeferredBus } = await import("../app/deferred-actions.ts");
+ const at = "2026-09-08T14:00:00.000Z", now = "2026-09-08T18:00:00.000Z";
+ const d = (id, c, i, when) => ({ id, category: c, issue: i, details: "", operability: "service", state: "deferred", deferredAt: when || at, createdAt: at, updatedAt: at, source: "defect-log", reportedBy: "CJ" });
+ const fleet = [{ id: "b1", n: "17801", s: "shop", l: "bay-3", defects: [
+   d("x1", "Brakes", "Air leak"), d("x2", "Lighting", "Headlight out", "2026-09-08T12:00:00.000Z")] }];
+
+ // RETURN TO SERVICE is a statement about the BUS, so every repair holding it
+ // comes off DEFERRED — not just the one the card happened to show.
+ const returned = answerDeferredBus(fleet, [], "b1", fleet[0].defects, "return", { now });
+ assert.equal(returned.saved, 2);
+ assert.deepEqual(returned.fleet[0].defects.map(x => x.state), ["open", "open"]);
+ assert.deepEqual(returned.fleet[0].defects.map(x => x.deferredReturnedAt), [now, now]);
+
+ // PUT ON DOWN SHEET moves ONE, because the sheet allows a bus one active
+ // entry — and needs no more: on the sheet, the bus stops being held at all.
+ const escalated = answerDeferredBus(fleet, [], "b1", fleet[0].defects, "downsheet", { now });
+ assert.equal(escalated.downEntries.length, 1, "one entry, not one per repair");
+ // The longest-held repair leads, so "one of them" is never arbitrary.
+ assert.equal(escalated.downEntries[0].defectId, "x2");
+ const { heldDeferredBuses: heldAfter } = await import("../app/deferred-counts.ts");
+ assert.equal(heldAfter(escalated.fleet, escalated.downEntries).length, 0, "the bus stops being held once it is on the sheet");
+});
+
 test("the evening deferred prompt has an off switch, and turning it off leaves the alert badge alone", async () => {
  const [model, panel, watch] = await Promise.all([
   readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
@@ -10222,8 +10295,8 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
- assert.match(page,/const sheetGroups=useMemo\(\(\)=>groupDownSheetEntries\(shown,order,locations\)/,"the scoreboard is grouped from the whole sheet");
- assert.match(page,/const groups=useMemo\(\(\)=>roadFilter\?groupDownSheetEntries\(downSheetRoadEntries\(shown,locations,roadFilter\),order,locations\):sheetGroups/,"only the table follows the filter");
+ assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the scoreboard is grouped from the whole sheet, in the reader's band order");
+ assert.match(page,/const groups=useMemo\(\(\)=>roadFilter\?orderDownSheetGroups\(groupDownSheetEntries\(downSheetRoadEntries\(shown,locations,roadFilter\),"number-asc",locations\),sectionOrder\):sheetGroups/,"only the table follows the filter");
  assert.ok(page.indexOf("const roadCounts=")<page.indexOf("const groups=useMemo"),"counted from the unfiltered set");
 
  /* AND SO IS EVERY OTHER TILE. Pressing INSPECTIONS ON ROAD is a request to

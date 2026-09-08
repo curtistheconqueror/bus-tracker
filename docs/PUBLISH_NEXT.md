@@ -1,13 +1,26 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 167 is live from `09a69aa` as Sites Version 163.**
+**STATUS: NONE PENDING — repository release 168 is live from `64ec7d2` as Sites Version 164.**
 
-**159 repairs a live data fault the shop is looking at on the floor today** — the
-Down Sheet inflates itself on every sync and a cleared sheet refills. It is one
-commit, no migration, no dependency change.
+**Version 168 is live.** It is one Down Sheet feature commit with no fleet, repair, database, dependency, or infrastructure migration.
+
+- **DEFERRED BUSES gets its own board**, directly under MYSTERY BUSES and in the
+  same shape. The two answer one question between them: a bus on property the
+  sheet does not explain is very often a bus somebody deferred. Each card shows
+  how long the bus has been held and carries the two ways out the Defect Log
+  already offers — PUT ON DOWN SHEET and RETURN TO SERVICE. Collapsed by default.
+- **The ORDER dropdown beside the search box is gone.** The sheet is numerical
+  inside each band either way. What replaces it is **SECTION ORDER** in the Down
+  Sheet settings — which band is read first, moved with up/down buttons.
+- **The app name is larger again** — 21px, 24px on a phone.
+
+One new storage key, `pace-down-sheet-deferred-collapsed-v1`, documented in
+`CLAUDE.md`. Nothing renamed, no records touched. 250 tests, lint and build all
+clean; measured in Chromium at 390 and 1180.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
 | Published | **165** | `ba3fb13` | **Live as Sites Version 161.** Deferred buses can check in once with a switchable prompt; TransitKey naming, Lite Mode groundwork, and Farebox Won't probe & open are included |

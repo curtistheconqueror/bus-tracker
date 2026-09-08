@@ -2,11 +2,19 @@
 
 import {DEFAULT_DOWN_SHEET_DISPLAY,DOWN_SHEET_LABEL_NAMES,DOWN_SHEET_STYLE_LABELS,normalizeDownSheetDisplay,type DownSheetDisplaySettings,type DownSheetLabels,type DownSheetStyleKey} from "./down-sheet-display-settings";
 
-import {OPTIONAL_DOWN_TILES,type OptionalDownTile,type Shift} from "./down-sheet-settings-store";
+import {DOWN_SHEET_GROUPS,OPTIONAL_DOWN_TILES,type DownSheetGroupKey,type OptionalDownTile,type Shift} from "./down-sheet-settings-store";
 export type {Shift};
-type Props={transfer:React.ReactNode;defaultInitials:string;setDefaultInitials:(value:string)=>void;defaultShift:Shift;setDefaultShift:(value:Shift)=>void;showCompleted:boolean;setShowCompleted:(value:boolean)=>void;extraTiles:OptionalDownTile[];setExtraTiles:(value:OptionalDownTile[])=>void;showQuickNotes:boolean;setShowQuickNotes:(value:boolean)=>void;display:DownSheetDisplaySettings;setDisplay:(value:DownSheetDisplaySettings)=>void;onClose:()=>void;/* Rendered on the shared Settings page without the shade or the close and DONE buttons; every change there saves as it is made. */inline?:boolean};
+type Props={transfer:React.ReactNode;defaultInitials:string;setDefaultInitials:(value:string)=>void;defaultShift:Shift;setDefaultShift:(value:Shift)=>void;showCompleted:boolean;setShowCompleted:(value:boolean)=>void;extraTiles:OptionalDownTile[];setExtraTiles:(value:OptionalDownTile[])=>void;sectionOrder:DownSheetGroupKey[];setSectionOrder:(value:DownSheetGroupKey[])=>void;showQuickNotes:boolean;setShowQuickNotes:(value:boolean)=>void;display:DownSheetDisplaySettings;setDisplay:(value:DownSheetDisplaySettings)=>void;onClose:()=>void;/* Rendered on the shared Settings page without the shade or the close and DONE buttons; every change there saves as it is made. */inline?:boolean};
 
-export default function DownSheetSettings({transfer,defaultInitials,setDefaultInitials,defaultShift,setDefaultShift,showCompleted,setShowCompleted,extraTiles,setExtraTiles,showQuickNotes,setShowQuickNotes,display,setDisplay,onClose,inline=false}:Props){
+export default function DownSheetSettings({transfer,defaultInitials,setDefaultInitials,defaultShift,setDefaultShift,showCompleted,setShowCompleted,extraTiles,setExtraTiles,sectionOrder,setSectionOrder,showQuickNotes,setShowQuickNotes,display,setDisplay,onClose,inline=false}:Props){
+ /* Swap with the neighbour rather than drag: this is read on a phone in a shop,
+    and a drag list there is a way to lose your place. */
+ const moveSection=(index:number,by:number)=>{
+  const next=[...sectionOrder],target=index+by;
+  if(target<0||target>=next.length)return;
+  [next[index],next[target]]=[next[target],next[index]];
+  setSectionOrder(next);
+ };
  const toggleTile=(key:OptionalDownTile,on:boolean)=>setExtraTiles(on?[...extraTiles.filter(item=>item!==key),key]:extraTiles.filter(item=>item!==key));
  const setLabel=(key:keyof DownSheetLabels,value:string)=>setDisplay({...display,labels:{...display.labels,[key]:value}});
  const setStyle=(key:DownSheetStyleKey,field:"color"|"fontSize",value:string)=>setDisplay({...display,styles:{...display.styles,[key]:{...display.styles[key],[field]:field==="fontSize"?Number(value):value}}});
@@ -22,6 +30,21 @@ export default function DownSheetSettings({transfer,defaultInitials,setDefaultIn
         they are asked for rather than assumed — the scoreboard had grown into
         a wall you scroll past to reach the sheet. Per device, like every other
         view preference here. */}
+    {/* Which band is read first is a shop preference, not a property of the
+        data: one foreman wants INSPECTIONS at the top because that is the work
+        being planned, another wants UNSCHEDULED first because that is the work
+        nobody has picked up yet. The sheet is numerical inside each band either
+        way, which is why the ORDER control beside the search box went. */}
+    <section className="down-settings-group"><h3>SECTION ORDER</h3>
+     <p className="down-settings-hint">The order the four bands are read down the sheet. Buses stay in bus-number order inside each one.</p>
+     <ol className="down-section-order">{sectionOrder.map((key,index)=>{
+      const band=DOWN_SHEET_GROUPS.find(group=>group.key===key);
+      return <li key={key}><span><b>{band?.label||key}</b><small>{band?.hint||""}</small></span>
+       <span className="down-section-move">
+        <button type="button" onClick={()=>moveSection(index,-1)} disabled={index===0} aria-label={"Move "+(band?.label||key)+" up"}>{"\u25B2"}</button>
+        <button type="button" onClick={()=>moveSection(index,1)} disabled={index===sectionOrder.length-1} aria-label={"Move "+(band?.label||key)+" down"}>{"\u25BC"}</button>
+       </span></li>})}</ol>
+    </section>
     <section className="down-settings-group"><h3>EXTRA COUNT TILES</h3>
      <p className="down-settings-hint">TOTAL ON SHEET, DOWN BUSES, SCHEDULED, COMPLETED TODAY, UNSCHEDULED, INSPECTIONS &amp; SCHEDULED MAINTENANCE and the two road counts are always on the board. Tick anything else you want beside them.</p>
      <div className="down-tile-choices">{OPTIONAL_DOWN_TILES.map(tile=>

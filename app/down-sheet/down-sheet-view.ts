@@ -33,6 +33,26 @@ const GROUP_ORDER=DOWN_SHEET_GROUPS.map(group=>group.key);
 export function downSheetGroupRank(key:DownSheetGroupKey){return GROUP_ORDER.indexOf(key)}
 export function downSheetGroupLabel(key:DownSheetGroupKey){return DOWN_SHEET_GROUPS.find(group=>group.key===key)?.label||""}
 
+/* The order the four bands are read in, which is a shop preference rather than
+   a property of the data: one foreman wants inspections at the top because that
+   is the work being planned, another wants UNSCHEDULED first because that is
+   the work nobody has picked up yet. DOWN_SHEET_GROUPS keeps the default.
+
+   Anything the saved order does not name keeps its default position at the end,
+   so a band added later appears rather than silently vanishing off a board that
+   renders by this list. */
+export function normalizeDownSheetSectionOrder(value:unknown):DownSheetGroupKey[]{
+ const saved=Array.isArray(value)?value:[];
+ const seen=new Set<DownSheetGroupKey>(),order:DownSheetGroupKey[]=[];
+ for(const key of saved)if(GROUP_ORDER.includes(key as DownSheetGroupKey)&&!seen.has(key as DownSheetGroupKey)){seen.add(key as DownSheetGroupKey);order.push(key as DownSheetGroupKey)}
+ for(const group of DOWN_SHEET_GROUPS)if(!seen.has(group.key))order.push(group.key);
+ return order;
+}
+export function orderDownSheetGroups<T extends {key:DownSheetGroupKey}>(groups:T[],sectionOrder:DownSheetGroupKey[]){
+ const order=normalizeDownSheetSectionOrder(sectionOrder);
+ return [...groups].sort((a,b)=>order.indexOf(a.key)-order.indexOf(b.key));
+}
+
 /* Spark plugs and valve adjustments are scheduled maintenance the shop plans
    for, not a bus that broke. They are named here because nobody writing the
    sheet calls them an "inspection", and counting them as breakdowns is exactly

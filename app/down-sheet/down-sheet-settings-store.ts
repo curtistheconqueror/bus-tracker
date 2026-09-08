@@ -12,6 +12,9 @@
 
 import {DOWN_SHEET_SETTINGS_STORAGE_KEY,writeSetting} from "../storage.ts";
 import {normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings.ts";
+import {DOWN_SHEET_GROUPS,normalizeDownSheetSectionOrder,type DownSheetGroupKey} from "./down-sheet-view.ts";
+export {DOWN_SHEET_GROUPS};
+export type {DownSheetGroupKey};
 
 export type Shift="1st"|"2nd"|"3rd";
 
@@ -34,7 +37,7 @@ export const OPTIONAL_DOWN_TILES=[
 export type OptionalDownTile=(typeof OPTIONAL_DOWN_TILES)[number]["key"];
 const OPTIONAL_TILE_KEYS:string[]=OPTIONAL_DOWN_TILES.map(tile=>tile.key);
 
-export type DownSheetSettings={showCompleted:boolean;defaultInitials:string;defaultShift:Shift;extraTiles:OptionalDownTile[];showQuickNotes:boolean;display:DownSheetDisplaySettings};
+export type DownSheetSettings={showCompleted:boolean;defaultInitials:string;defaultShift:Shift;extraTiles:OptionalDownTile[];showQuickNotes:boolean;sectionOrder:DownSheetGroupKey[];display:DownSheetDisplaySettings};
 export const DOWN_SHEET_SETTINGS_KEY=DOWN_SHEET_SETTINGS_STORAGE_KEY;
 
 /* The same reading the Down Sheet does on load, so a value written by the
@@ -55,6 +58,7 @@ export function readDownSheetSettings(raw:string|null):DownSheetSettings{
      switch — reusing that name would have made turning the panel off delete
      what was written in it. */
   showQuickNotes:saved.showQuickNotes===true,
+  sectionOrder:normalizeDownSheetSectionOrder(saved.sectionOrder),
   display:normalizeDownSheetDisplay(saved.display),
  };
 }
@@ -64,5 +68,5 @@ export function writeDownSheetSettings(storage:Pick<Storage,"getItem"|"setItem">
  try{current=JSON.parse(storage.getItem(DOWN_SHEET_SETTINGS_KEY)||"{}")||{}}catch{current={}}
  return writeSetting(storage,DOWN_SHEET_SETTINGS_KEY,JSON.stringify({...current,
   showCompleted:next.showCompleted,defaultInitials:next.defaultInitials,defaultShift:next.defaultShift,
-  extraTiles:next.extraTiles,showQuickNotes:next.showQuickNotes,display:next.display}));
+  extraTiles:next.extraTiles,showQuickNotes:next.showQuickNotes,sectionOrder:next.sectionOrder,display:next.display}));
 }

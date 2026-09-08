@@ -31,10 +31,11 @@
 import {useEffect,useMemo,useState} from "react";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,RECORDS_WRITTEN_EVENT,readDownSheetStorage,readFleetStorage,writeDownSheetStorageResult,writeFleetStorageResult} from "./storage";
 import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
-import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log/defect-log-sync";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
 import {QUICK_FILTER_EVENT,quickFilterHref} from "./quick-filters";
 import {deferredBadgeCounts,heldDeferredBuses} from "./deferred-counts";
+import {answerDeferredBus} from "./deferred-actions";
 import {SETTINGS_KEY as LOG_SETTINGS_KEY} from "./defect-log/defect-log-settings";
 
 const REVIEW_MINUTES=60;
@@ -223,26 +224,13 @@ export function DeferredReviewPrompt(){
  const submit=(action:ReviewAction,location:string,keepUntilISO?:string)=>{
   const stamp=new Date().toISOString();
   let nextFleet=location?moveBusToArea(fleet,candidate.bus.id,location,RELOCATION_AREAS,stamp).fleet:fleet;
-  let nextDown=downEntries;
-  /* PUT ON DOWN SHEET moves one repair, because the sheet allows a bus only one
-     active entry — and it needs no more: once the bus is on the sheet
-     heldDeferredRows drops every repair holding it, so the rest stop asking on
-     their own and the sheet becomes the record for all of them. The other two
-     answers are statements about the bus, so they are written to every repair
-     holding it back. */
-  const targets=action==="downsheet"?[candidate.lead]:candidate.defects;
-  let saved=0;
-  for(const defect of targets){
-   const patch:Partial<StructuredDefect>=action==="keep"
-    ?{state:"deferred",deferredUntil:keepUntilISO}
-    /* "return" is the same "held back, back in service, still open" moment as
-       unchecking DEFERRED by hand — stamp it. "downsheet" invalidates it: the
-       Down Sheet is now the record of what happens to this repair. */
-    :{state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:action==="return"?stamp:undefined};
-   const result=saveDefectLogRecord(nextFleet,nextDown,candidate.bus.id,{...defect,...patch},action==="downsheet",stamp);
-   if(result.error)continue;
-   nextFleet=result.fleet;nextDown=result.downEntries;saved++;
-  }
+  /* One place for these rules, shared with the DEFERRED board on the Down
+     Sheet — the same decision about the same bus, and two copies of it would
+     drift into a bus that is half returned on one screen and still held on the
+     other. See app/deferred-actions.ts for what each answer writes. */
+  const applied=answerDeferredBus(nextFleet,downEntries,candidate.bus.id,candidate.defects,action,{keepUntilISO,now:stamp});
+  nextFleet=applied.fleet;
+  const nextDown=applied.downEntries,saved=applied.saved,targets={length:applied.attempted};
   /* Both writes were fired and their results thrown away, so a refused write
      closed the prompt as though it had worked: the answer left the screen,
      nothing reached the device, and the same bus asked again on the next open
