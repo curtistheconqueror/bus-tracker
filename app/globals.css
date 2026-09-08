@@ -895,8 +895,18 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    and flush left on the other five - measured at x198 on a 1280 map against
    x18 everywhere else. The name is the one thing that must sit in the same
    corner on every page. */
-.app-name{display:block;text-align:left;margin:0 0 3px;font-size:11px;font-weight:900;letter-spacing:1.4px;line-height:1;color:currentColor;opacity:.62}
-@media(max-width:760px){.app-name{font-size:12px;letter-spacing:1.1px}}
+/* The name reads at full strength rather than as a watermark. It was 11px at
+   62% opacity, which on these headers came out a washed grey and looked like
+   a label for the page rather than the name of the app.
+
+   NOT black, and that was measured rather than chosen: all six headers are
+   dark navy — #061d45 flat on the map, Defect Log and Fixed Repairs, navy
+   gradients on the Down Sheet, Campaigns and Settings — so black text would be
+   invisible on every page that draws it. currentColor at full opacity is the
+   strongest this can read against them, and it stays correct if a header is
+   ever re-themed. */
+.app-name{display:block;text-align:left;margin:0 0 4px;font-size:17px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
+@media(max-width:760px){.app-name{font-size:19px;letter-spacing:1.3px}}
 
 /* THE FACILITY MAP'S HEADER IS A BARE <header>, and bare headers in this file
    are given a FIXED height:38px. The phone block below already releases it with

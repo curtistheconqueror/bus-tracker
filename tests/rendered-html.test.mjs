@@ -686,7 +686,7 @@ test("server-renders the live fleet command dashboard", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
 
-  assert.match(html, /<title>TransitKey — Fleet Maintenance<\/title>/i);
+  assert.match(html, /<title>FLEETSTEP — Fleet Maintenance<\/title>/i);
   assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
@@ -850,7 +850,7 @@ test("removes prospective customer branding from visible app titles", async () =
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   const manifest = JSON.parse(manifestText);
-  /* THE APP HAS A NAME NOW: TransitKey. Curtis chose it, and it is drawn in the
+  /* THE APP HAS A NAME NOW: FLEETSTEP. Curtis chose it, and it is drawn in the
      top-left of all six page headers by `app/app-name.tsx`.
 
      The manifest has to agree with that header. short_name is what a phone
@@ -861,11 +861,11 @@ test("removes prospective customer branding from visible app titles", async () =
      until the Facility Map called itself something the other pages did not, and
      a name is the last string that should be allowed to do that. */
   const appName = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
-  assert.match(appName, /export const APP_NAME="TransitKey"/);
-  assert.equal(manifest.short_name, "TransitKey");
-  assert.equal(manifest.name, "TransitKey — Fleet Maintenance");
-  assert.match(layout, /title:"TransitKey — Fleet Maintenance"/);
-  assert.match(layout, /title:"TransitKey"/, "the iOS home-screen title too");
+  assert.match(appName, /export const APP_NAME="FLEETSTEP"/);
+  assert.equal(manifest.short_name, "FLEETSTEP");
+  assert.equal(manifest.name, "FLEETSTEP — Fleet Maintenance");
+  assert.match(layout, /title:"FLEETSTEP — Fleet Maintenance"/);
+  assert.match(layout, /title:"FLEETSTEP"/, "the iOS home-screen title too");
   assert.match(operator, /FLEET INTELLIGENT COMMAND CONSOLE/);
   assert.match(downSheet, /FLEET MAINTENANCE/);
   assert.match(downSheet, /MAINTENANCE FACILITY/);
@@ -10593,11 +10593,11 @@ test("no Down Sheet cell is a flex container, or it stops stretching to its row"
 });
 
 test("the app's name is drawn top-left on every page, from one place", async () => {
-  /* Curtis named it: TransitKey. It goes in the top-left of every page header,
+  /* Curtis named it: FLEETSTEP. It goes in the top-left of every page header,
      above the kicker each one already carries, so the existing block moves
      down rather than making room sideways. */
   const component = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
-  assert.match(component,/export const APP_NAME="TransitKey"/);
+  assert.match(component,/export const APP_NAME="FLEETSTEP"/);
 
   /* ONE SHARED PIECE, not six copies. Five copies of the nav drifted until the
      Facility Map called itself something the other pages did not - that is why
@@ -10609,7 +10609,7 @@ test("the app's name is drawn top-left on every page, from one place", async () 
     const src = await readFile(new URL(file, import.meta.url), "utf8");
     assert.match(src,new RegExp('import AppName from "'+importPath.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+'"'),file+" must import the shared name");
     assert.match(src,/<AppName\/>/,file+" must draw it");
-    assert.doesNotMatch(src,/"TransitKey"/,file+" must not spell the name itself");
+    assert.doesNotMatch(src,/"FLEETSTEP"/,file+" must not spell the name itself");
   }
 
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");

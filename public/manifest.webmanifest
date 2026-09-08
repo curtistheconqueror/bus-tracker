@@ -1,6 +1,6 @@
 {
-  "name": "TransitKey — Fleet Maintenance",
-  "short_name": "TransitKey",
+  "name": "FLEETSTEP — Fleet Maintenance",
+  "short_name": "FLEETSTEP",
   "description": "Offline-capable facility-wide fleet location and maintenance tracking board.",
   "start_url": "/",
   "scope": "/",
