@@ -1228,9 +1228,18 @@ test("renders the interactive down sheet with All as the default shift view", as
      the whole-sheet count, so no number was actually lost - which is the thing
      to check here, not the panel's absence. */
   assert.doesNotMatch(html, /SHEET STATS/);
-  assert.match(html, /SHEET CAPACITY/);
-  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR"])
-   assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" came down into the tiles rather than being dropped");
+  // SHEET CAPACITY is one of the six opt-in tiles now, so it is absent on a
+  // fresh device and present only once somebody ticks it in the settings.
+  assert.doesNotMatch(html, /SHEET CAPACITY/, "the extra tiles are asked for, not assumed");
+  /* The board is collapsed on a fresh device and only DOWN BUSES is drawn, so
+     none of these are in the markup — including COMPLETED TODAY, which is one
+     of the eight that appear the moment it is expanded. Not dropped: opt-in for
+     four of them, one press away for the other. The source below is what holds
+     which is which; the HTML here only proves the page opens quiet. */
+  for(const label of ["PENDING","ACCIDENT","WAITING PARTS","COMPLETED TODAY","EST. ACTIVE LABOR","TOTAL ON SHEET"])
+   assert.doesNotMatch(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")), label+" must not be drawn while the count board is collapsed");
+  assert.match(html, /class="down-counts-toggle" aria-expanded="false"/, "the count board opens collapsed");
+  assert.match(html, /class="down-counts-lead"><strong>0<\/strong><span>DOWN BUSES<\/span>/, "DOWN BUSES is the one number it keeps while collapsed");
   /* What the page opens on: the button that adds a bus, and the search under
      it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
      asserted absent above. */
@@ -1238,7 +1247,9 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS is alone in its row now");
   assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
-  assert.match(html, /QUICK NOTES/);
+  // QUICK NOTES is off by default now — a permanent panel between the counts
+  // and the sheet, on the page whose problem was how much sits above the rows.
+  assert.doesNotMatch(html, /QUICK NOTES/, "quick notes is opt-in, so a fresh device does not draw it");
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
   assert.match(source, /knownActive/);
   assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
@@ -10203,7 +10214,9 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
  ]);
  /* Seven tiles: the five that were there, plus the two that do something. */
- assert.match(page,/\["inspection","INSPECTIONS ON ROAD",roadCounts\.inspection\],\["down","DOWNED BUSES ON ROAD",roadCounts\.down\]/);
+ // DOWNED BUSES ON ROAD leads the pair now — Curtis set the tile order and put
+ // it ahead of the inspections tally.
+ assert.match(page,/\["down","DOWNED BUSES ON ROAD",roadCounts\.down\],\["inspection","INSPECTIONS ON ROAD",roadCounts\.inspection\]/);
  assert.match(page,/onClick=\{\(\)=>setRoadFilter\(current=>current===kind\?null:kind\)\}/,"pressing the same one again shows the whole sheet");
  assert.match(page,/aria-pressed=\{roadFilter===kind\}/);
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
@@ -10219,7 +10232,26 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     it on a 57-bus sheet and TOTAL ON SHEET read 7 - so the foreman lost the
     numbers he had pressed it from. Reported off the live sheet. */
  assert.match(page,/<div className="group-count total"><strong>\{shown\.length\}<\/strong><span>TOTAL ON SHEET<\/span><\/div>/,"TOTAL ON SHEET counts the sheet, not the filtered view");
- assert.match(page,/\{sheetGroups\.map\(group=><div className=\{"group-count group-"\+group\.key\}/,"the four band tiles count the sheet too");
+ /* The band tiles are placed by name now rather than mapped off sheetGroups in
+    whatever order that array happens to be in: Curtis set the tile order, and
+    it interleaves bands with tiles that are not bands at all — COMPLETED TODAY
+    sits between SCHEDULED and UNSCHEDULED. */
+ assert.match(page,/const tileFor=\(key:string\)=>\{const group=sheetGroups\.find\(item=>item\.key===key\)/,"the band tiles still count the sheet");
+ /* Every wording the board draws has to name a label that exists. Moving the
+    tiles into their new order, I typed labels.completedToday - there is no such
+    key, the label is `completed` - and the tile rendered a number over a blank
+    line. It looked fine in the source and only showed up when the box was
+    measured in a browser. */
+ const {DEFAULT_DOWN_SHEET_DISPLAY:DOWN_LABELS}=await import("../app/down-sheet/down-sheet-display-settings.ts");
+ for(const key of [...page.matchAll(/displaySettings\.labels\.([A-Za-z]+)/g)].map(match=>match[1]))
+  assert.ok(key in DOWN_LABELS.labels, "displaySettings.labels."+key+" is not a label that exists, so it would draw blank");
+ const board=page.slice(page.indexOf('<div className="down-group-counts" id="down-counts-tiles">'),page.indexOf("</div>}\n  </section>"));
+ assert.deepEqual(
+  [...board.matchAll(/tileFor\("([a-z-]+)"\)|<span>(TOTAL ON SHEET|DOWN BUSES)<\/span>|completed-today-tile|"(DOWNED BUSES ON ROAD|INSPECTIONS ON ROAD)"/g)]
+   .map(match=>match[1]||match[2]||match[3]||"completed").filter((value,index,all)=>all.indexOf(value)===index),
+  ["TOTAL ON SHEET","DOWN BUSES","scheduled","completed","unscheduled","inspection","DOWNED BUSES ON ROAD","INSPECTIONS ON ROAD","off-property"],
+  "the eight always-on tiles are in the order Curtis set, with the opt-in ones after them",
+ );
  for(const filtered of [/<div className="group-count total"><strong>\{visible\.length\}/,/\{groups\.map\(group=><div className=\{"group-count group-"/])
   assert.doesNotMatch(page,filtered,"no scoreboard tile may be recomputed from the road-filtered set");
  /* What DOES follow the filter: the row count in view, the estimate, and the
@@ -10373,7 +10405,9 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
      same duration twice side by side is the duplication this was clearing.
      Measured: hidden unfiltered, 35h against 105h on 2nd shift, 28h against
      105h under the road filter. */
-  assert.match(page,/\{visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+  // Still only when it differs from EST. ACTIVE LABOR — and now only when that
+  // tile was asked for at all, since a view total beside no total says nothing.
+  assert.match(page,/\{extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
 
   /* The labour tiles print a duration rather than a count, so their text steps
      down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */

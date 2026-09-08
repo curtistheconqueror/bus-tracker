@@ -27,6 +27,7 @@ import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
 import AppName from "../app-name";
+import {OPTIONAL_DOWN_TILES,type OptionalDownTile} from "./down-sheet-settings-store";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";
@@ -70,6 +71,20 @@ const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
    the wrong one wants the same words in the same place either way. */
 const ENTRY_UNDO_KEY="pace-down-sheet-entry-undo-v1";
 const ADVANCED_OPEN_KEY="pace-down-sheet-advanced-open-v1";
+/* Per device, like ADVANCED ACTIONS above it. Absent means COLLAPSED, which is
+   the opposite of the usual "absent means on" here and is deliberate: fourteen
+   tiles was a wall to scroll past before reaching the sheet, and a board nobody
+   asked to open should not be the first thing on the page. */
+const COUNTS_OPEN_KEY="pace-down-sheet-counts-open-v1";
+/* This key holds more than this page writes to it — the Settings page owns some
+   of the same blob — so the sheet's own write merges over what is stored rather
+   than replacing it. It used to replace, which meant any field the sheet did
+   not itself know about was blanked the next time somebody changed a sort order
+   on the sheet. Nothing depended on that until now; the tile choices and the
+   quick-notes switch are set from the Settings page and read here. */
+function readStoredDownSettings():Record<string,unknown>{
+ try{return JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}")||{}}catch{return {}}
+}
 type RowAction={kind:"deleted"|"fixed";id:string;busNumber:string};
 function readRowAction(raw:string|null):RowAction|null{
  if(!raw)return null;
@@ -176,6 +191,9 @@ export default function DownSheet(){
  const [scannerOpen,setScannerOpen]=useState(false);
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
+ const [extraTiles,setExtraTiles]=useState<OptionalDownTile[]>([]);
+ const [showQuickNotes,setShowQuickNotes]=useState(false);
+ const [countsOpen,setCountsOpen]=useState(false);
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
  const [savedQuickNotes,setSavedQuickNotes]=useState("");
@@ -201,13 +219,15 @@ export default function DownSheet(){
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [mysteryDisplay,setMysteryDisplay]=useState(DEFAULT_DEFECT_LOG_DISPLAY);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
+ useEffect(()=>{setCountsOpen(localStorage.getItem(COUNTS_OPEN_KEY)==="1")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setOrder(settings.order==="number-desc"||settings.order==="category"?settings.order:"number-asc");setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownActive=new Set(restored.filter(isActive).map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownActive.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setOrder(settings.order==="number-desc"||settings.order==="category"?settings.order:"number-asc");setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const reconciled=reconcileDownSheetMembership(current,activeIds);if(reconciled!==current)writeFleetStorage(localStorage,reconciled);return reconciled})},[entries,hydrated]);
- useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,order,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,order,displaySettings,hydrated]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,order,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,order,extraTiles,showQuickNotes,displaySettings,hydrated]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
@@ -231,6 +251,12 @@ export default function DownSheet(){
     had pressed it from. The row count, the estimate and the note below still
     follow the filter, because those describe the view. */
  const sheetGroups=useMemo(()=>groupDownSheetEntries(shown,order,locations),[shown,order,locations]);
+ /* The band tiles used to render straight off sheetGroups, so their order on
+    the board was whatever DOWN_SHEET_GROUPS happened to be in. They are placed
+    by name now, because the order Curtis set interleaves them with tiles that
+    are not bands at all - COMPLETED TODAY sits between SCHEDULED and
+    UNSCHEDULED. The bands below the sheet still read sheetGroups directly. */
+ const tileFor=(key:string)=>{const group=sheetGroups.find(item=>item.key===key);return group?<div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>:null};
  const groups=useMemo(()=>roadFilter?groupDownSheetEntries(downSheetRoadEntries(shown,locations,roadFilter),order,locations):sheetGroups,[sheetGroups,shown,order,locations,roadFilter]);
  const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
  /* Down buses: on the sheet for a fault rather than only for maintenance.
@@ -498,7 +524,10 @@ export default function DownSheet(){
     <div className="down-advanced-group">
      <b className="down-advanced-label">VIEW</b>
      <div className="shift-filter" aria-label="Filter down sheet by shift">
-      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL":value.toUpperCase()}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
+      {/* "1ST" on its own said nothing — Curtis read the row and could not tell
+          what it was filtering. The word is on each button rather than only in
+          the SHOW label, because the button is what gets looked at. */}
+      <span>SHOW:</span>{(["All","1st","2nd","3rd"] as ShiftFilter[]).map(value=><button type="button" className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>setFilter(current=>current===value&&value!=="All"?"All":value)} key={value}>{value==="All"?"ALL SHIFTS":value.toUpperCase()+" SHIFT"}{value!=="All"&&<i>{value==="1st"?counters.first:value==="2nd"?counters.second:counters.third}</i>}</button>)}
      </div>
      <label className="completed-toggle"><input type="checkbox" checked={showCompleted} onChange={event=>setShowCompleted(event.target.checked)}/><span/>SHOW COMPLETED</label>
     </div>
@@ -529,55 +558,63 @@ export default function DownSheet(){
    <span className="view-results"><b>{visible.length}</b> IN VIEW</span>
   </section>
 
-  {/* The totals the sheet is read for, before the sheet itself. A bus away at a
-      vendor and a bus sitting in the yard with nobody on it are both "down" in
-      one long list, and that list could not tell anyone how many of each there
-      were. Same four bands, same order, as the dividers below. */}
-  <section className="down-group-counts" aria-label="Down sheet section counts">
-   <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
-   {/* Beside the total rather than under it, and the same size as every other
-       tile: the two headline numbers a foreman reads together — how many rows
-       are on the sheet, and how many of them are actually a bus down. */}
-   <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
-   {sheetGroups.map(group=><div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>)}
-   {/* SHEET STATS used to be a second scoreboard behind its own bar, saying
-       most of this again in a different shape. Curtis reads this one — "I like
-       the way it's organized and the color scheme" — so the tiles worth having
-       came down here and that panel is gone.
+  {/* The totals the sheet is read for, collapsed to one number until asked.
 
-       ACTIVE DOWN did not come with them. It counted the whole active sheet
-       while TOTAL ON SHEET counts the current view, which is why they read the
-       same number on ALL with no search and looked like a duplicate. Nothing
-       is lost: SHEET CAPACITY still prints the whole-sheet count beside its
-       ceiling. */}
-   <div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>
-   <div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>
-   <div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>
-   {/* Still a button, because it filters. Same press-to-narrow behaviour the
-       two road tallies have, so it belongs with them rather than looking like
-       a number you cannot touch. */}
-   <button type="button" className={"group-count group-completed completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
-   <div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>
-   <div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>
-   {/* Only once it has something of its own to say. Unfiltered it is the same
-       number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
-       side by side is exactly the duplication this was meant to clear. */}
-   {visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
-   {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
-       the sheet?" while looking at the yard; these answer "is this one out
-       working?" while looking at the sheet — which the sheet itself could not
-       say, because where a bus is belongs to the map. A bus carrying both an
-       inspection and a fault is in both counts on purpose.
+      It had grown to fourteen tiles — a wall to scroll past before reaching the
+      rows, on the page where the rows are the point. Curtis: "this is a bit
+      overwhelming and there is no hide button."
 
-       Pressed, they narrow the sheet below to exactly what they count, so the
-       number can be read as a list. They are buttons rather than tiles for
-       that reason; the five above are a scoreboard and stay one. */}
-   {([["inspection","INSPECTIONS ON ROAD",roadCounts.inspection],["down","DOWNED BUSES ON ROAD",roadCounts.down]] as [DownSheetRoadKind,string,number][]).map(([kind,label,count])=>
-    <button type="button" className={"group-count group-road group-road-"+kind+(roadFilter===kind?" active":"")} key={kind} aria-pressed={roadFilter===kind}
-     onClick={()=>setRoadFilter(current=>current===kind?null:kind)}
-     title={roadFilter===kind?"Showing only these buses — press again to show the whole sheet":"Show only the "+count+" bus"+(count===1?"":"es")+" this counts"}>
-     <strong>{count}</strong><span>{label}</span></button>)}
+      So DOWN BUSES stands alone by default, because that is the number the shop
+      opens this page for, and the rest are one press away. The eight it expands
+      to are hard-coded in the order he set; the six beyond them are ticked on
+      per device in the Down Sheet settings, still counted either way. */}
+  <section className="down-counts-board" aria-label="Down sheet section counts">
+   <div className="down-counts-head">
+    <button type="button" className="down-counts-toggle" aria-expanded={countsOpen} aria-controls="down-counts-tiles" onClick={()=>setCountsOpen(value=>!value)}>
+     <span className="down-counts-lead"><strong>{downBusCount}</strong><span>DOWN BUSES</span></span>
+     <span className="down-counts-more">{countsOpen?"HIDE COUNTS":"SHOW COUNTS"}<i aria-hidden="true">{countsOpen?"\u25B2":"\u25BC"}</i></span>
+    </button>
+   </div>
+   {countsOpen&&<div className="down-group-counts" id="down-counts-tiles">
+    <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
+    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
+    {tileFor("scheduled")}
+    {/* Still a button, because it filters. Same press-to-narrow behaviour the
+        two road tallies have, so it belongs with them rather than looking like
+        a number you cannot touch. */}
+    <button type="button" className={"group-count group-completed completed-today-tile"+(fixedToday?" active":"")} aria-pressed={fixedToday} disabled={!counters.completedToday&&!fixedToday} onClick={()=>setFixedToday(value=>!value)}><strong>{counters.completedToday}</strong><span>{displaySettings.labels.completed}</span></button>
+    {tileFor("unscheduled")}
+    {tileFor("inspection")}
+    {/* The inverse of the map's down-sheet badges. Those answer "is this bus on
+        the sheet?" while looking at the yard; these answer "is this one out
+        working?" while looking at the sheet — which the sheet itself could not
+        say, because where a bus is belongs to the map. A bus carrying both an
+        inspection and a fault is in both counts on purpose.
+
+        Pressed, they narrow the sheet below to exactly what they count, so the
+        number can be read as a list. */}
+    {([["down","DOWNED BUSES ON ROAD",roadCounts.down],["inspection","INSPECTIONS ON ROAD",roadCounts.inspection]] as [DownSheetRoadKind,string,number][]).map(([kind,label,count])=>
+     <button type="button" className={"group-count group-road group-road-"+kind+(roadFilter===kind?" active":"")} key={kind} aria-pressed={roadFilter===kind}
+      onClick={()=>setRoadFilter(current=>current===kind?null:kind)}
+      title={roadFilter===kind?"Showing only these buses — press again to show the whole sheet":"Show only the "+count+" bus"+(count===1?"":"es")+" this counts"}>
+      <strong>{count}</strong><span>{label}</span></button>)}
+    {/* Everything below here is opt-in. SHEET STATS used to be a second
+        scoreboard saying most of this again in a different shape; these are the
+        numbers that survived it and are still worth having on the days somebody
+        wants them. */}
+    {extraTiles.includes("off-property")&&tileFor("off-property")}
+    {extraTiles.includes("pending")&&<div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>}
+    {extraTiles.includes("accident")&&<div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>}
+    {extraTiles.includes("waiting")&&<div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>}
+    {extraTiles.includes("labor")&&<div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>}
+    {extraTiles.includes("capacity")&&<div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>}
+    {/* Only once it has something of its own to say. Unfiltered it is the same
+        number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
+        side by side is exactly the duplication this was meant to clear. */}
+    {extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
+   </div>}
   </section>
+
   {/* Loud, and on the page rather than behind MORE. An accidental delete is
       exactly when nobody goes hunting through a menu for the way back. */}
   {rowAction&&<p className={"down-deleted-note"+(rowAction.kind==="fixed"?" fixed":"")} role="status">Bus <b>{rowAction.busNumber||"—"}</b> {rowAction.kind==="fixed"?"was marked fixed and closed out.":"was deleted from the sheet. Its defects, status and location were kept."} <button type="button" onClick={undoDeleteEntry}>{rowAction.kind==="fixed"?"UNDO":"PUT BACK"}</button></p>}
@@ -594,10 +631,14 @@ export default function DownSheet(){
    onMoved={nextFleet=>{const result=writeFleetStorageResult(localStorage,nextFleet);setSaveProblem(result.reason||"");if(!result.ok)return false;setFleet(nextFleet);return true}}/>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
-  <section className="quick-notes">
+  {/* Off by default now. It sat permanently between the counts and the sheet
+      on a page whose whole problem was how much you scroll past to reach the
+      rows. The note itself is untouched on every device that has one — the
+      switch hides the panel, it does not clear what was written. */}
+  {showQuickNotes&&<section className="quick-notes">
    <label htmlFor="down-quick-notes"><b>{displaySettings.labels.quickNotes}</b><span>{quickNotes===savedQuickNotes?"Saved on this device":"Unsaved changes"}</span></label>
    <div className="quick-notes-editor"><textarea id="down-quick-notes" value={quickNotes} onChange={event=>setQuickNotes(event.target.value)} placeholder="Example: 3 road calls today; follow up with vendor; check late-shift parts delivery."/><button type="button" onClick={saveQuickNote} disabled={quickNotes===savedQuickNotes}>SAVE NOTE</button></div>
-  </section>
+  </section>}
   <section className="sheet-wrap">
    <div className="sheet-title"><div><b>{displaySettings.labels.sheetKicker||"MAINTENANCE FACILITY"}</b><span>{displaySettings.labels.sheetTitle}</span></div><p>{filter==="All"?"ALL SHIFTS":filter+" SHIFT"} · {visible.length} ROW{visible.length===1?"":"S"} · {formatRepairTime(visibleMinutes)} ESTIMATED</p></div>
    <div className="sheet-scroll">

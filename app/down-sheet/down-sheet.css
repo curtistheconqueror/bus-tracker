@@ -394,6 +394,23 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    `@media(max-width:760px)` block earlier in this file silently landed INSIDE
    it, and a divider that only has a colour on a phone is worse than none. The
    phone overrides below open their own block. */
+/* The board's own header: DOWN BUSES reads as the headline number whether the
+   rest is open or not, so collapsing never takes away the one figure the page
+   is opened for. The whole row is the control — a foreman on a phone should not
+   have to find a caret. */
+.down-counts-board{margin:0 0 9px}
+.down-counts-head{margin:0 14px}
+.down-counts-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:10px 13px;color:inherit;text-align:left;cursor:pointer}
+.down-counts-toggle:hover{border-color:#0b64bd}
+.down-counts-lead{display:flex;align-items:baseline;gap:9px;min-width:0}
+.down-counts-lead strong{color:#a01722;font-size:26px;font-weight:900;line-height:1}
+.down-counts-lead>span{color:#5a6b84;font-size:9px;font-weight:900;letter-spacing:.6px}
+.down-counts-more{flex-shrink:0;display:flex;align-items:center;gap:6px;color:#0b64bd;font-size:8px;font-weight:900;letter-spacing:.5px}
+.down-counts-more i{font-style:normal;font-size:7px}
+.down-counts-board .down-group-counts{margin-top:8px}
+.down-settings-hint{margin:0 0 7px;color:#5a6b84;font-size:8px;line-height:1.5}
+.down-tile-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+@media(max-width:760px){.down-counts-head{margin:0 8px}.down-counts-toggle{min-height:56px;padding:11px 12px}.down-counts-lead strong{font-size:30px}.down-counts-lead>span{font-size:10px}.down-counts-more{font-size:9px}.down-tile-choices{grid-template-columns:1fr}.down-settings-hint{font-size:9px}}
 .down-group-counts{margin:0 14px 9px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
 .down-group-counts .group-count{min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px;border:1px solid #b7c3d7;border-radius:7px;background:#fff;text-align:center}
 .down-group-counts .group-count strong{font-size:20px;font-weight:900;line-height:1;color:#173e73}
