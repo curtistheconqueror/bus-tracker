@@ -4,8 +4,8 @@ Updated: 2026-09-01
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 157 (repository release 161)
-Live feature checkpoint: commit 3b16d45
+Live release: Sites Version 159 (repository release 163)
+Live feature checkpoint: commit 5381dd2
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 161 is the current user-approved live release, deployed by Sites as Version 157. Its source checkpoint is commit 3b16d45. The Down Sheet now has row-level DELETE, PUT BACK, MARK FIXED, and undo actions; inspections remain independently tallied; mystery buses live with the Down Sheet; and Defect Log controls are compact behind Advanced Actions. No existing LocalStorage key was renamed, and cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 163 is the current user-approved live release, deployed by Sites as Version 159. Its source checkpoint is commit 5381dd2. Realtime Shop Cloud now falls back to polling if a device cannot reach the realtime service; Down Sheet actions sit at the end of each row and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists. No storage key, payload, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

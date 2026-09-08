@@ -49,6 +49,11 @@ export const SWEEP_MS=45000;
 export default function ShopCloudLive(){
  const running=useRef(false);
  const timer=useRef<number|undefined>(undefined);
+ /* Whether the shop can actually reach this device. Assumed false until the
+    channel says SUBSCRIBED, because the expensive mistake is the other way
+    round: a device that believes it is being told about changes stops asking,
+    and then never hears anything again. */
+ const live=useRef(false);
 
  useEffect(()=>{
   let stopped=false;
@@ -109,19 +114,39 @@ export default function ShopCloudLive(){
    timer.current=window.setTimeout(()=>{if(document.visibilityState!=="hidden")sync(true)},LIVE_DEBOUNCE_MS);
   };
 
-  const sweep=()=>{if(document.visibilityState==="visible")sync(false)};
+  /* THE SWEEP USED TO PUSH AND NEVER PULL — sync(false) — because receiving
+     was realtime's job. That works right up until realtime is not there, and
+     then the device is deaf with no way of noticing: it uploads its own work
+     every 45 seconds for a whole shift and never once asks what changed.
+     Reported from the floor — a phone imported a new Down Sheet, and the iPad
+     beside it still showed the previous one sixteen hours later.
+
+     So the sweep pulls whenever the channel is not confirmed live. When it IS
+     live the sweep stays push-only, which is the whole reason realtime exists:
+     a shop of phones on their owners' data plans should not each be dragging
+     the board down every 45 seconds to learn nothing changed. */
+  const sweep=()=>{if(document.visibilityState==="visible")sync(!live.current)};
+  /* Coming back to the app, or back onto signal, always asks. This is the
+     moment a person is actually looking at the board, and it is the cheapest
+     possible place to spend a pull. */
+  const resume=()=>{if(document.visibilityState==="visible")sync(true)};
   const interval=window.setInterval(sweep,SWEEP_MS);
-  document.addEventListener("visibilitychange",sweep);
-  window.addEventListener("online",sweep);
-  sweep();
+  document.addEventListener("visibilitychange",resume);
+  window.addEventListener("online",resume);
+  resume();
 
   const config=readCloudConfig(localStorage);
   if(!cloudConfigProblem(config))
-   subscribeToShopCloud(config,change=>{if(shouldSyncForChange(change,config.deviceLabel))wake()})
+   subscribeToShopCloud(config,
+    change=>{if(shouldSyncForChange(change,config.deviceLabel))wake()},
+    /* A channel that drops mid-shift puts the device straight back on pulling
+       sweeps, without waiting for anybody to reload the page. */
+    isLive=>{live.current=isLive;if(isLive)wake()})
     .then(stop=>{if(stopped)stop?.();else unsubscribe=stop});
 
   return()=>{
    stopped=true;
+   live.current=false;
    window.clearInterval(interval);
    window.clearTimeout(timer.current);
    document.removeEventListener("visibilitychange",sweep);

@@ -172,7 +172,7 @@ export async function cloudSignedIn(config:CloudConfig):Promise<boolean>{
    Returns a function that stops listening, or null when the device is not
    connected. Nothing here throws into the app: a shop with no realtime simply
    falls back to the sweep it already had. */
-export function subscribeToShopCloud(config:CloudConfig,onChange:(change:LiveChange)=>void):Promise<(()=>void)|null>{
+export function subscribeToShopCloud(config:CloudConfig,onChange:(change:LiveChange)=>void,onLive?:(live:boolean)=>void):Promise<(()=>void)|null>{
  return (async()=>{
   try{
    if(cloudConfigProblem(config))return null;
@@ -183,8 +183,18 @@ export function subscribeToShopCloud(config:CloudConfig,onChange:(change:LiveCha
     channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
      onChange({table,deviceLabel:String(payload?.new?.device_label??"")});
     });
-   channel.subscribe();
-   return()=>{try{supabase.removeChannel(channel)}catch{/* nothing to stop */}};
+   /* SUBSCRIBING IS NOT THE SAME AS BEING SUBSCRIBED. This called subscribe()
+      and threw the answer away, then handed back a stop-function whether the
+      channel had joined or not — so a device with a dead channel looked exactly
+      like a device with a live one, and the caller had no way to know it was
+      deaf. It then never pulled, because pulling was realtime's job. An iPad
+      sat on a sixteen-hour-old board for that reason.
+
+      Only SUBSCRIBED means the shop can reach this device. Every other status
+      — CHANNEL_ERROR, TIMED_OUT, CLOSED — means it cannot, and the caller
+      needs to know so it can go back to asking. */
+   channel.subscribe((status:string)=>{try{onLive?.(status==="SUBSCRIBED")}catch{/* a listener must not break the channel */}});
+   return()=>{try{onLive?.(false);supabase.removeChannel(channel)}catch{/* nothing to stop */}};
   }catch{return null}
  })();
 }
