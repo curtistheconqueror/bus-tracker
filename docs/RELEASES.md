@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 161 / release 165 | Live | ba3fb13 | Adds a one-time deferred-bus check-in that can be switched off, TransitKey app naming, Lite Mode groundwork, and Farebox Won't probe & open |
 | 160 / release 164 | Live | 945cc29 | Fixes the Down Sheet UPDATED BY cell so its row divider runs cleanly across the full row |
 | 159 / release 163 | Live | 5381dd2 | Realtime Shop Cloud falls back to polling if unreachable; Down Sheet actions sit at the row end and MARK FIXED confirms first; and UNDO FIX returns a repair to its originating workflow or is not offered when no open workflow exists |
 | 158 / release 162 | Live | 168f553 | Keeps Down Sheet score tiles stable while road tallies filter the table, adds compact Advanced Actions on both operational pages, makes Deferred status update immediately, and lets a Defect Log location open the Facility Map move workflow |

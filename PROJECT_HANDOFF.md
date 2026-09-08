@@ -4,8 +4,8 @@ Updated: 2026-09-07
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 160 (repository release 164)
-Live feature checkpoint: commit 945cc29
+Live release: Sites Version 161 (repository release 165)
+Live feature checkpoint: commit ba3fb13
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 164 is the current user-approved live release, deployed by Sites as Version 160. Its source checkpoint is commit 945cc29. The Down Sheet UPDATED BY cell now draws its divider cleanly across the full row instead of leaving a partial line. No storage key, payload, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 165 is the current user-approved live release, deployed by Sites as Version 161. Its source checkpoint is commit ba3fb13. A deferred bus now gets one check-in prompt, which can be switched off in Defect Log settings. The release also names the app TransitKey across pages, establishes Lite Mode groundwork, and adds Farebox Won't probe & open. No storage key, payload, or database migration was made. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
