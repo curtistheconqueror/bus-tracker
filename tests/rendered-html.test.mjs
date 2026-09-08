@@ -10389,3 +10389,30 @@ test("UNDO FIX returns a repair to where it came from, or does not offer itself"
      on both. */
   assert.match(page,/\{record\.defect\.source!=="fixed-log"&&<button type="button" className="reopen-repair"/);
 });
+
+test("no Down Sheet cell is a flex container, or it stops stretching to its row", async () => {
+  const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+  const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+
+  /* display:flex takes a cell out of table layout, and a cell that is not a
+     table-cell stops stretching to its row. `.updated` was flex to stack the
+     initials over the timestamp: on any row where the reason wrapped to a
+     second line the cell stayed 55px while the row grew to 63 or 76, and its
+     bottom border drew a stray line partway up the row beside an ACTIONS cell
+     that did stretch. Curtis photographed it. `.estimate-cell` already carried
+     display:table-cell for the same reason, so this was the second time.
+
+     Measured after: rows of 55, 76, 55 and 63px, every cell matching its row. */
+  const tdClasses=[...new Set([...page.matchAll(/<td className="([a-z- ]+)"/g)].map(m=>m[1]))]
+    .flatMap(names=>names.split(" ")).filter(Boolean);
+  assert.ok(tdClasses.includes("updated")&&tdClasses.includes("row-actions"),"the cells this is about are still cells");
+  for(const name of tdClasses){
+    const rule=css.match(new RegExp("\\."+name+"\\{([^}]*)\\}"));
+    if(!rule)continue;
+    assert.doesNotMatch(rule[1],/display:(flex|grid|inline-flex|inline-grid)/,
+      "."+name+" is a <td>; making it "+rule[1].match(/display:[a-z-]+/)?.[0]+" takes it out of table layout and it stops stretching to its row");
+  }
+  assert.match(css,/\.updated\{display:table-cell\}/);
+  assert.match(css,/\.updated b\{display:block/,"the children stack as blocks, which needs no flex");
+  assert.match(css,/\.estimate-cell\{display:table-cell/,"the precedent this follows");
+});
