@@ -37,7 +37,8 @@ import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusId
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
-import { deferredBadgeCounts } from "../app/deferred-counts.ts";
+import { deferredBadgeCounts, heldDeferredBuses } from "../app/deferred-counts.ts";
+import { readSettings } from "../app/defect-log/defect-log-settings.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
@@ -7728,7 +7729,7 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
  assert.match(counts, /minutes>=DEFERRED_OVERDUE_MINUTES/);
  assert.match(watch, /const REVIEW_MINUTES=60/);
  assert.match(watch, /const REVIEW_HOUR=20,REVIEW_MINUTE=30/);
- assert.match(watch, /minutes<REVIEW_MINUTES/);
+ assert.match(watch, /minutes>=REVIEW_MINUTES/);
  // Every page drops in both pieces, so the alert reaches wherever the app is
  // actually open rather than only the page that happened to log the defect.
  for (const file of ["../app/page.tsx", "../app/down-sheet/page.tsx", "../app/defect-log/page.tsx", "../app/fixed-repairs/page.tsx", "../app/lists/page.tsx"]) {
@@ -7736,6 +7737,62 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
   assert.match(source, /<DeferredNavBadge\/>/, file + " is missing the deferred nav badge");
   assert.match(source, /<DeferredReviewPrompt\/>/, file + " is missing the evening review prompt");
  }
+});
+
+test("the evening prompt asks once per BUS, and one answer covers every repair holding it", () => {
+ // The bug Curtis reported: the prompt was per DEFECT under a "Bus 9911"
+ // heading, so answering it handed back the same bus with the next repair
+ // underneath, over and over, and again on the next app open. Measured in a
+ // browser at 21:00 with a three-defect bus: three prompts, then a fourth
+ // after a reload. heldDeferredBuses is what stops that — one entry per bus.
+ const at = "2026-09-08T18:00:00.000Z";
+ const defect = (id, category, issue, extra = {}) => ({ id, category, issue, details: "", operability: "service", state: "deferred", deferredAt: at, createdAt: at, updatedAt: at, source: "defect-log", ...extra });
+ const fleet = [
+  { id: "bus-1", n: "9911", s: "shop", l: "bay-1", defects: [defect("d1", "Tech Services", "Farebox - Won't probe & open"), defect("d2", "Brakes", "Air leak"), defect("d3", "Lighting", "Headlight out")] },
+  { id: "bus-2", n: "9912", s: "shop", l: "bay-2", defects: [defect("d4", "Engine", "Check engine light")] },
+ ];
+
+ const buses = heldDeferredBuses(fleet, []);
+ assert.equal(buses.length, 2, "three deferred repairs on one bus are one question, not three");
+ assert.deepEqual(buses.map(held => held.bus.n), ["9911", "9912"]);
+ assert.deepEqual(buses[0].defects.map(item => item.id), ["d1", "d2", "d3"]);
+
+ // A bus already on the Down Sheet is the sheet's problem, not the prompt's.
+ assert.deepEqual(
+  heldDeferredBuses(fleet, [{ id: "e1", defectId: "d1", busId: "bus-1", workflow: "In Progress" }]).map(held => held.bus.n),
+  ["9912"],
+ );
+
+ // And the prompt's own gate: a bus drops out entirely once ANY of its repairs
+ // carries a keep-until in the future, because that answer was about the bus.
+ const now = new Date("2026-09-08T21:00:00.000Z");
+ const snoozed = heldDeferredBuses(
+  [{ ...fleet[0], defects: [defect("d1", "Tech Services", "Farebox - Won't probe & open", { deferredUntil: "2026-09-08T23:00:00.000Z" }), defect("d2", "Brakes", "Air leak")] }, fleet[1]],
+  [],
+ ).filter(held => !held.defects.some(item => item.deferredUntil && new Date(item.deferredUntil).getTime() > now.getTime()));
+ assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
+});
+
+test("the evening deferred prompt has an off switch, and turning it off leaves the alert badge alone", async () => {
+ const [model, panel, watch] = await Promise.all([
+  readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8"),
+ ]);
+ // Absent means on: every device already in the shop has a settings blob with
+ // no such field, and none of them should go quiet on upgrade.
+ assert.equal(readSettings(null).deferredReviewPrompt, true);
+ assert.equal(readSettings(JSON.stringify({})).deferredReviewPrompt, true);
+ assert.equal(readSettings(JSON.stringify({ deferredReviewPrompt: false })).deferredReviewPrompt, false);
+ assert.equal(readSettings("not json").deferredReviewPrompt, true);
+ assert.ok(model.includes("deferredReviewPrompt:true"), "the default has to be on");
+ assert.match(panel, /checked=\{settings\.deferredReviewPrompt\}/);
+ // The prompt reads the switch; the badge does not, so the 🚨 banner Curtis
+ // already relies on stays whichever way the switch is set.
+ assert.match(watch, /const \[enabled,setEnabled\]=useState\(true\)/);
+ assert.match(watch, /!now\|\|!enabled\|\|!isReviewWindowOpen\(now\)/);
+ const badge = watch.slice(watch.indexOf("export function DeferredNavBadge"), watch.indexOf("type ReviewAction"));
+ assert.ok(!badge.includes("enabled"), "the nav badge must not be gated by the prompt switch");
 });
 
 test("hasDeferredHistory remembers a repair that was deferred, returned to service, and is still open", () => {

@@ -21,6 +21,21 @@ export function heldDeferredRows(fleet:DefectLogFleetBus[],downEntries:DefectLog
  return rows;
 }
 
+/* The same rows grouped by bus, in the order the fleet holds them.
+
+   The review prompt asks about a BUS — a bus held on three repairs is one
+   question, not three — so it needs the repairs together rather than a flat
+   list it would have to regroup inside a memo. Kept here beside the rows it
+   groups, and testable without a browser. */
+export function heldDeferredBuses(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
+ const order:string[]=[],byBus:Record<string,{bus:DefectLogFleetBus;defects:StructuredDefect[]}>={};
+ for(const row of heldDeferredRows(fleet,downEntries)){
+  if(!byBus[row.bus.id]){byBus[row.bus.id]={bus:row.bus,defects:[]};order.push(row.bus.id)}
+  byBus[row.bus.id].defects.push(row.defect);
+ }
+ return order.map(id=>byBus[id]);
+}
+
 /* `listed` is what the Deferred filter will show — buses, deduplicated. That is
    the number printed on the badge, so the badge and the drawer it opens can
    never disagree. `overdue` is the same set narrowed to the ninety-minute line,

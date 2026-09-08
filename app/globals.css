@@ -803,6 +803,10 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .deferred-review-summary b{color:#0b64bd;font-size:10px}
 .deferred-review-summary span{font-size:12px;color:#172957;font-weight:700}
 .deferred-review-summary small{color:#0e7490;font-weight:900;font-size:10px}
+/* The bus is what the question is about, so the count of what else is holding
+   it belongs on the card. Amber rather than the teal above: it is the reason
+   one answer is about to move more than the repair being read. */
+.deferred-review-also{color:#8a4b06;background:#fdf0dc;border:1px solid #f0cf9a;border-radius:5px;padding:4px 6px;font-size:9px;line-height:1.4}
 .deferred-review-choices{display:grid;gap:8px}
 .deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}
 .deferred-review-choices label.selected{border-color:#0e7490;background:#eaf7fa}
