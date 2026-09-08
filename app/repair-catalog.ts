@@ -193,7 +193,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 1 Roof 2","Fire Suppression - Trouble Mod 1 Engine","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Trouble Mod 2 Roof 2","Fire Suppression - Trouble Mod 2 Engine","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
  "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
- "Lights and Fixtures":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
+ "Lights, Mirrors and Alarms":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
  "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
  /* A-3 and A-21 are on the sheet and were not on this list, so a scan of a real
@@ -228,7 +228,7 @@ export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
  "No Start":"🚫",
  "Doors, Ramp and Lift":"🚪",
  "Doors, Ramp and ADA":"♿",
- "Lights and Fixtures":"💡",
+ "Lights, Mirrors and Alarms":"💡",
  Bodywork:"🚌",
  "Pneumatic System":"💨",
  "Air System":"💨", /* legacy category, kept so an unmigrated read still finds its glyph */
@@ -692,7 +692,12 @@ export const RETIRED_ISSUES:Record<string,readonly string[]>={
    rewritten in storage: they are moved to their surviving home as they are read,
    so a defect logged under the old No Start category still opens, filters, and
    reports exactly as before. An issue with no clean equivalent keeps its wording. */
-const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain","Air System":"Pneumatic System"};
+const LEGACY_CATEGORY_RENAMES:Record<string,string>={"Operator Controls":"Bus Controls","No Start":"Battery, Starting and Charging","Suspension":"Suspension and Steering","Steering":"Suspension and Steering","Doors, Ramp and Lift":"Bus Accessories","Doors, Ramp and ADA":"Bus Accessories","Transmission":"Transmission and Drivetrain","Air System":"Pneumatic System",
+ /* Half of "Lights and Fixtures" was mirrors and one item was an audible
+    alarm, so the name said less about its contents every year. Renamed to what
+    is actually in it. Read-time like every rename here: nothing on disk moves,
+    and a defect logged under the old category still reads back correctly. */
+ "Lights and Fixtures":"Lights, Mirrors and Alarms"};
 const LEGACY_ISSUE_RENAMES:Record<string,string>={"MDT Screen":"IBS Screen"};
 /* Bus Controls now picks a group first, so a bare issue moves to its group. */
 const BUS_CONTROL_ISSUE_GROUPS:Record<string,string>={
@@ -804,10 +809,13 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
   "Only front start":"Rear start INOP",
   "Only rear start":"Front start INOP",
  },
- "Lights and Fixtures":{
+ "Lights, Mirrors and Alarms":{
   /* The lamps, not the stalk. Bus Controls owns the turn signal switches. */
   "Turn signals":"Turn signal lamps",
   "Mirrors / fixtures":"Mirror replacement (no body work)",
+  /* The catch-all follows the category name. "Fixture" was the word carrying
+     the mirrors when the category was Lights and Fixtures; it no longer is. */
+  "Other light or fixture":"Other light, mirror or alarm defect",
  },
  "Transmission and Drivetrain":{
   "Other transmission repair":"Other transmission or drivetrain repair",

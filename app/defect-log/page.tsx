@@ -523,29 +523,41 @@ export default function DefectLog(){
  const activeDownBusIds=useMemo(()=>downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId),[downEntries]);
  const activeDownBusIdSet=useMemo(()=>new Set(activeDownBusIds),[activeDownBusIds]);
  const busSearch=resolveBusNumberList(fleet,search),busSearchIds=new Set(busSearch.kind==="numbers"?busSearch.buses.map(bus=>bus.id):[]);
- /* Searching one bus number is a lens you look through to get AT that bus, and
-    it should end when you reach it. It used to end only when you emptied the
-    box by hand: tap the bus, do the work, come back, and the board was still
-    held down to one bus with nothing on screen saying so.
+ /* Tapping a bus used to clear a one-bus search, and that was wrong in the
+    ordinary case rather than the rare one. The tap that "reaches" the bus is
+    the same tap that expands it IN PLACE, so the whole board came back
+    underneath the card being read — worst on a single-defect bus, where the
+    tap opens one line and the entire log appears beneath it. Curtis: "it just
+    automatically brings back the whole list, I think it might be a little too
+    sensitive."
 
-    So tapping a bus clears it - on the tap, not on a save, because looking is
-    a finished errand too. A search naming SEVERAL buses is a worklist rather
-    than a lens, and survives: you are working down it. */
- const singleBusSearch=busSearch.kind==="numbers"&&busSearch.tokens.length===1&&busSearch.buses.length===1;
- const clearSearchOnReach=()=>{if(singleBusSearch)setSearch("")};
+    So a search ends when somebody says it ends. What this needed was never a
+    smarter guess about when to stop; it was for the filtered state to stop
+    being invisible, which is the bar below the controls. */
  const searchFeedback=busSearch.kind==="numbers"?[...busSearch.ambiguous.map(item=>item.query+" matches "+candidateBusNumbers(item.matches).join(", ")+" — enter the full bus number"),...(busSearch.invalid.length?["Use a full bus number or two ending digits: "+busSearch.invalid.join(", ")]:[]),...(busSearch.missing.length?["No bus matches: "+busSearch.missing.join(", ")]:[])].join(" · "):"";
  const active=records.filter(record=>isUnresolved(record.defect));
- const visible=records.filter(record=>{
+ /* Split in two so the page can say what the SEARCH is hiding, as opposed to
+    what the state filter is hiding — they are different questions and the
+    banner only answers the first. */
+ const matchesStateFilter=(record:DefectLogRecord)=>{
   if(!settings.showFixed&&record.defect.state==="completed")return false;
   if(filter==="open"&&!(record.defect.state==="open"||record.defect.state==="deferred"))return false;
   if(filter==="in-progress"&&record.defect.state!=="in-progress")return false;
   if(filter==="fixed"&&!(record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)))return false;
   if(filter==="downsheet"&&!activeDownBusIdSet.has(record.bus.id))return false;
+  return true;
+ };
+ const matchesSearch=(record:DefectLogRecord)=>{
   if(busSearch.kind==="numbers")return busSearchIds.has(record.bus.id);
   const query=search.trim().toLowerCase();if(!query)return true;
-  return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].some(value=>String(value||"").toLowerCase().includes(query));
- });
+  return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].filter(Boolean).join(" ").toLowerCase().includes(query);
+ };
+ const unsearched=records.filter(matchesStateFilter);
+ const visible=unsearched.filter(matchesSearch);
  const visibleGroups=groupDefectLogRecords(visible);
+ /* How many buses the search alone is holding back. Zero when nothing is typed,
+    which is what keeps the banner off the page the rest of the time. */
+ const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
  const focusedGroup=focusedBusId?visibleGroups.find(group=>group.bus.id===focusedBusId):undefined;
@@ -797,7 +809,16 @@ export default function DefectLog(){
        says which buses are on it. Both KEYS still work, so a saved default
        view of either keeps filtering — the button is what was removed, not
        the filter. Pressing the active one clears back to ALL. */}
-   <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/>{search&&<button type="button" className="clear-log-search" onClick={()=>setSearch("")} aria-label="Clear the search and show every bus">CLEAR</button>}</label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}</div>
+   <div className="log-search-wrap"><label className="log-search"><span>SEARCH</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus numbers (space/comma), repair, code, or note" aria-describedby={searchFeedback?"log-search-feedback":undefined}/>{search&&<button type="button" className="clear-log-search" onClick={()=>setSearch("")} aria-label="Clear the search and show every bus">CLEAR</button>}</label>{searchFeedback&&<small className="log-search-feedback" id="log-search-feedback">{searchFeedback}</small>}
+   {/* The filtered state used to be silent: the board was held down to one bus
+       and nothing on screen said so, which is what made people tap around
+       looking for the way back. It says what it is hiding and gives one press
+       to undo it — the small CLEAR in the field stays for whoever finds it
+       first. Only while something is typed, so it is never in the way. */}
+   {search.trim()&&<div className="log-search-filtered" role="status">
+    <span><b>{visibleGroups.length}</b> BUS{visibleGroups.length===1?"":"ES"} SHOWN{hiddenBySearch>0?" · "+hiddenBySearch+" HIDDEN BY THIS SEARCH":""}</span>
+    <button type="button" className="show-all-buses" onClick={()=>setSearch("")}>SHOW ALL</button>
+   </div>}</div>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
     decoration, so it carries its name and is shaped like the buttons beside it. */}
@@ -817,7 +838,7 @@ export default function DefectLog(){
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
    {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
-    <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();clearSearchOnReach();setFocusedBusId(group.bus.id)}}>FOCUS</button>
+    <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
         all: a select nested in a button is invalid, and every tap on it would
         have been swallowed by the card's own expand handler.
@@ -846,7 +867,7 @@ export default function DefectLog(){
       <em>{locationLabel(group.bus.l)}</em><i aria-hidden="true">▾</i>
      </button>
     </div>
-    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{clearSearchOnReach();setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
+    <button className="log-card-main log-group-header" aria-expanded={expanded} onClick={()=>{setExpandedBusIds(current=>current.includes(group.bus.id)?current.filter(id=>id!==group.bus.id):[...current,group.bus.id])}}>
      {/* No category glyph on the collapsed card. The round icon showed the
          category of whichever defect happened to be first, which on a MULTIPLE
          DEFECTS card is one category standing in for three. Each expanded row

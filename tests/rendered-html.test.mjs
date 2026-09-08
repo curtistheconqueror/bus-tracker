@@ -1684,8 +1684,8 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Unlocked / won't lock"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - BUS ER"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - MV ER"));
-  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
-  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - R/S"));
+  assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - C/S"));
+  assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - R/S"));
   assert.equal(repairCategoryEmoji("Engine"), REPAIR_CATEGORY_EMOJI.Engine);
   assert.equal(repairCategoryLabel("Engine"), "⚙️ Engine");
   assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Gauges and Dash - Fuel gauge INOP / false reading"));
@@ -2498,21 +2498,34 @@ test("changing a defect's bus number MOVES the record, and a removal never trave
  assert.deepEqual(repaired.fleet.map(bus => (bus.defects || []).length), [0, 1]);
 });
 
-test("a one-bus search ends when you reach the bus; a worklist of several survives", async () => {
- const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
- // Searching one bus number is a lens you look through to get AT that bus. It
- // used to end only when the box was emptied by hand, so Curtis tapped the bus,
- // did the work, came back, and the board was still held to one bus with
- // nothing on screen saying so. Several numbers is a worklist, not a lens.
- assert.match(page, /const singleBusSearch=busSearch\.kind==="numbers"&&busSearch\.tokens\.length===1&&busSearch\.buses\.length===1/);
- assert.match(page, /const clearSearchOnReach=\(\)=>\{if\(singleBusSearch\)setSearch\(""\)\}/);
- // Both ways into a bus clear it, and on the TAP rather than on a save —
- // looking at a bus is a finished errand too.
- assert.match(page, /log-card-main log-group-header[\s\S]{0,240}?onClick=\{\(\)=>\{clearSearchOnReach\(\);setExpandedBusIds/);
- assert.match(page, /log-focus-button[\s\S]{0,320}?clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)/);
- // And a way out that is not backspacing four digits. ALL still clears the
- // search too, but it drags the state filter back with it.
+test("a search ends when somebody ends it, and never says so silently", async () => {
+ const [page, css] = await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
+ ]);
+ /* Tapping a bus used to clear a one-bus search. That was wrong in the ordinary
+    case rather than the rare one: the tap that "reaches" the bus is the same tap
+    that expands it IN PLACE, so the whole board came back underneath the card
+    being read — worst on a single-defect bus, where the tap opens one line and
+    the entire log appears beneath it. */
+ assert.doesNotMatch(page, /clearSearchOnReach/, "tapping a bus must not clear the search");
+ assert.match(page, /log-card-main log-group-header[\s\S]{0,200}?onClick=\{\(\)=>\{setExpandedBusIds/);
+ assert.match(page, /log-focus-button[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+
+ // What it needed was never a smarter guess about when to stop; it was for the
+ // filtered state to stop being invisible. Two ways out, both only while
+ // something is typed: the tag in the field and the banner under it.
  assert.match(page, /className="clear-log-search" onClick=\{\(\)=>setSearch\(""\)\}/);
+ assert.match(page, /\{search\.trim\(\)&&<div className="log-search-filtered" role="status">/);
+ assert.match(page, /className="show-all-buses" onClick=\{\(\)=>setSearch\(""\)\}/);
+ assert.match(css, /\.log-search-filtered\{/);
+ assert.match(css, /\.show-all-buses\{min-height:44px/, "a real tap target on a phone");
+
+ // It counts what the SEARCH is hiding, not what the state filter is hiding —
+ // different questions, and the banner only answers the first.
+ assert.match(page, /const unsearched=records\.filter\(matchesStateFilter\)/);
+ assert.match(page, /const visible=unsearched\.filter\(matchesSearch\)/);
+ assert.match(page, /const hiddenBySearch=search\.trim\(\)\?groupDefectLogRecords\(unsearched\)\.length-visibleGroups\.length:0/);
 });
 
 test("ALREADY LOGGED can reach the record it is blocking on", async () => {
@@ -4669,7 +4682,7 @@ test("the operator blower and the mirror switches land in both structures a grou
  assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - Mirror heater switch"),
   {category:"Operator/Driver Controls",issue:"System Switches - Mirror heater switch - C/S"});
  // Lights and Fixtures still owns the mirrors themselves; only the switch moved.
- assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
+ assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - C/S"));
 });
 
 test("the split surge tank is two independent sides, and the empty one builds the winter list",async()=>{
@@ -5858,7 +5871,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  ]);
 
  // one control per bus card, and it must not be nested inside the card's expand button
- assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+ assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
  const focusButtonAt=page.indexOf('className="log-focus-button"'),headerAt=page.indexOf('className="log-card-main log-group-header"');
  assert.ok(focusButtonAt>0&&headerAt>focusButtonAt,"focus button must precede the header button as a sibling");
  assert.equal(/log-card-main log-group-header[\s\S]{0,600}?log-focus-button/.test(page),false);
@@ -6271,7 +6284,7 @@ test("the repair details panel opens for a record that has repair details",async
 });
 
 test("mirror wording says who does the work, and the missing fixtures exist",()=>{
- const lights=REPAIR_OPTIONS["Lights and Fixtures"],body=REPAIR_OPTIONS.Bodywork;
+ const lights=REPAIR_OPTIONS["Lights, Mirrors and Alarms"],body=REPAIR_OPTIONS.Bodywork;
 
  // Curtis keeps mirrors in both categories on purpose: a mirror the mechanic
  // can simply swap is not the same job as glass the body shop has to do. The
@@ -6308,8 +6321,8 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
 
  // renames are scoped to their category, so a word means one thing per place
  for(const [category,issue,expected] of [
-  ["Lights and Fixtures","Turn signals","Turn signal lamps"],
-  ["Lights and Fixtures","Mirrors / fixtures","Mirror replacement (no body work)"],
+  ["Lights, Mirrors and Alarms","Turn signals","Turn signal lamps"],
+  ["Lights, Mirrors and Alarms","Mirrors / fixtures","Mirror replacement (no body work)"],
   ["Bodywork","Mirror","Mirror damage (body shop)"],
   ["Bodywork","Glass / windshield","Glass / windshield cracked or shattered"],
  ]){
@@ -6318,7 +6331,14 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
   assert.ok(REPAIR_OPTIONS[category].includes(moved.issue),expected+" must be pickable");
  }
  // a rename in one category must not reach the same word in another
- assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Headlights"),{category:"Lights and Fixtures",issue:"Headlights"});
+ assert.deepEqual(migrateRepairIdentity("Lights, Mirrors and Alarms","Headlights"),{category:"Lights, Mirrors and Alarms",issue:"Headlights"});
+ /* The category was renamed: half of "Lights and Fixtures" was mirrors and one
+    item was an audible alarm, so the name said less about its contents every
+    year. Read-time like every rename here — a record logged under the old
+    category still reads back, and nothing on disk moved. */
+ assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Headlights"),{category:"Lights, Mirrors and Alarms",issue:"Headlights"});
+ assert.equal(REPAIR_OPTIONS["Lights and Fixtures"],undefined,"the old name is a rename, not a second live category");
+ assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Other light or fixture"),{category:"Lights, Mirrors and Alarms",issue:"Other light, mirror or alarm defect"},"the catch-all follows the name");
 
  // Warning lights was too vague to diagnose from and left the picker. Every
  // system that lights one already has its own entry.
@@ -6329,7 +6349,7 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  // the records that used it keep their wording and still read correctly
  const [kept]=normalizeDefects([{id:"warn-1",category:"Lights and Fixtures",issue:"Warning lights",details:"Amber lamp on",state:"open",operability:"service"}]);
  assert.equal(kept.issue,"Warning lights");
- assert.equal(defectLabel(kept),"Lights and Fixtures — Warning lights — Amber lamp on");
+ assert.equal(defectLabel(kept),"Lights, Mirrors and Alarms — Warning lights — Amber lamp on","a record stored under the old category reads under the new name");
 });
 
 test("the chair mark flags ADA equipment without touching what gets stored",async()=>{
