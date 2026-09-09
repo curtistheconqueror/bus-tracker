@@ -1,7 +1,6 @@
 # Publish next
 
-**STATUS: 169 IS PENDING — publish from `939fe49`.** Release 168 is live from
-`64ec7d2` as Sites Version 164.
+**STATUS: NONE PENDING — repository release 169 is live from `939fe49` as Sites Version 165.**
 
 ## ⏪ ROLLBACK IS EXPECTED, NOT AN EMERGENCY
 
@@ -53,7 +52,7 @@ Three commits, no migration.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **169** | **`939fe49`** | **Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request.** |
+| Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
