@@ -1,12 +1,12 @@
 # Publish next
 
-**STATUS: 170 IS PENDING — publish from `bdca898`.** Release 169 is live from
+**STATUS: 170 IS PENDING — publish from `cd02260`.** Release 169 is live from
 `939fe49` as Sites Version 165.
 
 **Read the SHA above, not a SHA you remember.** The 169 handoff named `939fe49`
 while it was the head of the branch, two code commits landed after it, and 169
 went out without them — which is exactly why 170 exists and is exactly the
-mistake to not repeat. `bdca898` is the last CODE commit and holds every line of
+mistake to not repeat. `cd02260` is the last CODE commit and holds every line of
 app code in 170. What sits above it is docs only — Codex's own 169 release
 record, this handoff, and the merge that brought them together — so none of it
 belongs in a build. **If more work lands before you get here, re-check this SHA
@@ -75,8 +75,8 @@ in 170 below, where they belong.
 
 ## What 170 is
 
-Two commits, no migration, no new storage key. Both are layout; neither reads or
-writes a record.
+Three commits, no migration, no new storage key. All three are layout; none
+reads or writes a record.
 
 - **SCAN SHEET alignment.** CANCEL was half off the left edge of a phone — a
   bare `footer` rule in globals.css was positioning every modal's action bar
@@ -97,18 +97,28 @@ writes a record.
   of the header, so reaching past the name does not navigate; the tap area is
   34px tall on a phone, paid for with a negative margin so nothing moved.
 
+- **The Facility Map's header joins the other five.** It was the one page whose
+  nav sat above its own name, so FLEETSTEP was the fifth thing down the screen
+  on the page the app opens on. The header now carries the same four lines
+  everywhere else does — name, FLEET MAINTENANCE kicker, an h1 that is the
+  page's name, and a subtitle — and the nav follows it. The long all-caps
+  sentence that was doing all four jobs became the subtitle. Measured against
+  the Defect Log at 390 and against 360/430/820 for overflow.
+
 ### What to check once 170 is live
 
 - On a phone, open SCAN SHEET from the Down Sheet: **CANCEL is fully on screen**,
   and dragging the modal scrolls the modal rather than the page behind it.
 - Tap **FLEETSTEP** at the top of any page: it goes to the Facility Map. Tap the
   empty space to the right of it: nothing happens.
+- On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
+  nav below it — not above it.
 - Nothing else should look different. If a header's title or kicker has moved
   even slightly, that is this release and worth saying.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **170** | **`bdca898`** | **SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
+| **NEXT** | **170** | **`cd02260`** | **SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — the app name at the top of every page linking home, and the Facility Map's header finally drawn like the other five. Roll back to 169 / `939fe49` on request.** |
 | Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
