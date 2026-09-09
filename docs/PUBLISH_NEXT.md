@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `76eb15e`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `9d6e49e`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `76eb15e` is the last CODE
+**Read the SHA above, not a SHA you remember.** `9d6e49e` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,7 +13,7 @@ this SHA first.**
 
 ## What 171 is
 
-**Five commits.** No migration, no schema change, no dependency change, no
+**Six commits.** No migration, no schema change, no dependency change, no
 storage key added or renamed, and nothing that rewrites a record. One header's
 markup, one CSS property on three selectors, ten new catalog options, and the
 Defect Log's two pickers rebuilt as typing fields.
@@ -59,6 +59,8 @@ Defect Log's two pickers rebuilt as typing fields.
   every typed word must appear, and there is deliberately no fuzzy matching, so
   a typo returns nothing rather than the wrong part. Storage is untouched: the
   search reaches the catalog's own strings and never spells a new one.
+  The list reads at the size of the field that opened it — 16px on a phone, the
+  same size the old drop-down drew its options at.
 
 ### What to check once 171 is live
 
@@ -186,7 +188,7 @@ writes a record.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **171** | **`76eb15e`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
+| **NEXT** | **171** | **`9d6e49e`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
 | Published | **170** | **`bdca898`** | **Live as Sites Version 166. SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
 | Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
