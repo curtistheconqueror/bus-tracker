@@ -1,7 +1,15 @@
 # Publish next
 
-**STATUS: 169 IS PENDING — publish from `939fe49`.** Release 168 is live from
+**STATUS: 169 IS PENDING — publish from `bdca898`.** Release 168 is live from
 `64ec7d2` as Sites Version 164.
+
+**The SHA moved twice after this file first named one, and both times it was a
+real commit that would have been left behind.** `939fe49` was named while it was
+the head of the branch; the SCAN SHEET fixes (`287059f`) and the masthead link
+(`bdca898`) landed after it. Publish from `bdca898` — the last CODE commit. The
+docs-only commit that carries this correction sits on top of it and is not worth
+publishing. **If more work lands before Codex gets here, the SHA below is the
+thing to re-check first.**
 
 ## ⏪ ROLLBACK IS EXPECTED, NOT AN EMERGENCY
 
@@ -33,7 +41,7 @@ Two things to know rather than discover:
 
 ## What 169 is
 
-Three commits, no migration.
+Five commits, no migration.
 
 - **Lite Mode.** A device that has never opened the app is asked once, on a
   screen showing the name and two choices, whether it wants FULL or LITE.
@@ -55,10 +63,16 @@ Three commits, no migration.
   against the viewport. Fixed for every dialog, not just this one. The page
   behind no longer scrolls instead of the modal, and three scroll locks that
   were silently doing nothing now work.
+- **The name at the top of every page is a link home.** FLEETSTEP is now an
+  `<a href="/">` — a masthead, the way every site has one. It looks identical:
+  measured on all six pages at 390 and 1180, same corner, same size, no
+  underline, no header height changed. The link ends at the last letter rather
+  than running the width of the header, so reaching past the name does not
+  navigate. `/` is the Facility Map — there is no separate landing page yet.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **169** | **`939fe49`** | **Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request.** |
+| **NEXT** | **169** | **`bdca898`** | **Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it; SCAN SHEET's CANCEL back on screen with every modal's action bar fixed with it; and the app name at the top of every page now links home. Roll back to 168 / `64ec7d2` on request.** |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
