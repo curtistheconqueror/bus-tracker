@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `cd02260`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `5eee938`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `cd02260` is the last CODE
+**Read the SHA above, not a SHA you remember.** `5eee938` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,9 +13,9 @@ this SHA first.**
 
 ## What 171 is
 
-**One commit.** No migration, no schema change, no dependency change, no storage
-key added or renamed, and nothing that reads or writes a record. It changes one
-header's markup and the CSS behind it.
+**Two commits.** No migration, no schema change, no dependency change, no
+storage key added or renamed, and nothing that reads or writes a record. One
+header's markup, and one CSS property on three selectors.
 
 - **The Facility Map's header joins the other five.** It was the one page whose
   nav sat above its own name — Curtis, on a phone: *"the facility map needs to
@@ -33,6 +33,15 @@ header's markup and the CSS behind it.
   own title had been rendering *smaller on a phone* than the kicker line on
   every other page. 25px desktop, 22px phone, the two sizes the other five use.
 
+- **The map's phone nav actually sticks.** It has carried
+  `position:sticky;top:0` since that rule was written and has never pinned
+  anything: `overflow-x:hidden` makes an element a scroll container, so the nav
+  was sticking to `.app`, which does not scroll — the document does. Swapping
+  those three declarations to `overflow-x:clip` (with `hidden` left in front as
+  the fallback for older browsers) gives it the viewport as its container.
+  Measured pinned at y0 from scrollY 400 all the way to 4200 on a 5123px page,
+  with no horizontal bleed introduced on any of the six pages at 360/390/430/820.
+
 ### What to check once 171 is live
 
 - On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
@@ -41,6 +50,11 @@ header's markup and the CSS behind it.
 - The title says **Facility Map**; the sentence it replaced is the small line
   under it.
 - Nothing below the header should have moved.
+- **Scroll down the Facility Map on a phone: the six page buttons should stay at
+  the top of the screen** instead of scrolling away. This is the one behaviour
+  change in 171 — if it is unwanted, say so and it comes out on its own.
+- No page should scroll sideways. That is what the `overflow-x` change could
+  plausibly break, so it is worth one swipe on the map and the Down Sheet.
 
 ### Rolling 171 back
 
@@ -144,7 +158,7 @@ writes a record.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **171** | **`cd02260`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle. Roll back to 170 / `bdca898` on request.** |
+| **NEXT** | **171** | **`5eee938`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something. Roll back to 170 / `bdca898` on request.** |
 | Published | **170** | **`bdca898`** | **Live as Sites Version 166. SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
 | Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
