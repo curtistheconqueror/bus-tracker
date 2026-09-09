@@ -541,8 +541,26 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .phone-command-dock,.phone-command-sheet,.phone-command-scrim{display:none}
 .garage-scroll{min-width:0}
 @media(max-width:620px){
- html,body{max-width:100%;overflow-x:hidden}
- .app{width:100%;max-width:100%;overflow-x:hidden!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
+ /* `overflow-x:CLIP`, not hidden, and the difference is the phone nav.
+
+    `overflow-x:hidden` computes the other axis to `overflow-y:auto`, which
+    makes the element a SCROLL CONTAINER. A `position:sticky` descendant sticks
+    to its nearest scroll container — so `.mobile-mode-nav` was sticking to
+    `.app`, and `.app` does not scroll: the document does. The nav had
+    `position:sticky;top:0` written on it and had never pinned anything, at any
+    width, since the rule was added. Measured: scroll to 1200 and the nav sat at
+    y-1086, gone off the top with everything else.
+
+    `clip` clips exactly the same content and does NOT create a scroll
+    container, so the nav's scroll container becomes the viewport and it pins.
+    `hidden` is left in front of it as the fallback declaration: a browser that
+    does not know `clip` ignores the second line and keeps today's behaviour,
+    which is a nav that scrolls away rather than a page that scrolls sideways.
+
+    Same species as the three dead scroll locks — a property written, believed,
+    and never once doing what it said. */
+ html,body{max-width:100%;overflow-x:hidden;overflow-x:clip}
+ .app{width:100%;max-width:100%;overflow-x:hidden!important;overflow-x:clip!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
  .app>header{height:auto;min-height:40px;padding:7px 10px;font-size:11px;line-height:1.2;text-align:center}
  .app>nav:not(.mobile-mode-nav):not(.phone-command-dock){height:auto;display:grid;grid-template-columns:1fr;gap:7px;padding:7px}
  .legend{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;white-space:normal}

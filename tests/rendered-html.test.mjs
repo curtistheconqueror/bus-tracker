@@ -7961,6 +7961,27 @@ test("a footer inside a dialog is not positioned against the viewport, and every
  assert.match(lock, /body\.classList\.add\(name,PAGE_SCROLL_LOCKED\)/);
  assert.match(lock, /root\.classList\.remove\(name,PAGE_SCROLL_LOCKED\)/);
  assert.match(globals, /html\.page-scroll-locked,body\.page-scroll-locked\{overflow:hidden;overscroll-behavior:none\}/);
+
+ /* THE SAME SPECIES, FOUND LATER: the Facility Map's phone nav carried
+    `position:sticky;top:0` and had never pinned anything since the rule was
+    written. `overflow-x:hidden` computes the other axis to `overflow-y:auto`,
+    which makes the element a scroll container, and a sticky descendant sticks
+    to its nearest scroll container — so the nav was sticking to `.app`, which
+    does not scroll: the document does. Measured before the fix: scroll to 1600
+    and the nav sat at y-1286, gone.
+
+    `overflow-x:clip` clips the same content without creating a scroll
+    container, so the nav's container becomes the viewport. `hidden` stays in
+    front of it as the fallback declaration — a browser that does not know
+    `clip` ignores the line after it and keeps the old behaviour, which is a
+    nav that scrolls away rather than a page that scrolls sideways. Both
+    declarations are load-bearing; deleting either changes what ships. */
+ assert.match(globals, /html,body\{max-width:100%;overflow-x:hidden;overflow-x:clip\}/,
+   "hidden first as the fallback, clip second so sticky has a scrolling container");
+ assert.match(globals, /\.app\{[^}]*overflow-x:hidden!important;overflow-x:clip!important/,
+   "the map's own wrapper was the container the nav was stuck to");
+ assert.match(globals, /\.mobile-mode-nav\{position:sticky;z-index:19;top:0/,
+   "the rule this exists to make true");
  // Every caller is now covered by that one rule whatever name it passes.
  for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../app/mystery-board.tsx", "../app/welcome-gate.tsx",
                      "../app/down-sheet/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
