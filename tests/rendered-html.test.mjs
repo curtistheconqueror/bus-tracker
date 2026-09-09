@@ -6172,7 +6172,23 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
  const ada=REPAIR_OPTIONS["Bus Accessories"];
  assert.equal(REPAIR_OPTIONS["Doors, Ramp and Lift"],undefined);
  const groups=REPAIR_OPTION_GROUPS["Bus Accessories"];
- assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request","Bike Rack"]);
+ assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request","Bike Rack","Wipers"]);
+
+ /* WIPERS, added last so nothing above it moved in the picker. Curtis asked for
+    the blades and the motors and settled the category himself — "maybe bus
+    accessories is more appropriate" — over Driver Controls. He is right: the
+    operator works the switch from the seat, but the part that fails is out on
+    the glass, and the switch already has its own home in System Switches.
+
+    Each side is its own blade on its own arm driven by its own motor, so all
+    four carry a side the way the securement and stop-request options do. A
+    sheet that says "wipers INOP" does not say which side, and that is exactly
+    what these options exist to pin down. */
+ for(const side of ["curbside","roadside"]){
+  assert.ok(groups["Wipers"].includes("Wiper blade ("+side+")"),side+" blade");
+  assert.ok(groups["Wipers"].includes("Wiper motor ("+side+")"),side+" motor");
+ }
+ assert.ok(groups["Wipers"].includes("Other wiper defect"),"the catch-all every other group here has");
 
  // the Q'STRAINT panel and the straps are separate units per side of the bus
  for(const side of ["curbside","roadside"]){
