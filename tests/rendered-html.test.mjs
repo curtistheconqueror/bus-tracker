@@ -7915,6 +7915,72 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
  assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
 });
 
+test("LITE changes what is drawn and can never reach a record", async () => {
+ const { hiddenInLite, shownIn, LITE_HIDDEN } = await import("../app/lite-mode.ts");
+
+ // Full hides nothing, whatever is on the list.
+ for (const feature of LITE_HIDDEN) {
+  assert.equal(hiddenInLite("full", feature), false, feature + " must be visible in full");
+  assert.equal(hiddenInLite("lite", feature), true, feature + " must stand down in lite");
+  assert.equal(shownIn("lite", feature), false);
+ }
+
+ /* THE CONSTRAINT THE WHOLE FEATURE RESTS ON. Lite changes what is DRAWN, never
+    what is STORED, SYNCED or READ BACK — a Lite phone and a full phone sit side
+    by side on the same Shop Cloud writing the same rows to the same keys, and
+    neither can tell what the other is running.
+
+    So no module that decides a record consults the mode. Asserted against the
+    files rather than trusted to a comment: the day somebody reaches for
+    hiddenInLite inside a save path to "keep Lite simple", this fails. */
+ const dataModules = [
+  "../app/storage.ts", "../app/cloud-sync.ts", "../app/cloud-live.ts", "../app/cloud-client.ts",
+  "../app/repair-catalog.ts", "../app/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
+  "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../app/fleet-backup.ts",
+  "../app/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
+ ];
+ for (const file of dataModules) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  assert.doesNotMatch(source, /hiddenInLite|shownIn|app-mode|useAppMode|APP_MODE_STORAGE_KEY/,
+   file + " decides records, so it must never consult the app mode");
+ }
+
+ // And lite-mode.ts itself imports only a type — it cannot read or write storage.
+ const rules = await readFile(new URL("../app/lite-mode.ts", import.meta.url), "utf8");
+ assert.doesNotMatch(rules, /localStorage|setItem|getItem/, "the rules never touch storage");
+ assert.match(rules, /^import type \{AppMode\} from "\.\/app-mode\.ts";$/m, "a type, not the store");
+});
+
+test("LITE stands the right things down on every surface", async () => {
+ const [nav, name, down, log, settings] = await Promise.all([
+  readFile(new URL("../app/tracker-nav.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
+ ]);
+ // One filter in one file — every header draws from TRACKER_PAGES.
+ assert.match(nav, /page\.href==="\/lists"&&hiddenInLite\(mode,"campaignsPage"\)/);
+ // "Behind the name it will say LITE" — on every screen, so nobody wonders why
+ // a control they were shown yesterday is missing today.
+ assert.match(name, /mode==="lite"&&<i className="app-name-lite">LITE<\/i>/);
+ // Both sheets: ADVANCED ACTIONS, and the drawer as well as its button — a
+ // device that had it open when Lite went on must not keep it open.
+ for (const [source, label] of [[down, "down sheet"], [log, "defect log"]]) {
+  assert.match(source, /!hiddenInLite\(appMode,"advancedActions"\)&&<button/, label + " keeps its advanced toggle in lite");
+  assert.match(source, /advancedOpen&&!hiddenInLite\(appMode,"advancedActions"\)/, label + " would keep an open drawer open");
+ }
+ // DEFERRED, everywhere it shows: the board, the badge, the evening prompt, the
+ // tick in the form and the history note.
+ assert.match(down, /!hiddenInLite\(appMode,"deferred"\)&&<DeferredBoard/);
+ assert.match(log, /!hiddenInLite\(appMode,"deferred"\)&&<><DeferredNavBadge\/><DeferredReviewPrompt\/><\/>/);
+ assert.match(log, /!hiddenInLite\(editorMode,"deferred"\)&&<label className="wide downsheet-check deferred-check">/);
+ // The diagnosis half of the form.
+ assert.match(log, /!hiddenInLite\(editorMode,"diagnosisFields"\)&&<details className="advanced-defect-details"/);
+ // The way out is a plain switch, because Lite is not a permission.
+ assert.match(settings, /checked=\{appMode==="lite"\} onChange=\{event=>setAppMode\(event\.target\.checked\?"lite":"full"\)\}/);
+});
+
 test("the welcome asks once, on a device that has never opened the app, and Full is the fallback", async () => {
  const { isFirstRun, readAppMode, serializeAppMode, APP_MODE_STORAGE_KEY, DEFAULT_APP_MODE } = await import("../app/app-mode.ts");
  const store = map => ({ getItem: key => (key in map ? map[key] : null) });
@@ -10558,7 +10624,7 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
      105h under the road filter. */
   // Still only when it differs from EST. ACTIVE LABOR — and now only when that
   // tile was asked for at all, since a view total beside no total says nothing.
-  assert.match(page,/\{extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+  assert.match(page,/\{!hiddenInLite\(appMode,"extraTiles"\)&&extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
 
   /* The labour tiles print a duration rather than a count, so their text steps
      down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */
@@ -10577,7 +10643,7 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
 
   /* In the header, under REFRESH, in a column of its own so it is under it at
      every width rather than only where the header happens to stack. */
-  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*<button className="down-advanced-toggle"/);
+  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*\{!hiddenInLite\(appMode,"advancedActions"\)&&<button className="down-advanced-toggle"/);
   assert.match(css,/\.down-header-actions\{[^}]*flex-direction:column/);
 
   /* UNMISTAKABLY THIS PAGE'S. Both headers are navy, so the Defect Log's

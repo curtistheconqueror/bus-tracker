@@ -28,6 +28,8 @@ import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {answerDeferredBus} from "../deferred-actions";
+import {useAppMode} from "../welcome-gate";
+import {hiddenInLite} from "../lite-mode";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
 import AppName from "../app-name";
 import WelcomeGate from "../welcome-gate";
@@ -199,6 +201,7 @@ export default function DownSheet(){
  const [showQuickNotes,setShowQuickNotes]=useState(false);
  const [countsOpen,setCountsOpen]=useState(false);
  const [deferredCollapsed,setDeferredCollapsed]=useState(true);
+ const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
  const [savedQuickNotes,setSavedQuickNotes]=useState("");
@@ -542,9 +545,9 @@ export default function DownSheet(){
        width, the same shape the Defect Log's header uses. */}
    <div className="down-header-actions">
     <RefreshButton/>
-    <button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
+    {!hiddenInLite(appMode,"advancedActions")&&<button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
      <span><b>ADVANCED ACTIONS</b><small>Shifts, completed, scan sheet and clearing</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>
+    </button>}
    </div>
   </header>
 
@@ -561,7 +564,7 @@ export default function DownSheet(){
       sheet itself. What stayed out: the two things used on every visit, ADD
       DOWN BUS and SEARCH, which now sit together instead of with a block of
       controls wedged between them. */}
-  {advancedOpen&&<section className="down-advanced open" id="down-advanced-drawer">
+  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="down-advanced open" id="down-advanced-drawer">
    <div className="down-advanced-body">
     <div className="down-advanced-group">
      <b className="down-advanced-label">VIEW</b>
@@ -643,16 +646,16 @@ export default function DownSheet(){
         scoreboard saying most of this again in a different shape; these are the
         numbers that survived it and are still worth having on the days somebody
         wants them. */}
-    {extraTiles.includes("off-property")&&tileFor("off-property")}
-    {extraTiles.includes("pending")&&<div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>}
-    {extraTiles.includes("accident")&&<div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>}
-    {extraTiles.includes("waiting")&&<div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>}
-    {extraTiles.includes("labor")&&<div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>}
-    {extraTiles.includes("capacity")&&<div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("off-property")&&tileFor("off-property")}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("pending")&&<div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("accident")&&<div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("waiting")&&<div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("labor")&&<div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("capacity")&&<div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>}
     {/* Only once it has something of its own to say. Unfiltered it is the same
         number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
         side by side is exactly the duplication this was meant to clear. */}
-    {extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
    </div>}
   </section>
 
@@ -675,8 +678,8 @@ export default function DownSheet(){
       a bus somebody deferred. Separate lists on purpose — a mystery is
       unexplained and a deferral is a decision, and folding them together would
       dilute the one thing MYSTERY BUSES is for. */}
-  <DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
-   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>
+  {!hiddenInLite(appMode,"deferred")&&<DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>}
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet

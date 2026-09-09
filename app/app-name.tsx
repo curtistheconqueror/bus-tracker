@@ -1,3 +1,5 @@
+"use client";
+
 /* The app's name, in one place.
 
    It is drawn in the top-left of all six page headers, above the kicker each
@@ -14,8 +16,16 @@
    settling it later. Changing it is this one line, the manifest, and the two
    titles in layout.tsx — nothing else in the app spells it. */
 
+import {useAppMode} from "./welcome-gate";
+
 export const APP_NAME="FLEETSTEP";
 
+
+/* "Behind the name it will say LITE" — Curtis. It rides with the name rather
+   than sitting somewhere else on the page, so a device in Lite says so on every
+   screen without a banner of its own, and nobody wonders why a control they
+   were shown yesterday is missing today. */
 export default function AppName({className}:{className?:string}){
- return <b className={className?"app-name "+className:"app-name"}>{APP_NAME}</b>;
+ const mode=useAppMode();
+ return <b className={className?"app-name "+className:"app-name"}>{APP_NAME}{mode==="lite"&&<i className="app-name-lite">LITE</i>}</b>;
 }

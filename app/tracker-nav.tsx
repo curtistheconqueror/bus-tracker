@@ -11,10 +11,17 @@
    page that wants the shared list in a different shell passes a className. */
 
 import {TRACKER_PAGES} from "./tracker-pages";
+import {useAppMode} from "./welcome-gate";
+import {hiddenInLite} from "./lite-mode";
 
 export default function TrackerNav({active,className}:{active:string;className?:string}){
+ /* One filter in one file, which is most of why hiding a page in Lite is
+    cheap: every header in the app draws from this list, and the comment in
+    tracker-pages.ts records what the five drifting copies used to cost. */
+ const mode=useAppMode();
+ const pages=TRACKER_PAGES.filter(page=>!(page.href==="/lists"&&hiddenInLite(mode,"campaignsPage")));
  return <nav className={className} aria-label="Tracker pages">
-  {TRACKER_PAGES.map(page=>{
+  {pages.map(page=>{
    const current=page.href===active;
    return <a key={page.href} className={current?"active":undefined} href={page.href} aria-current={current?"page":undefined}>{page.label}</a>;
   })}

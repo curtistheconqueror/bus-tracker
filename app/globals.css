@@ -917,6 +917,7 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    invisible on every page that draws it. currentColor at full opacity is the
    strongest this can read against them, and it stays correct if a header is
    ever re-themed. */
+.app-name-lite{margin-left:8px;border:1px solid currentColor;border-radius:4px;padding:2px 6px;font-size:.44em;font-style:normal;font-weight:900;letter-spacing:1.6px;vertical-align:middle;opacity:.85}
 .app-name{display:block;text-align:left;margin:0 0 5px;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
 @media(max-width:760px){.app-name{font-size:24px;letter-spacing:1.4px}}
 

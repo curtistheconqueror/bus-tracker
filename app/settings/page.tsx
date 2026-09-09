@@ -60,6 +60,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
 import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
+import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -160,6 +161,18 @@ export default function SettingsPage(){
  const report=(result:StorageWriteResult)=>setSaveProblem(result.reason||"");
  const [board,updateBoard,reloadBoard]=useStoredSettings(BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,report);
  const [down,updateDown,reloadDown]=useStoredSettings(DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings,report);
+ /* Written straight rather than through useStoredSettings: this key is one
+    value read by every surface, not a settings blob owned by one page, and the
+    welcome writes it too. The event is what tells the rest of this tab — a
+    `storage` event fires in OTHER tabs only. */
+ const [appMode,setAppModeState]=useState<AppMode>("full");
+ useEffect(()=>{setAppModeState(readAppMode(localStorage.getItem(APP_MODE_STORAGE_KEY)).mode)},[]);
+ const setAppMode=(mode:AppMode)=>{
+  setAppModeState(mode);
+  const written=writeSetting(localStorage,APP_MODE_STORAGE_KEY,serializeAppMode({mode,answered:true}));
+  if(!written.ok){alert("This device could not save that preference. It will go back to how it was next time the app opens.");return}
+  window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
+ };
  const [log,updateLog,reloadLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
 
  const [open,setOpen]=useState<Record<SectionKey,boolean>>(DEFAULT_OPEN);
@@ -344,6 +357,13 @@ export default function SettingsPage(){
          person sees: the welcome only appears by itself on a device that has
          never opened the app, and everybody in the shop already has a board.
          Pressing it does not change the mode — it re-asks the question. */}
+     {/* The way out, on the page a Lite device can still reach. Lite is not a
+         permission — anyone holding the device can turn it off — so this is a
+         plain switch rather than anything gated. */}
+     <section className="settings-lite-switch">
+      <label className="settings-check"><input type="checkbox" checked={appMode==="lite"} onChange={event=>setAppMode(event.target.checked?"lite":"full")}/>
+       <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the advanced actions on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
+     </section>
      <section className="settings-welcome-again">
       <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>
       <button type="button" className="show-welcome-again" onClick={()=>window.dispatchEvent(new CustomEvent(WELCOME_REQUEST_EVENT))}>SHOW IT</button>

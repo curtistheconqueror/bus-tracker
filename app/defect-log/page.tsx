@@ -28,6 +28,8 @@ import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFin
 import {shareOrDownloadFile} from "../share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
+import {useAppMode} from "../welcome-gate";
+import {hiddenInLite} from "../lite-mode";
 import {exportFleetBoardBackup} from "../fleet-backup";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "../storage";
 
@@ -261,6 +263,11 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  const toggleOnDownSheet=(on:boolean)=>{
   setValue(current=>({...current,onDownSheet:on,defect:on?{...current.defect,state:current.defect.state==="deferred"?"open":current.defect.state,deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined}:current.defect}));
  };
+ /* The form is where Lite earns its keep. A new person reports what is wrong
+    with a bus; diagnosis, findings, parts, hours and work states are for the
+    person who fixes it, and an empty field asked of somebody who does not know
+    the answer is how bad data gets entered. */
+ const editorMode=useAppMode();
  const selectedSymptoms=value.defect.symptoms||[],checkEngineMode=isCheckEngineIssue(value.defect.category,value.quickIssue);
  const diagLightMode=hasDiagLightField(value.defect.category),diagLight=normalizeDiagLight(value.defect.diagLight),typedAlarmDigits=String(value.defect.alarmCode||"").replace(/\D/g,"").slice(0,2);
  /* Ticking the lamp that is already on clears it, so a lamp recorded by mistake
@@ -384,7 +391,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
      <button type="button" className="close-log-middle" onClick={close}>CLOSE</button>
     </div>
-    <details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
+    {!hiddenInLite(editorMode,"diagnosisFields")&&<details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
     <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
     <div className="parts-used-block">
@@ -407,7 +414,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
       ?"This is a diagnostic defect. Record diagnostic hours even when the bus is not fixed — press SAVE DEFECT rather than SAVE AS FIXED and the time is kept against an open repair."
       :"Decimal hours: .5 is half an hour. Diagnostic time starts at "+MINIMUM_DIAGNOSTIC_HOURS+" hour and only goes up. Leave blank if no time is being billed."}</small>
     </fieldset>
-    </div></details>
+    </div></details>}
     {/* Both rows stay below ADVANCED DETAILS, where the Down Sheet control has
         always lived and where anyone looking for a Down Sheet thing looks. The
         recommendation goes directly above the escalation rather than up with
@@ -421,8 +428,8 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         combination it elsewhere refuses to let anybody make. The tick still
         shows the truth — the record really does say deferred — it just says
         where that came from and what to do about it. */}
-    <label className="wide downsheet-check deferred-check"><input type="checkbox" checked={deferred} disabled={value.defect.state==="completed"||value.onDownSheet} onChange={event=>toggleDeferred(event.target.checked)}/><span><b>DEFERRED</b><small>{value.onDownSheet?(deferred?"On the sheet, and the sheet has it deferred.":"Not available while it is on the Down Sheet."):deferred?"Held back since "+timeLabel(value.defect.deferredAt||new Date().toISOString())+".":hasHistory?"Check again to hold it back, or fix it now.":"Hold the bus back from service."}</small></span></label>
-    {hasHistory&&<p className="deferred-history-note" role="note"><b>WAS DEFERRED</b>Returned to service {timeLabel(value.defect.deferredReturnedAt||"")}. Still open.</p>}
+    {!hiddenInLite(editorMode,"deferred")&&<label className="wide downsheet-check deferred-check"><input type="checkbox" checked={deferred} disabled={value.defect.state==="completed"||value.onDownSheet} onChange={event=>toggleDeferred(event.target.checked)}/><span><b>DEFERRED</b><small>{value.onDownSheet?(deferred?"On the sheet, and the sheet has it deferred.":"Not available while it is on the Down Sheet."):deferred?"Held back since "+timeLabel(value.defect.deferredAt||new Date().toISOString())+".":hasHistory?"Check again to hold it back, or fix it now.":"Hold the bus back from service."}</small></span></label>}
+    {hasHistory&&!hiddenInLite(editorMode,"deferred")&&<p className="deferred-history-note" role="note"><b>WAS DEFERRED</b>Returned to service {timeLabel(value.defect.deferredReturnedAt||"")}. Still open.</p>}
     <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Could not reproduce the reported condition.</small></span></label>
 
     {/* Moved off the top of the form. Sitting between the bus and the category
@@ -464,6 +471,7 @@ export default function DefectLog(){
   setFilter(next);
   if(next==="all")setSearch("");
  };
+ const appMode=useAppMode();
  const [quickFilter,setQuickFilter]=useState<QuickFilterKey|null>(null);
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
@@ -732,7 +740,7 @@ export default function DefectLog(){
  
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
 
- return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/>{!hiddenInLite(appMode,"deferred")&&<><DeferredNavBadge/><DeferredReviewPrompt/></>}
   <header className="log-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{settings.display.labels.pageTitle||"Real-Time Defect Log"}</h1><p>{settings.display.labels.subtitle}</p></div>
    <TrackerNav active="/defect-log"/>
@@ -743,9 +751,9 @@ export default function DefectLog(){
     {/* aria-controls only while the drawer exists: the panel is not rendered
         at all when closed, and pointing at an id that is not in the document
         tells a screen reader about a thing it cannot go to. */}
-    <button className="header-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"log-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
+    {!hiddenInLite(appMode,"advancedActions")&&<button className="header-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"log-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
      <span><b>ADVANCED ACTIONS</b><small>Filters, undo, scan sweeps and the operator</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>
+    </button>}
    </div>
   </header>
   {/* ADVANCED ACTIONS.
@@ -765,7 +773,7 @@ export default function DefectLog(){
       The two groups are the ones the buttons already formed. VIEW changes what
       the feed shows; TOOLS acts on the log itself. Collapsed by default, and
       the choice is remembered per device. */}
-  {advancedOpen&&<section className="log-advanced open" id="log-advanced-drawer">
+  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="log-advanced open" id="log-advanced-drawer">
     <div className="log-advanced-body">
      <div className="log-advanced-group">
       <b className="log-advanced-label">VIEW</b>

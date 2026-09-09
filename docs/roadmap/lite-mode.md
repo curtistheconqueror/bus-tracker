@@ -1,9 +1,17 @@
 # Lite Mode
 
-**Partly built.** The first-run welcome and the per-device mode exist as of the
-commit that added `app/app-mode.ts` and `app/welcome-gate.tsx`. Nothing yet
-READS the mode to draw less — that is the next step, and everything below the
-"What Lite draws" heading is still design rather than code.
+**Built, first pass.** `app/lite-mode.ts` holds what Lite hides, and the nav,
+both sheets, the defect form and the app name read it. Fixed Repairs and the
+Settings page still draw everything — those are the next pass, and the sections
+below describing them are still design rather than code.
+
+**The constraint, enforced rather than promised.** Lite changes what is DRAWN,
+never what is STORED, SYNCED or READ BACK. `app/lite-mode.ts` imports one TYPE
+and touches no storage, and a test asserts that no module deciding a record —
+storage, both syncs, the cloud trio, the catalog, section transfer, backup and
+restore — so much as mentions the mode. Measured: a full → Lite → full round
+trip on a board holding a deferred bus with diagnosis notes, a part number and
+repair hours left `pace-board-v1` byte-identical.
 
 ## How a device gets asked
 
