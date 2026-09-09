@@ -7915,6 +7915,51 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
  assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
 });
 
+test("a footer inside a dialog is not positioned against the viewport, and every lock actually locks", async () => {
+ const [globals, scanner, lock, down] = await Promise.all([
+  readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/scroll-lock.ts", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8"),
+ ]);
+
+ /* The bare `footer` rule is page furniture — a pill floating at the bottom of
+    the Facility Map and the Down Sheet — and it reached EVERY <footer> in the
+    app. On the SCAN SHEET modal that put CANCEL at x=-78 on a 390px phone:
+    position:fixed and left:50% survived even where a later rule set
+    position:sticky, and translateX(-50%) dragged the bar half off the left edge.
+    Same shape as the bare `header{height:38px}` trap CLAUDE.md records. */
+ assert.match(globals, /footer\{position:fixed;bottom:10px;left:50%/, "the global is still there for .down-footnote and .command-bar");
+ assert.match(globals, /\[role="dialog"\] footer,\.shade footer,\.down-shade footer,\.log-shade footer\{position:static;left:auto;right:auto;transform:none/);
+
+ /* lockPageScroll added only the CALLER'S class, so a name with no stylesheet
+    rule behind it was a lock that silently did nothing. Three of the five call
+    sites were in that state: the SCAN SHEET modal Curtis reported, the
+    mystery-bus location editor, and the first-run welcome. The class that does
+    the locking is one shared name now, defined once. */
+ assert.match(lock, /export const PAGE_SCROLL_LOCKED="page-scroll-locked"/);
+ assert.match(lock, /root\.classList\.add\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(lock, /body\.classList\.add\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(lock, /root\.classList\.remove\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(globals, /html\.page-scroll-locked,body\.page-scroll-locked\{overflow:hidden;overscroll-behavior:none\}/);
+ // Every caller is now covered by that one rule whatever name it passes.
+ for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../app/mystery-board.tsx", "../app/welcome-gate.tsx",
+                     "../app/down-sheet/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  if (/lockPageScroll\(/.test(source)) assert.match(source, /lockPageScroll\("[a-z-]+"\)/, file + " passes a name");
+ }
+ // The scanner had no lock at all, which is what let the sheet drag underneath.
+ assert.match(scanner, /useEffect\(\(\)=>lockPageScroll\("scan-sheet-open"\),\[\]\)/);
+
+ /* 100vh on a phone is TALLER than the visible viewport — the browser chrome
+    overlays it — so the modal ran past the bottom of the screen and its action
+    bar went with it. 100vw ignored the shade's own padding and overflowed it
+    sideways by the same 8px. */
+ assert.match(down, /\.scan-shade\{padding:4px;height:100dvh\}/);
+ assert.match(down, /\.scan-modal\{width:100%;max-height:100dvh;border-radius:0\}/);
+ assert.doesNotMatch(down, /\.scan-modal\{width:100vw;max-height:100vh/);
+});
+
 test("LITE changes what is drawn and can never reach a record", async () => {
  const { hiddenInLite, shownIn, LITE_HIDDEN } = await import("../app/lite-mode.ts");
 
