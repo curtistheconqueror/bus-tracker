@@ -4,6 +4,7 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
+| 166 / release 170 | Live | bdca898 | Restores the Scan Sheet Cancel control and its modal scrolling, and makes the FLEETSTEP masthead return to the Facility Map |
 | 165 / release 169 | Live | 939fe49 | Adds an opt-in Lite Mode first-run choice, a search banner with Show All, and the read-time Lights, Mirrors and Alarms catalog rename |
 | 164 / release 168 | Live | 64ec7d2 | Adds a collapsed Deferred Buses board to the Down Sheet, replaces its order dropdown with a Section Order setting, and enlarges the FLEETSTEP name |
 | 163 / release 167 | Live | 09a69aa | Renames the application FLEETSTEP and collapses the Down Sheet scoreboard to its total, with the detailed counts available on request |
