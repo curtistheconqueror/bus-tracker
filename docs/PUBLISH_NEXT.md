@@ -50,6 +50,11 @@ Three commits, no migration.
   banner under the search says what it is hiding and offers SHOW ALL.
 - **Lights and Fixtures → Lights, Mirrors and Alarms**, with the catch-all
   following the name. Read-time; nothing on disk moves.
+- **SCAN SHEET alignment.** CANCEL was half off the left edge of a phone — a
+  bare `footer` rule in globals.css was positioning every modal's action bar
+  against the viewport. Fixed for every dialog, not just this one. The page
+  behind no longer scrolls instead of the modal, and three scroll locks that
+  were silently doing nothing now work.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
