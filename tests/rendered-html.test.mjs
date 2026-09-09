@@ -11169,3 +11169,54 @@ test("choosing a category narrows the defect search without walling it off",()=>
  // With no category chosen there is nothing to be foreign to.
  assert.equal(searchCatalogForCategory("wiper","").elsewhere.length,0);
 });
+
+test("the defects Curtis named from the floor are in the catalog and reachable by his words",()=>{
+ /* Added from one message: "we need ramp won't lock, doesn't fully cycle...
+    curbside marker, lights and roadside marker, lights and clearance lights
+    which are at the top... Water in storage tanks. Tanks for air."
+
+    Each is asserted twice: that it EXISTS where a mechanic would look for it,
+    and that the SEARCH finds it from the words he used rather than the words the
+    catalog happens to spell it with. An option nobody can find is not in the
+    catalog in any way that counts. */
+ const ramp=REPAIR_OPTION_GROUPS["Bus Accessories"]["Ramp, Lift and Kneeler"];
+ assert.ok(ramp.includes("Ramp will not lock"));
+ assert.ok(ramp.includes("Ramp does not fully cycle"));
+ /* Beside the other ramp faults rather than appended after the kneeler ones. */
+ assert.ok(ramp.indexOf("Ramp will not lock")>ramp.indexOf("Ramp will not stow"));
+ assert.ok(ramp.indexOf("Ramp does not fully cycle")<ramp.indexOf("Kneeler"));
+
+ const lights=REPAIR_OPTIONS["Lights, Mirrors and Alarms"];
+ /* "- C/S" and "- R/S", which is how THIS category already writes a side (see
+    the mirrors below them). Bus Accessories writes "(curbside)" instead; each
+    category is internally consistent, which is what a mechanic reads. */
+ assert.ok(lights.includes("Marker lights - C/S"));
+ assert.ok(lights.includes("Marker lights - R/S"));
+ assert.ok(lights.includes("Clearance lights"));
+ assert.ok(lights.indexOf("Marker lights - C/S")<lights.indexOf("Interior lights"),
+  "the exterior lamps stay together");
+
+ /* "Water in air STORAGE tanks", because that is the word Curtis used — "Water
+    in storage tanks. Tanks for air." Named "Water in air tanks" first, and the
+    search then returned NOTHING for his own phrase, since every typed word has
+    to appear and "storage" was not in it. The option was wrong, not the rule:
+    air storage tank is the standard term anyway. Caught before it shipped only
+    because the test searched his wording rather than the catalog's. */
+ assert.ok(REPAIR_OPTIONS["Pneumatic System"].includes("Water in air storage tanks"));
+
+ const top=query=>searchCatalog(query)[0];
+ assert.equal(top("ramp lock").value,"Ramp, Lift and Kneeler - Ramp will not lock");
+ assert.equal(top("ramp cycle").value,"Ramp, Lift and Kneeler - Ramp does not fully cycle");
+ assert.equal(top("marker lights").category,"Lights, Mirrors and Alarms");
+ assert.equal(top("clearance").value,"Clearance lights");
+ /* His words were "water in storage tanks" and "tanks for air" — neither is the
+    catalog's wording, and both have to land on it anyway. */
+ assert.equal(top("water tanks").value,"Water in air storage tanks");
+ assert.equal(top("water in storage tanks").value,"Water in air storage tanks");
+ assert.equal(top("tanks air water").value,"Water in air storage tanks");
+
+ /* The ramp items sit in a group that already carries the chair mark, so they
+    must not carry a second one of their own. */
+ for(const issue of ["Ramp will not lock","Ramp does not fully cycle"])
+  assert.equal(repairIssueDisplayLabel(issue,"Ramp, Lift and Kneeler"),issue);
+});
