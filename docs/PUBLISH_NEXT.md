@@ -1,25 +1,59 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 168 is live from `64ec7d2` as Sites Version 164.**
+**STATUS: 169 IS PENDING — publish from `939fe49`.** Release 168 is live from
+`64ec7d2` as Sites Version 164.
 
-**Version 168 is live.** It is one Down Sheet feature commit with no fleet, repair, database, dependency, or infrastructure migration.
+## ⏪ ROLLBACK IS EXPECTED, NOT AN EMERGENCY
 
-- **DEFERRED BUSES gets its own board**, directly under MYSTERY BUSES and in the
-  same shape. The two answer one question between them: a bus on property the
-  sheet does not explain is very often a bus somebody deferred. Each card shows
-  how long the bus has been held and carries the two ways out the Defect Log
-  already offers — PUT ON DOWN SHEET and RETURN TO SERVICE. Collapsed by default.
-- **The ORDER dropdown beside the search box is gone.** The sheet is numerical
-  inside each band either way. What replaces it is **SECTION ORDER** in the Down
-  Sheet settings — which band is read first, moved with up/down buttons.
-- **The app name is larger again** — 21px, 24px on a phone.
+Curtis asked for this one to be published so he can look at it, and asked that
+Codex **be ready to put 168 back if he does not like what he sees.** Treat a
+rollback request here as routine rather than as a failure.
 
-One new storage key, `pace-down-sheet-deferred-collapsed-v1`, documented in
-`CLAUDE.md`. Nothing renamed, no records touched. 250 tests, lint and build all
-clean; measured in Chromium at 390 and 1180.
+**Roll back to:** repository release **168**, commit **`64ec7d2`**, live as
+**Sites Version 164**. Redeploy that build. There is nothing else to undo.
+
+**Why a rollback is clean.** No migration, no schema change, no dependency
+change, no storage key renamed, and nothing in this release writes or rewrites a
+record. Lite Mode changes what is DRAWN and never what is stored — measured on a
+full → Lite → full round trip that left `pace-board-v1` byte-identical.
+
+Two things to know rather than discover:
+
+- **`pace-app-mode-v1` is a new per-device key** holding FULL or LITE. The 168
+  build does not read it, so after a rollback it sits there inert and every
+  device is simply full again. Nothing needs clearing.
+- **One caveat, and it is small.** This release renames the catalog category
+  *Lights and Fixtures* → *Lights, Mirrors and Alarms* as a read-time rename.
+  Defects logged under the NEW name during the trial keep every field on a
+  rolled-back 168 — verified: category, issue and details all survive and the
+  label still reads correctly — but 168 does not list that category in its
+  picker, so re-editing one of those defects would show a category the dropdown
+  does not offer. It affects only defects logged during the trial in that one
+  category, and it corrects itself the moment 169 goes back on.
+
+## What 169 is
+
+Three commits, no migration.
+
+- **Lite Mode.** A device that has never opened the app is asked once, on a
+  screen showing the name and two choices, whether it wants FULL or LITE.
+  Everybody in the shop already has a board, so nobody mid-shift meets it;
+  Settings carries FIRST-TIME WELCOME · SHOW IT so Curtis can see what a new
+  person sees on his own phone, and a plain switch to leave Lite.
+  Lite stands down: Fleet Campaigns, ADVANCED ACTIONS on both sheets, DEFERRED
+  everywhere it appears, the ADVANCED DETAILS half of the defect form, and the
+  six opt-in Down Sheet tiles. The eight tiles Curtis ordered — including DOWN
+  BUSES and DOWNED BUSES ON ROAD — are identical in both modes.
+  The name carries **LITE** beside it on every screen.
+- **A search ends when you end it.** Tapping a bus no longer clears a one-bus
+  search — that put the whole board back underneath the card being read. A
+  banner under the search says what it is hiding and offers SHOW ALL.
+- **Lights and Fixtures → Lights, Mirrors and Alarms**, with the catch-all
+  following the name. Read-time; nothing on disk moves.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| **NEXT** | **169** | **`939fe49`** | **Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request.** |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
