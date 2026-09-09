@@ -932,7 +932,26 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    strongest this can read against them, and it stays correct if a header is
    ever re-themed. */
 .app-name-lite{margin-left:8px;border:1px solid currentColor;border-radius:4px;padding:2px 6px;font-size:.44em;font-style:normal;font-weight:900;letter-spacing:1.6px;vertical-align:middle;opacity:.85}
-.app-name{display:block;text-align:left;margin:0 0 5px;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
+/* The name is an <a href="/"> — a masthead link home. Two UA defaults have to
+   be turned off for it to look like the name and not like a nav link: the
+   underline, and the link colour (which would paint it browser-blue on six dark
+   navy headers). color:inherit does the second; currentColor on an anchor
+   already resolved to the inherited value, but inherit says so out loud.
+
+   width:fit-content is the hit target, not decoration. display:block is load
+   bearing (see text-align above), and a full-width block anchor made the whole
+   header row navigate — a mechanic reaching for the empty space beside the name
+   would have been thrown to the map. fit-content keeps the block box in the
+   left corner on all six headers while ending the link at the last letter.
+
+   The padding is the other half of the hit target and the negative margin pays
+   for it exactly: 5px above and below takes a 24px line to a 34px tap area on a
+   phone, and margin -5px 0 0 replaces the old `0 0 5px` so the box occupies the
+   same 29px of the header and the letters land on the same y they always did.
+   Measured on all six: unchanged to the pixel. Do not "tidy" one without the
+   other or the kicker under it moves. */
+.app-name{display:block;width:fit-content;padding:5px 0;margin:-5px 0 0;text-align:left;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:inherit;text-decoration:none;cursor:pointer}
+.app-name:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:3px}
 @media(max-width:760px){.app-name{font-size:24px;letter-spacing:1.4px}}
 
 /* THE FACILITY MAP'S HEADER IS A BARE <header>, and bare headers in this file

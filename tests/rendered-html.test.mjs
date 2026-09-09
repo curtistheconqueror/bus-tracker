@@ -10908,9 +10908,31 @@ test("the app's name is drawn top-left on every page, from one place", async () 
     assert.doesNotMatch(src,/"FLEETSTEP"/,file+" must not spell the name itself");
   }
 
+  /* THE NAME IS THE WAY HOME. Curtis: "when I click on that title, it should
+     take me to the home page" - a masthead link, the way every site has one.
+     It must be a real <a href>, not a <b> with an onClick: a link is what a
+     long-press, a middle-click and a screen reader all already understand. */
+  assert.match(component,/export const HOME_HREF="\/"/,"the target is one edit, and a test can name it");
+  assert.match(component,/<a className=\{className\?"app-name "\+className:"app-name"\} href=\{HOME_HREF\}>/,
+    "the name element itself is the link - a wrapper around it would make the whole header row navigable");
+
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   /* Every page loads globals.css, so the name is styled once. */
-  assert.match(css,/\.app-name\{display:block;text-align:left/);
+  assert.match(css,/\.app-name\{display:block;width:fit-content;padding:5px 0;margin:-5px 0 0;text-align:left/,
+    "the padding grows the tap area and the negative margin pays for it - together they keep the old 29px of header");
+
+  /* An anchor arrives with two UA defaults that would give the game away: an
+     underline, and the browser link colour - which on six dark navy headers
+     reads as a nav link in the wrong place, or worse, as unreadable blue. */
+  const nameRule=css.match(/\.app-name\{([^}]*)\}/)[1];
+  assert.match(nameRule,/text-decoration:none/,"the masthead is not underlined");
+  assert.match(nameRule,/color:inherit/,"it takes the header's colour, never the UA link colour");
+
+  /* width:fit-content is the HIT TARGET. display:block is load-bearing for the
+     map (see below), and a full-width block anchor turns the whole empty right
+     side of the header into a link home - a mechanic reaching past the name on
+     the Down Sheet would have been thrown to the map mid-entry. */
+  assert.match(nameRule,/width:fit-content/,"the link ends at the last letter of the name");
 
   /* THE MAP'S HEADER FOUGHT THIS TWICE, and both rules are load-bearing.
 

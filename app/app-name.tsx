@@ -25,7 +25,23 @@ export const APP_NAME="FLEETSTEP";
    than sitting somewhere else on the page, so a device in Lite says so on every
    screen without a banner of its own, and nobody wonders why a control they
    were shown yesterday is missing today. */
+
+/* The name is a link home, the way a masthead is on most sites. It is a plain
+   `<a href>` rather than a next/link for the same reason `tracker-nav.tsx` uses
+   one: every page reads its records from LocalStorage on mount, so a full
+   navigation is the cheaper thing to reason about, and the two ways of moving
+   between pages behaving identically is worth more than the saved request.
+
+   `/` is the Facility Map today — there is no separate landing page yet — so on
+   the map this points at the page you are already on. That is what a masthead
+   does everywhere else and it costs nothing; when a landing page lands, this
+   one line is where it gets pointed.
+
+   HOME_HREF is exported so a test can assert the target rather than matching
+   markup, and so a landing page is one edit here. */
+export const HOME_HREF="/";
+
 export default function AppName({className}:{className?:string}){
  const mode=useAppMode();
- return <b className={className?"app-name "+className:"app-name"}>{APP_NAME}{mode==="lite"&&<i className="app-name-lite">LITE</i>}</b>;
+ return <a className={className?"app-name "+className:"app-name"} href={HOME_HREF}>{APP_NAME}{mode==="lite"&&<i className="app-name-lite">LITE</i>}</a>;
 }
