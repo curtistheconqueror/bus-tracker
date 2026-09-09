@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `e1c8f8f`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `76eb15e`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `e1c8f8f` is the last CODE
+**Read the SHA above, not a SHA you remember.** `76eb15e` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,9 +13,10 @@ this SHA first.**
 
 ## What 171 is
 
-**Four commits.** No migration, no schema change, no dependency change, no
+**Five commits.** No migration, no schema change, no dependency change, no
 storage key added or renamed, and nothing that rewrites a record. One header's
-markup, one CSS property on three selectors, and ten new catalog options.
+markup, one CSS property on three selectors, ten new catalog options, and the
+Defect Log's two pickers rebuilt as typing fields.
 
 - **The Facility Map's header joins the other five.** It was the one page whose
   nav sat above its own name — Curtis, on a phone: *"the facility map needs to
@@ -50,6 +51,15 @@ markup, one CSS property on three selectors, and ten new catalog options.
   shifted in the picker. Verified in the browser: Bus Accessories offers 50
   options where it offered 40, and the new ones store and display correctly.
 
+- **The Defect Log's CATEGORY and DEFECT pickers are now typing fields.** Tap one
+  and the whole list opens as before; type and it narrows. The DEFECT field
+  searches **every category at once** and fills the category in for you, so
+  nobody has to know a wiper motor lives under Bus Accessories before logging
+  one. Ranked rather than substring-matched — word starts beat mid-word hits,
+  every typed word must appear, and there is deliberately no fuzzy matching, so
+  a typo returns nothing rather than the wrong part. Storage is untouched: the
+  search reaches the catalog's own strings and never spells a new one.
+
 ### What to check once 171 is live
 
 - On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
@@ -61,6 +71,13 @@ markup, one CSS property on three selectors, and ten new catalog options.
 - Log a defect under **Bus Accessories** and scroll the option list to the
   bottom: ten **Wipers and Washers** options — blade and motor per side, and the
   washer set.
+- **Open + LOG DEFECT and type "wiper motor" without choosing a category.** It
+  should find it and set the category itself. Then tap the same field with
+  nothing typed: the full list should open the way the old drop-down did.
+- **This is the one to check on a real phone**, because it is the one thing that
+  cannot be measured in a container: with the keyboard up, are the results
+  above the keys and reachable? The field scrolls itself into view on open,
+  which should handle it, but a real iPhone is the only thing that proves it.
 - **Scroll down the Facility Map on a phone: the six page buttons should stay at
   the top of the screen** instead of scrolling away. This is the one behaviour
   change in 171 — if it is unwanted, say so and it comes out on its own.
@@ -169,7 +186,7 @@ writes a record.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **171** | **`e1c8f8f`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something and a Wipers and Washers group added to the catalog. Roll back to 170 / `bdca898` on request.** |
+| **NEXT** | **171** | **`76eb15e`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
 | Published | **170** | **`bdca898`** | **Live as Sites Version 166. SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
 | Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
