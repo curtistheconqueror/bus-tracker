@@ -5,7 +5,7 @@ import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,r
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTION_GROUPS,REPAIR_OPTIONS,repairCategoryLabel,repairGroupDisplayLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "./defect-log-sync";
 import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
@@ -36,6 +36,8 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import {moveBusToArea} from "../facility-areas";
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
+import ComboField from "../combo-field";
+import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "../defect-search.ts";
 import WelcomeGate from "../welcome-gate";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
@@ -173,6 +175,34 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     looks like it has no issue at all. Offer it as its own choice instead, so what
     was logged stays visible and survives a save untouched. */
  const offCatalogIssue=value.quickIssue&&!repairs.includes(value.quickIssue)?value.quickIssue:"";
+
+ /* The two picker handlers, lifted out of the JSX they used to live inside so
+    the DEFECT field can call BOTH: choosing an issue from a category the
+    mechanic has not selected has to set that category too. The bodies are the
+    old onChange bodies, moved rather than rewritten — everything they reset
+    (symptoms, quantity, unit, operability, the part fields) is reset for the
+    same reasons it always was. */
+ const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
+  defect:{...current.defect,category,issue:"",symptoms:[],quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
+
+ const chooseIssue=(issue:string,switchTo:string)=>{
+  const category=switchTo||value.defect.category;
+  const picked=defectCountField(category,issue);
+  const oilIssue=category==="Preventive Maintenance"&&issue==="Add engine oil";
+  setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
+   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
+    symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
+    quantity:undefined,unit:picked?picked.unit:oilIssue?"quarts":undefined,
+    operability:defaultDefectOperability(category,issue)}}));
+ };
+
+ /* What the closed DEFECT field reads. The catalog's own label when it knows the
+    option; the raw stored string when it does not, so a record saved under a
+    retired wording still shows what was logged rather than going blank. */
+ const issueDisplay=(issue:string,category:string)=>
+  CATALOG_OPTIONS.find(row=>row.value===issue&&(!category||row.category===category))?.label
+  ||CATALOG_OPTIONS.find(row=>row.value===issue)?.label
+  ||issue;
  /* A record saved before Stage 6 has a part number but no flag, so treat an
     existing number as parts used rather than hiding it behind an empty box. */
  const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
@@ -301,8 +331,46 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    <div className="log-form">
     <BusSelector fleet={fleet} busId={value.busId} select={busId=>setValue(current=>({...current,busId}))}/>
-    <label>CATEGORY<select value={value.defect.category} onChange={event=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,defect:{...current.defect,category:event.target.value,issue:"",symptoms:[],quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}))}><option value="">Select category</option>{Object.keys(REPAIR_OPTIONS).map(category=><option value={category} key={category}>{repairCategoryLabel(category)}</option>)}</select></label>
-    <label>QUICK SELECT (OPTIONAL)<select value={value.quickIssue} disabled={!value.defect.category} onChange={event=>{const issue=event.target.value,picked=defectCountField(value.defect.category,issue),oilIssue=value.defect.category==="Preventive Maintenance"&&issue==="Add engine oil";setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,defect:{...current.defect,issue,partsUsed:false,partNumber:"",partName:"",symptoms:isCheckEngineIssue(current.defect.category,issue)?current.defect.symptoms||[]:[],quantity:undefined,unit:picked?picked.unit:oilIssue?"quarts":undefined,operability:defaultDefectOperability(current.defect.category,issue)}}))}}><option value="">{value.defect.category?"Save category only or choose an issue":"Select category first"}</option>{offCatalogIssue&&<option value={offCatalogIssue}>{offCatalogIssue} (as logged)</option>}{REPAIR_OPTION_GROUPS[value.defect.category]?Object.entries(REPAIR_OPTION_GROUPS[value.defect.category]).map(([group,items])=><optgroup label={repairGroupDisplayLabel(group)} key={group}>{items.map(entry=><option value={group+" - "+entry} key={entry}>{repairIssueDisplayLabel(entry,group)}</option>)}</optgroup>):repairs.map(repair=><option value={repair} key={repair}>{repairIssueDisplayLabel(repair)}</option>)}</select></label>
+    {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
+        named the risk in the same breath — "just try to make it look clean".
+        One control per picker does both jobs: tap it and the whole list opens
+        the way the <select> did, type in it and the same list narrows. */}
+    <ComboField label="CATEGORY" className="wide"
+     value={value.defect.category}
+     display={value.defect.category?repairCategoryLabel(value.defect.category):""}
+     placeholder="Type or tap to choose a category"
+     emptyText="No category matches that"
+     search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
+     onPick={category=>chooseCategory(category)}/>
+    {/* NOT DISABLED WITHOUT A CATEGORY, and that is the point of the whole
+        change. The old picker made you name the category before it would show
+        you anything, so a mechanic had to know a wiper motor lives under Bus
+        Accessories before he could log one. Now he types "wiper motor", picks
+        it, and the category fills itself in behind him. */}
+    <ComboField label="DEFECT" className="wide"
+     value={value.quickIssue}
+     display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
+     placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+     emptyText="Nothing in the catalog matches that"
+     footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
+     search={query=>{
+      const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category);
+      const rows=[
+       ...inCategory.map(row=>({value:row.value,label:row.label,category:row.category,hint:row.groupLabel?row.groupLabel+" · "+row.categoryLabel:row.categoryLabel})),
+       ...elsewhere.map(row=>({value:row.value,label:row.label,category:row.category,foreign:true,
+        hint:(row.groupLabel?row.groupLabel+" · ":"")+row.categoryLabel+" — switches category"})),
+      ];
+      /* The wording a record was saved under, when the picker no longer offers
+         it. It led the old list and it leads this one, so what was logged stays
+         reachable and survives a save untouched. */
+      return offCatalogIssue&&!query?[{value:offCatalogIssue,label:offCatalogIssue,hint:"as logged"},...rows]:rows;
+     }}
+     /* The option carries its own category, so picking one always sets the
+         category — not only when the row was marked as coming from elsewhere.
+         With no category chosen every row is "in category" and none is marked,
+         which is exactly the case that matters: typing "wiper motor" cold and
+         picking it has to fill Bus Accessories in behind you. */
+     onPick={(issue,option)=>chooseIssue(issue,option?.category||"")}/>
     {/* Shown where the choice was just made, not behind Advanced Details. The
         point is to reach somebody standing at the bus before they walk away
         thinking a missing cap is only a missing cap. */}

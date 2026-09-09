@@ -793,3 +793,68 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-location{min-height:40px;padding:4px 2px}.log-location>em{font-size:9px}
 }
 @media(max-width:390px){.log-card-group{grid-template-columns:64px minmax(0,1fr)}}
+
+/* ── The typing picker ────────────────────────────────────────────────────────
+   One field that is both the search and the drop-down. Curtis: "just try to
+   make it look clean" — so it inherits the form's own input styling rather than
+   inventing a look, and the only new furniture is the caret, the clear button
+   and the list itself.
+
+   `.log-form input` already gives this 100% width, the form's border and, in the
+   phone block, min-height:44px and font-size:16px. Both of those matter more
+   here than they did for a <select>: 44px is a gloved thumb, and 16px is what
+   stops iOS zooming the whole page the moment the field takes a cursor. Do not
+   give .combo-input its own font-size and undo that.
+
+   THE LIST IS IN FLOW, NOT FLOATING. `.log-form` scrolls (overflow:auto), and a
+   floating list inside a scrolling box either clips at its edge or escapes over
+   the modal. In flow it pushes the form down, the browser scrolls the field into
+   view the way it does for any input, and the results end up above the phone
+   keyboard instead of behind it. */
+.combo-box{position:relative;display:block;width:100%;min-width:0}
+/* Room for the caret, and for the clear button beside it when there is one. */
+.combo-input{padding-right:44px!important;text-overflow:ellipsis}
+.combo-box.open .combo-input{border-color:#0d76d6;box-shadow:0 0 0 2px #0d76d622}
+.combo-caret{position:absolute;top:0;right:10px;height:38px;display:flex;align-items:center;font-size:10px;color:#6b7f9c;pointer-events:none}
+.combo-clear{position:absolute;top:0;right:26px;width:26px;height:38px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:#6b7f9c;font-size:15px;font-weight:900;line-height:1;padding:0;cursor:pointer}
+.combo-clear:hover,.combo-clear:focus-visible{color:#c02b2b}
+
+.combo-list{margin:4px 0 0;padding:0;list-style:none;max-height:246px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid #b7c3d5;border-radius:6px;background:#fff;box-shadow:0 8px 22px #0a1f3d1f}
+.combo-option{display:flex;flex-direction:column;gap:1px;min-height:38px;justify-content:center;padding:6px 9px;border-bottom:1px solid #eef2f8;cursor:pointer}
+.combo-option:last-child{border-bottom:0}
+.combo-option>b{font-size:10px;font-weight:900;color:#193357;line-height:1.2}
+/* The second line is what tells "Rear door will not close" from "Rear door open
+   / close switch". It is small, but it is the whole reason the list is readable
+   at all, so it is never the thing that gets trimmed to save room. */
+.combo-option>small{font-size:8px;font-weight:700;color:#74819a;line-height:1.25}
+.combo-option.active{background:#eaf3ff}
+.combo-option.active>b{color:#0b4f9e}
+/* An option from a category the mechanic did not choose. Marked rather than
+   hidden: picking it moves the category with it, and that should be visible
+   before the tap, not a surprise after it. */
+.combo-option.foreign{background:#fffaf0}
+.combo-option.foreign.active{background:#ffeeda}
+.combo-option.foreign>small::before{content:"↪ ";font-weight:900;color:#a2640a}
+.combo-empty{padding:11px 9px;font-size:9px;font-weight:700;color:#74819a}
+.combo-footnote{font-size:8px;font-weight:700;color:#74819a;line-height:1.3}
+
+/* Themed with the rest of the editor, so a re-themed Defect Log carries it. */
+.log-form .combo-list{border-color:color-mix(in srgb,var(--log-text,#193357) 26%,transparent);background:var(--log-surface,#fff)}
+.log-form .combo-option{border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 10%,transparent)}
+.log-form .combo-option>b{color:var(--log-text,#193357)}
+.log-form .combo-option>small,.log-form .combo-footnote,.log-form .combo-caret,.log-form .combo-clear{color:var(--log-muted,#74819a)}
+
+@media(max-width:760px){
+ /* 44px matches the phone rule the form already applies to its inputs — the
+    list rows have to be as reachable as the field that opened them. */
+ .combo-option{min-height:44px;padding:8px 10px}
+ .combo-option>b{font-size:11px}
+ .combo-option>small{font-size:9px}
+ .combo-caret,.combo-clear{height:44px}
+ .combo-clear{width:30px;right:28px}
+ .combo-input{padding-right:52px!important}
+ /* Taller than the desktop list because the phone keyboard is the thing being
+    worked around: enough rows to be worth scrolling, short enough that the
+    field that opened it stays on screen above it. */
+ .combo-list{max-height:min(300px,42vh)}
+}

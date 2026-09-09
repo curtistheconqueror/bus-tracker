@@ -14,6 +14,7 @@ import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
 import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -2762,7 +2763,14 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(trackerCss, /\.command-bar\{display:none!important\}/);
   assert.match(trackerCss, /\.phone-command-dock\{[^}]*grid-template-columns:repeat\(4/);
   assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
-  assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
+  /* QUICK SELECT (OPTIONAL) became DEFECT, and became a typing field. The label
+     changed because the field did: it is no longer an optional shortcut behind a
+     category, it is the way you name the defect — by typing it or by tapping it
+     open, whichever is faster with the bus in front of you. */
+  assert.match(defectPage, /<ComboField label="DEFECT"/);
+  assert.match(defectPage, /<ComboField label="CATEGORY"/);
+  assert.doesNotMatch(defectPage, /disabled=\{!value\.defect\.category\}/,
+    "the defect field must not be gated on a category - removing that gate is the point of the change");
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
   assert.match(defectCss, /\.save-log-middle,\.close-log-middle\{[^}]*min-height:50px/);
   assert.match(defectPage, /<details className="advanced-defect-details"/);
@@ -5237,7 +5245,10 @@ test("the Amerex panel is two systems, and the states that down a bus say so",as
  // shown where the choice was just made, not behind Advanced Details
  const notePage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.ok(notePage.indexOf("defect-note")<notePage.indexOf("advanced-defect-details"));
- assert.ok(notePage.indexOf('QUICK SELECT')<notePage.indexOf("defect-note"));
+ /* Anchored to a string that still exists: 'QUICK SELECT' was renamed and this
+    kept passing on indexOf(-1), which is a test that had stopped testing. */
+ assert.ok(notePage.includes('<ComboField label="DEFECT"'));
+ assert.ok(notePage.indexOf('<ComboField label="DEFECT"')<notePage.indexOf("defect-note"));
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
@@ -5924,7 +5935,10 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(focusBlock,/aria-label=\{"Add a defect to bus "\+focusedGroup\.bus\.n\}/);
  // wording the picker no longer offers still shows, instead of reading as blank
  assert.match(page,/const offCatalogIssue=value\.quickIssue&&!repairs\.includes\(value\.quickIssue\)\?value\.quickIssue:""/);
- assert.match(page,/\{offCatalogIssue&&<option value=\{offCatalogIssue\}>\{offCatalogIssue\} \(as logged\)<\/option>\}/);
+ /* Still reachable, now as the first ROW of the typing picker rather than the
+    first <option>: a record saved under wording the catalog has since retired
+    must survive a save untouched, whatever the picker is made of. */
+ assert.match(page,/offCatalogIssue&&!query\?\[\{value:offCatalogIssue,label:offCatalogIssue,hint:"as logged"\}/);
  // same green as + LOG DEFECT, and it does not squeeze out the close control
  assert.match(css,/\.add-log-focus-defect\{margin-left:auto;min-height:48px[^}]*background:#08733f/);
  assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
@@ -6437,9 +6451,22 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  assert.equal(page.match(/repairGroupDisplayLabel\(group\)/g).length,2);
  assert.equal(page.match(/repairIssueDisplayLabel\(issue,repairGroup\)/g).length,2);
  assert.equal(page.match(/repairIssueDisplayLabel\(issue\)/g).length,2);
- assert.match(logPage,/<optgroup label=\{repairGroupDisplayLabel\(group\)\}/);
- assert.match(logPage,/\{repairIssueDisplayLabel\(entry,group\)\}/);
- assert.match(logPage,/<option value=\{repair\} key=\{repair\}>\{repairIssueDisplayLabel\(repair\)\}/);
+ /* The Defect Log's picker no longer builds its own <optgroup>s — it draws rows
+    the search index built, so the mark now has to come through THERE or it
+    silently stops appearing. Assert it at the source rather than deleting the
+    check: this is exactly the kind of invariant that dies quietly in a rewrite. */
+ const searchIndex=await readFile(new URL("../app/defect-search.ts",import.meta.url),"utf8");
+ assert.match(searchIndex,/groupLabel=repairGroupDisplayLabel\(group\)/);
+ assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue,group\)/);
+ assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue\)/);
+ assert.match(logPage,/hint:row\.groupLabel\?row\.groupLabel\+" · "\+row\.categoryLabel:row\.categoryLabel/);
+ /* Same move as the group label above: the option's own wording is built in the
+    search index now, and the assertions on it sit with that file rather than
+    here. What the PAGE still has to prove is that it draws the index's label
+    instead of re-spelling the issue itself. */
+ assert.match(logPage,/label:row\.label/);
+ /* The flat-category branch went the same way — defect-search.ts builds those
+    rows too, and its labels are asserted above. */
 });
 
 test("release safety keeps interval units and learned parts attached to the right identity",async()=>{
@@ -11057,4 +11084,88 @@ test("the farebox knows the fault that stops it being probed", async () => {
   /* Other farebox defect stays last: it is the catch-all, and a catch-all that
      is not at the end reads as just another item. */
   assert.equal(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].at(-1),"Other farebox defect");
+});
+
+test("typing a defect finds it across every category, and near-identical wordings stay apart",()=>{
+ /* Curtis: "since there's so many defects that are similarly spelled, you know
+    this has to be a smart function." These are the cases that make a plain
+    substring match useless, so they are the cases the ranking is held to. */
+ const first=query=>searchCatalog(query)[0];
+ const labels=query=>searchCatalog(query).map(row=>row.label);
+
+ // THE POINT OF THE WHOLE CHANGE: found without naming the category first.
+ assert.equal(first("wiper motor").label,"Wiper motor (curbside)");
+ assert.equal(first("wiper motor").category,"Bus Accessories");
+
+ // WORD STARTS BEAT MID-WORD HITS. "mot" must not lead with "remote".
+ assert.ok(/motor/i.test(first("mot").label),"'mot' led with "+first("mot").label);
+
+ // EVERY TYPED WORD MUST APPEAR, so a second word narrows instead of widening.
+ assert.ok(searchCatalog("door").length>searchCatalog("rear door").length);
+ assert.ok(searchCatalog("rear door").length>searchCatalog("rear door close").length);
+ for(const row of searchCatalog("rear door close"))
+  for(const term of ["rear","door","close"])
+   assert.ok(row.haystack.includes(term),row.label+" is missing "+term);
+
+ // ORDER DOES NOT MATTER, because the group is searched with the issue.
+ assert.deepEqual(labels("door rear").slice(0,3),labels("rear door").slice(0,3));
+
+ // NEAR-IDENTICAL OPTIONS ARE ALL REACHABLE AND ALL DISTINGUISHABLE. The second
+ // line is the only thing telling some of these apart, so it must never be
+ // empty on an option whose issue text is shared with another.
+ const doors=searchCatalog("rear door").filter(row=>row.category==="Bus Accessories");
+ assert.ok(doors.length>=4,"expected the whole rear-door family, got "+doors.length);
+ for(const row of doors)assert.ok(row.groupLabel,row.label+" has no group line to be told apart by");
+
+ // PUNCTUATION IS A SEPARATOR: nobody types " / ".
+ assert.equal(first("washer reservoir leaking").label,"Washer reservoir / leaking");
+ assert.deepEqual(searchTerms("Washer reservoir / leaking"),["washer","reservoir","leaking"]);
+
+ // NO FUZZY MATCHING. A typo returns nothing rather than a confident wrong
+ // answer, because a wrong answer here is a repair filed against the wrong part.
+ assert.equal(searchCatalog("wpier motor").length,0);
+ assert.equal(searchCatalog("zzzz").length,0);
+
+ // AN EMPTY QUERY IS "SHOW ME EVERYTHING" - that is what a tap does.
+ assert.ok(searchCatalog("").length>0);
+ assert.equal(searchCategories("").length,CATEGORY_COUNT());
+ function CATEGORY_COUNT(){return Object.keys(REPAIR_OPTIONS).length}
+
+ // THE SAME QUERY ALWAYS RETURNS THE SAME LIST. A picker that reshuffles between
+ // keystrokes is a picker nobody trusts.
+ assert.deepEqual(labels("brake"),labels("brake"));
+
+ // EVERY ROW CARRIES A STORABLE IDENTITY, unchanged from what the old <select>
+ // wrote: "Group - Item" in a grouped category, the bare issue in a flat one.
+ for(const row of CATALOG_OPTIONS){
+  const flat=REPAIR_OPTIONS[row.category];
+  assert.ok(flat.includes(row.value),row.category+" / "+row.value+" is not a storable option");
+  assert.equal(row.value.includes("♿"),false,row.value+" must not store the chair mark");
+ }
+});
+
+test("choosing a category narrows the defect search without walling it off",()=>{
+ /* A bus is not a filing cabinet. Somebody who picked Brakes and then typed
+    "wiper motor" wants the wiper motor — not an empty list telling him he is in
+    the wrong drawer. Those matches follow the in-category ones and are marked,
+    so the category moving with the pick is visible before the tap. */
+ const scoped=searchCatalogForCategory("wiper motor","Brakes");
+ assert.equal(scoped.inCategory.length,0);
+ assert.ok(scoped.elsewhere.length>0,"the rest of the catalog must still be reachable");
+ assert.equal(scoped.elsewhere[0].category,"Bus Accessories");
+
+ // In-category matches lead when there are any.
+ const doors=searchCatalogForCategory("rear door","Bus Accessories");
+ assert.ok(doors.inCategory.length>0);
+ for(const row of doors.inCategory)assert.equal(row.category,"Bus Accessories");
+ for(const row of doors.elsewhere)assert.notEqual(row.category,"Bus Accessories");
+
+ // AN UNTOUCHED FIELD UNDER A CHOSEN CATEGORY SHOWS THAT CATEGORY, not the whole
+ // catalog underneath it - opening on 300 foreign rows would bury the choice.
+ const idle=searchCatalogForCategory("","Brakes");
+ assert.equal(idle.elsewhere.length,0);
+ for(const row of idle.inCategory)assert.equal(row.category,"Brakes");
+
+ // With no category chosen there is nothing to be foreign to.
+ assert.equal(searchCatalogForCategory("wiper","").elsewhere.length,0);
 });
