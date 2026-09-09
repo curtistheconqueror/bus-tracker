@@ -1,24 +1,35 @@
 # Publish next
 
-**STATUS: 169 IS PENDING — publish from `bdca898`.** Release 168 is live from
-`64ec7d2` as Sites Version 164.
+**STATUS: 170 IS PENDING — publish from `bdca898`.** Release 169 is live from
+`939fe49` as Sites Version 165.
 
-**The SHA moved twice after this file first named one, and both times it was a
-real commit that would have been left behind.** `939fe49` was named while it was
-the head of the branch; the SCAN SHEET fixes (`287059f`) and the masthead link
-(`bdca898`) landed after it. Publish from `bdca898` — the last CODE commit. The
-docs-only commit that carries this correction sits on top of it and is not worth
-publishing. **If more work lands before Codex gets here, the SHA below is the
-thing to re-check first.**
+**Read the SHA above, not a SHA you remember.** The 169 handoff named `939fe49`
+while it was the head of the branch, two code commits landed after it, and 169
+went out without them — which is exactly why 170 exists and is exactly the
+mistake to not repeat. `bdca898` is the last CODE commit and holds every line of
+app code in 170. What sits above it is docs only — Codex's own 169 release
+record, this handoff, and the merge that brought them together — so none of it
+belongs in a build. **If more work lands before you get here, re-check this SHA
+first.**
 
-## ⏪ ROLLBACK IS EXPECTED, NOT AN EMERGENCY
+## ⏪ ROLLBACK IS STILL EXPECTED, NOT AN EMERGENCY
 
-Curtis asked for this one to be published so he can look at it, and asked that
-Codex **be ready to put 168 back if he does not like what he sees.** Treat a
-rollback request here as routine rather than as a failure.
+Curtis is looking at 169 now and asked that Codex **be ready to put the previous
+version back if he does not like what he sees.** That standing instruction
+carries forward to 170. Treat a rollback request here as routine rather than as
+a failure.
 
-**Roll back to:** repository release **168**, commit **`64ec7d2`**, live as
-**Sites Version 164**. Redeploy that build. There is nothing else to undo.
+**Roll back 170 to:** repository release **169**, commit **`939fe49`**, live as
+**Sites Version 165**. Redeploy that build. There is nothing else to undo — 170
+is two UI commits with no migration, no schema change, no dependency change, no
+storage key added or renamed, and nothing that writes or rewrites a record.
+
+**If Curtis instead wants to go back past 169 entirely** — the trial he asked
+for when Lite Mode went out — the target below is the one he meant, and the two
+notes under it still apply.
+
+**Roll back to (pre-Lite):** repository release **168**, commit **`64ec7d2`**,
+live as **Sites Version 164**. Redeploy that build.
 
 **Why a rollback is clean.** No migration, no schema change, no dependency
 change, no storage key renamed, and nothing in this release writes or rewrites a
@@ -41,7 +52,7 @@ Two things to know rather than discover:
 
 ## What 169 is
 
-Five commits, no migration.
+Three commits, no migration.
 
 - **Lite Mode.** A device that has never opened the app is asked once, on a
   screen showing the name and two choices, whether it wants FULL or LITE.
@@ -58,21 +69,47 @@ Five commits, no migration.
   banner under the search says what it is hiding and offers SHOW ALL.
 - **Lights and Fixtures → Lights, Mirrors and Alarms**, with the catch-all
   following the name. Read-time; nothing on disk moves.
+**The SCAN SHEET alignment fixes were listed here and did NOT ship in 169.**
+They landed after `939fe49`, which is the SHA 169 was published from. They are
+in 170 below, where they belong.
+
+## What 170 is
+
+Two commits, no migration, no new storage key. Both are layout; neither reads or
+writes a record.
+
 - **SCAN SHEET alignment.** CANCEL was half off the left edge of a phone — a
   bare `footer` rule in globals.css was positioning every modal's action bar
-  against the viewport. Fixed for every dialog, not just this one. The page
-  behind no longer scrolls instead of the modal, and three scroll locks that
-  were silently doing nothing now work.
-- **The name at the top of every page is a link home.** FLEETSTEP is now an
-  `<a href="/">` — a masthead, the way every site has one. It looks identical:
-  measured on all six pages at 390 and 1180, same corner, same size, no
-  underline, no header height changed. The link ends at the last letter rather
-  than running the width of the header, so reaching past the name does not
-  navigate. `/` is the Facility Map — there is no separate landing page yet.
+  against the viewport rather than inside its own dialog. Fixed for every
+  dialog, not just this one. The page behind no longer scrolls instead of the
+  modal, and three scroll locks that were silently doing nothing now work: the
+  helper only ever added the caller's own class, so a call naming a class with
+  no CSS rule behind it was a lock that locked nothing.
+- **The app name links home.** Curtis: "when I click on that title, it should
+  take me to the home page." FLEETSTEP at the top of every page is now an
+  `<a href="/">` — a masthead, the way every site has one. `/` is the Facility
+  Map; there is no separate landing page yet, and `HOME_HREF` in
+  `app/app-name.tsx` is the one line to change when there is.
+
+  It looks identical, measured rather than read on all six pages at 390 and
+  1180: same corner, same size, white, no underline, and every header the same
+  height it was. The link ends at the last letter instead of running the width
+  of the header, so reaching past the name does not navigate; the tap area is
+  34px tall on a phone, paid for with a negative margin so nothing moved.
+
+### What to check once 170 is live
+
+- On a phone, open SCAN SHEET from the Down Sheet: **CANCEL is fully on screen**,
+  and dragging the modal scrolls the modal rather than the page behind it.
+- Tap **FLEETSTEP** at the top of any page: it goes to the Facility Map. Tap the
+  empty space to the right of it: nothing happens.
+- Nothing else should look different. If a header's title or kicker has moved
+  even slightly, that is this release and worth saying.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **169** | **`bdca898`** | **Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it; SCAN SHEET's CANCEL back on screen with every modal's action bar fixed with it; and the app name at the top of every page now links home. Roll back to 168 / `64ec7d2` on request.** |
+| **NEXT** | **170** | **`bdca898`** | **SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
+| Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |
