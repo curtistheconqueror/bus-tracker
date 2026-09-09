@@ -963,13 +963,34 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    min-height cannot undo a fixed height. height:auto is what releases it, and
    it is not redundant next to the min-height: delete it and the map's header
    goes back to being 38px tall whatever is inside it. */
-.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:7px 10px}
+.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left}
 /* The map's header is a centring flex row, so the name landed BESIDE the h1
    and centred with it - measured at x198 on a 1280 screen against x18 on every
    other page, and text-align could not touch it because flex was centring the
    ITEMS, not the text. Stacking is what "the structure moves down to fit the
-   name" actually means here; the title keeps its centre on its own line. */
-.app>header>h1{text-align:center}
+   name" actually means here.
+
+   THE TITLE NO LONGER KEEPS ITS CENTRE. It did while this header held two
+   lines and no other page's shape; now it holds the same four as the rest —
+   name, kicker, title, subtitle — and a centred title in a left-aligned stack
+   is the one line that looks like a mistake. `text-align:left` on the header
+   is what overrides the phone block above, which sets `center` on this same
+   selector: same specificity, so the later rule wins at every width, and this
+   file is read in order for exactly that reason.
+
+   The h1 also takes an explicit size. It was `font-size:inherit` from the bare
+   `header` rule, which the phone block drops to 11px — so on a phone the map's
+   own title was rendering SMALLER than its kicker's siblings on every other
+   page. 22px is what the other five headers use at this width. */
+.app>header>h1{margin:2px 0 1px;font-size:25px;line-height:1.05;text-align:left}
+@media(max-width:760px){.app>header>h1{font-size:22px}}
+
+/* The kicker and the subtitle the other five headers already draw, in the two
+   sizes they already use (8px letterspaced label, 9px sentence). They are
+   mixed against `--header-text` rather than given a colour so a re-themed
+   header carries them, which is the same reason `.app-name` inherits. */
+.app-kicker{margin-top:9px;font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--header-text,#fff) 72%,transparent)}
+.app-subtitle{margin:4px 0 0;font-size:9px;font-weight:400;line-height:1.3;text-shadow:none;color:color-mix(in srgb,var(--header-text,#fff) 78%,transparent)}
 
 /* ── The first-run welcome ────────────────────────────────────────────────────
    Full-bleed and above everything, because it is the only screen in this app

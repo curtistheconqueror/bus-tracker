@@ -693,7 +693,13 @@ test("server-renders the live fleet command dashboard", async () => {
   const html = await response.text();
 
   assert.match(html, /<title>FLEETSTEP — Fleet Maintenance<\/title>/i);
-  assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
+  /* The map's header now carries the same four lines as the other five —
+     name, kicker, title, subtitle — instead of one long all-caps sentence
+     doing the work of all four. The h1 is the page's name, matching what the
+     nav calls it, and the sentence it replaced became the subtitle's job. */
+  assert.match(html, /<h1>Facility Map<\/h1>/);
+  assert.match(html, /class="app-kicker">FLEET MAINTENANCE</);
+  assert.match(html, /class="app-subtitle">Facility-wide overview/);
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
@@ -2840,7 +2846,20 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
   assert.match(navPages,/\{href:"\/fixed-repairs",label:"FIXED REPAIRS"\}/);
   for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/<TrackerNav[^>]*\/>/);
-  assert.ok(trackerPage.indexOf("mobile-mode-nav")<trackerPage.indexOf("FLEET MAINTENANCE BUS TRACKING SYSTEM"),"phone route navigation must render before the Facility Map header");
+  /* THE ORDER FLIPPED, deliberately. This asserted the nav rendered BEFORE the
+     Facility Map's header, which is how the map became the one page whose nav
+     sat above its own name — FLEETSTEP was the fifth thing down the screen on
+     the page the app opens on. Curtis, looking at a phone: "the facility map
+     needs to get on board with title design. Fleetstep should be at top."
+     Every other header is name, kicker, title, subtitle, then nav, and the map
+     is now the same. It stays a SIBLING of the header rather than moving
+     inside it because it is `position:sticky` here and only here. */
+  /* Anchored to the MARKUP, not to the bare class name: a comment in page.tsx
+     mentions `.mobile-mode-nav` while explaining this very ordering, and a
+     bare indexOf found the comment and failed on it. Same trap as matching a
+     button by a word its own explanation also uses. */
+  assert.ok(trackerPage.indexOf("<AppName/>")<trackerPage.indexOf('<TrackerNav className="mobile-mode-nav"'),"the Facility Map's name must render before its phone nav, as on every other page");
+  assert.match(trackerPage,/<\/header>\s*<TrackerNav className="mobile-mode-nav"/,"the nav follows the header rather than preceding it");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
@@ -10949,7 +10968,18 @@ test("the app's name is drawn top-left on every page, from one place", async () 
 
      Delete either and the map breaks in a way no test but this one would say. */
   assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch/);
-  assert.match(css,/\.app>header>h1\{text-align:center\}/,"the title keeps its centre on its own line");
+  /* The title no longer keeps its centre: this header now holds the same
+     left-aligned stack as the other five, and a centred title inside it is the
+     one line that reads as a mistake. `text-align:left` on `.app>header` is
+     what beats the phone block's `center` on the same selector — same
+     specificity, later rule, which only works while this file stays in order. */
+  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left\}/);
+  assert.match(css,/\.app>header>h1\{margin:2px 0 1px;font-size:25px;line-height:1\.05;text-align:left\}/,
+    "an explicit size, because the phone block drops the header to 11px and the h1 inherited it");
+  assert.match(css,/@media\(max-width:760px\)\{\.app>header>h1\{font-size:22px\}\}/,
+    "25px desktop, 22px phone - the two sizes the other five headers already use");
+  assert.match(css,/\.app-kicker\{/,"the kicker the other five headers draw");
+  assert.match(css,/\.app-subtitle\{/,"and the subtitle under it");
 
   /* Measured across all six pages at 360, 390, 820 and 1280: the name renders,
      sits 12-18px from the left on every one, and nothing overflows its header
