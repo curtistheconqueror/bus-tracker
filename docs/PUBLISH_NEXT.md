@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `64a8b65`.**
+**STATUS: 171 IS PENDING — publish from `3b8e476`.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -23,10 +23,10 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `64a8b65` contains every line of 170 — so publishing 171 fixes
+forward anyway — `3b8e476` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `64a8b65`, all six surfaces at 390px and 1180px: the
+Verified in Chromium on `3b8e476`, all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
 
@@ -34,7 +34,7 @@ covers it), and the home screen opens full-screen and visible.
 
 Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `64a8b65` is the last CODE
+**Read the SHA above, not a SHA you remember.** `3b8e476` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -44,7 +44,7 @@ this SHA first.**
 
 ## What 171 is
 
-**Fifteen commits.** No migration, no schema change, no dependency change,
+**Sixteen commits.** No migration, no schema change, no dependency change,
 and nothing that rewrites a record. **Two new storage keys, both per-device and
 neither renaming anything** (`pace-down-sheet-recommended-collapsed-v1`,
 `pace-role-v1`), eighteen new catalog options, one new optional field on a
