@@ -12547,3 +12547,23 @@ test("the HOLD badge is a button that opens every held bus, and never shows the 
  assert.equal(slot.includes("HoldBadge"),false,"the fixed tab stops are left alone");
 });
 
+test("the line under FLEETSTEP scales with the screen",async()=>{
+ /* Curtis: make it "a little bigger, just a bit". Clamped rather than a fixed
+    size so it grows with the viewport the way .welcome-name above it does —
+    9px was the same on a 360px phone and a 1180px shop computer.
+
+    Measured with a Range over the text node, one rect per LINE BOX, because
+    the paragraph's own box is the container width and says nothing about the
+    text in it: 254px at 320 wide, 288px at its largest, one line everywhere
+    with 66px to spare at the narrowest. A first attempt eased the tracking to
+    buy width it turned out not to need, on exactly that confusion. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.welcome-kicker\{margin:11px 0 0;color:#9dc0ee;font-size:clamp\(10px,2\.9vw,12px\);font-weight:900;letter-spacing:2\.4px/);
+ /* The tracking is what it always was. */
+ assert.equal(/\.welcome-kicker\{[^}]*letter-spacing:2px/.test(css),false);
+ /* And it still grows from the same floor the name does rather than shrinking
+    below what it replaced. */
+ const floor=Number(css.match(/\.welcome-kicker\{[^}]*font-size:clamp\((\d+)px/)[1]);
+ assert.ok(floor>9,"bigger than the 9px it replaced, at every width");
+});
+

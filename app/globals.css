@@ -1061,7 +1061,19 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    control on the screen a thumb has to find. */
 .welcome-close{position:fixed;top:max(10px,env(safe-area-inset-top));right:10px;z-index:2;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff3d;border-radius:9px;background:#ffffff14;color:#dbe9fb;font-size:22px;font-weight:900;line-height:1;padding:0;cursor:pointer}
 .welcome-close:hover,.welcome-close:focus-visible{background:#ffffff2b;color:#fff;outline:none}
-.welcome-kicker{margin:11px 0 0;color:#9dc0ee;font-size:9px;font-weight:900;letter-spacing:2.4px;opacity:0}
+/* Curtis: make the line under FLEETSTEP "a little bigger, just a bit". 9px to
+   10-12px, clamped so it grows with the viewport the way .welcome-name above
+   it already does rather than being one fixed size on a phone and a shop
+   computer.
+
+   THE TRACKING IS UNTOUCHED, and that is a correction. The first attempt eased
+   it from 2.4px to 2px to buy width, on a measurement that said the text was
+   320px inside a 360px phone — but 320px was the PARAGRAPH's box, which is
+   just the container, and said nothing about the text in it. Measured properly
+   with a Range over the text node, one line box per rect: the text is 240px at
+   320px wide and 274px at its largest, one line at every width down to 320
+   with 80px to spare. There was nothing to buy, so nothing is paid for. */
+.welcome-kicker{margin:11px 0 0;color:#9dc0ee;font-size:clamp(10px,2.9vw,12px);font-weight:900;letter-spacing:2.4px;opacity:0}
 .welcome-gate.shown .welcome-kicker{animation:welcome-rise .6s ease-out .7s both}
 .welcome-choices{display:grid;gap:11px;margin:30px 0 0;opacity:0}
 .welcome-gate.shown .welcome-choices{animation:welcome-rise .6s ease-out 1.15s both}
