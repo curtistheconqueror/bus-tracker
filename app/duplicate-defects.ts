@@ -31,7 +31,7 @@
       thing, because being wrong there destroys a real defect and nobody would
       ever know which one. */
 
-import {defectLabel,isUnresolved,normalizeDefects,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
+import {defectLabel,isUnresolved,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "./down-sheet/down-sheet-sync.ts";
 /* The identity rule lives on its own so the Down Sheet can ask the same
    question before it writes without these two files importing each other. */
@@ -92,6 +92,11 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     fingerprint, so two records that match on category, issue and details can
     still differ here, and dropping one would lose a reported symptom. */
  const symptoms=[...new Set(ordered.flatMap(defect=>defect.symptoms||[]).map(text).filter(Boolean))];
+ /* Same reasoning for the fluids: two records that merge into one top-up must
+    keep every fluid either of them said went in. normalizeFluids puts them back
+    into catalog order and throws out anything that is not one, so a merge
+    cannot assemble a list the form could not have produced. */
+ const fluids=normalizeFluids(ordered.flatMap(defect=>defect.fluids||[]),survivor.category,survivor.issue);
  return {
   ...survivor,
   createdAt,
@@ -100,6 +105,7 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
   operability:group.some(defect=>defect.operability==="down")?"down":survivor.operability,
   state,
   ...(symptoms.length?{symptoms}:{}),
+  ...(fluids?{fluids}:{}),
   diagnosticNote:firstText(defect=>defect.diagnosticNote),
   actionTaken:firstText(defect=>defect.actionTaken),
   shopNotes:firstText(defect=>defect.shopNotes),

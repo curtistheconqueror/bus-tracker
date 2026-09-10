@@ -160,6 +160,17 @@ export type StructuredDefect={
     past whichever of those happens first. */
  deferredReturnedAt?:string;
  symptoms?:string[];
+ /* THE OTHER FLUIDS TOPPED UP ON THE SAME VISIT, and never the one the record
+    is already filed under. Curtis, asked whether three fluids should be three
+    records or one: "The one record listing several probably best and is less
+    clutter."
+
+    So a bus that took oil, glycol and transmission fluid on one visit is one
+    repair with two names in here, not three repairs to read past on the card.
+    The quantity stays with the ISSUE — the shop counts the quarts of oil it
+    uses and does not count the glycol — and this says what else went in, which
+    is the part that predicts a road call. */
+ fluids?:string[];
  quantity?:number;
  unit?:string;
  source?:DefectSource;
@@ -390,6 +401,41 @@ const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
 export const FLUID_TOP_UPS=["Add engine oil","Add coolant (glycol)","Add transmission fluid"];
 export function isFluidTopUp(category:unknown,issue:unknown){
  return String(category??"")==="Preventive Maintenance"&&FLUID_TOP_UPS.includes(String(issue??""));
+}
+/* Only the catalog's own three, never the one already named as the issue, and
+   only on a top-up: a fluid list left on a record that was retyped into a brake
+   job is a leftover, not a record of anything. Held in FLUID_TOP_UPS order
+   rather than tick order so the same visit always reads back the same way.
+
+   Absent rather than empty when there is nothing to say, which is how the rest
+   of this file spells "not ticked". */
+export function normalizeFluids(value:unknown,category:unknown,issue:unknown){
+ if(!Array.isArray(value))return undefined;
+ const picked=String(issue??"").trim();
+ if(!isFluidTopUp(category,picked))return undefined;
+ const ticked=new Set(value.map(item=>String(item).trim()));
+ const fluids=FLUID_TOP_UPS.filter(fluid=>fluid!==picked&&ticked.has(fluid));
+ return fluids.length?fluids:undefined;
+}
+/* "Add engine oil" is the catalog's wording for an instruction. This line is a
+   report of what was done, so the verb is said once and the fluids follow it —
+   otherwise a card reads "Add coolant - also Add transmission fluid". */
+/* NO KEY AT ALL WHEN THERE IS NOTHING TO SAY, which is not fussiness. The cloud
+   fingerprints each row by walking Object.keys, and a key holding undefined is
+   still a key there — so writing `fluids:undefined` onto every record would
+   change the fingerprint of EVERY defect in the shop and re-push the whole
+   table once over the garage's own data plan, to say nothing. A record that
+   already carries the key keeps it, cleared, so a value that stops being valid
+   is actually taken back off rather than left standing. */
+function fluidsPatch(defect:Partial<StructuredDefect>,category:string,issue:string){
+ const fluids=normalizeFluids(defect.fluids,category,issue);
+ if(fluids)return {fluids};
+ return defect.fluids===undefined?{}:{fluids:undefined};
+}
+export function fluidsLabel(defect:{fluids?:string[];category?:string;issue?:string}){
+ const fluids=normalizeFluids(defect.fluids,defect.category,defect.issue);
+ if(!fluids)return "";
+ return "also added "+fluids.map(fluid=>fluid.replace(/^Add /,"")).join(" and ");
 }
 
 export function defectCountField(category:unknown,issue:unknown){
@@ -953,7 +999,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
@@ -998,7 +1044,9 @@ export function defectSupportingDetails(defect:StructuredDefect){
  /* The lamp and its alarm number lead, ahead of the free text. On a Down Sheet
     "RED DIAG LIGHT alarm 32" is the line that decides what the bus needs, and
     it is no use to anybody sitting in a notes field nobody scrolls to. */
- return [diagLightLabel(defect),symptoms,defect.details.trim()].filter(Boolean).join(" — ");
+ /* Between the symptoms and the free text: it is a fact about the repair, like
+    the symptoms are, rather than something somebody typed about it. */
+ return [diagLightLabel(defect),symptoms,fluidsLabel(defect),defect.details.trim()].filter(Boolean).join(" — ");
 }
 export function defectLabel(defect:StructuredDefect){
  if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();

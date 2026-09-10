@@ -13,7 +13,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
@@ -11309,4 +11309,102 @@ test("the welcome screen names the app, not one garage",async()=>{
  /* Only inside the comment explaining the change, never in what renders. */
  const rendered=gate.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
  assert.equal(/PACE SOUTH/i.test(rendered),false,"the shop's name must not render on the welcome screen");
+});
+
+test("one visit that took several fluids is one record",async()=>{
+ /* Curtis asked for coolant and transmission fluid beside the oil top-up —
+    "a lot of these buses we have to constantly add glycol to it" — and then
+    settled how they should be stored: "The one record listing several probably
+    best and is less clutter."
+
+    So the DEFECT field names the fluid the record is filed under, and the rest
+    of what went in that stop rides on that same record. Three separate repairs
+    for one stop at the fluid cart is the thing this must not become. */
+ assert.deepEqual(FLUID_TOP_UPS,["Add engine oil","Add coolant (glycol)","Add transmission fluid"]);
+ for(const fluid of FLUID_TOP_UPS){
+  assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes(fluid),fluid+" must be in the catalog");
+  assert.equal(isFluidTopUp("Preventive Maintenance",fluid),true);
+ }
+ /* And nothing else in that category is one, so the quantity box does not
+    start appearing on a lube or an inspection. */
+ assert.equal(isFluidTopUp("Preventive Maintenance","Lubrication"),false);
+ assert.equal(isFluidTopUp("Brakes","Add engine oil"),false);
+
+ /* THE PICKED FLUID IS NEVER ALSO ONE OF THE EXTRAS. It is already the issue,
+    and listing it twice reads as "Add coolant - also added coolant". */
+ assert.deepEqual(normalizeFluids(["Add coolant (glycol)","Add engine oil"],"Preventive Maintenance","Add engine oil"),
+  ["Add coolant (glycol)"]);
+ /* Catalog order, not tick order, so the same visit reads back the same way
+    however the mechanic happened to tick it. */
+ assert.deepEqual(normalizeFluids(["Add transmission fluid","Add coolant (glycol)"],"Preventive Maintenance","Add engine oil"),
+  ["Add coolant (glycol)","Add transmission fluid"]);
+ /* Nothing outside the catalog's own three can arrive through a hand-edited
+    backup or an older record and invent a fluid the shop does not stock. */
+ assert.equal(normalizeFluids(["Add hydraulic fluid"],"Preventive Maintenance","Add engine oil"),undefined);
+ /* Absent, not empty, when there is nothing to say - and never on a repair
+    that is not a top-up at all, so a record retyped into a brake job cannot
+    keep a leftover list. */
+ assert.equal(normalizeFluids([],"Preventive Maintenance","Add engine oil"),undefined);
+ assert.equal(normalizeFluids(["Add coolant (glycol)"],"Brakes","Brake job"),undefined);
+
+ /* WHAT THE CARD SAYS. The catalog spells these as instructions ("Add engine
+    oil"); a card is a report of what was done, so the verb is said once. */
+ assert.equal(fluidsLabel({fluids:["Add coolant (glycol)","Add transmission fluid"],category:"Preventive Maintenance",issue:"Add engine oil"}),
+  "also added coolant (glycol) and transmission fluid");
+
+ /* A RECORD WITH NO FLUIDS MUST COME BACK WITH NO FLUIDS KEY AT ALL.
+
+    The cloud fingerprints each row by walking Object.keys, and a key holding
+    undefined is still a key there - so a normalizer that wrote fluids:undefined
+    onto every defect would change the fingerprint of every record the shop
+    holds and re-push the whole defect table once, over the garage's own data
+    plan, to say nothing. This is the guard on that. */
+ const [plain]=normalizeDefects([{id:"plain",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service"}]);
+ assert.equal(Object.keys(plain).includes("fluids"),false,
+  "a defect that never had fluids must not gain the key");
+ /* But a record that DOES carry one, and carries a value that is no longer
+    valid, has it taken back off rather than left standing. */
+ const [retyped]=normalizeDefects([{id:"retyped",category:"Brakes",issue:"Brake job",fluids:["Add coolant (glycol)"],details:"",state:"open",operability:"service"}]);
+ assert.equal(retyped.fluids,undefined,"a fluid list on a repair that is not a top-up is cleared");
+
+ /* END TO END: saved, normalized, read back. The quantity stays with the
+    ISSUE - Curtis: "typically here we only keep up with the [quarts] of oil we
+    use, not necessarily the coolant" - and the extra fluid follows it, which is
+    the half that predicts a road call. */
+ const [record]=normalizeDefects([{id:"fluids-1",category:"Preventive Maintenance",issue:"Add engine oil",
+  fluids:["Add transmission fluid","Add coolant (glycol)"],quantity:2,unit:"quarts",details:"",state:"open",operability:"service"}]);
+ assert.deepEqual(record.fluids,["Add coolant (glycol)","Add transmission fluid"]);
+ assert.equal(defectLabel(record),
+  "Preventive Maintenance — Add engine oil — 2 quarts — also added coolant (glycol) and transmission fluid");
+ /* The quarts sit against the oil and the extras follow, so nothing reads as
+    two quarts of glycol. */
+ assert.ok(defectLabel(record).indexOf("2 quarts")<defectLabel(record).indexOf("also added"));
+ assert.match(defectSupportingDetails(record),/also added coolant/);
+
+ const [form,filters]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/quick-filters.ts",import.meta.url),"utf8"),
+ ]);
+ /* THE QUANTITY BOX BELONGS TO ALL THREE. It was gated on the one string
+    "Add engine oil" while the catalog had already been told all three carry an
+    amount, so glycol and transmission fluid set a unit that nothing could ever
+    put a number in. One test, the catalog's own, for both. */
+ assert.equal(/quickIssue==="Add engine oil"/.test(form),false,
+  "the quantity box must not be gated on the one fluid");
+ assert.match(form,/const fluidMode=isFluidTopUp\(value\.defect\.category,value\.quickIssue\)/);
+ assert.match(form,/\{fluidMode&&<><label>[\s\S]{0,400}QUANTITY/);
+ /* Named only when there is a second fluid to confuse it with, and named with a
+    dash: the catalog's own wording is "Add coolant (glycol)", so a parenthesis
+    here renders "QUANTITY (COOLANT (GLYCOL))". */
+ assert.match(form,/extraFluids\.length\?"QUANTITY — "\+pickedFluid\.toUpperCase\(\):"QUANTITY"/);
+ /* And the picker itself offers the other two, never the one already chosen. */
+ assert.match(form,/otherFluids=FLUID_TOP_UPS\.filter\(fluid=>fluid!==value\.quickIssue\)/);
+ assert.match(form,/\{fluidMode&&<fieldset className="wide engine-symptom-picker fluid-picker"/);
+ /* Switching between the three top-ups is run through the same rule the record
+    is stored under, so the form cannot hold a state the storage would reject. */
+ assert.match(form,/fluids:normalizeFluids\(current\.defect\.fluids,category,issue\)/);
+ assert.match(form,/issue:"",symptoms:\[\],fluids:undefined/,"changing category clears the fluids with everything else");
+ /* Findable by what went in, on both the log's own search and the shared
+    filter, the same way symptoms already are. */
+ for(const source of [form,filters])assert.match(source,/\.\.\.\(\w+\.defect\.fluids\|\|\[\]\)|\.\.\.\(defect\.fluids\|\|\[\]\)/);
 });

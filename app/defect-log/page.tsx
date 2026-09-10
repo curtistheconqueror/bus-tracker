@@ -5,7 +5,7 @@ import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,r
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "./defect-log-sync";
 import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
@@ -183,7 +183,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     (symptoms, quantity, unit, operability, the part fields) is reset for the
     same reasons it always was. */
  const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
-  defect:{...current.defect,category,issue:"",symptoms:[],quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
+  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
 
  const chooseIssue=(issue:string,switchTo:string)=>{
   const category=switchTo||value.defect.category;
@@ -192,6 +192,12 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
    defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
     symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
+    /* Switching between the three top-ups keeps what is still true: pick oil
+       with glycol ticked, change your mind and pick glycol, and the tick that
+       is now the issue itself drops out rather than being listed twice.
+       normalizeFluids is the same rule the record is read back through, so the
+       form cannot hold a state the storage would reject. */
+    fluids:normalizeFluids(current.defect.fluids,category,issue),
     quantity:undefined,unit:picked?picked.unit:oilIssue?"quarts":undefined,
     operability:defaultDefectOperability(category,issue)}}));
  };
@@ -310,6 +316,15 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     from the catalog rather than from a category test written into this form.
     Fans were hard-coded here; air bags would have been a second copy of it. */
  const countField=defectCountField(value.defect.category,value.quickIssue);
+ /* The same test the stored record is normalized through, so what this form
+    offers and what the catalog counts as a top-up cannot drift apart. */
+ const fluidMode=isFluidTopUp(value.defect.category,value.quickIssue);
+ const extraFluids=value.defect.fluids||[],otherFluids=FLUID_TOP_UPS.filter(fluid=>fluid!==value.quickIssue);
+ /* "Add coolant (glycol)" is an instruction; on a label under it, the fluid is
+    what is being named. Said once here rather than at each of the three places
+    below that need it. */
+ const pickedFluid=String(value.quickIssue||"").replace(/^Add /,"");
+ const toggleFluid=(fluid:string)=>updateDefect("fluids",extraFluids.includes(fluid)?extraFluids.filter(item=>item!==fluid):[...extraFluids,fluid]);
  const toggleCheckEngineSymptom=(symptom:string)=>updateDefect("symptoms",selectedSymptoms.includes(symptom)?selectedSymptoms.filter(item=>item!==symptom):[...selectedSymptoms,symptom]);
  const selectedBus=fleet.find(bus=>bus.id===value.busId),saveLabel=draft.defect.createdAt===draft.defect.updatedAt?"SAVE DEFECT":"SAVE UPDATE";
  const recentDuplicate=selectedBus&&value.quickIssue?recentDefectDuplicate(selectedBus,value.defect):null;
@@ -420,7 +435,27 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      :typedAlarmDigits.length===2?"Saved with the defect and shown on the Down Sheet."
      :"Add the two-digit alarm number from the panel if it is showing one."
     }</small></fieldset>}
-    {value.defect.category==="Preventive Maintenance"&&value.quickIssue==="Add engine oil"&&<><label>QUANTITY<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
+    {/* ONE VISIT, ONE RECORD. A bus that took oil, glycol and transmission
+        fluid on the same stop used to be three separate repairs to scroll
+        past. Curtis: "The one record listing several probably best and is less
+        clutter." So the DEFECT field names the fluid the record is filed
+        under and these name the rest — the picked one is never offered here,
+        because it is already the issue.
+
+        Mirrors CHECK ENGINE SYMPTOMS rather than being a new kind of control:
+        it is the same shape of question (which of these also applied) in the
+        same form, and a second style for it would only make the form busier. */}
+    {fluidMode&&<fieldset className="wide engine-symptom-picker fluid-picker"><legend>ALSO TOPPED UP ON THIS VISIT — OPTIONAL</legend><div>{otherFluids.map(fluid=><label className={extraFluids.includes(fluid)?"selected":""} key={fluid}><input type="checkbox" checked={extraFluids.includes(fluid)} onChange={()=>toggleFluid(fluid)}/><span>{fluid.replace(/^Add /,"").replace(/^./,letter=>letter.toUpperCase())}</span></label>)}</div><small>{extraFluids.length?(extraFluids.length+1)+" fluids on one record. The quantity below counts the "+pickedFluid+" only.":"Tick anything else that went in on this stop. It stays on this one record."}</small></fieldset>}
+    {/* The box appeared for engine oil alone until now, while the catalog had
+        already been told all three carry an amount — so glycol and
+        transmission fluid set a unit that nothing could ever put a number in.
+        One test, the catalog's own, for both. */}
+    {fluidMode&&<><label>{
+     /* Named only when there is something to confuse it with. With two fluids
+        on the record, a bare QUANTITY does not say which one the quarts are —
+        and the shop counts oil, not glycol. */
+     extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
+    }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
     <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
     {/* Directly above WORK STATUS, and outside ADVANCED DETAILS on purpose:
@@ -650,7 +685,7 @@ export default function DefectLog(){
  const matchesSearch=(record:DefectLogRecord)=>{
   if(busSearch.kind==="numbers")return busSearchIds.has(record.bus.id);
   const query=search.trim().toLowerCase();if(!query)return true;
-  return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].filter(Boolean).join(" ").toLowerCase().includes(query);
+  return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),...(record.defect.fluids||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].filter(Boolean).join(" ").toLowerCase().includes(query);
  };
  const unsearched=records.filter(matchesStateFilter);
  const visible=unsearched.filter(matchesSearch);
