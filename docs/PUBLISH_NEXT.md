@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `649cef5`.**
+**STATUS: 171 IS PENDING — publish from `62d96d6`.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -23,10 +23,10 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `649cef5` contains every line of 170 — so publishing 171 fixes
+forward anyway — `62d96d6` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `3102444` (still true of `649cef5`, which only adds to
+Verified in Chromium on `3102444` (still true of `62d96d6`, which only adds to
 it), all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
@@ -35,7 +35,7 @@ covers it), and the home screen opens full-screen and visible.
 
 Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `649cef5` is the last CODE
+**Read the SHA above, not a SHA you remember.** `62d96d6` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -292,6 +292,17 @@ thing in it that goes stale silently.
   detected device: an iPad in split screen is phone-width and wants it, and a
   stored "this is an iPad" would be wrong the moment it was rotated.
 
+- **The dark themes are readable again.** Every rule that draws Defect Log text
+  already had a theme-aware fallback behind it and not one had ever fired: the
+  page defined all seven colour variables from the settings blob whether or not
+  anybody had chosen them, and the shipped values are light-theme hex. Dark,
+  Midnight and Tactical were painting light text colours onto dark surfaces —
+  the repair text measured **1.07:1 on Dark**, which is the background.
+
+  A colour still on its shipped value now defers to the theme. **The light
+  theme is byte-identical**; a colour somebody actually picked still wins on
+  every theme, and Settings tags the ones that are following.
+
 ## What to check once 171 is live
 
 - **Move a bus into Trouble Bay 12 from the Defect Log** (tap the location line
@@ -313,6 +324,11 @@ thing in it that goes stale silently.
 - Log a defect under **Bus Accessories** and scroll the option list to the
   bottom: ten **Wipers and Washers** options — blade and motor per side, and the
   washer set.
+- **Switch the Defect Log to the Dark, Midnight and Tactical themes.** The
+  repair text, the category headings and LIVE REPAIR FEED should all be plainly
+  readable. Before this release they were near-invisible on all three.
+- **The Light theme must look EXACTLY as it did** — that is the half of this
+  change most likely to have gone wrong.
 - **The Defect Log should look EXACTLY as it did.** All three new view options
   default to off. If anything about the feed has changed on a device that has
   not been into Settings, that is a bug in this release.
