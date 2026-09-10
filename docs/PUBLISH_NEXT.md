@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `a8bb5a9`.**
+**STATUS: 171 IS PENDING — publish from `649cef5`.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -23,10 +23,10 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `a8bb5a9` contains every line of 170 — so publishing 171 fixes
+forward anyway — `649cef5` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `3102444` (still true of `a8bb5a9`, which only adds to
+Verified in Chromium on `3102444` (still true of `649cef5`, which only adds to
 it), all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
@@ -35,7 +35,7 @@ covers it), and the home screen opens full-screen and visible.
 
 Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `a8bb5a9` is the last CODE
+**Read the SHA above, not a SHA you remember.** `649cef5` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
