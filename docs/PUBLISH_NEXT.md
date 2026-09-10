@@ -1,9 +1,17 @@
 # Publish next
 
-**STATUS: 172 IS PENDING — publish from `PUBLISH_SHA`.**
+**STATUS: 172 IS PENDING — publish from `ae42731`.**
 
-Release 171 is live from `649cef5` as Sites Version 171. 172 is one commit on
-top of it.
+Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
+on top of it, plus the merge that brought 171's own record into the branch —
+`ae42731` is the head to build, not `62d96d6`, because the merge carries the
+resolved test file.
+
+**Read the SHA above, not one you remember.** Recompute rather than trust it:
+
+```
+git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
+```
 
 ## What 172 is
 
