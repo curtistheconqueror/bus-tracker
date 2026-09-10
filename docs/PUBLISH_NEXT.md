@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `5d7cbdb`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `fed4f80`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `5d7cbdb` is the last CODE
+**Read the SHA above, not a SHA you remember.** `fed4f80` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,7 +13,7 @@ this SHA first.**
 
 ## What 171 is
 
-**Thirteen commits.** No migration, no schema change, no dependency change,
+**Fourteen commits.** No migration, no schema change, no dependency change,
 and nothing that rewrites a record. **Two new storage keys, both per-device and
 neither renaming anything** (`pace-down-sheet-recommended-collapsed-v1`,
 `pace-role-v1`), eighteen new catalog options, one new optional field on a
@@ -146,6 +146,38 @@ as typing fields, and one bug fixed that was live in 170.
   the key. It is per-device and never synced, and a first run still cannot get
   past the gate without answering FULL or LITE.
 
+- **A bus that keeps coming back is now counted.** Curtis: "if a person tries
+  to re-submit something in defects, I want a tally of how many times with the
+  date stamped... this way I know how many round trips a bus is making without
+  the repair." It was not done — the app already refused the repeat and counted
+  nothing.
+
+  The ALREADY LOGGED banner offers **+ COUNT THIS RETURN** beside OPEN IT.
+  Deliberate rather than automatic: counting when the banner merely appears
+  would count a foreman scrolling the picker. A second press inside two minutes
+  is treated as a thumb and refused.
+
+  **ADVANCED STATS** is a new section at the bottom of the **FOCUS view only**,
+  under however many defects the bus is carrying — "the list can drop further
+  down and just scroll to read." It holds the round-trip total for the bus, the
+  breakdown per repair, and every return with its date and initials. It is a
+  section rather than one number because more is going in it.
+
+  `reportAttempts` is another optional field on a defect, absent when empty, so
+  no row fingerprint moves. Nothing ever removes a return — saves and duplicate
+  merges both take the union.
+
+- **The two Superintendent roles are abbreviated**: *Asst Supt* and *Supt*, in
+  both departments. Curtis: "we have asst supt, so that is why I want it
+  shortened, so the label can show both like Asst Supt & Supt simultaneously."
+
+  He has also said the roles **will** decide access, on a person's own login,
+  with a questionnaire that does not exist yet. Still cosmetic in this release,
+  and `roles.ts` and `CLAUDE.md` now record both the intent and why it does not
+  start in this key: it is an unauthenticated string a phone's holder can change
+  from the screen that set it, so it can be the label a login confirms and never
+  the thing that decides.
+
 ### What to check once 171 is live
 
 - On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
@@ -178,7 +210,13 @@ as typing fields, and one bug fixed that was live in 170.
   long it has been waiting and offer MARK FIXED and REMOVE. REMOVE takes it off
   the list and leaves the repair open on the Defect Log.
 - **Touch FLEETSTEP, open MY ROLE, pick one.** It should be remembered and
-  should change nothing else anywhere in the app.
+  should change nothing else anywhere in the app. Both departments should offer
+  **Asst Supt** and **Supt**.
+- **Log a defect that is already open on the same bus.** The ALREADY LOGGED
+  banner should offer **+ COUNT THIS RETURN**; press it, then FOCUS that bus and
+  scroll to the bottom — **ADVANCED STATS** should show the round trip with its
+  date. Pressing twice quickly should still read 1. And a bus that is on the
+  Down Sheet must **stay** on it.
 - **Log "Add coolant (glycol)" and tick ENGINE OIL under ALSO TOPPED UP.** One
   record should save, reading *Add coolant (glycol) — also added engine oil*,
   and the QUANTITY box should be there for coolant at all — it never was before.
