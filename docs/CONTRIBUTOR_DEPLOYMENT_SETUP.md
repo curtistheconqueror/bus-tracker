@@ -17,7 +17,7 @@ Supabase Edge Functions are useful for backend jobs and AI/API orchestration, bu
 | Role | May do | Must not do |
 | --- | --- | --- |
 | Curtis | Approve production deployment; own GitHub, Cloudflare, and Supabase access | Put secrets in source or chat |
-| Claude Code / Codex contributor | Implement, test, commit, push branches, open pull requests, update `docs/PUBLISH_NEXT.md` | Deploy directly, alter production secrets, bypass protected branches |
+| Claude Code / Codex release-capable contributor | Implement, test, commit, push branches, and record an approved staging release gate | Handle Cloudflare tokens, deploy without Curtis's chat approval, or bypass protected branches |
 | GitHub Actions staging job | Deploy the exact approved `main` commit after CI and a Curtis-approved release-gate commit | Run automatically on a push or expose secrets to pull requests |
 | PACE IT, if adopted | Own its infrastructure, identity, network, backups, and security policy | Depend on an agent-held secret or undocumented manual process |
 

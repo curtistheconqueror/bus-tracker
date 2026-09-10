@@ -21,7 +21,7 @@ The existing public Sites URL remains the live Fleetstep application. Cloudflare
 5. The workflow installs the locked dependencies, runs lint and the full test suite, then deploys the generated Worker and client assets to the existing `fleetstep` Worker.
 6. Verify the staging URL on phone and iPad. Do not describe it as live production and do not alter the current Sites deployment.
 
-Contributors must never create a release gate. The gate is an operational trust boundary for the trusted release agent acting on Curtis's chat approval; it is not a replacement for future PACE-managed production controls.
+Release-capable agents may create a release gate only after Curtis explicitly approves in chat. The gate lets them deploy without handling a Cloudflare token; it is not a replacement for future PACE-managed production controls.
 
 ## Credentials and secrets
 
