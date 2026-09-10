@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `cca68cb`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `0c8a0f3`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `cca68cb` is the last CODE
+**Read the SHA above, not a SHA you remember.** `0c8a0f3` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,10 +13,11 @@ this SHA first.**
 
 ## What 171 is
 
-**Nine commits.** No migration, no schema change, no dependency change, no
+**Ten commits.** No migration, no schema change, no dependency change, no
 storage key added or renamed, and nothing that rewrites a record. One header's
-markup, one CSS property on three selectors, ten new catalog options, and the
-Defect Log's two pickers rebuilt as typing fields.
+markup, one CSS property on three selectors, eighteen new catalog options, one
+new optional field on a defect, and the Defect Log's two pickers rebuilt as
+typing fields.
 
 - **The Facility Map's header joins the other five.** It was the one page whose
   nav sat above its own name — Curtis, on a phone: *"the facility map needs to
@@ -83,7 +84,23 @@ Defect Log's two pickers rebuilt as typing fields.
   CUBIC SCREEN…); a ranked search keeps the group on each row instead, because
   headings stop dividing anything once results interleave.
 - **Add coolant (glycol)** and **Add transmission fluid** join *Add engine oil*
-  in Preventive Maintenance, all three with the quarts box.
+  in Preventive Maintenance, and **one stop at the fluid cart is one record.**
+  Pick any of the three and an ALSO TOPPED UP row offers the other two, so a bus
+  that took oil, glycol and transmission fluid is one repair to read rather than
+  three. Curtis: *"The one record listing several probably best and is less
+  clutter."*
+
+  The quarts box now appears for all three. It was gated on the one string
+  "Add engine oil" while the catalog had already been told all three carry an
+  amount, so glycol and transmission fluid had been setting a unit that nothing
+  could ever put a number in. The count stays with the fluid the record is filed
+  under — the shop counts quarts of oil and does not count glycol — and the
+  label names which one once a second fluid is on the record.
+
+  `fluids` is a **new optional field on a defect**, not a new storage key: it
+  rides inside `pace-board-v1` beside `symptoms`, and it rides to the Shop Cloud
+  inside `detail` the same way. A record that has none does not carry the key at
+  all, so **no existing row's cloud fingerprint changes** and nothing re-pushes.
 
 ### What to check once 171 is live
 
@@ -108,6 +125,11 @@ Defect Log's two pickers rebuilt as typing fields.
   change in 171 — if it is unwanted, say so and it comes out on its own.
 - No page should scroll sideways. That is what the `overflow-x` change could
   plausibly break, so it is worth one swipe on the map and the Down Sheet.
+- **Log "Add coolant (glycol)" and tick ENGINE OIL under ALSO TOPPED UP.** One
+  record should save, reading *Add coolant (glycol) — also added engine oil*,
+  and the QUANTITY box should be there for coolant at all — it never was before.
+  Then change the DEFECT to *Add engine oil*: the tick that just became the
+  issue should drop out on its own rather than being listed twice.
 
 ### Rolling 171 back
 
