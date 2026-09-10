@@ -87,4 +87,5 @@ jobs:
         run: npx --no-install wrangler deploy --config wrangler.json --name fleetstep
 
       - name: Report staging address
-        run: echo "Staging deployment complete: https://fleetstep.fleetstep-dev.workers.dev"
+        run: |
+          echo "Staging deployment complete: https://fleetstep.fleetstep-dev.workers.dev"
