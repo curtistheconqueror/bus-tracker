@@ -1041,16 +1041,19 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 
    An explicit choice must beat a preset: --log-repair-category-color is a
    colour the user can already set under TEXT STYLE. But that variable is
-   ALWAYS defined — the page writes it from the settings blob whether or not
-   anybody chose it — so var(--log-repair-category-color, quiet) never reaches
-   its fallback and this did nothing at all on the first attempt. Measured:
-   rgb(11,100,189), unchanged.
+   ALWAYS defined at the time — the page wrote it from the settings blob
+   whether or not anybody chose it — so var(--log-repair-category-color, quiet)
+   never reached its fallback and this did nothing at all on the first attempt.
+   Measured: rgb(11,100,189), unchanged.
 
-   So the page emits a SECOND variable, --log-repair-category-chosen, and emits
-   it ONLY when the stored colour differs from the shipped default. Undefined
-   means nobody chose, the fallback applies, and the heading goes quiet; defined
-   means somebody chose, and their colour wins. Same conditional-key pattern as
-   --log-card-border two hundred lines up.
+   The workaround was a second variable emitted only on a real choice. Chasing
+   it turned up a much larger bug behind it: NONE of the theme-aware fallbacks
+   in this file had ever fired, for the same reason, so Dark, Midnight and
+   Tactical were rendering light-theme text on dark surfaces — the repair text
+   measured 1.07:1. That is fixed at the source now, in
+   defect-log-display-settings.ts, and the extra variable is retired: the plain
+   --log-repair-category-color is emitted only when somebody has actually
+   picked one, so undefined means nobody chose and the fallback answers.
 
    THE !important ON .group-toggle IS NOT A SHORTCUT. .group-toggle already
    carries color:var(--log-accent)!important further up this file, so no amount
@@ -1081,7 +1084,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    by the fix for a regression. --log-header is dark on all four themes by
    definition, since it is what white header text sits on. */
 .defect-log-app[data-bus-blue="always"] .log-repair>b,
-.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:var(--log-repair-category-color,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
 .defect-log-app[data-bus-blue="always"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
 .defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
 .defect-log-app[data-bus-blue="always"] .grouped-defect-number{background:var(--log-header)}
@@ -1123,7 +1126,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .defect-log-app[data-bus-rail="phone"] .log-card-group>.grouped-defect-list{grid-column:1}
  .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-location-inline{display:inline-flex}
  .defect-log-app[data-bus-blue="phone"] .log-repair>b,
- .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+ .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:var(--log-repair-category-color,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
  .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
  .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
  .defect-log-app[data-bus-blue="phone"] .grouped-defect-number{background:var(--log-header)}
@@ -1139,3 +1142,10 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-view-options>label>select{min-height:44px;font-size:16px}
 .log-view-options>label>small{color:var(--log-muted);font-size:8px;font-weight:400;letter-spacing:0;line-height:1.45}
 .log-view-options-note{color:var(--log-muted);font-size:8px;line-height:1.45}
+
+/* TEXT STYLE, where a colour still on its shipped value follows the theme.
+   The tag says so beside the swatch, because the swatch is then showing a
+   colour the screen is not using. */
+.log-style-note{margin:0 0 8px;color:var(--log-muted);font-size:8px;line-height:1.45}
+.log-style-themed{margin-left:6px;border:1px solid var(--log-border);border-radius:4px;padding:1px 4px;color:var(--log-muted);font-size:6px;font-style:normal;font-weight:900;letter-spacing:.6px;white-space:nowrap}
+.log-style-follow{min-height:32px;grid-column:1/-1;border:1px solid var(--log-border);border-radius:5px;background:transparent;color:var(--log-accent);font-size:7px;font-weight:900;letter-spacing:.5px;cursor:pointer}

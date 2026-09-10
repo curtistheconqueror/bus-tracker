@@ -1,7 +1,7 @@
 "use client";
 
 import type {ReactNode} from "react";
-import {safeBorderColor,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
+import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,followsTheme,normalizeDefectLogDisplay,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {FLEET_BACKUP_INTERVAL_CHOICES,normalizeFleetBackupInterval} from "../storage";
 import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope} from "./defect-log-settings";
@@ -58,7 +58,14 @@ export default function LogSettingsModal({settings,setSettings,close,exportLog,t
    </div></section>
    <section className="log-settings-group"><h3>COLORS</h3><div className="log-color-grid">{COLOR_FIELDS.map(([key,label])=><label className="log-color-field" key={key}><span>{label}</span><input type="color" value={settings.appearance[key]} onChange={event=>setColor(key,event.target.value)}/></label>)}</div><button type="button" className="reset-look" onClick={()=>applyTheme("light")}>RESET LOOK</button></section>
    <section className="log-settings-group"><h3>WORDING</h3><div className="log-wording-grid">{(Object.keys(DEFECT_LOG_LABEL_NAMES) as (keyof DefectLogLabels)[]).map(key=><label key={key}>{DEFECT_LOG_LABEL_NAMES[key]}<input value={settings.display.labels[key]} onChange={event=>setDisplayLabel(key,event.target.value)}/></label>)}</div></section>
-   <section className="log-settings-group"><h3>TEXT STYLE</h3><div className="log-style-grid">{(Object.keys(DEFECT_LOG_STYLE_LABELS) as DefectLogStyleKey[]).map(key=><div key={key}><b>{DEFECT_LOG_STYLE_LABELS[key]}</b><label>COLOR<input type="color" value={settings.display.styles[key].color} onChange={event=>setDisplayStyle(key,"color",event.target.value)}/></label><label>SIZE<input type="number" min="7" max="32" value={settings.display.styles[key].fontSize} onChange={event=>setDisplayStyle(key,"fontSize",event.target.value)}/></label></div>)}</div><button type="button" className="reset-look" onClick={()=>setSettings({...settings,display:normalizeDefectLogDisplay(null)})}>RESET TEXT</button></section>
+   <section className="log-settings-group"><h3>TEXT STYLE</h3>
+   {/* FOLLOWING THEME is not decoration. A colour left at the shipped value is
+       treated as "no choice made" and the theme answers instead — which is what
+       stops the dark themes rendering light-theme text — so the swatch beside
+       it is showing a colour the screen is NOT using. Saying so is the
+       difference between a sensible default and a control that lies. */}
+   <p className="log-style-note">A colour still on its shipped value <b>follows the theme</b>, so the dark themes stay readable. Pick any other colour and it is pinned on every theme; RESET TEXT puts it back to following.</p>
+   <div className="log-style-grid">{(Object.keys(DEFECT_LOG_STYLE_LABELS) as DefectLogStyleKey[]).map(key=>{const themed=followsTheme(key,settings.display.styles[key].color);return <div key={key}><b>{DEFECT_LOG_STYLE_LABELS[key]}{themed&&<i className="log-style-themed">FOLLOWING THEME</i>}</b><label>COLOR<input type="color" value={settings.display.styles[key].color} onChange={event=>setDisplayStyle(key,"color",event.target.value)}/></label><label>SIZE<input type="number" min="7" max="32" value={settings.display.styles[key].fontSize} onChange={event=>setDisplayStyle(key,"fontSize",event.target.value)}/></label>{!themed&&<button type="button" className="log-style-follow" onClick={()=>setDisplayStyle(key,"color",DEFAULT_DEFECT_LOG_DISPLAY.styles[key].color)}>FOLLOW THEME</button>}</div>})}</div><button type="button" className="reset-look" onClick={()=>setSettings({...settings,display:normalizeDefectLogDisplay(null)})}>RESET TEXT</button></section>
    {/* The reminder used to be fixed at 20, which is either a nag or a stranger
        depending on how busy the shop is. Whoever is living with the banner picks
        the number. */}

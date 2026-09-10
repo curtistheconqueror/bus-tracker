@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "./defect-log-settings";
-import {DEFAULT_DEFECT_LOG_DISPLAY} from "./defect-log-display-settings";
+import {displayStyleVars} from "./defect-log-display-settings";
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
 import "./defect-log.css";
@@ -1012,12 +1012,17 @@ export default function DefectLog(){
  };
  const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterShareLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
  
- /* Defined ONLY when somebody has actually picked a Repair Title colour, which
-    is what lets BLUE MEANS THE BUS quieten the headings without overriding a
-    choice. --log-repair-category-color beside it is always defined, so it can
-    never reach a fallback — see the note in defect-log.css. */
- const chosenCategoryColor=settings.display.styles.repairCategory.color.toLowerCase()===DEFAULT_DEFECT_LOG_DISPLAY.styles.repairCategory.color.toLowerCase()?null:settings.display.styles.repairCategory.color;
- const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),...(chosenCategoryColor?{"--log-repair-category-chosen":chosenCategoryColor}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
+ /* Colours come from displayStyleVars, which OMITS any left at the shipped
+    default so the theme-aware fallback behind it in defect-log.css can answer.
+    Emitting all seven unconditionally is what made the dark themes render
+    light-theme text on dark surfaces — the repair text measured 1.07:1 on
+    Dark. See defect-log-display-settings.ts.
+
+    A workaround variable existed here for a while because the plain one was
+    always defined and so could never reach a fallback. It is gone: emitted
+    only on a real choice, the plain variable does the job, and BLUE MEANS THE
+    BUS reads it directly. */
+ const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
   /* Three view options, each "off" | "phone" | "always". They are attributes

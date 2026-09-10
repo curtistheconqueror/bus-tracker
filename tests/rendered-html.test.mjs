@@ -12253,15 +12253,24 @@ test("a chosen Repair Title color still wins when blue is locked to the bus",asy
     first version of this changed nothing at all and measured rgb(11,100,189),
     unchanged. A second variable is emitted only when the stored color differs
     from the shipped default: undefined means nobody chose. */
+ /* This started life as a SECOND variable, --log-repair-category-chosen,
+    because --log-repair-category-color was emitted unconditionally and so
+    could never reach a fallback. Chasing that turned up the far larger bug
+    behind it — none of the theme fallbacks in the stylesheet had ever fired —
+    and once displayStyleVars omitted every unchosen colour, the plain variable
+    did the job and the extra one was retired. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- assert.match(page,/chosenCategoryColor=settings\.display\.styles\.repairCategory\.color\.toLowerCase\(\)===DEFAULT_DEFECT_LOG_DISPLAY\.styles\.repairCategory\.color\.toLowerCase\(\)\?null:/);
- assert.match(page,/\.\.\.\(chosenCategoryColor\?\{"--log-repair-category-chosen":chosenCategoryColor\}:\{\}\)/,"the key is omitted, not set empty");
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ assert.equal(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"dark")["--log-repair-category-color"],undefined,"unchosen: the quiet fallback answers");
+ assert.equal(displayStyleVars(normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}}),"dark")["--log-repair-category-color"],"#c3262f","chosen: their colour wins");
+ assert.equal(/"--log-repair-category-chosen"/.test(page),false,"the workaround variable is no longer emitted");
+ const css2=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.equal(css2.includes("var(--log-repair-category-chosen"),false,"and nothing reads it");
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
  /* The repair heading and the focus view's record head share one declaration
     now, so the assertion matches the selector list rather than the old
     single-selector rule. */
- assert.match(css,/data-bus-blue="always"\] \.log-repair>b,\n\.defect-log-app\[data-bus-blue="always"\] \.log-focus-record-head>b\{color:var\(--log-repair-category-chosen,/);
- assert.equal(/data-bus-blue[^{]*\.log-repair>b[^{]*\{color:var\(--log-repair-category-color/.test(css),false,"the always-defined variable would never fall back");
+ assert.match(css,/data-bus-blue="always"\] \.log-repair>b,\n\.defect-log-app\[data-bus-blue="always"\] \.log-focus-record-head>b\{color:var\(--log-repair-category-color,/);
  for(const scope of ["always","phone"]){
   /* VIEW/CLOSE needs !important because .group-toggle already declares
      color:var(--log-accent)!important — no specificity reaches that, and
@@ -12304,5 +12313,75 @@ test("the second location button is display:none, not merely invisible",async()=
  }
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.equal(page.split("Facility location for bus ").length-1,2,"the pair, and only the pair");
+});
+
+test("a text colour nobody picked follows the theme, so the dark themes are readable",async()=>{
+ /* Every rule in defect-log.css that reads one of these already had a
+    theme-aware fallback — var(--log-repair-category-color,var(--log-accent))
+    and so on — and not one had ever fired, because the page defined all seven
+    variables from the settings blob whether or not anybody chose them, and the
+    shipped values are light-theme hex. Measured on the Defect Log at 1180px,
+    contrast against the effective background, nothing customised:
+
+                   light   dark   midnight  tactical
+      feed title   10.77   1.49   1.50      1.05
+      repair text  11.80   1.07   1.08      1.57
+      category      4.92   2.24   2.21      1.52
+
+    1.05:1 is the background. The defect text was invisible on three themes. */
+ const {displayStyleVars,followsTheme,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const untouched=DEFAULT_DEFECT_LOG_DISPLAY;
+ for(const theme of ["dark","midnight","tactical","custom"]){
+  const vars=displayStyleVars(untouched,theme);
+  assert.deepEqual(Object.keys(vars).filter(name=>name.endsWith("-color")),[],theme+" defers every unchosen colour to the theme");
+  /* Sizes are NOT theme-dependent and must still be emitted. */
+  assert.equal(Object.keys(vars).filter(name=>name.endsWith("-size")).length,7,theme+" still carries the sizes");
+ }
+ /* LIGHT KEEPS ALL SEVEN. They are light-theme colours picked by hand for this
+    app on white — LIVE REPAIR FEED's #163c70 is a deeper navy than the accent
+    on purpose. Deferring on light too swapped it for the accent and dropped it
+    from 10.77:1 to 5.77:1: legible, and a change nobody asked for on the theme
+    almost everybody uses. */
+ assert.equal(Object.keys(displayStyleVars(untouched,"light")).filter(name=>name.endsWith("-color")).length,7);
+ /* A REAL CHOICE STILL WINS, on every theme. */
+ const chosen=normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}});
+ for(const theme of ["light","dark","midnight","tactical","custom"])
+  assert.equal(displayStyleVars(chosen,theme)["--log-repair-category-color"],"#c3262f",theme+" keeps a chosen colour");
+ /* Case-insensitive, since a hand-edited blob or another device may store the
+    same colour in capitals. */
+ assert.equal(followsTheme("repairCategory","#0B64BD"),true);
+ assert.equal(followsTheme("repairCategory","#c3262f"),false);
+});
+
+test("the emitted variable names are the ones the stylesheets actually read",async()=>{
+ /* Derived from the CSS rather than listed here: this is a loop building
+    property names out of camelCase keys, and a key renamed on one side only
+    would silently stop styling anything. */
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const emitted=Object.keys(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"light"));
+ const css=(await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"))
+  +(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"));
+ for(const name of emitted)
+  assert.ok(css.includes("var("+name+","),name+" is read by a rule, with a fallback behind it");
+ /* And the page hands them over wholesale rather than restating the list — the
+    hand-written version is what drifted from the fallbacks in the first place. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/\.\.\.displayStyleVars\(settings\.display,settings\.theme\)/);
+ for(const name of emitted)
+  assert.equal(page.includes('"'+name+'"'),false,page+" no longer names "+name+" by hand");
+});
+
+test("Settings says which colours are following the theme",async()=>{
+ /* The swatch beside a following colour is showing a colour the screen is NOT
+    using. Saying so is the difference between a sensible default and a control
+    that lies — and the button pins it back the other way. */
+ const modal=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ assert.match(modal,/FOLLOWING THEME/);
+ assert.match(modal,/followsTheme\(key,settings\.display\.styles\[key\]\.color\)/);
+ /* FOLLOW THEME sets the colour back to the shipped default, which IS the
+    "no choice made" value — not a separate sentinel that would need its own
+    validation on read. */
+ assert.match(modal,/className="log-style-follow" onClick=\{\(\)=>setDisplayStyle\(key,"color",DEFAULT_DEFECT_LOG_DISPLAY\.styles\[key\]\.color\)\}/);
+ assert.match(modal,/\{!themed&&<button type="button" className="log-style-follow"/,"offered only where there is something to undo");
 });
 

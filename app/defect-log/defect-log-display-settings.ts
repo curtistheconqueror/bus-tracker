@@ -62,3 +62,68 @@ export function safeBorderColor(value:unknown){
  const text=String(value??"").trim();
  return /^#[0-9a-f]{6}$/i.test(text)?text:"";
 }
+
+/* A COLOUR LEFT AT THE SHIPPED DEFAULT MEANS "FOLLOW THE THEME".
+
+   Every rule in defect-log.css that reads one of these already has a
+   theme-aware fallback behind it — var(--log-repair-category-color,
+   var(--log-accent)), var(--log-repair-details-color, var(--log-text)), and so
+   on. They were written that way on purpose and not one of them had ever
+   fired, because the page defines all seven variables from the settings blob
+   whether or not anybody chose them, and the shipped values are light-theme
+   hex.
+
+   So the three dark themes were rendering light-theme text on dark surfaces.
+   Measured on the Defect Log at 1180px, WCAG 2 contrast against the effective
+   background, with nothing customised:
+
+                  light   dark   midnight   tactical
+     feed title   10.77   1.49   1.50       1.05
+     repair text  11.80   1.07   1.08       1.57
+     category      4.92   2.24   2.21       1.52
+
+   1.05:1 is the same colour as the background. The defect text — the thing the
+   page exists to show — was invisible on three of the four themes.
+
+   THE FIX IS TO STOP ANSWERING WHEN NOBODY ASKED. A stored colour equal to the
+   shipped default is not a choice; it is the absence of one, and the fallback
+   behind it already knows what to do. A stored colour that differs IS a choice
+   and still wins, on every theme, exactly as before.
+
+   The honest limit of this, the same one SUPERSEDED_DEFAULT_SIZES above admits:
+   somebody who deliberately picks the default blue is indistinguishable from
+   somebody who never picked. They get the theme colour. That is why the
+   Settings panel labels these FOLLOWING THEME rather than leaving it to be
+   discovered, and why picking any other colour pins it.
+
+   Nothing on disk is rewritten. This is read-time, like every other rename and
+   default in this project. */
+export function followsTheme(key:DefectLogStyleKey,color:string){
+ return String(color||"").toLowerCase()===DEFAULT_DEFECT_LOG_DISPLAY.styles[key].color.toLowerCase();
+}
+
+/* The custom properties to hand the page, colours omitted where the theme
+   should answer. Sizes are always emitted: a font size means the same thing on
+   every theme.
+
+   ON THE LIGHT THEME THE DEFAULTS ARE STILL EMITTED, and that is the point
+   rather than an exception. These seven values ARE light-theme colours, picked
+   by hand for this app on white — LIVE REPAIR FEED's #163c70 is a deeper navy
+   than the accent, chosen deliberately. Handing the fallback the job on light
+   too would have swapped it for the accent and dropped its contrast from
+   10.77:1 to 5.77:1: still legible, still a change nobody asked for, on the
+   theme almost everybody uses.
+
+   So "follow the theme" means what it says. On light, the theme's answer is
+   the value that was designed for it. On the three dark ones — and on a custom
+   palette, which can be anything at all — the fallback knows and this file
+   does not. */
+export function displayStyleVars(display:DefectLogDisplaySettings,theme:string){
+ const vars:Record<string,string>={};
+ for(const key of Object.keys(DEFAULT_DEFECT_LOG_DISPLAY.styles) as DefectLogStyleKey[]){
+  const style=display.styles[key],name=key.replace(/[A-Z]/g,letter=>"-"+letter.toLowerCase());
+  if(theme==="light"||!followsTheme(key,style.color))vars["--log-"+name+"-color"]=style.color;
+  vars["--log-"+name+"-size"]=style.fontSize+"px";
+ }
+ return vars;
+}
