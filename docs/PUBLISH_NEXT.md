@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `649cef5`.**
+**STATUS: NONE PENDING — repository release 171 is live from `649cef5` as Sites Version 171.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -12,7 +12,7 @@ reached his phone. What the title is, per release:
 | --- | --- | --- | --- |
 | 169 | 165 | `<b>` — plain bold text | **nothing at all; it is not a control** |
 | 170 | 166 | `<a href="/">` | goes to the Facility Map, not the home screen |
-| **171** | pending | `<button>` → the home screen | **what he asked for** |
+| **171** | 171 | `<button>` → the home screen | **live** |
 
 **There may be a discrepancy between the record and the deployment.** This file
 and `docs/RELEASES.md` both say release 170 / Sites 166 is live from `bdca898`.
@@ -33,7 +33,7 @@ covers it), and the home screen opens full-screen and visible.
 
 ---
 
-Release 170 is recorded as live from `bdca898` as Sites Version 166.
+Release 171 is recorded as live from `649cef5` as Sites Version 171.
 
 **Read the SHA above, not a SHA you remember.** `649cef5` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
