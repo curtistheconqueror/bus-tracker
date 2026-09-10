@@ -78,6 +78,18 @@ export function unitLabel(unit:RoleUnit){
    on this floor, and the earlier single "Mechanic / Technician" was a guess made
    before Curtis listed the trades out.
 
+   MASTER MECHANIC IS PLACED ON THE UNION SIDE, at the top of the mechanic
+   ladder, and that placement is the one thing here that was not stated. He
+   asked only to "add Master Mechanic in maintenance" without naming a side, and
+   the title genuinely goes both ways in transit: at many properties it is the
+   top classification in the agreement, sitting above Mechanic exactly where the
+   ladder Servicer → Mechanic Helper → Mechanic already points; at others it is
+   the management title for whoever runs the garage, which would put it beside
+   Foreman. The ladder reading is what the rest of his union list looks like, so
+   that is where it sits — and it is one line to move. Worth confirming, because
+   a job on the wrong side does not merely look odd: it cannot be chosen, since
+   the picker only offers the list for the side you picked.
+
    SUPERINTENDENT IS ABBREVIATED because there are two of them. Curtis: "we have
    asst supt, so that is why I want it shortened, so the label can show both like
    Asst Supt & Supt simultaneously." Spelled out, "Assistant Superintendent"
@@ -91,6 +103,18 @@ export function unitLabel(unit:RoleUnit){
      "The maintenance side will be Servicer, Mechanic Helper, Mechanic, Body &
       Frame, Building Maintenance. The other are non union. For transportation
       it will be Bus Operator, Dispatch, and the rest."
+
+   ...then corrected, which is why the table below is the only thing to read and
+   that quote is kept only as history:
+
+     "Yes dispatch is non union. They have a spot under them called Relief
+      Supervisor which are union... also add Master Mechanic in maintenance."
+
+   DISPATCH IS NON-UNION and Relief Supervisor is the union spot beneath it.
+   That correction is the argument for asking rather than inferring: Dispatch
+   was on the union side here for one commit purely because it is union at many
+   properties, and being union at many properties is not being union at this
+   one.
 
    So Foreman sits on the non-union side here, which is the one a shop cannot
    assume — it goes either way by contract — and is exactly why this was left
@@ -109,11 +133,11 @@ export function unitLabel(unit:RoleUnit){
    silently reads as "not set". */
 export const ROLE_DEPARTMENTS:{key:RoleDepartment;label:string;roles:Record<RoleUnit,string[]>}[]=[
  {key:"transportation",label:"Transportation",roles:{
-  union:["Bus Operator","Dispatch"],
-  "non-union":["Asst Supt","Supt"],
+  union:["Bus Operator","Relief Supervisor"],
+  "non-union":["Dispatch","Asst Supt","Supt"],
  }},
  {key:"maintenance",label:"Maintenance",roles:{
-  union:["Servicer","Mechanic Helper","Mechanic","Body & Frame","Building Maintenance"],
+  union:["Servicer","Mechanic Helper","Mechanic","Master Mechanic","Body & Frame","Building Maintenance"],
   "non-union":["Foreman","Asst Supt","Supt"],
  }},
 ];

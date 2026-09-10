@@ -11631,13 +11631,23 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     between bus operator, then dispatch and then superintendent. Now for
     maintenance, it will be servicer then mechanic, foreman, superintendent." */
  assert.deepEqual(ROLE_DEPARTMENTS.map(item=>item.key),["transportation","maintenance"]);
- /* CURTIS'S OWN SPLIT, in his own words: "The maintenance side will be Servicer,
-    Mechanic Helper, Mechanic, Body & Frame, Building Maintenance. The other are
-    non union. For transportation it will be Bus Operator, Dispatch, and the
-    rest." */
- assert.deepEqual(departmentRoles("transportation","union"),["Bus Operator","Dispatch"]);
- assert.deepEqual(departmentRoles("transportation","non-union"),["Asst Supt","Supt"]);
- assert.deepEqual(departmentRoles("maintenance","union"),["Servicer","Mechanic Helper","Mechanic","Body & Frame","Building Maintenance"]);
+ /* CURTIS'S OWN SPLIT, as corrected by him: "Yes dispatch is non union. They
+    have a spot under them called Relief Supervisor which are union... also add
+    Master Mechanic in maintenance."
+
+    DISPATCH IS NON-UNION. It sat on the union side for exactly one commit
+    because it is union at many transit properties — which is not the same as
+    being union at this one, and is the whole argument for asking rather than
+    inferring. Relief Supervisor is the union spot beneath it. */
+ assert.deepEqual(departmentRoles("transportation","union"),["Bus Operator","Relief Supervisor"]);
+ assert.deepEqual(departmentRoles("transportation","non-union"),["Dispatch","Asst Supt","Supt"]);
+ assert.equal(departmentRoles("transportation","union").includes("Dispatch"),false,
+  "Dispatch is non-union here, whatever it is elsewhere");
+ /* Master Mechanic sits at the top of the mechanic ladder, which is the only
+    placement in this table that Curtis did not state outright. */
+ assert.deepEqual(departmentRoles("maintenance","union"),["Servicer","Mechanic Helper","Mechanic","Master Mechanic","Body & Frame","Building Maintenance"]);
+ assert.ok(departmentRoles("maintenance","union").indexOf("Master Mechanic")>departmentRoles("maintenance","union").indexOf("Mechanic"),
+  "it is the top of the ladder, so it follows Mechanic");
  /* FOREMAN IS NON-UNION HERE. It is the one job a transit shop cannot assume —
     it goes either way by contract — and is exactly why the list was left
     unfiltered until he said which. */

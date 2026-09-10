@@ -203,8 +203,8 @@ as typing fields, and one bug fixed that was live in 170.
 
   | | Union | Non-Union |
   | --- | --- | --- |
-  | Transportation | Bus Operator, Dispatch | Asst Supt, Supt |
-  | Maintenance | Servicer, Mechanic Helper, Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+  | Transportation | Bus Operator, Relief Supervisor | Dispatch, Asst Supt, Supt |
+  | Maintenance | Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
 
   Foreman is on the non-union side — the one job a transit shop cannot assume.
   *Bargaining* names the union side, so it can never be the non-union label;
@@ -258,8 +258,10 @@ as typing fields, and one bug fixed that was live in 170.
 - **Touch FLEETSTEP, open MY ROLE, pick one.** It should be remembered and
   should change nothing else anywhere in the app. Both departments should offer
   **Asst Supt** and **Supt**. Picking **Union** under Maintenance should list
-  Servicer, Mechanic Helper, Mechanic, Body & Frame and Building Maintenance;
-  **Non-Union** should list Foreman, Asst Supt and Supt.
+  Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame and
+  Building Maintenance; **Non-Union** should list Foreman, Asst Supt and Supt.
+  Under Transportation, **Dispatch is non-union** and **Relief Supervisor** is
+  the union spot beneath it.
 - **Log a defect that is already open on the same bus.** The ALREADY LOGGED
   banner should offer **+ COUNT THIS RETURN**; press it, then FOCUS that bus and
   scroll to the bottom — **ADVANCED STATS** should show the round trip with its

@@ -158,11 +158,16 @@ because Curtis gave the actual split:
 
 | | Union | Non-Union |
 | --- | --- | --- |
-| Transportation | Bus Operator, Dispatch | Asst Supt, Supt |
-| Maintenance | Servicer, Mechanic Helper, Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+| Transportation | Bus Operator, Relief Supervisor | Dispatch, Asst Supt, Supt |
+| Maintenance | Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
 
-**Foreman is on the non-union side**, which is the one a transit shop cannot
-assume — it goes either way by contract. A combination not in that table cannot
+**Foreman is on the non-union side, and so is Dispatch** — Dispatch sat on the
+union side for one commit purely because it is union at many transit
+properties, which is not the same as being union at this one. **Relief
+Supervisor** is the union spot beneath Dispatch. **Master Mechanic** is placed
+at the top of the union mechanic ladder, and that is the one placement Curtis
+did not state outright — the title is a top classification at some properties
+and a management job at others. A combination not in that table cannot
 be chosen and does not read back, so if the contract changes, it changes in
 `app/roles.ts` and any device holding the old pairing reads as "not set" until
 its owner picks again. *Bargaining* is the union side, so it can never be the
