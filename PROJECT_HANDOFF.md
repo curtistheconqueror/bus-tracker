@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-09-08
+Updated: 2026-09-10
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 166 (repository release 170)
-Live feature checkpoint: commit bdca898
+Live release: Sites Version 171 (repository release 171)
+Live feature checkpoint: commit 649cef5
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 170 is the current user-approved live release, deployed by Sites as Version 166. Its source checkpoint is commit bdca898. The Scan Sheet Cancel action is fully reachable on phone widths, its modal scrolls while the page behind it stays still, and the FLEETSTEP masthead takes users back to the Facility Map. No fleet, repair, or database migration was made. Version 169 (commit 939fe49, Sites Version 165) remains the routine rollback target; Version 168 (commit 64ec7d2, Sites Version 164) remains the pre-Lite fallback. Cloud configuration remains optional and per device; LocalStorage remains the immediate offline store.
+Repository release 171 is live as Sites Version 171 from commit 649cef5. Version 171 keeps the existing offline-first model and makes no database or schema migration. It adds two per-device LocalStorage preferences (`pace-down-sheet-recommended-collapsed-v1` and `pace-role-v1`) plus optional `fluids` and `reportAttempts` fields on individual defects; absent fields remain absent, so existing records are not rewritten. It brings the Facility Map header and phone navigation into the same pattern as the other pages, adds Wipers and Washers plus floor-reported ramp, lighting and air-tank catalog choices, makes Defect Log pickers searchable typing fields, adds a Recommended for Down Sheet board, records an intentional duplicate report as a dated return, and keeps role selection cosmetic and per-device. Version 170 (commit bdca898) is the normal rollback target.
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 

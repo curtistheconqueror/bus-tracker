@@ -1,6 +1,89 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `62d96d6`.**
+**STATUS: 172 IS PENDING — publish from `PUBLISH_SHA`.**
+
+Release 171 is live from `649cef5` as Sites Version 171. 172 is one commit on
+top of it.
+
+## What 172 is
+
+**One commit, one bug, no new setting and nothing that rewrites a record.**
+Rolling back is redeploying 171 (`649cef5`, Sites Version 171).
+
+### The three dark themes were rendering light-theme text
+
+Every rule in `app/defect-log/defect-log.css` that draws Defect Log text
+already had a theme-aware fallback behind it —
+`var(--log-repair-category-color,var(--log-accent))`,
+`var(--log-repair-details-color,var(--log-text))`, and so on. They were written
+that way deliberately and **not one had ever fired**: the page defined all seven
+colour variables from the settings blob whether or not anybody had chosen them,
+and the shipped values are light-theme hex.
+
+Measured on the Defect Log at 1180px, WCAG 2 contrast against the effective
+background, with nothing customised:
+
+| | light | dark | midnight | tactical |
+| --- | --- | --- | --- | --- |
+| LIVE REPAIR FEED | 10.77 | 1.49 | 1.50 | **1.05** |
+| repair text | 11.80 | **1.07** | **1.08** | 1.57 |
+| category heading | 4.92 | 2.24 | 2.21 | 1.52 |
+
+1.05:1 is the same colour as the background. The defect text — what the page
+exists to show — was invisible on Dark, Midnight and Tactical.
+
+`displayStyleVars` now omits any colour still on its shipped value, so the
+fallback answers. After:
+
+| | light | dark | midnight | tactical |
+| --- | --- | --- | --- | --- |
+| LIVE REPAIR FEED | 10.77 | 5.85 | 6.53 | 4.83 |
+| repair text | 11.80 | 12.15 | 11.14 | 7.55 |
+| category heading | 4.92 | 4.71 | 5.17 | 3.77 |
+
+**The light theme is byte-identical**, deliberately. Those seven values ARE
+light-theme colours picked by hand for this app on white — LIVE REPAIR FEED's
+`#163c70` is a deeper navy than the accent on purpose. Deferring on light too
+swapped it for the accent and dropped it from 10.77:1 to 5.77:1: still legible,
+still a change nobody asked for, on the theme almost everybody uses. So light
+keeps its defaults; the three dark ones and any custom palette defer.
+
+**A colour somebody actually picked still wins**, on every theme — verified in
+Chromium, not reasoned about: Tactical with the Repair Title pinned red renders
+`rgb(195,38,47)` while the feed title beside it follows the theme.
+
+Settings says which is which. A following colour is tagged **FOLLOWING THEME**,
+because its swatch is showing a colour the screen is not using; a pinned one
+gets a **FOLLOW THEME** button that sets it back to the shipped value — which
+IS the "no choice made" value, not a new sentinel needing its own validation.
+
+Nothing on disk is rewritten. Read-time, like every other default here.
+
+### What to check once 172 is live
+
+- **Switch the Defect Log to Dark, then Midnight, then Tactical.** The repair
+  text, the category headings and LIVE REPAIR FEED should all be plainly
+  readable. Before this release they were near-invisible on all three.
+- **The Light theme must look EXACTLY as it did.** That is the half of this
+  change most likely to have gone wrong, so check it first and on a phone.
+- Settings → Defect Log → TEXT STYLE: six entries tagged FOLLOWING THEME.
+  Pick a colour on one; the tag goes and a FOLLOW THEME button appears. Press
+  it and the tag comes back.
+- Fixed Repairs shares this settings key — confirm its theme still applies.
+
+### Still below AA, and left alone on purpose
+
+The Repair Title on **Tactical** measures 3.77:1, under the 4.5 standard. That
+is the Tactical palette's own accent on its own surface. This change improved it
+2.5x from 1.52:1, but fixing it properly means altering the Tactical palette,
+which is a visible design decision rather than a bug fix. Flagged to Curtis.
+
+---
+
+Everything below this line is the 171 record, kept for the rollback table and
+the release history.
+
+## The 171 record
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -12,7 +95,7 @@ reached his phone. What the title is, per release:
 | --- | --- | --- | --- |
 | 169 | 165 | `<b>` — plain bold text | **nothing at all; it is not a control** |
 | 170 | 166 | `<a href="/">` | goes to the Facility Map, not the home screen |
-| **171** | pending | `<button>` → the home screen | **what he asked for** |
+| **171** | 171 | `<button>` → the home screen | **live** |
 
 **There may be a discrepancy between the record and the deployment.** This file
 and `docs/RELEASES.md` both say release 170 / Sites 166 is live from `bdca898`.
@@ -23,19 +106,19 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `62d96d6` contains every line of 170 — so publishing 171 fixes
+forward anyway — `649cef5` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `3102444` (still true of `62d96d6`, which only adds to
+Verified in Chromium on `3102444` (still true of `649cef5`, which only adds to
 it), all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
 
 ---
 
-Release 170 is recorded as live from `bdca898` as Sites Version 166.
+Release 171 is recorded as live from `649cef5` as Sites Version 171.
 
-**Read the SHA above, not a SHA you remember.** `62d96d6` is the last CODE
+**Read the SHA above, not a SHA you remember.** `649cef5` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -292,17 +375,6 @@ thing in it that goes stale silently.
   detected device: an iPad in split screen is phone-width and wants it, and a
   stored "this is an iPad" would be wrong the moment it was rotated.
 
-- **The dark themes are readable again.** Every rule that draws Defect Log text
-  already had a theme-aware fallback behind it and not one had ever fired: the
-  page defined all seven colour variables from the settings blob whether or not
-  anybody had chosen them, and the shipped values are light-theme hex. Dark,
-  Midnight and Tactical were painting light text colours onto dark surfaces —
-  the repair text measured **1.07:1 on Dark**, which is the background.
-
-  A colour still on its shipped value now defers to the theme. **The light
-  theme is byte-identical**; a colour somebody actually picked still wins on
-  every theme, and Settings tags the ones that are following.
-
 ## What to check once 171 is live
 
 - **Move a bus into Trouble Bay 12 from the Defect Log** (tap the location line
@@ -324,11 +396,6 @@ thing in it that goes stale silently.
 - Log a defect under **Bus Accessories** and scroll the option list to the
   bottom: ten **Wipers and Washers** options — blade and motor per side, and the
   washer set.
-- **Switch the Defect Log to the Dark, Midnight and Tactical themes.** The
-  repair text, the category headings and LIVE REPAIR FEED should all be plainly
-  readable. Before this release they were near-invisible on all three.
-- **The Light theme must look EXACTLY as it did** — that is the half of this
-  change most likely to have gone wrong.
 - **The Defect Log should look EXACTLY as it did.** All three new view options
   default to off. If anything about the feed has changed on a device that has
   not been into Settings, that is a bug in this release.

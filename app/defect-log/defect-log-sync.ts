@@ -332,4 +332,3 @@ export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(ent
   return {...entry,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:completed?roadServiceStatus({...bus,defects,pendingRepair:defectSummary(defects)}):defect.operability==="down"?"out":defect.state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:updatedBy||defect.reportedBy||entry.updatedBy,completedAt:completed?(entry.completedAt||now):"",history:[...(entry.history||[]),{at:now,initials:updatedBy||defect.reportedBy||"",action:completed?"Completed from Bus Settings":"Updated from Bus Settings"}]} as T;
  });
 }
-
