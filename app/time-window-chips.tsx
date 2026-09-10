@@ -31,11 +31,14 @@ export default function TimeWindowChips({value,onChange,hidden,label}:{
 }){
  return <div className="time-window-chips" role="group" aria-label={"Filter "+label+" by how recent"}>
   <small>SHOW</small>
-  <div className="time-window-row">{TIME_WINDOWS.map(window=>
-   <button type="button" key={window.key} className={"time-window-chip"+(window.key===value?" on":"")}
-    aria-pressed={window.key===value}
-    aria-label={window.key==="all"?"Show every "+label:"Show "+label+" from the last "+window.label}
-    onClick={()=>onChange(window.key)}>{window.label}</button>)}
+  {/* `item`, not `window`: the two boards that draw this both carry a comment
+      saying the global must not be shadowed, and a rule that holds in two
+      files and not the third is not a rule. */}
+  <div className="time-window-row">{TIME_WINDOWS.map(item=>
+   <button type="button" key={item.key} className={"time-window-chip"+(item.key===value?" on":"")}
+    aria-pressed={item.key===value}
+    aria-label={item.key==="all"?"Show every "+label:"Show "+label+" from the last "+item.label}
+    onClick={()=>onChange(item.key)}>{item.label}</button>)}
   </div>
   {/* "HIDDEN", not "OLDER HIDDEN" — measured in the browser and corrected
       there. A row with no stamp at all is held back by every narrowed window

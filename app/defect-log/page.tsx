@@ -16,6 +16,7 @@ import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "../quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "../recommended-counts";
+import {busDeferredMinutes} from "../deferred-counts";
 import {answerRecommendedBus} from "../recommended-actions";
 import {elapsedLong} from "../elapsed-label";
 import TimeWindowChips from "../time-window-chips";
@@ -757,8 +758,12 @@ export default function DefectLog(){
     and returns null, which withinTimeWindow only ever sees under ALL. */
  const quickFilterAgeMinutes=(bus:DefectLogFleetBus)=>{
   if(quickFilter==="deferred"){
-   const defect=quickFilterDefects(bus,"deferred").find(item=>isHeldDeferred(item,activeDownBusIdSet.has(bus.id)));
-   return defect?deferredMinutesElapsed(defect):null;
+   /* busDeferredMinutes, not the first held repair this bus happens to list:
+      the board on the Down Sheet draws this same list and must not answer
+      "how old is this bus" differently. A bus carrying one undated deferral
+      beside dated ones read as undated on the board and as dated here. */
+   const held=quickFilterDefects(bus,"deferred").filter(item=>isHeldDeferred(item,activeDownBusIdSet.has(bus.id)));
+   return held.length?busDeferredMinutes(held):null;
   }
   if(quickFilter==="down-sheet-recommended"){
    const defects=recommendedDefectsFor(bus.id);
@@ -1144,11 +1149,18 @@ export default function DefectLog(){
      {/* A BUTTON, NOT A SELECT, and that was measured rather than preferred.
 
          A native select cannot wrap, and this column is 82px wide - 72px on a
-         phone, 64px under 390. Bound to the location, 13 of the 17 labels
-         locationLabel() can produce were cut off at 390: Main Garage needed
-         49px against 38px of room, Foreman Office 59px. The line exists to say
-         where the bus is, and a control that hides that to become clickable is
-         a worse line than the one it replaced.
+         phone, 64px under 390. Bound to the location, 13 of the labels
+         locationLabel() could then produce were cut off at 390: Main Garage
+         needed 49px against 38px of room, Foreman Office 59px. The line exists
+         to say where the bus is, and a control that hides that to become
+         clickable is a worse line than the one it replaced.
+
+         THERE ARE EIGHTEEN OF THOSE LABELS NOW, not seventeen: naming the
+         trouble bays added Trouble Bay 11 and Trouble Bay 12, both fourteen
+         characters, which puts them in the same too-long group as Foreman
+         Office rather than changing the argument. Re-counted from
+         RELOCATION_AREAS rather than carried forward, and re-measured at 360,
+         390 and 1180 — both wrap inside the column and neither clips.
 
          So the label stays exactly what it was - the same text, still free to
          wrap onto two lines - and the whole of it is the target. It opens the

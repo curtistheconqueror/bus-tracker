@@ -10856,7 +10856,7 @@ test("the location under a bus number is the control that moves it on the map", 
 
   /* IT IS NOT A SELECT, and that was measured rather than preferred. A native
      select cannot wrap and this column is 72px on a phone: bound to the
-     location, 13 of the 17 labels locationLabel() can produce were cut off at
+     location, 13 of the labels locationLabel() could then produce were cut off at
      390 - Main Garage needed 49px against 38px of room, Foreman Office 59px.
      The label keeps its own type and its freedom to wrap; the whole of it is
      the target, and the editor it opens has the room the column does not. */
@@ -11960,7 +11960,13 @@ test("one location table, not five",async()=>{
  /* There were five, and they had already drifted — Fixed Repairs had no OFF
     PROPERTY entry and the share export's SHOP WALL prefix was missing its
     hyphen. Every one of them prefix-matched "garage-", which is the bug above.
-    A sixth copy would reintroduce it, so the table is asserted to exist once. */
+
+    This checks those five specifically. It is NOT a guarantee that no sixth
+    location-to-text mapper exists — two others do, and both are fine because
+    they resolve through sectionForLocation first and speak in AREA names
+    rather than labels: movedFromLabel in app/page.tsx and areaLabel in
+    app/operator-engine.ts. Both were read and both name the trouble bays
+    correctly. The claim here is the narrow one the assertions actually make. */
  const files=["../app/defect-log/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../app/defect-log/quick-filter-share.ts"];
  for(const file of files){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
@@ -12061,4 +12067,74 @@ test("the chip row escapes the quick-filter drawer's broad child rule",async()=>
  assert.ok(globals.indexOf(".time-window-chip{")<globals.lastIndexOf(".time-window-chip{flex:1"));
  /* Seven targets across a 360px row: 38px tall, sharing the width. */
  assert.match(globals,/@media\(max-width:620px\)\{[^@]*\.time-window-chip\{flex:1;min-width:0;min-height:38px/);
+});
+
+test("one undated deferral cannot make a six-day-old bus disappear",async()=>{
+ /* Found by review, reproduced in a browser: sorting on deferredAt and taking
+    the first put "" ahead of every ISO stamp, so a bus carrying one undated
+    deferral beside dated ones read as undated — and an undated row falls out
+    of every narrowed window. A bus held six days vanished under 7D and was
+    counted as "1 HIDDEN". The wrong direction for a list of buses nobody has
+    ruled on. */
+ const {busDeferredMinutes}=await import("../app/deferred-counts.ts");
+ const {withinTimeWindow}=await import("../app/time-window.ts");
+ const now=new Date("2026-09-10T12:00:00.000Z");
+ const at=hours=>new Date(now.getTime()-hours*3600000).toISOString();
+ const deferred=deferredAt=>({id:"d"+deferredAt,state:"deferred",deferredAt});
+ const sixDays=deferred(at(144)),undated={id:"d-none",state:"deferred",deferredAt:""};
+ /* The undated one sorts first and must not decide. */
+ assert.equal(Math.round(busDeferredMinutes([undated,sixDays],now)),144*60);
+ assert.equal(Math.round(busDeferredMinutes([sixDays,undated],now)),144*60);
+ assert.equal(withinTimeWindow(busDeferredMinutes([undated,sixDays],now),"7d"),true);
+ /* The longest hold wins, not the newest — a bus standing since Monday does
+    not become recent because a second repair was deferred on it today. */
+ assert.equal(Math.round(busDeferredMinutes([deferred(at(1)),deferred(at(30))],now)),30*60);
+ /* A bus with nothing dated at all still has no age, and still shows under ALL. */
+ assert.equal(busDeferredMinutes([undated],now),null);
+ assert.equal(withinTimeWindow(busDeferredMinutes([undated],now),"all"),true);
+ /* And the two surfaces that draw this list read it from here rather than
+    each working it out — they disagreed before, which is the whole point. */
+ const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ for(const [name,source] of [["the board",board],["the quick filter",page]]){
+  assert.match(source,/busDeferredMinutes\(/,name+" reads the shared rule");
+  assert.equal(/localeCompare\(String\(b\.deferredAt/.test(source),false,name+" no longer sorts on a blank stamp");
+ }
+});
+
+test("a collapsed board never shows a narrowed count with nothing saying so",async()=>{
+ /* The chips and the N HIDDEN button are inside the collapse and the header
+    count is not, so a board collapsed while narrowed read as a smaller list
+    with no explanation on screen — and both boards are collapsed by DEFAULT,
+    making that the resting state rather than an edge case. */
+ for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  /* DERIVED through the collapse, not reset by an effect and not by a line in
+     the toggle's onClick. An effect runs after the commit, which left one
+     frame showing the reduced count — measured at 2 on a board holding 3 —
+     and the onClick would miss the page restoring `collapsed` from storage on
+     mount. Reading it through makes the two impossible to disagree at all. */
+  assert.match(source,/const activeWindow:TimeWindowKey=collapsed\?"all":windowKey;/,file);
+  assert.match(source,/withinTimeWindow\([^)]*\),activeWindow\)/,file+" filters on the derived value");
+  assert.equal(/if\(collapsed\)setWindowKey/.test(source),false,file+" does not reset it after the fact");
+  /* The chips still show the chosen window, so expanding restores the filter
+     the person set rather than silently discarding it — the count is only ever
+     narrowed while the line explaining it is on screen. */
+  assert.match(source,/<TimeWindowChips value=\{windowKey\}/,file);
+ }
+});
+
+test("the SHOW ALL button is the same size on the boards and in the drawer",async()=>{
+ /* globals.css carries `aside div button{...padding:7px...}` and the
+    quick-filter drawer is an <aside>, so an unset property on either chip
+    control is inherited there and nowhere else. .time-window-hidden declared
+    no padding and measured 7px in the drawer against 0 on the boards — one
+    control at two sizes. A class beats three elements, so the fix is simply to
+    declare it. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.time-window-hidden\{[^}]*padding:/);
+ assert.match(css,/\.time-window-chip\{[^}]*padding:/);
+ /* And the rule it is defending against is really there, so this test fails
+    honestly if somebody removes it and wonders why the padding is pinned. */
+ assert.match(css,/aside div button\{[^}]*padding:7px/);
 });

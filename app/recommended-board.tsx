@@ -54,6 +54,23 @@ export default function RecommendedBoard({fleet,downEntries,collapsed,onCollapse
  const now=new Date();
  /* Not named `window`, for the same reason DeferredBoard's is not. */
  const [windowKey,setWindowKey]=useState<TimeWindowKey>("all");
+ /* COLLAPSING CLEARS THE WINDOW. The chips and the N HIDDEN button live
+    inside the collapse; the header count does not. So a board collapsed while
+    narrowed showed a reduced number with nothing on screen saying it was
+    reduced — and both boards are collapsed by DEFAULT, which makes that the
+    resting state rather than an edge. Found by review and measured: three held
+    buses, narrowed to one, collapsed, the header still read 1.
+
+    An effect rather than a line in the toggle's onClick, because the page owns
+    `collapsed` and restores it from storage on mount; this covers every route
+    into the collapsed state, not just the button. Clearing rather than showing
+    the unfiltered total, so that expanding never changes the number under
+    somebody's eyes either. */
+ /* Derived, NOT an effect. An effect runs after the commit, so collapsing
+    while narrowed rendered one frame with the reduced count still showing —
+    measured at 2 where the board holds 3. Reading it through the collapse
+    makes the two impossible to disagree at any point. */
+ const activeWindow:TimeWindowKey=collapsed?"all":windowKey;
  const all=useMemo(()=>recommendedBuses(fleet,downEntries),[fleet,downEntries]);
  /* Judged on the LONGEST wait on the bus, the same number the card prints —
     so "the last 24 hours" means the bus has been waiting less than a day, not
@@ -61,7 +78,7 @@ export default function RecommendedBoard({fleet,downEntries,collapsed,onCollapse
     morning. This board reaches 3D and 7D in normal use where DEFERRED never
     does; Curtis: "that bus could be in that status for a while, which is
     fine." */
- const buses=all.filter(group=>withinTimeWindow(busRecommendedMinutes(group.defects,now),windowKey));
+ const buses=all.filter(group=>withinTimeWindow(busRecommendedMinutes(group.defects,now),activeWindow));
  return <section className={"mystery-board recommended-board"+(collapsed?" collapsed":"")} aria-label="Buses recommended for the Down Sheet">
   <header className="mystery-head"><span><b>RECOMMENDED FOR DOWN SHEET</b><small>PUT FORWARD BY SOMEBODY, NOT RULED ON YET</small></span>
    <div className="mystery-header-actions"><strong>{buses.length}</strong>

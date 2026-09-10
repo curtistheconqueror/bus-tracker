@@ -41,7 +41,7 @@
    thing. */
 
 import {useMemo,useState} from "react";
-import {heldDeferredBuses} from "./deferred-counts";
+import {busDeferredMinutes,heldDeferredBuses} from "./deferred-counts";
 import TimeWindowChips from "./time-window-chips";
 import {withinTimeWindow,type TimeWindowKey} from "./time-window";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
@@ -53,12 +53,13 @@ import type {StructuredDefect} from "./repair-catalog";
 
 export const DEFERRED_BOARD_COLLAPSED_KEY="pace-down-sheet-deferred-collapsed-v1";
 
-/* The oldest deferral on the bus, in minutes, or null when none of them
-   carries a usable time. Shared by the card and the window filter so the
-   number a row shows is the number it was judged on. */
-function leadMinutes(defects:StructuredDefect[],now:Date){
- const lead=[...defects].sort((a,b)=>String(a.deferredAt||"").localeCompare(String(b.deferredAt||"")))[0];
- return lead?deferredMinutesElapsed(lead,now):null;
+/* The repair whose label the card prints: the one actually held longest, with
+   an undated repair used only when nothing else is available. Same ordering as
+   leadMinutes, so the sentence and the clock beside it describe one repair. */
+function leadDefect(defects:StructuredDefect[],now:Date){
+ const dated=defects.filter(defect=>deferredMinutesElapsed(defect,now)!==null);
+ if(!dated.length)return defects[0];
+ return dated.reduce((oldest,defect)=>(deferredMinutesElapsed(defect,now) as number)>(deferredMinutesElapsed(oldest,now) as number)?defect:oldest);
 }
 
 function held(minutes:number|null){
@@ -83,13 +84,30 @@ export default function DeferredBoard({fleet,downEntries,collapsed,onCollapsedCh
     inside a file that may later reach for localStorage is a trap laid for
     somebody else. */
  const [windowKey,setWindowKey]=useState<TimeWindowKey>("all");
+ /* COLLAPSING CLEARS THE WINDOW. The chips and the N HIDDEN button live
+    inside the collapse; the header count does not. So a board collapsed while
+    narrowed showed a reduced number with nothing on screen saying it was
+    reduced — and both boards are collapsed by DEFAULT, which makes that the
+    resting state rather than an edge. Found by review and measured: three held
+    buses, narrowed to one, collapsed, the header still read 1.
+
+    An effect rather than a line in the toggle's onClick, because the page owns
+    `collapsed` and restores it from storage on mount; this covers every route
+    into the collapsed state, not just the button. Clearing rather than showing
+    the unfiltered total, so that expanding never changes the number under
+    somebody's eyes either. */
+ /* Derived, NOT an effect. An effect runs after the commit, so collapsing
+    while narrowed rendered one frame with the reduced count still showing —
+    measured at 2 where the board holds 3. Reading it through the collapse
+    makes the two impossible to disagree at any point. */
+ const activeWindow:TimeWindowKey=collapsed?"all":windowKey;
  const all=useMemo(()=>heldDeferredBuses(fleet,downEntries),[fleet,downEntries]);
  /* The LONGEST-held repair on the bus decides, which is the same repair the
     card already prints its time from. Taking the newest instead would let a
     bus held since Monday reappear in "the last hour" because somebody deferred
     a second repair on it this morning — the bus has been standing since
     Monday, and that is the fact this list is for. */
- const buses=all.filter(group=>withinTimeWindow(leadMinutes(group.defects,now),windowKey));
+ const buses=all.filter(group=>withinTimeWindow(busDeferredMinutes(group.defects,now),activeWindow));
  return <section className={"mystery-board deferred-board"+(collapsed?" collapsed":"")} aria-label="Deferred buses">
   <header className="mystery-head"><span><b>DEFERRED BUSES</b><small>HELD BACK AND NOT ON THE DOWN SHEET — HERE OR ON THE ROAD</small></span>
    <div className="mystery-header-actions"><strong>{buses.length}</strong>
@@ -101,8 +119,8 @@ export default function DeferredBoard({fleet,downEntries,collapsed,onCollapsedCh
   {!collapsed&&(buses.length?<div className="mystery-list">{buses.map(({bus,defects})=>{
    /* The longest-held repair leads the card, so the time shown is how long this
       bus has actually been standing rather than whichever defect sorted first. */
-   const lead=[...defects].sort((a,b)=>String(a.deferredAt||"").localeCompare(String(b.deferredAt||"")))[0];
-   const minutes=leadMinutes(defects,now);
+   const lead=leadDefect(defects,now);
+   const minutes=busDeferredMinutes(defects,now);
    return <article className="mystery-card deferred-card" key={bus.id}>
     <div className="mystery-card-main">
      <span className="mystery-number"><small>BUS</small><b>{bus.n}</b></span>

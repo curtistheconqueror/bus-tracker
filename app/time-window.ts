@@ -37,7 +37,7 @@ export const TIME_WINDOWS:{key:TimeWindowKey;label:string;minutes:number}[]=[
 ];
 
 export function timeWindowMinutes(key:TimeWindowKey){
- return TIME_WINDOWS.find(window=>window.key===key)?.minutes||0;
+ return TIME_WINDOWS.find(item=>item.key===key)?.minutes||0;
 }
 
 /* AN UNDATED ROW FALLS OUT OF EVERY NARROWED WINDOW, and stays in ALL.
@@ -62,6 +62,6 @@ export function withinTimeWindow(minutes:number|null,key:TimeWindowKey){
 /* What the heading of a shared list says. "" for ALL, because a list with no
    window is just the list and saying so would be noise. */
 export function timeWindowLabel(key:TimeWindowKey){
- const window=TIME_WINDOWS.find(item=>item.key===key);
- return !window||!window.minutes?"":"LAST "+window.label;
+ const found=TIME_WINDOWS.find(item=>item.key===key);
+ return !found||!found.minutes?"":"LAST "+found.label;
 }
