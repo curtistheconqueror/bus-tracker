@@ -11532,6 +11532,29 @@ test("unticking RECOMMEND FOR DOWN SHEET actually sticks",async()=>{
  assert.deepEqual([...new Set(deleted)].sort(),["downSheetRecommendation","workStates"]);
  for(const field of deleted)assert.ok(sync.includes(field+":incoming."+field),
   field+" is deleted by repair-catalog.ts, so saveDefectLogRecord must take it from the incoming record or the removal is lost");
+
+ /* THE OTHER HALF OF THAT FIX, driven rather than read. Pulling a field out of
+    the spread means a caller passing a PARTIAL patch would now wipe it instead
+    of inheriting it. Every caller either passes a complete record built from
+    the stored one, or mints a brand-new defect where there is nothing to
+    inherit — both paths are exercised here, because the risk of this fix is
+    the mirror image of the bug it fixes. */
+ const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const stamp={at:"2026-09-09T21:00:00.000Z",by:"CJ"};
+ const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
+  {id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:stamp}]}];
+ const kept=saveDefectLogRecord(fleet,[],"b",{...fleet[0].defects[0],details:"edited"},false,"2026-09-10T00:00:00.000Z");
+ assert.deepEqual(kept.fleet[0].defects[0].downSheetRecommendation,stamp,
+  "editing a record from a complete copy keeps the recommendation it already carried");
+ const dropped=saveDefectLogRecord(fleet,[],"b",setDownSheetRecommendation(fleet[0].defects[0],false,"2026-09-10T00:00:00.000Z"),false,"2026-09-10T00:00:00.000Z");
+ assert.equal(dropped.fleet[0].defects[0].downSheetRecommendation,undefined,
+  "and unticking it actually removes it — the bug this whole test is about");
+ /* A new defect cannot inherit a recommendation from a record that is not
+    there. This is the scan-sweep path, which mints its own ids. */
+ const minted=saveDefectLogRecord(fleet,[],"b",{id:"sweep-1",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service"},false,"2026-09-10T00:00:00.000Z");
+ assert.equal(minted.fleet[0].defects.find(defect=>defect.id==="sweep-1").downSheetRecommendation,undefined);
+ assert.deepEqual(minted.fleet[0].defects.find(defect=>defect.id==="d1").downSheetRecommendation,stamp,
+  "and adding one defect must not disturb another's recommendation");
 });
 
 test("the recommended list can be answered from the board and from the quick filter",async()=>{
