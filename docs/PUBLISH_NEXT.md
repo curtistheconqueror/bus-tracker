@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 172 IS PENDING — publish from `ae42731`.**
+**STATUS: 172 IS PENDING — publish from `66f7634`.**
 
 Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
 on top of it, plus the merge that brought 171's own record into the branch —
@@ -14,6 +14,48 @@ git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
 ```
 
 ## What 172 is
+
+Three things: a bug that made three of the four themes unreadable, a readability
+pass on the closing line and the spacing around an opened bus, and **HOLD THIS
+BUS** — a new per-bus status.
+
+### HOLD THIS BUS
+
+Curtis: "somebody just asked me about two buses that are gonna probably come in
+to B12, and if they do, they want me to hold those buses, because they got work
+they have to do on them. There's no feature in the app that allows you to do
+that."
+
+- A standing instruction on a BUS, set from the **Facility Map bus editor** and
+  from an opened bus on the **Defect Log**. Both, because the Defect Log only
+  draws buses that have defects and a bus somebody wants kept usually has
+  nothing wrong with it — in this case the buses had not arrived yet.
+- **Nothing about where the bus is ever clears it.** Curtis first said a
+  location move should lift it, then chose otherwise when asked: his buses were
+  arriving, and arriving is a move.
+- **The time is optional** and is an expiry, applied at read time. Left blank
+  the hold stands until somebody takes it off. An expired hold is left on the
+  record rather than rewritten away.
+- **Pressing any HOLD badge lists every held bus** with its time, where it is,
+  and how long it has been held. The time appears only there, never on the
+  badge.
+- New optional `hold` field on the bus record in `pace-board-v1`. **No new
+  storage key, no rename.** It syncs; `busUpdatedAt` counts its stamp so a hold
+  is not dropped as out of order, and clearing deletes the key rather than
+  setting `undefined`, which would have changed every bus's fingerprint.
+
+### What to check once HOLD is live
+
+- On the Facility Map, open any bus → **HOLD THIS BUS** → PUT ON HOLD. An amber
+  HOLD badge appears on its token and a HOLD count appears in the tools row.
+- Press either badge: the list of every held bus. Take one off from there.
+- Hold a bus with **no defects at all** — it must still work, and it will not
+  appear on the Defect Log.
+- Set a time on one, then move that bus somewhere else. **The hold must
+  survive the move.**
+- On the Defect Log, open a bus → HOLD BUS beside + ADD DEFECT.
+
+
 
 **One commit, one bug, no new setting and nothing that rewrites a record.**
 Rolling back is redeploying 171 (`649cef5`, Sites Version 171).
