@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `0c8a0f3`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `5d7cbdb`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `0c8a0f3` is the last CODE
+**Read the SHA above, not a SHA you remember.** `5d7cbdb` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,11 +13,12 @@ this SHA first.**
 
 ## What 171 is
 
-**Ten commits.** No migration, no schema change, no dependency change, no
-storage key added or renamed, and nothing that rewrites a record. One header's
-markup, one CSS property on three selectors, eighteen new catalog options, one
-new optional field on a defect, and the Defect Log's two pickers rebuilt as
-typing fields.
+**Thirteen commits.** No migration, no schema change, no dependency change,
+and nothing that rewrites a record. **Two new storage keys, both per-device and
+neither renaming anything** (`pace-down-sheet-recommended-collapsed-v1`,
+`pace-role-v1`), eighteen new catalog options, one new optional field on a
+defect, a third board on the Down Sheet, the Defect Log's two pickers rebuilt
+as typing fields, and one bug fixed that was live in 170.
 
 - **The Facility Map's header joins the other five.** It was the one page whose
   nav sat above its own name — Curtis, on a phone: *"the facility map needs to
@@ -102,6 +103,49 @@ typing fields.
   inside `detail` the same way. A record that has none does not carry the key at
   all, so **no existing row's cloud fingerprint changes** and nothing re-pushes.
 
+- **A third board on the Down Sheet: RECOMMENDED FOR DOWN SHEET**, directly
+  under MYSTERY BUSES and DEFERRED BUSES, reusing their look down to the action
+  buttons with the Down Sheet's own blue as its stripe. Curtis: "right under
+  both of them, same color and everything, same functionality, with the same
+  number count."
+
+  It counts BUSES, not rows, so two recommendations on one bus count once, and
+  it drops a bus as soon as the repair is fixed, deleted, or put on the sheet —
+  the "in sync" part he asked for. A bus already on the sheet is not listed, the
+  same rule DEFERRED applies one board up. Nothing here goes overdue: a
+  recommendation waiting a week has not gone wrong.
+
+- **The same list in QUICK FILTERS now says how long each bus has been waiting**
+  and carries two actions: MARK FIXED closes the repair out, REMOVE withdraws
+  the recommendation and leaves the repair open. They are the Down Sheet's own
+  row actions — its tick and its cross — and neither destroys a record. The
+  board and the drawer share one counting function so they cannot disagree.
+
+- **DEFERRED no longer claims the bus is on property.** Curtis: "deferred buses
+  do not have to be on property... whether they're here or on the road." The
+  counting was already right; the subtitle was not, which is the worse half to
+  get wrong — a wrong number gets questioned, a wrong label invites the next
+  person to change the code until it agrees.
+
+- **A BUG THAT IS LIVE IN 170: unticking RECOMMEND FOR DOWN SHEET never stuck.**
+  The setter deletes its key, and the save merged with `{...existing,...incoming}`
+  where a missing key cannot override the stored value — so the recommendation
+  came back on the next read, in the defect editor too. `workStates` had this
+  exact bug, was fixed, and nobody checked whether anything else was deleted the
+  same way. Two fields are. A test now derives that list from the catalog so a
+  third cannot be forgotten. **Anybody who tried to withdraw a recommendation
+  since DS REC shipped will find it still there until this publishes.**
+
+- **The home screen asks what you do.** A collapsible MY ROLE panel under the
+  FULL/LITE choices: Transportation (Bus Operator, Dispatch, Superintendent) or
+  Maintenance (Servicer, Mechanic / Technician, Foreman, Superintendent).
+
+  **It is cosmetic and must stay that way.** Curtis: "there will be no special
+  conditions in the app for any of the working roles. This is all cosmetic. We
+  will wire that up later." A test asserts no surface outside the picker reads
+  the key. It is per-device and never synced, and a first run still cannot get
+  past the gate without answering FULL or LITE.
+
 ### What to check once 171 is live
 
 - On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
@@ -125,6 +169,16 @@ typing fields.
   change in 171 — if it is unwanted, say so and it comes out on its own.
 - No page should scroll sideways. That is what the `overflow-x` change could
   plausibly break, so it is worth one swipe on the map and the Down Sheet.
+- **On the Down Sheet, three boards in a row** — MYSTERY, DEFERRED, RECOMMENDED
+  FOR DOWN SHEET — each collapsed until opened. A bus out on the road that
+  somebody deferred should be counted in the second one.
+- **Tick RECOMMEND FOR DOWN SHEET on a defect, save, reopen it and untick it.**
+  It should stay unticked. Before this release it came back.
+- **Open QUICK FILTERS → Recommended for Down Sheet.** Each bus should say how
+  long it has been waiting and offer MARK FIXED and REMOVE. REMOVE takes it off
+  the list and leaves the repair open on the Defect Log.
+- **Touch FLEETSTEP, open MY ROLE, pick one.** It should be remembered and
+  should change nothing else anywhere in the app.
 - **Log "Add coolant (glycol)" and tick ENGINE OIL under ALSO TOPPED UP.** One
   record should save, reading *Add coolant (glycol) — also added engine oil*,
   and the QUANTITY box should be there for coolant at all — it never was before.
