@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `849bee5`.**
+**STATUS: 171 IS PENDING — publish from `a8bb5a9`.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -23,10 +23,10 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `849bee5` contains every line of 170 — so publishing 171 fixes
+forward anyway — `a8bb5a9` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `3102444` (still true of `849bee5`, which only adds to
+Verified in Chromium on `3102444` (still true of `a8bb5a9`, which only adds to
 it), all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
@@ -35,7 +35,7 @@ covers it), and the home screen opens full-screen and visible.
 
 Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `849bee5` is the last CODE
+**Read the SHA above, not a SHA you remember.** `a8bb5a9` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -275,7 +275,24 @@ thing in it that goes stale silently.
   restored from yesterday would open a board of buses nobody has ruled on
   already hiding them.
 
-### What to check once 171 is live
+#- **Three opt-in ways to tell one bus from the next, in Settings → Defect Log →
+  BUS GROUP SEPARATION.** Curtis: "the bus title card from the defects still
+  looks like it flows into the next bus card." A vertical full-height bus-number
+  rail, a switch that leaves the strong blue to the bus number alone, and a
+  closing line under an opened bus.
+
+  **All three ship OFF, so this release changes nothing on any screen until
+  somebody turns one on** — he asked for that explicitly: "I might not like it,
+  but I just wanna make sure we can roll back at any point." Nothing here writes
+  to a record; the switch is the whole of the undo.
+
+  Each is OFF / PHONE ONLY / EVERY SCREEN rather than on-off, because the
+  run-on it fixes is a phone problem and the iPad already reads. PHONE is a
+  WIDTH — the app's own 620px breakpoint, answered live by CSS — never a
+  detected device: an iPad in split screen is phone-width and wants it, and a
+  stored "this is an iPad" would be wrong the moment it was rotated.
+
+## What to check once 171 is live
 
 - **Move a bus into Trouble Bay 12 from the Defect Log** (tap the location line
   under the bus number). The line must then read **Trouble Bay 12**, not Main
@@ -296,6 +313,13 @@ thing in it that goes stale silently.
 - Log a defect under **Bus Accessories** and scroll the option list to the
   bottom: ten **Wipers and Washers** options — blade and motor per side, and the
   washer set.
+- **The Defect Log should look EXACTLY as it did.** All three new view options
+  default to off. If anything about the feed has changed on a device that has
+  not been into Settings, that is a bug in this release.
+- Then Settings → Defect Log → BUS GROUP SEPARATION, set BUS NUMBER DOWN THE
+  SIDE to **Phone only**. On a phone the number turns on its side in a
+  full-height stripe and the location moves beside the status; on the shop
+  computer nothing changes. Set it to **Every screen** and the computer follows.
 - **Open + LOG DEFECT and type "wiper motor" without choosing a category.** It
   should find it and set the category itself. Then tap the same field with
   nothing typed: the full list should open the way the old drop-down did.
