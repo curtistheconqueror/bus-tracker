@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 172 IS PENDING — publish from `b4b4b8a`.**
+**STATUS: 172 IS PENDING — publish from `3de6dab`.**
 
 Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
 on top of it, plus the merge that brought 171's own record into the branch —
@@ -18,6 +18,11 @@ git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
 Three things: a bug that made three of the four themes unreadable, a readability
 pass on the closing line and the spacing around an opened bus, and **HOLD THIS
 BUS** — a new per-bus status.
+
+### The line under FLEETSTEP
+
+9px to `clamp(10px,2.9vw,12px)`, so it grows with the screen instead of being
+one size on a phone and a shop computer.
 
 ### HOLD THIS BUS
 
