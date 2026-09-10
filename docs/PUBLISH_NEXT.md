@@ -1,7 +1,38 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `fed4f80`.** Release 170 is live from
-`bdca898` as Sites Version 166.
+**STATUS: 171 IS PENDING — publish from `fed4f80`.**
+
+## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
+
+Curtis has now reported three times that tapping the FLEETSTEP title does not
+take him to the home screen. **It is not a code bug** — the fix has simply never
+reached his phone. What the title is, per release:
+
+| Release | Sites | The title is | Tapping it does |
+| --- | --- | --- | --- |
+| 169 | 165 | `<b>` — plain bold text | **nothing at all; it is not a control** |
+| 170 | 166 | `<a href="/">` | goes to the Facility Map, not the home screen |
+| **171** | pending | `<button>` → the home screen | **what he asked for** |
+
+**There may be a discrepancy between the record and the deployment.** This file
+and `docs/RELEASES.md` both say release 170 / Sites 166 is live from `bdca898`.
+Curtis says Codex told him the release is **169**. If the site really is serving
+169, then 170 never went out either — and 170 existed only because the SCAN
+SHEET fixes missed 169. That would be three releases in a row where the record
+and the deployment disagreed.
+
+**So: check what Sites is actually serving before publishing 171, and tell
+Curtis the number you find.** If 170 is genuinely not live, 171 carries it
+forward anyway — `fed4f80` contains every line of 170 — so publishing 171 fixes
+both. Nothing needs to be published twice.
+
+Verified in Chromium on `fed4f80`, all six surfaces at 390px and 1180px: the
+title renders as a `<button>`, the tap lands on the button itself (nothing
+covers it), and the home screen opens full-screen and visible.
+
+---
+
+Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
 **Read the SHA above, not a SHA you remember.** `fed4f80` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
