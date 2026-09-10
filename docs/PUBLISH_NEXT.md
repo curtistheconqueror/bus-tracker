@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 172 IS PENDING — publish from `66f7634`.**
+**STATUS: 172 IS PENDING — publish from `b4b4b8a`.**
 
 Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
 on top of it, plus the merge that brought 171's own record into the branch —
