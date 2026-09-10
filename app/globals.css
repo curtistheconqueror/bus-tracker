@@ -1183,14 +1183,22 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
    BUTTON — Curtis: "pressing it on one bus, I wanted to show all the buses that
    are being held" — so it needs a real target height rather than the 17px the
    label-shaped badges beside it get away with. */
-/* 28px, and the phone rule below takes it to 34. It shares .work-state-badge
-   with the DS REC and WAS DEFERRED labels, which are 17px because a LABEL can
-   be — this one is a button that opens the held-bus list, so it needs a target.
-   Measured at 22px on the first pass: the phone block's .work-state-badge rule
-   sits after this one in the file and won on source order at equal
-   specificity, which is the same trap that has cost this stylesheet two
-   debugging rounds already. */
-.bus-hold-badge{min-height:28px;border-color:#a35a00;background:#fff4e6;color:#8a4a00;padding:0 8px;cursor:pointer;touch-action:manipulation}
+/* THE SAME BADGE AS DEFERRED, in a different colour. Curtis asked twice — "it
+   can look just the same, maybe the colour can be different", then "make sure
+   the badge is similar to the deferred one, in size etc" after seeing it.
+
+   So these numbers are copied from .inline-deferred-history-badge, the WAS DEF
+   badge it sits beside, rather than chosen: 24px tall, a 12px pill radius, 8px
+   of side padding, 9px type. Measured before and after — HOLD was 47x36 next to
+   a 37x24 WAS DEF, which is what he was looking at.
+
+   THE TAP TARGET IS KEPT WITHOUT MAKING THE BOX BIGGER. This one is a button
+   and the badges beside it are labels, so an invisible ::after stretches the
+   hit area to 40px while the drawn pill stays 24px. Bounded deliberately: the
+   card's timestamps sit below this cell, and an overlay tall enough to swallow
+   them would trade one problem for a worse one. Measured — see the test. */
+.bus-hold-badge{position:relative;height:24px;min-height:0;border-color:#a35a00;border-radius:12px;background:#fff4e6;color:#8a4a00;padding:0 8px;font-size:9px;cursor:pointer;touch-action:manipulation}
+.bus-hold-badge::after{content:"";position:absolute;left:0;right:0;top:50%;height:40px;transform:translateY(-50%)}
 .bus-hold-badge:hover,.bus-hold-badge:focus-visible{background:#ffe6c7;outline:none}
 
 .bus-hold-shade{align-items:flex-start;padding:0}
@@ -1221,7 +1229,6 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
 .hold-bus-button{min-height:40px;border:1px solid #a35a00;border-radius:6px;background:#fff4e6;color:#8a4a00;padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
 .hold-bus-button.on{background:#a35a00;color:#fff}
 @media(max-width:620px){
- .bus-hold-badge{min-height:34px;padding:0 10px}
  .hold-bus-row{grid-template-columns:1fr}
  .bus-hold-row{grid-template-columns:52px minmax(0,1fr)}
  .bus-hold-elapsed{grid-column:2}

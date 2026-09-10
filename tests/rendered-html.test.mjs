@@ -12515,20 +12515,29 @@ test("the HOLD badge is a button that opens every held bus, and never shows the 
   assert.match(page,/<HoldBoard fleet=/,file+" opens the list");
   assert.match(page,/<HoldBadge count=/,file+" draws the badge");
  }
- /* The badge is a real target, not a 17px label like the DS REC one beside it,
-    and getting there took beating a rule rather than writing one. It sits in
-    the Defect Log's meta column, where .log-meta .work-state-badge (0,2,0)
-    pins the label-shaped badges to 22px and beats .bus-hold-badge (0,1,0) in
-    globals.css. Measured 22px at every width until the matching-specificity
-    rule existed; 36px on a phone and 32px on the shop computer now. */
+ /* THE SAME SIZE AS THE DEFERRED BADGE. Curtis asked twice — "it can look just
+    the same, maybe the colour can be different", then "make sure the badge is
+    similar to the deferred one, in size etc" after seeing it at 47x36 beside a
+    37x24 WAS DEF. These numbers are copied from .inline-deferred-history-badge
+    rather than chosen, so they are asserted against it rather than as
+    literals: whatever that badge is, this one matches. */
  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- assert.match(css,/\.bus-hold-badge\{min-height:28px/,"the base size, for the map");
- assert.match(logCss,/\.log-meta \.bus-hold-badge\{min-height:32px/,"and one that actually reaches it on a card");
- assert.match(logCss,/@media\(max-width:620px\)\{\n \.log-meta \.bus-hold-badge\{min-height:36px\}/);
- /* The rule it is fighting is really there, so this fails honestly if somebody
-    removes it and wonders why the badge is pinned. */
- assert.match(logCss,/\.log-meta \.work-state-badge\{min-height:22px/);
+ const deferred=(css+logCss).match(/\.inline-deferred-history-badge\{[^}]*\}/g).join("");
+ for(const property of ["height:24px","border-radius:12px","font-size:9px"])
+  assert.ok(deferred.includes(property.replace("height:24px","height:17px"))||deferred.includes(property),"the deferred badge still declares "+property);
+ assert.match(css,/\.bus-hold-badge\{position:relative;height:24px;[^}]*border-radius:12px/);
+ assert.match(css,/\.bus-hold-badge\{[^}]*padding:0 8px;font-size:9px/);
+ /* And a rule that actually reaches it on a card: .log-meta .work-state-badge
+    (0,2,0) pins every badge in that column to 22px and beats .bus-hold-badge
+    (0,1,0), so the size set in globals.css never applied there. */
+ assert.match(logCss,/\.log-meta \.bus-hold-badge\{min-height:0;height:24px;padding:0 8px;border-radius:12px\}/);
+ assert.match(logCss,/\.log-meta \.work-state-badge\{min-height:22px/,"the rule it has to match, so this fails honestly if that one goes");
+ /* The tap target is kept without making the box bigger, because this one is a
+    button and the badges beside it are labels. Measured: a 24px pill with 40px
+    of reachable height, and nothing of its neighbours' taps stolen — the
+    timestamps below it stay topmost at their own centres. */
+ assert.match(css,/\.bus-hold-badge::after\{content:"";position:absolute;left:0;right:0;top:50%;height:40px;transform:translateY\(-50%\)\}/);
  /* NOT in the badge slot above it. That slot is a pair of FIXED sub-slots so
     DS and the count sit at the same x with or without each other; a third
     badge moves them, which is the tab-stop rule two tests hold after the DS

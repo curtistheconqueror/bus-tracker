@@ -1182,13 +1182,9 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-card-group.expanded{margin-bottom:8px}
 }
 
-/* THE HOLD BADGE IS A BUTTON, and .log-meta .work-state-badge is not.
-
-   That rule (0,2,0) sets min-height:22px for the label-shaped badges in this
-   column — DS REC, WAS DEFERRED — and it beats the 28px on .bus-hold-badge
-   (0,1,0) in globals.css. Measured 22px at every width until this existed.
-   A label can be 22px; a control that opens the held-bus list cannot. */
-.log-meta .bus-hold-badge{min-height:32px;padding:0 9px}
-@media(max-width:620px){
- .log-meta .bus-hold-badge{min-height:36px}
-}
+/* .log-meta .work-state-badge (0,2,0) pins every badge in this column to
+   min-height:22px and beats .bus-hold-badge (0,1,0) in globals.css, so the
+   size set there never reached a card. Matching its specificity is what makes
+   HOLD the same 24px as the WAS DEF badge beside it — which is what Curtis
+   asked for — rather than the 22px this column would otherwise impose. */
+.log-meta .bus-hold-badge{min-height:0;height:24px;padding:0 8px;border-radius:12px}
