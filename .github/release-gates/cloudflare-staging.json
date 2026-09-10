@@ -1,6 +1,6 @@
 {
   "approval": "CURTIS_APPROVED",
-  "approvedAt": "2026-09-10T17:59:04Z",
-  "approvedSourceCommit": "5b9e0e1aa988a6e85448a855e7228be95786b799",
+  "approvedAt": "2026-09-10T18:05:04Z",
+  "approvedSourceCommit": "670ed1903b20d6355a80c5d0fb624e1149a911ef",
   "target": "fleetstep staging"
 }
