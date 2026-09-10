@@ -1249,11 +1249,21 @@ export default function DefectLog(){
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
      <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
     </section>)}
+    </div>}
      {/* THE CLOSING LINE, off unless asked for. Curtis wanted this one kept as
          an option rather than built in: it is the plainest of the three and the
-         easiest to find unnecessary once the rail is doing the same job. */}
-     <p className="log-bus-end-marker" aria-hidden="true">END OF BUS {group.bus.n} · {group.records.length} DEFECT{group.records.length===1?"":"S"}</p>
-    </div>}
+         easiest to find unnecessary once the rail is doing the same job.
+
+         OUTSIDE the defect list, and that is what lets it run the full width of
+         the card. Inside it, the list's own side padding held it 8px short of
+         each edge at 390 and 10px at 1180 — and matching those with negative
+         margins would have meant guessing which of the four .grouped-defect-list
+         padding rules wins at each breakpoint. Out here it is a direct child of
+         the card and simply spans it.
+
+         It also reads better: this is the end of the BUS, not another item in
+         the bus's list of defects. */}
+     {expanded&&<p className="log-bus-end-marker" aria-hidden="true">END OF BUS {group.bus.n} · {group.records.length} DEFECT{group.records.length===1?"":"S"}</p>}
    </article>})}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
   </section>
   {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>

@@ -1089,9 +1089,22 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
 .defect-log-app[data-bus-blue="always"] .grouped-defect-number{background:var(--log-header)}
 
-/* 3. THE CLOSING LINE. Rendered always, shown only when asked. */
-.log-bus-end-marker{display:none}
-.defect-log-app[data-bus-end="always"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+/* 3. THE CLOSING LINE. Rendered only on an opened bus, shown only when asked.
+
+   FULL CARD WIDTH, 9px, and darker than muted — Curtis: "that text should be a
+   little bigger and go further across the bottom of each portion, and make it a
+   little bit darker so it is easier to see." It sits outside the defect list
+   for the width (see page.tsx); the tone is a 72% mix toward --log-text, which
+   goes dark on the light theme and light on the three dark ones, so "darker"
+   means "further from the background" on all four rather than literally black.
+   Solid rule rather than dashed, since it is now doing the work of an edge. */
+/* grid-column:1/-1 EVEN THOUGH IT IS HIDDEN HERE. Moving this out of the defect
+   list to get its full width made it a direct child of the card, which is a
+   two-column grid — so it auto-placed into the 82px bus column and measured
+   64px wide, narrower than it had been inside the list it left. 1/-1 spans both
+   columns, and spans the single column under the vertical rail too. */
+.log-bus-end-marker{display:none;grid-column:1/-1}
+.defect-log-app[data-bus-end="always"] .log-bus-end-marker{display:block;margin:0;border-top:1px solid var(--log-border);padding:9px 10px;color:color-mix(in srgb,var(--log-text) 72%,var(--log-surface));font-size:9px;font-weight:900;letter-spacing:1.4px;text-align:center}
 
 /* The inline location is hidden until a rail hides the column copy. Its own
    rule rather than a shared one, because it is the only control here that
@@ -1130,7 +1143,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
  .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
  .defect-log-app[data-bus-blue="phone"] .grouped-defect-number{background:var(--log-header)}
- .defect-log-app[data-bus-end="phone"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+ .defect-log-app[data-bus-end="phone"] .log-bus-end-marker{display:block;margin:0;border-top:1px solid var(--log-border);padding:9px 10px;color:color-mix(in srgb,var(--log-text) 72%,var(--log-surface));font-size:9px;font-weight:900;letter-spacing:1.4px;text-align:center}
 }
 
 /* The three selects in BUS GROUP SEPARATION. */
@@ -1149,3 +1162,22 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-style-note{margin:0 0 8px;color:var(--log-muted);font-size:8px;line-height:1.45}
 .log-style-themed{margin-left:6px;border:1px solid var(--log-border);border-radius:4px;padding:1px 4px;color:var(--log-muted);font-size:6px;font-style:normal;font-weight:900;letter-spacing:.6px;white-space:nowrap}
 .log-style-follow{min-height:32px;grid-column:1/-1;border:1px solid var(--log-border);border-radius:5px;background:transparent;color:var(--log-accent);font-size:7px;font-weight:900;letter-spacing:.5px;cursor:pointer}
+
+/* AN OPENED BUS ENDS FURTHER FROM THE NEXT ONE THAN A CLOSED ONE DOES.
+
+   Measured before changing anything: the card-to-card gap is IDENTICAL open or
+   closed — 14px at 390, 16px at 1180. Curtis read the open one as tighter
+   anyway, and he is right about what he was seeing. Closed, the boundary is a
+   band of page grey between two white cards. Open, the last defect row sits on
+   the list's own grey, which runs to the card edge, and that grey and the page
+   grey are near enough to each other that the edge stops registering. The
+   number was fine; the contrast either side of it was not.
+
+   So the gap after an opened card is made genuinely bigger rather than merely
+   equal, which is what he asked for, and the list gets more room under its last
+   row so that row is not crowded against the edge. */
+.log-card-group.expanded{margin-bottom:10px}
+.log-card-group.expanded>.grouped-defect-list{padding-bottom:12px}
+@media(max-width:620px){
+ .log-card-group.expanded{margin-bottom:8px}
+}

@@ -12185,34 +12185,41 @@ test("PHONE is a width, not a device",async()=>{
     inside the app's own 620px block for "phone" — and nothing is stored about
     the device. */
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- /* Sliced to the block's MATCHING BRACE, not to the end of the file. Taking
-    the rest of the file made "the phone form is inside the 620px block" true
-    of any rule that merely sat after it — demonstrated by appending an
-    unguarded [data-bus-rail="phone"] rule below the block, which applied at
-    every width and still passed both assertions here. That is exactly the
-    failure the next line says it prevents. */
- const phoneBlockStart=css.lastIndexOf("@media(max-width:620px){");
- let depth=0,phoneBlockEnd=css.indexOf("{",phoneBlockStart);
- for(;phoneBlockEnd<css.length;phoneBlockEnd++){
-  if(css[phoneBlockEnd]==="{")depth++;
-  else if(css[phoneBlockEnd]==="}"&&--depth===0)break;
+ /* EVERY 620px block, each sliced to its own MATCHING BRACE.
+
+    Two earlier versions of this were wrong in the same direction — too
+    generous — and each passed. The first sliced to the END OF FILE, so "the
+    phone form is inside the 620px block" was true of any rule that merely sat
+    after it; an unguarded copy applying at every width passed. The second
+    fixed the slice but still assumed the LAST 620px block was the options
+    one, which stopped being true the moment another phone rule was appended
+    below it — that is what caught this and it is why the scan is now over all
+    of them rather than over a guess about which. */
+ const phoneBlocks=[],marker="@media(max-width:620px){";
+ for(let at=css.indexOf(marker);at>=0;at=css.indexOf(marker,at+1)){
+  let depth=0,end=css.indexOf("{",at);
+  for(;end<css.length;end++){
+   if(css[end]==="{")depth++;
+   else if(css[end]==="}"&&--depth===0)break;
+  }
+  phoneBlocks.push({start:at,end,body:css.slice(at,end)});
  }
- const phoneBlock=css.slice(phoneBlockStart,phoneBlockEnd);
- assert.ok(phoneBlock.length<css.length-phoneBlockStart,"the slice stops at the block, not the file");
+ assert.ok(phoneBlocks.length>0);
+ const phoneBlock=phoneBlocks.map(block=>block.body).join("\n");
+ /* Everything OUTSIDE every one of those blocks, which is where a phone form
+    must never appear. */
+ const outside=phoneBlocks.reduce((rest,block)=>rest.replace(block.body,""),css);
  for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"]){
   assert.ok(css.includes('['+attribute+'="always"]'),attribute+" has an every-screen form");
-  assert.ok(phoneBlock.includes('['+attribute+'="phone"]'),attribute+' has a phone form, inside the 620px block');
-  /* The phone form must not also exist outside a media query, or "phone only"
-     would apply on the shop computer too. */
-  assert.equal(css.slice(0,phoneBlockStart).includes('['+attribute+'="phone"]'),false,attribute+" phone form is inside a media query only");
+  assert.ok(phoneBlock.includes('['+attribute+'="phone"]'),attribute+' has a phone form, inside a 620px block');
+  /* And nowhere else in the file, before or after — an unguarded copy would
+     make "phone only" apply on the shop computer too. */
+  assert.equal(outside.includes('['+attribute+'="phone"]'),false,attribute+" phone form is inside a media query only");
  }
  /* No user-agent sniffing anywhere in this feature. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.equal(/navigator\.(userAgent|platform)|matchMedia/.test(page),false,"the width is CSS's to answer, not JavaScript's");
- /* Nothing after the block either — an unguarded copy below it would apply on
-    the shop computer while claiming to be phone-only. */
- for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"])
-  assert.equal(css.slice(phoneBlockEnd).includes('['+attribute+'="phone"]'),false,attribute+" has no phone form after the block");
+
 });
 
 test("the vertical rail runs beside the defect rows, never across them",async()=>{
@@ -12383,5 +12390,38 @@ test("Settings says which colours are following the theme",async()=>{
     validation on read. */
  assert.match(modal,/className="log-style-follow" onClick=\{\(\)=>setDisplayStyle\(key,"color",DEFAULT_DEFECT_LOG_DISPLAY\.styles\[key\]\.color\)\}/);
  assert.match(modal,/\{!themed&&<button type="button" className="log-style-follow"/,"offered only where there is something to undo");
+});
+
+test("the closing line spans the card and an opened bus ends further from the next",async()=>{
+ /* Curtis: "that text should be a little bigger and go further across the
+    bottom of each portion, and make it a little bit darker so it is easier to
+    see... the space between the last defect and the next new bus card seems
+    thinner. Let's widen it up just a bit." */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* OUT of the defect list, so it spans the card without negative margins that
+    would have to match whichever of four .grouped-defect-list padding rules
+    wins at each breakpoint. */
+ const listStart=page.indexOf('{expanded&&<div className="grouped-defect-list"'),listEnd=page.indexOf("</div>}",listStart);
+ assert.ok(listStart>0);
+ assert.equal(page.slice(listStart,listEnd).includes("log-bus-end-marker"),false,"not inside the defect list");
+ assert.match(page,/\{expanded&&<p className="log-bus-end-marker"/,"and only on an opened bus");
+ /* Spanning BOTH columns. As a direct child of the card it auto-placed into
+    the 82px bus column and measured 64px wide — narrower than it had been
+    inside the list it left. */
+ assert.match(css,/\.log-bus-end-marker\{display:none;grid-column:1\/-1\}/);
+ /* Bigger, and darker than --log-muted. The mix goes toward --log-text, which
+    is dark on the light theme and light on the three dark ones, so "darker"
+    means "further from the background" on all four. Measured: 5.80 light,
+    8.28 dark, 7.76 midnight, 5.69 tactical. */
+ assert.match(css,/\.log-bus-end-marker\{display:block;[^}]*font-size:9px/);
+ assert.match(css,/\.log-bus-end-marker\{display:block;[^}]*color:color-mix\(in srgb,var\(--log-text\) 72%/);
+ assert.equal(/\.log-bus-end-marker\{display:block;[^}]*color:var\(--log-muted\)/.test(css),false,"muted was the old, lighter tone");
+ /* The gap after an opened card is genuinely larger, not merely equal. It was
+    already equal — 14px at 390 open or closed, measured — and read as tighter
+    because the list's grey runs to the card edge and the page grey beside it is
+    near enough that the edge stops registering. */
+ assert.match(css,/\.log-card-group\.expanded\{margin-bottom:10px\}/);
+ assert.match(css,/@media\(max-width:620px\)\{\n \.log-card-group\.expanded\{margin-bottom:8px\}/);
 });
 
