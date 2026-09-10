@@ -216,7 +216,14 @@ export type CloudRow=Record<string,unknown>;
    bus would mean the last device to sync always wins, even when it is the one
    holding week-old data. */
 export function busUpdatedAt(bus:SyncBus,fallback:string):string{
- const stamps=[bus.lastLocationChangeAt,bus.lastStatusChangeAt,bus.parkedAt]
+ /* THE HOLD'S OWN STAMP COUNTS. A hold touches none of the operational
+    timestamps below — deliberately, since placing one must not reset the
+    sitting-time clock — so without this a hold placed on a bus would push
+    carrying an updated_at from before it existed, and the database would drop
+    it as out of order. The hold would sit on one phone and reach nobody, which
+    for an instruction somebody else gave the foreman is the whole point
+    missed. */
+ const stamps=[bus.lastLocationChangeAt,bus.lastStatusChangeAt,bus.parkedAt,(bus.hold as {at?:unknown}|undefined)?.at]
   .map(value=>clean(value))
   .filter(value=>value!==""&&!Number.isNaN(new Date(value).getTime()));
  if(!stamps.length)return fallback;

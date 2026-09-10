@@ -20,6 +20,8 @@ import {recommendedRows,recommendedRank,busRecommendedMinutes} from "../recommen
 import {busDeferredMinutes} from "../deferred-counts";
 import {answerRecommendedBus} from "../recommended-actions";
 import {elapsedLong} from "../elapsed-label";
+import HoldBoard,{HoldBadge} from "../hold-board";
+import {heldBusCount,isHeld,setBusHold} from "../bus-hold";
 import TimeWindowChips from "../time-window-chips";
 import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "../time-window";
 import {roadCallNote} from "../road-calls";
@@ -667,6 +669,9 @@ export default function DefectLog(){
  const [statsOpen,setStatsOpen]=useState(false);
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
+ /* Open from any HOLD badge on the page — Curtis: "pressing it on one bus, I
+    wanted to show all the buses that are being held, and a time." */
+ const [holdBoardOpen,setHoldBoardOpen]=useState(false);
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
  const [sweepOpen,setSweepOpen]=useState(false);
@@ -940,6 +945,19 @@ export default function DefectLog(){
   if(!applied.saved){alert("That repair is no longer available. Refresh and try again.");return}
   setUndoSnapshot({fleet,downEntries,label:"Took Bus "+bus.n+" off the recommended list"});
   persist(applied.fleet,applied.downEntries);
+ };
+ /* HOLD, written straight to the fleet rather than through saveDefectLogRecord:
+    a hold is a fact about the BUS and touches no defect, and a bus can be held
+    with no defects at all. persist reports a refused write, which is why its
+    result is read rather than assumed. */
+ const holdCount=heldBusCount(fleet);
+ const setHold=(busId:string,on:boolean,until?:string)=>{
+  const bus=fleet.find(item=>item.id===busId);
+  if(!bus)return;
+  if(on===isHeld(bus)&&!until)return;
+  const nextFleet=fleet.map(item=>item.id===busId?setBusHold(item,on,{by:settings.defaultInitials,until}):item);
+  setUndoSnapshot({fleet,downEntries,label:(on?"Put Bus ":"Took Bus ")+bus.n+(on?" on hold":" off hold")});
+  persist(nextFleet,downEntries);
  };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
@@ -1234,10 +1252,10 @@ export default function DefectLog(){
          with or without DS), the state and status follow, and LATEST and VIEW
          hold the second row at its two ends. An empty slot stays empty; nothing
          slides into it. */}
-     <span className="log-meta"><span className="log-badge-slot">{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}{group.records.length>1&&<b className="defect-count-badge">×{group.records.length}</b>}</span><b className={"state "+groupState}>{STATE_LABELS[groupState]}</b><span className="log-status-cell"><small>{STATUS_LABELS[group.bus.s]||group.bus.s}</small>{groupHasDeferredHistory&&<b className="inline-deferred-history-badge" title="Was deferred, returned to service, still open">WAS DEF</b>}</span><time>LATEST {timeLabel(group.updatedAt)}</time><i className="group-toggle">{expanded?"CLOSE":"VIEW"}</i>{/* Under LATEST on its own row, so a road call reads as a fact about the bus rather than another status chip competing with the ones above. It falls off on its own seven days after the breakdown. */}
+     <span className="log-meta"><span className="log-badge-slot">{busOnDownSheet&&<b className="inline-ds-badge">DS</b>}{group.records.length>1&&<b className="defect-count-badge">×{group.records.length}</b>}</span><b className={"state "+groupState}>{STATE_LABELS[groupState]}</b><span className="log-status-cell"><small>{STATUS_LABELS[group.bus.s]||group.bus.s}</small>{groupHasDeferredHistory&&<b className="inline-deferred-history-badge" title="Was deferred, returned to service, still open">WAS DEF</b>}{/* HOLD lives in the status cell rather than the badge slot above it. That slot is a pair of FIXED sub-slots, so DS and the count sit at the same x with or without each other — a third badge there moves them, which is the tab-stop rule two tests were written to hold after the DS badge once measured 4px on top of the repair text. */}{isHeld(group.bus)&&<HoldBadge count={holdCount} onOpen={()=>setHoldBoardOpen(true)}/>}</span><time>LATEST {timeLabel(group.updatedAt)}</time><i className="group-toggle">{expanded?"CLOSE":"VIEW"}</i>{/* Under LATEST on its own row, so a road call reads as a fact about the bus rather than another status chip competing with the ones above. It falls off on its own seven days after the breakdown. */}
       {roadCall&&<b className="road-call-note" title="Broke down on the road. Shows for seven days, then stays in the bus's history.">{roadCall}</b>}</span>
     </button>
-    {expanded&&<div className="grouped-defect-list"><header className="grouped-defect-head"><span><b>BUS {group.bus.n}</b><small>{group.records.length} DEFECT{group.records.length===1?"":"S"}</small></span><button onClick={()=>setEditing({...newDraft(),busId:group.bus.id})}>+ ADD DEFECT</button></header>
+    {expanded&&<div className="grouped-defect-list"><header className="grouped-defect-head"><span><b>BUS {group.bus.n}</b><small>{group.records.length} DEFECT{group.records.length===1?"":"S"}</small></span>{/* HOLD sits with ADD DEFECT rather than in the per-defect action rows, because it is a fact about the bus and not about any one repair. */}<button type="button" className={"hold-bus-button"+(isHeld(group.bus)?" on":"")} onClick={()=>setHold(group.bus.id,!isHeld(group.bus))}>{isHeld(group.bus)?"TAKE OFF HOLD":"HOLD BUS"}</button><button onClick={()=>setEditing({...newDraft(),busId:group.bus.id})}>+ ADD DEFECT</button></header>
      {/* A bus can be on the sheet for work that was never typed into this log —
          scanned off a paper sheet, or logged straight onto the Down Sheet. Then
          the DS badge is true and no defect below carries the banner, which
@@ -1329,6 +1347,7 @@ export default function DefectLog(){
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
+  {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
   
  </main>;

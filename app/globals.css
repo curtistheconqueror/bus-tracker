@@ -1167,3 +1167,62 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
  .time-window-row{gap:4px}
  .time-window-chip{flex:1;min-width:0;min-height:38px;padding:0 2px}
 }
+
+/* HOLD, the badge and the list behind it.
+
+   AMBER, where DEFERRED is teal. Curtis asked for the same look — "it can look
+   just the same, maybe the colour can be different" — so this mirrors
+   .deferred-held-badge exactly and changes only the colour. A hold is somebody
+   else's instruction sitting on the bus, which is a different kind of fact from
+   anything the shop decided about it, and it should read as a different kind of
+   fact at a glance across a yard. */
+.bus-hold-token-badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:#a35a00;color:#fff;box-shadow:0 1px 3px #6b3a0099;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
+.quick-detail.bus-hold-detail-row>b{background:#a35a00;color:#fff}
+
+/* The badge on a Defect Log card and anywhere else a bus is drawn. It is a
+   BUTTON — Curtis: "pressing it on one bus, I wanted to show all the buses that
+   are being held" — so it needs a real target height rather than the 17px the
+   label-shaped badges beside it get away with. */
+/* 28px, and the phone rule below takes it to 34. It shares .work-state-badge
+   with the DS REC and WAS DEFERRED labels, which are 17px because a LABEL can
+   be — this one is a button that opens the held-bus list, so it needs a target.
+   Measured at 22px on the first pass: the phone block's .work-state-badge rule
+   sits after this one in the file and won on source order at equal
+   specificity, which is the same trap that has cost this stylesheet two
+   debugging rounds already. */
+.bus-hold-badge{min-height:28px;border-color:#a35a00;background:#fff4e6;color:#8a4a00;padding:0 8px;cursor:pointer;touch-action:manipulation}
+.bus-hold-badge:hover,.bus-hold-badge:focus-visible{background:#ffe6c7;outline:none}
+
+.bus-hold-shade{align-items:flex-start;padding:0}
+.bus-hold-modal{width:min(560px,100%);max-height:100vh;margin:0 auto;display:flex;flex-direction:column;border:1px solid var(--log-border,#bac7d9);border-radius:0 0 12px 12px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);overflow:hidden;box-shadow:0 20px 60px #00142d66}
+.bus-hold-head{flex:none;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#a35a00;color:#fff}
+.bus-hold-head span{display:flex;flex-direction:column;gap:2px}
+.bus-hold-head small{font-size:7px;font-weight:900;letter-spacing:1.4px}
+.bus-hold-head h2{margin:0;font-size:16px}
+.bus-hold-head button{width:34px;height:34px;border:1px solid #ffffff66;border-radius:6px;background:#ffffff1f;color:inherit;font-size:22px;line-height:1;cursor:pointer}
+.bus-hold-list{flex:1;display:grid;align-content:start;gap:8px;padding:10px;overflow-y:auto;overscroll-behavior:contain}
+.bus-hold-row{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:9px;align-items:center;border:1px solid var(--log-border,#bac7d9);border-left:4px solid #a35a00;border-radius:8px;background:var(--log-surface,#fff);padding:9px}
+.bus-hold-number{display:flex;flex-direction:column;gap:2px}
+.bus-hold-number small{color:var(--log-muted,#60728c);font-size:6px;font-weight:900;letter-spacing:1px}
+.bus-hold-number b{color:#8a4a00;font-size:17px}
+.bus-hold-detail{min-width:0;display:flex;flex-direction:column;gap:3px}
+.bus-hold-detail b{font-size:9px}
+.bus-hold-detail small{color:var(--log-muted,#60728c);font-size:7px;font-weight:900;letter-spacing:.5px}
+.bus-hold-elapsed{color:var(--log-muted,#60728c);font-size:7px;font-weight:900;white-space:nowrap}
+.bus-hold-release{grid-column:1/-1;min-height:38px;border:1px solid #a35a00;border-radius:6px;background:transparent;color:#8a4a00;font-size:8px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+.bus-hold-release:disabled{opacity:.5;cursor:not-allowed}
+.bus-hold-empty{display:flex;flex-direction:column;gap:6px;padding:34px 18px;text-align:center}
+.bus-hold-empty b{font-size:12px}
+.bus-hold-empty span{color:var(--log-muted,#60728c);font-size:9px;line-height:1.45}
+
+/* The control that sets one, on the map editor and the Defect Log card. */
+.hold-bus-field>span{font-size:9px;font-weight:900;letter-spacing:.5px}
+.hold-bus-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:7px;align-items:center}
+.hold-bus-button{min-height:40px;border:1px solid #a35a00;border-radius:6px;background:#fff4e6;color:#8a4a00;padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+.hold-bus-button.on{background:#a35a00;color:#fff}
+@media(max-width:620px){
+ .bus-hold-badge{min-height:34px;padding:0 10px}
+ .hold-bus-row{grid-template-columns:1fr}
+ .bus-hold-row{grid-template-columns:52px minmax(0,1fr)}
+ .bus-hold-elapsed{grid-column:2}
+}

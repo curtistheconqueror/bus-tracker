@@ -12425,3 +12425,116 @@ test("the closing line spans the card and an opened bus ends further from the ne
  assert.match(css,/@media\(max-width:620px\)\{\n \.log-card-group\.expanded\{margin-bottom:8px\}/);
 });
 
+test("a hold is a fact about the bus, and only time or a person lifts it",async()=>{
+ /* Curtis: "somebody just asked me about two buses that are gonna probably come
+    in to B12, and if they do, they want me to hold those buses." */
+ const {setBusHold,isHeld,heldBuses,heldBusCount,normalizeHold,holdExpired,holdUntilLabel,heldMinutes}=await import("../app/bus-hold.ts");
+ const now=new Date("2026-09-10T22:00:00.000Z");
+ const at=hours=>new Date(now.getTime()+hours*3600000).toISOString();
+ const bus={id:"b1",n:"18505",l:"road-1"};
+ /* NO KEY UNTIL THERE IS A HOLD, and no key again once there is not. busRow
+    copies every own key of a bus into map_fields and rowFingerprint walks
+    Object.keys, so hold:undefined would change every bus's fingerprint and
+    re-push the shop's whole fleet table — the trap fluids and reportAttempts
+    were written around on the defect record. */
+ assert.equal(Object.keys(bus).includes("hold"),false);
+ const held=setBusHold(bus,true,{at:at(-2),by:"CT"});
+ assert.equal(Object.keys(setBusHold(held,false)).includes("hold"),false,"clearing DELETES the key");
+ /* The time is optional — Curtis: "I don't want a time to be required in case a
+    person doesn't know the time off hand." With none, it simply stands. */
+ assert.equal(isHeld(held,now),true);
+ assert.equal(held.hold.until,undefined);
+ assert.equal(holdUntilLabel(held.hold),"");
+ /* With one, it lifts when that time passes. */
+ const timed=setBusHold(bus,true,{at:at(-2),until:at(1)});
+ assert.equal(isHeld(timed,now),true);
+ assert.equal(holdExpired(timed.hold,now),false);
+ const past=setBusHold(bus,true,{at:at(-5),until:at(-1)});
+ assert.equal(isHeld(past,now),false,"past its time it stops counting");
+ assert.equal(holdExpired(past.hold,now),true);
+ /* Read-time only. The record is left exactly as it is on the device. */
+ assert.equal(Object.keys(past).includes("hold"),true,"an expired hold is not rewritten away");
+ /* NOTHING ABOUT WHERE THE BUS IS EVER CLEARS IT. Curtis first said a location
+    move should lift it, then chose otherwise when asked — his own buses were
+    ARRIVING, and arriving is a move, so that rule would have dropped the hold
+    at the moment it started to matter. */
+ const source=await readFile(new URL("../app/bus-hold.ts",import.meta.url),"utf8");
+ assert.equal(/\bl\b\s*[=!]==|location|lastLocationChangeAt/.test(source.replace(/\/\*[\s\S]*?\*\//g,"")),false,"no code here reads where the bus is");
+ assert.equal(isHeld(setBusHold({...held,l:"garage-0"},true,{at:at(-2)}),now),true,"moved, still held");
+ /* A hold with no readable stamp is not a hold: every screen that draws one
+    says when it was placed. Boards are files people hand-edit and transfers
+    carry between devices. */
+ assert.equal(normalizeHold({by:"CT"}),null);
+ assert.equal(normalizeHold({at:"not-a-date"}),null);
+ assert.equal(normalizeHold("yes"),null);
+ assert.equal(isHeld({hold:{at:"not-a-date"}},now),false);
+ /* Longest-held first, and expired ones are not in the list at all. */
+ assert.deepEqual(heldBuses([past,timed,held],now).map(row=>row.bus.n),["18505","18505"]);
+ assert.equal(heldBusCount([past,timed,held],now),2);
+ assert.equal(Math.round(heldMinutes(held.hold,now)),120);
+ /* Floored at zero: a device with a wrong clock can stamp the future, and
+    "-4M" on a board reads as a bug in the app rather than in a clock. */
+ assert.equal(heldMinutes(setBusHold(bus,true,{at:at(3)}).hold,now),0);
+});
+
+test("a hold pushes to the Shop Cloud instead of sitting on one phone",async()=>{
+ /* A hold touches none of the operational timestamps — placing one must not
+    reset the sitting-time clock — so without its own stamp counted, a held bus
+    would push carrying an updated_at from before the hold existed and the
+    database would drop it as out of order. For an instruction somebody else
+    gave the foreman, reaching nobody else is the whole point missed. */
+ const {busUpdatedAt,busRow}=await import("../app/cloud-sync.ts");
+ const older="2026-09-10T18:00:00.000Z",newer="2026-09-10T21:30:00.000Z";
+ const bus={id:"b1",n:"18505",l:"road-1",s:"service",parkedAt:older,lastLocationChangeAt:older,lastStatusChangeAt:older,hold:{at:newer,by:"CT"}};
+ assert.equal(busUpdatedAt(bus,"2026-09-10T22:00:00.000Z"),newer,"the hold's own stamp is the newest thing about this bus");
+ /* And it travels: hold is not in MAP_HELD_BACK, so the row carries it. */
+ const row=busRow(bus,{initials:"CT",deviceLabel:"shop"},"2026-09-10T22:00:00.000Z");
+ assert.equal(row.map_fields.hold.at,newer);
+ /* A bus with no hold carries no hold key at all, so no fingerprint moves. */
+ const plain={id:"b2",n:"17516",l:"road-2",s:"service",parkedAt:older};
+ assert.equal(Object.keys(busRow(plain,{initials:"CT",deviceLabel:"shop"},older).map_fields).includes("hold"),false);
+});
+
+test("the HOLD badge is a button that opens every held bus, and never shows the time",async()=>{
+ /* Curtis: "pressing it on one bus, I wanted to show all the buses that are
+    being held, and a time." And on the badge itself: "don't just show the time
+    of the expected arrival by default, you have to press it to see that
+    information." */
+ const board=await readFile(new URL("../app/hold-board.tsx",import.meta.url),"utf8");
+ const badge=board.slice(board.indexOf("export function HoldBadge"),board.indexOf("export default function"));
+ assert.match(badge,/<button type="button" className="work-state-badge bus-hold-badge"/,"the same look as the deferred badge, per Curtis");
+ assert.equal(/holdUntilLabel|until/.test(badge),false,"no time on the badge");
+ /* The time exists only in the list, and says so when nobody set one rather
+    than leaving a blank line. */
+ assert.match(board,/\{until\|\|"NO TIME SET"\}/);
+ /* Both surfaces open the same list. The map matters most: it is the only one
+    that draws a held bus with NO defects, which is the case this was built
+    for — two buses that had not arrived yet. */
+ for(const file of ["../app/page.tsx","../app/defect-log/page.tsx"]){
+  const page=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(page,/<HoldBoard fleet=/,file+" opens the list");
+  assert.match(page,/<HoldBadge count=/,file+" draws the badge");
+ }
+ /* The badge is a real target, not a 17px label like the DS REC one beside it,
+    and getting there took beating a rule rather than writing one. It sits in
+    the Defect Log's meta column, where .log-meta .work-state-badge (0,2,0)
+    pins the label-shaped badges to 22px and beats .bus-hold-badge (0,1,0) in
+    globals.css. Measured 22px at every width until the matching-specificity
+    rule existed; 36px on a phone and 32px on the shop computer now. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.bus-hold-badge\{min-height:28px/,"the base size, for the map");
+ assert.match(logCss,/\.log-meta \.bus-hold-badge\{min-height:32px/,"and one that actually reaches it on a card");
+ assert.match(logCss,/@media\(max-width:620px\)\{\n \.log-meta \.bus-hold-badge\{min-height:36px\}/);
+ /* The rule it is fighting is really there, so this fails honestly if somebody
+    removes it and wonders why the badge is pinned. */
+ assert.match(logCss,/\.log-meta \.work-state-badge\{min-height:22px/);
+ /* NOT in the badge slot above it. That slot is a pair of FIXED sub-slots so
+    DS and the count sit at the same x with or without each other; a third
+    badge moves them, which is the tab-stop rule two tests hold after the DS
+    badge once measured 4px on top of the repair text. */
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const slot=logPage.slice(logPage.indexOf('<span className="log-badge-slot">'),logPage.indexOf("</span>",logPage.indexOf('<span className="log-badge-slot">')));
+ assert.equal(slot.includes("HoldBadge"),false,"the fixed tab stops are left alone");
+});
+

@@ -97,6 +97,17 @@ machine, because these sessions run in containers that are thrown away.
   wording must keep reading correctly through the rename maps in
   `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
   `LEGACY_ISSUE_RENAMES`, `RETIRED_ISSUES`). Nothing on disk is ever rewritten.
+- **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
+  `app/bus-hold.ts` stores it as an optional `hold` field on the bus record —
+  `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
+  sets it to `undefined`: `busRow` copies every own key into `map_fields` and
+  `rowFingerprint` walks `Object.keys`, so an undefined key would change every
+  bus's fingerprint and re-push the whole fleet table. `busUpdatedAt` counts the
+  hold's own stamp, or a hold would push with a timestamp from before it existed
+  and the database would drop it. No location change ever clears a hold: Curtis
+  chose that after being asked, because the buses in his case were arriving and
+  arriving is a move. The `until` time is optional and is an expiry, applied at
+  read time — an expired hold is left on the record, not rewritten away.
 - **The Down Sheet owns the DS badge.** Entries get there off photographed
   sheets or typed by hand, and the map *reads that membership back* rather than
   deciding it. No import, transfer or sync may assert it — see
@@ -248,6 +259,7 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
+app/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 app/location-label.ts      slot id -> the words a person says, trouble bays included
 app/repair-catalog.ts      the defect catalog, rename maps, count fields
 app/section-transfer.ts    per-section device transfers and their merge rules
