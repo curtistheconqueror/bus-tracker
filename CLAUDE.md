@@ -151,18 +151,27 @@ per-device view state — which panel is open, what has been dismissed
   pace-deferred-review-dismissed-v1
 ```
 
-**`pace-role-v1` names a person's job and must never gate anything.** It holds
+**`pace-role-v1` names a person's job and must not gate anything yet.** It holds
 a department and a role picked on the home screen — Transportation or
-Maintenance, then Bus Operator / Dispatch / Superintendent or Servicer /
-Mechanic / Foreman / Superintendent. Curtis asked for it as a label: "there
-will be no special conditions in the app for any of the working roles. This is
-all cosmetic. We will wire that up later." A list holding *Foreman* and
-*Superintendent* looks like a permission model, and it is not one: there is no
-login here, and this is an unauthenticated string in LocalStorage that anybody
-holding the phone can change from the screen that set it. If roles ever need to
-mean something, that is a conversation to have first, not a condition to add.
-Superintendent appears in both departments, so the pair is stored — the role
-alone does not say which one.
+Maintenance, then Bus Operator / Dispatch / Asst Supt / Supt, or Servicer /
+Mechanic / Foreman / Asst Supt / Supt. Curtis asked for it as a label first:
+"there will be no special conditions in the app for any of the working roles.
+This is all cosmetic. We will wire that up later."
+
+**Where it is going, and why that is not a licence to start.** He has since said
+the roles WILL decide access, and named the mechanism: "the distinction will be
+made on a person's own login... when a person picks one, it will determine what
+they see and have access to," plus a questionnaire that does not exist yet. The
+access rules ride on **that login**. This key is an unauthenticated string in
+LocalStorage that anybody holding the phone can change from the screen that set
+it, so it can be the label a login confirms and never the thing that decides.
+Until the login exists, nothing outside `app/roles.ts` may read it, and a test
+holds that line.
+
+*Asst Supt* and *Supt* are abbreviated because both exist and both departments
+have them — spelled out they differ by one word at the front, which is the
+hardest pair to scan on a phone. Both appear in both departments, so the pair is
+stored: the role alone does not say which one.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
 STATS panel it opened was a second scoreboard saying most of what the tiles

@@ -171,10 +171,74 @@ export type StructuredDefect={
     uses and does not count the glycol — and this says what else went in, which
     is the part that predicts a road call. */
  fluids?:string[];
+ /* EVERY TIME THIS BUS CAME BACK WITH THE SAME COMPLAINT STILL UNFIXED, one
+    stamp per return. Curtis: "if a person tries to re-submit something in
+    defects, I want a tally of how many times with the date stamped... this way
+    I know how many round trips a bus is making without the repair."
+
+    The tally IS the record. A count on its own would say a bus came back four
+    times and not that three of them were in one week, which is the difference
+    between a slow part and a repair that is not working. */
+ reportAttempts?:ReportAttempt[];
  quantity?:number;
  unit?:string;
  source?:DefectSource;
 };
+
+/* A return: when it happened, and who was standing there when it did. */
+export type ReportAttempt={at:string;by?:string};
+
+/* Sorted oldest first and deduplicated by timestamp, so the same return cannot
+   be counted twice by two saves racing each other, and the list always reads in
+   the order the bus actually came back. */
+export function normalizeReportAttempts(value:unknown):ReportAttempt[]{
+ if(!Array.isArray(value))return [];
+ const byTime=new Map<string,ReportAttempt>();
+ for(const item of value){
+  if(!item||typeof item!=="object")continue;
+  const at=String((item as ReportAttempt).at||"").trim();
+  if(!at||Number.isNaN(Date.parse(at)))continue;
+  const by=String((item as ReportAttempt).by||"").trim().toUpperCase();
+  byTime.set(at,by?{at,by}:{at});
+ }
+ return [...byTime.values()].sort((a,b)=>a.at.localeCompare(b.at));
+}
+
+/* A DOUBLE TAP IS NOT TWO ROUND TRIPS. A bus cannot leave and come back inside
+   two minutes, so a second stamp that close is a thumb, not a return — and this
+   number's whole job is to be evidence that a repair is not working. One that
+   inflates on a fumbled press is worse than no number at all. */
+export const REPORT_ATTEMPT_DEBOUNCE_MS=2*60*1000;
+
+/* Adding a return, which is the only way this list ever changes — nothing
+   removes one. A repair that keeps coming back is the history this app exists
+   to keep, and a tally somebody can quietly reset is a tally nobody can use.
+
+   Returns the defect UNCHANGED when the press is inside the debounce, so the
+   caller writes nothing rather than writing the same board back. */
+export function recordReportAttempt(defect:StructuredDefect,at:string,by=""):StructuredDefect{
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ const stamped=Date.parse(at);
+ if(Number.isNaN(stamped))return defect;
+ const last=attempts.length?Date.parse(attempts[attempts.length-1].at):NaN;
+ /* Only a stamp that is BEHIND this one blocks it. A record synced from a
+    device whose clock runs fast can hold a future stamp, and that must not
+    silently swallow every real return until the clock catches up. */
+ if(!Number.isNaN(last)&&stamped-last>=0&&stamped-last<REPORT_ATTEMPT_DEBOUNCE_MS)return defect;
+ return {...defect,reportAttempts:normalizeReportAttempts([...attempts,{at,by}])};
+}
+export function reportAttemptCount(defect:{reportAttempts?:ReportAttempt[]}){
+ return normalizeReportAttempts(defect.reportAttempts).length;
+}
+/* MERGED, NEVER REPLACED, when a record is saved.
+
+   An editor opened before a return was stamped holds the older, shorter list,
+   and `{...existing,...incoming}` would let that stale copy overwrite the
+   stamp — losing a return nobody would ever notice was missing. Taking the
+   union means a save can only ever add. */
+export function mergeReportAttempts(existing:unknown,incoming:unknown){
+ return normalizeReportAttempts([...normalizeReportAttempts(existing),...normalizeReportAttempts(incoming)]);
+}
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
  /* Condenser and evaporator fans are counted, not just described. One fan down
@@ -427,6 +491,15 @@ export function normalizeFluids(value:unknown,category:unknown,issue:unknown){
    table once over the garage's own data plan, to say nothing. A record that
    already carries the key keeps it, cleared, so a value that stops being valid
    is actually taken back off rather than left standing. */
+/* Absent when there are no returns, for the reason fluidsPatch is: rowFingerprint
+   walks Object.keys, so a key holding an empty array on every defect in the shop
+   would change every row's fingerprint and re-push the whole table to say
+   nothing. */
+function reportAttemptsPatch(defect:Partial<StructuredDefect>){
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ if(attempts.length)return {reportAttempts:attempts};
+ return defect.reportAttempts===undefined?{}:{reportAttempts:undefined};
+}
 function fluidsPatch(defect:Partial<StructuredDefect>,category:string,issue:string){
  const fluids=normalizeFluids(defect.fluids,category,issue);
  if(fluids)return {fluids};
@@ -1018,7 +1091,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];

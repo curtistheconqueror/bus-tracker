@@ -1,4 +1,4 @@
-import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,mergeReportAttempts,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
 import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
@@ -200,6 +200,16 @@ export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGro
  return [...groups.values()].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/* Returns take the UNION of what is stored and what is being saved, rather than
+   letting the spread pick a winner. An editor opened before a return was
+   stamped carries the older, shorter list, and would otherwise overwrite the
+   stamp with its stale copy — losing a return silently, which is the one thing
+   a tally must never do. Absent stays absent so no fingerprint moves. */
+function attemptsPatch(existing:StructuredDefect|undefined,incoming:StructuredDefect){
+ const merged=mergeReportAttempts(existing?.reportAttempts,incoming.reportAttempts);
+ return merged.length?{reportAttempts:merged}:{};
+}
+
 export function saveDefectLogRecord(
  fleet:DefectLogFleetBus[],
  downEntries:DefectLogDownEntry[],
@@ -243,7 +253,7 @@ export function saveDefectLogRecord(
    never a partial patch, so reading these straight off the incoming copy is
    what the callers already mean. A future caller that passes a patch would
    have to carry both fields with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;

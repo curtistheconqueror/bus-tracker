@@ -910,3 +910,58 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    Keeping it in this block also means the shared one is untouched, so a button
    added here can never fail the test that holds the deferred buttons at 44. */
 @media(max-width:760px){.quick-filter-recommended-row .fix-recommended{min-height:44px;font-size:9px}}
+
+/* COUNT THIS RETURN, beside OPEN IT on the ALREADY LOGGED banner.
+
+   Outlined where OPEN IT is solid: OPEN IT is still the primary move — go and
+   look at the record that already exists — and this is the second thing you
+   might want, not a competing first.
+
+   The banner becomes a wrapping row here. It was a rigid three-part flex line
+   and a second button squeezed the sentence to a column of single words at
+   360px. Measured, not guessed. */
+.duplicate-defect-warning{flex-wrap:wrap}
+.count-return{flex-shrink:0;min-height:34px;border:1px solid #8a5200;border-radius:5px;background:transparent;color:#8a5200;padding:0 11px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.3px;cursor:pointer;white-space:nowrap}
+.count-return:hover,.count-return:focus-visible{background:#f6e4b8;outline:none}
+.duplicate-return-tally{display:inline-block;margin-left:4px;border-radius:4px;background:#8a5200;color:#fff;padding:1px 5px;font-style:normal;font-weight:900}
+.work-state-badge.report-return{border-color:#d49617;background:#fff4cf;color:#8a5200}
+
+/* ADVANCED STATS — the last block in the focus body, and the only place it
+   appears. Curtis: "make it viewable only in focus, like the bottom of however
+   many defects listed. This way the list can drop further down and just scroll
+   to read."
+
+   So there is no collapse and no height cap: .log-focus-body already scrolls,
+   and this simply grows at the end of it. A stat that hides itself is a stat
+   nobody reads.
+
+   Its own frame rather than another .log-focus-record, because it is about the
+   BUS and everything above it is about one repair. */
+.log-focus-stats{display:grid;gap:10px;margin-top:2px;border:1px solid var(--log-border);border-radius:10px;background:var(--log-soft);padding:13px}
+.log-focus-stats-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.log-focus-stats-head b{color:var(--log-accent);font-size:10px;font-weight:900;letter-spacing:1.4px}
+.log-focus-stats-head small{color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.log-focus-stats-empty{display:grid;gap:4px;margin:0}
+.log-focus-stats-empty b{font-size:11px;color:var(--log-text)}
+.log-focus-stats-empty span{color:var(--log-muted);font-size:10px;line-height:1.5}
+.log-focus-stats-total{display:flex;align-items:center;gap:10px;margin:0;border:1px solid #d49617;border-radius:8px;background:#fff4cf;padding:9px 11px}
+.log-focus-stats-total b{font-size:22px;font-weight:900;line-height:1;color:#8a5200}
+.log-focus-stats-total span{color:#674700;font-size:9px;font-weight:900;letter-spacing:.5px;line-height:1.4}
+.log-focus-stat-row{display:grid;gap:7px;border-top:1px solid var(--log-border);padding-top:10px}
+.log-focus-stat-defect{display:grid;gap:2px}
+.log-focus-stat-defect b{font-size:11px;font-weight:800;color:var(--log-text);line-height:1.4}
+.log-focus-stat-defect small{color:var(--log-muted);font-size:9px;font-weight:800}
+/* Every return listed, because four in a week and four across three months are
+   different problems and a bare count cannot tell them apart. */
+.log-focus-stat-returns{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.log-focus-stat-returns li{display:flex;align-items:center;gap:8px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);padding:7px 9px}
+.log-focus-stat-returns b{flex:0 0 auto;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:#8a5200;color:#fff;font-size:9px;font-weight:900}
+.log-focus-stat-returns time{flex:1;min-width:0;color:var(--log-text);font-size:10px;font-weight:800}
+.log-focus-stat-returns i{flex:0 0 auto;color:var(--log-muted);font-style:normal;font-size:9px;font-weight:900;letter-spacing:.4px}
+@media(max-width:760px){
+ .count-return{min-height:44px;font-size:10px;padding:0 13px}
+ .log-focus-stats-head b{font-size:11px}
+ .log-focus-stat-defect b{font-size:12px}
+ .log-focus-stat-returns time{font-size:11px}
+ .log-focus-stats-empty span{font-size:11px}
+}

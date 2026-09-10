@@ -5966,7 +5966,13 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
   }
   if(css.slice(open+1,end).includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
  }
- assert.deepEqual(conditions,["max-width:760px"]);
+ /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
+    what the line above says, and what matters. Comparing the list itself also
+    asserted there was exactly ONE such block, so a second one at the same
+    correct breakpoint failed this. Deduplicated, it tests the rule; the length
+    check below keeps it from passing vacuously if the rules ever move out. */
+ assert.ok(conditions.length>0,"the focus view must still have phone rules");
+ assert.deepEqual([...new Set(conditions)],["max-width:760px"]);
 });
 
 test("parts memory learns per defect issue and lets a category default be chosen deliberately",()=>{
@@ -11625,17 +11631,26 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     between bus operator, then dispatch and then superintendent. Now for
     maintenance, it will be servicer then mechanic, foreman, superintendent." */
  assert.deepEqual(ROLE_DEPARTMENTS.map(item=>item.key),["transportation","maintenance"]);
- assert.deepEqual(departmentRoles("transportation"),["Bus Operator","Dispatch","Superintendent"]);
- assert.deepEqual(departmentRoles("maintenance"),["Servicer","Mechanic / Technician","Foreman","Superintendent"]);
+ assert.deepEqual(departmentRoles("transportation"),["Bus Operator","Dispatch","Asst Supt","Supt"]);
+ assert.deepEqual(departmentRoles("maintenance"),["Servicer","Mechanic / Technician","Foreman","Asst Supt","Supt"]);
 
- /* SUPERINTENDENT IS ON BOTH LISTS, so a bare role string does not say which
-    person it means. The pair is what is stored, and the label is what tells
-    them apart on screen. */
- assert.ok(departmentRoles("transportation").includes("Superintendent"));
- assert.ok(departmentRoles("maintenance").includes("Superintendent"));
- const road={department:"transportation",role:"Superintendent"},shop={department:"maintenance",role:"Superintendent"};
+ /* ABBREVIATED BECAUSE THERE ARE TWO. Curtis: "we have asst supt, so that is
+    why I want it shortened, so the label can show both like Asst Supt & Supt
+    simultaneously." Spelled out, "Assistant Superintendent" beside
+    "Superintendent" is two long strings differing by one word at the front —
+    the hardest pair of all to tell apart at a glance on a phone. */
+ for(const department of ["transportation","maintenance"]){
+  assert.ok(departmentRoles(department).includes("Asst Supt"),department+" has an assistant");
+  assert.ok(departmentRoles(department).includes("Supt"));
+  assert.equal(departmentRoles(department).some(role=>/Superintendent/i.test(role)),false,"spelled out, the two are too alike to scan");
+ }
+
+ /* AND THEY ARE ON BOTH LISTS, so a bare role string does not say which person
+    it means. The pair is what is stored, and the label is what tells them
+    apart on screen. */
+ const road={department:"transportation",role:"Supt"},shop={department:"maintenance",role:"Supt"};
  assert.notEqual(roleLabel(road),roleLabel(shop));
- assert.equal(roleLabel(shop),"Maintenance · Superintendent");
+ assert.equal(roleLabel(shop),"Maintenance · Supt");
  assert.deepEqual(readRole(serializeRole(road)),road);
 
  /* Nothing on file means NO ROLE, never a default. A device that quietly
@@ -11647,6 +11662,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  /* A role this build no longer offers reads as not set and is NOT rewritten —
     the same read-time rule the repair catalog follows for renamed defects. */
  assert.equal(readRole('{"department":"maintenance","role":"Bodyman"}'),null);
+ assert.equal(readRole('{"department":"maintenance","role":"Superintendent"}'),null,"the spelled-out wording is not offered any more");
  assert.equal(readRole('{"role":"Foreman"}'),null,"a role with no department cannot be resolved");
 
  /* THE ONE RULE THAT MATTERS MOST. Curtis: "there will be no special conditions
@@ -11687,4 +11703,146 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  /* And it joins the reduced-motion opt-out rather than being the one panel that
     still flies in for somebody who asked the OS for none of that. */
  assert.match(css,/\.welcome-name span,\.welcome-kicker,\.welcome-choices,\.welcome-role,\.welcome-foot\{opacity:1/);
+});
+
+test("a bus that keeps coming back is counted, with every date kept",async()=>{
+ /* Curtis: "if a person tries to re-submit something in defects, I want a tally
+    of how many times with the date stamped as it does already. This way I know
+    how many round trips a bus is making without the repair."
+
+    The app already REFUSED the repeat — recentDefectDuplicate blocks a matching
+    unresolved defect for five days and disables the save buttons — and counted
+    nothing. The bus came back and there was nowhere for that to land. */
+ const {normalizeReportAttempts,recordReportAttempt,reportAttemptCount,mergeReportAttempts,REPORT_ATTEMPT_DEBOUNCE_MS}=await import("../app/repair-catalog.ts");
+ const base={id:"d1",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service"};
+
+ /* THE TALLY IS THE LIST, not a number. Four returns in one week and four
+    across three months are different problems, and a count cannot tell them
+    apart — which is exactly the judgement Curtis is making with it. */
+ const once=recordReportAttempt(base,"2026-09-08T10:00:00.000Z","cj");
+ assert.equal(reportAttemptCount(once),1);
+ assert.deepEqual(once.reportAttempts,[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],"initials are stored as they are shown");
+ const twice=recordReportAttempt(once,"2026-09-09T10:00:00.000Z","RM");
+ assert.deepEqual(twice.reportAttempts.map(a=>a.by),["CJ","RM"]);
+
+ /* A DOUBLE TAP IS NOT TWO ROUND TRIPS. A bus cannot leave and come back inside
+    two minutes, so a second press that close is a thumb — and a number that
+    inflates on a fumbled tap is worse than no number, because this one is meant
+    to be evidence that a repair is not working. */
+ const fumbled=recordReportAttempt(twice,"2026-09-09T10:00:30.000Z","RM");
+ assert.equal(fumbled,twice,"the defect comes back untouched, so the caller writes nothing at all");
+ const later=recordReportAttempt(twice,new Date(Date.parse("2026-09-09T10:00:00.000Z")+REPORT_ATTEMPT_DEBOUNCE_MS).toISOString(),"RM");
+ assert.equal(reportAttemptCount(later),3,"and a real return just past the window counts");
+ /* A record synced from a device whose clock runs fast holds a future stamp.
+    That must not swallow every genuine return until the clock catches up. */
+ const fromTheFuture=recordReportAttempt({...base,reportAttempts:[{at:"2027-01-01T00:00:00.000Z"}]},"2026-09-09T10:00:00.000Z","CJ");
+ assert.equal(reportAttemptCount(fromTheFuture),2,"a stamp ahead of this one cannot block it");
+
+ /* Read-time cleaning: junk out, duplicates collapsed, always oldest first. */
+ assert.deepEqual(normalizeReportAttempts([{at:"2026-09-09T10:00:00.000Z"},{at:"2026-09-08T10:00:00.000Z"},{at:"2026-09-09T10:00:00.000Z"}]).map(a=>a.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"]);
+ assert.deepEqual(normalizeReportAttempts(["nonsense",null,{at:""},{at:"not a date"},{}]),[]);
+ assert.deepEqual(normalizeReportAttempts("not an array"),[]);
+
+ /* NOTHING REMOVES A RETURN. A save can only ever add, because an editor opened
+    before a return was stamped holds the older list and the merge spread would
+    otherwise let that stale copy overwrite the stamp — losing a round trip
+    nobody would ever notice was missing. */
+ assert.deepEqual(mergeReportAttempts([{at:"2026-09-08T10:00:00.000Z"}],[{at:"2026-09-09T10:00:00.000Z"}]).map(a=>a.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"]);
+ assert.deepEqual(mergeReportAttempts([{at:"2026-09-08T10:00:00.000Z"}],[]).map(a=>a.at),["2026-09-08T10:00:00.000Z"],"an empty incoming list cannot erase a stored one");
+
+ const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[{...base,reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}]}]}];
+ const stale=saveDefectLogRecord(fleet,[],"b",{...base,details:"edited"},false,"2026-09-10T00:00:00.000Z");
+ assert.equal(reportAttemptCount(stale.fleet[0].defects[0]),1,
+  "saving an editor draft that predates the stamp must not drop it");
+
+ /* AND THE KEY STAYS ABSENT WHEN THERE IS NOTHING TO SAY. rowFingerprint walks
+    Object.keys, so an empty array on every defect in the shop would change every
+    row's fingerprint and re-push the whole table to say nothing — the same trap
+    the fluids field was caught in. */
+ const [plain]=normalizeDefects([{id:"plain",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service"}]);
+ assert.equal(Object.keys(plain).includes("reportAttempts"),false);
+ const [carried]=normalizeDefects([{id:"c",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service",reportAttempts:[{at:"2026-09-08T10:00:00.000Z"}]}]);
+ assert.equal(reportAttemptCount(carried),1);
+
+ /* A MERGE MUST NOT LOSE A ROUND TRIP either. Two copies of one repair coming
+    back together have to keep every return between them — the tally can only
+    ever grow, and a merge that quietly halved it would make the number evidence
+    of nothing. Same union symptoms and fluids already get. */
+ const {mergeDuplicateDefects}=await import("../app/duplicate-defects.ts");
+ const dupes=mergeDuplicateDefects([{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
+  {...base,id:"d1",details:"same",reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
+  {...base,id:"d2",details:"same",reportAttempts:[{at:"2026-09-09T10:00:00.000Z",by:"RM"},{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z"},
+ ]}],[],"2026-09-10T00:00:00.000Z");
+ const survivors=dupes.buses[0].defects;
+ assert.equal(survivors.length,1,"the two copies merged");
+ assert.deepEqual(survivors[0].reportAttempts.map(attempt=>attempt.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"],
+  "every return survives, and the one both copies held counts once");
+});
+
+test("counting a return must not take the bus off the Down Sheet",async()=>{
+ /* THE TRAP IN THE OBVIOUS REUSE. saveDefectLogRecord is how everything else on
+    this page writes a defect, and it is the wrong tool here twice over: it
+    REFUSES the save as a recent duplicate — which is the very state being
+    recorded — and saving with onDownSheet:false closes out the bus's Down Sheet
+    entry. Counting that a bus came back would have quietly taken it off the
+    sheet, which is exactly backwards.
+
+    So countReturn writes the one field on the one defect, the way saveShopNotes
+    writes a note. Driven in a browser as well: the sheet entry read
+    "6301:Scheduled" before and after three presses. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const start=page.indexOf("const countReturn=");
+ assert.ok(start>0,"the handler must exist");
+ const body=page.slice(start,page.indexOf("\n };",start));
+ assert.equal(body.includes("saveDefectLogRecord"),false,
+  "counting a return must not go through the save path that closes Down Sheet entries");
+ assert.match(body,/persist\(nextFleet,downEntries\)/,"the Down Sheet entries are passed through untouched");
+ /* The stamp goes on the STORED defect, not the copy the banner is holding, so
+    a form left open cannot write back a tally it read before somebody added to
+    it. */
+ assert.match(body,/recordReportAttempt\(current,now,settings\.defaultInitials\)/);
+ /* A press the debounce refused writes nothing and takes no undo snapshot — an
+    UNDO offering to reverse a change nobody made is worse than the fumbled tap. */
+ assert.match(body,/if\(!counted\)return;/);
+ assert.ok(body.indexOf("if(!counted)return;")<body.indexOf("setUndoSnapshot"));
+
+ /* THE BUTTON IS DELIBERATE, NOT AUTOMATIC. Counting the moment the ALREADY
+    LOGGED banner appears would count a foreman scrolling the picker and every
+    re-render. One press, one return. */
+ assert.match(page,/className="count-return" onClick=\{\(\)=>countReturn\(value\.busId,recentDuplicate\)\}/);
+ /* And the banner still refuses the duplicate — this adds a way to record the
+    return, it does not re-open the door to a second record. */
+ assert.match(page,/<button type="submit" className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}/);
+});
+
+test("ADVANCED STATS lives at the bottom of the focus view and nowhere else",async()=>{
+ /* Curtis: "I want this in a new section located in the bus's defect page. This
+    will be called Advanced stats. It will keep various info. But for now, just
+    the same defect log attempt." And on where exactly: "make it viewable only
+    in focus, like the bottom of however many defects listed. This way the list
+    can drop further down and just scroll to read." */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const focusStart=page.indexOf('<section className="log-focus"'),focusEnd=page.indexOf("{editing&&<DefectEditor");
+ const focus=page.slice(focusStart,focusEnd);
+ assert.ok(focus.includes('className="log-focus-stats"'),"it is inside the focus view");
+ /* ONLY there. A second copy on the feed card is the thing he ruled out. */
+ assert.equal(page.split('className="log-focus-stats"').length-1,1);
+ assert.equal(page.slice(0,focusStart).includes("log-focus-stats"),false,"nothing above the focus view draws it");
+ /* AFTER the records, so it lands under however many defects the bus carries. */
+ assert.ok(focus.indexOf("focusedGroup.records.map")<focus.indexOf('className="log-focus-stats"'));
+ /* Not collapsed and not capped: the focus body already scrolls, and a stat
+    that hides itself is a stat nobody reads. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.log-focus-body\{[^}]*overflow-y:auto/);
+ assert.equal(/\.log-focus-stats\{[^}]*(max-height|overflow)/.test(css),false);
+ /* A bus with no returns says so rather than rendering an empty frame. */
+ assert.match(focus,/No repeat reports on this bus\./);
+ /* The bus-level number leads — "how many round trips is this bus making" is
+    the question — with the per-defect breakdown under it. */
+ assert.match(focus,/ROUND TRIP\{trips===1\?"":"S"\}/);
+ assert.match(focus,/normalizeReportAttempts\(record\.defect\.reportAttempts\)\.map/,"every return is listed, not just the count");
 });
