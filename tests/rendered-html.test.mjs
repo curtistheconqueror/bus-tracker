@@ -11643,8 +11643,10 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  assert.deepEqual(departmentRoles("transportation","non-union"),["Dispatch","Asst Supt","Supt"]);
  assert.equal(departmentRoles("transportation","union").includes("Dispatch"),false,
   "Dispatch is non-union here, whatever it is elsewhere");
- /* Master Mechanic sits at the top of the mechanic ladder, which is the only
-    placement in this table that Curtis did not state outright. */
+ /* Master Mechanic is union, at the top of the mechanic ladder — inferred from
+    the shape of the rest of the list, then confirmed: "Master mechanic is
+    union, you're correct." The title is a top classification at some transit
+    properties and a management job at others, which is why it was asked. */
  assert.deepEqual(departmentRoles("maintenance","union"),["Servicer","Mechanic Helper","Mechanic","Master Mechanic","Body & Frame","Building Maintenance"]);
  assert.ok(departmentRoles("maintenance","union").indexOf("Master Mechanic")>departmentRoles("maintenance","union").indexOf("Mechanic"),
   "it is the top of the ladder, so it follows Mechanic");

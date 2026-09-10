@@ -78,17 +78,17 @@ export function unitLabel(unit:RoleUnit){
    on this floor, and the earlier single "Mechanic / Technician" was a guess made
    before Curtis listed the trades out.
 
-   MASTER MECHANIC IS PLACED ON THE UNION SIDE, at the top of the mechanic
-   ladder, and that placement is the one thing here that was not stated. He
-   asked only to "add Master Mechanic in maintenance" without naming a side, and
-   the title genuinely goes both ways in transit: at many properties it is the
-   top classification in the agreement, sitting above Mechanic exactly where the
-   ladder Servicer → Mechanic Helper → Mechanic already points; at others it is
-   the management title for whoever runs the garage, which would put it beside
-   Foreman. The ladder reading is what the rest of his union list looks like, so
-   that is where it sits — and it is one line to move. Worth confirming, because
-   a job on the wrong side does not merely look odd: it cannot be chosen, since
-   the picker only offers the list for the side you picked.
+   MASTER MECHANIC IS UNION, at the top of the mechanic ladder — confirmed by
+   Curtis ("Master mechanic is union, you're correct") rather than left as the
+   inference it started as. He had asked only to "add Master Mechanic in
+   maintenance" without naming a side, and the title genuinely goes both ways in
+   transit: at many properties it is the top classification in the agreement,
+   sitting above Mechanic exactly where the ladder Servicer → Mechanic Helper →
+   Mechanic already points; at others it is the management title for whoever
+   runs the garage, which would have put it beside Foreman. It was placed on the
+   ladder because that is the shape of the rest of his union list, and asked
+   about because a job on the wrong side does not merely look odd — it cannot be
+   chosen at all, since the picker only offers the list for the side you picked.
 
    SUPERINTENDENT IS ABBREVIATED because there are two of them. Curtis: "we have
    asst supt, so that is why I want it shortened, so the label can show both like
