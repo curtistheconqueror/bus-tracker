@@ -1087,10 +1087,23 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
 .welcome-role-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:0;background:none;color:#fff;padding:11px 15px;text-align:left;font-family:inherit;cursor:pointer}
 .welcome-role-toggle span{display:grid;gap:3px;min-width:0}
 .welcome-role-toggle b{font-size:10px;font-weight:900;letter-spacing:1.6px}
-.welcome-role-toggle small{color:#b9d3f4;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A flex row so the ELLIPSIS lands on the job title and never on the union tag.
+   With both in one text flow the tag is what gets cut, and it is the shortest
+   thing on the line — the first that should survive a squeeze, not the last. */
+.welcome-role-toggle small{display:flex;align-items:center;gap:7px;min-width:0;color:#b9d3f4;font-size:11px;font-weight:700}
+.welcome-role-toggle small>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* UNION / NON-UNION, drawn as a tag rather than a third dot-separated part of
+   the name. It is an attribute of the person, not part of the job title, and
+   "Transportation · Non-Union · Mechanic / Technician" does not fit a phone. */
+.welcome-role-unit{flex:0 0 auto;border:1px solid rgba(255,255,255,.3);border-radius:4px;background:rgba(255,255,255,.1);padding:1px 6px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.8px;white-space:nowrap}
+.welcome-role-unit.union{border-color:#7fb2f0;background:rgba(127,178,240,.24);color:#dbe9fb}
 .welcome-role-toggle i{flex:0 0 auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:7px;color:#dbe9fb;font-style:normal;font-size:15px;font-weight:900;line-height:1}
 .welcome-role-body{display:grid;gap:9px;padding:0 15px 14px}
 .welcome-role-departments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+/* The union row reuses the department row outright — same two-up grid, same
+   buttons — because it is the same shape of question one step later, and a
+   second layout for it would only make the panel busier. */
+.welcome-role-units{margin-top:-2px}
 .welcome-role-roles{display:grid;gap:7px}
 .welcome-role-body button{min-height:44px;border:1px solid rgba(255,255,255,.28);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;padding:0 12px;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.4px;cursor:pointer}
 .welcome-role-body button:hover,.welcome-role-body button:focus-visible{border-color:#7fb2f0;background:rgba(255,255,255,.14);outline:none}

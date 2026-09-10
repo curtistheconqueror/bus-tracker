@@ -152,9 +152,23 @@ per-device view state — which panel is open, what has been dismissed
 ```
 
 **`pace-role-v1` names a person's job and must not gate anything yet.** It holds
-a department and a role picked on the home screen — Transportation or
-Maintenance, then Bus Operator / Dispatch / Asst Supt / Supt, or Servicer /
-Mechanic / Foreman / Asst Supt / Supt. Curtis asked for it as a label first:
+three things picked on the home screen, in this order: **department**, then
+**union or non-union**, then the **job** — and the second narrows the third,
+because Curtis gave the actual split:
+
+| | Union | Non-Union |
+| --- | --- | --- |
+| Transportation | Bus Operator, Dispatch | Asst Supt, Supt |
+| Maintenance | Servicer, Mechanic Helper, Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+
+**Foreman is on the non-union side**, which is the one a transit shop cannot
+assume — it goes either way by contract. A combination not in that table cannot
+be chosen and does not read back, so if the contract changes, it changes in
+`app/roles.ts` and any device holding the old pairing reads as "not set" until
+its owner picks again. *Bargaining* is the union side, so it can never be the
+non-union label; Union / Non-Union is what the floor says.
+
+Curtis asked for it as a label first:
 "there will be no special conditions in the app for any of the working roles.
 This is all cosmetic. We will wire that up later."
 

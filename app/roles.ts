@@ -39,7 +39,30 @@
 export const ROLE_STORAGE_KEY="pace-role-v1";
 
 export type RoleDepartment="transportation"|"maintenance";
-export type RoleChoice={department:RoleDepartment;role:string};
+export type RoleUnit="union"|"non-union";
+export type RoleChoice={department:RoleDepartment;unit:RoleUnit;role:string};
+
+/* UNION OR NOT, asked after the department and before the role. Curtis: "I want
+   the distinction after they select their dept, transportation or maintenance —
+   union or non-union."
+
+   He also asked whether non-union is called "bargain". It is the other way
+   round: a BARGAINING UNIT is the group a union represents, so "bargaining"
+   names the union side and cannot label the other one. The pairs that are
+   actually used are Union / Non-Union, Bargaining / Non-Bargaining, and
+   Represented / Non-Represented. The plainest of the three is what a shop floor
+   says out loud, so that is what is drawn; the other two are a one-line change
+   here if the formal wording is wanted later.
+
+   Union first because most of the building is: operators, servicers and
+   mechanics outnumber the superintendents. */
+export const ROLE_UNITS:{key:RoleUnit;label:string}[]=[
+ {key:"union",label:"Union"},
+ {key:"non-union",label:"Non-Union"},
+];
+export function unitLabel(unit:RoleUnit){
+ return ROLE_UNITS.find(item=>item.key===unit)?.label||"";
+}
 
 /* Curtis's own two lists, in his own order — which is the shop's order, from
    the road or the floor upward, not alphabetical:
@@ -48,8 +71,12 @@ export type RoleChoice={department:RoleDepartment;role:string};
       dispatch and then superintendent. Now for maintenance, it will be servicer
       then mechanic, foreman, superintendent."
 
-   "Mechanic / Technician" carries both words because he used both for the one
-   role ("mechanic/technician" the first time, "mechanic" the second).
+   ...later corrected and expanded by him into the union/non-union table below,
+   which is the one that is built.
+
+   Mechanic and Mechanic Helper are two rows rather than one: they are two jobs
+   on this floor, and the earlier single "Mechanic / Technician" was a guess made
+   before Curtis listed the trades out.
 
    SUPERINTENDENT IS ABBREVIATED because there are two of them. Curtis: "we have
    asst supt, so that is why I want it shortened, so the label can show both like
@@ -58,17 +85,47 @@ export type RoleChoice={department:RoleDepartment;role:string};
    front, which is the hardest pair of all to tell apart at a glance on a phone.
    Both departments get both, since both already had a Superintendent.
 
+   THE UNION ANSWER NARROWS THE JOB LIST, because Curtis supplied the actual
+   split rather than leaving it to be guessed:
+
+     "The maintenance side will be Servicer, Mechanic Helper, Mechanic, Body &
+      Frame, Building Maintenance. The other are non union. For transportation
+      it will be Bus Operator, Dispatch, and the rest."
+
+   So Foreman sits on the non-union side here, which is the one a shop cannot
+   assume — it goes either way by contract — and is exactly why this was left
+   unfiltered until he said. A list filtered on a guess shows somebody a screen
+   with their own job missing from it; a list filtered on the contract shows
+   each person only the five or so rows that can possibly be theirs.
+
+   The consequence to know: a combination that is not in this table cannot be
+   chosen and does not read back. If the contract changes and a job moves sides,
+   it moves HERE, and any device that stored the old pairing reads as "not set"
+   until its owner picks again.
+
    Renaming these strings is safe ONLY because 171 has not published — no device
    holds a role yet. Once it has, a wording change here has to become a read-time
    rename like the repair catalog's, or every device that stored the old spelling
    silently reads as "not set". */
-export const ROLE_DEPARTMENTS:{key:RoleDepartment;label:string;roles:string[]}[]=[
- {key:"transportation",label:"Transportation",roles:["Bus Operator","Dispatch","Asst Supt","Supt"]},
- {key:"maintenance",label:"Maintenance",roles:["Servicer","Mechanic / Technician","Foreman","Asst Supt","Supt"]},
+export const ROLE_DEPARTMENTS:{key:RoleDepartment;label:string;roles:Record<RoleUnit,string[]>}[]=[
+ {key:"transportation",label:"Transportation",roles:{
+  union:["Bus Operator","Dispatch"],
+  "non-union":["Asst Supt","Supt"],
+ }},
+ {key:"maintenance",label:"Maintenance",roles:{
+  union:["Servicer","Mechanic Helper","Mechanic","Body & Frame","Building Maintenance"],
+  "non-union":["Foreman","Asst Supt","Supt"],
+ }},
 ];
 
-export function departmentRoles(department:RoleDepartment){
- return ROLE_DEPARTMENTS.find(item=>item.key===department)?.roles||[];
+export function departmentRoles(department:RoleDepartment,unit:RoleUnit){
+ return ROLE_DEPARTMENTS.find(item=>item.key===department)?.roles[unit]||[];
+}
+/* Every job in a department, both sides, for anything that needs the whole set
+   rather than one person's slice. */
+export function allDepartmentRoles(department:RoleDepartment){
+ const found=ROLE_DEPARTMENTS.find(item=>item.key===department);
+ return found?[...found.roles.union,...found.roles["non-union"]]:[];
 }
 export function departmentLabel(department:RoleDepartment){
  return ROLE_DEPARTMENTS.find(item=>item.key===department)?.label||"";
@@ -85,21 +142,38 @@ export function readRole(raw:string|null):RoleChoice|null{
   if(!saved||typeof saved!=="object")return null;
   const department=saved.department==="transportation"||saved.department==="maintenance"?saved.department:null;
   if(!department)return null;
+  /* All three or nothing. A half-answered role — a department and a job with no
+     union status — is a record that looks complete on the summary line and is
+     not, and there is no honest way to guess the missing third. Safe to require
+     because 171 has not published and no device holds a role yet; once one does,
+     an older two-part answer would have to be read forward rather than dropped. */
+  const unit=saved.unit==="union"||saved.unit==="non-union"?saved.unit:null;
+  if(!unit)return null;
   /* Validated at READ time against the list, and never written back. A stored
      answer whose wording this build no longer offers reads as "not set" and is
      left exactly as it is on the device — the same rule the repair catalog
      follows for renamed defects, for the same reason: rewriting somebody's
      record to make this build tidier throws away what they actually chose. */
-  return departmentRoles(department).includes(String(saved.role))?{department,role:String(saved.role)}:null;
+  /* Validated against the PAIR, not the department alone: a Supt stored as
+     union is a combination the picker cannot produce, so it came from a
+     hand-edited backup or a build whose table said something else. */
+  return departmentRoles(department,unit).includes(String(saved.role))?{department,unit,role:String(saved.role)}:null;
  }catch{return null}
 }
 
 export function serializeRole(choice:RoleChoice){
- return JSON.stringify({version:1,department:choice.department,role:choice.role,chosenAt:new Date().toISOString()});
+ return JSON.stringify({version:1,department:choice.department,unit:choice.unit,role:choice.role,chosenAt:new Date().toISOString()});
 }
 
 /* "Maintenance · Foreman", which is the only spelling that tells one
-   department's Supt from the other's. */
+   department's Supt from the other's.
+
+   The union status is deliberately NOT in this string. Three parts joined by
+   dots runs past the width of a phone's summary line, where the longest of them
+   — "Transportation · Non-Union · Mechanic / Technician" — would be truncated
+   at exactly the end that identifies the person. It is drawn as its own tag
+   beside this instead, which also matches what it is: an attribute of the
+   person, not part of their job title. */
 export function roleLabel(choice:RoleChoice|null){
  return choice?departmentLabel(choice.department)+" · "+choice.role:"";
 }

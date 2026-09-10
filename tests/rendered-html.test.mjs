@@ -11631,24 +11631,41 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     between bus operator, then dispatch and then superintendent. Now for
     maintenance, it will be servicer then mechanic, foreman, superintendent." */
  assert.deepEqual(ROLE_DEPARTMENTS.map(item=>item.key),["transportation","maintenance"]);
- assert.deepEqual(departmentRoles("transportation"),["Bus Operator","Dispatch","Asst Supt","Supt"]);
- assert.deepEqual(departmentRoles("maintenance"),["Servicer","Mechanic / Technician","Foreman","Asst Supt","Supt"]);
+ /* CURTIS'S OWN SPLIT, in his own words: "The maintenance side will be Servicer,
+    Mechanic Helper, Mechanic, Body & Frame, Building Maintenance. The other are
+    non union. For transportation it will be Bus Operator, Dispatch, and the
+    rest." */
+ assert.deepEqual(departmentRoles("transportation","union"),["Bus Operator","Dispatch"]);
+ assert.deepEqual(departmentRoles("transportation","non-union"),["Asst Supt","Supt"]);
+ assert.deepEqual(departmentRoles("maintenance","union"),["Servicer","Mechanic Helper","Mechanic","Body & Frame","Building Maintenance"]);
+ /* FOREMAN IS NON-UNION HERE. It is the one job a transit shop cannot assume —
+    it goes either way by contract — and is exactly why the list was left
+    unfiltered until he said which. */
+ assert.deepEqual(departmentRoles("maintenance","non-union"),["Foreman","Asst Supt","Supt"]);
+ /* No job appears on both sides of one department: a person is represented or
+    not, and a row on both would make the union question decide nothing. */
+ for(const department of ["transportation","maintenance"]){
+  const union=departmentRoles(department,"union"),other=departmentRoles(department,"non-union");
+  assert.deepEqual(union.filter(role=>other.includes(role)),[],department+" has no job on both sides");
+  assert.ok(union.length&&other.length,department+" has jobs on each side");
+ }
 
  /* ABBREVIATED BECAUSE THERE ARE TWO. Curtis: "we have asst supt, so that is
     why I want it shortened, so the label can show both like Asst Supt & Supt
     simultaneously." Spelled out, "Assistant Superintendent" beside
     "Superintendent" is two long strings differing by one word at the front —
     the hardest pair of all to tell apart at a glance on a phone. */
+ const {allDepartmentRoles}=await import("../app/roles.ts");
  for(const department of ["transportation","maintenance"]){
-  assert.ok(departmentRoles(department).includes("Asst Supt"),department+" has an assistant");
-  assert.ok(departmentRoles(department).includes("Supt"));
-  assert.equal(departmentRoles(department).some(role=>/Superintendent/i.test(role)),false,"spelled out, the two are too alike to scan");
+  assert.ok(allDepartmentRoles(department).includes("Asst Supt"),department+" has an assistant");
+  assert.ok(allDepartmentRoles(department).includes("Supt"));
+  assert.equal(allDepartmentRoles(department).some(role=>/Superintendent/i.test(role)),false,"spelled out, the two are too alike to scan");
  }
 
  /* AND THEY ARE ON BOTH LISTS, so a bare role string does not say which person
     it means. The pair is what is stored, and the label is what tells them
     apart on screen. */
- const road={department:"transportation",role:"Supt"},shop={department:"maintenance",role:"Supt"};
+ const road={department:"transportation",unit:"non-union",role:"Supt"},shop={department:"maintenance",unit:"non-union",role:"Supt"};
  assert.notEqual(roleLabel(road),roleLabel(shop));
  assert.equal(roleLabel(shop),"Maintenance · Supt");
  assert.deepEqual(readRole(serializeRole(road)),road);
@@ -11658,12 +11675,41 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     nobody chose, and this exists so the person says it themselves. */
  assert.equal(readRole(null),null);
  assert.equal(readRole("not json"),null);
- assert.equal(readRole('{"department":"catering","role":"Chef"}'),null);
+ assert.equal(readRole('{"department":"catering","unit":"union","role":"Chef"}'),null);
+ /* Validated against the PAIR: a Supt stored as union is a combination the
+    picker cannot produce, so it came from a hand-edited backup. */
+ assert.equal(readRole('{"department":"maintenance","unit":"union","role":"Supt"}'),null,"a job on the wrong side of the contract does not read back");
+ assert.deepEqual(readRole('{"department":"maintenance","unit":"non-union","role":"Supt"}'),{department:"maintenance",unit:"non-union",role:"Supt"});
  /* A role this build no longer offers reads as not set and is NOT rewritten —
     the same read-time rule the repair catalog follows for renamed defects. */
- assert.equal(readRole('{"department":"maintenance","role":"Bodyman"}'),null);
- assert.equal(readRole('{"department":"maintenance","role":"Superintendent"}'),null,"the spelled-out wording is not offered any more");
+ assert.equal(readRole('{"department":"maintenance","unit":"union","role":"Bodyman"}'),null);
+ assert.equal(readRole('{"department":"maintenance","unit":"non-union","role":"Superintendent"}'),null,"the spelled-out wording is not offered any more");
  assert.equal(readRole('{"role":"Foreman"}'),null,"a role with no department cannot be resolved");
+
+ /* UNION OR NOT, asked between the department and the job. Curtis: "I want the
+    distinction after they select their dept — union or non-union." He also
+    asked whether non-union is called "bargain": it is the other way round. A
+    BARGAINING UNIT is the group a union represents, so "bargaining" names the
+    union side and cannot label the other one. */
+ const {ROLE_UNITS,unitLabel}=await import("../app/roles.ts");
+ assert.deepEqual(ROLE_UNITS.map(item=>item.key),["union","non-union"],"union first — most of the building is");
+ assert.deepEqual(ROLE_UNITS.map(item=>item.label),["Union","Non-Union"]);
+ for(const item of ROLE_UNITS)assert.equal(/bargain/i.test(item.label),false,
+  "bargaining names the union side, so it can never be the non-union label");
+ assert.equal(unitLabel("union"),"Union");
+
+ /* ALL THREE OR NOTHING. A department and a job with no union status is a
+    record that looks complete on the summary line and is not, and there is no
+    honest way to guess the missing third. */
+ assert.equal(readRole('{"department":"maintenance","role":"Foreman"}'),null,"a role with no union status is not a complete answer");
+ assert.equal(readRole('{"department":"maintenance","unit":"casual","role":"Foreman"}'),null);
+ assert.deepEqual(readRole(serializeRole({department:"maintenance",unit:"non-union",role:"Foreman"})),
+  {department:"maintenance",unit:"non-union",role:"Foreman"});
+
+ /* The union status is NOT in the name. Three parts joined by dots runs past a
+    phone's summary line, and the part that would be truncated is the end that
+    identifies the person. It is drawn as its own tag instead. */
+ assert.equal(roleLabel({department:"maintenance",unit:"union",role:"Building Maintenance"}),"Maintenance · Building Maintenance");
 
  /* THE ONE RULE THAT MATTERS MOST. Curtis: "there will be no special conditions
     in the app for any of the working roles. This is all cosmetic."
@@ -11682,8 +11728,23 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  assert.equal(sync.includes("pace-role-v1"),false);
 
  const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  /* Collapsible, as asked. */
  assert.match(gate,/className="welcome-role-toggle" aria-expanded=\{roleOpen\}/);
+ /* Three steps, in Curtis's order: department, then union, then the job. The
+    role buttons do not render until both of the first two are answered. */
+ assert.match(gate,/\{department&&<div className="welcome-role-departments welcome-role-units">/);
+ assert.match(gate,/\{department&&unit&&<div className="welcome-role-roles">/);
+ assert.ok(gate.indexOf('className="welcome-role-departments">')<gate.indexOf('welcome-role-units">'));
+ assert.ok(gate.indexOf('welcome-role-units">')<gate.indexOf('className="welcome-role-roles">'));
+ /* Changing the department clears the union answer rather than carrying it
+    across, so a half-changed answer cannot be saved. */
+ assert.match(gate,/setDepartment\(department===item\.key\?null:item\.key\);setUnit\(null\)/);
+ /* The label is wrapped so the ellipsis lands on the job title and never on the
+    union tag — the tag is the shortest thing on the line and the first that
+    should survive a squeeze. */
+ assert.match(css,/\.welcome-role-toggle small\{display:flex[^}]*\}/);
+ assert.match(css,/\.welcome-role-toggle small>span\{min-width:0;overflow:hidden;text-overflow:ellipsis/);
  /* UNDER the two mode choices and ABOVE the footnote: the screen already asks
     one question a first run must answer, and stacking a second in front of it
     would turn a gate into a form. */
@@ -11694,7 +11755,6 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  assert.equal(body.includes("setOpen"),false,"picking a role must not close a gate that has not been answered");
  assert.equal(body.includes(  "APP_MODE_STORAGE_KEY"),false,"and must not touch the mode");
 
- const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  /* globals.css line 2 gives every bare <button> height:28px. Every control here
     is a bare button, so each one states its own height — measured at 44px in
     Chromium at 360/390/430/820, not read off this rule. */

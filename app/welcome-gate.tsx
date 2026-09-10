@@ -17,7 +17,7 @@ import {useEffect,useState} from "react";
 import {APP_NAME} from "./app-name";
 import {APP_MODE_STORAGE_KEY,isFirstRun,readAppMode,serializeAppMode,type AppMode} from "./app-mode";
 import {lockPageScroll} from "./scroll-lock";
-import {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,type RoleChoice,type RoleDepartment} from "./roles";
+import {ROLE_DEPARTMENTS,ROLE_UNITS,ROLE_STORAGE_KEY,departmentRoles,readRole,roleLabel,serializeRole,unitLabel,type RoleChoice,type RoleDepartment,type RoleUnit} from "./roles";
 
 export const WELCOME_REQUEST_EVENT="pace-show-welcome";
 
@@ -44,6 +44,7 @@ export default function WelcomeGate(){
  const [role,setRole]=useState<RoleChoice|null>(null);
  const [roleOpen,setRoleOpen]=useState(false);
  const [department,setDepartment]=useState<RoleDepartment|null>(null);
+ const [unit,setUnit]=useState<RoleUnit|null>(null);
  useEffect(()=>{try{setRole(readRole(localStorage.getItem(ROLE_STORAGE_KEY)))}catch{}},[]);
  useEffect(()=>{
   if(isFirstRun(localStorage))setOpen(true);
@@ -72,11 +73,11 @@ export default function WelcomeGate(){
      refusing to close the panel over it would be a bigger problem than the one
      being reported. */
   try{localStorage.setItem(ROLE_STORAGE_KEY,serializeRole(next))}catch{}
-  setRole(next);setRoleOpen(false);setDepartment(null);
+  setRole(next);setRoleOpen(false);setDepartment(null);setUnit(null);
  };
  const clearRole=()=>{
   try{localStorage.removeItem(ROLE_STORAGE_KEY)}catch{}
-  setRole(null);setDepartment(null);
+  setRole(null);setDepartment(null);setUnit(null);
  };
  const choose=(mode:AppMode)=>{
   try{localStorage.setItem(APP_MODE_STORAGE_KEY,serializeAppMode({mode,answered:true}))}
@@ -142,8 +143,8 @@ export default function WelcomeGate(){
        at some length why nothing else may. */}
    <div className={"welcome-role"+(roleOpen?" open":"")}>
     <button type="button" className="welcome-role-toggle" aria-expanded={roleOpen}
-     onClick={()=>{setRoleOpen(!roleOpen);setDepartment(null)}}>
-     <span><b>MY ROLE</b><small>{role?roleLabel(role):"Not set — optional"}</small></span>
+     onClick={()=>{setRoleOpen(!roleOpen);setDepartment(null);setUnit(null)}}>
+     <span><b>MY ROLE</b><small><span>{role?roleLabel(role):"Not set — optional"}</span>{role&&<i className={"welcome-role-unit "+role.unit}>{unitLabel(role.unit).toUpperCase()}</i>}</small></span>
      <i aria-hidden="true">{roleOpen?"−":"+"}</i>
     </button>
     {roleOpen&&<div className="welcome-role-body">
@@ -152,13 +153,24 @@ export default function WelcomeGate(){
          rather than a separate BACK control. */}
      <div className="welcome-role-departments">{ROLE_DEPARTMENTS.map(item=>
       <button type="button" key={item.key} className={department===item.key?"selected":""}
-       aria-pressed={department===item.key} onClick={()=>setDepartment(department===item.key?null:item.key)}>{item.label}</button>)}
+       aria-pressed={department===item.key} onClick={()=>{setDepartment(department===item.key?null:item.key);setUnit(null)}}>{item.label}</button>)}
      </div>
-     {department&&<div className="welcome-role-roles">{ROLE_DEPARTMENTS.find(item=>item.key===department)?.roles.map(name=>
-      <button type="button" key={name} className={role?.department===department&&role.role===name?"selected":""}
-       onClick={()=>chooseRole({department,role:name})}>{name}</button>)}
+     {/* THE SECOND QUESTION, between the department and the job. Curtis: "I want
+         the distinction after they select their dept — union or non-union."
+
+         It NARROWS the job list below it, because he then gave the actual split
+         rather than leaving it to be guessed. That is what makes the third step
+         short: five rows at most, and every one of them possibly yours. The
+         table lives in roles.ts, which is where a contract change goes. */}
+     {department&&<div className="welcome-role-departments welcome-role-units">{ROLE_UNITS.map(item=>
+      <button type="button" key={item.key} className={unit===item.key?"selected":""}
+       aria-pressed={unit===item.key} onClick={()=>setUnit(unit===item.key?null:item.key)}>{item.label}</button>)}
      </div>}
-     {!department&&<small className="welcome-role-hint">Pick a department, then a role.{role?" Yours is set to "+roleLabel(role)+".":""}</small>}
+     {department&&unit&&<div className="welcome-role-roles">{departmentRoles(department,unit).map(name=>
+      <button type="button" key={name} className={role?.department===department&&role.unit===unit&&role.role===name?"selected":""}
+       onClick={()=>chooseRole({department,unit,role:name})}>{name}</button>)}
+     </div>}
+     {(!department||!unit)&&<small className="welcome-role-hint">{department?"Union or non-union — it decides which jobs are listed next.":"Pick a department, then union or non-union, then your job."}{role?" Yours is set to "+roleLabel(role)+" ("+unitLabel(role.unit)+").":""}</small>}
      {role&&<button type="button" className="welcome-role-clear" onClick={clearRole}>CLEAR MY ROLE</button>}
     </div>}
    </div>
