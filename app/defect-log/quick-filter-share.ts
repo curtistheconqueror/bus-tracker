@@ -1,20 +1,17 @@
 import {defectLabel} from "../repair-catalog.ts";
 import {quickFilterDefects,quickFilterFallbackLabel,type QuickFilterBus,type QuickFilterKey} from "../quick-filters.ts";
+/* The same name the Defect Log shows on a card — now literally the same
+   function, which is how a shared list learned to say Trouble Bay 12. A list
+   somebody reads on their phone in the yard is worth far more when it says
+   where to walk, and worth less than nothing when it names the wrong bay.
+
+   Unknown slots stay blank here rather than printing the raw id: this text
+   gets pasted into a message to somebody who may not have the app open at
+   all, and "offsite-3" reads as a typo to them. */
+import {knownLocationLabel as shareAreaLabel} from "../location-label.ts";
+export {shareAreaLabel};
 
 export type QuickFilterShareBus=QuickFilterBus&{n:string;l?:string};
-
-/* The same prefixes the Defect Log shows on a card. A list somebody reads on
-   their phone in the yard is worth far more when it says where to walk. */
-const AREA_LABELS:[string,string][]=[
- ["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],
- ["bay-","Shop Bay"],["service-","Service Detail"],["wall","Shop Wall"],["waiting-","Waiting Area"],
- ["offsite-","Off Property"],["paint-","Paint Booth"],["wash-","Wash Rack"],["body-","Body Shop"],
- ["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["office-","Foreman Office"],
-];
-export function shareAreaLabel(location:string|undefined){
- const at=String(location??"").trim();
- return at?AREA_LABELS.find(([prefix])=>at.startsWith(prefix))?.[1]||"":"";
-}
 
 /* One line per defect, with the exact duplicates collapsed.
 

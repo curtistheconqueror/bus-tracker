@@ -18,6 +18,8 @@ import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,qu
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "../recommended-counts";
 import {answerRecommendedBus} from "../recommended-actions";
 import {elapsedLong} from "../elapsed-label";
+import TimeWindowChips from "../time-window-chips";
+import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "../time-window";
 import {roadCallNote} from "../road-calls";
 import {lockPageScroll} from "../scroll-lock";
 /* One copy of the location editor, shared with the Down Sheet's MYSTERY BUSES
@@ -622,6 +624,10 @@ export default function DefectLog(){
  };
  const appMode=useAppMode();
  const [quickFilter,setQuickFilter]=useState<QuickFilterKey|null>(null);
+ /* Reset every time a filter is opened, and never written to storage — see
+    time-window-chips.tsx for why a remembered window is the wrong default on
+    a list of buses nobody has ruled on yet. */
+ const [quickFilterWindow,setQuickFilterWindow]=useState<TimeWindowKey>("all");
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
@@ -632,7 +638,7 @@ export default function DefectLog(){
     the drawer and reloading does not silently reopen it. */
  useEffect(()=>{
   const open=(key:QuickFilterKey)=>{
-   setQuickFilter(key);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");
+   setQuickFilter(key);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow("all");
    setTimeout(()=>document.querySelector(".quick-filter-drawer")?.scrollIntoView({behavior:"smooth",block:"start"}),0);
   };
   const requested=quickFilterFromValue(new URLSearchParams(window.location.search).get(QUICK_FILTER_PARAM));
@@ -742,7 +748,30 @@ export default function DefectLog(){
  const recommendedDefectsFor=(busId:string)=>recommendedRowsForFleet.filter(row=>row.bus.id===busId).map(row=>row.defect).sort((a,b)=>recommendedRank(a)-recommendedRank(b));
  const recommendedSince=(bus:DefectLogFleetBus)=>recommendedRank(recommendedDefectsFor(bus.id)[0]);
  const candidateIdsFor=(key:QuickFilterKey)=>key==="deferred"?deferredCandidateIds:key==="down-sheet-recommended"?recommendedCandidateIds:quickFilterBusIds(fleet,key);
- const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,candidateIdsFor(item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(candidateIdsFor(quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):quickFilter==="down-sheet-recommended"?recommendedSince(a)-recommendedSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
+ const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,candidateIdsFor(item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(candidateIdsFor(quickFilter)):new Set<string>(),quickFilterAllBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):quickFilter==="down-sheet-recommended"?recommendedSince(a)-recommendedSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
+ /* HOW OLD THIS ROW IS, for the window chips, in the two filters that carry
+    them. Read from exactly the records the row's own line prints its time
+    from — the deferred row from the held repair, the recommended row from
+    recommendedDefectsFor — so a bus can never be hidden by a clock the card
+    beside it is not showing. Every other filter answers "what is true now"
+    and returns null, which withinTimeWindow only ever sees under ALL. */
+ const quickFilterAgeMinutes=(bus:DefectLogFleetBus)=>{
+  if(quickFilter==="deferred"){
+   const defect=quickFilterDefects(bus,"deferred").find(item=>isHeldDeferred(item,activeDownBusIdSet.has(bus.id)));
+   return defect?deferredMinutesElapsed(defect):null;
+  }
+  if(quickFilter==="down-sheet-recommended"){
+   const defects=recommendedDefectsFor(bus.id);
+   return defects.length?busRecommendedMinutes(defects):null;
+  }
+  return null;
+ };
+ const quickFilterWindowed=quickFilter==="deferred"||quickFilter==="down-sheet-recommended";
+ const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow)):quickFilterAllBuses;
+ /* The window travels with the shared list. A heading that says only
+    "Deferred — 6 buses" to somebody who cannot see the screen it came off is
+    the failure this whole control could otherwise cause. */
+ const quickFilterShareLabel=quickFilterLabel+(quickFilterWindowed&&timeWindowLabel(quickFilterWindow)?" ("+timeWindowLabel(quickFilterWindow)+")":"");
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
  /* Reports why nothing was kept instead of returning in silence. The state is
@@ -959,7 +988,7 @@ export default function DefectLog(){
  };
  const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
- const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterLabel,quickFilterBuses,quickFilter));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
+ const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
 /* The same list as a page rather than a paragraph.
 
     Text is right for pasting into a group message. It is wrong for a list
@@ -970,12 +999,12 @@ export default function DefectLog(){
  const shareQuickFilterPage=async()=>{
   if(!quickFilter)return;
   const stamp=new Date().toLocaleString();
-  const html=quickFilterShareHtml(quickFilterLabel,quickFilterBuses,quickFilter,stamp);
+  const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp);
   const blob=new Blob([html],{type:"text/html"});
-  const outcome=await shareOrDownloadFile(blob,quickFilterShareFilename(quickFilterLabel),quickFilterLabel+" bus list");
+  const outcome=await shareOrDownloadFile(blob,quickFilterShareFilename(quickFilterShareLabel),quickFilterShareLabel+" bus list");
   setQuickFilterShareStatus(outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
  };
- const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterLabel,quickFilterBuses,quickFilter);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
+ const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterShareLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
  
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":settings.appearance.header,"--log-header-text":settings.appearance.headerText,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],"--log-page-title-color":settings.display.styles.pageTitle.color,"--log-page-title-size":settings.display.styles.pageTitle.fontSize+"px","--log-summary-color":settings.display.styles.summary.color,"--log-summary-size":settings.display.styles.summary.fontSize+"px","--log-mystery-color":settings.display.styles.mystery.color,"--log-mystery-size":settings.display.styles.mystery.fontSize+"px","--log-feed-title-color":settings.display.styles.feedTitle.color,"--log-feed-title-size":settings.display.styles.feedTitle.fontSize+"px","--log-repair-category-color":settings.display.styles.repairCategory.color,"--log-repair-category-size":settings.display.styles.repairCategory.fontSize+"px","--log-repair-details-color":settings.display.styles.repairDetails.color,"--log-repair-details-size":settings.display.styles.repairDetails.fontSize+"px","--log-shop-notes-color":settings.display.styles.shopNotes.color,"--log-shop-notes-size":settings.display.styles.shopNotes.fontSize+"px"} as React.CSSProperties;
 
@@ -1025,7 +1054,7 @@ export default function DefectLog(){
        buttons back for everybody else. */
     ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
     ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
-      <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("")}}/>
+      <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow("all")}}/>
       <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
      </div>
      <div className="log-advanced-group">
@@ -1072,7 +1101,7 @@ export default function DefectLog(){
     decoration, so it carries its name and is shaped like the buttons beside it. */}
    
   </section>
-  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header><div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=quickFilterDefects(bus,quickFilter),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
+  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={setQuickFilterWindow} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"}/>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=quickFilterDefects(bus,quickFilter),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
       kind of number that makes somebody stop trusting every other number on
       the card. The comparisons that matter — the 90-minute alert and the
@@ -1095,7 +1124,7 @@ export default function DefectLog(){
        it out, then the cross that takes it off the list. */}
    <button type="button" className="fix-recommended" onClick={()=>markRecommendedFixed(bus,recommendedDefects)} disabled={!recommendedDefects.length} title={recommendedDefects.length>1?"Marks all "+recommendedDefects.length+" recommended repairs on this bus fixed":"Marks this repair fixed and closes it out"}>MARK FIXED</button>
    <button type="button" className="end-deferral" onClick={()=>removeRecommendation(bus,recommendedDefects)} disabled={!recommendedDefects.length} title="Takes this bus off the recommended list. The repair stays open.">REMOVE</button>
-  </div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
+  </div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>{quickFilterWindowed&&quickFilterAllBuses.length?quickFilterAllBuses.length+" bus"+(quickFilterAllBuses.length===1?"":"es")+" match this filter, all outside this window.":"No buses currently match this filter."}</p>}</div></aside>}
   {/* MYSTERY BUSES moved to the Down Sheet. Every bus it lists is a bus that is
       NOT on that sheet, so it belongs beside the sheet rather than here. The
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}

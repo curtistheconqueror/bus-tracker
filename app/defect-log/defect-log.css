@@ -965,3 +965,9 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-focus-stat-returns time{font-size:11px}
  .log-focus-stats-empty span{font-size:11px}
 }
+
+/* The drawer is a flex column whose broad `>div` rule turns every direct child
+   into a scrolling grid — that rule is why .quick-filter-share-actions has to
+   restate itself too. The chip row is a direct child, so it needs the same
+   escape or it becomes a two-column grid with its own scrollbar. */
+.quick-filter-drawer>.time-window-chips{flex:none;display:flex;gap:8px;padding:7px;overflow:visible}

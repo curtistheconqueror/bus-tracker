@@ -44,12 +44,17 @@ this SHA first.**
 
 ## What 171 is
 
-**Seventeen commits.** No migration, no schema change, no dependency change,
-and nothing that rewrites a record. **Two new storage keys, both per-device and
-neither renaming anything** (`pace-down-sheet-recommended-collapsed-v1`,
-`pace-role-v1`), eighteen new catalog options, one new optional field on a
-defect, a third board on the Down Sheet, the Defect Log's two pickers rebuilt
-as typing fields, and one bug fixed that was live in 170.
+No migration, no schema change, no dependency change, and nothing that rewrites
+a record. **Two new storage keys, both per-device and neither renaming
+anything** (`pace-down-sheet-recommended-collapsed-v1`, `pace-role-v1`),
+eighteen new catalog options, one new optional field on a defect, a third board
+on the Down Sheet, the Defect Log's two pickers rebuilt as typing fields, and
+**two bugs fixed that are live in 170** — one of them a wrong label on the
+control Curtis had just used.
+
+**Recount the commits from the SHA above rather than trusting a number here.**
+This section has been written across several sittings and the count is the one
+thing in it that goes stale silently.
 
 - **The Facility Map's header joins the other five.** It was the one page whose
   nav sat above its own name — Curtis, on a phone: *"the facility map needs to
@@ -224,8 +229,63 @@ as typing fields, and one bug fixed that was live in 170.
   from the screen that set it, so it can be the label a login confirms and never
   the thing that decides.
 
+- **A trouble bay is no longer called the Main Garage.** Curtis moved Bus 17516
+  to B12 from the Defect Log and the line under the bus number still read Main
+  Garage: *"it believes that it's in b twelve, which is in the main garage, but
+  there is a distinction there."*
+
+  There is, and the app already knew it everywhere except the label. The MOVE
+  editor offers MAIN GARAGE (BAYS 1-10), TROUBLE BAY 11 and TROUBLE BAY 12 as
+  three separate destinations; the AI operator is told in so many words that
+  "Main Garage means bays 1-10 only"; the map draws a divider down that column.
+  Only the label disagreed — and a label that disagrees with the control that
+  set it is worse than a missing one, because the foreman did the right thing
+  and the screen told him it had not taken.
+
+  The cause was that **five** copies of that label existed and every one of them
+  matched on the slot prefix, so all 84 garage spaces answered "Main Garage".
+  They are now one module, `app/location-label.ts`, which resolves a slot
+  through the same `RELOCATION_AREAS` table the move editor writes with. Two
+  drifts between those copies went with it: Fixed Repairs had no OFF PROPERTY
+  entry at all, so a bus away at a vendor printed as the raw `offsite-3`, and
+  the shared-list export's SHOP WALL prefix was missing its hyphen.
+
+- **DEFERRED and RECOMMENDED FOR DOWN SHEET can be narrowed to what is recent.**
+  Curtis: *"let's say there's 20 buses on either list, if those 20 buses were
+  collected over the period of three days, I wanna be able to filter it down to
+  just the most recent 24 hours, so the most recent five hours or whatever the
+  case may be — if I don't want to send that whole list to somebody."*
+
+  A row of chips — ALL, 1H, 4H, 8H, 24H, 3D, 7D — on all four places those two
+  lists appear: both boards on the Down Sheet and both quick-filter drawers on
+  the Defect Log. **Only those two**, as he asked: the other quick filters
+  answer "what is true right now", where hiding a bus that went down on Monday
+  would be a bug rather than a filter.
+
+  Three things about it that are decisions rather than details. **The window
+  narrows the SHARED list too** — COPY LIST and SHARE emit only the rows on
+  screen, headed `Deferred (Held from Service) (LAST 8H) — 2 buses`, because a
+  filter that tidies the screen and then pastes all twenty lies at the only
+  moment that matters. **A row with no timestamp** — a recommendation stamped
+  before the field carried an `at` — stays under ALL and falls out of every
+  narrowed window, and the `N HIDDEN · SHOW ALL` button beside the chips is
+  what says so and puts them back. **Nothing is persisted**: the window resets
+  to ALL on every load and on every filter change, because a window silently
+  restored from yesterday would open a board of buses nobody has ruled on
+  already hiding them.
+
 ### What to check once 171 is live
 
+- **Move a bus into Trouble Bay 12 from the Defect Log** (tap the location line
+  under the bus number). The line must then read **Trouble Bay 12**, not Main
+  Garage — and the same on the Down Sheet boards, in the quick-filter drawer,
+  on Fixed Repairs and in a copied list.
+- **Open the DEFERRED quick filter and tap 4H.** The count in the drawer header
+  and the rows drawn must agree, `N HIDDEN · SHOW ALL` must appear, and
+  **COPY LIST must paste only what is on screen**, with `(LAST 4H)` in its
+  heading. Tapping SHOW ALL puts them back.
+- The same chips are on the DEFERRED and RECOMMENDED boards on the Down Sheet,
+  inside the collapse — a collapsed board is still one line.
 - On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
   six page buttons below it rather than above. It should read like the Down
   Sheet and Defect Log headers do.

@@ -838,8 +838,11 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
   assert.match(page,/aria-expanded=\{expanded\}/);
-  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses,quickFilter\)/);
-  assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
+  /* quickFilterShareLabel, not quickFilterLabel: the recency window is part of
+     what a shared list claims, so it travels in the heading. Still built from
+     quickFilterBuses, which is the narrowed list. */
+  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
+  assert.match(page,/navigator\.share\(\{title:quickFilterShareLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
   assert.match(page,/aria-label="Share filtered bus list as text"/);
@@ -11917,4 +11920,145 @@ test("ADVANCED STATS lives at the bottom of the focus view and nowhere else",asy
     the question — with the per-defect breakdown under it. */
  assert.match(focus,/ROUND TRIP\{trips===1\?"":"S"\}/);
  assert.match(focus,/normalizeReportAttempts\(record\.defect\.reportAttempts\)\.map/,"every return is listed, not just the count");
+});
+
+test("a trouble bay is not the main garage",async()=>{
+ /* Curtis moved a bus to B12 from the Defect Log and the line under the bus
+    number still read Main Garage: "it believes that it's in b twelve, which is
+    in the main garage, but there is a distinction there."
+
+    There is, and everything except the label already knew it. */
+ const {locationLabel,knownLocationLabel}=await import("../app/location-label.ts");
+ const {RELOCATION_AREAS}=await import("../app/facility-areas.ts");
+ /* Read off the areas the MOVE editor writes with rather than hard-coded slot
+    ids, so this test cannot pass against a garage the move editor has since
+    renumbered. */
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 11"])assert.equal(locationLabel(slot),"Trouble Bay 11");
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 12"])assert.equal(locationLabel(slot),"Trouble Bay 12");
+ for(const slot of RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"])assert.equal(locationLabel(slot),"Main Garage");
+ /* All 84 garage spaces are covered by exactly one of the three. */
+ const garage=[...RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"],...RELOCATION_AREAS["TROUBLE BAY 11"],...RELOCATION_AREAS["TROUBLE BAY 12"]];
+ assert.equal(new Set(garage).size,84);
+ /* The prefix fallback still answers for the places no area lists — the West
+    overflow and the gaps in the East lot's numbering. */
+ assert.equal(locationLabel("west-overflow-2"),"CNG West");
+ assert.equal(locationLabel("east-3"),"CNG East");
+ /* OFF PROPERTY, which the Fixed Repairs copy of this list never had. */
+ assert.equal(locationLabel("offsite-3"),"Off Property");
+ /* An unrecognised slot is shown, not swallowed; a blank one takes the caller's
+    own wording. */
+ assert.equal(locationLabel("nonsense-9"),"nonsense-9");
+ assert.equal(locationLabel(""),"Location not set");
+ assert.equal(locationLabel("","Location not recorded"),"Location not recorded");
+ /* The share export prints nothing rather than a slot id at somebody who does
+    not have the app open. */
+ assert.equal(knownLocationLabel("nonsense-9"),"");
+ assert.equal(knownLocationLabel("garage-11"),"Trouble Bay 12");
+});
+
+test("one location table, not five",async()=>{
+ /* There were five, and they had already drifted — Fixed Repairs had no OFF
+    PROPERTY entry and the share export's SHOP WALL prefix was missing its
+    hyphen. Every one of them prefix-matched "garage-", which is the bug above.
+    A sixth copy would reintroduce it, so the table is asserted to exist once. */
+ const files=["../app/defect-log/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../app/defect-log/quick-filter-share.ts"];
+ for(const file of files){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
+  assert.match(source,/from "\.\.?\/location-label/,file+" reads the shared one");
+ }
+ const shared=await readFile(new URL("../app/location-label.ts",import.meta.url),"utf8");
+ /* And in the one copy, the areas are consulted BEFORE the prefixes. Reverse
+    those two and "garage-11" answers Main Garage again. */
+ assert.ok(shared.indexOf("SLOT_LABELS.get(at)")<shared.indexOf("PREFIX_LABELS.find"));
+});
+
+test("the recency window keeps an undated row out of every narrowed list",async()=>{
+ const {withinTimeWindow,timeWindowLabel,timeWindowMinutes,TIME_WINDOWS}=await import("../app/time-window.ts");
+ /* ALL means all, including a row with no usable stamp. */
+ assert.equal(withinTimeWindow(null,"all"),true);
+ assert.equal(withinTimeWindow(99999,"all"),true);
+ /* Narrowed, an undated row falls out: a list whose whole claim is that
+    everything in it is recent cannot carry a row of unknown age. */
+ assert.equal(withinTimeWindow(null,"24h"),false);
+ /* The boundary is inclusive, and a minute past it is not. */
+ assert.equal(withinTimeWindow(240,"4h"),true);
+ assert.equal(withinTimeWindow(241,"4h"),false);
+ /* A stamp from a wrong clock reads as newer than anything real, never older. */
+ assert.equal(withinTimeWindow(-30,"1h"),true);
+ /* The heading a shared list carries. ALL says nothing, because a list with no
+    window is just the list. */
+ assert.equal(timeWindowLabel("all"),"");
+ assert.equal(timeWindowLabel("24h"),"LAST 24H");
+ assert.equal(timeWindowMinutes("7d"),7*24*60);
+ assert.equal(TIME_WINDOWS[0].key,"all");
+});
+
+test("the window narrows the shared list, not just the drawn one",async()=>{
+ /* Curtis asked for this so he could send part of a list: "if I don't want to
+    send that whole list to somebody." A filter that tidies the screen and then
+    pastes all twenty is worse than no filter — it lies at the only moment that
+    matters. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* Every share path builds from quickFilterBuses, which is the narrowed list,
+    and none from quickFilterAllBuses. */
+ assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
+ assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp\)/);
+ assert.equal(/quickFilterShareText\(\w+,quickFilterAllBuses/.test(page),false);
+ /* And the heading says which window, so somebody who cannot see the screen it
+    came off is not reading six buses as the total. */
+ assert.match(page,/quickFilterShareLabel=quickFilterLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow\)/);
+ /* Only the two lists that accumulate carry it. Curtis: "only as it relates to
+    these two fields." */
+ assert.match(page,/quickFilterWindowed=quickFilter==="deferred"\|\|quickFilter==="down-sheet-recommended"/);
+ /* Reset on open, and never written to storage — a window restored from
+    yesterday would open the drawer already hiding buses. */
+ assert.equal(page.split('setQuickFilterWindow("all")').length-1,2,"both entry points reset it");
+ const chips=await readFile(new URL("../app/time-window-chips.tsx",import.meta.url),"utf8");
+ assert.equal(/localStorage|STORAGE_KEY/.test(chips),false,"the window is not persisted");
+ /* The count of what is held back is on screen AND is the button that clears
+    it — a narrowed list that looks like the whole list is the only failure
+    this control can cause. It does not call those rows OLD: a row with no
+    stamp is held back by every narrowed window too, and it has no age. */
+ assert.match(chips,/\{hidden\} HIDDEN · SHOW ALL/);
+ /* The comment above it in that file explains the wording, so match the
+    rendered string rather than the phrase anywhere in the source. */
+ assert.equal(/\{hidden\} OLDER HIDDEN/.test(chips),false);
+ assert.match(chips,/className="time-window-hidden" onClick=\{\(\)=>onChange\("all"\)\}/);
+});
+
+test("both Down Sheet boards carry the window and say what it hides",async()=>{
+ for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(source,/<TimeWindowChips value=\{windowKey\}/,file+" draws the chips");
+  /* The count beside the chips is what the window is holding back — measured
+     against the unfiltered list, which is why both are kept. */
+  assert.match(source,/hidden=\{all\.length-buses\.length\}/,file);
+  assert.match(source,/buses=all\.filter\(group=>withinTimeWindow\(/,file);
+  /* An empty board has to say WHICH kind of empty it is. "Nothing deferred"
+     and "nothing in the last hour" are different facts and only one of them
+     means there is nothing to do. */
+  assert.match(source,/Nothing this recent\./,file);
+  /* Inside the collapse, so a collapsed board is still one line. */
+  assert.match(source,/\{!collapsed&&all\.length>0&&<TimeWindowChips/,file);
+  /* Judged on the longest wait on the bus, the same number the card prints —
+     not the newest, which would let a week-old bus reappear in "the last hour"
+     because a second repair was added to it this morning. */
+  assert.equal(/withinTimeWindow\([^)]*sort\(/.test(source),false,file+" reuses the card's own age");
+ }
+});
+
+test("the chip row escapes the quick-filter drawer's broad child rule",async()=>{
+ /* .quick-filter-drawer>div turns every direct child into a scrolling grid.
+    .quick-filter-share-actions already had to restate itself for that reason;
+    the chip row is a direct child too. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.quick-filter-drawer>\.time-window-chips\{[^}]*flex:none/);
+ assert.match(css,/\.quick-filter-drawer>\.time-window-chips\{[^}]*display:flex/);
+ const globals=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ /* The phone rule sits after the base rule it overrides. At equal specificity
+    source order decides, and this file has several earlier max-width blocks. */
+ assert.ok(globals.indexOf(".time-window-chip{")<globals.lastIndexOf(".time-window-chip{flex:1"));
+ /* Seven targets across a 360px row: 38px tall, sharing the width. */
+ assert.match(globals,/@media\(max-width:620px\)\{[^@]*\.time-window-chip\{flex:1;min-width:0;min-height:38px/);
 });

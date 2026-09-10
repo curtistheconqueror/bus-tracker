@@ -4,6 +4,13 @@ import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.t
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
+/* The plain name of a parking space, for reports that leave the app. Lived on
+   the Defect Log page, then here; now re-exported from location-label.ts,
+   which is the one copy that knows a trouble bay from the rest of the garage.
+   Kept exported from here because every caller already imports it from this
+   module. */
+import {locationLabel} from "../location-label.ts";
+export {locationLabel};
 
 export type DefectLogFleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;shift?:string;roadcall?:boolean;down?:boolean;
@@ -326,10 +333,3 @@ export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(ent
  });
 }
 
-/* The plain name of a parking space, for reports that leave the app. Lived on
-   the Defect Log page; moved here so the report export can be built from the
-   shared Settings page as well. */
-export function locationLabel(location:string){
- const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
- const found=labels.find(([prefix])=>location.startsWith(prefix));return found?found[1]:location||"Location not set";
-}

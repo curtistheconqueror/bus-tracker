@@ -86,6 +86,11 @@ machine, because these sessions run in containers that are thrown away.
   silently orphans a mechanic's board.
 - **Never delete or merge repair records to simplify the UI.** History is the
   point of the app.
+- **A location is named through `app/location-label.ts`, never by a prefix.**
+  Matching `garage-` gets you "Main Garage" for all 84 spaces, including
+  TROUBLE BAY 11 and 12, which the move editor treats as separate destinations.
+  Five copies of that table existed and all five had the bug; a sixth would
+  bring it back, and a test asserts there is one.
 - **Never commit** API keys, credentials, fleet backups, photographs, or
   employee-sensitive information.
 - **Catalog renames are read-time, never rewrites.** A record saved under an old
@@ -243,6 +248,7 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
+app/location-label.ts      slot id -> the words a person says, trouble bays included
 app/repair-catalog.ts      the defect catalog, rename maps, count fields
 app/section-transfer.ts    per-section device transfers and their merge rules
 app/storage.ts             storage keys, envelopes, recovery snapshots

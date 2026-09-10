@@ -25,8 +25,10 @@
    The counting rules, and why an already-on-the-sheet bus is not listed, are in
    recommended-counts.ts beside the code that applies them. */
 
-import {useMemo} from "react";
+import {useMemo,useState} from "react";
 import {recommendedBuses,busRecommendedMinutes} from "./recommended-counts";
+import TimeWindowChips from "./time-window-chips";
+import {withinTimeWindow,type TimeWindowKey} from "./time-window";
 import {elapsedLong} from "./elapsed-label";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice, the same trap the DEFERRED board hit. */
@@ -50,13 +52,24 @@ export default function RecommendedBoard({fleet,downEntries,collapsed,onCollapse
  busy?:boolean;
 }){
  const now=new Date();
- const buses=useMemo(()=>recommendedBuses(fleet,downEntries),[fleet,downEntries]);
+ /* Not named `window`, for the same reason DeferredBoard's is not. */
+ const [windowKey,setWindowKey]=useState<TimeWindowKey>("all");
+ const all=useMemo(()=>recommendedBuses(fleet,downEntries),[fleet,downEntries]);
+ /* Judged on the LONGEST wait on the bus, the same number the card prints —
+    so "the last 24 hours" means the bus has been waiting less than a day, not
+    that somebody added a second recommendation to a week-old one this
+    morning. This board reaches 3D and 7D in normal use where DEFERRED never
+    does; Curtis: "that bus could be in that status for a while, which is
+    fine." */
+ const buses=all.filter(group=>withinTimeWindow(busRecommendedMinutes(group.defects,now),windowKey));
  return <section className={"mystery-board recommended-board"+(collapsed?" collapsed":"")} aria-label="Buses recommended for the Down Sheet">
   <header className="mystery-head"><span><b>RECOMMENDED FOR DOWN SHEET</b><small>PUT FORWARD BY SOMEBODY, NOT RULED ON YET</small></span>
    <div className="mystery-header-actions"><strong>{buses.length}</strong>
     <button className="mystery-toggle" type="button" aria-expanded={!collapsed} onClick={()=>onCollapsedChange(!collapsed)} aria-label={(collapsed?"Expand":"Collapse")+" RECOMMENDED FOR DOWN SHEET"}>{collapsed?"+":"−"}</button>
    </div>
   </header>
+  {/* Inside the collapse, so a collapsed board stays one line. */}
+  {!collapsed&&all.length>0&&<TimeWindowChips value={windowKey} onChange={setWindowKey} hidden={all.length-buses.length} label="recommended buses"/>}
   {!collapsed&&(buses.length?<div className="mystery-list">{buses.map(({bus,defects})=>{
    /* Already sorted longest-waiting first inside the bus, so the lead repair is
       the one that has been waiting longest rather than whichever the fleet
@@ -80,6 +93,6 @@ export default function RecommendedBoard({fleet,downEntries,collapsed,onCollapse
      <button type="button" className="deferred-to-sheet" disabled={busy} onClick={()=>onAnswer(bus.id,defects,"downsheet")}>+ PUT ON DOWN SHEET</button>
      <button type="button" className="deferred-return" disabled={busy} onClick={()=>{if(confirm("Take Bus "+bus.n+" off RECOMMENDED FOR DOWN SHEET? The repair"+(defects.length===1?"":"s")+" stay open on the Defect Log — only the recommendation is withdrawn."))onAnswer(bus.id,defects,"dismiss")}}>NOT FOR THE SHEET</button>
     </div>
-   </article>})}</div>:<div className="mystery-empty"><b>Nothing is waiting on a decision.</b><span>No open repair is recommended for the sheet right now.</span></div>)}
+   </article>})}</div>:<div className="mystery-empty">{all.length?<><b>Nothing this recent.</b><span>{all.length} bus{all.length===1?" is":"es are"} waiting on a decision, all outside this window.</span></>:<><b>Nothing is waiting on a decision.</b><span>No open repair is recommended for the sheet right now.</span></>}</div>)}
  </section>;
 }
