@@ -132,6 +132,7 @@ the cloud's bookkeeping, per device
 
 per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
+  pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
@@ -149,6 +150,19 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-role-v1` names a person's job and must never gate anything.** It holds
+a department and a role picked on the home screen — Transportation or
+Maintenance, then Bus Operator / Dispatch / Superintendent or Servicer /
+Mechanic / Foreman / Superintendent. Curtis asked for it as a label: "there
+will be no special conditions in the app for any of the working roles. This is
+all cosmetic. We will wire that up later." A list holding *Foreman* and
+*Superintendent* looks like a permission model, and it is not one: there is no
+login here, and this is an unauthenticated string in LocalStorage that anybody
+holding the phone can change from the screen that set it. If roles ever need to
+mean something, that is a conversation to have first, not a condition to add.
+Superintendent appears in both departments, so the pair is stored — the role
+alone does not say which one.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
 STATS panel it opened was a second scoreboard saying most of what the tiles

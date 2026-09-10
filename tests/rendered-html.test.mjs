@@ -11590,3 +11590,78 @@ test("the recommended list can be answered from the board and from the quick fil
  assert.match(page,/const recommendedRowsForFleet=useMemo\(\(\)=>recommendedRows\(fleet,downEntries\),\[fleet,downEntries\]\)/);
  assert.match(page,/key==="down-sheet-recommended"\?recommendedCandidateIds/);
 });
+
+test("the home screen asks what you do, and nothing in the app acts on the answer",async()=>{
+ /* Curtis: "a collapsible expandable section placed somewhere sensible on the
+    screen where a person could select their role... this could be broken up
+    into two categories, transportation and maintenance." */
+ const {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,departmentRoles}=await import("../app/roles.ts");
+
+ /* HIS TWO LISTS, IN HIS ORDER — the shop's order, from the road or the floor
+    upward, not alphabetical. "Transportation, it will give you the option
+    between bus operator, then dispatch and then superintendent. Now for
+    maintenance, it will be servicer then mechanic, foreman, superintendent." */
+ assert.deepEqual(ROLE_DEPARTMENTS.map(item=>item.key),["transportation","maintenance"]);
+ assert.deepEqual(departmentRoles("transportation"),["Bus Operator","Dispatch","Superintendent"]);
+ assert.deepEqual(departmentRoles("maintenance"),["Servicer","Mechanic / Technician","Foreman","Superintendent"]);
+
+ /* SUPERINTENDENT IS ON BOTH LISTS, so a bare role string does not say which
+    person it means. The pair is what is stored, and the label is what tells
+    them apart on screen. */
+ assert.ok(departmentRoles("transportation").includes("Superintendent"));
+ assert.ok(departmentRoles("maintenance").includes("Superintendent"));
+ const road={department:"transportation",role:"Superintendent"},shop={department:"maintenance",role:"Superintendent"};
+ assert.notEqual(roleLabel(road),roleLabel(shop));
+ assert.equal(roleLabel(shop),"Maintenance · Superintendent");
+ assert.deepEqual(readRole(serializeRole(road)),road);
+
+ /* Nothing on file means NO ROLE, never a default. A device that quietly
+    decided somebody was a Foreman would be putting a word on screen that
+    nobody chose, and this exists so the person says it themselves. */
+ assert.equal(readRole(null),null);
+ assert.equal(readRole("not json"),null);
+ assert.equal(readRole('{"department":"catering","role":"Chef"}'),null);
+ /* A role this build no longer offers reads as not set and is NOT rewritten —
+    the same read-time rule the repair catalog follows for renamed defects. */
+ assert.equal(readRole('{"department":"maintenance","role":"Bodyman"}'),null);
+ assert.equal(readRole('{"role":"Foreman"}'),null,"a role with no department cannot be resolved");
+
+ /* THE ONE RULE THAT MATTERS MOST. Curtis: "there will be no special conditions
+    in the app for any of the working roles. This is all cosmetic."
+
+    A list holding Foreman and Superintendent looks like a permission model. It
+    is not one: there is no login in this app, and this is an unauthenticated
+    string in LocalStorage that anybody holding the phone can change from the
+    screen that set it. The moment something gates on it, that string is
+    standing between a person and a control. */
+ const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../app/storage.ts","../app/cloud-sync.ts"]
+  .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
+ for(const source of files)assert.equal(source.includes(ROLE_STORAGE_KEY)||source.includes("readRole"),false,
+  "nothing outside the picker may read the role — it is a label, not a permission");
+ /* And it is never synced: it is a per-device label, like the app mode. */
+ const sync=await readFile(new URL("../app/cloud-sync.ts",import.meta.url),"utf8");
+ assert.equal(sync.includes("pace-role-v1"),false);
+
+ const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ /* Collapsible, as asked. */
+ assert.match(gate,/className="welcome-role-toggle" aria-expanded=\{roleOpen\}/);
+ /* UNDER the two mode choices and ABOVE the footnote: the screen already asks
+    one question a first run must answer, and stacking a second in front of it
+    would turn a gate into a form. */
+ assert.ok(gate.indexOf('className="welcome-choices"')<gate.indexOf('className={"welcome-role"'));
+ assert.ok(gate.indexOf('className={"welcome-role"')<gate.indexOf('className="welcome-foot"'));
+ /* Choosing a role must not answer the mode question for somebody. */
+ const body=gate.slice(gate.indexOf("const chooseRole="),gate.indexOf("\n };",gate.indexOf("const chooseRole=")));
+ assert.equal(body.includes("setOpen"),false,"picking a role must not close a gate that has not been answered");
+ assert.equal(body.includes(  "APP_MODE_STORAGE_KEY"),false,"and must not touch the mode");
+
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ /* globals.css line 2 gives every bare <button> height:28px. Every control here
+    is a bare button, so each one states its own height — measured at 44px in
+    Chromium at 360/390/430/820, not read off this rule. */
+ assert.match(css,/\.welcome-role-body button\{min-height:44px/);
+ assert.match(css,/\.welcome-role-toggle\{width:100%;min-height:52px/);
+ /* And it joins the reduced-motion opt-out rather than being the one panel that
+    still flies in for somebody who asked the OS for none of that. */
+ assert.match(css,/\.welcome-name span,\.welcome-kicker,\.welcome-choices,\.welcome-role,\.welcome-foot\{opacity:1/);
+});

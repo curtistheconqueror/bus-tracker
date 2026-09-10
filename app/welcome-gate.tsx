@@ -17,6 +17,7 @@ import {useEffect,useState} from "react";
 import {APP_NAME} from "./app-name";
 import {APP_MODE_STORAGE_KEY,isFirstRun,readAppMode,serializeAppMode,type AppMode} from "./app-mode";
 import {lockPageScroll} from "./scroll-lock";
+import {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,type RoleChoice,type RoleDepartment} from "./roles";
 
 export const WELCOME_REQUEST_EVENT="pace-show-welcome";
 
@@ -38,6 +39,12 @@ export default function WelcomeGate(){
     So the close exists only when the question is already answered. On a genuine
     first run there is no way past it, which is the whole point of a gate. */
  const [dismissable,setDismissable]=useState(false);
+ /* Read on mount for the same reason `open` is: the answer lives in
+    localStorage, so a server render knows nothing about it. */
+ const [role,setRole]=useState<RoleChoice|null>(null);
+ const [roleOpen,setRoleOpen]=useState(false);
+ const [department,setDepartment]=useState<RoleDepartment|null>(null);
+ useEffect(()=>{try{setRole(readRole(localStorage.getItem(ROLE_STORAGE_KEY)))}catch{}},[]);
  useEffect(()=>{
   if(isFirstRun(localStorage))setOpen(true);
   const onRequest=()=>{setDismissable(!isFirstRun(localStorage));setOpen(true)};
@@ -59,6 +66,18 @@ export default function WelcomeGate(){
  },[open,dismissable]);
 
  if(!open)return null;
+ const chooseRole=(next:RoleChoice)=>{
+  /* Same shape as choosing a mode, including the shrug on a failed write: a
+     device that cannot store a job title has lost nothing anybody needs, and
+     refusing to close the panel over it would be a bigger problem than the one
+     being reported. */
+  try{localStorage.setItem(ROLE_STORAGE_KEY,serializeRole(next))}catch{}
+  setRole(next);setRoleOpen(false);setDepartment(null);
+ };
+ const clearRole=()=>{
+  try{localStorage.removeItem(ROLE_STORAGE_KEY)}catch{}
+  setRole(null);setDepartment(null);
+ };
  const choose=(mode:AppMode)=>{
   try{localStorage.setItem(APP_MODE_STORAGE_KEY,serializeAppMode({mode,answered:true}))}
   catch{/* A device that cannot store the answer still gets the app it chose for
@@ -102,6 +121,46 @@ export default function WelcomeGate(){
     <button type="button" className="welcome-choice welcome-lite" onClick={()=>choose("lite")}>
      <b>LITE</b><small>The same app drawing less of itself, to learn the workflow on. Turn it off in Settings whenever you want.</small>
     </button>
+   </div>
+   {/* THE ROLE PICKER, under the two mode choices and above the footnote.
+
+       Placed there rather than above them because the screen already asks one
+       question that has to be answered on a first run, and a second question
+       stacked in front of it would turn a gate into a form. FULL or LITE
+       decides what the app draws; this decides nothing yet, so it sits below,
+       folded away, for whoever wants it.
+
+       Curtis: "a collapsible expandable section placed somewhere sensible on
+       the screen where a person could select their role."
+
+       TWO STEPS, because he described two: "this could be broken up into two
+       categories, transportation and maintenance, and then if you hit
+       transportation it will give you the option between bus operator, then
+       dispatch and then superintendent." Picking a department opens its roles;
+       picking a role closes the whole panel with the answer showing on the
+       summary line. Nothing else in the app changes — see roles.ts, which says
+       at some length why nothing else may. */}
+   <div className={"welcome-role"+(roleOpen?" open":"")}>
+    <button type="button" className="welcome-role-toggle" aria-expanded={roleOpen}
+     onClick={()=>{setRoleOpen(!roleOpen);setDepartment(null)}}>
+     <span><b>MY ROLE</b><small>{role?roleLabel(role):"Not set — optional"}</small></span>
+     <i aria-hidden="true">{roleOpen?"−":"+"}</i>
+    </button>
+    {roleOpen&&<div className="welcome-role-body">
+     {/* The department buttons stay on screen after one is picked, ticked, so
+         the way back to the other list is the thing already under your thumb
+         rather than a separate BACK control. */}
+     <div className="welcome-role-departments">{ROLE_DEPARTMENTS.map(item=>
+      <button type="button" key={item.key} className={department===item.key?"selected":""}
+       aria-pressed={department===item.key} onClick={()=>setDepartment(department===item.key?null:item.key)}>{item.label}</button>)}
+     </div>
+     {department&&<div className="welcome-role-roles">{ROLE_DEPARTMENTS.find(item=>item.key===department)?.roles.map(name=>
+      <button type="button" key={name} className={role?.department===department&&role.role===name?"selected":""}
+       onClick={()=>chooseRole({department,role:name})}>{name}</button>)}
+     </div>}
+     {!department&&<small className="welcome-role-hint">Pick a department, then a role.{role?" Yours is set to "+roleLabel(role)+".":""}</small>}
+     {role&&<button type="button" className="welcome-role-clear" onClick={clearRole}>CLEAR MY ROLE</button>}
+    </div>}
    </div>
    <p className="welcome-foot">Nothing here changes what is saved. Both keep the same records and the same Shop Cloud.{dismissable&&" Close this and nothing changes at all."}</p>
   </div>
