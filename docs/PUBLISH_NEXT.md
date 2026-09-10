@@ -1,6 +1,6 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `fed4f80`.**
+**STATUS: 171 IS PENDING — publish from `64a8b65`.**
 
 ## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
 
@@ -23,10 +23,10 @@ and the deployment disagreed.
 
 **So: check what Sites is actually serving before publishing 171, and tell
 Curtis the number you find.** If 170 is genuinely not live, 171 carries it
-forward anyway — `fed4f80` contains every line of 170 — so publishing 171 fixes
+forward anyway — `64a8b65` contains every line of 170 — so publishing 171 fixes
 both. Nothing needs to be published twice.
 
-Verified in Chromium on `fed4f80`, all six surfaces at 390px and 1180px: the
+Verified in Chromium on `64a8b65`, all six surfaces at 390px and 1180px: the
 title renders as a `<button>`, the tap lands on the button itself (nothing
 covers it), and the home screen opens full-screen and visible.
 
@@ -34,7 +34,7 @@ covers it), and the home screen opens full-screen and visible.
 
 Release 170 is recorded as live from `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `fed4f80` is the last CODE
+**Read the SHA above, not a SHA you remember.** `64a8b65` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -44,7 +44,7 @@ this SHA first.**
 
 ## What 171 is
 
-**Fourteen commits.** No migration, no schema change, no dependency change,
+**Fifteen commits.** No migration, no schema change, no dependency change,
 and nothing that rewrites a record. **Two new storage keys, both per-device and
 neither renaming anything** (`pace-down-sheet-recommended-collapsed-v1`,
 `pace-role-v1`), eighteen new catalog options, one new optional field on a
@@ -198,6 +198,21 @@ as typing fields, and one bug fixed that was live in 170.
   no row fingerprint moves. Nothing ever removes a return — saves and duplicate
   merges both take the union.
 
+- **MY ROLE asks three things**: department, then **union or non-union**, then
+  the job — and the second narrows the third, because Curtis gave the split:
+
+  | | Union | Non-Union |
+  | --- | --- | --- |
+  | Transportation | Bus Operator, Dispatch | Asst Supt, Supt |
+  | Maintenance | Servicer, Mechanic Helper, Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+
+  Foreman is on the non-union side — the one job a transit shop cannot assume.
+  *Bargaining* names the union side, so it can never be the non-union label;
+  Union / Non-Union is what the floor says. The status is drawn as a tag beside
+  the name rather than a third dot-separated part of it. A combination outside
+  that table cannot be chosen and does not read back, so a contract change moves
+  a job in `app/roles.ts`.
+
 - **The two Superintendent roles are abbreviated**: *Asst Supt* and *Supt*, in
   both departments. Curtis: "we have asst supt, so that is why I want it
   shortened, so the label can show both like Asst Supt & Supt simultaneously."
@@ -242,7 +257,9 @@ as typing fields, and one bug fixed that was live in 170.
   the list and leaves the repair open on the Defect Log.
 - **Touch FLEETSTEP, open MY ROLE, pick one.** It should be remembered and
   should change nothing else anywhere in the app. Both departments should offer
-  **Asst Supt** and **Supt**.
+  **Asst Supt** and **Supt**. Picking **Union** under Maintenance should list
+  Servicer, Mechanic Helper, Mechanic, Body & Frame and Building Maintenance;
+  **Non-Union** should list Foreman, Asst Supt and Supt.
 - **Log a defect that is already open on the same bus.** The ALREADY LOGGED
   banner should offer **+ COUNT THIS RETURN**; press it, then FOCUS that bus and
   scroll to the bottom — **ADVANCED STATS** should show the round trip with its
