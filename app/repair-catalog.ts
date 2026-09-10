@@ -558,6 +558,25 @@ export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:b
    nobody agreed to, and membership that cleared the recommendation would erase
    the record of who asked for it. */
 export function isDownSheetRecommended(defect:StructuredDefect){return Boolean(defect.downSheetRecommendation)}
+/* HOW LONG IT HAS BEEN WAITING FOR AN ANSWER. Curtis, on the recommended list:
+   "there needs to be some type of timestamp for how long it's been recommended
+   for the down sheet."
+
+   The stamp was already being written — setDownSheetRecommendation has recorded
+   `at` since the field existed — and nothing had ever read it back. This is the
+   same shape as deferredMinutesElapsed and deliberately not the same meaning:
+   a deferral running long is a problem, and a recommendation running long is
+   often just a decision nobody has needed to make yet. Curtis: "that bus could
+   be in that status for a while, which is fine." So this reports the time and
+   nothing anywhere treats a number here as overdue.
+
+   null when the recommendation carries no usable time, never 0 — a stamp
+   written by a device with a broken clock must not read as "just now". */
+export function recommendedMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ if(!defect.downSheetRecommendation)return null;
+ const started=Date.parse(String(defect.downSheetRecommendation.at||""));
+ return Number.isNaN(started)?null:(now.getTime()-started)/60000;
+}
 export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
  const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
  if(!stamp)delete next.downSheetRecommendation;

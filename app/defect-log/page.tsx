@@ -15,6 +15,9 @@ import {readMergedAway,writeMergedAway} from "../cloud-sync";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "../quick-filters";
+import {recommendedRows,recommendedRank,busRecommendedMinutes} from "../recommended-counts";
+import {answerRecommendedBus} from "../recommended-actions";
+import {elapsedLong} from "../elapsed-label";
 import {roadCallNote} from "../road-calls";
 import {lockPageScroll} from "../scroll-lock";
 /* One copy of the location editor, shared with the Down Sheet's MYSTERY BUSES
@@ -702,7 +705,24 @@ export default function DefectLog(){
     happen here instead. */
  const deferredCandidateIds=useMemo(()=>quickFilterBusIds(fleet,"deferred").filter(id=>!activeDownBusIdSet.has(id)),[fleet,activeDownBusIdSet]);
  const deferredSince=(bus:DefectLogFleetBus)=>{const defect=quickFilterDefects(bus,"deferred").find(item=>isHeldDeferred(item,activeDownBusIdSet.has(bus.id)));return defect?.deferredAt?new Date(defect.deferredAt).getTime():Infinity};
- const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,item.key==="deferred"?deferredCandidateIds.length:quickFilterBusIds(fleet,item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(quickFilter==="deferred"?deferredCandidateIds:quickFilterBusIds(fleet,quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
+ /* RECOMMENDED FOR DOWN SHEET is narrowed here for the same reason DEFERRED is,
+    and to the same rule: a bus the sheet already carries is not waiting on
+    anybody. quick-filters.ts cannot apply it — it never sees Down Sheet entries
+    — so the board on the Down Sheet and this drawer would otherwise print two
+    different numbers for one list. Curtis asked for the counts to be in sync,
+    and this is the half that makes them so.
+
+    recommendedRows is the board's own function rather than a second copy of the
+    rule: one of them changing without the other is precisely the drift being
+    guarded against here. */
+ const recommendedRowsForFleet=useMemo(()=>recommendedRows(fleet,downEntries),[fleet,downEntries]);
+ const recommendedCandidateIds=useMemo(()=>[...new Set(recommendedRowsForFleet.map(row=>row.bus.id))],[recommendedRowsForFleet]);
+ /* Longest-waiting first, the same ordering the board draws, so a foreman
+    switching between the two screens reads the same list in the same order. */
+ const recommendedDefectsFor=(busId:string)=>recommendedRowsForFleet.filter(row=>row.bus.id===busId).map(row=>row.defect).sort((a,b)=>recommendedRank(a)-recommendedRank(b));
+ const recommendedSince=(bus:DefectLogFleetBus)=>recommendedRank(recommendedDefectsFor(bus.id)[0]);
+ const candidateIdsFor=(key:QuickFilterKey)=>key==="deferred"?deferredCandidateIds:key==="down-sheet-recommended"?recommendedCandidateIds:quickFilterBusIds(fleet,key);
+ const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,candidateIdsFor(item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(candidateIdsFor(quickFilter)):new Set<string>(),quickFilterBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):quickFilter==="down-sheet-recommended"?recommendedSince(a)-recommendedSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
  /* Reports why nothing was kept instead of returning in silence. The state is
@@ -823,6 +843,48 @@ export default function DefectLog(){
   }
   setUndoSnapshot({fleet,downEntries,label:"Ended Deferred status for Bus "+bus.n});
   persist(nextFleet,nextDown);
+ };
+ /* THE TWO ACTIONS ON THE RECOMMENDED LIST. Curtis: "I need quick remove or
+    mark as fix actions just like on the down sheet, so I need that
+    functionality when that list is brought up in quick filters."
+
+    They are the Down Sheet's own two row actions, mapped onto what a
+    recommendation is. There, the tick closes the entry out and the cross takes
+    the row off the sheet without touching the bus. Here, MARK FIXED closes the
+    repair out and REMOVE withdraws the recommendation and leaves the repair
+    open — the cross's exact analogue, and the reason it is not a delete.
+    Neither one destroys a record; this app keeps its history.
+
+    Both act on every recommended repair on the bus, because the ROW is a bus.
+    Answering per defect under a bus heading is the bug that made the evening
+    deferred prompt ask three times about one bus.
+
+    Written as their own loops rather than by calling markFixed in one: that
+    path persists as it goes, so a second call would be building on the fleet
+    it closed over one render ago and would silently drop the first fix. Same
+    shape as endDeferralForBus above, for the same reason. */
+ const markRecommendedFixed=(bus:DefectLogFleetBus,defects:StructuredDefect[])=>{
+  if(!defects.length)return;
+  if(defects.length>1&&!confirm("Mark all "+defects.length+" recommended repairs on Bus "+bus.n+" fixed?"))return;
+  const now=new Date().toISOString();
+  let nextFleet=fleet,nextDown=downEntries;
+  const hide:{busId:string;defectId:string}[]=[];
+  for(const defect of defects){
+   const result=saveDefectLogRecord(nextFleet,nextDown,bus.id,{...defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:defect.reportedBy||settings.defaultInitials,completedBy:defect.completedBy||settings.defaultInitials},false,now);
+   if(result.error){alert("That repair is no longer available. Refresh and try again.");return}
+   nextFleet=result.fleet;nextDown=result.downEntries;hide.push({busId:bus.id,defectId:defect.id});
+  }
+  setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+bus.n+" fixed"});
+  persist(hideDefectLogRecords(nextFleet,hide,now),nextDown);
+ };
+ const removeRecommendation=(bus:DefectLogFleetBus,defects:StructuredDefect[])=>{
+  if(!defects.length)return;
+  if(!confirm("Take Bus "+bus.n+" off RECOMMENDED FOR DOWN SHEET? The repair"+(defects.length===1?"":"s")+" stay open — only the recommendation is withdrawn."))return;
+  const now=new Date().toISOString();
+  const applied=answerRecommendedBus(fleet,downEntries,bus.id,defects,"dismiss",{now});
+  if(!applied.saved){alert("That repair is no longer available. Refresh and try again.");return}
+  setUndoSnapshot({fleet,downEntries,label:"Took Bus "+bus.n+" off the recommended list"});
+  persist(applied.fleet,applied.downEntries);
  };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
@@ -965,7 +1027,24 @@ export default function DefectLog(){
       the card. The comparisons that matter — the 90-minute alert and the
       evening review — still read the real signed value and correctly ignore
       a stay that has not started yet. */
-   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null;return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
+   deferredMinutes=quickFilter==="deferred"?(()=>{const elapsed=deferredMinutesElapsed(defects[0]||{state:"open"} as StructuredDefect);return elapsed===null?null:Math.max(0,elapsed)})():null,
+   /* Taken from the board's own rows rather than from `defects` above: the
+      quick filter counts a recommendation on a bus already on the sheet and
+      the board does not, and the row's buttons must act on exactly what the
+      row's count is made of. */
+   recommendedDefects=quickFilter==="down-sheet-recommended"?recommendedDefectsFor(bus.id):[],
+   recommendedMinutes=recommendedDefects.length?busRecommendedMinutes(recommendedDefects):null,
+   recommendedBy=workStateStampLabel(recommendedDefects[0]?.downSheetRecommendation);return <article className={"quick-filter-bus-card"+(expanded?" expanded":"")} key={bus.id}><button className="quick-filter-bus" aria-expanded={expanded} onClick={()=>setQuickFilterExpandedBusIds(current=>current.includes(bus.id)?[]:[bus.id])}><span><small>BUS</small><b>{bus.n}</b></span><span><strong>{locationLabel(bus.l)}</strong><small>{preview}</small></span><i>{expanded?"HIDE":"VIEW"}</i></button>{quickFilter==="deferred"&&<div className="quick-filter-deferred-row"><small className={deferredMinutes!==null&&deferredMinutes>=90?"deferred-overdue":""}>DEFERRED {deferredMinutes===null?"":deferredMinutes>=60?Math.floor(deferredMinutes/60)+"H "+Math.round(deferredMinutes%60)+"M":Math.round(deferredMinutes)+"M"}</small><button type="button" className="end-deferral" onClick={()=>endDeferralForBus(bus,defects)} disabled={!defects.length} title={defects.length>1?"Ends all "+defects.length+" deferred repairs on this bus":"Returns this repair to Open and takes the bus off Deferred"}>END DEFERRAL</button><button type="button" className="mystery-move" onClick={()=>setMovingMysteryBusId(bus.id)}>MOVE / LOCATION</button></div>}{quickFilter==="down-sheet-recommended"&&<div className="quick-filter-deferred-row quick-filter-recommended-row">
+   {/* HOW LONG IT HAS BEEN WAITING, which the stamp has always recorded and
+       nothing has ever shown. No overdue styling on purpose: Curtis said a bus
+       "could be in that status for a while, which is fine", so this reports the
+       wait rather than complaining about it. Days once hours stop reading. */}
+   <small>{recommendedMinutes===null?"RECOMMENDED":"RECOMMENDED "+elapsedLong(recommendedMinutes)+" AGO"}{recommendedBy?" · "+recommendedBy.toUpperCase():""}</small>
+   {/* The Down Sheet's two row actions, in its own order: the tick that closes
+       it out, then the cross that takes it off the list. */}
+   <button type="button" className="fix-recommended" onClick={()=>markRecommendedFixed(bus,recommendedDefects)} disabled={!recommendedDefects.length} title={recommendedDefects.length>1?"Marks all "+recommendedDefects.length+" recommended repairs on this bus fixed":"Marks this repair fixed and closes it out"}>MARK FIXED</button>
+   <button type="button" className="end-deferral" onClick={()=>removeRecommendation(bus,recommendedDefects)} disabled={!recommendedDefects.length} title="Takes this bus off the recommended list. The repair stays open.">REMOVE</button>
+  </div>}{expanded&&<div className="quick-filter-defects" aria-label={"Bus "+bus.n+" filtered defects"}>{defects.length?defects.map((defect,index)=><section key={defect.id}><span>{index+1}</span><div><b>{repairCategoryLabel(defect.category)}</b><strong>{defectLabel(defect)}</strong>{defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{defect.diagnosticNote&&<small><b>DIAG:</b> {defect.diagnosticNote}</small>}{defect.actionTaken&&<small><b>ACTION:</b> {defect.actionTaken}</small>}{defect.shopNotes&&<small><b>SHOP NOTES:</b> {defect.shopNotes}</small>}</div><i className={"state "+defect.state}>{STATE_LABELS[defect.state]}</i></section>):<p>{fallback}. No matching active defect record is attached yet.</p>}</div>}</article>}):<p>No buses currently match this filter.</p>}</div></aside>}
   {/* MYSTERY BUSES moved to the Down Sheet. Every bus it lists is a bus that is
       NOT on that sheet, so it belongs beside the sheet rather than here. The
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}

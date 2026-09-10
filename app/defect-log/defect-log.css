@@ -881,3 +881,32 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
     field that opened it stays on screen above it. */
  .combo-list{max-height:min(300px,42vh)}
 }
+
+/* THE RECOMMENDED ROW IN THE QUICK FILTER DRAWER.
+
+   It reuses .quick-filter-deferred-row outright — same three-column grid, same
+   collapse to two columns on a phone — because it is the same kind of strip
+   answering the same kind of question, and a second grid would be one more
+   thing to keep in step. Only the colour changes: the Down Sheet's blue rather
+   than the deferred teal, matching the stripe on the board that shows this same
+   list, so the two screens read as one feature.
+
+   There is no overdue colour here and there should not be. A deferral running
+   past ninety minutes goes red; a recommendation waiting a week has not gone
+   wrong. Curtis: "that bus could be in that status for a while, which is fine." */
+.quick-filter-recommended-row{background:color-mix(in srgb,#0b64bd 8%,var(--log-surface))}
+.quick-filter-recommended-row small{color:#0b4c91}
+.quick-filter-recommended-row .fix-recommended{min-width:0;min-height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #0b64bd;border-radius:6px;background:#0b64bd;color:#fff;padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap}
+.quick-filter-recommended-row .fix-recommended:hover,.quick-filter-recommended-row .fix-recommended:focus-visible{background:#0a5aa8;outline:none}
+.quick-filter-recommended-row .fix-recommended:disabled{opacity:.55;cursor:default}
+.quick-filter-recommended-row .end-deferral{border-color:#9fc0e6;background:#e8f1fc;color:#0b4c91}
+.quick-filter-recommended-row .end-deferral:hover,.quick-filter-recommended-row .end-deferral:focus-visible{background:#d8e7fa}
+/* The phone size lives HERE, at the end, and not in the shared @media block
+   several hundred lines up. Both rules are two classes deep, so specificity
+   cannot break the tie and source order decides — the base rule above, being
+   later in the file, simply won, and MARK FIXED measured 32px on a phone next
+   to a 44px REMOVE. Measured, not read: the stylesheet looked right.
+
+   Keeping it in this block also means the shared one is untouched, so a button
+   added here can never fail the test that holds the deferred buttons at 44. */
+@media(max-width:760px){.quick-filter-recommended-row .fix-recommended{min-height:44px;font-size:9px}}

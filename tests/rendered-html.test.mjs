@@ -13,7 +13,7 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, recommendedMinutesElapsed, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
@@ -10729,7 +10729,12 @@ test("a deferred bus can be released from the drawer that lists it, and the badg
   /* ONE snapshot, taken before anything moves. Calling the single-record
      handler in a loop would snapshot the already-changed board on the second
      pass, and UNDO would then only reach the last repair. */
-  const body=page.slice(page.indexOf("const endDeferralForBus="),page.indexOf("const movingMysteryBus="));
+  /* Sliced to this handler's OWN closing brace rather than to whatever happens
+     to be declared after it. The end anchor used to be the next handler along,
+     which meant a new one landing in between silently widened the region and
+     failed this on its snapshot rather than on anything wrong here. */
+  const start=page.indexOf("const endDeferralForBus=");
+  const body=page.slice(start,page.indexOf("\n };",start));
   assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,"exactly one undo snapshot for the whole release");
   assert.equal((body.match(/persist\(/g)||[]).length,1,"and one write at the end");
   assert.ok(body.indexOf("setUndoSnapshot")>body.indexOf("for(const defect of deferred)"),"snapshot is of the fleet as it was, taken from the closure not the fold");
@@ -11407,4 +11412,181 @@ test("one visit that took several fluids is one record",async()=>{
  /* Findable by what went in, on both the log's own search and the shared
     filter, the same way symptoms already are. */
  for(const source of [form,filters])assert.match(source,/\.\.\.\(\w+\.defect\.fluids\|\|\[\]\)|\.\.\.\(defect\.fluids\|\|\[\]\)/);
+});
+
+test("a deferred bus does not have to be on property",async()=>{
+ /* Curtis's rule, in his words: "deferred buses do not have to be on property,
+    so this way on the down sheet right under mystery buses it will show the
+    total of deferred buses whether they're here or on the road."
+
+    The COUNTING was already right — heldDeferredRows has never looked at a
+    location. The board's subtitle said "HELD BACK, ON PROPERTY, NOT ON THE
+    DOWN SHEET", which is the worse half of the two to get wrong: a wrong
+    number gets questioned, a wrong label invites the next person to change the
+    code until it agrees. This test exists so that cannot happen. */
+ const {heldDeferredBuses,deferredBadgeCounts}=await import("../app/deferred-counts.ts");
+ const held=at=>({id:"x",category:"Brakes",issue:"Grinding",details:"",state:"deferred",operability:"service",deferredAt:at});
+ const at="2026-09-10T00:00:00.000Z";
+ const fleet=[
+  {id:"a",n:"6301",l:"bay-1",defects:[{...held(at),id:"d1"}]},
+  {id:"b",n:"6302",l:"road-4",defects:[{...held(at),id:"d2"}]},
+  {id:"c",n:"6303",l:"offsite-2",defects:[{...held(at),id:"d3"}]},
+ ];
+ assert.deepEqual(heldDeferredBuses(fleet,[]).map(row=>row.bus.n),["6301","6302","6303"],
+  "a bus on the road and a bus off property are both still deferred");
+ assert.equal(deferredBadgeCounts(fleet,[]).listed,3);
+ /* And the label has to say so, because it is what a foreman reads. */
+ const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const rendered=board.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.equal(/ON PROPERTY/i.test(rendered),false,"the board must not claim these buses are on property");
+ assert.match(board,/<small>HELD BACK AND NOT ON THE DOWN SHEET — HERE OR ON THE ROAD<\/small>/);
+});
+
+test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses waiting",async()=>{
+ /* Curtis: "a recommended for down sheet right in the same section as in the
+    down sheet as mystery buses and deferred buses. I want this to go right
+    under both of them, same color and everything, same functionality, with the
+    same number count — that number count needs to be in sync." */
+ const {recommendedBuses,recommendedBusCount,recommendedRows}=await import("../app/recommended-counts.ts");
+ const rec=at=>({at,by:"CJ"});
+ const fleet=[
+  {id:"a",n:"6301",l:"bay-1",defects:[{id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T21:00:00.000Z")}]},
+  /* Two recommendations on ONE bus. The deferred badge shipped this bug once —
+     per-defect rows counted as per-bus — so it is guarded here from the start. */
+  {id:"b",n:"6302",l:"bay-2",defects:[
+   {id:"d2",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:30:00.000Z")},
+   {id:"d3",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:15:00.000Z")}]},
+  /* Off property, waiting days. It belongs on the list — the board is about
+     what is waiting on a decision, not about what is parked outside. */
+  {id:"c",n:"6303",l:"offsite-2",defects:[{id:"d4",category:"Engine",issue:"Oil leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-06T00:00:00.000Z")}]},
+  /* Recommended and ALREADY ON THE SHEET: covered, so not waiting on anybody. */
+  {id:"d",n:"6304",l:"bay-3",defects:[{id:"d5",category:"Engine",issue:"No start",details:"",state:"open",operability:"down",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* Recommended and FIXED. This is the "in sync" half: close the repair the
+     recommendation was about and the number drops with no tidying up. */
+  {id:"e",n:"6305",l:"bay-4",defects:[{id:"d6",category:"Engine",issue:"Done",details:"",state:"completed",operability:"service",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* Not recommended at all. */
+  {id:"f",n:"6306",l:"bay-5",defects:[{id:"d7",category:"Engine",issue:"Plain",details:"",state:"open",operability:"service"}]},
+ ];
+ const onSheet=[{id:"e1",busId:"d",busNumber:"6304",workflow:"Scheduled"}];
+ assert.equal(recommendedBusCount(fleet,onSheet),3,"buses, deduplicated — never rows");
+ assert.equal(recommendedRows(fleet,onSheet).length,4,"and four rows behind those three buses");
+ /* LONGEST WAITING FIRST. The only question this board answers is what has been
+    waiting on you, and alphabetical order answers nothing. */
+ assert.deepEqual(recommendedBuses(fleet,onSheet).map(row=>row.bus.n),["6303","6301","6302"]);
+ /* Inside a bus too, so the card's lead repair is the one waiting longest. */
+ assert.deepEqual(recommendedBuses(fleet,onSheet).find(row=>row.bus.n==="6302").defects.map(d=>d.issue),["Air leak","Misfire"]);
+
+ /* THE TIMESTAMP CURTIS ASKED FOR: "there needs to be some type of timestamp
+    for how long it's been recommended for the down sheet." The stamp was
+    already being written and nothing had ever read it back. */
+ const now=new Date("2026-09-10T00:00:00.000Z");
+ assert.equal(recommendedMinutesElapsed(fleet[0].defects[0],now),180);
+ /* null, never 0, when there is no usable time — a stamp from a device with a
+    broken clock must not read as "just now". */
+ assert.equal(recommendedMinutesElapsed({downSheetRecommendation:{by:"CJ"}},now),null);
+ assert.equal(recommendedMinutesElapsed({},now),null);
+ const {elapsedLong}=await import("../app/elapsed-label.ts");
+ assert.equal(elapsedLong(180),"3H 0M");
+ assert.equal(elapsedLong(60*24*4),"4D");
+ assert.equal(elapsedLong(-5),"0M","a clock ahead of this one must not print a negative");
+
+ /* NOTHING HERE IS OVERDUE, and that is a decision rather than an omission.
+    Curtis: "that bus could be in that status for a while, which is fine." */
+ const board=await readFile(new URL("../app/recommended-board.tsx",import.meta.url),"utf8");
+ assert.equal(/overdue/i.test(board.replace(/\/\*[\s\S]*?\*\//g,"")),false,"a recommendation is never late");
+ /* Same board classes as the two above it — "same color and everything". */
+ assert.match(board,/className=\{"mystery-board recommended-board"\+\(collapsed\?" collapsed":""\)\}/);
+ assert.match(board,/className="deferred-card-actions"/,"and the same action buttons");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.recommended-board \.mystery-head\{border-left:4px solid #0b64bd\}/);
+
+ /* Third, under both, which is where Curtis put it. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.ok(page.indexOf("<MysteryBoard")<page.indexOf("<DeferredBoard"));
+ assert.ok(page.indexOf("<DeferredBoard")<page.indexOf("<RecommendedBoard"));
+});
+
+test("unticking RECOMMEND FOR DOWN SHEET actually sticks",async()=>{
+ /* A LIVE BUG, found by driving the button in a browser and reading the record
+    back rather than by reading the code.
+
+    setDownSheetRecommendation DELETES its key when the tick comes off, the same
+    way setDefectWorkState does — and saveDefectLogRecord merges with
+    `{...existing,...incoming}`, where a missing key cannot override the value
+    `existing` still holds. So the recommendation came straight back on the next
+    read, in the editor and on both surfaces that list recommendations.
+
+    workStates had this exact bug, was found, and was fixed by pulling that one
+    field out of the spread. Nobody checked whether anything else was deleted
+    the same way. Two fields are; now both are rescued. */
+ assert.equal("downSheetRecommendation" in setDownSheetRecommendation({id:"d"},false,"2026-09-10T00:00:00.000Z"),false,
+  "the key is deleted, not set to undefined — which is why the spread cannot carry the removal");
+ const sync=await readFile(new URL("../app/defect-log/defect-log-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/\{\.\.\.existing,\.\.\.incoming,workStates:incoming\.workStates,downSheetRecommendation:incoming\.downSheetRecommendation,/);
+
+ /* THE GUARD THAT GENERALISES IT. Every field repair-catalog.ts deletes has to
+    be named in that merge; a third one added later and forgotten is the same
+    bug a third time. */
+ const catalog=await readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8");
+ const deleted=[...catalog.matchAll(/delete next\.(\w+)/g)].map(match=>match[1]);
+ assert.deepEqual([...new Set(deleted)].sort(),["downSheetRecommendation","workStates"]);
+ for(const field of deleted)assert.ok(sync.includes(field+":incoming."+field),
+  field+" is deleted by repair-catalog.ts, so saveDefectLogRecord must take it from the incoming record or the removal is lost");
+});
+
+test("the recommended list can be answered from the board and from the quick filter",async()=>{
+ /* Curtis: "I need quick remove or mark as fix actions just like on the down
+    sheet, so I need that functionality when that list is brought up in quick
+    filters." The Down Sheet's row actions are a tick that closes the entry out
+    and a cross that takes the row off the sheet without touching the bus. */
+ const {answerRecommendedBus}=await import("../app/recommended-actions.ts");
+ const rec=at=>({at,by:"CJ"});
+ const fleet=[{id:"b",n:"6302",l:"bay-2",s:"defect",defects:[
+  {id:"d2",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:30:00.000Z")},
+  {id:"d3",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:15:00.000Z")}]}];
+ const defects=fleet[0].defects,now="2026-09-10T00:00:00.000Z";
+
+ /* NOT FOR THE SHEET is a statement about the BUS, so every recommendation on
+    it goes. Answering per defect under a bus heading is the bug that made the
+    evening deferred prompt ask three times about one bus. */
+ const dismissed=answerRecommendedBus(fleet,[],"b",defects,"dismiss",{now});
+ assert.equal(dismissed.saved,2);
+ const after=dismissed.fleet[0].defects;
+ assert.equal(after.some(defect=>defect.downSheetRecommendation),false,"both recommendations are withdrawn");
+ assert.deepEqual(after.map(defect=>defect.state),["open","open"],"and the repairs are still open — this is not a delete");
+
+ /* PUT ON DOWN SHEET moves ONE repair, because the sheet allows a bus one
+    active entry, and it needs no more: the bus being on the sheet drops every
+    recommendation on it from the board on its own. */
+ const escalated=answerRecommendedBus(fleet,[],"b",defects,"downsheet",{now});
+ assert.equal(escalated.saved,1);
+ assert.equal(escalated.downEntries.length,1);
+ /* The longest-waiting repair is the one that goes, matching the row the
+    foreman was reading. */
+ assert.equal(escalated.downEntries[0].repair,"Air leak");
+ /* AND IT DOES NOT CLEAR THE RECOMMENDATION. The stamp is the record of who
+    asked for this; membership erasing it is what repair-catalog.ts refuses. */
+ assert.ok(escalated.fleet[0].defects.every(defect=>defect.downSheetRecommendation),
+  "putting a bus on the sheet must not erase who recommended it");
+
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The two buttons, on the row, in the Down Sheet's own order. */
+ assert.match(page,/className="fix-recommended" onClick=\{\(\)=>markRecommendedFixed\(bus,recommendedDefects\)\}/);
+ assert.match(page,/className="end-deferral" onClick=\{\(\)=>removeRecommendation\(bus,recommendedDefects\)\}/);
+ assert.match(page,/RECOMMENDED "\+elapsedLong\(recommendedMinutes\)\+" AGO"/,"and the wait time Curtis asked for");
+ /* ONE snapshot and ONE write per action, taken before anything moves —
+    endDeferralForBus's rule, for the same reason: calling the single-record
+    handler in a loop would snapshot an already-changed board. */
+ for(const name of ["const markRecommendedFixed=","const removeRecommendation="]){
+  const start=page.indexOf(name);
+  assert.ok(start>0,name+" must exist");
+  const body=page.slice(start,page.indexOf("\n };",start));
+  assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,name+" takes exactly one undo snapshot");
+  assert.equal((body.match(/persist\(/g)||[]).length,1,name+" writes once, at the end");
+ }
+ /* THE COUNTS ARE IN SYNC. The board excludes a bus already on the sheet and
+    the drawer has to as well, or one feature prints two different numbers.
+    Both go through recommendedRows rather than keeping a second copy. */
+ assert.match(page,/const recommendedRowsForFleet=useMemo\(\(\)=>recommendedRows\(fleet,downEntries\),\[fleet,downEntries\]\)/);
+ assert.match(page,/key==="down-sheet-recommended"\?recommendedCandidateIds/);
 });

@@ -850,6 +850,18 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .deferred-card .mystery-badges i{background:#fdf0dc;border-color:#f0cf9a;color:#8a4b06}
 .deferred-card .mystery-badges i.deferred-overdue{background:#fde2e2;border-color:#f2b6b6;color:#96131f}
 @media(max-width:760px){.deferred-card-actions button{min-height:46px;font-size:10px}}
+/* RECOMMENDED FOR DOWN SHEET reuses both boards above it, down to the action
+   buttons, because Curtis asked for "the same color and everything". The one
+   distinguishing mark is the 4px stripe on the head — the same single knob that
+   separates DEFERRED from MYSTERY — and here it is the Down Sheet's own blue,
+   already used by the + PUT ON DOWN SHEET button two lines up, because this is
+   the board about getting onto that sheet.
+
+   No overdue variant, and that is deliberate rather than unfinished: a
+   recommendation waiting a week is not late. Curtis: "that bus could be in that
+   status for a while, which is fine." */
+.recommended-board .mystery-head{border-left:4px solid #0b64bd}
+.recommended-card .mystery-badges i{background:#e8f1fc;border-color:#bcd6f2;color:#0b4c91}
 .deferred-review-also{color:#8a4b06;background:#fdf0dc;border:1px solid #f0cf9a;border-radius:5px;padding:4px 6px;font-size:9px;line-height:1.4}
 .deferred-review-choices{display:grid;gap:8px}
 .deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}

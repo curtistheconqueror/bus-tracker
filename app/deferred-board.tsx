@@ -2,14 +2,35 @@
 
 /* DEFERRED, on the Down Sheet, directly under MYSTERY BUSES.
 
-   The two boards answer one question between them. MYSTERY BUSES is "this bus
-   is on property and nothing on the sheet says why" — the list somebody walking
-   the yard with a clipboard needs. A deferred bus is exactly that shape: held
-   back, on property, deliberately NOT on the sheet. So one of the mysteries is
-   very often a bus somebody deferred hours ago and nobody wrote down.
+   MYSTERY BUSES is "this bus is on property and nothing on the sheet says why"
+   — the list somebody walking the yard with a clipboard needs. DEFERRED is a
+   different shape and this board used to describe itself as the same one.
+
+   A DEFERRED BUS DOES NOT HAVE TO BE ON PROPERTY. Curtis: "deferred buses do
+   not have to be on property, so this way on the Down Sheet right under mystery
+   buses it will show the total of deferred buses whether they're here or on the
+   road." A deferred bus is one that is NOT on the Down Sheet and that somebody
+   is trying to get fixed — and a bus out on a run all afternoon is exactly the
+   one most easily forgotten, so leaving it out would empty the list of the
+   entries it is most needed for.
+
+   The counting has always been right: heldDeferredRows never looked at a
+   location, only at whether the repair is deferred and the bus is off the
+   sheet. It was the SUBTITLE that said "ON PROPERTY", which is worse than a
+   wrong number — a number somebody would have questioned, whereas a label
+   invites the next person to "fix" the code to match it. There is a test on
+   the rule now for that reason.
+
+   Where the two boards do still meet: one of the mysteries is very often a bus
+   somebody deferred hours ago and nobody wrote down.
 
    They stay separate rather than merging, and that is the point: a mystery is
-   unexplained and a deferral is a decision. Folding them together would take
+   unexplained and a deferral is a decision. RECOMMENDED FOR DOWN SHEET sits
+   under both and is a third thing again — a bus somebody has put forward and
+   nobody has ruled on, which can sit there for a while quite legitimately.
+   Curtis drew that line himself: "the distinction is with the recommended for
+   down sheet, because that bus could be in that status for a while, which is
+   fine." Folding them together would take
    the one thing MYSTERY BUSES is for — that nobody knows — and dilute it with
    buses whose reason is on record. Sitting one under the other, the reader can
    cross off the mysteries that are only deferrals without losing either list.
@@ -50,7 +71,7 @@ export default function DeferredBoard({fleet,downEntries,collapsed,onCollapsedCh
  const now=new Date();
  const buses=useMemo(()=>heldDeferredBuses(fleet,downEntries),[fleet,downEntries]);
  return <section className={"mystery-board deferred-board"+(collapsed?" collapsed":"")} aria-label="Deferred buses">
-  <header className="mystery-head"><span><b>DEFERRED BUSES</b><small>HELD BACK, ON PROPERTY, NOT ON THE DOWN SHEET</small></span>
+  <header className="mystery-head"><span><b>DEFERRED BUSES</b><small>HELD BACK AND NOT ON THE DOWN SHEET — HERE OR ON THE ROAD</small></span>
    <div className="mystery-header-actions"><strong>{buses.length}</strong>
     <button className="mystery-toggle" type="button" aria-expanded={!collapsed} onClick={()=>onCollapsedChange(!collapsed)} aria-label={(collapsed?"Expand":"Collapse")+" DEFERRED BUSES"}>{collapsed?"+":"−"}</button>
    </div>

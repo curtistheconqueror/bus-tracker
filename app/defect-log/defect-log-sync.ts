@@ -222,18 +222,28 @@ export function saveDefectLogRecord(
  const strayOn=busHoldingDefect(fleet,incoming.id,bus.id);
  const leaving=existing?undefined:strayOn;
  const state=incoming.state;
- /* workStates is taken from the incoming record rather than left to the
-   spread, because unticking the LAST box produces a defect with no workStates
-   KEY AT ALL - setDefectWorkState deletes it rather than leaving an undefined
-   behind, to keep stored records clean - and a missing key cannot override the
-   one `existing` still carries. Unticking your only ticked box therefore did
-   not stick: it came back on the next read.
+ /* THE TWO FIELDS THAT ARE DELETED RATHER THAN SET TO UNDEFINED are taken from
+   the incoming record instead of being left to the spread.
+
+   `{...existing,...incoming}` cannot express "this field is gone". Both
+   setDefectWorkState and setDownSheetRecommendation DELETE their key when the
+   last tick comes off — deliberately, to keep stored records clean — and a
+   missing key does not override the one `existing` still carries. So the value
+   came straight back on the next read and the untick looked like it had not
+   worked.
+
+   workStates was fixed when it was found; downSheetRecommendation had the same
+   bug and was found the same way, by driving the button in a browser and
+   reading the record back. Turning RECOMMEND FOR DOWN SHEET off did nothing
+   that survived a save — in the editor, and on the two surfaces that list
+   recommendations. Anything else added to repair-catalog.ts that deletes its
+   key belongs on this line too; grep it for `delete next.`.
 
    Every caller passes a complete defect built from the record it is editing,
-   never a partial patch, so reading this field straight off the incoming copy
-   is what the callers already mean. A future caller that passes a patch would
-   have to carry workStates with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
+   never a partial patch, so reading these straight off the incoming copy is
+   what the callers already mean. A future caller that passes a patch would
+   have to carry both fields with it. */
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
