@@ -1,0 +1,67 @@
+# Staging is deliberately manual. A contributor can prepare and merge source,
+# but a Fleetstep release agent starts this workflow only after Curtis gives
+# approval in chat. The text input is an auditable confirmation, not identity
+# verification; repository access remains limited to trusted maintainers.
+name: Deploy Cloudflare staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      curtis_approval:
+        description: "Type CURTIS_APPROVED to deploy the current main branch to Fleetstep staging"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Do not let a second manual release replace a deployment already in progress.
+concurrency:
+  group: fleetstep-cloudflare-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # The environment also rejects non-main refs. Keeping the check here makes
+    # the source boundary explicit in the run record as well.
+    if: github.ref == 'refs/heads/main' && inputs.curtis_approval == 'CURTIS_APPROVED'
+    name: Validate and deploy staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://fleetstep.fleetstep-dev.workers.dev
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Account IDs are normally environment variables. The secret fallback
+      # supports the initial setup if it was saved as a secret by mistake.
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build and test
+        run: npm test
+
+      # vinext generates a Worker-ready Wrangler configuration at build time.
+      # Deploy it from dist/server so the worker entry and client assets remain
+      # in their generated relative locations. --name targets only the existing
+      # Cloudflare staging Worker; it does not change the current Sites app.
+      - name: Deploy Fleetstep staging
+        working-directory: dist/server
+        run: npx --no-install wrangler deploy --config wrangler.json --name fleetstep
+
+      - name: Report staging address
+        run: echo "Staging deployment complete: https://fleetstep.fleetstep-dev.workers.dev"
