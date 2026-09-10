@@ -11220,3 +11220,56 @@ test("the defects Curtis named from the floor are in the catalog and reachable b
  for(const issue of ["Ramp will not lock","Ramp does not fully cycle"])
   assert.equal(repairIssueDisplayLabel(issue,"Ramp, Lift and Kneeler"),issue);
 });
+
+test("Lite can always be turned back off from inside Lite",async()=>{
+ /* Curtis: "make sure there's a way to go back to the full version. If I do
+    select the light version in the settings, let's not make a blooper where I
+    can't no longer select that mode because it disappeared."
+
+    A mode you can enter and not leave is a trap, and it is the kind that only
+    shows up on somebody else's phone. Lite is a drawing choice, not a
+    permission — anyone holding the device can turn it off — so the way out has
+    to survive being in Lite. This holds the three things that would break it. */
+ const [nav,settings,lite,gate]=await Promise.all([
+  readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/lite-mode.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8"),
+ ]);
+
+ /* 1. SETTINGS MUST STAY IN THE NAV. The nav filters exactly one page in Lite,
+    and if that ever becomes a list, Settings must not join it — losing the nav
+    entry is losing the only door. */
+ assert.match(nav,/page\.href==="\/lists"&&hiddenInLite\(mode,"campaignsPage"\)/);
+ assert.equal(nav.includes('"/settings"'),false,"the nav must not single out Settings at all");
+
+ /* 2. NOTHING ON THE SETTINGS PAGE IS GATED ON THE MODE. The switch is a plain
+    checkbox on an ungated page; the moment anything there starts asking
+    hiddenInLite, the door can be shut from the inside. */
+ assert.equal(settings.includes("hiddenInLite"),false,
+  "Settings must not hide anything in Lite - it is the way out");
+ assert.match(settings,/className="settings-lite-switch"/);
+ assert.match(settings,/checked=\{appMode==="lite"\}[\s\S]{0,120}setAppMode\(event\.target\.checked\?"lite":"full"\)/,
+  "the switch must set the mode both ways, not just into Lite");
+ /* And the second way out, for a device that would rather be re-asked. */
+ assert.match(settings,/className="show-welcome-again"/);
+
+ /* 3. LITE NEVER HIDES A SURFACE THAT HOLDS THE SWITCH. */
+ assert.equal(lite.includes('"settingsPage"'),false);
+ for(const feature of ["campaignsPage","advancedActions"])assert.ok(lite.includes('"'+feature+'"'));
+
+ /* The welcome screen says so too, so the choice is not made blind. */
+ assert.match(gate,/Turn it off in Settings whenever you want/);
+});
+
+test("the welcome screen names the app, not one garage",async()=>{
+ /* Curtis: "take PACE SOUTH off that page and replace it with Transit
+    Maintenance Work Solutions." The line under the name is what the app calls
+    itself; the shop's own name does not belong on the screen that greets a
+    device that has never opened it. */
+ const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ assert.match(gate,/<p className="welcome-kicker">Transit Maintenance Work Solutions<\/p>/);
+ /* Only inside the comment explaining the change, never in what renders. */
+ const rendered=gate.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+ assert.equal(/PACE SOUTH/i.test(rendered),false,"the shop's name must not render on the welcome screen");
+});

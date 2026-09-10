@@ -57,7 +57,23 @@ export default function WelcomeGate(){
     {APP_NAME.split("").map((letter,index)=>
      <span aria-hidden="true" key={index} style={{animationDelay:(index*55)+"ms"}}>{letter}</span>)}
    </h1>
-   <p className="welcome-kicker">PACE SOUTH · FLEET MAINTENANCE</p>
+   {/* The line under the name is what the app calls ITSELF, not what one garage
+       calls itself. Curtis: "take PACE SOUTH off that page and replace it with
+       Transit Maintenance Work Solutions."
+
+       "· FLEET MAINTENANCE" went with it rather than being kept alongside: the
+       new phrase already says maintenance, and a kicker that reads "Transit
+       Maintenance Work Solutions · FLEET MAINTENANCE" says the same word twice
+       under a name that is nine letters long.
+
+       His capitalisation, not the old line's. The style here is 9px at 2.4px
+       letter-spacing with no text-transform, so the shouting in "PACE SOUTH"
+       was literal text — a 33-character phrase set that way reads as a wall.
+
+       This is the only place the shop's own name was on this screen. The one
+       other "Pace South" in the app is a download FILENAME in
+       section-transfer-controls.tsx, which is a different thing and untouched. */}
+   <p className="welcome-kicker">Transit Maintenance Work Solutions</p>
    <div className="welcome-choices">
     <button type="button" className="welcome-choice welcome-full" onClick={()=>choose("full")}>
      <b>FULL</b><small>Every surface and every control. What the shop runs on.</small>
