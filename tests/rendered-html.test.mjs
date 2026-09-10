@@ -6459,7 +6459,13 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  assert.match(searchIndex,/groupLabel=repairGroupDisplayLabel\(group\)/);
  assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue,group\)/);
  assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue\)/);
- assert.match(logPage,/hint:row\.groupLabel\?row\.groupLabel\+" · "\+row\.categoryLabel:row\.categoryLabel/);
+ /* The mark has to survive in BOTH places the group name is now drawn — the
+    section heading a browsing list is divided by, and the line under each row
+    when the list is ranked. Both read row.groupLabel, which is where
+    defect-search.ts put the mark; asserting only one of them would let the
+    other quietly lose it. */
+ assert.match(logPage,/hint:browsing\?undefined:\(row\.groupLabel\?row\.groupLabel\+" · "\+row\.categoryLabel:row\.categoryLabel\)/);
+ assert.match(logPage,/section:browsing\?\(value\.defect\.category\?\(row\.groupLabel\|\|row\.categoryLabel\)/);
  /* Same move as the group label above: the option's own wording is built in the
     search index now, and the assertions on it sit with that file rather than
     here. What the PAGE still has to prove is that it draws the index's label
@@ -11001,18 +11007,49 @@ test("the app's name is drawn top-left on every page, from one place", async () 
     assert.doesNotMatch(src,/"FLEETSTEP"/,file+" must not spell the name itself");
   }
 
-  /* THE NAME IS THE WAY HOME. Curtis: "when I click on that title, it should
-     take me to the home page" - a masthead link, the way every site has one.
-     It must be a real <a href>, not a <b> with an onClick: a link is what a
-     long-press, a middle-click and a screen reader all already understand. */
-  assert.match(component,/export const HOME_HREF="\/"/,"the target is one edit, and a test can name it");
-  assert.match(component,/<a className=\{className\?"app-name "\+className:"app-name"\} href=\{HOME_HREF\}>/,
-    "the name element itself is the link - a wrapper around it would make the whole header row navigable");
+  /* THE NAME OPENS THE HOME SCREEN, and the home screen is the welcome screen.
+
+     It was an <a href="/"> first, and `/` is the Facility Map — so it took you
+     to a page rather than to the screen Curtis meant. He said it twice: "I like
+     the design and how you have the name show up on the screen, but I still
+     can't access it by touching the top... the proper design is by touching the
+     title on each and every page takes you back to the home screen."
+
+     A BUTTON, not a link, because it no longer navigates — it opens a dialog
+     over the page you are on, and a link that goes nowhere is a worse lie than
+     a button that looks like a masthead. It asks with the SAME event Settings'
+     SHOW IT uses, so there is one way to open that screen rather than two that
+     can drift. */
+  assert.match(component,/<button type="button" className=\{className\?"app-name "\+className:"app-name"\}/,
+    "the name element itself is the control - a wrapper would make the whole header row tappable");
+  assert.match(component,/onClick=\{\(\)=>window\.dispatchEvent\(new CustomEvent\(WELCOME_REQUEST_EVENT\)\)\}/);
+  assert.equal(component.includes('href='),false,"it must not still claim to be a link");
+
+  /* A <button> in this stylesheet walks into a bare `button{}` rule — 28px tall,
+     navy, 9px text — so the reset is load-bearing, not tidiness. Delete any of
+     these four and the app's name renders as a small navy pill. */
+  {
+   const cssNow=await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+   const rule=cssNow.match(/\.app-name\{([^}]*)\}/)[1];
+   for(const property of ["height:auto","background:none","border-radius:0","font-family:inherit"])
+    assert.ok(rule.includes(property),".app-name must reset "+property+" against the bare button rule");
+   /* Not anchored to a line start: this file's first rules are compacted onto
+      one very long line, which is part of why the trap is easy to miss. */
+   assert.ok(cssNow.includes("button{height:28px"),"the bare button rule this defends against still exists");
+  }
 
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   /* Every page loads globals.css, so the name is styled once. */
-  assert.match(css,/\.app-name\{display:block;width:fit-content;padding:5px 0;margin:-5px 0 0;text-align:left/,
-    "the padding grows the tap area and the negative margin pays for it - together they keep the old 29px of header");
+  /* The <button> reset now sits between `width:fit-content` and `text-align`,
+     so this matches the pieces that carry meaning rather than the whole string
+     in order: the padding grows the tap area and the negative margin pays for
+     it, and together they keep the header the same height it always was. */
+  assert.match(css,/\.app-name\{display:block;width:fit-content;/);
+  {
+   const rule=css.match(/\.app-name\{([^}]*)\}/)[1];
+   for(const property of ["padding:5px 0","margin:-5px 0 0","text-align:left"])
+    assert.ok(rule.includes(property),".app-name must keep "+property);
+  }
 
   /* An anchor arrives with two UA defaults that would give the game away: an
      underline, and the browser link colour - which on six dark navy headers

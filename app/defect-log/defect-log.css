@@ -827,6 +827,14 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    now". Nothing about a typing field justifies smaller text than the drop-down
    it replaced, so `b` matches `.combo-input` at every width and the second line
    is sized under it rather than shrunk to fit. */
+/* THE DIVIDERS THE OLD <optgroup> DREW. A native optgroup label is faded, small
+   and set apart from the options under it, and dividing a long list that way is
+   most of what made it readable — "each was kinda divided in the sections that
+   had a lot of different defect options", Curtis, after noticing they had gone.
+
+   Sticky, which the native one was not: the list scrolls inside its own box, so
+   the heading you are under stays visible while you read the rows beneath it. */
+.combo-section{position:sticky;top:0;z-index:1;padding:6px 9px 4px;background:#f2f6fc;border-bottom:1px solid #dde5f1;color:#5d718d;font-size:8px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;line-height:1.25}
 .combo-option{display:flex;flex-direction:column;gap:1px;min-height:38px;justify-content:center;padding:6px 9px;border-bottom:1px solid #eef2f8;cursor:pointer}
 .combo-option:last-child{border-bottom:0}
 .combo-option>b{font-size:10px;font-weight:900;color:#193357;line-height:1.2}
@@ -847,6 +855,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 
 /* Themed with the rest of the editor, so a re-themed Defect Log carries it. */
 .log-form .combo-list{border-color:color-mix(in srgb,var(--log-text,#193357) 26%,transparent);background:var(--log-surface,#fff)}
+.log-form .combo-section{background:color-mix(in srgb,var(--log-surface,#fff) 88%,var(--log-text,#193357));border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 14%,transparent);color:var(--log-muted,#5d718d)}
 .log-form .combo-option{border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 10%,transparent)}
 .log-form .combo-option>b{color:var(--log-text,#193357)}
 .log-form .combo-option>small,.log-form .combo-footnote,.log-form .combo-caret,.log-form .combo-clear{color:var(--log-muted,#74819a)}
@@ -858,6 +867,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
     width, which is what the old <select> drew its options at. The row grows to
     52px to hold two lines at that size — bigger than the 44px minimum, which is
     a gloved thumb getting more to aim at, not less. */
+ .combo-section{padding:8px 11px 6px;font-size:10px;letter-spacing:1.2px}
  .combo-option{min-height:52px;padding:9px 11px}
  .combo-option>b{font-size:16px;line-height:1.15}
  .combo-option>small{font-size:12px}

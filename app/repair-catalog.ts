@@ -200,7 +200,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     morning had to pick the nearest thing: A3 became A-6 and A21 became A-15, and
     the bus was recorded as having had a service it never had. */
  "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
- "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
+ "Preventive Maintenance":["Add engine oil","Add coolant (glycol)","Add transmission fluid","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  /* HAZMAT on the sheet means a biohazard on board — blood, vomit or faeces. It
     had nowhere to go and landed as "Unknown diagnosis", which is the one thing
     it must not read as: nobody boards or cleans that bus without knowing. */
@@ -378,6 +378,20 @@ const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
   "Leaking air bag - Rear":airBagCount(4),
  },
 };
+/* THE TOP-UPS THAT CARRY AN AMOUNT. "Add engine oil" has offered a quarts box
+   since it existed, and the two fluids beside it are the same job on the same
+   visit — Curtis: "a lot of these buses we have to constantly add glycol to it."
+   One list rather than three conditions, so adding a fourth fluid later is one
+   line and cannot half-work.
+
+   Quarts for all three. Coolant is often talked about in gallons, but the box is
+   optional and one unit across the three tops-ups is easier to read back on a
+   card than three units that each need thinking about. */
+export const FLUID_TOP_UPS=["Add engine oil","Add coolant (glycol)","Add transmission fluid"];
+export function isFluidTopUp(category:unknown,issue:unknown){
+ return String(category??"")==="Preventive Maintenance"&&FLUID_TOP_UPS.includes(String(issue??""));
+}
+
 export function defectCountField(category:unknown,issue:unknown){
  const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
  return DEFECT_COUNT_FIELDS[moved.category]?.[moved.issue];

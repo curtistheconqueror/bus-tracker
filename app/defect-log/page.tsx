@@ -5,7 +5,7 @@ import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,r
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "../repair-catalog";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "./defect-log-sync";
 import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
@@ -188,7 +188,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  const chooseIssue=(issue:string,switchTo:string)=>{
   const category=switchTo||value.defect.category;
   const picked=defectCountField(category,issue);
-  const oilIssue=category==="Preventive Maintenance"&&issue==="Add engine oil";
+  const oilIssue=isFluidTopUp(category,issue);
   setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
    defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
     symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
@@ -355,8 +355,31 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
      search={query=>{
       const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category);
+      /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that
+         split is measured rather than chosen. Browsing, the rows arrive in
+         catalog order, so a heading each time the group changes reproduces
+         exactly what the old <optgroup> drew — which is what Curtis missed:
+         "each was kinda divided in the sections that had a lot of different
+         defect options."
+
+         Searching, the rows are RANKED, so the groups interleave and the same
+         heading comes back further down. Measured on this catalog: "light"
+         returned 26 rows under 19 headings, "INOP" 16 under 11, with Tech
+         Services · Farebox appearing twice. At 1.4 rows per heading the
+         dividers stop dividing anything, so there the group rides on each row
+         instead — which is also the only thing telling two near-identical
+         wordings apart when they come from different groups. */
+      const browsing=!query.trim();
       const rows=[
-       ...inCategory.map(row=>({value:row.value,label:row.label,category:row.category,hint:row.groupLabel?row.groupLabel+" · "+row.categoryLabel:row.categoryLabel})),
+       ...inCategory.map(row=>({value:row.value,label:row.label,category:row.category,
+        /* With a category chosen the heading is just the group: repeating that
+           category above every group inside the one category you picked is noise. */
+        section:browsing?(value.defect.category?(row.groupLabel||row.categoryLabel):(row.groupLabel?row.categoryLabel+" · "+row.groupLabel:row.categoryLabel)):undefined,
+        /* Omitted while browsing because the heading directly above already says
+           it, and saying it twice on every row is what made the old list long. */
+        hint:browsing?undefined:(row.groupLabel?row.groupLabel+" · "+row.categoryLabel:row.categoryLabel)})),
+       /* Only ever present when something has been typed, so these never carry a
+          heading — and the warning is the point of their line. */
        ...elsewhere.map(row=>({value:row.value,label:row.label,category:row.category,foreign:true,
         hint:(row.groupLabel?row.groupLabel+" · ":"")+row.categoryLabel+" — switches category"})),
       ];

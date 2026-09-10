@@ -27,9 +27,20 @@ export default function WelcomeGate(){
     later on the ones that have already answered. */
  const [open,setOpen]=useState(false);
  const [shown,setShown]=useState(false);
+ /* A FIRST RUN MUST ANSWER; ANYONE ELSE IS JUST LOOKING.
+
+    Until now the only way off this screen was picking FULL or LITE, which is
+    right for a device that has never opened the app and wrong for every other
+    time it is opened. Curtis, on tapping the name: "I need to be able to see it
+    whenever I want to." Being made to re-answer a question you already answered
+    is not seeing it, it is being interrogated by your own home screen.
+
+    So the close exists only when the question is already answered. On a genuine
+    first run there is no way past it, which is the whole point of a gate. */
+ const [dismissable,setDismissable]=useState(false);
  useEffect(()=>{
   if(isFirstRun(localStorage))setOpen(true);
-  const onRequest=()=>setOpen(true);
+  const onRequest=()=>{setDismissable(!isFirstRun(localStorage));setOpen(true)};
   window.addEventListener(WELCOME_REQUEST_EVENT,onRequest);
   return ()=>window.removeEventListener(WELCOME_REQUEST_EVENT,onRequest);
  },[]);
@@ -37,6 +48,15 @@ export default function WelcomeGate(){
     it cannot half-play behind a page that was still hydrating. */
  useEffect(()=>{if(!open)return;const id=window.requestAnimationFrame(()=>setShown(true));return ()=>{window.cancelAnimationFrame(id);setShown(false)}},[open]);
  useEffect(()=>{if(open)return lockPageScroll("welcome-open")},[open]);
+ /* Escape closes it for the same reason the × does, and for nobody who has not
+    answered yet. There is no Escape key on a bus, so this is the shop computer's
+    way out rather than the phone's — the × is the phone's. */
+ useEffect(()=>{
+  if(!open||!dismissable)return;
+  const key=(event:KeyboardEvent)=>{if(event.key==="Escape")setOpen(false)};
+  window.addEventListener("keydown",key);
+  return ()=>window.removeEventListener("keydown",key);
+ },[open,dismissable]);
 
  if(!open)return null;
  const choose=(mode:AppMode)=>{
@@ -49,6 +69,7 @@ export default function WelcomeGate(){
   window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
  };
  return <div className={"welcome-gate"+(shown?" shown":"")} role="dialog" aria-modal="true" aria-label={"Welcome to "+APP_NAME}>
+  {dismissable&&<button type="button" className="welcome-close" aria-label="Close" onClick={()=>setOpen(false)}>×</button>}
   <div className="welcome-inner">
    {/* One letter per span so the name can resolve in rather than simply appear.
        Each carries its own delay; prefers-reduced-motion drops all of it and
@@ -82,7 +103,7 @@ export default function WelcomeGate(){
      <b>LITE</b><small>The same app drawing less of itself, to learn the workflow on. Turn it off in Settings whenever you want.</small>
     </button>
    </div>
-   <p className="welcome-foot">Nothing here changes what is saved. Both keep the same records and the same Shop Cloud.</p>
+   <p className="welcome-foot">Nothing here changes what is saved. Both keep the same records and the same Shop Cloud.{dismissable&&" Close this and nothing changes at all."}</p>
   </div>
  </div>;
 }

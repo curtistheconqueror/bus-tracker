@@ -26,7 +26,7 @@
    is a way to REACH a catalog string, never a way to spell a new one, because a
    defect log whose wording drifts is a defect log nobody can count. */
 
-import {useEffect,useId,useRef,useState} from "react";
+import {Fragment,useEffect,useId,useRef,useState} from "react";
 
 export type ComboOption={
  value:string;
@@ -39,6 +39,14 @@ export type ComboOption={
  /* Set on options that come from outside the chosen category, so the list can
     say so rather than silently changing the category under the mechanic. */
  foreign?:boolean;
+ /* The heading this row sits under — "Tech Services · Farebox". A heading is
+    drawn each time this CHANGES from the row above, which reproduces exactly
+    what a native <optgroup> drew and is why it exists: the old picker divided a
+    long list into named sections, and flattening it lost that. Curtis: "it was
+    almost like a background faded lettering... each was kinda divided in the
+    sections that had a lot of different defect options. I noticed it's not
+    separated like that anymore." */
+ section?:string;
  /* Carried on the option rather than looked up from its value afterwards. Two
     categories can hold the same wording — the value alone does not say which
     one this row came from, and resolving it by value would quietly move the
@@ -115,7 +123,9 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     bottom and the mechanic is arrowing through rows he cannot see. */
  useEffect(()=>{
   if(!open||!listRef.current)return;
-  const row=listRef.current.children[active] as HTMLElement|undefined;
+  /* NOT children[active]: the headings are list items too, so the nth child and
+     the nth OPTION stopped being the same thing the moment sections went in. */
+  const row=listRef.current.querySelectorAll(".combo-option")[active] as HTMLElement|undefined;
   row?.scrollIntoView({block:"nearest"});
  },[active,open]);
 
@@ -173,8 +183,10 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
    {open&&<ul className="combo-list" id={id+"-list"} role="listbox" ref={listRef}>
     {options.length===0&&<li className="combo-empty" role="presentation">{emptyText||"Nothing matches that"}</li>}
-    {options.map((option,index)=><li
-      key={option.value+"|"+index}
+    {options.map((option,index)=><Fragment key={option.value+"|"+index}>
+     {option.section&&option.section!==options[index-1]?.section&&
+      <li className="combo-section" role="presentation">{option.section}</li>}
+     <li
       id={id+"-option-"+index}
       role="option"
       aria-selected={index===active}
@@ -185,7 +197,8 @@ export default function ComboField({label,value,display,search,onPick,placeholde
       onMouseEnter={()=>setActive(index)}>
       <b>{option.label}</b>
       {option.hint&&<small>{option.hint}</small>}
-     </li>)}
+     </li>
+    </Fragment>)}
    </ul>}
   </div>
   {footnote&&<small className="combo-footnote">{footnote}</small>}
