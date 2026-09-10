@@ -971,3 +971,131 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    restate itself too. The chip row is a direct child, so it needs the same
    escape or it becomes a two-column grid with its own scrollbar. */
 .quick-filter-drawer>.time-window-chips{flex:none;display:flex;gap:8px;padding:7px;overflow:visible}
+
+/* ─── THREE WAYS OF TELLING ONE BUS FROM THE NEXT ────────────────────────────
+   All three off unless the device asks for them, and each written twice: once
+   under [data-x="always"] for every width, once inside @media(max-width:620px)
+   under [data-x="phone"]. That duplication is the price of "phone" meaning a
+   WIDTH rather than a device — see ViewScope in defect-log-settings.ts. A media
+   query re-answers on rotation and resize with nothing stored.
+
+   620px is this app's phone breakpoint everywhere else, so an iPad at 820
+   portrait and 1180 landscape is untouched by "phone", and the same iPad in
+   split screen is not. That is the behaviour wanted, not a compromise.
+
+   AT THE END OF THIS FILE ON PURPOSE. Several earlier max-width blocks name
+   .log-card-group and .log-bus-column; at equal specificity CSS decides on
+   source order, so a phone rule sitting above the base rules it overrides
+   loses silently. That has already cost this project two debugging rounds. */
+
+/* 1. THE BUS NUMBER DOWN THE SIDE.
+
+   ABSOLUTE, NOT A GRID ROW, and that was measured rather than reasoned. The
+   obvious version is grid-row:1/-1 on the existing two-column card, and it
+   silently does not work: with rows auto-placed there is no EXPLICIT grid, and
+   -1 resolves to the end of the explicit grid rather than the end of the card.
+   It rendered 146px tall inside a 729px card — taller than the 103px it starts
+   at, which is exactly the kind of partial success that reads as working.
+
+   So the card gets a 38px left padding and the rail is absolutely positioned
+   into it, top:0 bottom:0. .log-card already carries position:relative, so the
+   card is the containing block. That is deterministic at any number of
+   defects, with no JavaScript and nothing counting rows.
+
+   grid-column:auto ON THE RAIL is load-bearing and not tidying. An absolutely
+   positioned child of a grid container whose grid-placement is DEFINITE is
+   positioned against its grid AREA rather than the card's padding box, and
+   .log-bus-column carries grid-column:1 from the base rule. Left in, the rail
+   rendered 46px inboard of the card edge and the defect rows measured 30px
+   underneath it — an overlap, in the one place this whole option exists to
+   keep clear. Setting it back to auto restores the padding box as the
+   containing block.
+
+   EVERY child has to be moved to column 1, the header included. Missing it
+   cost a second round: .log-card-group>.log-group-header{grid-column:2} still
+   applied, column 2 was now implicit and sized to its content, and the single
+   explicit minmax(0,1fr) column beside it resolved to ZERO. Computed value
+   read "0px 307px" and the defect rows measured 2px wide. Nothing in the rule
+   I had written said anything about a header.
+
+   The defect rows keep their own borders, backgrounds and action bars exactly
+   as they are — they simply start 38px further right. The rail runs alongside
+   them, never across them, and a test measures that no row's left edge is
+   inside the rail. */
+.defect-log-app[data-bus-rail="always"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+.defect-log-app[data-bus-rail="always"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
+.defect-log-app[data-bus-rail="always"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
+.defect-log-app[data-bus-rail="always"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
+.defect-log-app[data-bus-rail="always"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
+.defect-log-app[data-bus-rail="always"] .log-bus-column .log-location{display:none}
+.defect-log-app[data-bus-rail="always"] .log-card-group>.log-group-header,
+.defect-log-app[data-bus-rail="always"] .log-card-group>.grouped-defect-list,
+.defect-log-app[data-bus-rail="always"] .log-card-group>.log-focus-row{grid-column:1}
+.defect-log-app[data-bus-rail="always"] .log-card-group>.log-location-inline{display:inline-flex}
+
+/* 2. BLUE MEANS THE BUS.
+
+   Not a repaint — a de-escalation. The bus number keeps --log-accent and every
+   other blue in the feed drops to a quiet slate mixed from the theme's own text
+   colour, so it still works on the dark themes rather than being a hard-coded
+   navy that vanishes on Midnight.
+
+   An explicit choice must beat a preset: --log-repair-category-color is a
+   colour the user can already set under TEXT STYLE. But that variable is
+   ALWAYS defined — the page writes it from the settings blob whether or not
+   anybody chose it — so var(--log-repair-category-color, quiet) never reaches
+   its fallback and this did nothing at all on the first attempt. Measured:
+   rgb(11,100,189), unchanged.
+
+   So the page emits a SECOND variable, --log-repair-category-chosen, and emits
+   it ONLY when the stored colour differs from the shipped default. Undefined
+   means nobody chose, the fallback applies, and the heading goes quiet; defined
+   means somebody chose, and their colour wins. Same conditional-key pattern as
+   --log-card-border two hundred lines up. */
+.defect-log-app[data-bus-blue="always"] .log-repair>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+.defect-log-app[data-bus-blue="always"] .log-card-group>.log-focus-button,
+.defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 62%,var(--log-surface))}
+.defect-log-app[data-bus-blue="always"] .grouped-defect-head b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+
+/* 3. THE CLOSING LINE. Rendered always, shown only when asked. */
+.log-bus-end-marker{display:none}
+.defect-log-app[data-bus-end="always"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+
+/* The inline location is hidden until a rail hides the column copy. Its own
+   rule rather than a shared one, because it is the only control here that
+   appears rather than changes. */
+/* NO grid-column HERE. It carried grid-column:2 from the two-column version of
+   this idea, and under the absolute rail the card is ONE column — so column 2
+   was implicit, sized auto to the button's own width, and the explicit
+   minmax(0,1fr) column beside it collapsed to nothing. Measured: defect rows
+   2px wide at 390 and 54px at 820, on a card that grew from 729px to 1098px
+   tall. A row of 2px is not a subtle bug and it was still invisible in the
+   source of the rule that caused it. */
+.log-location-inline{display:none;max-width:100%;justify-self:start;margin:0 12px 9px}
+
+@media(max-width:620px){
+ .defect-log-app[data-bus-rail="phone"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
+ .defect-log-app[data-bus-rail="phone"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
+ .defect-log-app[data-bus-rail="phone"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-column .log-location{display:none}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-group-header,
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.grouped-defect-list,
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-focus-row{grid-column:1}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-location-inline{display:inline-flex}
+ .defect-log-app[data-bus-blue="phone"] .log-repair>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+ .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button,
+ .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 62%,var(--log-surface))}
+ .defect-log-app[data-bus-blue="phone"] .grouped-defect-head b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+ .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+ .defect-log-app[data-bus-end="phone"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+}
+
+/* The three selects in BUS GROUP SEPARATION. */
+.log-view-options{display:grid;gap:10px;margin-top:10px;border-top:1px solid var(--log-border);padding-top:10px}
+.log-view-options>label{display:grid;gap:4px;font-size:8px;font-weight:900;letter-spacing:.6px}
+.log-view-options>label>select{min-height:38px}
+.log-view-options>label>small{color:var(--log-muted);font-size:8px;font-weight:400;letter-spacing:0;line-height:1.45}
+.log-view-options-note{color:var(--log-muted);font-size:8px;line-height:1.45}

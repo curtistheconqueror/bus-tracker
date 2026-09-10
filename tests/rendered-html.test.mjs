@@ -5967,7 +5967,20 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
    if(css[end]==="{")depth++;
    else if(css[end]==="}"&&--depth===0)break;
   }
-  if(css.slice(open+1,end).includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
+  /* THE RULE THIS TESTS is that the focus view's own LAYOUT uses one phone
+    breakpoint. Two things now match ".log-focus" without being that, and this
+    test failed on both when the view options were added — correctly reporting
+    a second breakpoint, wrongly calling it a focus-view layout rule:
+
+    .log-focus-row and .log-focus-button are elements on a feed CARD, not in
+    the focus view; they share a prefix and nothing else. And a rule guarded by
+    [data-bus-...] belongs to one of the opt-in view options, which are OFF by
+    default and carry their own breakpoint by design — "phone only" means the
+    620px block, which is the whole point of them and is asserted separately in
+    "PHONE is a width, not a device". Neither is the focus view's layout. */
+ const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}")
+  .replace(/\.log-focus-row|\.log-focus-button/g,"");
+ if(body.includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
  }
  /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
     what the line above says, and what matters. Comparing the list itself also
@@ -12138,3 +12151,106 @@ test("the SHOW ALL button is the same size on the boards and in the drawer",asyn
     honestly if somebody removes it and wonders why the padding is pinned. */
  assert.match(css,/aside div button\{[^}]*padding:7px/);
 });
+
+test("the three view options default to off and survive a bad settings blob",async()=>{
+ /* Curtis: "I might not like it, but I just wanna make sure we can roll back at
+    any point." Off by default is what makes that true — a device that updates
+    looks exactly as it did. */
+ const {DEFAULT_SETTINGS,readSettings,normalizeViewScope,VIEW_SCOPES}=await import("../app/defect-log/defect-log-settings.ts");
+ for(const key of ["busRail","busBlueOnly","busEndMarker"]){
+  assert.equal(DEFAULT_SETTINGS[key],"off",key+" ships off");
+  assert.equal(readSettings(null)[key],"off");
+  assert.equal(readSettings(JSON.stringify({[key]:"always"}))[key],"always");
+  assert.equal(readSettings(JSON.stringify({[key]:"phone"}))[key],"phone");
+  /* A settings blob is a file somebody can hand-edit and a transfer can carry
+     between devices, so anything else reads as off rather than as itself. */
+  assert.equal(readSettings(JSON.stringify({[key]:"ALWAYS"}))[key],"off");
+  assert.equal(readSettings(JSON.stringify({[key]:true}))[key],"off");
+ }
+ assert.equal(normalizeViewScope(undefined),"off");
+ assert.deepEqual(VIEW_SCOPES.map(scope=>scope.key),["off","phone","always"]);
+});
+
+test("PHONE is a width, not a device",async()=>{
+ /* Curtis asked whether "the system is smart enough to pick up on what device
+    you're using based on the pixelation of the screen", and floated a separate
+    phone settings page. A media query knows the VIEWPORT, which is better: an
+    iPad in split screen is phone-width and wants the phone treatment, and a
+    stored "this is an iPad" answer would be wrong the moment it was rotated.
+
+    So every option is written twice — once unconditionally for "always", once
+    inside the app's own 620px block for "phone" — and nothing is stored about
+    the device. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ const phoneBlockStart=css.lastIndexOf("@media(max-width:620px){"),phoneBlock=css.slice(phoneBlockStart);
+ for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"]){
+  assert.ok(css.includes('['+attribute+'="always"]'),attribute+" has an every-screen form");
+  assert.ok(phoneBlock.includes('['+attribute+'="phone"]'),attribute+' has a phone form, inside the 620px block');
+  /* The phone form must not also exist outside a media query, or "phone only"
+     would apply on the shop computer too. */
+  assert.equal(css.slice(0,phoneBlockStart).includes('['+attribute+'="phone"]'),false,attribute+" phone form is inside a media query only");
+ }
+ /* No user-agent sniffing anywhere in this feature. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.equal(/navigator\.(userAgent|platform)|matchMedia/.test(page),false,"the width is CSS's to answer, not JavaScript's");
+});
+
+test("the vertical rail runs beside the defect rows, never across them",async()=>{
+ /* Curtis asked this directly: "will they keep the defects themselves separated,
+    even though the number is written across them?" It does not run across them
+    — it is a 38px stripe in the card's left padding and the rows start after
+    it. Measured in Chromium at 360/390/430/820/1180: the rail ends at 63 and
+    the first row starts at 71.
+
+    Two rules make that true and both were found by measuring, not by reading. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* 1. grid-column:auto on the rail. An abspos child of a grid container with a
+       DEFINITE grid placement is positioned against its grid area, and the base
+       rule sets grid-column:1 — leaving it in put the rail 46px inboard with
+       the rows 30px underneath it. */
+ assert.equal(css.match(/\.log-bus-column\{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px/g)?.length,2,"both scopes reset the placement");
+ /* 2. Every child moves to column 1, the HEADER included. Missing it left
+       .log-card-group>.log-group-header{grid-column:2} applying, which made
+       column 2 implicit and collapsed the explicit 1fr column to 0px — defect
+       rows measured 2px wide. */
+ for(const scope of ['[data-bus-rail="always"]','[data-bus-rail="phone"]'])
+  assert.ok(new RegExp(scope.replace(/[[\]"]/g,ch=>"\\"+ch)+" \\.log-card-group>\\.log-group-header,").test(css),scope+" moves the header too");
+ /* grid-row:1/-1 is NOT how this is done: with rows auto-placed there is no
+    explicit grid and -1 resolves to the explicit end, which rendered 146px
+    inside a 729px card. */
+ assert.equal(/data-bus-rail[^{]*\.log-bus-column\{[^}]*grid-row:1\/-1/.test(css),false);
+});
+
+test("a chosen Repair Title color still wins when blue is locked to the bus",async()=>{
+ /* --log-repair-category-color is ALWAYS written from the settings blob, so
+    var(--log-repair-category-color, quiet) can never reach its fallback — the
+    first version of this changed nothing at all and measured rgb(11,100,189),
+    unchanged. A second variable is emitted only when the stored color differs
+    from the shipped default: undefined means nobody chose. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/chosenCategoryColor=settings\.display\.styles\.repairCategory\.color\.toLowerCase\(\)===DEFAULT_DEFECT_LOG_DISPLAY\.styles\.repairCategory\.color\.toLowerCase\(\)\?null:/);
+ assert.match(page,/\.\.\.\(chosenCategoryColor\?\{"--log-repair-category-chosen":chosenCategoryColor\}:\{\}\)/,"the key is omitted, not set empty");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/data-bus-blue="always"\] \.log-repair>b\{color:var\(--log-repair-category-chosen,/);
+ assert.equal(/data-bus-blue[^{]*\.log-repair>b\{color:var\(--log-repair-category-color/.test(css),false,"the always-defined variable would never fall back");
+});
+
+test("the second location button is display:none, not merely invisible",async()=>{
+ /* The rail has no room for "Trouble Bay 12" on its side, so the control is in
+    the markup twice and CSS shows whichever fits. display:none takes the hidden
+    one out of the ACCESSIBILITY TREE as well as off the screen — visibility or
+    opacity would leave a screen reader announcing the same button twice on
+    every card in the feed. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.log-location-inline\{display:none;/);
+ assert.equal(/\.log-location-inline\{[^}]*(visibility:hidden|opacity:0)/.test(css),false);
+ /* And exactly one of the pair is ever shown: the rail hides the column copy in
+    the same rule that reveals this one. */
+ for(const scope of ['always','phone']){
+  assert.ok(css.includes('[data-bus-rail="'+scope+'"] .log-bus-column .log-location{display:none}'),scope+" hides the column copy");
+  assert.ok(css.includes('[data-bus-rail="'+scope+'"] .log-card-group>.log-location-inline{display:inline-flex}'),scope+" shows the inline copy");
+ }
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.equal(page.split("Facility location for bus ").length-1,2,"the pair, and only the pair");
+});
+
