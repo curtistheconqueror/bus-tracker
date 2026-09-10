@@ -33,10 +33,11 @@ export type MysteryBoardBus={
  defects?:{id?:string;state?:string;source?:string}[];
 };
 
-export function mysteryLocationLabel(location:string){
- const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
- const found=labels.find(([prefix])=>location.startsWith(prefix));return found?found[1]:location||"Location not set";
-}
+/* The boards' own name for the same function, kept so the three boards that
+   import it do not all have to change; the label itself comes from the one
+   copy that resolves a slot through the areas the move editor writes with. */
+import {locationLabel as mysteryLocationLabel} from "./location-label";
+export {mysteryLocationLabel};
 
 export function MysteryMoveModal<T extends {id:string;n:string;l:string}>({bus,fleet,move,close}:{bus:T;fleet:T[];move:(area:string)=>boolean;close:()=>void}){
  const [area,setArea]=useState(""),currentArea=sectionForLocation(bus.l),choices=Object.entries(RELOCATION_AREAS).map(([name,slots])=>({name,current:slots.includes(bus.l),open:slots.filter(slot=>!fleet.some(item=>item.l===slot)).length}));

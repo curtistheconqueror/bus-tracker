@@ -53,3 +53,19 @@ export function deferredBadgeCounts(fleet:DefectLogFleetBus[],downEntries:Defect
  });
  return {listed:new Set(rows.map(row=>row.bus.id)).size,overdue:new Set(overdue.map(row=>row.bus.id)).size};
 }
+
+/* THE LONGEST any repair on this bus has been held, in minutes, or null when
+   not one of them carries a usable time. The mirror of busRecommendedMinutes,
+   and here rather than in the board because the board and the Defect Log's
+   Deferred quick filter must not answer "how old is this bus" differently —
+   they draw the same list.
+
+   Nulls are dropped rather than allowed to decide. Sorting on deferredAt and
+   taking the first puts "" ahead of every ISO stamp, so one undated deferral
+   alongside dated ones makes the whole bus read as undated — and an undated
+   row falls out of every narrowed recency window. A bus held six days
+   disappeared under 7D that way. */
+export function busDeferredMinutes(defects:StructuredDefect[],now=new Date()){
+ const minutes=defects.map(defect=>deferredMinutesElapsed(defect,now)).filter((value):value is number=>value!==null);
+ return minutes.length?Math.max(...minutes):null;
+}

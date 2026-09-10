@@ -4,7 +4,7 @@ import type {ReactNode} from "react";
 import {safeBorderColor,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,normalizeDefectLogDisplay,type DefectLogLabels,type DefectLogStyleKey} from "./defect-log-display-settings";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {FLEET_BACKUP_INTERVAL_CHOICES,normalizeFleetBackupInterval} from "../storage";
-import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme} from "./defect-log-settings";
+import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope} from "./defect-log-settings";
 
 /* The Defect Log's settings panel.
 
@@ -13,6 +13,15 @@ import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamil
    changes save as they are made. exportLog is optional because the report
    export is still being re-homed; a caller that cannot build it simply does
    not get the button. */
+/* Named and described once, so the three selects cannot drift apart in
+   wording. The blurbs say what CHANGES, not what it is for: somebody reading
+   this on a phone in a garage wants to know what will look different. */
+const VIEW_OPTIONS:{key:"busRail"|"busBlueOnly"|"busEndMarker";title:string;blurb:string}[]=[
+ {key:"busRail",title:"BUS NUMBER DOWN THE SIDE",blurb:"Turns the bus number on its side in a full-height stripe, so you can see where one bus ends and the next begins. The repair line on the closed card gains about 26px; an opened card gets a little taller, and the location moves to its own line. The defects keep their own rows beside the stripe, never under it."},
+ {key:"busBlueOnly",title:"BLUE MEANS THE BUS",blurb:"Leaves the strong blue to the bus number alone. The repair headings, the FOCUS and VIEW buttons and the numbered disc on each defect row all drop to a darker, quieter tone. Nothing gets smaller, and the BUS heading over an opened list keeps its own. If you have set your own Repair Title color under TEXT STYLE, that choice still wins."},
+ {key:"busEndMarker",title:"CLOSING LINE UNDER EACH BUS",blurb:"Adds a quiet END OF BUS 18505 · 3 DEFECTS line under the last defect of an opened bus, so the list cannot read as one long run."},
+];
+
 export default function LogSettingsModal({settings,setSettings,close,exportLog,transfer,inline=false}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog?:()=>void;transfer:ReactNode;inline?:boolean}){
  const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
  const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
@@ -32,7 +41,21 @@ export default function LogSettingsModal({settings,setSettings,close,exportLog,t
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
    <section className="log-settings-group"><h3>THEME</h3><div className="log-theme-grid">{Object.entries(LOG_THEMES).map(([key,preset])=><button type="button" className={settings.theme===key?"active":""} onClick={()=>applyTheme(key as Exclude<LogTheme,"custom">)} key={key}><i style={{background:preset.appearance.page,borderColor:preset.appearance.accent}}/><span>{preset.label}</span></button>)}</div>{settings.theme==="custom"&&<small>CUSTOM</small>}</section>
    <section className="log-settings-group"><h3>FONT</h3><div className="log-font-grid"><label>STYLE<select value={settings.fontFamily} onChange={event=>setSettings({...settings,fontFamily:event.target.value as LogFontFamily})}><option value="clean">Clean</option><option value="condensed">Condensed</option><option value="classic">Classic</option></select></label><label>SIZE<select value={settings.fontSize} onChange={event=>setSettings({...settings,fontSize:event.target.value as LogFontSize})}><option value="standard">Standard</option><option value="large">Large</option><option value="extra">Extra Large</option></select></label></div></section>
-   <section className="log-settings-group log-group-contrast-setting"><h3>BUS GROUP SEPARATION</h3><label>CONTRAST<select value={settings.groupContrast} onChange={event=>setSettings({...settings,groupContrast:event.target.value as LogGroupContrast})}><option value="strong">Strong (recommended)</option><option value="standard">Standard</option></select></label><small>Strong adds a clearer outer border, extra space, and an expanded-bus shade without changing defect or status colors.</small><label>OUTLINE COLOR<div className="group-border-row"><input type="color" value={settings.groupBorder||"#9ea6b4"} aria-label="Bus group outline color" onChange={event=>setSettings({...settings,groupBorder:safeBorderColor(event.target.value)})}/><button type="button" onClick={()=>setSettings({...settings,groupBorder:""})} disabled={!settings.groupBorder}>USE THEME COLOR</button><small>Left on the theme color the outline follows whichever theme is set, so it stays readable on the dark ones. Choosing a color here fixes it for every theme on this device.</small></div></label></section>
+   <section className="log-settings-group log-group-contrast-setting"><h3>BUS GROUP SEPARATION</h3><label>CONTRAST<select value={settings.groupContrast} onChange={event=>setSettings({...settings,groupContrast:event.target.value as LogGroupContrast})}><option value="strong">Strong (recommended)</option><option value="standard">Standard</option></select></label><small>Strong adds a clearer outer border, extra space, and an expanded-bus shade without changing defect or status colors.</small><label>OUTLINE COLOR<div className="group-border-row"><input type="color" value={settings.groupBorder||"#9ea6b4"} aria-label="Bus group outline color" onChange={event=>setSettings({...settings,groupBorder:safeBorderColor(event.target.value)})}/><button type="button" onClick={()=>setSettings({...settings,groupBorder:""})} disabled={!settings.groupBorder}>USE THEME COLOR</button><small>Left on the theme color the outline follows whichever theme is set, so it stays readable on the dark ones. Choosing a color here fixes it for every theme on this device.</small></div></label>
+   {/* THE THREE WAYS OF TELLING ONE BUS FROM THE NEXT, each off until somebody
+       asks for it, and each answering WHERE rather than just whether — see
+       ViewScope in defect-log-settings.ts for why the answer is a width and
+       never a device. They live in this section because this section is
+       already the one named for the problem they solve. */}
+   <div className="log-view-options">
+    {VIEW_OPTIONS.map(option=><label key={option.key}>{option.title}
+     <select value={settings[option.key]} onChange={event=>setSettings({...settings,[option.key]:normalizeViewScope(event.target.value)})}>
+      {VIEW_SCOPES.map(scope=><option value={scope.key} key={scope.key}>{scope.label}</option>)}
+     </select>
+     <small>{option.blurb}</small>
+    </label>)}
+    <small className="log-view-options-note">All three are off until you pick one, change nothing that is stored, and can be turned back off from here. Phone only follows the window rather than the device, so an iPad in split screen gets it and the same iPad full screen does not.</small>
+   </div></section>
    <section className="log-settings-group"><h3>COLORS</h3><div className="log-color-grid">{COLOR_FIELDS.map(([key,label])=><label className="log-color-field" key={key}><span>{label}</span><input type="color" value={settings.appearance[key]} onChange={event=>setColor(key,event.target.value)}/></label>)}</div><button type="button" className="reset-look" onClick={()=>applyTheme("light")}>RESET LOOK</button></section>
    <section className="log-settings-group"><h3>WORDING</h3><div className="log-wording-grid">{(Object.keys(DEFECT_LOG_LABEL_NAMES) as (keyof DefectLogLabels)[]).map(key=><label key={key}>{DEFECT_LOG_LABEL_NAMES[key]}<input value={settings.display.labels[key]} onChange={event=>setDisplayLabel(key,event.target.value)}/></label>)}</div></section>
    <section className="log-settings-group"><h3>TEXT STYLE</h3><div className="log-style-grid">{(Object.keys(DEFECT_LOG_STYLE_LABELS) as DefectLogStyleKey[]).map(key=><div key={key}><b>{DEFECT_LOG_STYLE_LABELS[key]}</b><label>COLOR<input type="color" value={settings.display.styles[key].color} onChange={event=>setDisplayStyle(key,"color",event.target.value)}/></label><label>SIZE<input type="number" min="7" max="32" value={settings.display.styles[key].fontSize} onChange={event=>setDisplayStyle(key,"fontSize",event.target.value)}/></label></div>)}</div><button type="button" className="reset-look" onClick={()=>setSettings({...settings,display:normalizeDefectLogDisplay(null)})}>RESET TEXT</button></section>

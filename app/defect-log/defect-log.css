@@ -793,3 +793,349 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-location{min-height:40px;padding:4px 2px}.log-location>em{font-size:9px}
 }
 @media(max-width:390px){.log-card-group{grid-template-columns:64px minmax(0,1fr)}}
+
+/* ── The typing picker ────────────────────────────────────────────────────────
+   One field that is both the search and the drop-down. Curtis: "just try to
+   make it look clean" — so it inherits the form's own input styling rather than
+   inventing a look, and the only new furniture is the caret, the clear button
+   and the list itself.
+
+   `.log-form input` already gives this 100% width, the form's border and, in the
+   phone block, min-height:44px and font-size:16px. Both of those matter more
+   here than they did for a <select>: 44px is a gloved thumb, and 16px is what
+   stops iOS zooming the whole page the moment the field takes a cursor. Do not
+   give .combo-input its own font-size and undo that.
+
+   THE LIST IS IN FLOW, NOT FLOATING. `.log-form` scrolls (overflow:auto), and a
+   floating list inside a scrolling box either clips at its edge or escapes over
+   the modal. In flow it pushes the form down, the browser scrolls the field into
+   view the way it does for any input, and the results end up above the phone
+   keyboard instead of behind it. */
+.combo-box{position:relative;display:block;width:100%;min-width:0}
+/* Room for the caret, and for the clear button beside it when there is one. */
+.combo-input{padding-right:44px!important;text-overflow:ellipsis}
+.combo-box.open .combo-input{border-color:#0d76d6;box-shadow:0 0 0 2px #0d76d622}
+.combo-caret{position:absolute;top:0;right:10px;height:38px;display:flex;align-items:center;font-size:10px;color:#6b7f9c;pointer-events:none}
+.combo-clear{position:absolute;top:0;right:26px;width:26px;height:38px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:#6b7f9c;font-size:15px;font-weight:900;line-height:1;padding:0;cursor:pointer}
+.combo-clear:hover,.combo-clear:focus-visible{color:#c02b2b}
+
+.combo-list{margin:4px 0 0;padding:0;list-style:none;max-height:246px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid #b7c3d5;border-radius:6px;background:#fff;box-shadow:0 8px 22px #0a1f3d1f}
+/* THE LIST READS AT THE SIZE OF THE FIELD THAT OPENED IT. A native <select>
+   drew its options at the select's own font size — 16px on a phone here — and
+   the first build of this list drew them at 11px, which Curtis caught straight
+   away: "now it's smaller than the drop-down menu... it's too hard to see it
+   now". Nothing about a typing field justifies smaller text than the drop-down
+   it replaced, so `b` matches `.combo-input` at every width and the second line
+   is sized under it rather than shrunk to fit. */
+/* THE DIVIDERS THE OLD <optgroup> DREW. A native optgroup label is faded, small
+   and set apart from the options under it, and dividing a long list that way is
+   most of what made it readable — "each was kinda divided in the sections that
+   had a lot of different defect options", Curtis, after noticing they had gone.
+
+   Sticky, which the native one was not: the list scrolls inside its own box, so
+   the heading you are under stays visible while you read the rows beneath it. */
+.combo-section{position:sticky;top:0;z-index:1;padding:6px 9px 4px;background:#f2f6fc;border-bottom:1px solid #dde5f1;color:#5d718d;font-size:8px;font-weight:900;letter-spacing:1.3px;text-transform:uppercase;line-height:1.25}
+.combo-option{display:flex;flex-direction:column;gap:1px;min-height:38px;justify-content:center;padding:6px 9px;border-bottom:1px solid #eef2f8;cursor:pointer}
+.combo-option:last-child{border-bottom:0}
+.combo-option>b{font-size:10px;font-weight:900;color:#193357;line-height:1.2}
+/* The second line is what tells "Rear door will not close" from "Rear door open
+   / close switch". It is small, but it is the whole reason the list is readable
+   at all, so it is never the thing that gets trimmed to save room. */
+.combo-option>small{font-size:9px;font-weight:700;color:#74819a;line-height:1.25}
+.combo-option.active{background:#eaf3ff}
+.combo-option.active>b{color:#0b4f9e}
+/* An option from a category the mechanic did not choose. Marked rather than
+   hidden: picking it moves the category with it, and that should be visible
+   before the tap, not a surprise after it. */
+.combo-option.foreign{background:#fffaf0}
+.combo-option.foreign.active{background:#ffeeda}
+.combo-option.foreign>small::before{content:"↪ ";font-weight:900;color:#a2640a}
+.combo-empty{padding:11px 9px;font-size:10px;font-weight:700;color:#74819a}
+.combo-footnote{font-size:8px;font-weight:700;color:#74819a;line-height:1.3}
+
+/* Themed with the rest of the editor, so a re-themed Defect Log carries it. */
+.log-form .combo-list{border-color:color-mix(in srgb,var(--log-text,#193357) 26%,transparent);background:var(--log-surface,#fff)}
+.log-form .combo-section{background:color-mix(in srgb,var(--log-surface,#fff) 88%,var(--log-text,#193357));border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 14%,transparent);color:var(--log-muted,#5d718d)}
+.log-form .combo-option{border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 10%,transparent)}
+.log-form .combo-option>b{color:var(--log-text,#193357)}
+.log-form .combo-option>small,.log-form .combo-footnote,.log-form .combo-caret,.log-form .combo-clear{color:var(--log-muted,#74819a)}
+
+@media(max-width:760px){
+ /* 44px matches the phone rule the form already applies to its inputs — the
+    list rows have to be as reachable as the field that opened them. */
+ /* 16px on the main line because that is what `.log-form input` is given at this
+    width, which is what the old <select> drew its options at. The row grows to
+    52px to hold two lines at that size — bigger than the 44px minimum, which is
+    a gloved thumb getting more to aim at, not less. */
+ .combo-section{padding:8px 11px 6px;font-size:10px;letter-spacing:1.2px}
+ .combo-option{min-height:52px;padding:9px 11px}
+ .combo-option>b{font-size:16px;line-height:1.15}
+ .combo-option>small{font-size:12px}
+ .combo-empty{font-size:14px;padding:14px 11px}
+ .combo-footnote{font-size:11px}
+ .combo-caret,.combo-clear{height:44px}
+ .combo-clear{width:30px;right:28px}
+ .combo-input{padding-right:52px!important}
+ /* Taller than the desktop list because the phone keyboard is the thing being
+    worked around: enough rows to be worth scrolling, short enough that the
+    field that opened it stays on screen above it. */
+ .combo-list{max-height:min(300px,42vh)}
+}
+
+/* THE RECOMMENDED ROW IN THE QUICK FILTER DRAWER.
+
+   It reuses .quick-filter-deferred-row outright — same three-column grid, same
+   collapse to two columns on a phone — because it is the same kind of strip
+   answering the same kind of question, and a second grid would be one more
+   thing to keep in step. Only the colour changes: the Down Sheet's blue rather
+   than the deferred teal, matching the stripe on the board that shows this same
+   list, so the two screens read as one feature.
+
+   There is no overdue colour here and there should not be. A deferral running
+   past ninety minutes goes red; a recommendation waiting a week has not gone
+   wrong. Curtis: "that bus could be in that status for a while, which is fine." */
+.quick-filter-recommended-row{background:color-mix(in srgb,#0b64bd 8%,var(--log-surface))}
+.quick-filter-recommended-row small{color:#0b4c91}
+.quick-filter-recommended-row .fix-recommended{min-width:0;min-height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #0b64bd;border-radius:6px;background:#0b64bd;color:#fff;padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap}
+.quick-filter-recommended-row .fix-recommended:hover,.quick-filter-recommended-row .fix-recommended:focus-visible{background:#0a5aa8;outline:none}
+.quick-filter-recommended-row .fix-recommended:disabled{opacity:.55;cursor:default}
+.quick-filter-recommended-row .end-deferral{border-color:#9fc0e6;background:#e8f1fc;color:#0b4c91}
+.quick-filter-recommended-row .end-deferral:hover,.quick-filter-recommended-row .end-deferral:focus-visible{background:#d8e7fa}
+/* The phone size lives HERE, at the end, and not in the shared @media block
+   several hundred lines up. Both rules are two classes deep, so specificity
+   cannot break the tie and source order decides — the base rule above, being
+   later in the file, simply won, and MARK FIXED measured 32px on a phone next
+   to a 44px REMOVE. Measured, not read: the stylesheet looked right.
+
+   Keeping it in this block also means the shared one is untouched, so a button
+   added here can never fail the test that holds the deferred buttons at 44. */
+@media(max-width:760px){.quick-filter-recommended-row .fix-recommended{min-height:44px;font-size:9px}}
+
+/* COUNT THIS RETURN, beside OPEN IT on the ALREADY LOGGED banner.
+
+   Outlined where OPEN IT is solid: OPEN IT is still the primary move — go and
+   look at the record that already exists — and this is the second thing you
+   might want, not a competing first.
+
+   The banner becomes a wrapping row here. It was a rigid three-part flex line
+   and a second button squeezed the sentence to a column of single words at
+   360px. Measured, not guessed. */
+.duplicate-defect-warning{flex-wrap:wrap}
+.count-return{flex-shrink:0;min-height:34px;border:1px solid #8a5200;border-radius:5px;background:transparent;color:#8a5200;padding:0 11px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.3px;cursor:pointer;white-space:nowrap}
+.count-return:hover,.count-return:focus-visible{background:#f6e4b8;outline:none}
+.duplicate-return-tally{display:inline-block;margin-left:4px;border-radius:4px;background:#8a5200;color:#fff;padding:1px 5px;font-style:normal;font-weight:900}
+.work-state-badge.report-return{border-color:#d49617;background:#fff4cf;color:#8a5200}
+
+/* ADVANCED STATS — the last block in the focus body, and the only place it
+   appears. Curtis: "make it viewable only in focus, like the bottom of however
+   many defects listed. This way the list can drop further down and just scroll
+   to read."
+
+   So there is no collapse and no height cap: .log-focus-body already scrolls,
+   and this simply grows at the end of it. A stat that hides itself is a stat
+   nobody reads.
+
+   Its own frame rather than another .log-focus-record, because it is about the
+   BUS and everything above it is about one repair. */
+.log-focus-stats{display:grid;gap:10px;margin-top:2px;border:1px solid var(--log-border);border-radius:10px;background:var(--log-soft);padding:13px}
+.log-focus-stats-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.log-focus-stats-head b{color:var(--log-accent);font-size:10px;font-weight:900;letter-spacing:1.4px}
+.log-focus-stats-head small{color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.log-focus-stats-empty{display:grid;gap:4px;margin:0}
+.log-focus-stats-empty b{font-size:11px;color:var(--log-text)}
+.log-focus-stats-empty span{color:var(--log-muted);font-size:10px;line-height:1.5}
+.log-focus-stats-total{display:flex;align-items:center;gap:10px;margin:0;border:1px solid #d49617;border-radius:8px;background:#fff4cf;padding:9px 11px}
+.log-focus-stats-total b{font-size:22px;font-weight:900;line-height:1;color:#8a5200}
+.log-focus-stats-total span{color:#674700;font-size:9px;font-weight:900;letter-spacing:.5px;line-height:1.4}
+.log-focus-stat-row{display:grid;gap:7px;border-top:1px solid var(--log-border);padding-top:10px}
+.log-focus-stat-defect{display:grid;gap:2px}
+.log-focus-stat-defect b{font-size:11px;font-weight:800;color:var(--log-text);line-height:1.4}
+.log-focus-stat-defect small{color:var(--log-muted);font-size:9px;font-weight:800}
+/* Every return listed, because four in a week and four across three months are
+   different problems and a bare count cannot tell them apart. */
+.log-focus-stat-returns{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.log-focus-stat-returns li{display:flex;align-items:center;gap:8px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);padding:7px 9px}
+.log-focus-stat-returns b{flex:0 0 auto;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:#8a5200;color:#fff;font-size:9px;font-weight:900}
+.log-focus-stat-returns time{flex:1;min-width:0;color:var(--log-text);font-size:10px;font-weight:800}
+.log-focus-stat-returns i{flex:0 0 auto;color:var(--log-muted);font-style:normal;font-size:9px;font-weight:900;letter-spacing:.4px}
+@media(max-width:760px){
+ .count-return{min-height:44px;font-size:10px;padding:0 13px}
+ .log-focus-stats-head b{font-size:11px}
+ .log-focus-stat-defect b{font-size:12px}
+ .log-focus-stat-returns time{font-size:11px}
+ .log-focus-stats-empty span{font-size:11px}
+}
+
+/* The drawer is a flex column whose broad `>div` rule turns every direct child
+   into a scrolling grid — that rule is why .quick-filter-share-actions has to
+   restate itself too. The chip row is a direct child, so it needs the same
+   escape or it becomes a two-column grid with its own scrollbar. */
+.quick-filter-drawer>.time-window-chips{flex:none;display:flex;gap:8px;padding:7px;overflow:visible}
+
+/* ─── THREE WAYS OF TELLING ONE BUS FROM THE NEXT ────────────────────────────
+   All three off unless the device asks for them, and each written twice: once
+   under [data-x="always"] for every width, once inside @media(max-width:620px)
+   under [data-x="phone"]. That duplication is the price of "phone" meaning a
+   WIDTH rather than a device — see ViewScope in defect-log-settings.ts. A media
+   query re-answers on rotation and resize with nothing stored.
+
+   620px is this app's phone breakpoint everywhere else, so an iPad at 820
+   portrait and 1180 landscape is untouched by "phone", and the same iPad in
+   split screen is not. That is the behaviour wanted, not a compromise.
+
+   AT THE END OF THIS FILE ON PURPOSE. Several earlier max-width blocks name
+   .log-card-group and .log-bus-column; at equal specificity CSS decides on
+   source order, so a phone rule sitting above the base rules it overrides
+   loses silently. That has already cost this project two debugging rounds. */
+
+/* 1. THE BUS NUMBER DOWN THE SIDE.
+
+   ABSOLUTE, NOT A GRID ROW, and that was measured rather than reasoned. The
+   obvious version is grid-row:1/-1 on the existing two-column card, and it
+   silently does not work: with rows auto-placed there is no EXPLICIT grid, and
+   -1 resolves to the end of the explicit grid rather than the end of the card.
+   It rendered 146px tall inside a 729px card — taller than the 103px it starts
+   at, which is exactly the kind of partial success that reads as working.
+
+   So the card gets a 38px left padding and the rail is absolutely positioned
+   into it, top:0 bottom:0. .log-card already carries position:relative, so the
+   card is the containing block. That is deterministic at any number of
+   defects, with no JavaScript and nothing counting rows.
+
+   grid-column:auto ON THE RAIL is load-bearing and not tidying. An absolutely
+   positioned child of a grid container whose grid-placement is DEFINITE is
+   positioned against its grid AREA rather than the card's padding box, and
+   .log-bus-column carries grid-column:1 from the base rule. Left in, the rail
+   rendered 46px inboard of the card edge and the defect rows measured 30px
+   underneath it — an overlap, in the one place this whole option exists to
+   keep clear. Setting it back to auto restores the padding box as the
+   containing block.
+
+   EVERY child has to be moved to column 1, the header included. Missing it
+   cost a second round: .log-card-group>.log-group-header{grid-column:2} still
+   applied, column 2 was now implicit and sized to its content, and the single
+   explicit minmax(0,1fr) column beside it resolved to ZERO. Computed value
+   read "0px 307px" and the defect rows measured 2px wide. Nothing in the rule
+   I had written said anything about a header.
+
+   The defect rows keep their own borders, backgrounds and action bars exactly
+   as they are — they simply start 38px further right. The rail runs alongside
+   them, never across them, and a test measures that no row's left edge is
+   inside the rail. */
+.defect-log-app[data-bus-rail="always"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+.defect-log-app[data-bus-rail="always"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
+.defect-log-app[data-bus-rail="always"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
+.defect-log-app[data-bus-rail="always"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
+.defect-log-app[data-bus-rail="always"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
+.defect-log-app[data-bus-rail="always"] .log-bus-column .log-location{display:none}
+.defect-log-app[data-bus-rail="always"] .log-card-group>.log-group-header,
+.defect-log-app[data-bus-rail="always"] .log-card-group>.grouped-defect-list{grid-column:1}
+.defect-log-app[data-bus-rail="always"] .log-card-group>.log-location-inline{display:inline-flex}
+
+/* 2. BLUE MEANS THE BUS.
+
+   Not a repaint — a de-escalation. The bus number keeps --log-accent and every
+   other blue in the feed drops to a quiet slate mixed from the theme's own text
+   colour, so it still works on the dark themes rather than being a hard-coded
+   navy that vanishes on Midnight.
+
+   An explicit choice must beat a preset: --log-repair-category-color is a
+   colour the user can already set under TEXT STYLE. But that variable is
+   ALWAYS defined — the page writes it from the settings blob whether or not
+   anybody chose it — so var(--log-repair-category-color, quiet) never reaches
+   its fallback and this did nothing at all on the first attempt. Measured:
+   rgb(11,100,189), unchanged.
+
+   So the page emits a SECOND variable, --log-repair-category-chosen, and emits
+   it ONLY when the stored colour differs from the shipped default. Undefined
+   means nobody chose, the fallback applies, and the heading goes quiet; defined
+   means somebody chose, and their colour wins. Same conditional-key pattern as
+   --log-card-border two hundred lines up.
+
+   THE !important ON .group-toggle IS NOT A SHORTCUT. .group-toggle already
+   carries color:var(--log-accent)!important further up this file, so no amount
+   of specificity reaches it; matching the declaration is the only way short of
+   rewriting the rule that owns it. The first version of this omitted it and
+   VIEW/CLOSE measured rgb(11,100,189) with the option on and off, on all four
+   themes — dead code under a blurb that promised otherwise.
+
+   FOUR THINGS DROP, and the list was corrected by measurement. .grouped-defect-
+   number is in it: the numbered disc on every defect row has an accent
+   BACKGROUND, so an expanded three-defect bus was three solid blue circles
+   under a setting that says blue is the bus. .grouped-defect-head b is NOT in
+   it, and was: that heading reads "BUS 18505 · 3 DEFECTS", it was never blue
+   (it is --log-text), and quietening the one other place the BUS is named is
+   the opposite of what this option is for.
+
+   78%, not 62%, on the buttons. At 62% FOCUS measured 4.23:1 against the light
+   theme's white — under AA, on 8px 900-weight uppercase that gets no
+   large-text exemption. 78% measures 6.99:1, and the same mix lifts the repair
+   heading on every dark theme, where the shipped #0b64bd was already failing
+   at 1.5-2.2:1 with this option OFF.
+
+   THE DISC IS --log-header, not a mix, and that is the second correction the
+   measurements forced. It is a BACKGROUND behind near-white text, so it has to
+   go DARK on every theme — and a mix toward --log-text goes dark on the light
+   theme and LIGHT on the three dark ones, which is backwards. At 62% it took
+   the light theme's disc text from 5.88:1 to 4.23:1: a regression introduced
+   by the fix for a regression. --log-header is dark on all four themes by
+   definition, since it is what white header text sits on. */
+.defect-log-app[data-bus-blue="always"] .log-repair>b,
+.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+.defect-log-app[data-bus-blue="always"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+.defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
+.defect-log-app[data-bus-blue="always"] .grouped-defect-number{background:var(--log-header)}
+
+/* 3. THE CLOSING LINE. Rendered always, shown only when asked. */
+.log-bus-end-marker{display:none}
+.defect-log-app[data-bus-end="always"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+
+/* The inline location is hidden until a rail hides the column copy. Its own
+   rule rather than a shared one, because it is the only control here that
+   appears rather than changes. */
+/* NO grid-column HERE. It carried grid-column:2 from the two-column version of
+   this idea, and under the absolute rail the card is ONE column — so column 2
+   was implicit, sized auto to the button's own width, and the explicit
+   minmax(0,1fr) column beside it collapsed to nothing. Measured: defect rows
+   2px wide at 390 and 54px at 820, on a card that grew from 729px to 1098px
+   tall. A row of 2px is not a subtle bug and it was still invisible in the
+   source of the rule that caused it. */
+/* width:auto IS THE POINT OF THIS RULE. .log-location carries width:100% for
+   the narrow column it normally sits in; inherited here — where the element is
+   a direct child of the card rather than of that column — it resolved to the
+   full 307px grid area, and the 12px left margin then pushed it 10px past the
+   card's own edge at every width from 360 to 1180. .log-card{overflow:hidden}
+   clipped it, so a keyboard-focused control lost its right border and focus
+   ring to a strip that was not even hit-testable. Measured, not read.
+
+   max-width and justify-self were both inert while width was 100%; with auto
+   they do what they say and this is the chip it was always described as. */
+.log-location-inline{display:none;width:auto;max-width:calc(100% - 24px);justify-self:start;margin:0 12px 9px}
+
+@media(max-width:620px){
+ .defect-log-app[data-bus-rail="phone"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-column{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px;justify-content:flex-start;align-items:center;gap:0;padding:9px 0;background:color-mix(in srgb,var(--log-accent) 9%,var(--log-surface));border-right:1px solid var(--log-border)}
+ .defect-log-app[data-bus-rail="phone"] .log-bus{flex-direction:row;align-items:center;gap:5px;writing-mode:vertical-rl;text-orientation:mixed}
+ .defect-log-app[data-bus-rail="phone"] .log-bus>small{font-size:6px;letter-spacing:1.4px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
+ .defect-log-app[data-bus-rail="phone"] .log-bus-column .log-location{display:none}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-group-header,
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.grouped-defect-list{grid-column:1}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-location-inline{display:inline-flex}
+ .defect-log-app[data-bus-blue="phone"] .log-repair>b,
+ .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+ .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+ .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
+ .defect-log-app[data-bus-blue="phone"] .grouped-defect-number{background:var(--log-header)}
+ .defect-log-app[data-bus-end="phone"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
+}
+
+/* The three selects in BUS GROUP SEPARATION. */
+.log-view-options{display:grid;gap:10px;margin-top:10px;border-top:1px solid var(--log-border);padding-top:10px}
+.log-view-options>label{display:grid;gap:4px;font-size:8px;font-weight:900;letter-spacing:.6px}
+/* 44px, matching every other select on this screen — the phone rule at
+   .log-settings select is less specific than this one, so 38px silently won
+   and these sat 6px shorter than their own siblings. */
+.log-view-options>label>select{min-height:44px;font-size:16px}
+.log-view-options>label>small{color:var(--log-muted);font-size:8px;font-weight:400;letter-spacing:0;line-height:1.45}
+.log-view-options-note{color:var(--log-muted);font-size:8px;line-height:1.45}

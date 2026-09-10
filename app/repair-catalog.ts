@@ -160,10 +160,85 @@ export type StructuredDefect={
     past whichever of those happens first. */
  deferredReturnedAt?:string;
  symptoms?:string[];
+ /* THE OTHER FLUIDS TOPPED UP ON THE SAME VISIT, and never the one the record
+    is already filed under. Curtis, asked whether three fluids should be three
+    records or one: "The one record listing several probably best and is less
+    clutter."
+
+    So a bus that took oil, glycol and transmission fluid on one visit is one
+    repair with two names in here, not three repairs to read past on the card.
+    The quantity stays with the ISSUE — the shop counts the quarts of oil it
+    uses and does not count the glycol — and this says what else went in, which
+    is the part that predicts a road call. */
+ fluids?:string[];
+ /* EVERY TIME THIS BUS CAME BACK WITH THE SAME COMPLAINT STILL UNFIXED, one
+    stamp per return. Curtis: "if a person tries to re-submit something in
+    defects, I want a tally of how many times with the date stamped... this way
+    I know how many round trips a bus is making without the repair."
+
+    The tally IS the record. A count on its own would say a bus came back four
+    times and not that three of them were in one week, which is the difference
+    between a slow part and a repair that is not working. */
+ reportAttempts?:ReportAttempt[];
  quantity?:number;
  unit?:string;
  source?:DefectSource;
 };
+
+/* A return: when it happened, and who was standing there when it did. */
+export type ReportAttempt={at:string;by?:string};
+
+/* Sorted oldest first and deduplicated by timestamp, so the same return cannot
+   be counted twice by two saves racing each other, and the list always reads in
+   the order the bus actually came back. */
+export function normalizeReportAttempts(value:unknown):ReportAttempt[]{
+ if(!Array.isArray(value))return [];
+ const byTime=new Map<string,ReportAttempt>();
+ for(const item of value){
+  if(!item||typeof item!=="object")continue;
+  const at=String((item as ReportAttempt).at||"").trim();
+  if(!at||Number.isNaN(Date.parse(at)))continue;
+  const by=String((item as ReportAttempt).by||"").trim().toUpperCase();
+  byTime.set(at,by?{at,by}:{at});
+ }
+ return [...byTime.values()].sort((a,b)=>a.at.localeCompare(b.at));
+}
+
+/* A DOUBLE TAP IS NOT TWO ROUND TRIPS. A bus cannot leave and come back inside
+   two minutes, so a second stamp that close is a thumb, not a return — and this
+   number's whole job is to be evidence that a repair is not working. One that
+   inflates on a fumbled press is worse than no number at all. */
+export const REPORT_ATTEMPT_DEBOUNCE_MS=2*60*1000;
+
+/* Adding a return, which is the only way this list ever changes — nothing
+   removes one. A repair that keeps coming back is the history this app exists
+   to keep, and a tally somebody can quietly reset is a tally nobody can use.
+
+   Returns the defect UNCHANGED when the press is inside the debounce, so the
+   caller writes nothing rather than writing the same board back. */
+export function recordReportAttempt(defect:StructuredDefect,at:string,by=""):StructuredDefect{
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ const stamped=Date.parse(at);
+ if(Number.isNaN(stamped))return defect;
+ const last=attempts.length?Date.parse(attempts[attempts.length-1].at):NaN;
+ /* Only a stamp that is BEHIND this one blocks it. A record synced from a
+    device whose clock runs fast can hold a future stamp, and that must not
+    silently swallow every real return until the clock catches up. */
+ if(!Number.isNaN(last)&&stamped-last>=0&&stamped-last<REPORT_ATTEMPT_DEBOUNCE_MS)return defect;
+ return {...defect,reportAttempts:normalizeReportAttempts([...attempts,{at,by}])};
+}
+export function reportAttemptCount(defect:{reportAttempts?:ReportAttempt[]}){
+ return normalizeReportAttempts(defect.reportAttempts).length;
+}
+/* MERGED, NEVER REPLACED, when a record is saved.
+
+   An editor opened before a return was stamped holds the older, shorter list,
+   and `{...existing,...incoming}` would let that stale copy overwrite the
+   stamp — losing a return nobody would ever notice was missing. Taking the
+   union means a save can only ever add. */
+export function mergeReportAttempts(existing:unknown,incoming:unknown){
+ return normalizeReportAttempts([...normalizeReportAttempts(existing),...normalizeReportAttempts(incoming)]);
+}
 
 export const REPAIR_OPTIONS:Record<string,string[]>={
  /* Condenser and evaporator fans are counted, not just described. One fan down
@@ -192,15 +267,15 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Tech Services":["Farebox - INOP (general)","Farebox - No power","Farebox - Blank / black screen","Farebox - Bill transport INOP","Farebox - Coin mech INOP","Farebox - Coin off line","Farebox - Coin bin missing","Farebox - Unlocked / won't lock","Farebox - Can't unlock top / coin bypass reset","Farebox - Won't probe & open","Farebox - Loose from floor mounts","Farebox - Other farebox defect","Ventra - INOP (general)","Ventra - Other Ventra defect","CUBIC Screen - BUS ER","CUBIC Screen - MV ER","CUBIC Screen - Screen black","IBS Screen - INOP (general)","IBS Screen - Screen black","Signs, Cameras and Other - Destination Sign","Signs, Cameras and Other - Dash cam","Signs, Cameras and Other - Camera / DVR system","Signs, Cameras and Other - Other Tech Services"],
  "Amerex":["Fire Suppression - FIRE alarm (system discharged)","Fire Suppression - Heat sensor communication fault","Fire Suppression - Trouble Mod 1 Roof 1","Fire Suppression - Trouble Mod 1 Roof 2","Fire Suppression - Trouble Mod 1 Engine","Fire Suppression - Trouble Mod 2 Roof 1","Fire Suppression - Trouble Mod 2 Roof 2","Fire Suppression - Trouble Mod 2 Engine","Fire Suppression - Control head no power","Fire Suppression - Other Fire Suppression Trouble","Gas Concentration - Trace","Gas Concentration - Significant Leak","Gas Concentration - Other Gas Concentration Alert","CNG - Check CNG valves light","CNG - PRD cap missing","CNG - PRD leaking","CNG - Other CNG defect"],
  "Fuel Delivery":["Fuel leak","Low fuel pressure","Fuel pump","Injector","Fuel filter","Fuel control fault","Other fuel repair"],
- "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots"],
- "Lights, Mirrors and Alarms":["Headlights","Brake / tail lights","Turn signal lamps","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
+ "Bus Accessories":["Doors - Front door","Doors - Front door will not open","Doors - Front door will not close","Doors - Front door opens / closes slowly","Doors - Rear door","Doors - Rear door will not open","Doors - Rear door will not close","Doors - Rear door opens / closes slowly","Doors - Door controls","Doors - Interlock","Doors - Other door defect","Ramp, Lift and Kneeler - Wheelchair ramp","Ramp, Lift and Kneeler - Ramp not working","Ramp, Lift and Kneeler - Ramp no power","Ramp, Lift and Kneeler - Ramp will not deploy","Ramp, Lift and Kneeler - Ramp will not stow","Ramp, Lift and Kneeler - Ramp will not lock","Ramp, Lift and Kneeler - Ramp does not fully cycle","Ramp, Lift and Kneeler - Kneeler","Ramp, Lift and Kneeler - Kneeler not functioning correctly","Ramp, Lift and Kneeler - Kneeler sits too high","Ramp, Lift and Kneeler - Wheelchair lift","Ramp, Lift and Kneeler - Other ramp, lift or kneeler defect","Wheelchair Securement - Q'STRAINT switch (curbside)","Wheelchair Securement - Q'STRAINT switch (roadside)","Wheelchair Securement - Securement straps / retractor (curbside)","Wheelchair Securement - Securement straps / retractor (roadside)","Wheelchair Securement - Flip-up bench seat (curbside)","Wheelchair Securement - Flip-up bench seat (roadside)","Wheelchair Securement - Occupant lap / shoulder belt","Wheelchair Securement - Other securement defect","Stop Request - Stop request INOP (curbside)","Stop Request - Stop request INOP (roadside)","Stop Request - Stop request INOP (wheelchair area - curbside)","Stop Request - Stop request INOP (wheelchair area - roadside)","Stop Request - Stop request pull cord / line - broken (curbside)","Stop Request - Stop request pull cord / line - broken (roadside)","Stop Request - Stop request chime / tone","Stop Request - Stop request sign / light","Stop Request - Other stop request defect","Bike Rack - Arm replacement","Bike Rack - Loose / pivots","Wipers and Washers - Wiper blade (curbside)","Wipers and Washers - Wiper blade (roadside)","Wipers and Washers - Wiper motor (curbside)","Wipers and Washers - Wiper motor (roadside)","Wipers and Washers - Washer not spraying","Wipers and Washers - Washer nozzle (curbside)","Wipers and Washers - Washer nozzle (roadside)","Wipers and Washers - Washer pump","Wipers and Washers - Washer reservoir / leaking","Wipers and Washers - Other wiper or washer defect"],
+ "Lights, Mirrors and Alarms":["Headlights","Brake / tail lights","Turn signal lamps","Marker lights - C/S","Marker lights - R/S","Clearance lights","Interior lights","Back-up alarm","Outside rear view mirror - C/S","Outside rear view mirror - R/S","Interior mirror","Mirror replacement (no body work)","Other light or fixture"],
  "Bodywork":["Accident damage","Body panel","Bumper","Bike rack - bent / replacement","Ramp - complete replacement (beyond repair)","IBS screen pole - broken","Glass / windshield cracked or shattered","Mirror damage (body shop)","Interior advertising panel / ad card rack - loose or hanging (C/S)","Interior advertising panel / ad card rack - loose or hanging (R/S)","Passenger seat - loose","Passenger seat - missing","Passenger seat - damaged","Passenger assist handle / hanging strap - loose or broken","Passenger grab rail / stanchion - loose or damaged","Paint","Interior body repair","Other bodywork"],
- "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
+ "Pneumatic System":["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear","Air compressor","Air dryer","Air tank / valve","Water in air storage tanks","Treadle valve (brake pedal)","R-12 service valve (C/S rear)","R-14 parking brake valve (R/S rear)","Builds air slowly","Air-system warning","Other air-system repair"],
  /* A-3 and A-21 are on the sheet and were not on this list, so a scan of a real
     morning had to pick the nearest thing: A3 became A-6 and A21 became A-15, and
     the bus was recorded as having had a service it never had. */
  "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
- "Preventive Maintenance":["Add engine oil","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
+ "Preventive Maintenance":["Add engine oil","Add coolant (glycol)","Add transmission fluid","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  /* HAZMAT on the sheet means a biohazard on board — blood, vomit or faeces. It
     had nowhere to go and landed as "Unknown diagnosis", which is the one thing
     it must not read as: nobody boards or cleans that bus without knowing. */
@@ -378,6 +453,64 @@ const DEFECT_COUNT_FIELDS:Record<string,Record<string,DefectCountField>>={
   "Leaking air bag - Rear":airBagCount(4),
  },
 };
+/* THE TOP-UPS THAT CARRY AN AMOUNT. "Add engine oil" has offered a quarts box
+   since it existed, and the two fluids beside it are the same job on the same
+   visit — Curtis: "a lot of these buses we have to constantly add glycol to it."
+   One list rather than three conditions, so adding a fourth fluid later is one
+   line and cannot half-work.
+
+   Quarts for all three. Coolant is often talked about in gallons, but the box is
+   optional and one unit across the three tops-ups is easier to read back on a
+   card than three units that each need thinking about. */
+export const FLUID_TOP_UPS=["Add engine oil","Add coolant (glycol)","Add transmission fluid"];
+export function isFluidTopUp(category:unknown,issue:unknown){
+ return String(category??"")==="Preventive Maintenance"&&FLUID_TOP_UPS.includes(String(issue??""));
+}
+/* Only the catalog's own three, never the one already named as the issue, and
+   only on a top-up: a fluid list left on a record that was retyped into a brake
+   job is a leftover, not a record of anything. Held in FLUID_TOP_UPS order
+   rather than tick order so the same visit always reads back the same way.
+
+   Absent rather than empty when there is nothing to say, which is how the rest
+   of this file spells "not ticked". */
+export function normalizeFluids(value:unknown,category:unknown,issue:unknown){
+ if(!Array.isArray(value))return undefined;
+ const picked=String(issue??"").trim();
+ if(!isFluidTopUp(category,picked))return undefined;
+ const ticked=new Set(value.map(item=>String(item).trim()));
+ const fluids=FLUID_TOP_UPS.filter(fluid=>fluid!==picked&&ticked.has(fluid));
+ return fluids.length?fluids:undefined;
+}
+/* "Add engine oil" is the catalog's wording for an instruction. This line is a
+   report of what was done, so the verb is said once and the fluids follow it —
+   otherwise a card reads "Add coolant - also Add transmission fluid". */
+/* NO KEY AT ALL WHEN THERE IS NOTHING TO SAY, which is not fussiness. The cloud
+   fingerprints each row by walking Object.keys, and a key holding undefined is
+   still a key there — so writing `fluids:undefined` onto every record would
+   change the fingerprint of EVERY defect in the shop and re-push the whole
+   table once over the garage's own data plan, to say nothing. A record that
+   already carries the key keeps it, cleared, so a value that stops being valid
+   is actually taken back off rather than left standing. */
+/* Absent when there are no returns, for the reason fluidsPatch is: rowFingerprint
+   walks Object.keys, so a key holding an empty array on every defect in the shop
+   would change every row's fingerprint and re-push the whole table to say
+   nothing. */
+function reportAttemptsPatch(defect:Partial<StructuredDefect>){
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ if(attempts.length)return {reportAttempts:attempts};
+ return defect.reportAttempts===undefined?{}:{reportAttempts:undefined};
+}
+function fluidsPatch(defect:Partial<StructuredDefect>,category:string,issue:string){
+ const fluids=normalizeFluids(defect.fluids,category,issue);
+ if(fluids)return {fluids};
+ return defect.fluids===undefined?{}:{fluids:undefined};
+}
+export function fluidsLabel(defect:{fluids?:string[];category?:string;issue?:string}){
+ const fluids=normalizeFluids(defect.fluids,defect.category,defect.issue);
+ if(!fluids)return "";
+ return "also added "+fluids.map(fluid=>fluid.replace(/^Add /,"")).join(" and ");
+}
+
 export function defectCountField(category:unknown,issue:unknown){
  const moved=migrateRepairIdentity(String(category??"").trim(),String(issue??"").trim());
  return DEFECT_COUNT_FIELDS[moved.category]?.[moved.issue];
@@ -498,6 +631,25 @@ export function setDefectWorkState(defect:StructuredDefect,key:WorkStateKey,on:b
    nobody agreed to, and membership that cleared the recommendation would erase
    the record of who asked for it. */
 export function isDownSheetRecommended(defect:StructuredDefect){return Boolean(defect.downSheetRecommendation)}
+/* HOW LONG IT HAS BEEN WAITING FOR AN ANSWER. Curtis, on the recommended list:
+   "there needs to be some type of timestamp for how long it's been recommended
+   for the down sheet."
+
+   The stamp was already being written — setDownSheetRecommendation has recorded
+   `at` since the field existed — and nothing had ever read it back. This is the
+   same shape as deferredMinutesElapsed and deliberately not the same meaning:
+   a deferral running long is a problem, and a recommendation running long is
+   often just a decision nobody has needed to make yet. Curtis: "that bus could
+   be in that status for a while, which is fine." So this reports the time and
+   nothing anywhere treats a number here as overdue.
+
+   null when the recommendation carries no usable time, never 0 — a stamp
+   written by a device with a broken clock must not read as "just now". */
+export function recommendedMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ if(!defect.downSheetRecommendation)return null;
+ const started=Date.parse(String(defect.downSheetRecommendation.at||""));
+ return Number.isNaN(started)?null:(now.getTime()-started)/60000;
+}
 export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
  const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
  if(!stamp)delete next.downSheetRecommendation;
@@ -600,10 +752,30 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
     are called out because each side is a separate unit that fails on its own. */
  "Bus Accessories":{
   "Doors":["Front door","Front door will not open","Front door will not close","Front door opens / closes slowly","Rear door","Rear door will not open","Rear door will not close","Rear door opens / closes slowly","Door controls","Interlock","Other door defect"],
-  "Ramp, Lift and Kneeler":["Wheelchair ramp","Ramp not working","Ramp no power","Ramp will not deploy","Ramp will not stow","Kneeler","Kneeler not functioning correctly","Kneeler sits too high","Wheelchair lift","Other ramp, lift or kneeler defect"],
+  "Ramp, Lift and Kneeler":["Wheelchair ramp","Ramp not working","Ramp no power","Ramp will not deploy","Ramp will not stow","Ramp will not lock","Ramp does not fully cycle","Kneeler","Kneeler not functioning correctly","Kneeler sits too high","Wheelchair lift","Other ramp, lift or kneeler defect"],
   "Wheelchair Securement":["Q'STRAINT switch (curbside)","Q'STRAINT switch (roadside)","Securement straps / retractor (curbside)","Securement straps / retractor (roadside)","Flip-up bench seat (curbside)","Flip-up bench seat (roadside)","Occupant lap / shoulder belt","Other securement defect"],
   "Stop Request":["Stop request INOP (curbside)","Stop request INOP (roadside)","Stop request INOP (wheelchair area - curbside)","Stop request INOP (wheelchair area - roadside)","Stop request pull cord / line - broken (curbside)","Stop request pull cord / line - broken (roadside)","Stop request chime / tone","Stop request sign / light","Other stop request defect"],
   "Bike Rack":["Arm replacement","Loose / pivots"],
+  /* Curbside and roadside on all four, because each side is its own blade
+     on its own arm driven by its own motor: one side stops sweeping while
+     the other is fine, and "wipers INOP" on a sheet does not say which.
+     Curtis asked for the blades and the motors and settled the category
+     himself — "maybe bus accessories is more appropriate" — over Driver
+     Controls, which is right: the operator works the switch from the seat,
+     but the part that fails is out on the glass.
+
+     THE WASHERS RIDE WITH THE WIPERS, and the group is named for both. They are
+     the same control, the same stalk and the same job on the same glass, and a
+     mechanic looking for one is standing in front of the other. Only the
+     nozzles take a side: one pump feeds one reservoir, so those two are whole-
+     bus the way the blades and motors are not.
+
+     The group was called "Wipers" for about an hour. Renaming it was free ONLY
+     because release 171 had not published yet, so no device anywhere held a
+     "Wipers - ..." record to orphan — checked against `main` before touching
+     it, not assumed. Once this ships that door is shut and the rename maps in
+     this file are the only way. */
+  "Wipers and Washers":["Wiper blade (curbside)","Wiper blade (roadside)","Wiper motor (curbside)","Wiper motor (roadside)","Washer not spraying","Washer nozzle (curbside)","Washer nozzle (roadside)","Washer pump","Washer reservoir / leaking","Other wiper or washer defect"],
  },
  /* "INOP (general)" is the landing spot for a fault known only by its device —
     the bare "Farebox" and "Ventra" records logged before anything more specific
@@ -919,7 +1091,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];
@@ -964,7 +1136,9 @@ export function defectSupportingDetails(defect:StructuredDefect){
  /* The lamp and its alarm number lead, ahead of the free text. On a Down Sheet
     "RED DIAG LIGHT alarm 32" is the line that decides what the bus needs, and
     it is no use to anybody sitting in a notes field nobody scrolls to. */
- return [diagLightLabel(defect),symptoms,defect.details.trim()].filter(Boolean).join(" — ");
+ /* Between the symptoms and the free text: it is a fact about the repair, like
+    the symptoms are, rather than something somebody typed about it. */
+ return [diagLightLabel(defect),symptoms,fluidsLabel(defect),defect.details.trim()].filter(Boolean).join(" — ");
 }
 export function defectLabel(defect:StructuredDefect){
  if(defect.issue.trim().toLowerCase()==="manual entry")return defect.details.trim();

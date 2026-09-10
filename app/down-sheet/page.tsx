@@ -26,8 +26,10 @@ import ShopCloudLive from "../shop-cloud-live";
 import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
+import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {answerDeferredBus} from "../deferred-actions";
+import {answerRecommendedBus} from "../recommended-actions";
 import {useAppMode} from "../welcome-gate";
 import {hiddenInLite} from "../lite-mode";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
@@ -201,6 +203,7 @@ export default function DownSheet(){
  const [showQuickNotes,setShowQuickNotes]=useState(false);
  const [countsOpen,setCountsOpen]=useState(false);
  const [deferredCollapsed,setDeferredCollapsed]=useState(true);
+ const [recommendedCollapsed,setRecommendedCollapsed]=useState(true);
  const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
@@ -232,6 +235,11 @@ export default function DownSheet(){
     rows, and a foreman who never opened it should not have to scroll past it. */
  useEffect(()=>{setDeferredCollapsed(localStorage.getItem(DEFERRED_BOARD_COLLAPSED_KEY)!=="0")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,DEFERRED_BOARD_COLLAPSED_KEY,deferredCollapsed?"1":"0")},[deferredCollapsed,hydrated]);
+ /* Absent means COLLAPSED here too, for the reason the two boards above it are:
+    this is now the THIRD panel between the counts and the rows, and a foreman
+    who never opened it should not be scrolling past it to reach the sheet. */
+ useEffect(()=>{setRecommendedCollapsed(localStorage.getItem(RECOMMENDED_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,RECOMMENDED_BOARD_COLLAPSED_KEY,recommendedCollapsed?"1":"0")},[recommendedCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
@@ -317,6 +325,21 @@ export default function DownSheet(){
   const wroteDown=writeDownSheetStorageResult(localStorage,applied.downEntries as DownEntry[]);
   setFleet(applied.fleet as FleetBus[]);setEntries(applied.downEntries as DownEntry[]);
   if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" came off DEFERRED, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
+  if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
+ };
+ /* The recommendation board's answer, written through this page the way the
+    deferred one is. Same two failure reports, because the same two things can
+    go wrong: nothing would save, or the fleet saved and the sheet did not. */
+ const answerRecommended=(busId:string,defects:StructuredDefect[],action:"downsheet"|"dismiss")=>{
+  const now=new Date().toISOString(),bus=fleet.find(item=>item.id===busId),label=bus?.n||busId;
+  const applied=answerRecommendedBus(fleet as DefectLogFleetBus[],entries as DownEntry[] as DefectLogDownEntry[],busId,defects,action,{now});
+  if(!applied.saved){alert("Nothing on Bus "+label+" would save — the repairs the board expected are no longer where it left them. Open the bus on the Defect Log.");return}
+  const wroteFleet=writeFleetStorageResult(localStorage,applied.fleet as FleetBus[]);
+  setSaveProblem(wroteFleet.reason||"");
+  if(!wroteFleet.ok){alert("This device could not save the change, so Bus "+label+" is unchanged. Export a backup and clear space, then try again.");return}
+  const wroteDown=writeDownSheetStorageResult(localStorage,applied.downEntries as DownEntry[]);
+  setFleet(applied.fleet as FleetBus[]);setEntries(applied.downEntries as DownEntry[]);
+  if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" was updated, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
   if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
  };
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);
@@ -680,6 +703,18 @@ export default function DownSheet(){
       dilute the one thing MYSTERY BUSES is for. */}
   {!hiddenInLite(appMode,"deferred")&&<DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
    collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>}
+  {/* Third and last of the three, directly under DEFERRED. Curtis asked for it
+      "right under both of them, same color and everything". The three read down
+      the page as one question getting narrower: nobody knows why this bus is
+      here (MYSTERY), somebody decided to hold it (DEFERRED), somebody asked for
+      it to go on the sheet and nobody has answered (RECOMMENDED).
+
+      Not gated on Lite, unlike DEFERRED. Holding a bus back from service is a
+      judgement Curtis reserved; saying "I think this one belongs on the sheet"
+      is not, and the quick filter that shows the same list has always been
+      available in Lite — hiding only the board would be the odd half. */}
+  <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet

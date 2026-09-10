@@ -541,8 +541,26 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .phone-command-dock,.phone-command-sheet,.phone-command-scrim{display:none}
 .garage-scroll{min-width:0}
 @media(max-width:620px){
- html,body{max-width:100%;overflow-x:hidden}
- .app{width:100%;max-width:100%;overflow-x:hidden!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
+ /* `overflow-x:CLIP`, not hidden, and the difference is the phone nav.
+
+    `overflow-x:hidden` computes the other axis to `overflow-y:auto`, which
+    makes the element a SCROLL CONTAINER. A `position:sticky` descendant sticks
+    to its nearest scroll container — so `.mobile-mode-nav` was sticking to
+    `.app`, and `.app` does not scroll: the document does. The nav had
+    `position:sticky;top:0` written on it and had never pinned anything, at any
+    width, since the rule was added. Measured: scroll to 1200 and the nav sat at
+    y-1086, gone off the top with everything else.
+
+    `clip` clips exactly the same content and does NOT create a scroll
+    container, so the nav's scroll container becomes the viewport and it pins.
+    `hidden` is left in front of it as the fallback declaration: a browser that
+    does not know `clip` ignores the second line and keeps today's behaviour,
+    which is a nav that scrolls away rather than a page that scrolls sideways.
+
+    Same species as the three dead scroll locks — a property written, believed,
+    and never once doing what it said. */
+ html,body{max-width:100%;overflow-x:hidden;overflow-x:clip}
+ .app{width:100%;max-width:100%;overflow-x:hidden!important;overflow-x:clip!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
  .app>header{height:auto;min-height:40px;padding:7px 10px;font-size:11px;line-height:1.2;text-align:center}
  .app>nav:not(.mobile-mode-nav):not(.phone-command-dock){height:auto;display:grid;grid-template-columns:1fr;gap:7px;padding:7px}
  .legend{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;white-space:normal}
@@ -832,6 +850,18 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .deferred-card .mystery-badges i{background:#fdf0dc;border-color:#f0cf9a;color:#8a4b06}
 .deferred-card .mystery-badges i.deferred-overdue{background:#fde2e2;border-color:#f2b6b6;color:#96131f}
 @media(max-width:760px){.deferred-card-actions button{min-height:46px;font-size:10px}}
+/* RECOMMENDED FOR DOWN SHEET reuses both boards above it, down to the action
+   buttons, because Curtis asked for "the same color and everything". The one
+   distinguishing mark is the 4px stripe on the head — the same single knob that
+   separates DEFERRED from MYSTERY — and here it is the Down Sheet's own blue,
+   already used by the + PUT ON DOWN SHEET button two lines up, because this is
+   the board about getting onto that sheet.
+
+   No overdue variant, and that is deliberate rather than unfinished: a
+   recommendation waiting a week is not late. Curtis: "that bus could be in that
+   status for a while, which is fine." */
+.recommended-board .mystery-head{border-left:4px solid #0b64bd}
+.recommended-card .mystery-badges i{background:#e8f1fc;border-color:#bcd6f2;color:#0b4c91}
 .deferred-review-also{color:#8a4b06;background:#fdf0dc;border:1px solid #f0cf9a;border-radius:5px;padding:4px 6px;font-size:9px;line-height:1.4}
 .deferred-review-choices{display:grid;gap:8px}
 .deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}
@@ -950,7 +980,18 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    same 29px of the header and the letters land on the same y they always did.
    Measured on all six: unchanged to the pixel. Do not "tidy" one without the
    other or the kicker under it moves. */
-.app-name{display:block;width:fit-content;padding:5px 0;margin:-5px 0 0;text-align:left;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:inherit;text-decoration:none;cursor:pointer}
+/* IT IS A <button> NOW, AND THIS FILE HAS A BARE `button{}` RULE — line 2,
+   height:28px, background:#162a53, border-radius:4px, font-size:9px. Every one
+   of those properties the class does not itself set would land on the masthead
+   and turn the app's own name into a small navy pill. `.app-name` outranks that
+   rule on specificity for whatever they both declare, so what had to be written
+   out here is exactly what the class was NOT already setting: height,
+   background, border-radius, and the font-family a <button> does not inherit on
+   its own. Same species as the bare `header{height:38px}` further down.
+
+   -webkit-appearance is for iOS, which otherwise draws its own button chrome
+   underneath all of this. */
+.app-name{display:block;width:fit-content;height:auto;padding:5px 0;margin:-5px 0 0;border:0;border-radius:0;background:none;-webkit-appearance:none;appearance:none;font-family:inherit;text-align:left;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:inherit;text-decoration:none;cursor:pointer}
 .app-name:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:3px}
 @media(max-width:760px){.app-name{font-size:24px;letter-spacing:1.4px}}
 
@@ -963,13 +1004,34 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    min-height cannot undo a fixed height. height:auto is what releases it, and
    it is not redundant next to the min-height: delete it and the map's header
    goes back to being 38px tall whatever is inside it. */
-.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:7px 10px}
+.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left}
 /* The map's header is a centring flex row, so the name landed BESIDE the h1
    and centred with it - measured at x198 on a 1280 screen against x18 on every
    other page, and text-align could not touch it because flex was centring the
    ITEMS, not the text. Stacking is what "the structure moves down to fit the
-   name" actually means here; the title keeps its centre on its own line. */
-.app>header>h1{text-align:center}
+   name" actually means here.
+
+   THE TITLE NO LONGER KEEPS ITS CENTRE. It did while this header held two
+   lines and no other page's shape; now it holds the same four as the rest —
+   name, kicker, title, subtitle — and a centred title in a left-aligned stack
+   is the one line that looks like a mistake. `text-align:left` on the header
+   is what overrides the phone block above, which sets `center` on this same
+   selector: same specificity, so the later rule wins at every width, and this
+   file is read in order for exactly that reason.
+
+   The h1 also takes an explicit size. It was `font-size:inherit` from the bare
+   `header` rule, which the phone block drops to 11px — so on a phone the map's
+   own title was rendering SMALLER than its kicker's siblings on every other
+   page. 22px is what the other five headers use at this width. */
+.app>header>h1{margin:2px 0 1px;font-size:25px;line-height:1.05;text-align:left}
+@media(max-width:760px){.app>header>h1{font-size:22px}}
+
+/* The kicker and the subtitle the other five headers already draw, in the two
+   sizes they already use (8px letterspaced label, 9px sentence). They are
+   mixed against `--header-text` rather than given a colour so a re-themed
+   header carries them, which is the same reason `.app-name` inherits. */
+.app-kicker{margin-top:9px;font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--header-text,#fff) 72%,transparent)}
+.app-subtitle{margin:4px 0 0;font-size:9px;font-weight:400;line-height:1.3;text-shadow:none;color:color-mix(in srgb,var(--header-text,#fff) 78%,transparent)}
 
 /* ── The first-run welcome ────────────────────────────────────────────────────
    Full-bleed and above everything, because it is the only screen in this app
@@ -993,6 +1055,12 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
 .welcome-name::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.55) 50%,transparent 58%);transform:translateX(-120%);pointer-events:none}
 .welcome-gate.shown .welcome-name::after{animation:welcome-sweep 1.1s ease-out .85s both}
 @keyframes welcome-sweep{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
+/* The way out for somebody who only came to look. It does not exist on a first
+   run — see welcome-gate.tsx — so this styles a control that is simply absent
+   until the question has been answered once. 44px because it is the only
+   control on the screen a thumb has to find. */
+.welcome-close{position:fixed;top:max(10px,env(safe-area-inset-top));right:10px;z-index:2;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff3d;border-radius:9px;background:#ffffff14;color:#dbe9fb;font-size:22px;font-weight:900;line-height:1;padding:0;cursor:pointer}
+.welcome-close:hover,.welcome-close:focus-visible{background:#ffffff2b;color:#fff;outline:none}
 .welcome-kicker{margin:11px 0 0;color:#9dc0ee;font-size:9px;font-weight:900;letter-spacing:2.4px;opacity:0}
 .welcome-gate.shown .welcome-kicker{animation:welcome-rise .6s ease-out .7s both}
 .welcome-choices{display:grid;gap:11px;margin:30px 0 0;opacity:0}
@@ -1003,13 +1071,52 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
 .welcome-choice b{font-size:15px;font-weight:900;letter-spacing:1.4px}
 .welcome-choice small{color:#b9d3f4;font-size:10px;line-height:1.5}
 .welcome-full{border-color:rgba(255,255,255,.5)}
+/* THE ROLE PICKER. It rises after the two choices and before the footnote, on
+   the same stagger the rest of the screen uses, so it reads as part of the
+   screen rather than as something bolted under it.
+
+   Quieter than .welcome-choice on purpose: those two are the question this
+   screen exists to ask, and a third panel styled as loudly would compete with
+   them. Border and no fill until it is open.
+
+   Every control here is at least 44px tall. This is a phone screen somebody
+   taps once with a glove on. */
+.welcome-role{margin:14px 0 0;border:1px solid rgba(255,255,255,.22);border-radius:11px;text-align:left;opacity:0;overflow:hidden}
+.welcome-gate.shown .welcome-role{animation:welcome-rise .6s ease-out 1.3s both}
+.welcome-role.open{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.07)}
+.welcome-role-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:0;background:none;color:#fff;padding:11px 15px;text-align:left;font-family:inherit;cursor:pointer}
+.welcome-role-toggle span{display:grid;gap:3px;min-width:0}
+.welcome-role-toggle b{font-size:10px;font-weight:900;letter-spacing:1.6px}
+/* A flex row so the ELLIPSIS lands on the job title and never on the union tag.
+   With both in one text flow the tag is what gets cut, and it is the shortest
+   thing on the line — the first that should survive a squeeze, not the last. */
+.welcome-role-toggle small{display:flex;align-items:center;gap:7px;min-width:0;color:#b9d3f4;font-size:11px;font-weight:700}
+.welcome-role-toggle small>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* UNION / NON-UNION, drawn as a tag rather than a third dot-separated part of
+   the name. It is an attribute of the person, not part of the job title, and
+   "Transportation · Non-Union · Mechanic / Technician" does not fit a phone. */
+.welcome-role-unit{flex:0 0 auto;border:1px solid rgba(255,255,255,.3);border-radius:4px;background:rgba(255,255,255,.1);padding:1px 6px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.8px;white-space:nowrap}
+.welcome-role-unit.union{border-color:#7fb2f0;background:rgba(127,178,240,.24);color:#dbe9fb}
+.welcome-role-toggle i{flex:0 0 auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:7px;color:#dbe9fb;font-style:normal;font-size:15px;font-weight:900;line-height:1}
+.welcome-role-body{display:grid;gap:9px;padding:0 15px 14px}
+.welcome-role-departments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+/* The union row reuses the department row outright — same two-up grid, same
+   buttons — because it is the same shape of question one step later, and a
+   second layout for it would only make the panel busier. */
+.welcome-role-units{margin-top:-2px}
+.welcome-role-roles{display:grid;gap:7px}
+.welcome-role-body button{min-height:44px;border:1px solid rgba(255,255,255,.28);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;padding:0 12px;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.4px;cursor:pointer}
+.welcome-role-body button:hover,.welcome-role-body button:focus-visible{border-color:#7fb2f0;background:rgba(255,255,255,.14);outline:none}
+.welcome-role-body button.selected{border-color:#7fb2f0;background:rgba(127,178,240,.26)}
+.welcome-role-hint{color:#93b3dc;font-size:10px;line-height:1.5}
+.welcome-role-clear{color:#b9d3f4!important;font-size:9px!important;letter-spacing:1.2px!important;min-height:38px!important;background:none!important;border-color:rgba(255,255,255,.18)!important}
 .welcome-foot{margin:17px 0 0;color:#7f9ec6;font-size:9px;line-height:1.5;opacity:0}
 .welcome-gate.shown .welcome-foot{animation:welcome-rise .6s ease-out 1.4s both}
 @media(max-width:620px){.welcome-choice{padding:17px 15px}.welcome-choice b{font-size:16px}.welcome-choice small{font-size:11px}.welcome-foot{font-size:10px}}
 @media(prefers-reduced-motion:reduce){
- .welcome-name span,.welcome-kicker,.welcome-choices,.welcome-foot{opacity:1;filter:none;transform:none}
+ .welcome-name span,.welcome-kicker,.welcome-choices,.welcome-role,.welcome-foot{opacity:1;filter:none;transform:none}
  .welcome-gate.shown .welcome-name span,.welcome-gate.shown .welcome-name::after,
- .welcome-gate.shown .welcome-kicker,.welcome-gate.shown .welcome-choices,.welcome-gate.shown .welcome-foot{animation:none}
+ .welcome-gate.shown .welcome-kicker,.welcome-gate.shown .welcome-choices,.welcome-gate.shown .welcome-role,.welcome-gate.shown .welcome-foot{animation:none}
  .welcome-name::after{display:none}
 }
 
@@ -1019,3 +1126,44 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    is kept for surfaces that style theirs, but the locking lives here so a name
    with no rule behind it can no longer be a lock that does nothing. */
 html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behavior:none}
+
+/* SHOW · ALL 1H 4H 8H 24H 3D 7D — the recency window on the two boards that
+   accumulate, and on the same two lists in the Defect Log's quick filters.
+
+   At the END of this file on purpose. The phone rule below is a plain
+   max-width block, and there are several of those earlier in the file that
+   name similar selectors; at equal specificity CSS decides on source order, so
+   a media rule sitting above a base rule it means to override loses silently.
+   That exact mistake cost a measured 32px-instead-of-44px control on the
+   recommended quick-filter row, and the fix was moving the block here.
+
+   "time-window" is not a Tailwind utility name, and there is no bare `button`
+   rule in this file — the 28px navy one is `.tools>button`. But there IS
+   `aside div button{...padding:7px...}` near the top, and the quick-filter
+   drawer is an `<aside>`, so both controls below are inside its reach. A class
+   beats three elements, so every property either of them declares wins; the
+   trap is a property one of them does NOT declare. That is exactly what
+   happened to `.time-window-hidden`, which had no padding and measured 7px in
+   the drawer against 0 on the boards — one control at two sizes. Its padding
+   is now explicit for that reason and must stay. Found by review; the earlier
+   version of this comment asserted a check that had not actually been made. */
+.time-window-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid var(--log-border,#bac7d9);background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff))}
+.time-window-chips>small{flex:none;color:var(--log-muted,#60728c);font-size:7px;font-weight:900;letter-spacing:1px}
+.time-window-row{display:flex;flex:1;flex-wrap:wrap;gap:4px}
+.time-window-chip{min-width:34px;min-height:34px;border:1px solid var(--log-border,#bac7d9);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-muted,#60728c);padding:0 7px;font-size:8px;font-weight:900;letter-spacing:.3px;cursor:pointer;touch-action:manipulation}
+.time-window-chip:hover,.time-window-chip:focus-visible{border-color:var(--log-accent,#0b64bd);color:var(--log-accent,#0b64bd);outline:none}
+.time-window-chip.on{border-color:var(--log-accent,#0b64bd);background:var(--log-accent,#0b64bd);color:var(--log-header-text,#fff)}
+/* The way out is the same size as the way in. A narrowed list that looks like
+   the whole list is the one failure this control can cause, so the count of
+   what it is holding back is on screen and is itself the button that clears
+   it. Dashed rather than solid: it is a state, not another choice. */
+.time-window-hidden{flex-basis:100%;min-height:32px;border:1px dashed var(--log-accent,#0b64bd);border-radius:6px;background:transparent;color:var(--log-accent,#0b64bd);padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.time-window-hidden:hover,.time-window-hidden:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,transparent);outline:none}
+@media(max-width:620px){
+ .time-window-chips{gap:6px;padding:7px 8px}
+ /* Seven chips share the row rather than wrapping to a second line: at 360 the
+    row has about 320px of usable width and seven 40px targets with 4px gaps
+    need 304. Measured at 360, 390 and 430. */
+ .time-window-row{gap:4px}
+ .time-window-chip{flex:1;min-width:0;min-height:38px;padding:0 2px}
+}
