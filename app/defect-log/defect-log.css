@@ -1029,8 +1029,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app[data-bus-rail="always"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
 .defect-log-app[data-bus-rail="always"] .log-bus-column .log-location{display:none}
 .defect-log-app[data-bus-rail="always"] .log-card-group>.log-group-header,
-.defect-log-app[data-bus-rail="always"] .log-card-group>.grouped-defect-list,
-.defect-log-app[data-bus-rail="always"] .log-card-group>.log-focus-row{grid-column:1}
+.defect-log-app[data-bus-rail="always"] .log-card-group>.grouped-defect-list{grid-column:1}
 .defect-log-app[data-bus-rail="always"] .log-card-group>.log-location-inline{display:inline-flex}
 
 /* 2. BLUE MEANS THE BUS.
@@ -1051,12 +1050,41 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    it ONLY when the stored colour differs from the shipped default. Undefined
    means nobody chose, the fallback applies, and the heading goes quiet; defined
    means somebody chose, and their colour wins. Same conditional-key pattern as
-   --log-card-border two hundred lines up. */
-.defect-log-app[data-bus-blue="always"] .log-repair>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
-.defect-log-app[data-bus-blue="always"] .log-card-group>.log-focus-button,
-.defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 62%,var(--log-surface))}
-.defect-log-app[data-bus-blue="always"] .grouped-defect-head b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
-.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+   --log-card-border two hundred lines up.
+
+   THE !important ON .group-toggle IS NOT A SHORTCUT. .group-toggle already
+   carries color:var(--log-accent)!important further up this file, so no amount
+   of specificity reaches it; matching the declaration is the only way short of
+   rewriting the rule that owns it. The first version of this omitted it and
+   VIEW/CLOSE measured rgb(11,100,189) with the option on and off, on all four
+   themes — dead code under a blurb that promised otherwise.
+
+   FOUR THINGS DROP, and the list was corrected by measurement. .grouped-defect-
+   number is in it: the numbered disc on every defect row has an accent
+   BACKGROUND, so an expanded three-defect bus was three solid blue circles
+   under a setting that says blue is the bus. .grouped-defect-head b is NOT in
+   it, and was: that heading reads "BUS 18505 · 3 DEFECTS", it was never blue
+   (it is --log-text), and quietening the one other place the BUS is named is
+   the opposite of what this option is for.
+
+   78%, not 62%, on the buttons. At 62% FOCUS measured 4.23:1 against the light
+   theme's white — under AA, on 8px 900-weight uppercase that gets no
+   large-text exemption. 78% measures 6.99:1, and the same mix lifts the repair
+   heading on every dark theme, where the shipped #0b64bd was already failing
+   at 1.5-2.2:1 with this option OFF.
+
+   THE DISC IS --log-header, not a mix, and that is the second correction the
+   measurements forced. It is a BACKGROUND behind near-white text, so it has to
+   go DARK on every theme — and a mix toward --log-text goes dark on the light
+   theme and LIGHT on the three dark ones, which is backwards. At 62% it took
+   the light theme's disc text from 5.88:1 to 4.23:1: a regression introduced
+   by the fix for a regression. --log-header is dark on all four themes by
+   definition, since it is what white header text sits on. */
+.defect-log-app[data-bus-blue="always"] .log-repair>b,
+.defect-log-app[data-bus-blue="always"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+.defect-log-app[data-bus-blue="always"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+.defect-log-app[data-bus-blue="always"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
+.defect-log-app[data-bus-blue="always"] .grouped-defect-number{background:var(--log-header)}
 
 /* 3. THE CLOSING LINE. Rendered always, shown only when asked. */
 .log-bus-end-marker{display:none}
@@ -1072,7 +1100,17 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    2px wide at 390 and 54px at 820, on a card that grew from 729px to 1098px
    tall. A row of 2px is not a subtle bug and it was still invisible in the
    source of the rule that caused it. */
-.log-location-inline{display:none;max-width:100%;justify-self:start;margin:0 12px 9px}
+/* width:auto IS THE POINT OF THIS RULE. .log-location carries width:100% for
+   the narrow column it normally sits in; inherited here — where the element is
+   a direct child of the card rather than of that column — it resolved to the
+   full 307px grid area, and the 12px left margin then pushed it 10px past the
+   card's own edge at every width from 360 to 1180. .log-card{overflow:hidden}
+   clipped it, so a keyboard-focused control lost its right border and focus
+   ring to a strip that was not even hit-testable. Measured, not read.
+
+   max-width and justify-self were both inert while width was 100%; with auto
+   they do what they say and this is the chip it was always described as. */
+.log-location-inline{display:none;width:auto;max-width:calc(100% - 24px);justify-self:start;margin:0 12px 9px}
 
 @media(max-width:620px){
  .defect-log-app[data-bus-rail="phone"] .log-card-group{grid-template-columns:minmax(0,1fr);padding-left:38px}
@@ -1082,20 +1120,22 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .defect-log-app[data-bus-rail="phone"] .log-bus-number{writing-mode:inherit;letter-spacing:1.5px}
  .defect-log-app[data-bus-rail="phone"] .log-bus-column .log-location{display:none}
  .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-group-header,
- .defect-log-app[data-bus-rail="phone"] .log-card-group>.grouped-defect-list,
- .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-focus-row{grid-column:1}
+ .defect-log-app[data-bus-rail="phone"] .log-card-group>.grouped-defect-list{grid-column:1}
  .defect-log-app[data-bus-rail="phone"] .log-card-group>.log-location-inline{display:inline-flex}
- .defect-log-app[data-bus-blue="phone"] .log-repair>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
- .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button,
- .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 62%,var(--log-surface))}
- .defect-log-app[data-bus-blue="phone"] .grouped-defect-head b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
- .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+ .defect-log-app[data-bus-blue="phone"] .log-repair>b,
+ .defect-log-app[data-bus-blue="phone"] .log-focus-record-head>b{color:var(--log-repair-category-chosen,color-mix(in srgb,var(--log-text) 78%,var(--log-surface)))}
+ .defect-log-app[data-bus-blue="phone"] .log-card-group>.log-focus-button{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))}
+ .defect-log-app[data-bus-blue="phone"] .log-meta>.group-toggle{color:color-mix(in srgb,var(--log-text) 78%,var(--log-surface))!important}
+ .defect-log-app[data-bus-blue="phone"] .grouped-defect-number{background:var(--log-header)}
  .defect-log-app[data-bus-end="phone"] .log-bus-end-marker{display:block;margin:8px 0 0;border-top:1px dashed var(--log-border);padding-top:7px;color:var(--log-muted);font-size:7px;font-weight:900;letter-spacing:1.2px;text-align:center}
 }
 
 /* The three selects in BUS GROUP SEPARATION. */
 .log-view-options{display:grid;gap:10px;margin-top:10px;border-top:1px solid var(--log-border);padding-top:10px}
 .log-view-options>label{display:grid;gap:4px;font-size:8px;font-weight:900;letter-spacing:.6px}
-.log-view-options>label>select{min-height:38px}
+/* 44px, matching every other select on this screen — the phone rule at
+   .log-settings select is less specific than this one, so 38px silently won
+   and these sat 6px shorter than their own siblings. */
+.log-view-options>label>select{min-height:44px;font-size:16px}
 .log-view-options>label>small{color:var(--log-muted);font-size:8px;font-weight:400;letter-spacing:0;line-height:1.45}
 .log-view-options-note{color:var(--log-muted);font-size:8px;line-height:1.45}

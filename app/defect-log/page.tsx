@@ -1187,7 +1187,12 @@ export default function DefectLog(){
     {/* THE SAME CONTROL A SECOND TIME, for when the column becomes a vertical
         rail and has no room for it. "Trouble Bay 12" turned on its side is a
         110px stripe nobody can read, so with the rail on the copy above is
-        hidden and this one is shown beside the status instead.
+        hidden and this one is shown as a chip on its own line above the
+        repair, where the full area names fit.
+
+        NOT "beside the status", which an earlier version of this comment
+        claimed and the layout never did — it is a row of its own, and saying
+        otherwise is how the next person stops checking.
 
         Two in the markup rather than one moved by JavaScript because only CSS
         knows the width — see the attributes on the page root. The hidden one is

@@ -5968,18 +5968,21 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
    else if(css[end]==="}"&&--depth===0)break;
   }
   /* THE RULE THIS TESTS is that the focus view's own LAYOUT uses one phone
-    breakpoint. Two things now match ".log-focus" without being that, and this
-    test failed on both when the view options were added — correctly reporting
-    a second breakpoint, wrongly calling it a focus-view layout rule:
+    breakpoint. A rule guarded by [data-bus-...] is not that: it belongs to one
+    of the opt-in view options, which are OFF by default and carry their own
+    breakpoint BY DESIGN — "phone only" means the 620px block, which is the
+    whole point of them and is asserted separately in "PHONE is a width, not a
+    device".
 
-    .log-focus-row and .log-focus-button are elements on a feed CARD, not in
-    the focus view; they share a prefix and nothing else. And a rule guarded by
-    [data-bus-...] belongs to one of the opt-in view options, which are OFF by
-    default and carry their own breakpoint by design — "phone only" means the
-    620px block, which is the whole point of them and is asserted separately in
-    "PHONE is a width, not a device". Neither is the focus view's layout. */
- const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}")
-  .replace(/\.log-focus-row|\.log-focus-button/g,"");
+    THAT FILTER ALONE IS ENOUGH, re-derived by running this loop four ways over
+    the shipped stylesheet. A first attempt also stripped the names
+    .log-focus-row and .log-focus-button, on the theory that they are card
+    elements rather than focus-view ones. Unnecessary, and worse than
+    unnecessary: stripping a name blinds this guard to it forever, and
+    .log-card-group>.log-focus-button already has a real rule in a media block
+    that this would then never check. A future .log-focus-button rule dropped
+    into the wrong breakpoint would have passed silently. */
+ const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}");
  if(body.includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
  }
  /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
@@ -12182,7 +12185,20 @@ test("PHONE is a width, not a device",async()=>{
     inside the app's own 620px block for "phone" — and nothing is stored about
     the device. */
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- const phoneBlockStart=css.lastIndexOf("@media(max-width:620px){"),phoneBlock=css.slice(phoneBlockStart);
+ /* Sliced to the block's MATCHING BRACE, not to the end of the file. Taking
+    the rest of the file made "the phone form is inside the 620px block" true
+    of any rule that merely sat after it — demonstrated by appending an
+    unguarded [data-bus-rail="phone"] rule below the block, which applied at
+    every width and still passed both assertions here. That is exactly the
+    failure the next line says it prevents. */
+ const phoneBlockStart=css.lastIndexOf("@media(max-width:620px){");
+ let depth=0,phoneBlockEnd=css.indexOf("{",phoneBlockStart);
+ for(;phoneBlockEnd<css.length;phoneBlockEnd++){
+  if(css[phoneBlockEnd]==="{")depth++;
+  else if(css[phoneBlockEnd]==="}"&&--depth===0)break;
+ }
+ const phoneBlock=css.slice(phoneBlockStart,phoneBlockEnd);
+ assert.ok(phoneBlock.length<css.length-phoneBlockStart,"the slice stops at the block, not the file");
  for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"]){
   assert.ok(css.includes('['+attribute+'="always"]'),attribute+" has an every-screen form");
   assert.ok(phoneBlock.includes('['+attribute+'="phone"]'),attribute+' has a phone form, inside the 620px block');
@@ -12193,6 +12209,10 @@ test("PHONE is a width, not a device",async()=>{
  /* No user-agent sniffing anywhere in this feature. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.equal(/navigator\.(userAgent|platform)|matchMedia/.test(page),false,"the width is CSS's to answer, not JavaScript's");
+ /* Nothing after the block either — an unguarded copy below it would apply on
+    the shop computer while claiming to be phone-only. */
+ for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"])
+  assert.equal(css.slice(phoneBlockEnd).includes('['+attribute+'="phone"]'),false,attribute+" has no phone form after the block");
 });
 
 test("the vertical rail runs beside the defect rows, never across them",async()=>{
@@ -12215,6 +12235,12 @@ test("the vertical rail runs beside the defect rows, never across them",async()=
        rows measured 2px wide. */
  for(const scope of ['[data-bus-rail="always"]','[data-bus-rail="phone"]'])
   assert.ok(new RegExp(scope.replace(/[[\]"]/g,ch=>"\\"+ch)+" \\.log-card-group>\\.log-group-header,").test(css),scope+" moves the header too");
+ /* .log-focus-row is a DEAD selector — no .tsx renders it — and the first
+    version of these rules carried two more copies of it. A rule for an element
+    that does not exist reads as coverage and is not. */
+ for(const file of ["../app/defect-log/page.tsx","../app/defect-log/defect-log-settings-modal.tsx"])
+  assert.equal((await readFile(new URL(file,import.meta.url),"utf8")).includes("log-focus-row"),false,file);
+ assert.equal(/data-bus-rail[^{]*\.log-focus-row/.test(css),false,"the option adds no rule for an element nothing renders");
  /* grid-row:1/-1 is NOT how this is done: with rows auto-placed there is no
     explicit grid and -1 resolves to the explicit end, which rendered 146px
     inside a 729px card. */
@@ -12231,8 +12257,34 @@ test("a chosen Repair Title color still wins when blue is locked to the bus",asy
  assert.match(page,/chosenCategoryColor=settings\.display\.styles\.repairCategory\.color\.toLowerCase\(\)===DEFAULT_DEFECT_LOG_DISPLAY\.styles\.repairCategory\.color\.toLowerCase\(\)\?null:/);
  assert.match(page,/\.\.\.\(chosenCategoryColor\?\{"--log-repair-category-chosen":chosenCategoryColor\}:\{\}\)/,"the key is omitted, not set empty");
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
- assert.match(css,/data-bus-blue="always"\] \.log-repair>b\{color:var\(--log-repair-category-chosen,/);
- assert.equal(/data-bus-blue[^{]*\.log-repair>b\{color:var\(--log-repair-category-color/.test(css),false,"the always-defined variable would never fall back");
+ /* The repair heading and the focus view's record head share one declaration
+    now, so the assertion matches the selector list rather than the old
+    single-selector rule. */
+ assert.match(css,/data-bus-blue="always"\] \.log-repair>b,\n\.defect-log-app\[data-bus-blue="always"\] \.log-focus-record-head>b\{color:var\(--log-repair-category-chosen,/);
+ assert.equal(/data-bus-blue[^{]*\.log-repair>b[^{]*\{color:var\(--log-repair-category-color/.test(css),false,"the always-defined variable would never fall back");
+ for(const scope of ["always","phone"]){
+  /* VIEW/CLOSE needs !important because .group-toggle already declares
+     color:var(--log-accent)!important — no specificity reaches that, and
+     without it the option measured rgb(11,100,189) on and off, all themes. */
+  assert.match(css,new RegExp('data-bus-blue="'+scope+'"\\] \\.log-meta>\\.group-toggle\\{color:[^}]*!important\\}'),scope+" reaches VIEW/CLOSE");
+  /* The numbered disc is an accent BACKGROUND — three blue circles on an
+     opened three-defect bus under a setting that says blue is the bus. */
+  /* --log-header, not a mix toward --log-text: this is a BACKGROUND behind
+     near-white text, so it must go dark on every theme, and a mix toward the
+     text colour goes dark on the light theme and LIGHT on the three dark ones.
+     At 62% it took the light theme's disc text from 5.88:1 to 4.23:1.
+     Measured with --log-header: 16.54 / 20.04 / 19.83 / 14.61. */
+  assert.match(css,new RegExp('data-bus-blue="'+scope+'"\\] \\.grouped-defect-number\\{background:var\\(--log-header\\)\\}'),scope+" quietens the disc without dimming its text");
+  /* The BUS heading over an opened list is NOT quietened: it was never blue,
+     and it is the one other place the bus is named. */
+  assert.equal(new RegExp('data-bus-blue="'+scope+'"\\] \\.grouped-defect-head').test(css),false,scope+" leaves the BUS heading alone");
+ }
+ /* FOCUS at 62% measured 4.23:1 on the light theme's white — under AA on 8px
+    900-weight uppercase, which gets no large-text exemption. 78% is 5.85:1. */
+ assert.match(css,/data-bus-blue="always"\] \.log-card-group>\.log-focus-button\{color:color-mix\(in srgb,var\(--log-text\) 78%/);
+ /* Nothing in this option uses the 62% mix any more; it failed AA once as a
+    foreground and once as a background, in opposite directions. */
+ assert.equal(/data-bus-blue[^}]*62%/.test(css),false);
 });
 
 test("the second location button is display:none, not merely invisible",async()=>{

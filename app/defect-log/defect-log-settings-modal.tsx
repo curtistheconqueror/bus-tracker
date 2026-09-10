@@ -17,9 +17,9 @@ import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamil
    wording. The blurbs say what CHANGES, not what it is for: somebody reading
    this on a phone in a garage wants to know what will look different. */
 const VIEW_OPTIONS:{key:"busRail"|"busBlueOnly"|"busEndMarker";title:string;blurb:string}[]=[
- {key:"busRail",title:"BUS NUMBER DOWN THE SIDE",blurb:"Turns the bus number on its side in a full-height stripe, so you can see where one bus ends and the next begins. Frees about 26px of width for the repair text. The defects keep their own rows beside it."},
- {key:"busBlueOnly",title:"BLUE MEANS THE BUS",blurb:"Leaves the strong blue to the bus number alone and drops the repair headings and the FOCUS / VIEW buttons to a darker, quieter tone. Nothing gets smaller. If you have set your own Repair Title color under TEXT STYLE, that choice still wins."},
- {key:"busEndMarker",title:"CLOSING LINE UNDER EACH BUS",blurb:"Adds a quiet END OF BUS 18505 line under the last defect of an opened bus, so the list cannot read as one long run."},
+ {key:"busRail",title:"BUS NUMBER DOWN THE SIDE",blurb:"Turns the bus number on its side in a full-height stripe, so you can see where one bus ends and the next begins. The repair line on the closed card gains about 26px; an opened card gets a little taller, and the location moves to its own line. The defects keep their own rows beside the stripe, never under it."},
+ {key:"busBlueOnly",title:"BLUE MEANS THE BUS",blurb:"Leaves the strong blue to the bus number alone. The repair headings, the FOCUS and VIEW buttons and the numbered disc on each defect row all drop to a darker, quieter tone. Nothing gets smaller, and the BUS heading over an opened list keeps its own. If you have set your own Repair Title color under TEXT STYLE, that choice still wins."},
+ {key:"busEndMarker",title:"CLOSING LINE UNDER EACH BUS",blurb:"Adds a quiet END OF BUS 18505 · 3 DEFECTS line under the last defect of an opened bus, so the list cannot read as one long run."},
 ];
 
 export default function LogSettingsModal({settings,setSettings,close,exportLog,transfer,inline=false}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog?:()=>void;transfer:ReactNode;inline?:boolean}){
