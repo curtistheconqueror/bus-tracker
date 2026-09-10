@@ -10,15 +10,18 @@ The existing public Sites URL remains the live Fleetstep application. Cloudflare
 | Staging URL | `https://fleetstep.fleetstep-dev.workers.dev` |
 | GitHub workflow | `Deploy Cloudflare staging` |
 | Allowed source | `main` only |
-| Trigger | Manual dispatch after Curtis approves in chat |
+| Trigger | A Curtis-approved one-file release gate |
 
 ## Release agent procedure
 
 1. Confirm Curtis explicitly approved the staging release in chat.
 2. Confirm `main` contains the reviewed contribution and CI is green.
-3. In GitHub Actions, start **Deploy Cloudflare staging** from `main` and enter `CURTIS_APPROVED` exactly.
-4. The workflow installs the locked dependencies, runs lint and the full test suite, then deploys the generated Worker and client assets to the existing `fleetstep` Worker.
-5. Verify the staging URL on phone and iPad. Do not describe it as live production and do not alter the current Sites deployment.
+3. Create or update `.github/release-gates/cloudflare-staging.json` with `approval: "CURTIS_APPROVED"` and the exact current `main` commit as `approvedSourceCommit`.
+4. Commit and push **only** that release-gate file. The workflow verifies that it names its parent source and that no feature change rode along with the approval.
+5. The workflow installs the locked dependencies, runs lint and the full test suite, then deploys the generated Worker and client assets to the existing `fleetstep` Worker.
+6. Verify the staging URL on phone and iPad. Do not describe it as live production and do not alter the current Sites deployment.
+
+Contributors must never create a release gate. The gate is an operational trust boundary for the trusted release agent acting on Curtis's chat approval; it is not a replacement for future PACE-managed production controls.
 
 ## Credentials and secrets
 

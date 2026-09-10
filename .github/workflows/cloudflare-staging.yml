@@ -1,30 +1,34 @@
-# Staging is deliberately manual. A contributor can prepare and merge source,
-# but a Fleetstep release agent starts this workflow only after Curtis gives
-# approval in chat. The text input is an auditable confirmation, not identity
-# verification; repository access remains limited to trusted maintainers.
+# A staging deploy is triggered only by a dedicated approval record on main, or
+# as a manually dispatched fallback. Ordinary feature pushes never deploy.
 name: Deploy Cloudflare staging
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/release-gates/cloudflare-staging.json
   workflow_dispatch:
     inputs:
       curtis_approval:
-        description: "Type CURTIS_APPROVED to deploy the current main branch to Fleetstep staging"
+        description: "Type CURTIS_APPROVED to deploy the selected main revision to Fleetstep staging"
         required: true
         type: string
 
 permissions:
   contents: read
 
-# Do not let a second manual release replace a deployment already in progress.
+# Do not let a second approved release replace one already in progress.
 concurrency:
   group: fleetstep-cloudflare-staging
   cancel-in-progress: false
 
 jobs:
   deploy:
-    # The environment also rejects non-main refs. Keeping the check here makes
-    # the source boundary explicit in the run record as well.
-    if: github.ref == 'refs/heads/main' && inputs.curtis_approval == 'CURTIS_APPROVED'
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.curtis_approval == 'CURTIS_APPROVED')
     name: Validate and deploy staging
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -39,7 +43,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: main
+          # Push-triggered runs must inspect their parent before deploying.
+          fetch-depth: 2
+
+      # The release-gate commit itself must change exactly one file and name
+      # its parent. That makes the built source unambiguous and prevents a
+      # feature change from quietly riding along with an approval record.
+      - name: Verify chat approval gate
+        if: github.event_name == 'push'
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { execFileSync } from "node:child_process";
+            const gatePath = ".github/release-gates/cloudflare-staging.json";
+            const gate = JSON.parse(readFileSync(gatePath, "utf8"));
+            if (gate.approval !== "CURTIS_APPROVED") throw new Error("Missing Curtis approval marker.");
+            const parent = execFileSync("git", ["rev-parse", "HEAD^"], { encoding: "utf8" }).trim();
+            if (gate.approvedSourceCommit !== parent) throw new Error("Approval gate does not name this release source.");
+            const changed = execFileSync("git", ["diff", "--name-only", "HEAD^", "HEAD"], { encoding: "utf8" }).trim();
+            if (changed !== gatePath) throw new Error("An approval commit may change only the release gate.");
+          '
 
       - uses: actions/setup-node@v5
         with:
