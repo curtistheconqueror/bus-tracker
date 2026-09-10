@@ -1,9 +1,9 @@
 # Publish next
 
-**STATUS: 171 IS PENDING — publish from `d324975`.** Release 170 is live from
+**STATUS: 171 IS PENDING — publish from `cca68cb`.** Release 170 is live from
 `bdca898` as Sites Version 166.
 
-**Read the SHA above, not a SHA you remember.** `d324975` is the last CODE
+**Read the SHA above, not a SHA you remember.** `cca68cb` is the last CODE
 commit; above it sit Codex's own 170 release record, this handoff, and the merge
 that joined them — docs only, none of it belonging in a build. The 169 handoff
 named a SHA that had been the head when it was written, two code commits landed
@@ -13,7 +13,7 @@ this SHA first.**
 
 ## What 171 is
 
-**Eight commits.** No migration, no schema change, no dependency change, no
+**Nine commits.** No migration, no schema change, no dependency change, no
 storage key added or renamed, and nothing that rewrites a record. One header's
 markup, one CSS property on three selectors, ten new catalog options, and the
 Defect Log's two pickers rebuilt as typing fields.
@@ -73,6 +73,17 @@ Defect Log's two pickers rebuilt as typing fields.
   **Lite can always be turned back off from inside Lite**: Settings stays in the
   nav, the switch is on it, and unticking returns the device to Full. Three
   tests now hold that door open.
+
+- **The app name opens the home screen from every page.** It was pointed at `/`
+  (the Facility Map) first; it now opens the welcome screen itself, which is what
+  Curtis meant. A first run must still answer FULL or LITE — the close only
+  exists once the question has been answered, so looking at it changes nothing.
+- **The defect picker's sections are back.** Browsing the list is divided by
+  faded group headings the way the old `<optgroup>` divided it (FAREBOX, VENTRA,
+  CUBIC SCREEN…); a ranked search keeps the group on each row instead, because
+  headings stop dividing anything once results interleave.
+- **Add coolant (glycol)** and **Add transmission fluid** join *Add engine oil*
+  in Preventive Maintenance, all three with the quarts box.
 
 ### What to check once 171 is live
 
@@ -200,7 +211,7 @@ writes a record.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
-| **NEXT** | **171** | **`d324975`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
+| **NEXT** | **171** | **`cca68cb`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
 | Published | **170** | **`bdca898`** | **Live as Sites Version 166. SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
 | Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
