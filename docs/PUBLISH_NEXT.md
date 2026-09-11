@@ -1,7 +1,8 @@
 # Publish next
 
-**STATUS: PUBLISHED AS SITES VERSION 173 from `3de6dab` — but `main` does not
-have it yet, and PR #6 is still open.**
+**STATUS: 173 IS LIVE from `3de6dab`, `main` still does not have it, and there
+is now UNPUBLISHED WORK ON TOP — build the next release from the branch head,
+not from `3de6dab`. PR #6 is still open.**
 
 ## ⚠️ THE LIVE CODE IS NOT ON `main`
 
@@ -26,6 +27,75 @@ are Codex's to do. Nothing needs rebuilding: the published artifact is correct.
 This STATUS line is the one thing Claude keeps current, and it is deliberately
 NOT saying "172 is pending" any more — leaving that would have had the next
 session publish `3de6dab` a second time under a number that is already taken.
+
+---
+
+## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
+
+Two changes landed on this branch AFTER `3de6dab` was published. **They are not
+live.** Whatever number comes next — 174 unless Codex has taken it — should be
+built from the branch head, not from `3de6dab`.
+
+```
+git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
+```
+
+### 1. A HOLD is now DEVICE-LOCAL
+
+Curtis reversed the original design: *"If someone is asked to hold a bus (like
+bay 12 guy) then they should know. It doesn't need to show up on everybody's
+screen."* A hold is an instruction one person is carrying, not a fact about the
+fleet.
+
+`hold` is now in **`MAP_HELD_BACK`** (`cloud-sync.ts`) and in **`MAP_EXCLUDED`**
+(`section-transfer.ts`), so it reaches neither the Shop Cloud nor an export.
+Transfers are how one device seeds another here, so leaving that second gate
+open would have put bay 12's instructions on every board by the back door.
+Being in `MAP_EXCLUDED` also means an incoming transfer keeps the RECEIVER's
+own hold rather than overwriting it.
+
+The non-obvious half: **`busUpdatedAt` no longer counts the hold's own stamp.**
+It did from the first build, when holds synced and a hold pushing with a
+pre-hold timestamp would have been dropped as out of order. With holds held
+back the reason inverts — counting it would send a row whose `map_fields` are
+byte-identical but stamped newer. Placing a hold now moves no fingerprint and
+pushes nothing at all, asserted by comparing `rowFingerprint` of the held and
+unheld bus.
+
+**No storage key changed and nothing on disk needs migrating.** A device
+already holding a synced hold keeps it; it simply stops travelling. Holds that
+already reached the cloud stay in the table until that row is next written —
+harmless, since nothing reads `map_fields.hold` back any more.
+
+### 2. Settings: every group is behind a closed drawer
+
+Curtis: *"Its a lot and i do mean a LOT!! ... compress all of the settings in
+such a way where there is only 5 sections ... very digestible and easy to
+navigate."*
+
+The five sections were already there; the thirty groups inside them were not
+collapsed. Now 25 drawers, none open on arrival — **WORDING** included, which
+he named specifically. The accordion follows the screen rather than the device:
+one-at-a-time under 620px, several at once above it with drawers packing
+two-up.
+
+Two duplications went, both of which he hit: the jump-link row that sat under
+the page nav carrying four of the same labels, and each panel's own
+"PAGE NAME / Settings" banner sitting beneath a section header that said the
+same thing.
+
+Four defects were found by MEASURING and would not have been found by reading:
+the header nav had been handing six links 475px of a needed 642px so every
+adjacent pair overlapped by 21.8px (already broken before this change, at
+5.4px); the drawers kept a light header on the three dark themes, 17:1 against
+the section under them; three of five section stripes silently lost to a
+`border-color` shorthand in a later rule; and a `flex-basis` became a height in
+the phone's column layout and opened a 340px gap.
+
+### Gates
+
+`npm test` — **295 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+clean. Measured in Chromium at 360 / 390 / 1180 on all four themes.
 
 ---
 
