@@ -6803,7 +6803,13 @@ test("the shop cloud never becomes a condition of using the board",async()=>{
     devices at all, so it is a whole-app control — and somebody setting up a new
     iPad should not have to open a section called "Board settings" and scroll to
     find the one thing they came for. */
- assert.match(settings,/<section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">/);
+ /* No aria-labelledby any more, and that is the fix rather than a loss: the
+    <h3 id="master-cloud-heading"> it pointed at became the drawer's title when
+    the groups were put behind drawers, and a dangling IDREF makes the region
+    announce UNNAMED — strictly worse than no attribute. The drawer's own <h3>
+    heads it now. Measured: zero broken IDREFs on the page. */
+ assert.match(settings,/<section className="settings-group cloud-sync-settings">/);
+ assert.equal(/aria-labelledby="master-cloud-heading"/.test(settings),false,"the dangling reference must not come back");
  assert.match(settings,/<CloudSyncControl\/>/);
  assert.equal(/cloud-sync-settings/.test(panel),false,"no longer in the map's section");
  assert.equal(/CloudSyncControl/.test(panel),false,"the map panel must not import it either");
@@ -12792,4 +12798,117 @@ test("the bus quick-view reads its flags the same way the token badge does",asyn
  assert.equal(/\{deferredHeld&&/.test(page),false,"a bare deferredHeld is not declared in that scope");
  /* deferredHeld really is derived and really does overwrite the record. */
  assert.match(page,/deferredHeld:deferredHeldSet\.has\(bus\.id\)/);
+});
+
+test("a hold rides MASTER EXPORT but never a share",async()=>{
+ /* Raised in review as a hole: the hold is stripped from the cloud and from a
+    section transfer, but MASTER EXPORT carries it. That is the intended
+    behaviour and the distinction is the point, so it is pinned here rather
+    than left to the next reader's judgement.
+
+    SHARING one person's instruction with everybody is what Curtis ruled out:
+    "If someone is asked to hold a bus (like bay 12 guy) then they should know.
+    It doesn't need to show up on everybody's screen." The Shop Cloud and a
+    section transfer both do that, so both are gated.
+
+    MASTER EXPORT is a device CLONE, not a share. It already carries the board,
+    Down Sheet and Defect Log settings, parts memory and findings memory —
+    every one per-device and never synced — and MASTER IMPORT is the one import
+    that REPLACES rather than merges. A foreman on a new phone should arrive
+    with the holds he was told about. */
+ const now="2026-09-11T12:00:00.000Z";
+ const hold={at:"2026-09-11T09:00:00.000Z",by:"CT"};
+ const bus={id:"b1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold};
+
+ /* The two shares drop it. */
+ const {exportFleetMapPayload}=await import("../app/section-transfer.ts");
+ assert.equal("hold" in exportFleetMapPayload([bus],now).buses[0],false,"a section transfer is a share");
+ const {busRow}=await import("../app/cloud-sync.ts");
+ assert.equal("hold" in busRow(bus,{initials:"CT",deviceLabel:"shop"},now).map_fields,false,"the Shop Cloud is a share");
+
+ /* The clone keeps it — asserted on the payload builder, which passes `buses`
+    through verbatim, and on the absence of any filter being added later. */
+ const source=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ assert.match(source,/payload=\{kind:"pace-south-fleet-board-backup",version:5,exportedAt:exportedAt\.toISOString\(\),buses,/,
+  "MASTER EXPORT passes the buses through unfiltered, holds included");
+ /* Checked against the CODE, not the comments: the comment below deliberately
+    names MAP_EXCLUDED to explain why it is not used here, and the first cut of
+    this assertion matched its own explanation. */
+ const code=source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.equal(/MAP_EXCLUDED|MAP_HELD_BACK|omit\(/.test(code),false,
+  "no filter has been added here — if one is, this distinction was broken by accident");
+ assert.match(source,/THIS FILE CARRIES A BUS'S `hold` AND THAT IS DELIBERATE/,
+  "and the reason is written where somebody would come to change it");
+});
+
+test("setHold does not offer to undo a write that was refused",async()=>{
+ /* Raised in review. `persist` returns a StorageWriteResult and returns early
+    when the write is refused — a full device, say — so setFleet never runs and
+    no HOLD badge appears. setHold called it and ignored the answer, having
+    ALREADY taken the undo snapshot, so UNDO LAST sat there offering to undo
+    "Put Bus 18505 on hold" — a change the board never took. Undoing it would
+    then write a fleet from before an edit that never happened.
+
+    The comment above setHold had claimed all along that "its result is read
+    rather than assumed". It was not. Both halves are fixed: the result is
+    read, and the snapshot moved BELOW it.
+
+    HONEST LIMIT: this asserts the source order, not a driven browser run. The
+    refused-write path could not be reached through the Defect Log UI here —
+    the seeded defect would not render a card — so what is guarded is the shape
+    that was wrong, which is the ordering. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const start=page.indexOf("const setHold=(busId:string");
+ assert.ok(start>0,"setHold is still in this file");
+ const body=page.slice(start,page.indexOf("\n };",start));
+ const persistAt=body.indexOf("persist(nextFleet,downEntries)");
+ const guardAt=body.indexOf("if(!written.ok)return");
+ const snapshotAt=body.indexOf("setUndoSnapshot(");
+ assert.ok(persistAt>0,"setHold still persists");
+ assert.ok(guardAt>persistAt,"the write result is read");
+ assert.ok(snapshotAt>guardAt,"and the undo snapshot is taken only AFTER the write is known to have landed");
+ assert.match(body,/const written=persist\(nextFleet,downEntries\);/);
+});
+
+test("wrapping the panels in drawers did not sever their child-combinator rules",async()=>{
+ /* Putting the settings groups inside <SettingsDrawers>/<SettingsDrawer> pushed
+    their contents one level deeper, and THREE `>` rules quietly stopped
+    matching. Nothing failed; the styling just evaporated. Measured in Chromium:
+    the DEFAULT INITIALS caption rendered display:block at the browser default
+    16px instead of an 8px all-caps flex column, the amber "Records live on this
+    device" note lost its border, background and padding entirely, and Fixed
+    Repairs' inner sections lost their border and padding so RESET LOOK sat flush
+    against the colour grid.
+
+    Then fixing those introduced a fourth: `.down-settings-body
+    .settings-drawer-body>label` is (0,2,1), which out-specifies
+    `.down-settings-body .settings-check` at (0,2,0), and SHOW COMPLETED became
+    a column. Every rule re-rooted through the drawer has to carry its
+    override with it.
+
+    The rule this encodes: a selector rooted at a panel body with a `>` must
+    also name the drawer body, or it describes a DOM that no longer exists. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [down,fixed]=await Promise.all([
+  read("app/down-sheet/down-sheet.css"),read("app/fixed-repairs/fixed-repairs.css"),
+ ]);
+ assert.match(down,/\.down-settings-body>label,\.down-settings-body \.settings-drawer-body>label\{/);
+ assert.match(down,/\.down-settings-body>p,\.down-settings-body \.settings-drawer-body>p\{/);
+ assert.match(fixed,/\.fixed-settings>div>section,\.fixed-settings \.settings-drawer-body>section\{/);
+ /* And the override that the re-rooting out-specified, re-rooted to match. */
+ assert.match(down,/\.down-settings-body \.settings-check,\.down-settings-body \.settings-drawer-body>label\.settings-check\{flex-direction:row/);
+
+ /* No OTHER rule reaches through a bare `>` into content the drawers now wrap.
+    Only two roots are affected — `.down-settings-body>` and
+    `.fixed-settings>div>` — because those are the elements the drawers were
+    inserted directly beneath. `.fixed-settings>header` and `.log-settings>div`
+    are NOT affected: the drawers sit inside those, not around them, and an
+    earlier cut of this scan flagged `.fixed-settings>header span` for no
+    reason. */
+ for(const [css,file,root] of [[down,"down-sheet.css",".down-settings-body>"],[fixed,"fixed-repairs.css",".fixed-settings>div>"]])
+  for(const match of css.matchAll(new RegExp("^"+root.replace(/[.>]/g,ch=>"\\"+ch)+"[^,{\n]*","gm"))){
+   const full=css.slice(match.index,css.indexOf("{",match.index));
+   assert.ok(full.includes(".settings-drawer-body"),
+    file+" reaches through a bare `>` into drawer-wrapped content and will silently stop matching: "+match[0].trim());
+  }
 });

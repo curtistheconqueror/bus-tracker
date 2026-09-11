@@ -244,9 +244,14 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 /* The hidden attribute must win, or a closed drawer draws its whole contents
    anyway — the grid above would otherwise re-assert display. */
 .settings-drawer-body[hidden]{display:none}
-/* Groups already carry their own h3 and spacing from globals.css. Inside a
-   drawer the drawer's own header is the title, so the inner one would be a
-   second title saying the same thing one line down. */
+/* Groups already carry their own h3 and spacing from globals.css; this only
+   tightens the gap inside a drawer.
+
+   IT DOES NOT HIDE THE INNER h3, and an earlier version of this comment said
+   it did. Nothing here hides anything — which is correct, because a drawer
+   holding TWO groups needs their headings to tell them apart. The duplication
+   to avoid is a drawer whose TITLE repeats its only group's h3; that is a
+   naming job, not a CSS one, and a test asserts no drawer does it. */
 .settings-drawer-body>.settings-group,.settings-drawer-body>.down-settings-group,.settings-drawer-body>.log-settings-group{gap:9px}
 
 /* THE DRAWERS MUST FOLLOW THE THEME OF THE SECTION THEY SIT IN.

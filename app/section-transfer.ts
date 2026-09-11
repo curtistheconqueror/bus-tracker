@@ -51,9 +51,12 @@ const DOWN_SHEET_FIELDS=["down","onDownSheet","downSheetReady"] as const;
    It doesn't need to show up on everybody's screen." Transfers in this shop
    are how one device SEEDS another, so carrying holds would put one person's
    instructions on everybody's board by the back door — the same outcome the
-   cloud change was made to prevent. Listing it here also means line 191 keeps
-   the RECEIVER's own hold, so importing a board never clears what this phone
-   was told to hold. */
+   cloud change was made to prevent. Listing it here also means the merge's
+   closing `...pick(current,MAP_EXCLUDED)` keeps the RECEIVER's own hold, so
+   importing a board never clears what this phone was told to hold. (Named by
+   its mechanism rather than by a line number: the first draft of this comment
+   said "line 191", which was nine lines out the moment the comment itself was
+   added, because the comment pushed the code down.) */
 const HOLD_FIELDS=["hold"] as const;
 const MAP_EXCLUDED=[...DEFECT_FIELDS,...DOWN_SHEET_FIELDS,...HOLD_FIELDS];
 

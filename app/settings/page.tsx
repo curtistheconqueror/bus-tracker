@@ -389,7 +389,10 @@ export default function SettingsPage(){
          and it is now the first whole-app control anybody sees. */}
      </SettingsDrawer>
      <SettingsDrawer title="SHOP CLOUD" note="Connect this device so the map, Defect Log and Down Sheet reach the others.">
-     <section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">
+     {/* No aria-labelledby: the <h3 id="master-cloud-heading"> it named became the
+          drawer title, and a dangling IDREF makes this region announce UNNAMED —
+          worse than no attribute at all. The drawer's own <h3> heads it now. */}
+     <section className="settings-group cloud-sync-settings">
       <p>Share the map, the Defect Log and the Down Sheet between every device in the shop. Each device is connected once and then keeps itself up to date. This never has to be on: with it off, or with no signal, the tracker works exactly as it does today.</p>
       <CloudSyncControl/>
      </section>
@@ -415,7 +418,7 @@ export default function SettingsPage(){
       <FleetRecoveryControl/>
      </section>
      </SettingsDrawer>
-     <SettingsDrawer title="ONE LOOK FOR EVERY PAGE" note="Set the theme and reading text for the whole app at once.">
+     <SettingsDrawer title="ONE LOOK &amp; READING TEXT" note="Set the theme and the reading text for the whole app at once.">
      <section className="settings-group master-theme" aria-labelledby="master-theme-heading">
       <h3 id="master-theme-heading">ONE LOOK FOR EVERY PAGE</h3>
       <p>Sets the Facility Map, the Defect Log and Fixed Repairs together, so the whole app matches. Picking one here writes it into each page's own settings, which you can then change on its own below.</p>

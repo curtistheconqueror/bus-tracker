@@ -82,9 +82,11 @@ export function isHeld(bus:HoldableBus|undefined,now:Date|number=new Date()){
    not move a fingerprint if it tried.
 
    What is left is smaller but still real: `delete` is the only spelling that
-   makes `"hold" in bus` false, which is what every reader here tests, and it
-   keeps a cleared hold out of the board JSON instead of leaving a tombstone
-   key in it. And it is the safety net — the instant somebody takes `hold` back
+   makes `"hold" in bus` false, which is what every reader here tests. (It is
+   NOT about keeping the board JSON clean — an earlier draft of this comment
+   said so and was wrong: JSON.stringify drops undefined-valued properties, so
+   `hold:undefined` would never reach pace-board-v1 either.) And it is the
+   safety net — the instant somebody takes `hold` back
    out of MAP_HELD_BACK, the original trap is live again and this line is what
    stops it. Same trap `fluids` and `reportAttempts` were written around on the
    defect record. */

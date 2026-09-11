@@ -48,7 +48,17 @@ screen."* A hold is an instruction one person is carrying, not a fact about the
 fleet.
 
 `hold` is now in **`MAP_HELD_BACK`** (`cloud-sync.ts`) and in **`MAP_EXCLUDED`**
-(`section-transfer.ts`), so it reaches neither the Shop Cloud nor an export.
+(`section-transfer.ts`), so it reaches neither the Shop Cloud nor a section
+transfer.
+
+**MASTER EXPORT still carries it, on purpose.** That file is a device CLONE,
+not a share — it already carries `pace-board-settings-v1`,
+`pace-down-sheet-settings-v1`, `pace-defect-log-settings-v1`, parts memory and
+findings memory, every one of which CLAUDE.md lists as per-device and never
+synced, and MASTER IMPORT is documented as the one import that REPLACES rather
+than merges. A foreman moving to a new phone should arrive with the holds he
+was told about. Stripping `hold` there while keeping every other per-device key
+would be the inconsistent choice, not the safe one.
 Transfers are how one device seeds another here, so leaving that second gate
 open would have put bay 12's instructions on every board by the back door.
 Being in `MAP_EXCLUDED` also means an incoming transfer keeps the RECEIVER's
@@ -147,9 +157,13 @@ that."
   and how long it has been held. The time appears only there, never on the
   badge.
 - New optional `hold` field on the bus record in `pace-board-v1`. **No new
-  storage key, no rename.** It syncs; `busUpdatedAt` counts its stamp so a hold
-  is not dropped as out of order, and clearing deletes the key rather than
-  setting `undefined`, which would have changed every bus's fingerprint.
+  storage key, no rename.**
+
+  > ⚠️ **SUPERSEDED — do not read the rest of this bullet as current.** As
+  > shipped in 173 the hold synced and `busUpdatedAt` counted its stamp. Both
+  > were reversed afterwards; see "A HOLD is now DEVICE-LOCAL" near the top of
+  > this file. Left here rather than rewritten because this section describes
+  > what Sites Version 173 actually contains, and 173 is still what is live.
 
 ### What to check once HOLD is live
 

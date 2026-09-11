@@ -948,16 +948,24 @@ export default function DefectLog(){
  };
  /* HOLD, written straight to the fleet rather than through saveDefectLogRecord:
     a hold is a fact about the BUS and touches no defect, and a bus can be held
-    with no defects at all. persist reports a refused write, which is why its
-    result is read rather than assumed. */
+    with no defects at all. persist reports a refused write, and its result IS
+    read — see the note inside, and do not reorder the snapshot above it. */
  const holdCount=heldBusCount(fleet);
  const setHold=(busId:string,on:boolean,until?:string)=>{
   const bus=fleet.find(item=>item.id===busId);
   if(!bus)return;
   if(on===isHeld(bus)&&!until)return;
   const nextFleet=fleet.map(item=>item.id===busId?setBusHold(item,on,{by:settings.defaultInitials,until}):item);
+  /* PERSIST FIRST, AND READ WHAT IT SAYS. The comment above always claimed the
+     result was read; it was not, and the snapshot was taken before the write.
+     On a refused write — a full device — setFleet never runs, so no badge
+     appears, yet UNDO LAST would have been sitting there offering to undo
+     "Put Bus 18505 on hold", a change that never happened. Undoing it would
+     then write a fleet from before an edit the board never took. Same shape as
+     the sweep filer above, which has read `written.ok` since it was written. */
+  const written=persist(nextFleet,downEntries);
+  if(!written.ok)return;
   setUndoSnapshot({fleet,downEntries,label:(on?"Put Bus ":"Took Bus ")+bus.n+(on?" on hold":" off hold")});
-  persist(nextFleet,downEntries);
  };
  const movingMysteryBus=fleet.find(bus=>bus.id===movingMysteryBusId)||null;
  const moveMysteryBus=(area:string)=>{if(!movingMysteryBus)return false;const result=moveBusToArea(fleet,movingMysteryBus.id,area);if(result.error==="insufficient-space"){alert(area+" is full. No bus was moved.");return false}if(result.error){alert("That bus or facility area is no longer available. Refresh and try again.");return false}if(result.unchanged)return true;if(!writeFleetStorage(localStorage,result.fleet))return false;setFleet(result.fleet);return true};
