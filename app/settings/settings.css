@@ -17,14 +17,29 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 .settings-header>div>span{font-size:7px;font-weight:900;letter-spacing:1.5px}
 .settings-header h1{margin:2px 0;font-size:28px;font-weight:900}
 .settings-header p{margin:0;font-size:9px;opacity:.82}
+/* THE NAV MUST NOT BE SQUEEZED. Its six links each carry min-width:102px, so
+   the row needs ~642px; the header is a flex row and was handing it whatever
+   the title block left over. Measured at 1180: the nav box was 475px and every
+   adjacent pair of links overlapped its neighbour by 21.8px. It was already
+   overlapping by 5.4px before this section was touched — lengthening the blurb
+   above merely made a latent bug visible, which is the only reason it was
+   caught. The nav now keeps its own width and the text block wraps instead. */
+/* ROW LAYOUT ONLY. Below 760px the header is already flex-direction:column,
+   and in a column a flex-basis is a HEIGHT — `flex:1 1 340px` there made the
+   title block 340px tall and opened a blue chasm between the blurb and the nav
+   on a phone. Measured, not guessed: it is invisible in the rule and obvious
+   in a screenshot. */
+@media(min-width:761px){
+ .settings-header{flex-wrap:wrap}
+ .settings-header>div{flex:1 1 340px;min-width:0}
+ .settings-header nav{flex:0 0 auto}
+}
 .settings-header nav{height:auto;min-width:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding:0;border:0;background:transparent;color:inherit}
 .settings-header nav a{min-width:102px;min-height:42px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff55;border-radius:6px;color:#fff;padding:5px 8px;font-size:8px;font-weight:900;text-align:center;text-decoration:none}
 .settings-header nav a.active{background:#fff;color:#06275c}
 
 /* Four sections is a long page on a phone once they are open. The jump row
    stays put, and each link opens the section it jumps to. */
-.settings-jump{position:sticky;top:0;z-index:3;height:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px;padding:8px 14px;background:#f4f7fb;color:#112657;border:0;border-bottom:1px solid #c6cee0}
-.settings-jump a{min-height:34px;display:inline-flex;align-items:center;border:1px solid #b7c4d7;border-radius:6px;background:#fff;color:#173968;padding:0 12px;font-size:9px;font-weight:900;text-decoration:none;touch-action:manipulation}
 
 .settings-sections{display:grid;gap:14px;padding:14px}
 .settings-section{display:grid;gap:12px;padding:10px 14px 14px;border:1px solid #bac7d9;border-radius:12px;background:#fff;box-shadow:0 2px 9px #16345a13;scroll-margin-top:58px}
@@ -96,6 +111,47 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 .settings-section-fixed .settings-section-kicker{color:var(--fixed-accent,#0b64bd)}
 .settings-section-fixed .settings-section-title,.settings-section-fixed .settings-section-blurb{color:var(--fixed-ink,#172b4d)}
 .settings-section-fixed .settings-section-chevron{border-color:var(--fixed-border);background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
+
+/* TELLING THE FIVE APART AT A GLANCE. Curtis: "The title sections need to look
+   very easy to distinguish apart, and with nice boarders."
+
+   The kicker already names the page, but four of the five drew it in the same
+   blue, so scrolling past gave you five identical-looking headers and the word
+   had to be READ to know where you were. A colour-coded left edge is legible
+   before the text is — it survives being scrolled past at speed, which is how
+   this page is actually used.
+
+   THIS BLOCK MUST STAY BELOW EVERY .settings-section-* RULE THAT SETS THE
+   border-color SHORTHAND, and it is down here for that reason alone. It was
+   written above them first and three of the five stripes silently did not
+   apply: .settings-section-master sets border-color:#8fa6cc, -log sets
+   var(--log-border) and -fixed sets var(--fixed-border), all at equal
+   specificity, so the later rule won and the shorthand reset the left edge
+   back. MEASURED, not read — the rendered stripes came back as #8fa6cc and
+   var(--log-border) while the stylesheet said otherwise. Do not move this up,
+   and do not reach for !important if it breaks: find the shorthand.
+
+   DEFECT LOG and FIXED REPAIRS take their accent from the theme the page is
+   set to, because those two sections already render in their own page's theme;
+   a pinned colour there would clash on the dark ones. The other three are not
+   themed and take a fixed hue. Deliberately not the status palette's greens
+   and reds — nothing here is a bus status, and borrowing that vocabulary on a
+   settings page is how a colour starts meaning two things. */
+.settings-section{border-left-width:5px}
+.settings-section-master{border-left-color:#0b3d7a}
+.settings-section-map{border-left-color:#5a3ea8}
+.settings-section-map .settings-section-kicker{color:#4a3191}
+.settings-section-down{border-left-color:#a9560c}
+.settings-section-down .settings-section-kicker{color:#8f4708}
+.settings-section-log{border-left-color:var(--log-accent)}
+/* Fixed Repairs SHARES the Defect Log's theme by design, so taking the accent
+   raw gave these two adjacent sections the same stripe — measured identical at
+   rgb(11,100,189) on the light theme, which is precisely the sameness this
+   whole block exists to remove. Mixing toward teal keeps it following the
+   theme (so it still suits the dark palettes) while never landing on the
+   Defect Log's own colour. */
+.settings-section-fixed{border-left-color:color-mix(in srgb,var(--fixed-accent,#0b64bd) 45%,#0b6b5e)}
+
 .fixed-settings.inline{width:100%;max-width:none;height:auto;max-height:none;border:1px solid var(--fixed-border);border-radius:11px;box-shadow:none;overflow:visible}
 .fixed-settings.inline>header{position:static}
 
@@ -107,9 +163,7 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .settings-header h1{font-size:22px}
  .settings-header nav{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
  .settings-header nav a{min-width:0;height:50px;padding:0 4px;font-size:10px;line-height:1.15;white-space:normal;touch-action:manipulation}
- .settings-jump{padding:6px 8px}
- .settings-jump a{flex:1 1 calc(50% - 6px);justify-content:center;min-height:44px}
- .settings-sections{gap:10px;padding:8px}
+   .settings-sections{gap:10px;padding:8px}
  .settings-section{padding:8px 10px 10px;border-radius:10px;scroll-margin-top:110px}
  .settings-section.closed{padding-bottom:8px}
  .settings-section-title{font-size:22px}
@@ -131,3 +185,105 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 .show-welcome-again{flex-shrink:0;min-height:34px;border:1px solid #0b64bd;border-radius:6px;background:#0b64bd;color:#fff;padding:0 14px;font-size:8px;font-weight:900;letter-spacing:.4px;cursor:pointer}
 .show-welcome-again:hover{background:#09539d}
 @media(max-width:760px){.settings-welcome-again b{font-size:10px}.settings-welcome-again small{font-size:9px}.show-welcome-again{min-height:44px;font-size:10px;padding:0 16px}}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   THE SECOND LEVEL: DRAWERS INSIDE A SECTION
+
+   Curtis: "compress all of the settings in such a way where there is only 5
+   sections ... The title sections need to look very easy to distinguish
+   apart, and with nice boarders." The five sections keep the big 26px title;
+   these sit under them and have to read as clearly SUBORDINATE to it while
+   still being obviously separate from each other. Hence: smaller type, a real
+   border on every drawer, and a filled header bar rather than a bare row. */
+.settings-drawers{display:grid;gap:8px}
+
+/* TWO-UP ON A BIG SCREEN. Curtis: "keep in mind the design for the bigger
+   screen and the PC." A single column of drawers on a 1180px shop computer is
+   a column of headers with a mile of white space beside it. */
+@media(min-width:900px){
+ /* CLOSED drawers pack two-up; an OPEN one takes the full width, because the
+    things inside them — a colour grid, the maintenance table — are unusable in
+    half. `dense` matters: without it, a full-width open drawer leaves a hole
+    beside the closed one above it, which is what the first cut of this looked
+    like and it read as broken rather than as a layout.
+
+    Doing it by OPEN state rather than by a per-drawer flag is why the flag is
+    gone. Marking drawers wide by hand made the CLOSED page ragged — a
+    full-width header bar sitting next to empty space — and a closed drawer is
+    only ever a header, so it has no reason to want the room. */
+ .settings-drawers{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;grid-auto-flow:row dense}
+ .settings-drawer.open{grid-column:1/-1}
+}
+
+.settings-drawer{overflow:hidden;border:1px solid #c3cee0;border-radius:9px;background:#fdfefe}
+.settings-drawer.open{border-color:#0b64bd;box-shadow:0 1px 6px #0b64bd1f}
+
+.settings-drawer-head{margin:0;display:block;font-size:inherit;font-weight:inherit}
+
+/* THE BARE `button{}` RULE IN globals.css LINE 2 LANDS HERE.
+   It sets height:28px, border:0, border-radius:4px, background:#162a53,
+   color:#fff, padding:0 13px, font-size:9px, font-weight:900 — so every one of
+   those has to be answered or this header renders as a small navy pill with
+   its title clipped. Same species as the bare header{height:38px} trap in
+   CLAUDE.md, and the same trap .app-name documents at globals.css:983.
+
+   `height:auto` is the one that looks redundant next to min-height and is NOT.
+   min-height raises a floor; it cannot release a fixed height, so without it a
+   two-line title on a 360px phone would overflow its own header. Do not tidy
+   it away. font-family too: a <button> does not inherit it. */
+.settings-drawer-toggle{width:100%;height:auto;min-height:46px;display:grid;grid-template-columns:minmax(0,1fr) 34px;align-items:center;column-gap:10px;row-gap:1px;border:0;border-radius:0;background:#f1f5fb;color:#12325f;padding:8px 10px;font-family:inherit;font-size:inherit;font-weight:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+.settings-drawer.open>.settings-drawer-head>.settings-drawer-toggle{background:#e8f1fc;border-bottom:1px solid #c3cee0}
+.settings-drawer-toggle:focus-visible{outline:3px solid #0b64bd;outline-offset:-3px}
+
+.settings-drawer-title{grid-column:1;font-size:12px;font-weight:900;letter-spacing:.9px;line-height:1.2}
+.settings-drawer-note{grid-column:1;font-size:9px;font-weight:400;line-height:1.35;color:#5b6f8f}
+.settings-drawer-chevron{grid-column:2;grid-row:1/-1;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:1px solid #b9c6da;border-radius:7px;background:#fff;color:#12325f;font-size:15px;line-height:1;transition:transform .15s}
+.settings-drawer.open .settings-drawer-chevron{transform:rotate(180deg)}
+
+.settings-drawer-body{display:grid;gap:11px;padding:11px 10px 12px}
+/* The hidden attribute must win, or a closed drawer draws its whole contents
+   anyway — the grid above would otherwise re-assert display. */
+.settings-drawer-body[hidden]{display:none}
+/* Groups already carry their own h3 and spacing from globals.css. Inside a
+   drawer the drawer's own header is the title, so the inner one would be a
+   second title saying the same thing one line down. */
+.settings-drawer-body>.settings-group,.settings-drawer-body>.down-settings-group,.settings-drawer-body>.log-settings-group{gap:9px}
+
+/* THE DRAWERS MUST FOLLOW THE THEME OF THE SECTION THEY SIT IN.
+
+   DEFECT LOG and FIXED REPAIRS render their section in the page's own theme,
+   and three of the four themes are dark. The drawer colours above are light
+   ones, so on Dark, Midnight and Tactical the header stayed a near-white bar
+   inside a near-black section — MEASURED at rgb(241,245,251) on rgb(16,19,24),
+   a 17:1 jump between a control and the surface it sits on. The text on it was
+   perfectly readable, which is exactly why reading the CSS would not have
+   caught it: nothing is illegible, it just looks broken.
+
+   This is the same failure the previous release fixed one level down, where
+   the log's own text kept light-theme colours on the dark themes. Deriving the
+   surface from the theme's text colour rather than pinning a second palette is
+   what stops it coming back a third time on a theme nobody has added yet. */
+.settings-section-log .settings-drawer{border-color:var(--log-border);background:var(--log-surface)}
+.settings-section-log .settings-drawer-toggle{background:color-mix(in srgb,var(--log-surface) 90%,var(--log-text));color:var(--log-text)}
+.settings-section-log .settings-drawer.open>.settings-drawer-head>.settings-drawer-toggle{background:color-mix(in srgb,var(--log-surface) 80%,var(--log-accent));border-bottom-color:var(--log-border)}
+.settings-section-log .settings-drawer.open{border-color:var(--log-accent)}
+/* 82%, not 72%: at 72 the note measured 4.35:1 on Tactical, under the 4.5
+   standard. Tactical is the palette that catches every one of these. */
+.settings-section-log .settings-drawer-note{color:color-mix(in srgb,var(--log-text) 82%,var(--log-surface))}
+.settings-section-log .settings-drawer-chevron{border-color:var(--log-border);background:var(--log-surface);color:var(--log-text)}
+
+.settings-section-fixed .settings-drawer{border-color:var(--fixed-border,#c3cee0);background:var(--fixed-surface,#fff)}
+.settings-section-fixed .settings-drawer-toggle{background:color-mix(in srgb,var(--fixed-surface,#fff) 90%,var(--fixed-ink,#172b4d));color:var(--fixed-ink,#172b4d)}
+.settings-section-fixed .settings-drawer.open>.settings-drawer-head>.settings-drawer-toggle{background:color-mix(in srgb,var(--fixed-surface,#fff) 80%,var(--fixed-accent,#0b64bd));border-bottom-color:var(--fixed-border,#c3cee0)}
+.settings-section-fixed .settings-drawer.open{border-color:var(--fixed-accent,#0b64bd)}
+.settings-section-fixed .settings-drawer-note{color:color-mix(in srgb,var(--fixed-ink,#172b4d) 82%,var(--fixed-surface,#fff))}
+.settings-section-fixed .settings-drawer-chevron{border-color:var(--fixed-border,#c3cee0);background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
+
+@media(max-width:620px){
+ /* Bigger tap target, and the note gets its own line rather than crowding the
+    title on a 360px screen. */
+ .settings-drawer-toggle{min-height:54px;padding:9px 11px}
+ .settings-drawer-title{font-size:13px}
+ .settings-drawer-chevron{width:34px;height:34px}
+ .settings-drawer-body{padding:11px 9px 12px}
+}

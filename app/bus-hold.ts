@@ -71,12 +71,23 @@ export function isHeld(bus:HoldableBus|undefined,now:Date|number=new Date()){
 
 /* PLACING AND CLEARING, and the one rule that is not about holds at all:
 
-   CLEARING DELETES THE KEY rather than setting it to undefined. cloud-sync's
-   busRow copies every own key of a bus into map_fields, and rowFingerprint
-   walks Object.keys — so `hold:undefined` is still a key, every bus's
-   fingerprint would change, and the next sync would re-push the shop's entire
-   fleet table. The same trap `fluids` and `reportAttempts` were written around
-   on the defect record. */
+   CLEARING DELETES THE KEY rather than setting it to undefined.
+
+   THE ORIGINAL REASON NO LONGER APPLIES, AND THE RULE STAYS ANYWAY. It was
+   written when holds synced: busRow copies every own key of a bus into
+   map_fields and rowFingerprint walks Object.keys, so `hold:undefined` was
+   still a key, every bus's fingerprint would have changed, and the next sync
+   would have re-pushed the shop's entire fleet table. `hold` is in
+   MAP_HELD_BACK now, so it never reaches map_fields and an undefined one could
+   not move a fingerprint if it tried.
+
+   What is left is smaller but still real: `delete` is the only spelling that
+   makes `"hold" in bus` false, which is what every reader here tests, and it
+   keeps a cleared hold out of the board JSON instead of leaving a tombstone
+   key in it. And it is the safety net — the instant somebody takes `hold` back
+   out of MAP_HELD_BACK, the original trap is live again and this line is what
+   stops it. Same trap `fluids` and `reportAttempts` were written around on the
+   defect record. */
 export function setBusHold<T extends HoldableBus>(bus:T,on:boolean,options:{at?:string;by?:string;until?:string}={}):T{
  const next={...bus} as T&{hold?:BusHold};
  if(!on){delete next.hold;return next}

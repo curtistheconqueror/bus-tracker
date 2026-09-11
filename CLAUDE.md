@@ -100,9 +100,10 @@ machine, because these sessions run in containers that are thrown away.
 - **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
   `app/bus-hold.ts` stores it as an optional `hold` field on the bus record —
   `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
-  sets it to `undefined`: `busRow` copies every own key into `map_fields` and
-  `rowFingerprint` walks `Object.keys`, so an undefined key would change every
-  bus's fingerprint and re-push the whole fleet table.
+  sets it to `undefined`. That rule was written when holds synced, and its
+  original reason has since inverted — see below — but it stays: `delete` is
+  the only spelling that makes `"hold" in bus` false, and it is the safety net
+  if `hold` ever leaves `MAP_HELD_BACK`.
   **A hold is DEVICE-LOCAL and never travels** — `hold` is listed in
   `MAP_HELD_BACK` (`cloud-sync.ts`) and in `MAP_EXCLUDED` (`section-transfer.ts`),
   so it reaches neither the Shop Cloud nor an export, and being in `MAP_EXCLUDED`

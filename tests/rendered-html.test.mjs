@@ -3596,8 +3596,20 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const [id,key] of [["facility-map","map"],["down-sheet","down"],["defect-log","log"],["fixed-repairs","fixed"]]){
   assert.match(page,new RegExp('<SectionHead id="'+id+'" kicker="[A-Z ]+" title="[^"]+" open=\\{open\\.'+key+'\\} onToggle=\\{\\(\\)=>toggle\\("'+key+'"\\)\\}\\/>'),id+" title row toggles it");
   assert.match(page,new RegExp('<SectionBody id="'+id+'" open=\\{open\\.'+key+'\\}>'),id+" body follows the same flag");
-  assert.match(page,new RegExp('<a href="#'+id+'" onClick=\\{\\(\\)=>reveal\\("'+key+'"\\)\\}>'),id+" jump link opens what it jumps to");
  }
+
+ /* THE SECOND NAV IS GONE, and must stay gone.
+
+    A row of jump links — MASTER, FACILITY MAP, DOWN SHEET, DEFECT LOG, FIXED
+    REPAIRS — used to sit directly under the page nav, which carries four of
+    those same five labels in the same pill shape. One switched PAGE, the other
+    scrolled to a SECTION, and nothing about either said which. Curtis: "the
+    same layout is right above to actually switch to that page. IT confused me
+    a few times." Asserting on the CSS too, because a rule left behind is how
+    the markup comes back. */
+ assert.equal(/settings-jump/.test(page),false,"the duplicate section nav must not return");
+ assert.equal(/settings-jump/.test(css),false,"and neither may its styling, which is how it would come back");
+ assert.equal(/const reveal=/.test(page),false,"the helper that only the jump links used is gone with them");
  assert.match(css,/\.settings-section-body\[hidden\]\{display:none\}/,"the body's grid display must not defeat the hidden attribute");
  assert.match(css,/\.settings-section-title\{[^}]*font-size:26px;font-weight:900/,"the title is the line people read to find a setting");
  assert.match(css,/\.settings-section-toggle\{width:100%;min-height:58px/,"the whole row is the target, not a chevron");
@@ -12602,3 +12614,135 @@ test("the line under FLEETSTEP scales with the screen",async()=>{
  assert.ok(floor>9,"bigger than the 9px it replaced, at every width");
 });
 
+
+test("the settings page is five sections of closed drawers, and WORDING is one of them",async()=>{
+ /* Curtis, after going through the page: "i had a few confusing moments lol.
+    Its a lot and i do mean a LOT!! ... We need to compress all of the settings
+    in such a way where there is only 5 sections ... The goal here is to make
+    the settings section very digestible and easy to navigate."
+
+    The five sections already existed. What did not was a second level: open one
+    section and every group inside it was drawn flat and wide open — thirty of
+    them across the five panels. Each group is a drawer now and drawers start
+    closed. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [drawer,css,settingsPage,mapPanel,downPanel,logPanel,fixedPanel]=await Promise.all([
+  read("app/settings/settings-drawer.tsx"),read("app/settings/settings.css"),read("app/settings/page.tsx"),
+  read("app/map-settings-panel.tsx"),read("app/down-sheet/down-sheet-settings.tsx"),
+  read("app/defect-log/defect-log-settings-modal.tsx"),read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+ ]);
+
+ /* STILL EXACTLY FIVE at the top. The drawers are a second level, not a sixth
+    section — if this ever grows, the compression has been undone. */
+ assert.match(settingsPage,/type SectionKey="master"\|"map"\|"down"\|"log"\|"fixed";/);
+
+ /* CLOSED BY DEFAULT is the whole point: an empty open list, not a list with
+    a favourite in it. */
+ assert.match(drawer,/useState<readonly string\[\]>\(\[\]\)/,"every drawer starts closed");
+
+ /* WORDING, which Curtis named: "Where you can change the title section name
+    and other things, all of that is open. That needs to be collapsed on
+    default." It appears on two surfaces and both must be behind a drawer. */
+ for(const [panel,where] of [[downPanel,"the Down Sheet"],[logPanel,"the Defect Log"]]){
+  assert.match(panel,/<SettingsDrawer title="WORDING"/,"WORDING is a drawer on "+where);
+  assert.equal(/<h3>WORDING<\/h3>/.test(panel),false,"WORDING no longer draws itself open on "+where);
+ }
+
+ /* Every panel is wrapped, so no group is left outside the system. */
+ for(const [panel,where] of [[mapPanel,"map"],[downPanel,"down sheet"],[logPanel,"defect log"],[fixedPanel,"fixed repairs"],[settingsPage,"master"]])
+  assert.match(panel,/<SettingsDrawers>/,where+" puts its groups in drawers");
+
+ /* THE WIDTH RULE. Curtis: "Accordion, but keep in mind the design for the
+    bigger screen and the PC." One-at-a-time is right on a phone and a
+    straitjacket on a shop computer, so the behaviour follows the screen and
+    the JS breakpoint is the CSS breakpoint. */
+ assert.match(drawer,/export const PHONE_QUERY="\(max-width:620px\)"/);
+ assert.match(drawer,/return phone\?\[id\]:\[\.\.\.current,id\]/,"a phone replaces the open drawer; a wide screen adds to it");
+ assert.match(drawer,/useState\(true\)/,"the phone rule is the default, because the server cannot measure a window");
+ assert.match(css,/@media\(min-width:900px\)\{[\s\S]*?\.settings-drawers\{grid-template-columns:repeat\(2[^}]*grid-auto-flow:row dense\}/,"drawers go two-up where there is room");
+ assert.match(css,/\.settings-drawer\.open\{grid-column:1\/-1\}/,"an open drawer takes the full width; dense flow stops that leaving a hole");
+ assert.equal(/settings-drawer-wide/.test(css),false,"the per-drawer width flag is gone — open state decides, so a CLOSED page is never ragged");
+
+ /* The header nav carries six links at min-width:102px and the header is a
+    flex row, so it must not be allowed to shrink: measured at 1180 it had been
+    handed 475px and every adjacent pair of links overlapped by 21.8px. */
+ assert.match(css,/@media\(min-width:761px\)\{[\s\S]*?\.settings-header nav\{flex:0 0 auto\}/,
+  "the nav keeps its own width — and ONLY in the row layout, because below 760px the header is a column where a flex-basis is a height");
+
+ /* THE BARE button{} RULE in globals.css line 2 sets height:28px, and
+    min-height cannot release a fixed height — the trap CLAUDE.md names and
+    .app-name documents. Without height:auto a two-line title on a 360px phone
+    overflows its own header, silently. */
+ const toggle=css.match(/\.settings-drawer-toggle\{[^}]*\}/)[0];
+ for(const property of ["height:auto","border:0","border-radius:0","background:","color:","padding:","font-family:inherit","font-size:inherit","font-weight:inherit"])
+  assert.ok(toggle.includes(property),".settings-drawer-toggle must answer the bare button rule's "+property);
+ assert.match(css,/\.settings-drawer-body\[hidden\]\{display:none\}/,"the body's grid display must not defeat the hidden attribute");
+
+ /* A <button> may only contain phrasing content, so the heading wraps the
+    button rather than the other way round — same shape as the section above. */
+ assert.match(drawer,/<h3 className="settings-drawer-head">\s*<button type="button" className="settings-drawer-toggle" aria-expanded=\{open\}/);
+});
+
+test("a page's settings panel does not draw a second Settings header inside its section",async()=>{
+ /* Curtis: "I also noticed that the different sections have their own settings
+    section. This looks confusing as well because the same layout is right above
+    to actually switch to that page. IT confused me a few times."
+
+    Two doublings caused that, and both are gone. The jump-link nav is asserted
+    elsewhere; this is the other one. Each page's panel carried its own
+    "DOWN SHEET ADMINISTRATION / Settings" banner, which on the Settings page
+    landed directly beneath a section header already saying the page name and
+    the word Settings. Kept for the modal path, which has no header above it —
+    hence !inline rather than deletion. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [down,log,fixed]=await Promise.all([
+  read("app/down-sheet/down-sheet-settings.tsx"),
+  read("app/defect-log/defect-log-settings-modal.tsx"),
+  read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+ ]);
+ assert.match(down,/\{!inline&&<div className="repair-editor-head">/,"the Down Sheet banner is modal-only");
+ assert.match(log,/\{!inline&&<header className="log-settings-head">/,"the Defect Log banner is modal-only");
+ assert.match(fixed,/\{!inline&&<header><span><small>FIXED REPAIRS<\/small>/,"the Fixed Repairs banner is modal-only");
+ /* The CLOSE button rode inside those headers, so it must have gone with them
+    rather than been left rendering on its own. Checked by its own markup, not
+    by "any !inline button" — the Down Sheet's DONE button is also guarded that
+    way, is unrelated, and made the first cut of this assertion fail on a
+    control that was never part of the problem. */
+ assert.equal(/\{!inline&&<button type="button" onClick=\{onClose\}>×<\/button>\}/.test(down),false,"the Down Sheet close button went with its header");
+ assert.equal(/\{!inline&&<button onClick=\{close\}>x<\/button>\}/.test(log),false,"the Defect Log close button went with its header");
+ assert.equal(/\{!inline&&<button type="button" onClick=\{close\} aria-label="Close settings">/.test(fixed),false,"the Fixed Repairs close button went with its header");
+ /* And the DONE button that IS still guarded stays guarded — it is the one
+    control here that legitimately belongs to the modal path only. */
+ assert.match(down,/\{!inline&&<button className="save-repair"/,"DONE is still modal-only");
+});
+
+test("a settings drawer follows the theme of the section it sits in",async()=>{
+ /* THE THIRD TIME THIS SHAPE HAS APPEARED. The Defect Log's own text kept
+    light-theme colours on the dark themes until the release before this one.
+    The drawers landed with the same defect one level up: DEFECT LOG and FIXED
+    REPAIRS render their section in the page's theme, three of the four themes
+    are dark, and the drawer header was pinned to a light #f1f5fb. Measured in
+    Chromium it came back rgb(241,245,251) on a rgb(16,19,24) section — a 17:1
+    jump between a control and the surface under it. Nothing was illegible,
+    which is exactly why reading the stylesheet did not catch it.
+
+    Deriving from the theme's own variables rather than pinning a second
+    palette is what stops it returning on a theme nobody has added yet, so the
+    assertion is that no drawer colour inside those two sections is a literal. */
+ const css=await readFile(new URL("../app/settings/settings.css",import.meta.url),"utf8");
+ for(const section of ["log","fixed"]){
+  const rules=css.split("\n").filter(line=>line.startsWith(".settings-section-"+section+" .settings-drawer"));
+  assert.ok(rules.length>=5,"the "+section+" section restyles its drawers ("+rules.length+" rules)");
+  for(const rule of rules){
+   const declarations=rule.slice(rule.indexOf("{")+1);
+   /* Every colour must come from a var(). A bare hex is allowed ONLY as the
+      fallback inside var(--x,#hex), which is how the fixed-repairs vars are
+      written everywhere else in this file. */
+   const literals=declarations.replace(/var\([^)]*\)/g,"").match(/#[0-9a-f]{3,8}/gi);
+   assert.equal(literals,null,"pinned colour "+literals+" in: "+rule.slice(0,90));
+  }
+ }
+ /* And the header must differ from the drawer body enough to read as a header,
+    which is why it is a mix toward the text/accent rather than the surface. */
+ assert.match(css,/\.settings-section-log \.settings-drawer-toggle\{background:color-mix\(in srgb,var\(--log-surface\) 90%,var\(--log-text\)\)/);
+});
