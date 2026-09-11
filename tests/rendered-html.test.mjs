@@ -12477,22 +12477,57 @@ test("a hold is a fact about the bus, and only time or a person lifts it",async(
  assert.equal(heldMinutes(setBusHold(bus,true,{at:at(3)}).hold,now),0);
 });
 
-test("a hold pushes to the Shop Cloud instead of sitting on one phone",async()=>{
- /* A hold touches none of the operational timestamps — placing one must not
-    reset the sitting-time clock — so without its own stamp counted, a held bus
-    would push carrying an updated_at from before the hold existed and the
-    database would drop it as out of order. For an instruction somebody else
-    gave the foreman, reaching nobody else is the whole point missed. */
- const {busUpdatedAt,busRow}=await import("../app/cloud-sync.ts");
- const older="2026-09-10T18:00:00.000Z",newer="2026-09-10T21:30:00.000Z";
- const bus={id:"b1",n:"18505",l:"road-1",s:"service",parkedAt:older,lastLocationChangeAt:older,lastStatusChangeAt:older,hold:{at:newer,by:"CT"}};
- assert.equal(busUpdatedAt(bus,"2026-09-10T22:00:00.000Z"),newer,"the hold's own stamp is the newest thing about this bus");
- /* And it travels: hold is not in MAP_HELD_BACK, so the row carries it. */
- const row=busRow(bus,{initials:"CT",deviceLabel:"shop"},"2026-09-10T22:00:00.000Z");
- assert.equal(row.map_fields.hold.at,newer);
- /* A bus with no hold carries no hold key at all, so no fingerprint moves. */
- const plain={id:"b2",n:"17516",l:"road-2",s:"service",parkedAt:older};
- assert.equal(Object.keys(busRow(plain,{initials:"CT",deviceLabel:"shop"},older).map_fields).includes("hold"),false);
+test("a hold stays on the phone that was told, and costs the cloud nothing",async()=>{
+ /* Curtis, reversing the original build: "If someone is asked to hold a bus
+    (like bay 12 guy) then they should know. It doesn't need to show up on
+    everybody's screen." A hold is an instruction one person is carrying, not a
+    fact about the fleet.
+
+    Two things have to be true for that, and only one of them is obvious. The
+    row must not CARRY the hold — and placing a hold must not push AT ALL. If
+    busUpdatedAt still counted the hold's stamp, a held bus would push a row
+    whose map_fields were byte-identical to the last one but stamped newer:
+    traffic that says "newer" while carrying nothing new, which is exactly the
+    out-of-order ammunition updated_at exists to deny. */
+ const {busUpdatedAt,busRow,rowFingerprint}=await import("../app/cloud-sync.ts");
+ const older="2026-09-10T18:00:00.000Z",newer="2026-09-10T21:30:00.000Z",now="2026-09-10T22:00:00.000Z";
+ const config={initials:"CT",deviceLabel:"shop"};
+ const plain={id:"b1",n:"18505",l:"road-1",s:"service",parkedAt:older,lastLocationChangeAt:older,lastStatusChangeAt:older};
+ const held={...plain,hold:{at:newer,by:"CT"}};
+
+ /* The hold's stamp is ignored: the newest OPERATIONAL stamp still wins. */
+ assert.equal(busUpdatedAt(held,now),older,"the hold's own stamp must not move updated_at");
+ assert.equal(busUpdatedAt(plain,now),busUpdatedAt(held,now),"holding a bus changes nothing about when it was last updated");
+
+ /* The row does not carry it. */
+ const heldRow=busRow(held,config,now);
+ assert.equal(Object.keys(heldRow.map_fields).includes("hold"),false,"hold never reaches map_fields");
+
+ /* And the decisive one: the pushed row is INDISTINGUISHABLE from the
+    unheld bus, so nothing is queued and no other device ever hears of it. */
+ assert.equal(rowFingerprint(heldRow),rowFingerprint(busRow(plain,config,now)),"placing a hold moves no fingerprint, so it pushes nothing");
+});
+
+test("a device transfer does not carry one person's holds onto everybody's board",async()=>{
+ /* The cloud is not the only way a record travels. Transfers are how one
+    device SEEDS another in this shop, so a hold riding an export would put bay
+    12's instructions on every board by the back door — the same outcome the
+    cloud change was made to prevent. The receiver's OWN hold has to survive the
+    import too: being told to hold a bus is not undone by somebody sending you
+    their board. */
+ const {exportFleetMapPayload,mergeFleetMap}=await import("../app/section-transfer.ts");
+ const now="2026-09-11T12:00:00.000Z";
+ const senderHold={at:"2026-09-11T09:00:00.000Z",by:"RM"};
+ const theirs=[{id:"a1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold:senderHold}];
+ const payload=exportFleetMapPayload(theirs,now);
+ assert.equal("hold" in payload.buses[0],false,"the export strips it");
+
+ /* Receiver holds a DIFFERENT bus, and has none on the bus being sent. */
+ const mineHold={at:"2026-09-11T11:00:00.000Z",by:"CT"};
+ const mine=[{id:"b1",n:"18505",l:"road-1",s:"service",defects:[],pendingRepair:"",hold:mineHold}];
+ const {buses}=mergeFleetMap(mine,payload);
+ assert.deepEqual(buses[0].hold,mineHold,"the receiver's own hold survives the import untouched");
+ assert.equal(buses[0].l,"garage-3","while the location it WAS sent still arrives");
 });
 
 test("the HOLD badge is a button that opens every held bus, and never shows the time",async()=>{

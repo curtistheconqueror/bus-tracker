@@ -102,10 +102,20 @@ machine, because these sessions run in containers that are thrown away.
   `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
   sets it to `undefined`: `busRow` copies every own key into `map_fields` and
   `rowFingerprint` walks `Object.keys`, so an undefined key would change every
-  bus's fingerprint and re-push the whole fleet table. `busUpdatedAt` counts the
-  hold's own stamp, or a hold would push with a timestamp from before it existed
-  and the database would drop it. No location change ever clears a hold: Curtis
-  chose that after being asked, because the buses in his case were arriving and
+  bus's fingerprint and re-push the whole fleet table.
+  **A hold is DEVICE-LOCAL and never travels** — `hold` is listed in
+  `MAP_HELD_BACK` (`cloud-sync.ts`) and in `MAP_EXCLUDED` (`section-transfer.ts`),
+  so it reaches neither the Shop Cloud nor an export, and being in `MAP_EXCLUDED`
+  also means an incoming transfer keeps the RECEIVER's own hold. Curtis:
+  *"If someone is asked to hold a bus (like bay 12 guy) then they should know.
+  It doesn't need to show up on everybody's screen."* It follows that
+  `busUpdatedAt` must **not** count the hold's own stamp — it did from the first
+  build, when holds still synced, and the reason inverted with the rule.
+  Counting it now would stamp a row newer while its `map_fields` were
+  byte-identical: a push claiming to be newer while carrying nothing new, which
+  is the out-of-order ammunition `updated_at` exists to deny. Placing a hold
+  moves no fingerprint and pushes nothing at all.
+  No location change ever clears a hold: Curtis chose that after being asked, because the buses in his case were arriving and
   arriving is a move. The `until` time is optional and is an expiry, applied at
   read time — an expired hold is left on the record, not rewritten away.
 - **The Down Sheet owns the DS badge.** Entries get there off photographed

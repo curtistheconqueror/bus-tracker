@@ -46,7 +46,16 @@ const DEFECT_FIELDS=["defects","pendingRepair"] as const;
    keeps whatever the receiving device's own Down Sheet says. To move down
    status, move the Down Sheet. */
 const DOWN_SHEET_FIELDS=["down","onDownSheet","downSheetReady"] as const;
-const MAP_EXCLUDED=[...DEFECT_FIELDS,...DOWN_SHEET_FIELDS];
+/* A HOLD IS DEVICE-LOCAL, so it does not ride a transfer either. Curtis:
+   "If someone is asked to hold a bus (like bay 12 guy) then they should know.
+   It doesn't need to show up on everybody's screen." Transfers in this shop
+   are how one device SEEDS another, so carrying holds would put one person's
+   instructions on everybody's board by the back door — the same outcome the
+   cloud change was made to prevent. Listing it here also means line 191 keeps
+   the RECEIVER's own hold, so importing a board never clears what this phone
+   was told to hold. */
+const HOLD_FIELDS=["hold"] as const;
+const MAP_EXCLUDED=[...DEFECT_FIELDS,...DOWN_SHEET_FIELDS,...HOLD_FIELDS];
 
 export type TransferBus={id?:string;n?:string;[key:string]:unknown};
 export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[]};
