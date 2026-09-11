@@ -1,6 +1,38 @@
 # Publish next
 
-**STATUS: 172 IS PENDING — publish from `3de6dab`.**
+**STATUS: PUBLISHED AS SITES VERSION 173 from `3de6dab` — but `main` does not
+have it yet, and PR #6 is still open.**
+
+## ⚠️ THE LIVE CODE IS NOT ON `main`
+
+Codex published `3de6dab` as **Sites Version 173** (the number went 171 → 173;
+172 was skipped). The build is live and passed all 291 tests, lint and build.
+
+At the time of writing, `main` is still `5a36d35` and `3de6dab` is **not an
+ancestor of it**. PR #6 is open, unmerged, mergeable-clean. So:
+
+- The site is serving code that exists only on
+  `claude/codex-workflow-docs-fn9any`.
+- `docs/PUBLISH_NEXT.md` **on main** still reads "NONE PENDING — 171 is live".
+- `docs/RELEASES.md` **on main** has no row for 173; its newest row is 171.
+- `RELEASES.md` says "Git commits remain the authoritative rollback points" —
+  and the commit this release was built from is not on the branch anybody would
+  roll back to.
+
+**The fix is to merge PR #6**, after which the 173 record belongs in
+`RELEASES.md` and `PROJECT_HANDOFF.md` and this file gets reset, all of which
+are Codex's to do. Nothing needs rebuilding: the published artifact is correct.
+
+This STATUS line is the one thing Claude keeps current, and it is deliberately
+NOT saying "172 is pending" any more — leaving that would have had the next
+session publish `3de6dab` a second time under a number that is already taken.
+
+---
+
+**What 173 contains** is everything described below as 172. The section
+headings are left alone rather than renumbered, because the SHA is what a
+publish is keyed to and `3de6dab` is unambiguous; renaming the sections would
+only make this file disagree with the commit messages and the PR.
 
 Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
 on top of it, plus the merge that brought 171's own record into the branch —
