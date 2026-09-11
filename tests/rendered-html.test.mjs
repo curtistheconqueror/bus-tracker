@@ -12746,3 +12746,50 @@ test("a settings drawer follows the theme of the section it sits in",async()=>{
     which is why it is a mix toward the text/accent rather than the surface. */
  assert.match(css,/\.settings-section-log \.settings-drawer-toggle\{background:color-mix\(in srgb,var\(--log-surface\) 90%,var\(--log-text\)\)/);
 });
+
+test("an imported helper is never called as a method on a record",async()=>{
+ /* HOVERING ANY BUS BLANKED THE FACILITY MAP, and it shipped — it was live as
+    Sites Version 173 until this commit.
+
+    The quick-view portal called `bus.isHeld(bus)`. There is no such method;
+    `isHeld` is a module import, used correctly as `isHeld(bus)` thirty
+    characters earlier in the same line for the token badge. Hovering threw
+    TypeError, React unmounted the root, and the board went blank until reload
+    — measured as tokens 2 -> 0 and document.body 90,569 -> 19,099 bytes.
+
+    NOTHING CAUGHT IT. eslint is not type-aware here, `vinext build` does not
+    typecheck, and 295 tests passed: the suite asserts on source text, and the
+    source text looked plausible. So the check has to be for the SHAPE — an
+    imported function invoked as a property of something else. */
+ const files=["app/page.tsx","app/defect-log/page.tsx","app/down-sheet/page.tsx",
+  "app/fixed-repairs/page.tsx","app/lists/page.tsx","app/settings/page.tsx",
+  "app/deferred-board.tsx","app/recommended-board.tsx","app/mystery-board.tsx","app/hold-board.tsx"];
+ for(const file of files){
+  const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
+  /* Every name brought in by a braced import, which is how this repo imports
+     helpers. Default imports are components and are not called this way. */
+  const imported=new Set();
+  for(const match of source.matchAll(/import\s*\{([^}]*)\}\s*from/g))
+   for(const part of match[1].split(","))
+    {const name=part.split(/\s+as\s+/).pop().trim().replace(/^type\s+/,"");if(/^[a-z]\w*$/.test(name))imported.add(name)}
+  for(const name of imported)
+   for(const hit of source.matchAll(new RegExp("([A-Za-z_$][\\w$]*)\\."+name+"\\s*\\(","g")))
+    assert.fail(file+" calls the imported helper `"+name+"` as a method: `"+hit[0]+"` — it takes the record as an argument, so this throws at runtime and unmounts the page");
+ }
+});
+
+test("the bus quick-view reads its flags the same way the token badge does",async()=>{
+ /* The second half of the same crash: a bare `deferredHeld`, undeclared in
+    that scope. `deferredHeld` is DERIVED per render at page.tsx — the stored
+    record's own value is overwritten — so the only correct reading is
+    `bus.deferredHeld`, which the token badge and the aria-label both use.
+    Pinning all three to the same spelling is what stops them drifting again. */
+ const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ const quick=page.slice(page.indexOf('className={"quick-view '));
+ assert.ok(quick.length>0,"the quick-view portal is still in this file");
+ assert.match(quick,/\{isHeld\(bus\)&&<span className="quick-detail bus-hold-detail-row"/);
+ assert.match(quick,/\{bus\.deferredHeld&&<span className="quick-detail deferred-held-detail"/);
+ assert.equal(/\{deferredHeld&&/.test(page),false,"a bare deferredHeld is not declared in that scope");
+ /* deferredHeld really is derived and really does overwrite the record. */
+ assert.match(page,/deferredHeld:deferredHeldSet\.has\(bus\.id\)/);
+});
