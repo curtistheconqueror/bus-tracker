@@ -19,6 +19,22 @@ function readSavedValue(storage:Pick<Storage,"getItem">,key:string){
  try{return JSON.parse(storage.getItem(key)||"null")}catch{return null}
 }
 
+/* THIS FILE CARRIES A BUS'S `hold` AND THAT IS DELIBERATE — do not add a
+   filter here to match section-transfer's MAP_EXCLUDED.
+
+   A hold is device-local: it is held back from the Shop Cloud and from a
+   section transfer, because those SHARE one person's instruction with
+   everybody. Curtis: "If someone is asked to hold a bus (like bay 12 guy) then
+   they should know. It doesn't need to show up on everybody's screen."
+
+   MASTER EXPORT is not sharing. It is a device CLONE — it already carries the
+   board settings, the Down Sheet settings, the Defect Log settings, parts
+   memory and findings memory, every one of which CLAUDE.md lists as per-device
+   and never synced, and MASTER IMPORT is the one import in the app that
+   REPLACES rather than merges. A foreman whose phone died should arrive on the
+   new one with the holds he was told about, along with everything else that
+   made it his device. Stripping `hold` here while keeping the rest would be
+   the inconsistent choice, not the careful one. */
 export async function exportFleetBoardBackup(storage:Storage,buses:unknown[]){
  const exportedAt=new Date(),filename="fleet-board-"+exportedAt.toISOString().slice(0,10)+".json",payload={kind:"pace-south-fleet-board-backup",version:5,exportedAt:exportedAt.toISOString(),buses,settings:readSavedValue(storage,BOARD_SETTINGS_STORAGE_KEY),downSheet:readSavedValue(storage,DOWN_SHEET_STORAGE_KEY),downSheetSettings:readSavedValue(storage,DOWN_SHEET_SETTINGS_STORAGE_KEY),defectLogSettings:readSavedValue(storage,DEFECT_LOG_SETTINGS_STORAGE_KEY),partsMemory:readSavedValue(storage,PARTS_MEMORY_STORAGE_KEY),busLists:readSavedValue(storage,BUS_LISTS_STORAGE_KEY),busListTemplates:readSavedValue(storage,BUS_LIST_TEMPLATES_STORAGE_KEY),findingsMemory:readSavedValue(storage,FINDINGS_MEMORY_STORAGE_KEY)},contents=JSON.stringify(payload,null,2),blob=new Blob([contents],{type:"application/json"});
  const outcome=await shareOrDownloadFile(blob,filename,"Fleet Board Backup");

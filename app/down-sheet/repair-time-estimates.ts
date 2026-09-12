@@ -34,7 +34,7 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
  "No Start":30, /* legacy category, kept so an unmigrated read still estimates sensibly */
  "Doors, Ramp and ADA":180,
  "Doors, Ramp and Lift":180, /* legacy category, kept so an unmigrated read still estimates sensibly */
- "Lights and Fixtures":60,
+ "Lights, Mirrors and Alarms":60,
  "Bodywork":240,
  "Pneumatic System":180,
  "Air System":180, /* legacy category, kept so an unmigrated read still estimates sensibly */

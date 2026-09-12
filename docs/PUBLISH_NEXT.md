@@ -1,25 +1,722 @@
 # Publish next
 
-**STATUS: NONE PENDING — repository release 168 is live from `64ec7d2` as Sites Version 164.**
+**STATUS: 173 IS LIVE from `3de6dab`, `main` still does not have it, and there
+is now UNPUBLISHED WORK ON TOP — build the next release from the branch head,
+not from `3de6dab`. PR #6 is still open.**
 
-**Version 168 is live.** It is one Down Sheet feature commit with no fleet, repair, database, dependency, or infrastructure migration.
+## ⚠️ THE LIVE CODE IS NOT ON `main`
 
-- **DEFERRED BUSES gets its own board**, directly under MYSTERY BUSES and in the
-  same shape. The two answer one question between them: a bus on property the
-  sheet does not explain is very often a bus somebody deferred. Each card shows
-  how long the bus has been held and carries the two ways out the Defect Log
-  already offers — PUT ON DOWN SHEET and RETURN TO SERVICE. Collapsed by default.
-- **The ORDER dropdown beside the search box is gone.** The sheet is numerical
-  inside each band either way. What replaces it is **SECTION ORDER** in the Down
-  Sheet settings — which band is read first, moved with up/down buttons.
-- **The app name is larger again** — 21px, 24px on a phone.
+Codex published `3de6dab` as **Sites Version 173** (the number went 171 → 173;
+172 was skipped). The build is live and passed all 291 tests, lint and build.
 
-One new storage key, `pace-down-sheet-deferred-collapsed-v1`, documented in
-`CLAUDE.md`. Nothing renamed, no records touched. 250 tests, lint and build all
-clean; measured in Chromium at 390 and 1180.
+At the time of writing, `main` is still `5a36d35` and `3de6dab` is **not an
+ancestor of it**. PR #6 is open, unmerged, mergeable-clean. So:
+
+- The site is serving code that exists only on
+  `claude/codex-workflow-docs-fn9any`.
+- `docs/PUBLISH_NEXT.md` **on main** still reads "NONE PENDING — 171 is live".
+- `docs/RELEASES.md` **on main** has no row for 173; its newest row is 171.
+- `RELEASES.md` says "Git commits remain the authoritative rollback points" —
+  and the commit this release was built from is not on the branch anybody would
+  roll back to.
+
+**The fix is to merge PR #6**, after which the 173 record belongs in
+`RELEASES.md` and `PROJECT_HANDOFF.md` and this file gets reset, all of which
+are Codex's to do. Nothing needs rebuilding: the published artifact is correct.
+
+This STATUS line is the one thing Claude keeps current, and it is deliberately
+NOT saying "172 is pending" any more — leaving that would have had the next
+session publish `3de6dab` a second time under a number that is already taken.
+
+---
+
+## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
+
+Two changes landed on this branch AFTER `3de6dab` was published. **They are not
+live.** Whatever number comes next — 174 unless Codex has taken it — should be
+built from the branch head, not from `3de6dab`.
+
+```
+git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
+```
+
+### 1. A HOLD is now DEVICE-LOCAL
+
+Curtis reversed the original design: *"If someone is asked to hold a bus (like
+bay 12 guy) then they should know. It doesn't need to show up on everybody's
+screen."* A hold is an instruction one person is carrying, not a fact about the
+fleet.
+
+`hold` is now in **`MAP_HELD_BACK`** (`cloud-sync.ts`) and in **`MAP_EXCLUDED`**
+(`section-transfer.ts`), so it reaches neither the Shop Cloud nor a section
+transfer.
+
+**MASTER EXPORT still carries it, on purpose.** That file is a device CLONE,
+not a share — it already carries `pace-board-settings-v1`,
+`pace-down-sheet-settings-v1`, `pace-defect-log-settings-v1`, parts memory and
+findings memory, every one of which CLAUDE.md lists as per-device and never
+synced, and MASTER IMPORT is documented as the one import that REPLACES rather
+than merges. A foreman moving to a new phone should arrive with the holds he
+was told about. Stripping `hold` there while keeping every other per-device key
+would be the inconsistent choice, not the safe one.
+Transfers are how one device seeds another here, so leaving that second gate
+open would have put bay 12's instructions on every board by the back door.
+Being in `MAP_EXCLUDED` also means an incoming transfer keeps the RECEIVER's
+own hold rather than overwriting it.
+
+The non-obvious half: **`busUpdatedAt` no longer counts the hold's own stamp.**
+It did from the first build, when holds synced and a hold pushing with a
+pre-hold timestamp would have been dropped as out of order. With holds held
+back the reason inverts — counting it would send a row whose `map_fields` are
+byte-identical but stamped newer. Placing a hold now moves no fingerprint and
+pushes nothing at all, asserted by comparing `rowFingerprint` of the held and
+unheld bus.
+
+**No storage key changed and nothing on disk needs migrating.** A device
+already holding a synced hold keeps it; it simply stops travelling. Holds that
+already reached the cloud stay in the table until that row is next written —
+harmless, since nothing reads `map_fields.hold` back any more.
+
+### 2. Settings: every group is behind a closed drawer
+
+Curtis: *"Its a lot and i do mean a LOT!! ... compress all of the settings in
+such a way where there is only 5 sections ... very digestible and easy to
+navigate."*
+
+The five sections were already there; the thirty groups inside them were not
+collapsed. Now 25 drawers, none open on arrival — **WORDING** included, which
+he named specifically. The accordion follows the screen rather than the device:
+one-at-a-time under 620px, several at once above it with drawers packing
+two-up.
+
+Two duplications went, both of which he hit: the jump-link row that sat under
+the page nav carrying four of the same labels, and each panel's own
+"PAGE NAME / Settings" banner sitting beneath a section header that said the
+same thing.
+
+Four defects were found by MEASURING and would not have been found by reading:
+the header nav had been handing six links 475px of a needed 642px so every
+adjacent pair overlapped by 21.8px (already broken before this change, at
+5.4px); the drawers kept a light header on the three dark themes, 17:1 against
+the section under them; three of five section stripes silently lost to a
+`border-color` shorthand in a later rule; and a `flex-basis` became a height in
+the phone's column layout and opened a 340px gap.
+
+### Gates
+
+`npm test` — **295 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+clean. Measured in Chromium at 360 / 390 / 1180 on all four themes.
+
+---
+
+**What 173 contains** is everything described below as 172. The section
+headings are left alone rather than renumbered, because the SHA is what a
+publish is keyed to and `3de6dab` is unambiguous; renaming the sections would
+only make this file disagree with the commit messages and the PR.
+
+Release 171 is live from `649cef5` as Sites Version 171. 172 is one code change
+on top of it, plus the merge that brought 171's own record into the branch —
+`ae42731` is the head to build, not `62d96d6`, because the merge carries the
+resolved test file.
+
+**Read the SHA above, not one you remember.** Recompute rather than trust it:
+
+```
+git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
+```
+
+## What 172 is
+
+Three things: a bug that made three of the four themes unreadable, a readability
+pass on the closing line and the spacing around an opened bus, and **HOLD THIS
+BUS** — a new per-bus status.
+
+### The line under FLEETSTEP
+
+9px to `clamp(10px,2.9vw,12px)`, so it grows with the screen instead of being
+one size on a phone and a shop computer.
+
+### HOLD THIS BUS
+
+Curtis: "somebody just asked me about two buses that are gonna probably come in
+to B12, and if they do, they want me to hold those buses, because they got work
+they have to do on them. There's no feature in the app that allows you to do
+that."
+
+- A standing instruction on a BUS, set from the **Facility Map bus editor** and
+  from an opened bus on the **Defect Log**. Both, because the Defect Log only
+  draws buses that have defects and a bus somebody wants kept usually has
+  nothing wrong with it — in this case the buses had not arrived yet.
+- **Nothing about where the bus is ever clears it.** Curtis first said a
+  location move should lift it, then chose otherwise when asked: his buses were
+  arriving, and arriving is a move.
+- **The time is optional** and is an expiry, applied at read time. Left blank
+  the hold stands until somebody takes it off. An expired hold is left on the
+  record rather than rewritten away.
+- **Pressing any HOLD badge lists every held bus** with its time, where it is,
+  and how long it has been held. The time appears only there, never on the
+  badge.
+- New optional `hold` field on the bus record in `pace-board-v1`. **No new
+  storage key, no rename.**
+
+  > ⚠️ **SUPERSEDED — do not read the rest of this bullet as current.** As
+  > shipped in 173 the hold synced and `busUpdatedAt` counted its stamp. Both
+  > were reversed afterwards; see "A HOLD is now DEVICE-LOCAL" near the top of
+  > this file. Left here rather than rewritten because this section describes
+  > what Sites Version 173 actually contains, and 173 is still what is live.
+
+### What to check once HOLD is live
+
+- On the Facility Map, open any bus → **HOLD THIS BUS** → PUT ON HOLD. An amber
+  HOLD badge appears on its token and a HOLD count appears in the tools row.
+- Press either badge: the list of every held bus. Take one off from there.
+- Hold a bus with **no defects at all** — it must still work, and it will not
+  appear on the Defect Log.
+- Set a time on one, then move that bus somewhere else. **The hold must
+  survive the move.**
+- On the Defect Log, open a bus → HOLD BUS beside + ADD DEFECT.
+
+
+
+**One commit, one bug, no new setting and nothing that rewrites a record.**
+Rolling back is redeploying 171 (`649cef5`, Sites Version 171).
+
+### The three dark themes were rendering light-theme text
+
+Every rule in `app/defect-log/defect-log.css` that draws Defect Log text
+already had a theme-aware fallback behind it —
+`var(--log-repair-category-color,var(--log-accent))`,
+`var(--log-repair-details-color,var(--log-text))`, and so on. They were written
+that way deliberately and **not one had ever fired**: the page defined all seven
+colour variables from the settings blob whether or not anybody had chosen them,
+and the shipped values are light-theme hex.
+
+Measured on the Defect Log at 1180px, WCAG 2 contrast against the effective
+background, with nothing customised:
+
+| | light | dark | midnight | tactical |
+| --- | --- | --- | --- | --- |
+| LIVE REPAIR FEED | 10.77 | 1.49 | 1.50 | **1.05** |
+| repair text | 11.80 | **1.07** | **1.08** | 1.57 |
+| category heading | 4.92 | 2.24 | 2.21 | 1.52 |
+
+1.05:1 is the same colour as the background. The defect text — what the page
+exists to show — was invisible on Dark, Midnight and Tactical.
+
+`displayStyleVars` now omits any colour still on its shipped value, so the
+fallback answers. After:
+
+| | light | dark | midnight | tactical |
+| --- | --- | --- | --- | --- |
+| LIVE REPAIR FEED | 10.77 | 5.85 | 6.53 | 4.83 |
+| repair text | 11.80 | 12.15 | 11.14 | 7.55 |
+| category heading | 4.92 | 4.71 | 5.17 | 3.77 |
+
+**The light theme is byte-identical**, deliberately. Those seven values ARE
+light-theme colours picked by hand for this app on white — LIVE REPAIR FEED's
+`#163c70` is a deeper navy than the accent on purpose. Deferring on light too
+swapped it for the accent and dropped it from 10.77:1 to 5.77:1: still legible,
+still a change nobody asked for, on the theme almost everybody uses. So light
+keeps its defaults; the three dark ones and any custom palette defer.
+
+**A colour somebody actually picked still wins**, on every theme — verified in
+Chromium, not reasoned about: Tactical with the Repair Title pinned red renders
+`rgb(195,38,47)` while the feed title beside it follows the theme.
+
+Settings says which is which. A following colour is tagged **FOLLOWING THEME**,
+because its swatch is showing a colour the screen is not using; a pinned one
+gets a **FOLLOW THEME** button that sets it back to the shipped value — which
+IS the "no choice made" value, not a new sentinel needing its own validation.
+
+Nothing on disk is rewritten. Read-time, like every other default here.
+
+### What to check once 172 is live
+
+- **Switch the Defect Log to Dark, then Midnight, then Tactical.** The repair
+  text, the category headings and LIVE REPAIR FEED should all be plainly
+  readable. Before this release they were near-invisible on all three.
+- **The Light theme must look EXACTLY as it did.** That is the half of this
+  change most likely to have gone wrong, so check it first and on a phone.
+- Settings → Defect Log → TEXT STYLE: six entries tagged FOLLOWING THEME.
+  Pick a colour on one; the tag goes and a FOLLOW THEME button appears. Press
+  it and the tag comes back.
+- Fixed Repairs shares this settings key — confirm its theme still applies.
+
+### Still below AA, and left alone on purpose
+
+The Repair Title on **Tactical** measures 3.77:1, under the 4.5 standard. That
+is the Tactical palette's own accent on its own surface. This change improved it
+2.5x from 1.52:1, but fixing it properly means altering the Tactical palette,
+which is a visible design decision rather than a bug fix. Flagged to Curtis.
+
+---
+
+Everything below this line is the 171 record, kept for the rollback table and
+the release history.
+
+## The 171 record
+
+## ⚠️ BEFORE ANYTHING ELSE: CONFIRM WHAT IS ACTUALLY DEPLOYED
+
+Curtis has now reported three times that tapping the FLEETSTEP title does not
+take him to the home screen. **It is not a code bug** — the fix has simply never
+reached his phone. What the title is, per release:
+
+| Release | Sites | The title is | Tapping it does |
+| --- | --- | --- | --- |
+| 169 | 165 | `<b>` — plain bold text | **nothing at all; it is not a control** |
+| 170 | 166 | `<a href="/">` | goes to the Facility Map, not the home screen |
+| **171** | 171 | `<button>` → the home screen | **live** |
+
+**There may be a discrepancy between the record and the deployment.** This file
+and `docs/RELEASES.md` both say release 170 / Sites 166 is live from `bdca898`.
+Curtis says Codex told him the release is **169**. If the site really is serving
+169, then 170 never went out either — and 170 existed only because the SCAN
+SHEET fixes missed 169. That would be three releases in a row where the record
+and the deployment disagreed.
+
+**So: check what Sites is actually serving before publishing 171, and tell
+Curtis the number you find.** If 170 is genuinely not live, 171 carries it
+forward anyway — `649cef5` contains every line of 170 — so publishing 171 fixes
+both. Nothing needs to be published twice.
+
+Verified in Chromium on `3102444` (still true of `649cef5`, which only adds to
+it), all six surfaces at 390px and 1180px: the
+title renders as a `<button>`, the tap lands on the button itself (nothing
+covers it), and the home screen opens full-screen and visible.
+
+---
+
+Release 171 is recorded as live from `649cef5` as Sites Version 171.
+
+**Read the SHA above, not a SHA you remember.** `649cef5` is the last CODE
+commit; above it sit Codex's own 170 release record, this handoff, and the merge
+that joined them — docs only, none of it belonging in a build. The 169 handoff
+named a SHA that had been the head when it was written, two code commits landed
+after it, and 169 shipped without them. That is what 170 was for and it is the
+mistake not to repeat here. **If more work lands before you get here, re-check
+this SHA first.**
+
+## What 171 is
+
+No migration, no schema change, no dependency change, and nothing that rewrites
+a record. **Two new storage keys, both per-device and neither renaming
+anything** (`pace-down-sheet-recommended-collapsed-v1`, `pace-role-v1`),
+eighteen new catalog options, one new optional field on a defect, a third board
+on the Down Sheet, the Defect Log's two pickers rebuilt as typing fields, and
+**two bugs fixed that are live in 170** — one of them a wrong label on the
+control Curtis had just used.
+
+**Recount the commits from the SHA above rather than trusting a number here.**
+This section has been written across several sittings and the count is the one
+thing in it that goes stale silently.
+
+- **The Facility Map's header joins the other five.** It was the one page whose
+  nav sat above its own name — Curtis, on a phone: *"the facility map needs to
+  get on board with title design. Fleetstep should be at top."* On the page the
+  app opens on, FLEETSTEP was the fifth thing down the screen.
+
+  The nav now follows the header, and the header carries the same four lines
+  every other page draws: the name, a FLEET MAINTENANCE kicker, an h1 that is
+  the page's own name (**Facility Map**, matching what the nav calls it), and a
+  subtitle. The long all-caps sentence that had been doing all four jobs at once
+  became the subtitle's one job, so no wording is lost.
+
+  The h1 also takes an explicit size. It was `font-size:inherit` from the bare
+  `header` rule, and the phone block drops that header to 11px — so the map's
+  own title had been rendering *smaller on a phone* than the kicker line on
+  every other page. 25px desktop, 22px phone, the two sizes the other five use.
+
+- **The map's phone nav actually sticks.** It has carried
+  `position:sticky;top:0` since that rule was written and has never pinned
+  anything: `overflow-x:hidden` makes an element a scroll container, so the nav
+  was sticking to `.app`, which does not scroll — the document does. Swapping
+  those three declarations to `overflow-x:clip` (with `hidden` left in front as
+  the fallback for older browsers) gives it the viewport as its container.
+  Measured pinned at y0 from scrollY 400 all the way to 4200 on a 5123px page,
+  with no horizontal bleed introduced on any of the six pages at 360/390/430/820.
+
+- **Wipers and Washers join the defect catalog**, under Bus Accessories: wiper
+  blade and wiper motor each curbside and roadside; washer not spraying, pump,
+  reservoir, and a nozzle per side; plus a catch-all. Ten options in one new
+  group. Purely additive to what is LIVE — nothing a device holds is renamed or
+  moved, no rename map is involved, and the group sits last so nothing above it
+  shifted in the picker. Verified in the browser: Bus Accessories offers 50
+  options where it offered 40, and the new ones store and display correctly.
+
+- **The Defect Log's CATEGORY and DEFECT pickers are now typing fields.** Tap one
+  and the whole list opens as before; type and it narrows. The DEFECT field
+  searches **every category at once** and fills the category in for you, so
+  nobody has to know a wiper motor lives under Bus Accessories before logging
+  one. Ranked rather than substring-matched — word starts beat mid-word hits,
+  every typed word must appear, and there is deliberately no fuzzy matching, so
+  a typo returns nothing rather than the wrong part. Storage is untouched: the
+  search reaches the catalog's own strings and never spells a new one.
+  The list reads at the size of the field that opened it — 16px on a phone, the
+  same size the old drop-down drew its options at.
+
+- **Six more defects from the floor**: *Ramp will not lock* and *Ramp does not
+  fully cycle* under Ramp, Lift and Kneeler; *Marker lights - C/S*, *Marker
+  lights - R/S* and *Clearance lights* under Lights, Mirrors and Alarms; and
+  *Water in air storage tanks* under Pneumatic System. Purely additive.
+
+- **The welcome screen's second line** now reads *Transit Maintenance Work
+  Solutions* instead of *PACE SOUTH · FLEET MAINTENANCE* — what the app calls
+  itself rather than what one garage calls itself. Verified alongside it that
+  **Lite can always be turned back off from inside Lite**: Settings stays in the
+  nav, the switch is on it, and unticking returns the device to Full. Three
+  tests now hold that door open.
+
+- **The app name opens the home screen from every page.** It was pointed at `/`
+  (the Facility Map) first; it now opens the welcome screen itself, which is what
+  Curtis meant. A first run must still answer FULL or LITE — the close only
+  exists once the question has been answered, so looking at it changes nothing.
+- **The defect picker's sections are back.** Browsing the list is divided by
+  faded group headings the way the old `<optgroup>` divided it (FAREBOX, VENTRA,
+  CUBIC SCREEN…); a ranked search keeps the group on each row instead, because
+  headings stop dividing anything once results interleave.
+- **Add coolant (glycol)** and **Add transmission fluid** join *Add engine oil*
+  in Preventive Maintenance, and **one stop at the fluid cart is one record.**
+  Pick any of the three and an ALSO TOPPED UP row offers the other two, so a bus
+  that took oil, glycol and transmission fluid is one repair to read rather than
+  three. Curtis: *"The one record listing several probably best and is less
+  clutter."*
+
+  The quarts box now appears for all three. It was gated on the one string
+  "Add engine oil" while the catalog had already been told all three carry an
+  amount, so glycol and transmission fluid had been setting a unit that nothing
+  could ever put a number in. The count stays with the fluid the record is filed
+  under — the shop counts quarts of oil and does not count glycol — and the
+  label names which one once a second fluid is on the record.
+
+  `fluids` is a **new optional field on a defect**, not a new storage key: it
+  rides inside `pace-board-v1` beside `symptoms`, and it rides to the Shop Cloud
+  inside `detail` the same way. A record that has none does not carry the key at
+  all, so **no existing row's cloud fingerprint changes** and nothing re-pushes.
+
+- **A third board on the Down Sheet: RECOMMENDED FOR DOWN SHEET**, directly
+  under MYSTERY BUSES and DEFERRED BUSES, reusing their look down to the action
+  buttons with the Down Sheet's own blue as its stripe. Curtis: "right under
+  both of them, same color and everything, same functionality, with the same
+  number count."
+
+  It counts BUSES, not rows, so two recommendations on one bus count once, and
+  it drops a bus as soon as the repair is fixed, deleted, or put on the sheet —
+  the "in sync" part he asked for. A bus already on the sheet is not listed, the
+  same rule DEFERRED applies one board up. Nothing here goes overdue: a
+  recommendation waiting a week has not gone wrong.
+
+- **The same list in QUICK FILTERS now says how long each bus has been waiting**
+  and carries two actions: MARK FIXED closes the repair out, REMOVE withdraws
+  the recommendation and leaves the repair open. They are the Down Sheet's own
+  row actions — its tick and its cross — and neither destroys a record. The
+  board and the drawer share one counting function so they cannot disagree.
+
+- **DEFERRED no longer claims the bus is on property.** Curtis: "deferred buses
+  do not have to be on property... whether they're here or on the road." The
+  counting was already right; the subtitle was not, which is the worse half to
+  get wrong — a wrong number gets questioned, a wrong label invites the next
+  person to change the code until it agrees.
+
+- **A BUG THAT IS LIVE IN 170: unticking RECOMMEND FOR DOWN SHEET never stuck.**
+  The setter deletes its key, and the save merged with `{...existing,...incoming}`
+  where a missing key cannot override the stored value — so the recommendation
+  came back on the next read, in the defect editor too. `workStates` had this
+  exact bug, was fixed, and nobody checked whether anything else was deleted the
+  same way. Two fields are. A test now derives that list from the catalog so a
+  third cannot be forgotten. **Anybody who tried to withdraw a recommendation
+  since DS REC shipped will find it still there until this publishes.**
+
+- **The home screen asks what you do.** A collapsible MY ROLE panel under the
+  FULL/LITE choices: Transportation (Bus Operator, Dispatch, Superintendent) or
+  Maintenance (Servicer, Mechanic / Technician, Foreman, Superintendent).
+
+  **It is cosmetic and must stay that way.** Curtis: "there will be no special
+  conditions in the app for any of the working roles. This is all cosmetic. We
+  will wire that up later." A test asserts no surface outside the picker reads
+  the key. It is per-device and never synced, and a first run still cannot get
+  past the gate without answering FULL or LITE.
+
+- **A bus that keeps coming back is now counted.** Curtis: "if a person tries
+  to re-submit something in defects, I want a tally of how many times with the
+  date stamped... this way I know how many round trips a bus is making without
+  the repair." It was not done — the app already refused the repeat and counted
+  nothing.
+
+  The ALREADY LOGGED banner offers **+ COUNT THIS RETURN** beside OPEN IT.
+  Deliberate rather than automatic: counting when the banner merely appears
+  would count a foreman scrolling the picker. A second press inside two minutes
+  is treated as a thumb and refused.
+
+  **ADVANCED STATS** is a new section at the bottom of the **FOCUS view only**,
+  under however many defects the bus is carrying — "the list can drop further
+  down and just scroll to read." It holds the round-trip total for the bus, the
+  breakdown per repair, and every return with its date and initials. It is a
+  section rather than one number because more is going in it.
+
+  `reportAttempts` is another optional field on a defect, absent when empty, so
+  no row fingerprint moves. Nothing ever removes a return — saves and duplicate
+  merges both take the union.
+
+- **MY ROLE asks three things**: department, then **union or non-union**, then
+  the job — and the second narrows the third, because Curtis gave the split:
+
+  | | Union | Non-Union |
+  | --- | --- | --- |
+  | Transportation | Bus Operator, Relief Supervisor | Dispatch, Asst Supt, Supt |
+  | Maintenance | Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+
+  Foreman is on the non-union side — the one job a transit shop cannot assume.
+  *Bargaining* names the union side, so it can never be the non-union label;
+  Union / Non-Union is what the floor says. The status is drawn as a tag beside
+  the name rather than a third dot-separated part of it. A combination outside
+  that table cannot be chosen and does not read back, so a contract change moves
+  a job in `app/roles.ts`.
+
+- **The two Superintendent roles are abbreviated**: *Asst Supt* and *Supt*, in
+  both departments. Curtis: "we have asst supt, so that is why I want it
+  shortened, so the label can show both like Asst Supt & Supt simultaneously."
+
+  He has also said the roles **will** decide access, on a person's own login,
+  with a questionnaire that does not exist yet. Still cosmetic in this release,
+  and `roles.ts` and `CLAUDE.md` now record both the intent and why it does not
+  start in this key: it is an unauthenticated string a phone's holder can change
+  from the screen that set it, so it can be the label a login confirms and never
+  the thing that decides.
+
+- **A trouble bay is no longer called the Main Garage.** Curtis moved Bus 17516
+  to B12 from the Defect Log and the line under the bus number still read Main
+  Garage: *"it believes that it's in b twelve, which is in the main garage, but
+  there is a distinction there."*
+
+  There is, and the app already knew it everywhere except the label. The MOVE
+  editor offers MAIN GARAGE (BAYS 1-10), TROUBLE BAY 11 and TROUBLE BAY 12 as
+  three separate destinations; the AI operator is told in so many words that
+  "Main Garage means bays 1-10 only"; the map draws a divider down that column.
+  Only the label disagreed — and a label that disagrees with the control that
+  set it is worse than a missing one, because the foreman did the right thing
+  and the screen told him it had not taken.
+
+  The cause was that **five** copies of that label existed and every one of them
+  matched on the slot prefix, so all 84 garage spaces answered "Main Garage".
+  They are now one module, `app/location-label.ts`, which resolves a slot
+  through the same `RELOCATION_AREAS` table the move editor writes with. Two
+  drifts between those copies went with it: Fixed Repairs had no OFF PROPERTY
+  entry at all, so a bus away at a vendor printed as the raw `offsite-3`, and
+  the shared-list export's SHOP WALL prefix was missing its hyphen.
+
+- **DEFERRED and RECOMMENDED FOR DOWN SHEET can be narrowed to what is recent.**
+  Curtis: *"let's say there's 20 buses on either list, if those 20 buses were
+  collected over the period of three days, I wanna be able to filter it down to
+  just the most recent 24 hours, so the most recent five hours or whatever the
+  case may be — if I don't want to send that whole list to somebody."*
+
+  A row of chips — ALL, 1H, 4H, 8H, 24H, 3D, 7D — on all four places those two
+  lists appear: both boards on the Down Sheet and both quick-filter drawers on
+  the Defect Log. **Only those two**, as he asked: the other quick filters
+  answer "what is true right now", where hiding a bus that went down on Monday
+  would be a bug rather than a filter.
+
+  Three things about it that are decisions rather than details. **The window
+  narrows the SHARED list too** — COPY LIST and SHARE emit only the rows on
+  screen, headed `Deferred (Held from Service) (LAST 8H) — 2 buses`, because a
+  filter that tidies the screen and then pastes all twenty lies at the only
+  moment that matters. **A row with no timestamp** — a recommendation stamped
+  before the field carried an `at` — stays under ALL and falls out of every
+  narrowed window, and the `N HIDDEN · SHOW ALL` button beside the chips is
+  what says so and puts them back. **Nothing is persisted**: the window resets
+  to ALL on every load and on every filter change, because a window silently
+  restored from yesterday would open a board of buses nobody has ruled on
+  already hiding them.
+
+#- **Three opt-in ways to tell one bus from the next, in Settings → Defect Log →
+  BUS GROUP SEPARATION.** Curtis: "the bus title card from the defects still
+  looks like it flows into the next bus card." A vertical full-height bus-number
+  rail, a switch that leaves the strong blue to the bus number alone, and a
+  closing line under an opened bus.
+
+  **All three ship OFF, so this release changes nothing on any screen until
+  somebody turns one on** — he asked for that explicitly: "I might not like it,
+  but I just wanna make sure we can roll back at any point." Nothing here writes
+  to a record; the switch is the whole of the undo.
+
+  Each is OFF / PHONE ONLY / EVERY SCREEN rather than on-off, because the
+  run-on it fixes is a phone problem and the iPad already reads. PHONE is a
+  WIDTH — the app's own 620px breakpoint, answered live by CSS — never a
+  detected device: an iPad in split screen is phone-width and wants it, and a
+  stored "this is an iPad" would be wrong the moment it was rotated.
+
+## What to check once 171 is live
+
+- **Move a bus into Trouble Bay 12 from the Defect Log** (tap the location line
+  under the bus number). The line must then read **Trouble Bay 12**, not Main
+  Garage — and the same on the Down Sheet boards, in the quick-filter drawer,
+  on Fixed Repairs and in a copied list.
+- **Open the DEFERRED quick filter and tap 4H.** The count in the drawer header
+  and the rows drawn must agree, `N HIDDEN · SHOW ALL` must appear, and
+  **COPY LIST must paste only what is on screen**, with `(LAST 4H)` in its
+  heading. Tapping SHOW ALL puts them back.
+- The same chips are on the DEFERRED and RECOMMENDED boards on the Down Sheet,
+  inside the collapse — a collapsed board is still one line.
+- On the Facility Map, **FLEETSTEP is the first thing on the screen**, with the
+  six page buttons below it rather than above. It should read like the Down
+  Sheet and Defect Log headers do.
+- The title says **Facility Map**; the sentence it replaced is the small line
+  under it.
+- Nothing below the header should have moved.
+- Log a defect under **Bus Accessories** and scroll the option list to the
+  bottom: ten **Wipers and Washers** options — blade and motor per side, and the
+  washer set.
+- **The Defect Log should look EXACTLY as it did.** All three new view options
+  default to off. If anything about the feed has changed on a device that has
+  not been into Settings, that is a bug in this release.
+- Then Settings → Defect Log → BUS GROUP SEPARATION, set BUS NUMBER DOWN THE
+  SIDE to **Phone only**. On a phone the number turns on its side in a
+  full-height stripe and the location moves beside the status; on the shop
+  computer nothing changes. Set it to **Every screen** and the computer follows.
+- **Open + LOG DEFECT and type "wiper motor" without choosing a category.** It
+  should find it and set the category itself. Then tap the same field with
+  nothing typed: the full list should open the way the old drop-down did.
+- **This is the one to check on a real phone**, because it is the one thing that
+  cannot be measured in a container: with the keyboard up, are the results
+  above the keys and reachable? The field scrolls itself into view on open,
+  which should handle it, but a real iPhone is the only thing that proves it.
+- **Scroll down the Facility Map on a phone: the six page buttons should stay at
+  the top of the screen** instead of scrolling away. This is the one behaviour
+  change in 171 — if it is unwanted, say so and it comes out on its own.
+- No page should scroll sideways. That is what the `overflow-x` change could
+  plausibly break, so it is worth one swipe on the map and the Down Sheet.
+- **On the Down Sheet, three boards in a row** — MYSTERY, DEFERRED, RECOMMENDED
+  FOR DOWN SHEET — each collapsed until opened. A bus out on the road that
+  somebody deferred should be counted in the second one.
+- **Tick RECOMMEND FOR DOWN SHEET on a defect, save, reopen it and untick it.**
+  It should stay unticked. Before this release it came back.
+- **Open QUICK FILTERS → Recommended for Down Sheet.** Each bus should say how
+  long it has been waiting and offer MARK FIXED and REMOVE. REMOVE takes it off
+  the list and leaves the repair open on the Defect Log.
+- **Touch FLEETSTEP, open MY ROLE, pick one.** It should be remembered and
+  should change nothing else anywhere in the app. Both departments should offer
+  **Asst Supt** and **Supt**. Picking **Union** under Maintenance should list
+  Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame and
+  Building Maintenance; **Non-Union** should list Foreman, Asst Supt and Supt.
+  Under Transportation, **Dispatch is non-union** and **Relief Supervisor** is
+  the union spot beneath it.
+- **Log a defect that is already open on the same bus.** The ALREADY LOGGED
+  banner should offer **+ COUNT THIS RETURN**; press it, then FOCUS that bus and
+  scroll to the bottom — **ADVANCED STATS** should show the round trip with its
+  date. Pressing twice quickly should still read 1. And a bus that is on the
+  Down Sheet must **stay** on it.
+- **Log "Add coolant (glycol)" and tick ENGINE OIL under ALSO TOPPED UP.** One
+  record should save, reading *Add coolant (glycol) — also added engine oil*,
+  and the QUANTITY box should be there for coolant at all — it never was before.
+  Then change the DEFECT to *Add engine oil*: the tick that just became the
+  issue should drop out on its own rather than being listed twice.
+
+### Rolling 171 back
+
+Redeploy **170** — commit **`bdca898`**, live as **Sites Version 166**. There is
+nothing else to undo. The rollback notes below are kept for the older releases
+they describe.
+
+## ⏪ ROLLBACK IS STILL EXPECTED, NOT AN EMERGENCY
+
+Curtis is looking at 169 now and asked that Codex **be ready to put the previous
+version back if he does not like what he sees.** That standing instruction
+carries forward to 170. Treat a rollback request here as routine rather than as
+a failure.
+
+**Roll back 170 to:** repository release **169**, commit **`939fe49`**, live as
+**Sites Version 165**. Redeploy that build. There is nothing else to undo — 170
+is two UI commits with no migration, no schema change, no dependency change, no
+storage key added or renamed, and nothing that writes or rewrites a record.
+
+**If Curtis instead wants to go back past 169 entirely** — the trial he asked
+for when Lite Mode went out — the target below is the one he meant, and the two
+notes under it still apply.
+
+**Roll back to (pre-Lite):** repository release **168**, commit **`64ec7d2`**,
+live as **Sites Version 164**. Redeploy that build.
+
+**Why a rollback is clean.** No migration, no schema change, no dependency
+change, no storage key renamed, and nothing in this release writes or rewrites a
+record. Lite Mode changes what is DRAWN and never what is stored — measured on a
+full → Lite → full round trip that left `pace-board-v1` byte-identical.
+
+Two things to know rather than discover:
+
+- **`pace-app-mode-v1` is a new per-device key** holding FULL or LITE. The 168
+  build does not read it, so after a rollback it sits there inert and every
+  device is simply full again. Nothing needs clearing.
+- **One caveat, and it is small.** This release renames the catalog category
+  *Lights and Fixtures* → *Lights, Mirrors and Alarms* as a read-time rename.
+  Defects logged under the NEW name during the trial keep every field on a
+  rolled-back 168 — verified: category, issue and details all survive and the
+  label still reads correctly — but 168 does not list that category in its
+  picker, so re-editing one of those defects would show a category the dropdown
+  does not offer. It affects only defects logged during the trial in that one
+  category, and it corrects itself the moment 169 goes back on.
+
+## What 169 is
+
+Three commits, no migration.
+
+- **Lite Mode.** A device that has never opened the app is asked once, on a
+  screen showing the name and two choices, whether it wants FULL or LITE.
+  Everybody in the shop already has a board, so nobody mid-shift meets it;
+  Settings carries FIRST-TIME WELCOME · SHOW IT so Curtis can see what a new
+  person sees on his own phone, and a plain switch to leave Lite.
+  Lite stands down: Fleet Campaigns, ADVANCED ACTIONS on both sheets, DEFERRED
+  everywhere it appears, the ADVANCED DETAILS half of the defect form, and the
+  six opt-in Down Sheet tiles. The eight tiles Curtis ordered — including DOWN
+  BUSES and DOWNED BUSES ON ROAD — are identical in both modes.
+  The name carries **LITE** beside it on every screen.
+- **A search ends when you end it.** Tapping a bus no longer clears a one-bus
+  search — that put the whole board back underneath the card being read. A
+  banner under the search says what it is hiding and offers SHOW ALL.
+- **Lights and Fixtures → Lights, Mirrors and Alarms**, with the catch-all
+  following the name. Read-time; nothing on disk moves.
+**The SCAN SHEET alignment fixes were listed here and did NOT ship in 169.**
+They landed after `939fe49`, which is the SHA 169 was published from. They are
+in 170 below, where they belong.
+
+## What 170 is
+
+Two commits, no migration, no new storage key. Both are layout; neither reads or
+writes a record.
+
+- **SCAN SHEET alignment.** CANCEL was half off the left edge of a phone — a
+  bare `footer` rule in globals.css was positioning every modal's action bar
+  against the viewport rather than inside its own dialog. Fixed for every
+  dialog, not just this one. The page behind no longer scrolls instead of the
+  modal, and three scroll locks that were silently doing nothing now work: the
+  helper only ever added the caller's own class, so a call naming a class with
+  no CSS rule behind it was a lock that locked nothing.
+- **The app name links home.** Curtis: "when I click on that title, it should
+  take me to the home page." FLEETSTEP at the top of every page is now an
+  `<a href="/">` — a masthead, the way every site has one. `/` is the Facility
+  Map; there is no separate landing page yet, and `HOME_HREF` in
+  `app/app-name.tsx` is the one line to change when there is.
+
+  It looks identical, measured rather than read on all six pages at 390 and
+  1180: same corner, same size, white, no underline, and every header the same
+  height it was. The link ends at the last letter instead of running the width
+  of the header, so reaching past the name does not navigate; the tap area is
+  34px tall on a phone, paid for with a negative margin so nothing moved.
+
+### What to check once 170 is live
+
+- On a phone, open SCAN SHEET from the Down Sheet: **CANCEL is fully on screen**,
+  and dragging the modal scrolls the modal rather than the page behind it.
+- Tap **FLEETSTEP** at the top of any page: it goes to the Facility Map. Tap the
+  empty space to the right of it: nothing happens.
+- Nothing else should look different. If a header's title or kicker has moved
+  even slightly, that is this release and worth saying.
 
 | Order | Version | Publish from | What it is |
 | --- | --- | --- | --- |
+| **NEXT** | **171** | **`cca68cb`** | **The Facility Map's header finally drawn like the other five: the name first with the nav below it, a kicker, a title that is the page's own name, and the old all-caps sentence as its subtitle — plus the phone nav's `position:sticky` finally doing something a Wipers and Washers group added to the catalog, and the Defect Log's pickers rebuilt as one typing field each that searches every category. Roll back to 170 / `bdca898` on request.** |
+| Published | **170** | **`bdca898`** | **Live as Sites Version 166. SCAN SHEET's CANCEL back on screen — with every modal's action bar fixed alongside it and three dead scroll locks made real — and the app name at the top of every page linking home. Roll back to 169 / `939fe49` on request.** |
+| Published | **169** | `939fe49` | **Live as Sites Version 165.** Lite Mode — a first-run choice, and the app drawing less of itself for a new person; a search that ends when you end it; and the Lights and Fixtures category renamed to what is in it. Roll back to 168 / `64ec7d2` on request. |
 | Published | **168** | `64ec7d2` | **Live as Sites Version 164.** A DEFERRED board on the Down Sheet under MYSTERY BUSES, with PUT ON DOWN SHEET and RETURN TO SERVICE on each bus; the ORDER dropdown replaced by a SECTION ORDER setting; and a larger app name |
 | Published | **167** | `09a69aa` | **Live as Sites Version 163.** FLEETSTEP branding is applied across the app and the Down Sheet scoreboard defaults to one total with details available on request |
 | Published | **166** | `1de3d68` | **Live as Sites Version 162.** Defects move instead of copying, removal stays scoped, the ALREADY LOGGED banner can OPEN IT, and Search clears on tap with a CLEAR tag |

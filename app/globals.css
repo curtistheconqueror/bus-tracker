@@ -1,5 +1,19 @@
 @import "tailwindcss";
-:root{--navy:#06275c;--ink:#112657}*{box-sizing:border-box}html,body{margin:0;background:#e8edf6;color:var(--ink);font-family:Arial,Helvetica,sans-serif}.app{min-height:100vh;border:5px solid #06275c;background:linear-gradient(#fff,#f4f6fa);padding-bottom:36px;transition:.2s}.app.dark{filter:brightness(.82) contrast(1.08)}button,input,select,textarea{font:inherit}header{height:38px;background:linear-gradient(#0a326e,#041d47);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;text-shadow:0 1px 2px #000}nav{height:42px;display:flex;align-items:center;justify-content:space-between;padding:4px 10px;background:#fff;border-bottom:1px solid #c6cee0}.legend{display:flex;align-items:center;gap:18px;font-size:9px;font-weight:800;white-space:nowrap}.legend span{display:flex;align-items:center;gap:5px}.tools{display:flex;align-items:center;gap:9px}.tools>button{height:28px;border:0;border-radius:4px;background:#162a53;color:#fff;padding:0 13px;font-size:9px;font-weight:900}.tools .blue{background:#0969d9}.tools .green{background:#008345}.tools label{height:28px;background:#142957;color:#fff;border-radius:4px;padding:6px 8px;font-weight:bold}.tools input{width:0;border:0;background:transparent;color:#fff;outline:0;transition:.2s}.tools label:focus-within input{width:60px;margin-left:4px}.facility{margin:9px 7px;display:grid;gap:8px}.panel,.mid{border:1px solid #9cadd1;border-radius:6px;background:#ffffffa8}.title{height:28px;display:flex;align-items:center;justify-content:center;position:relative;text-align:center;font-size:12px;font-weight:900;color:#172957}.title>button{position:absolute;right:3px;border:0;background:transparent;color:#7e8dab;opacity:0}.title:hover>button{opacity:1}.service{width:75%;justify-self:center;padding:0 10px 8px;border-color:#957ac6}.service .title,.wall .title{color:#572497}.single{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(35px,1fr);height:34px}.spot{min-width:0;border:1px dashed #aeb8cc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff6;transition:.12s}.spot.ready{background:#d7f5e4;border:2px solid #008c4d}.token{border:0;border-radius:3px;background:#fff;box-shadow:0 1px 2px #99a3b7;padding:3px 4px;display:flex;align-items:center;gap:4px;font-size:9px;color:#111;cursor:grab;white-space:nowrap;max-width:100%}.token:active{cursor:grabbing}.bus{--c:#777;width:16px;height:13px;border:1px solid #27344a;border-radius:3px;background:var(--c);display:inline-block;position:relative;flex:none}.bus:before,.bus:after{content:"";position:absolute;top:2px;width:5px;height:4px;background:#dff7ff;border-radius:1px}.bus:before{left:2px}.bus:after{right:2px}.bus b,.bus em{position:absolute;bottom:-3px;width:4px;height:4px;border-radius:50%;background:#18213a}.bus b{left:1px}.bus em{right:1px}.bus small{position:absolute;bottom:1px;left:6px;width:4px;height:2px;background:#fff}.mid{height:322px;display:grid;grid-template-columns:145px 405px 225px 250px 1fr;grid-template-rows:248px 60px;gap:7px;padding:9px 8px}.specials{display:grid;gap:18px}.special{border:1px solid #8ea5ce;border-radius:5px;display:grid;grid-template-columns:62px 1fr;align-items:center;padding:7px}.special .title{height:auto;justify-content:flex-start;text-align:left}.special .spot{height:43px}.paint{border-color:#9b87cc}.wash{border-color:#75a5eb}.body{border-color:#e4aa71}.baygrid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(2,98px);gap:8px 4px;padding:0 6px}.bay{transform:skew(-9deg);border:1px solid #b3bdd1;border-radius:4px;background:linear-gradient(100deg,#fff,#f6f8fc);display:flex;flex-direction:column;align-items:center;padding:5px}.bay:nth-child(n+7){transform:skew(9deg)}.bay>b{font-size:10px}.bay .spot{margin-top:auto;width:51px;height:48px;border:0;background:transparent;transform:skew(9deg)}.bay:nth-child(n+7) .spot{transform:skew(-9deg)}.vertical{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.vertical section{border:1px solid #b4bdd1;border-radius:5px;padding:0 10px 9px}.vertical .title{height:45px}.vspots{height:155px;display:grid;gap:4px}.east{border:1px solid #83ae96;border-radius:5px;padding:0 10px}.lotgrid{display:grid;gap:7px}.eastgrid{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(7,1fr);height:205px}.lot p{text-align:center;margin:7px;font-size:9px;font-weight:900}.blank{border:1px dashed #b7c0d1;border-radius:5px}.wall{grid-column:1/4;border:1px solid #9b87cc;border-radius:5px;padding:0 38px 7px}.wall .title{height:20px}.bottom{display:grid;grid-template-columns:57% 43%;gap:8px}.garage{padding:0 8px 10px}.garagegrid{display:grid;grid-template-columns:40px repeat(12,1fr)}.garagegrid>i,.garagegrid>b,.grow>strong{height:18px;background:#062d66;color:#fff;border:1px solid #fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:9px}.grow{display:contents}.grow>strong{height:33px;white-space:nowrap}.grow .spot{height:33px;border-radius:0}.west{padding:0 12px 8px}.westgrid{grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(5,1fr);height:222px}.fold .service .single,.fold .mid>*:not(.wall),.fold .wall .single,.fold .garagegrid,.fold .lotgrid,.fold .lot p{display:none}.fold .mid{height:auto;display:block}.fold .bottom{grid-template-columns:1fr 1fr}footer{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:linear-gradient(#263a63,#16284d);color:#fff;border-radius:5px;padding:7px 18px;font-size:11px;letter-spacing:.5px;box-shadow:0 2px 8px #777;white-space:nowrap;z-index:5}aside{position:fixed;top:90px;right:16px;width:255px;background:#fff;border:1px solid #9badd0;border-radius:8px;padding:15px;box-shadow:0 8px 30px #23385b55;z-index:15;font-size:12px}aside>b{color:#142858}aside>button{position:absolute;right:8px;top:7px;border:0;background:transparent}aside p{color:#64708b}aside div{display:flex;gap:7px}aside div button{border:1px solid #8191b3;background:#f7f9fd;border-radius:4px;padding:7px;font-size:10px;font-weight:bold}.shade{position:fixed;inset:0;background:#06152caa;display:flex;align-items:center;justify-content:center;z-index:30;padding:18px}.modal{width:min(650px,100%);background:#f8faff;border-radius:10px;box-shadow:0 18px 70px #0009;overflow:hidden}.mhead{background:#082e69;color:#fff;padding:14px 20px;display:flex;justify-content:space-between}.mhead span{font-size:9px;letter-spacing:1.5px}.mhead h2{margin:2px 0;font-size:23px}.mhead button{border:0;background:transparent;color:#fff}.form{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.form label{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:900;color:#506080}.form input,.form select,.form textarea{border:1px solid #b9c3d7;border-radius:5px;padding:9px;background:#fff;color:#172858}.form .check{flex-direction:row;align-items:center}.form .wide{grid-column:1/-1}.form textarea{min-height:80px}.actions{border-top:1px solid #d1d8e6;padding:12px 20px;display:grid;grid-template-columns:auto 1fr auto auto;gap:8px}.actions button{border:1px solid #aeb8cc;background:#fff;border-radius:4px;padding:9px 13px;font-size:10px;font-weight:900}.actions .save{background:#0867d5;color:#fff}.actions .delete{color:#b71922;border-color:#e1a1a4}@media(max-width:1100px){header{font-size:17px}.legend{gap:8px}.facility{min-width:1010px}.app{overflow-x:auto}.mid{grid-template-columns:120px 350px 205px 225px 1fr}.token{font-size:8px;padding:2px}.tools>button{padding:0 7px}}@media(max-width:800px){nav{height:auto}.legend{display:grid;grid-template-columns:repeat(3,1fr)}.tools{flex-wrap:wrap;justify-content:flex-end}.facility{zoom:.76}.form{grid-template-columns:1fr}.form .wide{grid-column:auto}footer{font-size:8px}}
+:root{--navy:#06275c;--ink:#112657}*{box-sizing:border-box}html,body{margin:0;background:#e8edf6;color:var(--ink);font-family:Arial,Helvetica,sans-serif}.app{min-height:100vh;border:5px solid #06275c;background:linear-gradient(#fff,#f4f6fa);padding-bottom:36px;transition:.2s}.app.dark{filter:brightness(.82) contrast(1.08)}button,input,select,textarea{font:inherit}header{height:38px;background:linear-gradient(#0a326e,#041d47);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;text-shadow:0 1px 2px #000}nav{height:42px;display:flex;align-items:center;justify-content:space-between;padding:4px 10px;background:#fff;border-bottom:1px solid #c6cee0}.legend{display:flex;align-items:center;gap:18px;font-size:9px;font-weight:800;white-space:nowrap}.legend span{display:flex;align-items:center;gap:5px}.tools{display:flex;align-items:center;gap:9px}.tools>button{height:28px;border:0;border-radius:4px;background:#162a53;color:#fff;padding:0 13px;font-size:9px;font-weight:900}.tools .blue{background:#0969d9}.tools .green{background:#008345}.tools label{height:28px;background:#142957;color:#fff;border-radius:4px;padding:6px 8px;font-weight:bold}.tools input{width:0;border:0;background:transparent;color:#fff;outline:0;transition:.2s}.tools label:focus-within input{width:60px;margin-left:4px}.facility{margin:9px 7px;display:grid;gap:8px}.panel,.mid{border:1px solid #9cadd1;border-radius:6px;background:#ffffffa8}.title{height:28px;display:flex;align-items:center;justify-content:center;position:relative;text-align:center;font-size:12px;font-weight:900;color:#172957}.title>button{position:absolute;right:3px;border:0;background:transparent;color:#7e8dab;opacity:0}.title:hover>button{opacity:1}.service{width:75%;justify-self:center;padding:0 10px 8px;border-color:#957ac6}.service .title,.wall .title{color:#572497}.single{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(35px,1fr);height:34px}.spot{min-width:0;border:1px dashed #aeb8cc;border-radius:4px;display:flex;align-items:center;justify-content:center;background:#fff6;transition:.12s}.spot.ready{background:#d7f5e4;border:2px solid #008c4d}.token{border:0;border-radius:3px;background:#fff;box-shadow:0 1px 2px #99a3b7;padding:3px 4px;display:flex;align-items:center;gap:4px;font-size:9px;color:#111;cursor:grab;white-space:nowrap;max-width:100%}.token:active{cursor:grabbing}.bus{--c:#777;width:16px;height:13px;border:1px solid #27344a;border-radius:3px;background:var(--c);display:inline-block;position:relative;flex:none}.bus:before,.bus:after{content:"";position:absolute;top:2px;width:5px;height:4px;background:#dff7ff;border-radius:1px}.bus:before{left:2px}.bus:after{right:2px}.bus b,.bus em{position:absolute;bottom:-3px;width:4px;height:4px;border-radius:50%;background:#18213a}.bus b{left:1px}.bus em{right:1px}.bus small{position:absolute;bottom:1px;left:6px;width:4px;height:2px;background:#fff}.mid{height:322px;display:grid;grid-template-columns:145px 405px 225px 250px 1fr;grid-template-rows:248px 60px;gap:7px;padding:9px 8px}.specials{display:grid;gap:18px}.special{border:1px solid #8ea5ce;border-radius:5px;display:grid;grid-template-columns:62px 1fr;align-items:center;padding:7px}.special .title{height:auto;justify-content:flex-start;text-align:left}.special .spot{height:43px}.paint{border-color:#9b87cc}.wash{border-color:#75a5eb}.body{border-color:#e4aa71}.baygrid{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(2,98px);gap:8px 4px;padding:0 6px}.bay{transform:skew(-9deg);border:1px solid #b3bdd1;border-radius:4px;background:linear-gradient(100deg,#fff,#f6f8fc);display:flex;flex-direction:column;align-items:center;padding:5px}.bay:nth-child(n+7){transform:skew(9deg)}.bay>b{font-size:10px}.bay .spot{margin-top:auto;width:51px;height:48px;border:0;background:transparent;transform:skew(9deg)}.bay:nth-child(n+7) .spot{transform:skew(-9deg)}.vertical{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.vertical section{border:1px solid #b4bdd1;border-radius:5px;padding:0 10px 9px}.vertical .title{height:45px}.vspots{height:155px;display:grid;gap:4px}.east{border:1px solid #83ae96;border-radius:5px;padding:0 10px}.lotgrid{display:grid;gap:7px}.eastgrid{grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(7,1fr);height:205px}.lot p{text-align:center;margin:7px;font-size:9px;font-weight:900}.blank{border:1px dashed #b7c0d1;border-radius:5px}.wall{grid-column:1/4;border:1px solid #9b87cc;border-radius:5px;padding:0 38px 7px}.wall .title{height:20px}.bottom{display:grid;grid-template-columns:57% 43%;gap:8px}.garage{padding:0 8px 10px}.garagegrid{display:grid;grid-template-columns:40px repeat(12,1fr)}.garagegrid>i,.garagegrid>b,.grow>strong{height:18px;background:#062d66;color:#fff;border:1px solid #fff;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:9px}.grow{display:contents}.grow>strong{height:33px;white-space:nowrap}.grow .spot{height:33px;border-radius:0}.west{padding:0 12px 8px}.westgrid{grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(5,1fr);height:222px}.fold .service .single,.fold .mid>*:not(.wall),.fold .wall .single,.fold .garagegrid,.fold .lotgrid,.fold .lot p{display:none}.fold .mid{height:auto;display:block}.fold .bottom{grid-template-columns:1fr 1fr}footer{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:linear-gradient(#263a63,#16284d);color:#fff;border-radius:5px;padding:7px 18px;font-size:11px;letter-spacing:.5px;box-shadow:0 2px 8px #777;white-space:nowrap;z-index:5}
+/* That bare `footer` rule above is a page furniture rule — a footnote pill
+   floating at the bottom of the Facility Map and the Down Sheet — and it
+   reaches EVERY <footer> in the app, including the action bars at the bottom of
+   every modal. On the SCAN SHEET modal it put CANCEL at x=-78 on a 390px phone:
+   position:fixed and left:50% survived even where a later rule set
+   position:sticky, and translateX(-50%) then dragged the bar half off the left
+   edge. Measured, not guessed — the button was unreachable.
+
+   This is the same shape as the bare `header{height:38px}` trap CLAUDE.md
+   records, so it is fixed the same way and once: a footer inside a dialog is
+   part of that dialog's layout and is never positioned against the viewport.
+   Scoped to dialogs rather than removing the global, because .down-footnote and
+   .command-bar genuinely rely on it. */
+[role="dialog"] footer,.shade footer,.down-shade footer,.log-shade footer{position:static;left:auto;right:auto;transform:none;white-space:normal;box-shadow:none}aside{position:fixed;top:90px;right:16px;width:255px;background:#fff;border:1px solid #9badd0;border-radius:8px;padding:15px;box-shadow:0 8px 30px #23385b55;z-index:15;font-size:12px}aside>b{color:#142858}aside>button{position:absolute;right:8px;top:7px;border:0;background:transparent}aside p{color:#64708b}aside div{display:flex;gap:7px}aside div button{border:1px solid #8191b3;background:#f7f9fd;border-radius:4px;padding:7px;font-size:10px;font-weight:bold}.shade{position:fixed;inset:0;background:#06152caa;display:flex;align-items:center;justify-content:center;z-index:30;padding:18px}.modal{width:min(650px,100%);background:#f8faff;border-radius:10px;box-shadow:0 18px 70px #0009;overflow:hidden}.mhead{background:#082e69;color:#fff;padding:14px 20px;display:flex;justify-content:space-between}.mhead span{font-size:9px;letter-spacing:1.5px}.mhead h2{margin:2px 0;font-size:23px}.mhead button{border:0;background:transparent;color:#fff}.form{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:14px}.form label{display:flex;flex-direction:column;gap:5px;font-size:10px;font-weight:900;color:#506080}.form input,.form select,.form textarea{border:1px solid #b9c3d7;border-radius:5px;padding:9px;background:#fff;color:#172858}.form .check{flex-direction:row;align-items:center}.form .wide{grid-column:1/-1}.form textarea{min-height:80px}.actions{border-top:1px solid #d1d8e6;padding:12px 20px;display:grid;grid-template-columns:auto 1fr auto auto;gap:8px}.actions button{border:1px solid #aeb8cc;background:#fff;border-radius:4px;padding:9px 13px;font-size:10px;font-weight:900}.actions .save{background:#0867d5;color:#fff}.actions .delete{color:#b71922;border-color:#e1a1a4}@media(max-width:1100px){header{font-size:17px}.legend{gap:8px}.facility{min-width:1010px}.app{overflow-x:auto}.mid{grid-template-columns:120px 350px 205px 225px 1fr}.token{font-size:8px;padding:2px}.tools>button{padding:0 7px}}@media(max-width:800px){nav{height:auto}.legend{display:grid;grid-template-columns:repeat(3,1fr)}.tools{flex-wrap:wrap;justify-content:flex-end}.facility{zoom:.76}.form{grid-template-columns:1fr}.form .wide{grid-column:auto}footer{font-size:8px}}
 /* Eight-space single-file parking and bus quick views */
 .service{overflow:visible}
 .single{grid-auto-flow:unset;grid-auto-columns:unset;grid-template-columns:repeat(8,minmax(0,1fr));height:42px}
@@ -527,8 +541,26 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .phone-command-dock,.phone-command-sheet,.phone-command-scrim{display:none}
 .garage-scroll{min-width:0}
 @media(max-width:620px){
- html,body{max-width:100%;overflow-x:hidden}
- .app{width:100%;max-width:100%;overflow-x:hidden!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
+ /* `overflow-x:CLIP`, not hidden, and the difference is the phone nav.
+
+    `overflow-x:hidden` computes the other axis to `overflow-y:auto`, which
+    makes the element a SCROLL CONTAINER. A `position:sticky` descendant sticks
+    to its nearest scroll container — so `.mobile-mode-nav` was sticking to
+    `.app`, and `.app` does not scroll: the document does. The nav had
+    `position:sticky;top:0` written on it and had never pinned anything, at any
+    width, since the rule was added. Measured: scroll to 1200 and the nav sat at
+    y-1086, gone off the top with everything else.
+
+    `clip` clips exactly the same content and does NOT create a scroll
+    container, so the nav's scroll container becomes the viewport and it pins.
+    `hidden` is left in front of it as the fallback declaration: a browser that
+    does not know `clip` ignores the second line and keeps today's behaviour,
+    which is a nav that scrolls away rather than a page that scrolls sideways.
+
+    Same species as the three dead scroll locks — a property written, believed,
+    and never once doing what it said. */
+ html,body{max-width:100%;overflow-x:hidden;overflow-x:clip}
+ .app{width:100%;max-width:100%;overflow-x:hidden!important;overflow-x:clip!important;border-width:3px;padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
  .app>header{height:auto;min-height:40px;padding:7px 10px;font-size:11px;line-height:1.2;text-align:center}
  .app>nav:not(.mobile-mode-nav):not(.phone-command-dock){height:auto;display:grid;grid-template-columns:1fr;gap:7px;padding:7px}
  .legend{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;white-space:normal}
@@ -818,6 +850,18 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .deferred-card .mystery-badges i{background:#fdf0dc;border-color:#f0cf9a;color:#8a4b06}
 .deferred-card .mystery-badges i.deferred-overdue{background:#fde2e2;border-color:#f2b6b6;color:#96131f}
 @media(max-width:760px){.deferred-card-actions button{min-height:46px;font-size:10px}}
+/* RECOMMENDED FOR DOWN SHEET reuses both boards above it, down to the action
+   buttons, because Curtis asked for "the same color and everything". The one
+   distinguishing mark is the 4px stripe on the head — the same single knob that
+   separates DEFERRED from MYSTERY — and here it is the Down Sheet's own blue,
+   already used by the + PUT ON DOWN SHEET button two lines up, because this is
+   the board about getting onto that sheet.
+
+   No overdue variant, and that is deliberate rather than unfinished: a
+   recommendation waiting a week is not late. Curtis: "that bus could be in that
+   status for a while, which is fine." */
+.recommended-board .mystery-head{border-left:4px solid #0b64bd}
+.recommended-card .mystery-badges i{background:#e8f1fc;border-color:#bcd6f2;color:#0b4c91}
 .deferred-review-also{color:#8a4b06;background:#fdf0dc;border:1px solid #f0cf9a;border-radius:5px;padding:4px 6px;font-size:9px;line-height:1.4}
 .deferred-review-choices{display:grid;gap:8px}
 .deferred-review-choices label{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #b9c3d7;border-radius:7px;background:#fff;cursor:pointer}
@@ -917,7 +961,38 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    invisible on every page that draws it. currentColor at full opacity is the
    strongest this can read against them, and it stays correct if a header is
    ever re-themed. */
-.app-name{display:block;text-align:left;margin:0 0 5px;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:currentColor}
+.app-name-lite{margin-left:8px;border:1px solid currentColor;border-radius:4px;padding:2px 6px;font-size:.44em;font-style:normal;font-weight:900;letter-spacing:1.6px;vertical-align:middle;opacity:.85}
+/* The name is an <a href="/"> — a masthead link home. Two UA defaults have to
+   be turned off for it to look like the name and not like a nav link: the
+   underline, and the link colour (which would paint it browser-blue on six dark
+   navy headers). color:inherit does the second; currentColor on an anchor
+   already resolved to the inherited value, but inherit says so out loud.
+
+   width:fit-content is the hit target, not decoration. display:block is load
+   bearing (see text-align above), and a full-width block anchor made the whole
+   header row navigate — a mechanic reaching for the empty space beside the name
+   would have been thrown to the map. fit-content keeps the block box in the
+   left corner on all six headers while ending the link at the last letter.
+
+   The padding is the other half of the hit target and the negative margin pays
+   for it exactly: 5px above and below takes a 24px line to a 34px tap area on a
+   phone, and margin -5px 0 0 replaces the old `0 0 5px` so the box occupies the
+   same 29px of the header and the letters land on the same y they always did.
+   Measured on all six: unchanged to the pixel. Do not "tidy" one without the
+   other or the kicker under it moves. */
+/* IT IS A <button> NOW, AND THIS FILE HAS A BARE `button{}` RULE — line 2,
+   height:28px, background:#162a53, border-radius:4px, font-size:9px. Every one
+   of those properties the class does not itself set would land on the masthead
+   and turn the app's own name into a small navy pill. `.app-name` outranks that
+   rule on specificity for whatever they both declare, so what had to be written
+   out here is exactly what the class was NOT already setting: height,
+   background, border-radius, and the font-family a <button> does not inherit on
+   its own. Same species as the bare `header{height:38px}` further down.
+
+   -webkit-appearance is for iOS, which otherwise draws its own button chrome
+   underneath all of this. */
+.app-name{display:block;width:fit-content;height:auto;padding:5px 0;margin:-5px 0 0;border:0;border-radius:0;background:none;-webkit-appearance:none;appearance:none;font-family:inherit;text-align:left;font-size:21px;font-weight:900;letter-spacing:1.6px;line-height:1;color:inherit;text-decoration:none;cursor:pointer}
+.app-name:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:3px}
 @media(max-width:760px){.app-name{font-size:24px;letter-spacing:1.4px}}
 
 /* THE FACILITY MAP'S HEADER IS A BARE <header>, and bare headers in this file
@@ -929,10 +1004,244 @@ header>h1{margin:0;font-size:inherit;font-weight:inherit;line-height:inherit;col
    min-height cannot undo a fixed height. height:auto is what releases it, and
    it is not redundant next to the min-height: delete it and the map's header
    goes back to being 38px tall whatever is inside it. */
-.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:7px 10px}
+.app>header{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left}
 /* The map's header is a centring flex row, so the name landed BESIDE the h1
    and centred with it - measured at x198 on a 1280 screen against x18 on every
    other page, and text-align could not touch it because flex was centring the
    ITEMS, not the text. Stacking is what "the structure moves down to fit the
-   name" actually means here; the title keeps its centre on its own line. */
-.app>header>h1{text-align:center}
+   name" actually means here.
+
+   THE TITLE NO LONGER KEEPS ITS CENTRE. It did while this header held two
+   lines and no other page's shape; now it holds the same four as the rest —
+   name, kicker, title, subtitle — and a centred title in a left-aligned stack
+   is the one line that looks like a mistake. `text-align:left` on the header
+   is what overrides the phone block above, which sets `center` on this same
+   selector: same specificity, so the later rule wins at every width, and this
+   file is read in order for exactly that reason.
+
+   The h1 also takes an explicit size. It was `font-size:inherit` from the bare
+   `header` rule, which the phone block drops to 11px — so on a phone the map's
+   own title was rendering SMALLER than its kicker's siblings on every other
+   page. 22px is what the other five headers use at this width. */
+.app>header>h1{margin:2px 0 1px;font-size:25px;line-height:1.05;text-align:left}
+@media(max-width:760px){.app>header>h1{font-size:22px}}
+
+/* The kicker and the subtitle the other five headers already draw, in the two
+   sizes they already use (8px letterspaced label, 9px sentence). They are
+   mixed against `--header-text` rather than given a colour so a re-themed
+   header carries them, which is the same reason `.app-name` inherits. */
+.app-kicker{margin-top:9px;font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--header-text,#fff) 72%,transparent)}
+.app-subtitle{margin:4px 0 0;font-size:9px;font-weight:400;line-height:1.3;text-shadow:none;color:color-mix(in srgb,var(--header-text,#fff) 78%,transparent)}
+
+/* ── The first-run welcome ────────────────────────────────────────────────────
+   Full-bleed and above everything, because it is the only screen in this app
+   that asks a question before the app opens.
+
+   The name resolves in a letter at a time — each starts scattered, blurred and
+   transparent and settles into place — which is the "flush of pixels" Curtis
+   asked for without a canvas or a library. A sweep of light crosses the wordmark
+   once it has landed.
+
+   prefers-reduced-motion drops every bit of it and the name is simply there.
+   Somebody who has told their phone they do not want motion is not asking for
+   an exception on a shop tool. */
+.welcome-gate{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:26px 20px;background:radial-gradient(120% 90% at 50% 0%,#0d3a7d 0%,#061d45 55%,#03102a 100%);overflow-y:auto}
+.welcome-inner{width:100%;max-width:520px;text-align:center}
+.welcome-name{position:relative;margin:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;color:#fff;font-size:clamp(34px,11vw,64px);font-weight:900;letter-spacing:3px;line-height:1.05}
+.welcome-name span{display:inline-block;opacity:0;filter:blur(14px);transform:translate3d(0,26px,0) scale(1.35)}
+.welcome-gate.shown .welcome-name span{animation:welcome-letter .72s cubic-bezier(.22,1,.36,1) both}
+@keyframes welcome-letter{from{opacity:0;filter:blur(14px);transform:translate3d(0,26px,0) scale(1.35)}to{opacity:1;filter:blur(0);transform:none}}
+/* The sweep starts after the last letter has landed. */
+.welcome-name::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.55) 50%,transparent 58%);transform:translateX(-120%);pointer-events:none}
+.welcome-gate.shown .welcome-name::after{animation:welcome-sweep 1.1s ease-out .85s both}
+@keyframes welcome-sweep{from{transform:translateX(-120%)}to{transform:translateX(120%)}}
+/* The way out for somebody who only came to look. It does not exist on a first
+   run — see welcome-gate.tsx — so this styles a control that is simply absent
+   until the question has been answered once. 44px because it is the only
+   control on the screen a thumb has to find. */
+.welcome-close{position:fixed;top:max(10px,env(safe-area-inset-top));right:10px;z-index:2;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid #ffffff3d;border-radius:9px;background:#ffffff14;color:#dbe9fb;font-size:22px;font-weight:900;line-height:1;padding:0;cursor:pointer}
+.welcome-close:hover,.welcome-close:focus-visible{background:#ffffff2b;color:#fff;outline:none}
+/* Curtis: make the line under FLEETSTEP "a little bigger, just a bit". 9px to
+   10-12px, clamped so it grows with the viewport the way .welcome-name above
+   it already does rather than being one fixed size on a phone and a shop
+   computer.
+
+   THE TRACKING IS UNTOUCHED, and that is a correction. The first attempt eased
+   it from 2.4px to 2px to buy width, on a measurement that said the text was
+   320px inside a 360px phone — but 320px was the PARAGRAPH's box, which is
+   just the container, and said nothing about the text in it. Measured properly
+   with a Range over the text node, one line box per rect: the text is 240px at
+   320px wide and 274px at its largest, one line at every width down to 320
+   with 80px to spare. There was nothing to buy, so nothing is paid for. */
+.welcome-kicker{margin:11px 0 0;color:#9dc0ee;font-size:clamp(10px,2.9vw,12px);font-weight:900;letter-spacing:2.4px;opacity:0}
+.welcome-gate.shown .welcome-kicker{animation:welcome-rise .6s ease-out .7s both}
+.welcome-choices{display:grid;gap:11px;margin:30px 0 0;opacity:0}
+.welcome-gate.shown .welcome-choices{animation:welcome-rise .6s ease-out 1.15s both}
+@keyframes welcome-rise{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
+.welcome-choice{display:grid;gap:5px;border:1px solid rgba(255,255,255,.28);border-radius:11px;background:rgba(255,255,255,.07);padding:16px 17px;color:#fff;text-align:left;cursor:pointer}
+.welcome-choice:hover{border-color:#7fb2f0;background:rgba(255,255,255,.13)}
+.welcome-choice b{font-size:15px;font-weight:900;letter-spacing:1.4px}
+.welcome-choice small{color:#b9d3f4;font-size:10px;line-height:1.5}
+.welcome-full{border-color:rgba(255,255,255,.5)}
+/* THE ROLE PICKER. It rises after the two choices and before the footnote, on
+   the same stagger the rest of the screen uses, so it reads as part of the
+   screen rather than as something bolted under it.
+
+   Quieter than .welcome-choice on purpose: those two are the question this
+   screen exists to ask, and a third panel styled as loudly would compete with
+   them. Border and no fill until it is open.
+
+   Every control here is at least 44px tall. This is a phone screen somebody
+   taps once with a glove on. */
+.welcome-role{margin:14px 0 0;border:1px solid rgba(255,255,255,.22);border-radius:11px;text-align:left;opacity:0;overflow:hidden}
+.welcome-gate.shown .welcome-role{animation:welcome-rise .6s ease-out 1.3s both}
+.welcome-role.open{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.07)}
+.welcome-role-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:0;background:none;color:#fff;padding:11px 15px;text-align:left;font-family:inherit;cursor:pointer}
+.welcome-role-toggle span{display:grid;gap:3px;min-width:0}
+.welcome-role-toggle b{font-size:10px;font-weight:900;letter-spacing:1.6px}
+/* A flex row so the ELLIPSIS lands on the job title and never on the union tag.
+   With both in one text flow the tag is what gets cut, and it is the shortest
+   thing on the line — the first that should survive a squeeze, not the last. */
+.welcome-role-toggle small{display:flex;align-items:center;gap:7px;min-width:0;color:#b9d3f4;font-size:11px;font-weight:700}
+.welcome-role-toggle small>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* UNION / NON-UNION, drawn as a tag rather than a third dot-separated part of
+   the name. It is an attribute of the person, not part of the job title, and
+   "Transportation · Non-Union · Mechanic / Technician" does not fit a phone. */
+.welcome-role-unit{flex:0 0 auto;border:1px solid rgba(255,255,255,.3);border-radius:4px;background:rgba(255,255,255,.1);padding:1px 6px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.8px;white-space:nowrap}
+.welcome-role-unit.union{border-color:#7fb2f0;background:rgba(127,178,240,.24);color:#dbe9fb}
+.welcome-role-toggle i{flex:0 0 auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.3);border-radius:7px;color:#dbe9fb;font-style:normal;font-size:15px;font-weight:900;line-height:1}
+.welcome-role-body{display:grid;gap:9px;padding:0 15px 14px}
+.welcome-role-departments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+/* The union row reuses the department row outright — same two-up grid, same
+   buttons — because it is the same shape of question one step later, and a
+   second layout for it would only make the panel busier. */
+.welcome-role-units{margin-top:-2px}
+.welcome-role-roles{display:grid;gap:7px}
+.welcome-role-body button{min-height:44px;border:1px solid rgba(255,255,255,.28);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;padding:0 12px;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.4px;cursor:pointer}
+.welcome-role-body button:hover,.welcome-role-body button:focus-visible{border-color:#7fb2f0;background:rgba(255,255,255,.14);outline:none}
+.welcome-role-body button.selected{border-color:#7fb2f0;background:rgba(127,178,240,.26)}
+.welcome-role-hint{color:#93b3dc;font-size:10px;line-height:1.5}
+.welcome-role-clear{color:#b9d3f4!important;font-size:9px!important;letter-spacing:1.2px!important;min-height:38px!important;background:none!important;border-color:rgba(255,255,255,.18)!important}
+.welcome-foot{margin:17px 0 0;color:#7f9ec6;font-size:9px;line-height:1.5;opacity:0}
+.welcome-gate.shown .welcome-foot{animation:welcome-rise .6s ease-out 1.4s both}
+@media(max-width:620px){.welcome-choice{padding:17px 15px}.welcome-choice b{font-size:16px}.welcome-choice small{font-size:11px}.welcome-foot{font-size:10px}}
+@media(prefers-reduced-motion:reduce){
+ .welcome-name span,.welcome-kicker,.welcome-choices,.welcome-role,.welcome-foot{opacity:1;filter:none;transform:none}
+ .welcome-gate.shown .welcome-name span,.welcome-gate.shown .welcome-name::after,
+ .welcome-gate.shown .welcome-kicker,.welcome-gate.shown .welcome-choices,.welcome-gate.shown .welcome-role,.welcome-gate.shown .welcome-foot{animation:none}
+ .welcome-name::after{display:none}
+}
+
+/* The one rule that actually holds the page still. lockPageScroll adds this to
+   BOTH <html> and <body> — in this app the element that scrolls differs by
+   surface, and two lines beats reasoning about which. A caller's own class name
+   is kept for surfaces that style theirs, but the locking lives here so a name
+   with no rule behind it can no longer be a lock that does nothing. */
+html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behavior:none}
+
+/* SHOW · ALL 1H 4H 8H 24H 3D 7D — the recency window on the two boards that
+   accumulate, and on the same two lists in the Defect Log's quick filters.
+
+   At the END of this file on purpose. The phone rule below is a plain
+   max-width block, and there are several of those earlier in the file that
+   name similar selectors; at equal specificity CSS decides on source order, so
+   a media rule sitting above a base rule it means to override loses silently.
+   That exact mistake cost a measured 32px-instead-of-44px control on the
+   recommended quick-filter row, and the fix was moving the block here.
+
+   "time-window" is not a Tailwind utility name, and there is no bare `button`
+   rule in this file — the 28px navy one is `.tools>button`. But there IS
+   `aside div button{...padding:7px...}` near the top, and the quick-filter
+   drawer is an `<aside>`, so both controls below are inside its reach. A class
+   beats three elements, so every property either of them declares wins; the
+   trap is a property one of them does NOT declare. That is exactly what
+   happened to `.time-window-hidden`, which had no padding and measured 7px in
+   the drawer against 0 on the boards — one control at two sizes. Its padding
+   is now explicit for that reason and must stay. Found by review; the earlier
+   version of this comment asserted a check that had not actually been made. */
+.time-window-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 12px;border-bottom:1px solid var(--log-border,#bac7d9);background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff))}
+.time-window-chips>small{flex:none;color:var(--log-muted,#60728c);font-size:7px;font-weight:900;letter-spacing:1px}
+.time-window-row{display:flex;flex:1;flex-wrap:wrap;gap:4px}
+.time-window-chip{min-width:34px;min-height:34px;border:1px solid var(--log-border,#bac7d9);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-muted,#60728c);padding:0 7px;font-size:8px;font-weight:900;letter-spacing:.3px;cursor:pointer;touch-action:manipulation}
+.time-window-chip:hover,.time-window-chip:focus-visible{border-color:var(--log-accent,#0b64bd);color:var(--log-accent,#0b64bd);outline:none}
+.time-window-chip.on{border-color:var(--log-accent,#0b64bd);background:var(--log-accent,#0b64bd);color:var(--log-header-text,#fff)}
+/* The way out is the same size as the way in. A narrowed list that looks like
+   the whole list is the one failure this control can cause, so the count of
+   what it is holding back is on screen and is itself the button that clears
+   it. Dashed rather than solid: it is a state, not another choice. */
+.time-window-hidden{flex-basis:100%;min-height:32px;border:1px dashed var(--log-accent,#0b64bd);border-radius:6px;background:transparent;color:var(--log-accent,#0b64bd);padding:0 8px;font-size:7px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.time-window-hidden:hover,.time-window-hidden:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,transparent);outline:none}
+@media(max-width:620px){
+ .time-window-chips{gap:6px;padding:7px 8px}
+ /* Seven chips share the row rather than wrapping to a second line: at 360 the
+    row has about 320px of usable width and seven 40px targets with 4px gaps
+    need 304. Measured at 360, 390 and 430. */
+ .time-window-row{gap:4px}
+ .time-window-chip{flex:1;min-width:0;min-height:38px;padding:0 2px}
+}
+
+/* HOLD, the badge and the list behind it.
+
+   AMBER, where DEFERRED is teal. Curtis asked for the same look — "it can look
+   just the same, maybe the colour can be different" — so this mirrors
+   .deferred-held-badge exactly and changes only the colour. A hold is somebody
+   else's instruction sitting on the bus, which is a different kind of fact from
+   anything the shop decided about it, and it should read as a different kind of
+   fact at a glance across a yard. */
+.bus-hold-token-badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:12px;padding:0 3px;border:1px solid #fff;border-radius:7px;background:#a35a00;color:#fff;box-shadow:0 1px 3px #6b3a0099;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:900;line-height:1;letter-spacing:.1px;z-index:4;pointer-events:none}
+.quick-detail.bus-hold-detail-row>b{background:#a35a00;color:#fff}
+
+/* The badge on a Defect Log card and anywhere else a bus is drawn. It is a
+   BUTTON — Curtis: "pressing it on one bus, I wanted to show all the buses that
+   are being held" — so it needs a real target height rather than the 17px the
+   label-shaped badges beside it get away with. */
+/* THE SAME BADGE AS DEFERRED, in a different colour. Curtis asked twice — "it
+   can look just the same, maybe the colour can be different", then "make sure
+   the badge is similar to the deferred one, in size etc" after seeing it.
+
+   So these numbers are copied from .inline-deferred-history-badge, the WAS DEF
+   badge it sits beside, rather than chosen: 24px tall, a 12px pill radius, 8px
+   of side padding, 9px type. Measured before and after — HOLD was 47x36 next to
+   a 37x24 WAS DEF, which is what he was looking at.
+
+   THE TAP TARGET IS KEPT WITHOUT MAKING THE BOX BIGGER. This one is a button
+   and the badges beside it are labels, so an invisible ::after stretches the
+   hit area to 40px while the drawn pill stays 24px. Bounded deliberately: the
+   card's timestamps sit below this cell, and an overlay tall enough to swallow
+   them would trade one problem for a worse one. Measured — see the test. */
+.bus-hold-badge{position:relative;height:24px;min-height:0;border-color:#a35a00;border-radius:12px;background:#fff4e6;color:#8a4a00;padding:0 8px;font-size:9px;cursor:pointer;touch-action:manipulation}
+.bus-hold-badge::after{content:"";position:absolute;left:0;right:0;top:50%;height:40px;transform:translateY(-50%)}
+.bus-hold-badge:hover,.bus-hold-badge:focus-visible{background:#ffe6c7;outline:none}
+
+.bus-hold-shade{align-items:flex-start;padding:0}
+.bus-hold-modal{width:min(560px,100%);max-height:100vh;margin:0 auto;display:flex;flex-direction:column;border:1px solid var(--log-border,#bac7d9);border-radius:0 0 12px 12px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);overflow:hidden;box-shadow:0 20px 60px #00142d66}
+.bus-hold-head{flex:none;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#a35a00;color:#fff}
+.bus-hold-head span{display:flex;flex-direction:column;gap:2px}
+.bus-hold-head small{font-size:7px;font-weight:900;letter-spacing:1.4px}
+.bus-hold-head h2{margin:0;font-size:16px}
+.bus-hold-head button{width:34px;height:34px;border:1px solid #ffffff66;border-radius:6px;background:#ffffff1f;color:inherit;font-size:22px;line-height:1;cursor:pointer}
+.bus-hold-list{flex:1;display:grid;align-content:start;gap:8px;padding:10px;overflow-y:auto;overscroll-behavior:contain}
+.bus-hold-row{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:9px;align-items:center;border:1px solid var(--log-border,#bac7d9);border-left:4px solid #a35a00;border-radius:8px;background:var(--log-surface,#fff);padding:9px}
+.bus-hold-number{display:flex;flex-direction:column;gap:2px}
+.bus-hold-number small{color:var(--log-muted,#60728c);font-size:6px;font-weight:900;letter-spacing:1px}
+.bus-hold-number b{color:#8a4a00;font-size:17px}
+.bus-hold-detail{min-width:0;display:flex;flex-direction:column;gap:3px}
+.bus-hold-detail b{font-size:9px}
+.bus-hold-detail small{color:var(--log-muted,#60728c);font-size:7px;font-weight:900;letter-spacing:.5px}
+.bus-hold-elapsed{color:var(--log-muted,#60728c);font-size:7px;font-weight:900;white-space:nowrap}
+.bus-hold-release{grid-column:1/-1;min-height:38px;border:1px solid #a35a00;border-radius:6px;background:transparent;color:#8a4a00;font-size:8px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+.bus-hold-release:disabled{opacity:.5;cursor:not-allowed}
+.bus-hold-empty{display:flex;flex-direction:column;gap:6px;padding:34px 18px;text-align:center}
+.bus-hold-empty b{font-size:12px}
+.bus-hold-empty span{color:var(--log-muted,#60728c);font-size:9px;line-height:1.45}
+
+/* The control that sets one, on the map editor and the Defect Log card. */
+.hold-bus-field>span{font-size:9px;font-weight:900;letter-spacing:.5px}
+.hold-bus-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:7px;align-items:center}
+.hold-bus-button{min-height:40px;border:1px solid #a35a00;border-radius:6px;background:#fff4e6;color:#8a4a00;padding:0 10px;font-size:9px;font-weight:900;letter-spacing:.5px;cursor:pointer;touch-action:manipulation}
+.hold-bus-button.on{background:#a35a00;color:#fff}
+@media(max-width:620px){
+ .hold-bus-row{grid-template-columns:1fr}
+ .bus-hold-row{grid-template-columns:52px minmax(0,1fr)}
+ .bus-hold-elapsed{grid-column:2}
+}

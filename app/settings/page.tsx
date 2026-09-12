@@ -59,6 +59,9 @@ import FleetRecoveryControl from "../fleet-recovery-control";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "../storage";
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
+import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
+import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
+import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -159,13 +162,24 @@ export default function SettingsPage(){
  const report=(result:StorageWriteResult)=>setSaveProblem(result.reason||"");
  const [board,updateBoard,reloadBoard]=useStoredSettings(BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,report);
  const [down,updateDown,reloadDown]=useStoredSettings(DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings,report);
+ /* Written straight rather than through useStoredSettings: this key is one
+    value read by every surface, not a settings blob owned by one page, and the
+    welcome writes it too. The event is what tells the rest of this tab — a
+    `storage` event fires in OTHER tabs only. */
+ const [appMode,setAppModeState]=useState<AppMode>("full");
+ useEffect(()=>{setAppModeState(readAppMode(localStorage.getItem(APP_MODE_STORAGE_KEY)).mode)},[]);
+ const setAppMode=(mode:AppMode)=>{
+  setAppModeState(mode);
+  const written=writeSetting(localStorage,APP_MODE_STORAGE_KEY,serializeAppMode({mode,answered:true}));
+  if(!written.ok){alert("This device could not save that preference. It will go back to how it was next time the app opens.");return}
+  window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
+ };
  const [log,updateLog,reloadLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
 
  const [open,setOpen]=useState<Record<SectionKey,boolean>>(DEFAULT_OPEN);
  const toggle=(key:SectionKey)=>setOpen(current=>({...current,[key]:!current[key]}));
  /* A jump link opens what it jumps to. Landing on a closed title row and
     having to press it again is the kind of thing that reads as broken. */
- const reveal=(key:SectionKey)=>setOpen(current=>current[key]?current:{...current,[key]:true});
 
  /* The board and the sheet, for the parts of this page that act on records:
     the section transfers, the log report, and MERGE DUPES. */
@@ -328,17 +342,43 @@ export default function SettingsPage(){
  const fixedStyle={"--fixed-page":log.appearance.page,"--fixed-surface":log.appearance.surface,"--fixed-ink":log.appearance.text,"--fixed-muted":log.appearance.muted,"--fixed-header":log.appearance.header,"--fixed-header-text":log.appearance.headerText,"--fixed-accent":log.appearance.accent,"--fixed-font":FONT_STACKS[log.fontFamily],"--fixed-scale":fixedScale} as CSSProperties;
  const sectionClass=(key:SectionKey,name:string)=>"settings-section settings-section-"+name+(open[key]?" open":" closed");
 
- return <main className="settings-app"><ShopCloudLive/>
+ return <main className="settings-app"><WelcomeGate/><ShopCloudLive/>
   <SaveAlert reason={saveProblem} onExport={async()=>{await exportFleetBoardBackup(localStorage,fleet)}}/>
-  <header className="settings-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Press a title to open that page's settings; changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
-  <nav className="settings-jump" aria-label="Settings sections">
-   <a href="#master" onClick={()=>reveal("master")}>MASTER</a><a href="#facility-map" onClick={()=>reveal("map")}>FACILITY MAP</a><a href="#down-sheet" onClick={()=>reveal("down")}>DOWN SHEET</a><a href="#defect-log" onClick={()=>reveal("log")}>DEFECT LOG</a><a href="#fixed-repairs" onClick={()=>reveal("fixed")}>FIXED REPAIRS</a>
-  </nav>
+  <header className="settings-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Settings</h1><p>Every page's settings in one place. Open a section, then open the drawer you want &mdash; everything starts closed so the page stays short. Changes save on this device as you make them.</p></div><TrackerNav active="/settings"/><RefreshButton/></header>
+  {/* THE SECOND NAV IS GONE, and it is the reason Curtis came in here.
+
+      A row of jump links — MASTER, FACILITY MAP, DOWN SHEET, DEFECT LOG,
+      FIXED REPAIRS — sat directly under the page nav, which carries four of
+      those same five labels in the same pill shape. One row switched PAGE, the
+      other scrolled to a SECTION, and nothing about either said which.
+      Curtis: "the same layout is right above to actually switch to that page.
+      IT confused me a few times."
+
+      Nothing replaces it. The five section headers below are 26px, bordered
+      and a screen apart; they are the navigation, and a list of shortcuts to
+      five things you can already see was never carrying its own weight. */}
   <div className="settings-sections">
    <section id="master" className={sectionClass("master","master")} aria-labelledby="master-heading">
     <SectionHead id="master" kicker="EVERY PAGE" title="Master settings" open={open.master} onToggle={()=>toggle("master")}/>
     <SectionBody id="master" open={open.master}>
      <p className="settings-section-blurb">The settings that are about the whole app rather than one page: connecting this device to the shop, moving everything to another device, and one look across all four pages. Each page's own settings are in its section below, and anything set here can still be tuned there afterwards.</p>
+     {/* Curtis asked for this so he can see on his own phone exactly what a new
+         person sees: the welcome only appears by itself on a device that has
+         never opened the app, and everybody in the shop already has a board.
+         Pressing it does not change the mode — it re-asks the question. */}
+     {/* The way out, on the page a Lite device can still reach. Lite is not a
+         permission — anyone holding the device can turn it off — so this is a
+         plain switch rather than anything gated. */}
+     <SettingsDrawers>
+     <SettingsDrawer title="THIS DEVICE" note="Lite mode, and showing the first-time welcome screen again.">
+     <section className="settings-lite-switch">
+      <label className="settings-check"><input type="checkbox" checked={appMode==="lite"} onChange={event=>setAppMode(event.target.checked?"lite":"full")}/>
+       <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the advanced actions on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
+     </section>
+     <section className="settings-welcome-again">
+      <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>
+      <button type="button" className="show-welcome-again" onClick={()=>window.dispatchEvent(new CustomEvent(WELCOME_REQUEST_EVENT))}>SHOW IT</button>
+     </section>
      {/* First thing on the page, above everything.
 
          It was inside FACILITY MAP, which is a page's settings — and it is the
@@ -347,11 +387,17 @@ export default function SettingsPage(){
          a new iPad had to know to open a section called "Board settings" and
          scroll, to find the one thing they came for. It is a whole-app control
          and it is now the first whole-app control anybody sees. */}
-     <section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">
-      <h3 id="master-cloud-heading">SHOP CLOUD</h3>
+     </SettingsDrawer>
+     <SettingsDrawer title="SHOP CLOUD" note="Connect this device so the map, Defect Log and Down Sheet reach the others.">
+     {/* No aria-labelledby: the <h3 id="master-cloud-heading"> it named became the
+          drawer title, and a dangling IDREF makes this region announce UNNAMED —
+          worse than no attribute at all. The drawer's own <h3> heads it now. */}
+     <section className="settings-group cloud-sync-settings">
       <p>Share the map, the Defect Log and the Down Sheet between every device in the shop. Each device is connected once and then keeps itself up to date. This never has to be on: with it off, or with no signal, the tracker works exactly as it does today.</p>
       <CloudSyncControl/>
      </section>
+     </SettingsDrawer>
+     <SettingsDrawer title="BACKUP, RESTORE &amp; MOVING DEVICE" note="MASTER EXPORT and IMPORT, and the last known good copy of the board.">
      <section className="settings-group master-transfer" aria-labelledby="master-transfer-heading">
       <h3 id="master-transfer-heading">MASTER EXPORT &amp; MASTER IMPORT</h3>
       <p>Everything this device holds, in one file: the map, the Defect Log, the Down Sheet, Fleet Campaigns, remembered parts and findings, and every page's settings. Export on the old device, then import that file on the new one.</p>
@@ -371,6 +417,8 @@ export default function SettingsPage(){
       <p>The board as it was before the last save that changed it, kept automatically on this device. Use it when the board looks wrong and you have no export to fall back on. It restores the buses and their repairs; the Down Sheet, campaigns and settings are left as they are, so it is a smaller step back than MASTER IMPORT.</p>
       <FleetRecoveryControl/>
      </section>
+     </SettingsDrawer>
+     <SettingsDrawer title="ONE LOOK &amp; READING TEXT" note="Set the theme and the reading text for the whole app at once.">
      <section className="settings-group master-theme" aria-labelledby="master-theme-heading">
       <h3 id="master-theme-heading">ONE LOOK FOR EVERY PAGE</h3>
       <p>Sets the Facility Map, the Defect Log and Fixed Repairs together, so the whole app matches. Picking one here writes it into each page's own settings, which you can then change on its own below.</p>
@@ -389,6 +437,8 @@ export default function SettingsPage(){
        <label>SIZE<select value={log.fontSize} onChange={event=>updateLog({fontSize:event.target.value as LogSettings["fontSize"]})}>{MASTER_SIZES.map(size=><option value={size.key} key={size.key}>{size.label}</option>)}</select></label>
       </div>
      </section>
+     </SettingsDrawer>
+     </SettingsDrawers>
     </SectionBody>
    </section>
    <section id="facility-map" className={sectionClass("map","map")} aria-labelledby="facility-map-heading">

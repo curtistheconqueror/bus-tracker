@@ -202,7 +202,16 @@ export function cloudFailureMessage(error:unknown):string{
 
    `id` is held out because it is this device's name for the bus and means
    nothing on another one. Fleet number is what both devices agree on. */
-const MAP_HELD_BACK=["id","n","l","s","defects","pendingRepair","down","onDownSheet","downSheetReady"];
+/* Keys that never leave this device. `down`, `onDownSheet` and `downSheetReady`
+   are here because the Down Sheet owns the DS badge and no sync may assert it.
+
+   `hold` is here for a different reason, and Curtis gave it: "If someone is
+   asked to hold a bus (like bay 12 guy) then they should know. It doesn't need
+   to show up on everybody's screen." A hold is an instruction one person is
+   carrying, not a fact about the fleet, so it stays on the phone that was told.
+   Being held back also means placing a hold moves no fingerprint and pushes
+   nothing at all — see busUpdatedAt, which deliberately does NOT count it. */
+const MAP_HELD_BACK=["id","n","l","s","defects","pendingRepair","down","onDownSheet","downSheetReady","hold"];
 
 const KNOWN_STATUS=["service","defect","shop","out","decommissioned","unknown"];
 
@@ -216,6 +225,12 @@ export type CloudRow=Record<string,unknown>;
    bus would mean the last device to sync always wins, even when it is the one
    holding week-old data. */
 export function busUpdatedAt(bus:SyncBus,fallback:string):string{
+ /* THE HOLD'S OWN STAMP IS DELIBERATELY NOT HERE. A hold is device-local
+    (see MAP_HELD_BACK), so it never reaches map_fields and never moves a
+    fingerprint. Counting its stamp would bump updated_at on a row whose
+    content had not changed by one byte — a push that says "newer" while
+    carrying nothing new, which is exactly the out-of-order ammunition
+    updated_at exists to deny. Placing a hold must cost the cloud nothing. */
  const stamps=[bus.lastLocationChangeAt,bus.lastStatusChangeAt,bus.parkedAt]
   .map(value=>clean(value))
   .filter(value=>value!==""&&!Number.isNaN(new Date(value).getTime()));

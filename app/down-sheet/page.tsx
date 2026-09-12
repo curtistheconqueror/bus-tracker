@@ -26,10 +26,15 @@ import ShopCloudLive from "../shop-cloud-live";
 import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
+import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {answerDeferredBus} from "../deferred-actions";
+import {answerRecommendedBus} from "../recommended-actions";
+import {useAppMode} from "../welcome-gate";
+import {hiddenInLite} from "../lite-mode";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "../defect-log/defect-log-display-settings";
 import AppName from "../app-name";
+import WelcomeGate from "../welcome-gate";
 import {OPTIONAL_DOWN_TILES,type OptionalDownTile} from "./down-sheet-settings-store";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
@@ -198,6 +203,8 @@ export default function DownSheet(){
  const [showQuickNotes,setShowQuickNotes]=useState(false);
  const [countsOpen,setCountsOpen]=useState(false);
  const [deferredCollapsed,setDeferredCollapsed]=useState(true);
+ const [recommendedCollapsed,setRecommendedCollapsed]=useState(true);
+ const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
  const [savedQuickNotes,setSavedQuickNotes]=useState("");
@@ -228,6 +235,11 @@ export default function DownSheet(){
     rows, and a foreman who never opened it should not have to scroll past it. */
  useEffect(()=>{setDeferredCollapsed(localStorage.getItem(DEFERRED_BOARD_COLLAPSED_KEY)!=="0")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,DEFERRED_BOARD_COLLAPSED_KEY,deferredCollapsed?"1":"0")},[deferredCollapsed,hydrated]);
+ /* Absent means COLLAPSED here too, for the reason the two boards above it are:
+    this is now the THIRD panel between the counts and the rows, and a foreman
+    who never opened it should not be scrolling past it to reach the sheet. */
+ useEffect(()=>{setRecommendedCollapsed(localStorage.getItem(RECOMMENDED_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,RECOMMENDED_BOARD_COLLAPSED_KEY,recommendedCollapsed?"1":"0")},[recommendedCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
@@ -313,6 +325,21 @@ export default function DownSheet(){
   const wroteDown=writeDownSheetStorageResult(localStorage,applied.downEntries as DownEntry[]);
   setFleet(applied.fleet as FleetBus[]);setEntries(applied.downEntries as DownEntry[]);
   if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" came off DEFERRED, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
+  if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
+ };
+ /* The recommendation board's answer, written through this page the way the
+    deferred one is. Same two failure reports, because the same two things can
+    go wrong: nothing would save, or the fleet saved and the sheet did not. */
+ const answerRecommended=(busId:string,defects:StructuredDefect[],action:"downsheet"|"dismiss")=>{
+  const now=new Date().toISOString(),bus=fleet.find(item=>item.id===busId),label=bus?.n||busId;
+  const applied=answerRecommendedBus(fleet as DefectLogFleetBus[],entries as DownEntry[] as DefectLogDownEntry[],busId,defects,action,{now});
+  if(!applied.saved){alert("Nothing on Bus "+label+" would save — the repairs the board expected are no longer where it left them. Open the bus on the Defect Log.");return}
+  const wroteFleet=writeFleetStorageResult(localStorage,applied.fleet as FleetBus[]);
+  setSaveProblem(wroteFleet.reason||"");
+  if(!wroteFleet.ok){alert("This device could not save the change, so Bus "+label+" is unchanged. Export a backup and clear space, then try again.");return}
+  const wroteDown=writeDownSheetStorageResult(localStorage,applied.downEntries as DownEntry[]);
+  setFleet(applied.fleet as FleetBus[]);setEntries(applied.downEntries as DownEntry[]);
+  if(!wroteDown.ok){setSaveProblem(wroteDown.reason||"failed");alert("Bus "+label+" was updated, but the Down Sheet could not be saved on this device. Check the sheet before relying on it.");return}
   if(applied.saved<applied.attempted)alert("Bus "+label+" was updated, but "+(applied.attempted-applied.saved)+" of its repairs would not save. Check the bus on the Defect Log.");
  };
  const saveEntry=(next:DownEntry)=>{if(next.workflow!=="Completed"&&entries.some(entry=>entry.id!==next.id&&entry.workflow!=="Completed"&&entry.busId===next.busId)){alert("That bus already has an active down-sheet entry.");return}const nextFleet=applyDownEntryToFleet(fleet,next);setFleet(nextFleet);writeFleetStorage(localStorage,nextFleet);
@@ -533,7 +560,7 @@ export default function DownSheet(){
 
  const appStyle={"--down-page-title-color":displaySettings.styles.pageTitle.color,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 
- return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>
@@ -541,9 +568,9 @@ export default function DownSheet(){
        width, the same shape the Defect Log's header uses. */}
    <div className="down-header-actions">
     <RefreshButton/>
-    <button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
+    {!hiddenInLite(appMode,"advancedActions")&&<button className="down-advanced-toggle" type="button" aria-expanded={advancedOpen} aria-controls={advancedOpen?"down-advanced-drawer":undefined} onClick={()=>setAdvancedOpen(value=>!value)}>
      <span><b>ADVANCED ACTIONS</b><small>Shifts, completed, scan sheet and clearing</small></span><i aria-hidden="true">{advancedOpen?"CLOSE":"OPEN"}</i>
-    </button>
+    </button>}
    </div>
   </header>
 
@@ -560,7 +587,7 @@ export default function DownSheet(){
       sheet itself. What stayed out: the two things used on every visit, ADD
       DOWN BUS and SEARCH, which now sit together instead of with a block of
       controls wedged between them. */}
-  {advancedOpen&&<section className="down-advanced open" id="down-advanced-drawer">
+  {advancedOpen&&!hiddenInLite(appMode,"advancedActions")&&<section className="down-advanced open" id="down-advanced-drawer">
    <div className="down-advanced-body">
     <div className="down-advanced-group">
      <b className="down-advanced-label">VIEW</b>
@@ -642,16 +669,16 @@ export default function DownSheet(){
         scoreboard saying most of this again in a different shape; these are the
         numbers that survived it and are still worth having on the days somebody
         wants them. */}
-    {extraTiles.includes("off-property")&&tileFor("off-property")}
-    {extraTiles.includes("pending")&&<div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>}
-    {extraTiles.includes("accident")&&<div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>}
-    {extraTiles.includes("waiting")&&<div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>}
-    {extraTiles.includes("labor")&&<div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>}
-    {extraTiles.includes("capacity")&&<div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("off-property")&&tileFor("off-property")}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("pending")&&<div className="group-count group-pending"><strong>{counters.pending}</strong><span>{displaySettings.labels.pending}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("accident")&&<div className="group-count group-accident"><strong>{counters.accident}</strong><span>{displaySettings.labels.accident}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("waiting")&&<div className="group-count group-waiting"><strong>{counters.waiting}</strong><span>{displaySettings.labels.waiting}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("labor")&&<div className="group-count group-labor"><strong>{formatRepairTime(counters.activeMinutes)}</strong><span>{displaySettings.labels.activeLabor||"EST. ACTIVE LABOR"}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("capacity")&&<div className="group-count group-capacity"><strong>{active.length}<small> / {MAX_ENTRIES}</small></strong><span>{displaySettings.labels.capacity}</span></div>}
     {/* Only once it has something of its own to say. Unfiltered it is the same
         number as EST. ACTIVE LABOR to the minute, and printing 244h 30m twice
         side by side is exactly the duplication this was meant to clear. */}
-    {extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
+    {!hiddenInLite(appMode,"extraTiles")&&extraTiles.includes("labor")&&visibleMinutes!==counters.activeMinutes&&<div className="group-count group-view-labor"><strong>{formatRepairTime(visibleMinutes)}</strong><span>{displaySettings.labels.currentView||"EST. CURRENT VIEW"}</span></div>}
    </div>}
   </section>
 
@@ -674,8 +701,20 @@ export default function DownSheet(){
       a bus somebody deferred. Separate lists on purpose — a mystery is
       unexplained and a deferral is a decision, and folding them together would
       dilute the one thing MYSTERY BUSES is for. */}
-  <DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
-   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>
+  {!hiddenInLite(appMode,"deferred")&&<DeferredBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={deferredCollapsed} onCollapsedChange={setDeferredCollapsed} onAnswer={answerDeferred}/>}
+  {/* Third and last of the three, directly under DEFERRED. Curtis asked for it
+      "right under both of them, same color and everything". The three read down
+      the page as one question getting narrower: nobody knows why this bus is
+      here (MYSTERY), somebody decided to hold it (DEFERRED), somebody asked for
+      it to go on the sheet and nobody has answered (RECOMMENDED).
+
+      Not gated on Lite, unlike DEFERRED. Holding a bus back from service is a
+      judgement Curtis reserved; saying "I think this one belongs on the sheet"
+      is not, and the quick filter that shows the same list has always been
+      available in Lite — hiding only the board would be the odd half. */}
+  <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
+   collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet

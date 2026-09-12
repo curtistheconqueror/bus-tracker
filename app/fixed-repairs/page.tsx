@@ -16,11 +16,13 @@ import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "../fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
+import {locationLabel as sharedLocationLabel} from "../location-label";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
 import ShopCloudLive from "../shop-cloud-live";
 import {candidateBusNumbers,resolveBusNumber} from "../bus-number-resolver";
 import AppName from "../app-name";
+import WelcomeGate from "../welcome-gate";
 
 /* How many completed repairs render at once.
 
@@ -48,7 +50,12 @@ function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetP
 function isToday(value:string){return Boolean(value)&&new Date(value).toDateString()===new Date().toDateString()}
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Not recorded":new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(date.getTime()))return "";return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16)}
-function locationLabel(location:string){const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not recorded"}
+/* Its own "not recorded" wording, kept: this page prints a completed repair,
+   where a blank location is a gap in a record rather than a bus nobody has
+   parked yet. The list itself is the shared one, which is how OFF PROPERTY
+   arrives — this copy never had it, so a bus away at a vendor printed as the
+   raw slot id. */
+const locationLabel=(location:string)=>sharedLocationLabel(location,"Location not recorded");
 
 function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange,busQuery="",busFeedback="",onBusQuery}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void;busQuery?:string;busFeedback?:string;onBusQuery?:(value:string)=>void}){
  const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
@@ -315,7 +322,7 @@ function repairOrigin(source:string|undefined){
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
  /* This page had no save banner at all, alone among the four. A refused write
     here is the one that can lose the only copy of a record. */
- return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><TrackerNav active="/fixed-repairs"/><RefreshButton/></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>

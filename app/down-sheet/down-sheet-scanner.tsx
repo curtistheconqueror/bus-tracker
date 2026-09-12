@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useRef,useState} from "react";
+import {lockPageScroll} from "../scroll-lock";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
 import {knownMechanicNames} from "./scan-spelling";
@@ -102,6 +103,11 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
   onImport(imports);
  };
 
+ /* Curtis: "I can't seem to move this page. It only moves what's behind the
+    page." Nothing was holding the page still, so a drag scrolled the Down Sheet
+    underneath the modal while the modal itself stayed put. Every other dialog
+    in this app locks the page; this one was missed. */
+ useEffect(()=>lockPageScroll("scan-sheet-open"),[]);
  return <div className="down-shade scan-shade" role="dialog" aria-modal="true" aria-labelledby="scan-title">
   <section className="scan-modal">
    <header className="repair-editor-head"><div><span>PHOTO IMPORT</span><h2 id="scan-title">SCAN SHEET</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>

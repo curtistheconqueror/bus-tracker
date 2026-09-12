@@ -86,12 +86,39 @@ machine, because these sessions run in containers that are thrown away.
   silently orphans a mechanic's board.
 - **Never delete or merge repair records to simplify the UI.** History is the
   point of the app.
+- **A location is named through `app/location-label.ts`, never by a prefix.**
+  Matching `garage-` gets you "Main Garage" for all 84 spaces, including
+  TROUBLE BAY 11 and 12, which the move editor treats as separate destinations.
+  Five copies of that table existed and all five had the bug; a sixth would
+  bring it back, and a test asserts there is one.
 - **Never commit** API keys, credentials, fleet backups, photographs, or
   employee-sensitive information.
 - **Catalog renames are read-time, never rewrites.** A record saved under an old
   wording must keep reading correctly through the rename maps in
   `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
   `LEGACY_ISSUE_RENAMES`, `RETIRED_ISSUES`). Nothing on disk is ever rewritten.
+- **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
+  `app/bus-hold.ts` stores it as an optional `hold` field on the bus record —
+  `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
+  sets it to `undefined`. That rule was written when holds synced, and its
+  original reason has since inverted — see below — but it stays: `delete` is
+  the only spelling that makes `"hold" in bus` false, and it is the safety net
+  if `hold` ever leaves `MAP_HELD_BACK`.
+  **A hold is DEVICE-LOCAL and never travels** — `hold` is listed in
+  `MAP_HELD_BACK` (`cloud-sync.ts`) and in `MAP_EXCLUDED` (`section-transfer.ts`),
+  so it reaches neither the Shop Cloud nor an export, and being in `MAP_EXCLUDED`
+  also means an incoming transfer keeps the RECEIVER's own hold. Curtis:
+  *"If someone is asked to hold a bus (like bay 12 guy) then they should know.
+  It doesn't need to show up on everybody's screen."* It follows that
+  `busUpdatedAt` must **not** count the hold's own stamp — it did from the first
+  build, when holds still synced, and the reason inverted with the rule.
+  Counting it now would stamp a row newer while its `map_fields` were
+  byte-identical: a push claiming to be newer while carrying nothing new, which
+  is the out-of-order ammunition `updated_at` exists to deny. Placing a hold
+  moves no fingerprint and pushes nothing at all.
+  No location change ever clears a hold: Curtis chose that after being asked, because the buses in his case were arriving and
+  arriving is a move. The `until` time is optional and is an expiry, applied at
+  read time — an expired hold is left on the record, not rewritten away.
 - **The Down Sheet owns the DS badge.** Entries get there off photographed
   sheets or typed by hand, and the map *reads that membership back* rather than
   deciding it. No import, transfer or sync may assert it — see
@@ -131,6 +158,8 @@ the cloud's bookkeeping, per device
   pace-cloud-removed-entries-v1    Down Sheet entries taken off    (tombstones)
 
 per-device settings, never synced
+  pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
+  pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
@@ -142,11 +171,53 @@ per-device view state — which panel is open, what has been dismissed
   pace-down-sheet-advanced-open-v1     ADVANCED ACTIONS on the DOWN SHEET
   pace-down-sheet-counts-open-v1       the DOWN SHEET count tiles, collapsed by default
   pace-down-sheet-deferred-collapsed-v1  the DOWN SHEET's DEFERRED board, collapsed by default
+  pace-down-sheet-recommended-collapsed-v1  the DOWN SHEET's RECOMMENDED FOR DOWN SHEET board, collapsed by default
   pace-defect-log-stats-open-v1
   pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-role-v1` names a person's job and must not gate anything yet.** It holds
+three things picked on the home screen, in this order: **department**, then
+**union or non-union**, then the **job** — and the second narrows the third,
+because Curtis gave the actual split:
+
+| | Union | Non-Union |
+| --- | --- | --- |
+| Transportation | Bus Operator, Relief Supervisor | Dispatch, Asst Supt, Supt |
+| Maintenance | Servicer, Mechanic Helper, Mechanic, Master Mechanic, Body & Frame, Building Maintenance | Foreman, Asst Supt, Supt |
+
+**Foreman is on the non-union side, and so is Dispatch** — Dispatch sat on the
+union side for one commit purely because it is union at many transit
+properties, which is not the same as being union at this one. **Relief
+Supervisor** is the union spot beneath Dispatch. **Master Mechanic** is union, at the top of
+the mechanic ladder — inferred from the shape of the rest of the list, then
+confirmed by Curtis. The title is a top classification at some transit
+properties and a management job at others, so it was worth asking. A combination not in that table cannot
+be chosen and does not read back, so if the contract changes, it changes in
+`app/roles.ts` and any device holding the old pairing reads as "not set" until
+its owner picks again. *Bargaining* is the union side, so it can never be the
+non-union label; Union / Non-Union is what the floor says.
+
+Curtis asked for it as a label first:
+"there will be no special conditions in the app for any of the working roles.
+This is all cosmetic. We will wire that up later."
+
+**Where it is going, and why that is not a licence to start.** He has since said
+the roles WILL decide access, and named the mechanism: "the distinction will be
+made on a person's own login... when a person picks one, it will determine what
+they see and have access to," plus a questionnaire that does not exist yet. The
+access rules ride on **that login**. This key is an unauthenticated string in
+LocalStorage that anybody holding the phone can change from the screen that set
+it, so it can be the label a login confirms and never the thing that decides.
+Until the login exists, nothing outside `app/roles.ts` may read it, and a test
+holds that line.
+
+*Asst Supt* and *Supt* are abbreviated because both exist and both departments
+have them — spelled out they differ by one word at the front, which is the
+hardest pair to scan on a phone. Both appear in both departments, so the pair is
+stored: the role alone does not say which one.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
 STATS panel it opened was a second scoreboard saying most of what the tiles
@@ -199,6 +270,8 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
+app/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
+app/location-label.ts      slot id -> the words a person says, trouble bays included
 app/repair-catalog.ts      the defect catalog, rename maps, count fields
 app/section-transfer.ts    per-section device transfers and their merge rules
 app/storage.ts             storage keys, envelopes, recovery snapshots

@@ -13,7 +13,8 @@ import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectCl
 import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
 import { reassignBusPair } from "../app/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, recommendedMinutesElapsed, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
+import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
 import { sectionBusCount } from "../app/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
@@ -693,7 +694,13 @@ test("server-renders the live fleet command dashboard", async () => {
   const html = await response.text();
 
   assert.match(html, /<title>FLEETSTEP — Fleet Maintenance<\/title>/i);
-  assert.match(html, /FLEET MAINTENANCE BUS TRACKING SYSTEM - FACILITY WIDE OVERVIEW/);
+  /* The map's header now carries the same four lines as the other five —
+     name, kicker, title, subtitle — instead of one long all-caps sentence
+     doing the work of all four. The h1 is the page's name, matching what the
+     nav calls it, and the sentence it replaced became the subtitle's job. */
+  assert.match(html, /<h1>Facility Map<\/h1>/);
+  assert.match(html, /class="app-kicker">FLEET MAINTENANCE</);
+  assert.match(html, /class="app-subtitle">Facility-wide overview/);
   assert.doesNotMatch(html, />PACE MAINTENANCE BUS TRACKING SYSTEM/);
   assert.match(html, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(html, /class="command-bar"/);
@@ -831,8 +838,11 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
   assert.match(page,/quickFilterExpandedBusIds/);
   assert.match(page,/aria-expanded=\{expanded\}/);
-  assert.match(page,/quickFilterShareText\(quickFilterLabel,quickFilterBuses,quickFilter\)/);
-  assert.match(page,/navigator\.share\(\{title:quickFilterLabel\+" bus list",text\}\)/);
+  /* quickFilterShareLabel, not quickFilterLabel: the recency window is part of
+     what a shared list claims, so it travels in the heading. Still built from
+     quickFilterBuses, which is the narrowed list. */
+  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
+  assert.match(page,/navigator\.share\(\{title:quickFilterShareLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
   assert.match(page,/aria-label="Share filtered bus list as text"/);
@@ -1684,8 +1694,8 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Unlocked / won't lock"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - BUS ER"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - MV ER"));
-  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
-  assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - R/S"));
+  assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - C/S"));
+  assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - R/S"));
   assert.equal(repairCategoryEmoji("Engine"), REPAIR_CATEGORY_EMOJI.Engine);
   assert.equal(repairCategoryLabel("Engine"), "⚙️ Engine");
   assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Gauges and Dash - Fuel gauge INOP / false reading"));
@@ -2498,21 +2508,34 @@ test("changing a defect's bus number MOVES the record, and a removal never trave
  assert.deepEqual(repaired.fleet.map(bus => (bus.defects || []).length), [0, 1]);
 });
 
-test("a one-bus search ends when you reach the bus; a worklist of several survives", async () => {
- const page = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
- // Searching one bus number is a lens you look through to get AT that bus. It
- // used to end only when the box was emptied by hand, so Curtis tapped the bus,
- // did the work, came back, and the board was still held to one bus with
- // nothing on screen saying so. Several numbers is a worklist, not a lens.
- assert.match(page, /const singleBusSearch=busSearch\.kind==="numbers"&&busSearch\.tokens\.length===1&&busSearch\.buses\.length===1/);
- assert.match(page, /const clearSearchOnReach=\(\)=>\{if\(singleBusSearch\)setSearch\(""\)\}/);
- // Both ways into a bus clear it, and on the TAP rather than on a save —
- // looking at a bus is a finished errand too.
- assert.match(page, /log-card-main log-group-header[\s\S]{0,240}?onClick=\{\(\)=>\{clearSearchOnReach\(\);setExpandedBusIds/);
- assert.match(page, /log-focus-button[\s\S]{0,320}?clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)/);
- // And a way out that is not backspacing four digits. ALL still clears the
- // search too, but it drags the state filter back with it.
+test("a search ends when somebody ends it, and never says so silently", async () => {
+ const [page, css] = await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8"),
+ ]);
+ /* Tapping a bus used to clear a one-bus search. That was wrong in the ordinary
+    case rather than the rare one: the tap that "reaches" the bus is the same tap
+    that expands it IN PLACE, so the whole board came back underneath the card
+    being read — worst on a single-defect bus, where the tap opens one line and
+    the entire log appears beneath it. */
+ assert.doesNotMatch(page, /clearSearchOnReach/, "tapping a bus must not clear the search");
+ assert.match(page, /log-card-main log-group-header[\s\S]{0,200}?onClick=\{\(\)=>\{setExpandedBusIds/);
+ assert.match(page, /log-focus-button[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+
+ // What it needed was never a smarter guess about when to stop; it was for the
+ // filtered state to stop being invisible. Two ways out, both only while
+ // something is typed: the tag in the field and the banner under it.
  assert.match(page, /className="clear-log-search" onClick=\{\(\)=>setSearch\(""\)\}/);
+ assert.match(page, /\{search\.trim\(\)&&<div className="log-search-filtered" role="status">/);
+ assert.match(page, /className="show-all-buses" onClick=\{\(\)=>setSearch\(""\)\}/);
+ assert.match(css, /\.log-search-filtered\{/);
+ assert.match(css, /\.show-all-buses\{min-height:44px/, "a real tap target on a phone");
+
+ // It counts what the SEARCH is hiding, not what the state filter is hiding —
+ // different questions, and the banner only answers the first.
+ assert.match(page, /const unsearched=records\.filter\(matchesStateFilter\)/);
+ assert.match(page, /const visible=unsearched\.filter\(matchesSearch\)/);
+ assert.match(page, /const hiddenBySearch=search\.trim\(\)\?groupDefectLogRecords\(unsearched\)\.length-visibleGroups\.length:0/);
 });
 
 test("ALREADY LOGGED can reach the record it is blocking on", async () => {
@@ -2743,7 +2766,14 @@ test("phone layouts expose large primary controls and category-only defect entry
   assert.match(trackerCss, /\.command-bar\{display:none!important\}/);
   assert.match(trackerCss, /\.phone-command-dock\{[^}]*grid-template-columns:repeat\(4/);
   assert.match(downCss, /\.down-header nav a\{[^}]*height:50px/);
-  assert.match(defectPage, /QUICK SELECT \(OPTIONAL\)/);
+  /* QUICK SELECT (OPTIONAL) became DEFECT, and became a typing field. The label
+     changed because the field did: it is no longer an optional shortcut behind a
+     category, it is the way you name the defect — by typing it or by tapping it
+     open, whichever is faster with the bus in front of you. */
+  assert.match(defectPage, /<ComboField label="DEFECT"/);
+  assert.match(defectPage, /<ComboField label="CATEGORY"/);
+  assert.doesNotMatch(defectPage, /disabled=\{!value\.defect\.category\}/,
+    "the defect field must not be gated on a category - removing that gate is the point of the change");
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
   assert.match(defectCss, /\.save-log-middle,\.close-log-middle\{[^}]*min-height:50px/);
   assert.match(defectPage, /<details className="advanced-defect-details"/);
@@ -2827,7 +2857,20 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
   assert.match(navPages,/\{href:"\/fixed-repairs",label:"FIXED REPAIRS"\}/);
   for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/<TrackerNav[^>]*\/>/);
-  assert.ok(trackerPage.indexOf("mobile-mode-nav")<trackerPage.indexOf("FLEET MAINTENANCE BUS TRACKING SYSTEM"),"phone route navigation must render before the Facility Map header");
+  /* THE ORDER FLIPPED, deliberately. This asserted the nav rendered BEFORE the
+     Facility Map's header, which is how the map became the one page whose nav
+     sat above its own name — FLEETSTEP was the fifth thing down the screen on
+     the page the app opens on. Curtis, looking at a phone: "the facility map
+     needs to get on board with title design. Fleetstep should be at top."
+     Every other header is name, kicker, title, subtitle, then nav, and the map
+     is now the same. It stays a SIBLING of the header rather than moving
+     inside it because it is `position:sticky` here and only here. */
+  /* Anchored to the MARKUP, not to the bare class name: a comment in page.tsx
+     mentions `.mobile-mode-nav` while explaining this very ordering, and a
+     bare indexOf found the comment and failed on it. Same trap as matching a
+     button by a word its own explanation also uses. */
+  assert.ok(trackerPage.indexOf("<AppName/>")<trackerPage.indexOf('<TrackerNav className="mobile-mode-nav"'),"the Facility Map's name must render before its phone nav, as on every other page");
+  assert.match(trackerPage,/<\/header>\s*<TrackerNav className="mobile-mode-nav"/,"the nav follows the header rather than preceding it");
   assert.match(defectPage,/save-log-middle-actions[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/save-fixed-bottom[\s\S]*?SAVE AS FIXED/);
   assert.match(defectPage,/FIX \/ STEPS TAKEN/);
@@ -3553,8 +3596,20 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  for(const [id,key] of [["facility-map","map"],["down-sheet","down"],["defect-log","log"],["fixed-repairs","fixed"]]){
   assert.match(page,new RegExp('<SectionHead id="'+id+'" kicker="[A-Z ]+" title="[^"]+" open=\\{open\\.'+key+'\\} onToggle=\\{\\(\\)=>toggle\\("'+key+'"\\)\\}\\/>'),id+" title row toggles it");
   assert.match(page,new RegExp('<SectionBody id="'+id+'" open=\\{open\\.'+key+'\\}>'),id+" body follows the same flag");
-  assert.match(page,new RegExp('<a href="#'+id+'" onClick=\\{\\(\\)=>reveal\\("'+key+'"\\)\\}>'),id+" jump link opens what it jumps to");
  }
+
+ /* THE SECOND NAV IS GONE, and must stay gone.
+
+    A row of jump links — MASTER, FACILITY MAP, DOWN SHEET, DEFECT LOG, FIXED
+    REPAIRS — used to sit directly under the page nav, which carries four of
+    those same five labels in the same pill shape. One switched PAGE, the other
+    scrolled to a SECTION, and nothing about either said which. Curtis: "the
+    same layout is right above to actually switch to that page. IT confused me
+    a few times." Asserting on the CSS too, because a rule left behind is how
+    the markup comes back. */
+ assert.equal(/settings-jump/.test(page),false,"the duplicate section nav must not return");
+ assert.equal(/settings-jump/.test(css),false,"and neither may its styling, which is how it would come back");
+ assert.equal(/const reveal=/.test(page),false,"the helper that only the jump links used is gone with them");
  assert.match(css,/\.settings-section-body\[hidden\]\{display:none\}/,"the body's grid display must not defeat the hidden attribute");
  assert.match(css,/\.settings-section-title\{[^}]*font-size:26px;font-weight:900/,"the title is the line people read to find a setting");
  assert.match(css,/\.settings-section-toggle\{width:100%;min-height:58px/,"the whole row is the target, not a chevron");
@@ -4669,7 +4724,7 @@ test("the operator blower and the mirror switches land in both structures a grou
  assert.deepEqual(migrateRepairIdentity("Bus Controls","System Switches - Mirror heater switch"),
   {category:"Operator/Driver Controls",issue:"System Switches - Mirror heater switch - C/S"});
  // Lights and Fixtures still owns the mirrors themselves; only the switch moved.
- assert.ok(REPAIR_OPTIONS["Lights and Fixtures"].includes("Outside rear view mirror - C/S"));
+ assert.ok(REPAIR_OPTIONS["Lights, Mirrors and Alarms"].includes("Outside rear view mirror - C/S"));
 });
 
 test("the split surge tank is two independent sides, and the empty one builds the winter list",async()=>{
@@ -5205,7 +5260,10 @@ test("the Amerex panel is two systems, and the states that down a bus say so",as
  // shown where the choice was just made, not behind Advanced Details
  const notePage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.ok(notePage.indexOf("defect-note")<notePage.indexOf("advanced-defect-details"));
- assert.ok(notePage.indexOf('QUICK SELECT')<notePage.indexOf("defect-note"));
+ /* Anchored to a string that still exists: 'QUICK SELECT' was renamed and this
+    kept passing on indexOf(-1), which is a test that had stopped testing. */
+ assert.ok(notePage.includes('<ComboField label="DEFECT"'));
+ assert.ok(notePage.indexOf('<ComboField label="DEFECT"')<notePage.indexOf("defect-note"));
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
@@ -5858,7 +5916,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  ]);
 
  // one control per bus card, and it must not be nested inside the card's expand button
- assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);clearSearchOnReach\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
+ assert.match(page,/className="log-focus-button"[\s\S]{0,320}?onClick=\{event=>\{event\.stopPropagation\(\);setFocusedBusId\(group\.bus\.id\)\}\}/);
  const focusButtonAt=page.indexOf('className="log-focus-button"'),headerAt=page.indexOf('className="log-card-main log-group-header"');
  assert.ok(focusButtonAt>0&&headerAt>focusButtonAt,"focus button must precede the header button as a sibling");
  assert.equal(/log-card-main log-group-header[\s\S]{0,600}?log-focus-button/.test(page),false);
@@ -5892,7 +5950,10 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(focusBlock,/aria-label=\{"Add a defect to bus "\+focusedGroup\.bus\.n\}/);
  // wording the picker no longer offers still shows, instead of reading as blank
  assert.match(page,/const offCatalogIssue=value\.quickIssue&&!repairs\.includes\(value\.quickIssue\)\?value\.quickIssue:""/);
- assert.match(page,/\{offCatalogIssue&&<option value=\{offCatalogIssue\}>\{offCatalogIssue\} \(as logged\)<\/option>\}/);
+ /* Still reachable, now as the first ROW of the typing picker rather than the
+    first <option>: a record saved under wording the catalog has since retired
+    must survive a save untouched, whatever the picker is made of. */
+ assert.match(page,/offCatalogIssue&&!query\?\[\{value:offCatalogIssue,label:offCatalogIssue,hint:"as logged"\}/);
  // same green as + LOG DEFECT, and it does not squeeze out the close control
  assert.match(css,/\.add-log-focus-defect\{margin-left:auto;min-height:48px[^}]*background:#08733f/);
  assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
@@ -5918,9 +5979,31 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
    if(css[end]==="{")depth++;
    else if(css[end]==="}"&&--depth===0)break;
   }
-  if(css.slice(open+1,end).includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
+  /* THE RULE THIS TESTS is that the focus view's own LAYOUT uses one phone
+    breakpoint. A rule guarded by [data-bus-...] is not that: it belongs to one
+    of the opt-in view options, which are OFF by default and carry their own
+    breakpoint BY DESIGN — "phone only" means the 620px block, which is the
+    whole point of them and is asserted separately in "PHONE is a width, not a
+    device".
+
+    THAT FILTER ALONE IS ENOUGH, re-derived by running this loop four ways over
+    the shipped stylesheet. A first attempt also stripped the names
+    .log-focus-row and .log-focus-button, on the theory that they are card
+    elements rather than focus-view ones. Unnecessary, and worse than
+    unnecessary: stripping a name blinds this guard to it forever, and
+    .log-card-group>.log-focus-button already has a real rule in a media block
+    that this would then never check. A future .log-focus-button rule dropped
+    into the wrong breakpoint would have passed silently. */
+ const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}");
+ if(body.includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
  }
- assert.deepEqual(conditions,["max-width:760px"]);
+ /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
+    what the line above says, and what matters. Comparing the list itself also
+    asserted there was exactly ONE such block, so a second one at the same
+    correct breakpoint failed this. Deduplicated, it tests the rule; the length
+    check below keeps it from passing vacuously if the rules ever move out. */
+ assert.ok(conditions.length>0,"the focus view must still have phone rules");
+ assert.deepEqual([...new Set(conditions)],["max-width:760px"]);
 });
 
 test("parts memory learns per defect issue and lets a category default be chosen deliberately",()=>{
@@ -6140,7 +6223,33 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
  const ada=REPAIR_OPTIONS["Bus Accessories"];
  assert.equal(REPAIR_OPTIONS["Doors, Ramp and Lift"],undefined);
  const groups=REPAIR_OPTION_GROUPS["Bus Accessories"];
- assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request","Bike Rack"]);
+ assert.deepEqual(Object.keys(groups),["Doors","Ramp, Lift and Kneeler","Wheelchair Securement","Stop Request","Bike Rack","Wipers and Washers"]);
+
+ /* WIPERS, added last so nothing above it moved in the picker. Curtis asked for
+    the blades and the motors and settled the category himself — "maybe bus
+    accessories is more appropriate" — over Driver Controls. He is right: the
+    operator works the switch from the seat, but the part that fails is out on
+    the glass, and the switch already has its own home in System Switches.
+
+    Each side is its own blade on its own arm driven by its own motor, so all
+    four carry a side the way the securement and stop-request options do. A
+    sheet that says "wipers INOP" does not say which side, and that is exactly
+    what these options exist to pin down. */
+ for(const side of ["curbside","roadside"]){
+  assert.ok(groups["Wipers and Washers"].includes("Wiper blade ("+side+")"),side+" blade");
+  assert.ok(groups["Wipers and Washers"].includes("Wiper motor ("+side+")"),side+" motor");
+  assert.ok(groups["Wipers and Washers"].includes("Washer nozzle ("+side+")"),side+" nozzle");
+ }
+ /* The washers are the same control on the same glass, so they share the group
+    and the group is named for both. Only the NOZZLES take a side: one pump
+    feeds one reservoir, so those two are whole-bus. */
+ for(const wholeBus of ["Washer not spraying","Washer pump","Washer reservoir / leaking"]){
+  assert.ok(groups["Wipers and Washers"].includes(wholeBus),wholeBus+" is one per bus, not one per side");
+  for(const side of ["curbside","roadside"])
+   assert.equal(groups["Wipers and Washers"].includes(wholeBus+" ("+side+")"),false,wholeBus+" must not be split per side");
+ }
+ assert.ok(groups["Wipers and Washers"].includes("Other wiper or washer defect"),"the catch-all every other group here has");
+ assert.equal(groups["Wipers"],undefined,"the group carries both names, not just the wipers");
 
  // the Q'STRAINT panel and the straps are separate units per side of the bus
  for(const side of ["curbside","roadside"]){
@@ -6271,7 +6380,7 @@ test("the repair details panel opens for a record that has repair details",async
 });
 
 test("mirror wording says who does the work, and the missing fixtures exist",()=>{
- const lights=REPAIR_OPTIONS["Lights and Fixtures"],body=REPAIR_OPTIONS.Bodywork;
+ const lights=REPAIR_OPTIONS["Lights, Mirrors and Alarms"],body=REPAIR_OPTIONS.Bodywork;
 
  // Curtis keeps mirrors in both categories on purpose: a mirror the mechanic
  // can simply swap is not the same job as glass the body shop has to do. The
@@ -6308,8 +6417,8 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
 
  // renames are scoped to their category, so a word means one thing per place
  for(const [category,issue,expected] of [
-  ["Lights and Fixtures","Turn signals","Turn signal lamps"],
-  ["Lights and Fixtures","Mirrors / fixtures","Mirror replacement (no body work)"],
+  ["Lights, Mirrors and Alarms","Turn signals","Turn signal lamps"],
+  ["Lights, Mirrors and Alarms","Mirrors / fixtures","Mirror replacement (no body work)"],
   ["Bodywork","Mirror","Mirror damage (body shop)"],
   ["Bodywork","Glass / windshield","Glass / windshield cracked or shattered"],
  ]){
@@ -6318,7 +6427,14 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
   assert.ok(REPAIR_OPTIONS[category].includes(moved.issue),expected+" must be pickable");
  }
  // a rename in one category must not reach the same word in another
- assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Headlights"),{category:"Lights and Fixtures",issue:"Headlights"});
+ assert.deepEqual(migrateRepairIdentity("Lights, Mirrors and Alarms","Headlights"),{category:"Lights, Mirrors and Alarms",issue:"Headlights"});
+ /* The category was renamed: half of "Lights and Fixtures" was mirrors and one
+    item was an audible alarm, so the name said less about its contents every
+    year. Read-time like every rename here — a record logged under the old
+    category still reads back, and nothing on disk moved. */
+ assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Headlights"),{category:"Lights, Mirrors and Alarms",issue:"Headlights"});
+ assert.equal(REPAIR_OPTIONS["Lights and Fixtures"],undefined,"the old name is a rename, not a second live category");
+ assert.deepEqual(migrateRepairIdentity("Lights and Fixtures","Other light or fixture"),{category:"Lights, Mirrors and Alarms",issue:"Other light, mirror or alarm defect"},"the catch-all follows the name");
 
  // Warning lights was too vague to diagnose from and left the picker. Every
  // system that lights one already has its own entry.
@@ -6329,7 +6445,7 @@ test("mirror wording says who does the work, and the missing fixtures exist",()=
  // the records that used it keep their wording and still read correctly
  const [kept]=normalizeDefects([{id:"warn-1",category:"Lights and Fixtures",issue:"Warning lights",details:"Amber lamp on",state:"open",operability:"service"}]);
  assert.equal(kept.issue,"Warning lights");
- assert.equal(defectLabel(kept),"Lights and Fixtures — Warning lights — Amber lamp on");
+ assert.equal(defectLabel(kept),"Lights, Mirrors and Alarms — Warning lights — Amber lamp on","a record stored under the old category reads under the new name");
 });
 
 test("the chair mark flags ADA equipment without touching what gets stored",async()=>{
@@ -6372,9 +6488,28 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
  assert.equal(page.match(/repairGroupDisplayLabel\(group\)/g).length,2);
  assert.equal(page.match(/repairIssueDisplayLabel\(issue,repairGroup\)/g).length,2);
  assert.equal(page.match(/repairIssueDisplayLabel\(issue\)/g).length,2);
- assert.match(logPage,/<optgroup label=\{repairGroupDisplayLabel\(group\)\}/);
- assert.match(logPage,/\{repairIssueDisplayLabel\(entry,group\)\}/);
- assert.match(logPage,/<option value=\{repair\} key=\{repair\}>\{repairIssueDisplayLabel\(repair\)\}/);
+ /* The Defect Log's picker no longer builds its own <optgroup>s — it draws rows
+    the search index built, so the mark now has to come through THERE or it
+    silently stops appearing. Assert it at the source rather than deleting the
+    check: this is exactly the kind of invariant that dies quietly in a rewrite. */
+ const searchIndex=await readFile(new URL("../app/defect-search.ts",import.meta.url),"utf8");
+ assert.match(searchIndex,/groupLabel=repairGroupDisplayLabel\(group\)/);
+ assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue,group\)/);
+ assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue\)/);
+ /* The mark has to survive in BOTH places the group name is now drawn — the
+    section heading a browsing list is divided by, and the line under each row
+    when the list is ranked. Both read row.groupLabel, which is where
+    defect-search.ts put the mark; asserting only one of them would let the
+    other quietly lose it. */
+ assert.match(logPage,/hint:browsing\?undefined:\(row\.groupLabel\?row\.groupLabel\+" · "\+row\.categoryLabel:row\.categoryLabel\)/);
+ assert.match(logPage,/section:browsing\?\(value\.defect\.category\?\(row\.groupLabel\|\|row\.categoryLabel\)/);
+ /* Same move as the group label above: the option's own wording is built in the
+    search index now, and the assertions on it sit with that file rather than
+    here. What the PAGE still has to prove is that it draws the index's label
+    instead of re-spelling the issue itself. */
+ assert.match(logPage,/label:row\.label/);
+ /* The flat-category branch went the same way — defect-search.ts builds those
+    rows too, and its labels are asserted above. */
 });
 
 test("release safety keeps interval units and learned parts attached to the right identity",async()=>{
@@ -6668,7 +6803,13 @@ test("the shop cloud never becomes a condition of using the board",async()=>{
     devices at all, so it is a whole-app control — and somebody setting up a new
     iPad should not have to open a section called "Board settings" and scroll to
     find the one thing they came for. */
- assert.match(settings,/<section className="settings-group cloud-sync-settings" aria-labelledby="master-cloud-heading">/);
+ /* No aria-labelledby any more, and that is the fix rather than a loss: the
+    <h3 id="master-cloud-heading"> it pointed at became the drawer's title when
+    the groups were put behind drawers, and a dangling IDREF makes the region
+    announce UNNAMED — strictly worse than no attribute. The drawer's own <h3>
+    heads it now. Measured: zero broken IDREFs on the page. */
+ assert.match(settings,/<section className="settings-group cloud-sync-settings">/);
+ assert.equal(/aria-labelledby="master-cloud-heading"/.test(settings),false,"the dangling reference must not come back");
  assert.match(settings,/<CloudSyncControl\/>/);
  assert.equal(/cloud-sync-settings/.test(panel),false,"no longer in the map's section");
  assert.equal(/CloudSyncControl/.test(panel),false,"the map panel must not import it either");
@@ -7893,6 +8034,196 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
   [],
  ).filter(held => !held.defects.some(item => item.deferredUntil && new Date(item.deferredUntil).getTime() > now.getTime()));
  assert.deepEqual(snoozed.map(held => held.bus.n), ["9912"], "keeping a bus deferred until 23:00 must silence the whole bus");
+});
+
+test("a footer inside a dialog is not positioned against the viewport, and every lock actually locks", async () => {
+ const [globals, scanner, lock, down] = await Promise.all([
+  readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/scroll-lock.ts", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8"),
+ ]);
+
+ /* The bare `footer` rule is page furniture — a pill floating at the bottom of
+    the Facility Map and the Down Sheet — and it reached EVERY <footer> in the
+    app. On the SCAN SHEET modal that put CANCEL at x=-78 on a 390px phone:
+    position:fixed and left:50% survived even where a later rule set
+    position:sticky, and translateX(-50%) dragged the bar half off the left edge.
+    Same shape as the bare `header{height:38px}` trap CLAUDE.md records. */
+ assert.match(globals, /footer\{position:fixed;bottom:10px;left:50%/, "the global is still there for .down-footnote and .command-bar");
+ assert.match(globals, /\[role="dialog"\] footer,\.shade footer,\.down-shade footer,\.log-shade footer\{position:static;left:auto;right:auto;transform:none/);
+
+ /* lockPageScroll added only the CALLER'S class, so a name with no stylesheet
+    rule behind it was a lock that silently did nothing. Three of the five call
+    sites were in that state: the SCAN SHEET modal Curtis reported, the
+    mystery-bus location editor, and the first-run welcome. The class that does
+    the locking is one shared name now, defined once. */
+ assert.match(lock, /export const PAGE_SCROLL_LOCKED="page-scroll-locked"/);
+ assert.match(lock, /root\.classList\.add\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(lock, /body\.classList\.add\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(lock, /root\.classList\.remove\(name,PAGE_SCROLL_LOCKED\)/);
+ assert.match(globals, /html\.page-scroll-locked,body\.page-scroll-locked\{overflow:hidden;overscroll-behavior:none\}/);
+
+ /* THE SAME SPECIES, FOUND LATER: the Facility Map's phone nav carried
+    `position:sticky;top:0` and had never pinned anything since the rule was
+    written. `overflow-x:hidden` computes the other axis to `overflow-y:auto`,
+    which makes the element a scroll container, and a sticky descendant sticks
+    to its nearest scroll container — so the nav was sticking to `.app`, which
+    does not scroll: the document does. Measured before the fix: scroll to 1600
+    and the nav sat at y-1286, gone.
+
+    `overflow-x:clip` clips the same content without creating a scroll
+    container, so the nav's container becomes the viewport. `hidden` stays in
+    front of it as the fallback declaration — a browser that does not know
+    `clip` ignores the line after it and keeps the old behaviour, which is a
+    nav that scrolls away rather than a page that scrolls sideways. Both
+    declarations are load-bearing; deleting either changes what ships. */
+ assert.match(globals, /html,body\{max-width:100%;overflow-x:hidden;overflow-x:clip\}/,
+   "hidden first as the fallback, clip second so sticky has a scrolling container");
+ assert.match(globals, /\.app\{[^}]*overflow-x:hidden!important;overflow-x:clip!important/,
+   "the map's own wrapper was the container the nav was stuck to");
+ assert.match(globals, /\.mobile-mode-nav\{position:sticky;z-index:19;top:0/,
+   "the rule this exists to make true");
+ // Every caller is now covered by that one rule whatever name it passes.
+ for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../app/mystery-board.tsx", "../app/welcome-gate.tsx",
+                     "../app/down-sheet/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  if (/lockPageScroll\(/.test(source)) assert.match(source, /lockPageScroll\("[a-z-]+"\)/, file + " passes a name");
+ }
+ // The scanner had no lock at all, which is what let the sheet drag underneath.
+ assert.match(scanner, /useEffect\(\(\)=>lockPageScroll\("scan-sheet-open"\),\[\]\)/);
+
+ /* 100vh on a phone is TALLER than the visible viewport — the browser chrome
+    overlays it — so the modal ran past the bottom of the screen and its action
+    bar went with it. 100vw ignored the shade's own padding and overflowed it
+    sideways by the same 8px. */
+ assert.match(down, /\.scan-shade\{padding:4px;height:100dvh\}/);
+ assert.match(down, /\.scan-modal\{width:100%;max-height:100dvh;border-radius:0\}/);
+ assert.doesNotMatch(down, /\.scan-modal\{width:100vw;max-height:100vh/);
+});
+
+test("LITE changes what is drawn and can never reach a record", async () => {
+ const { hiddenInLite, shownIn, LITE_HIDDEN } = await import("../app/lite-mode.ts");
+
+ // Full hides nothing, whatever is on the list.
+ for (const feature of LITE_HIDDEN) {
+  assert.equal(hiddenInLite("full", feature), false, feature + " must be visible in full");
+  assert.equal(hiddenInLite("lite", feature), true, feature + " must stand down in lite");
+  assert.equal(shownIn("lite", feature), false);
+ }
+
+ /* THE CONSTRAINT THE WHOLE FEATURE RESTS ON. Lite changes what is DRAWN, never
+    what is STORED, SYNCED or READ BACK — a Lite phone and a full phone sit side
+    by side on the same Shop Cloud writing the same rows to the same keys, and
+    neither can tell what the other is running.
+
+    So no module that decides a record consults the mode. Asserted against the
+    files rather than trusted to a comment: the day somebody reaches for
+    hiddenInLite inside a save path to "keep Lite simple", this fails. */
+ const dataModules = [
+  "../app/storage.ts", "../app/cloud-sync.ts", "../app/cloud-live.ts", "../app/cloud-client.ts",
+  "../app/repair-catalog.ts", "../app/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
+  "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../app/fleet-backup.ts",
+  "../app/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
+ ];
+ for (const file of dataModules) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  assert.doesNotMatch(source, /hiddenInLite|shownIn|app-mode|useAppMode|APP_MODE_STORAGE_KEY/,
+   file + " decides records, so it must never consult the app mode");
+ }
+
+ // And lite-mode.ts itself imports only a type — it cannot read or write storage.
+ const rules = await readFile(new URL("../app/lite-mode.ts", import.meta.url), "utf8");
+ assert.doesNotMatch(rules, /localStorage|setItem|getItem/, "the rules never touch storage");
+ assert.match(rules, /^import type \{AppMode\} from "\.\/app-mode\.ts";$/m, "a type, not the store");
+});
+
+test("LITE stands the right things down on every surface", async () => {
+ const [nav, name, down, log, settings] = await Promise.all([
+  readFile(new URL("../app/tracker-nav.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
+ ]);
+ // One filter in one file — every header draws from TRACKER_PAGES.
+ assert.match(nav, /page\.href==="\/lists"&&hiddenInLite\(mode,"campaignsPage"\)/);
+ // "Behind the name it will say LITE" — on every screen, so nobody wonders why
+ // a control they were shown yesterday is missing today.
+ assert.match(name, /mode==="lite"&&<i className="app-name-lite">LITE<\/i>/);
+ // Both sheets: ADVANCED ACTIONS, and the drawer as well as its button — a
+ // device that had it open when Lite went on must not keep it open.
+ for (const [source, label] of [[down, "down sheet"], [log, "defect log"]]) {
+  assert.match(source, /!hiddenInLite\(appMode,"advancedActions"\)&&<button/, label + " keeps its advanced toggle in lite");
+  assert.match(source, /advancedOpen&&!hiddenInLite\(appMode,"advancedActions"\)/, label + " would keep an open drawer open");
+ }
+ // DEFERRED, everywhere it shows: the board, the badge, the evening prompt, the
+ // tick in the form and the history note.
+ assert.match(down, /!hiddenInLite\(appMode,"deferred"\)&&<DeferredBoard/);
+ assert.match(log, /!hiddenInLite\(appMode,"deferred"\)&&<><DeferredNavBadge\/><DeferredReviewPrompt\/><\/>/);
+ assert.match(log, /!hiddenInLite\(editorMode,"deferred"\)&&<label className="wide downsheet-check deferred-check">/);
+ // The diagnosis half of the form.
+ assert.match(log, /!hiddenInLite\(editorMode,"diagnosisFields"\)&&<details className="advanced-defect-details"/);
+ // The way out is a plain switch, because Lite is not a permission.
+ assert.match(settings, /checked=\{appMode==="lite"\} onChange=\{event=>setAppMode\(event\.target\.checked\?"lite":"full"\)\}/);
+});
+
+test("the welcome asks once, on a device that has never opened the app, and Full is the fallback", async () => {
+ const { isFirstRun, readAppMode, serializeAppMode, APP_MODE_STORAGE_KEY, DEFAULT_APP_MODE } = await import("../app/app-mode.ts");
+ const store = map => ({ getItem: key => (key in map ? map[key] : null) });
+
+ // Nothing on the device at all: the one case that gets the welcome by itself.
+ assert.equal(isFirstRun(store({})), true);
+ // Answered already — never again, whatever else is or is not there.
+ assert.equal(isFirstRun(store({ [APP_MODE_STORAGE_KEY]: serializeAppMode({ mode: "lite", answered: true }) })), false);
+
+ /* The trap this function exists for. A MISSING board and a SAVED board holding
+    zero buses come back identically from readFleetStorage — storage.ts returns
+    {items:[],valid:true} for both — so asking it "is the board empty" would put
+    the welcome in front of somebody who had just cleared theirs. isFirstRun
+    reads getItem directly, so an empty-but-present board is not a first run. */
+ assert.equal(isFirstRun(store({ "pace-board-v1": JSON.stringify({ kind: "buses", version: 4, buses: [] }) })), false,
+  "a device that cleared its board has still opened this app");
+ assert.equal(isFirstRun(store({ "pace-board-v1": JSON.stringify({ kind: "buses", version: 4, buses: [{ id: "b1", n: "17501" }] }) })), false);
+ // A storage that throws (private mode, blocked site data) is not a first run:
+ // better to skip the welcome than to show it on every single page load.
+ assert.equal(isFirstRun({ getItem() { throw new Error("blocked") } }), false);
+
+ /* Full when nothing is stored, and when what is stored is unreadable. Somebody
+    who never answers, or whose device loses the answer, keeps every surface —
+    the other default takes pages away from a mechanic mid-shift because a write
+    failed once. */
+ assert.deepEqual(readAppMode(null), DEFAULT_APP_MODE);
+ assert.equal(readAppMode(null).mode, "full");
+ assert.equal(readAppMode("not json").mode, "full");
+ assert.equal(readAppMode(JSON.stringify({ mode: "nonsense", answered: true })).mode, "full");
+ assert.deepEqual(readAppMode(serializeAppMode({ mode: "lite", answered: true })), { mode: "lite", answered: true });
+});
+
+test("the welcome is on every page, re-openable from Settings, and does not render before mount", async () => {
+ const [gate, css, settings] = await Promise.all([
+  readFile(new URL("../app/welcome-gate.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
+ ]);
+ // A first-timer can land on any URL, so it mounts everywhere the nav goes.
+ for (const file of ["../app/page.tsx", "../app/down-sheet/page.tsx", "../app/defect-log/page.tsx", "../app/fixed-repairs/page.tsx", "../app/lists/page.tsx", "../app/settings/page.tsx"]) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(source, /<WelcomeGate\/>/, file + " is missing the welcome gate");
+ }
+ /* The answer lives in localStorage, so it opens closed and decides on mount.
+    Rendering it before then would put a full-screen overlay into the HTML of
+    every page for every device and take it away a frame later. */
+ assert.match(gate, /const \[open,setOpen\]=useState\(false\)/);
+ assert.match(gate, /if\(isFirstRun\(localStorage\)\)setOpen\(true\)/);
+ // Curtis sees what a new person sees, from his own phone.
+ assert.match(settings, /new CustomEvent\(WELCOME_REQUEST_EVENT\)/);
+ assert.match(gate, /window\.addEventListener\(WELCOME_REQUEST_EVENT,onRequest\)/);
+ // A device that cannot store the answer still gets the app it chose.
+ assert.match(gate, /catch\{\/\* A device that cannot store the answer/);
+ // Somebody who told their phone they do not want motion is not asking for an
+ // exception on a shop tool.
+ assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\s*\n\s*\.welcome-name span/);
 });
 
 test("the Down Sheet's bands are read in the order the shop chose, and the ORDER control is gone", async () => {
@@ -10441,7 +10772,12 @@ test("a deferred bus can be released from the drawer that lists it, and the badg
   /* ONE snapshot, taken before anything moves. Calling the single-record
      handler in a loop would snapshot the already-changed board on the second
      pass, and UNDO would then only reach the last repair. */
-  const body=page.slice(page.indexOf("const endDeferralForBus="),page.indexOf("const movingMysteryBus="));
+  /* Sliced to this handler's OWN closing brace rather than to whatever happens
+     to be declared after it. The end anchor used to be the next handler along,
+     which meant a new one landing in between silently widened the region and
+     failed this on its snapshot rather than on anything wrong here. */
+  const start=page.indexOf("const endDeferralForBus=");
+  const body=page.slice(start,page.indexOf("\n };",start));
   assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,"exactly one undo snapshot for the whole release");
   assert.equal((body.match(/persist\(/g)||[]).length,1,"and one write at the end");
   assert.ok(body.indexOf("setUndoSnapshot")>body.indexOf("for(const defect of deferred)"),"snapshot is of the fleet as it was, taken from the closure not the fold");
@@ -10480,7 +10816,7 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
      105h under the road filter. */
   // Still only when it differs from EST. ACTIVE LABOR — and now only when that
   // tile was asked for at all, since a view total beside no total says nothing.
-  assert.match(page,/\{extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
+  assert.match(page,/\{!hiddenInLite\(appMode,"extraTiles"\)&&extraTiles\.includes\("labor"\)&&visibleMinutes!==counters\.activeMinutes&&<div className="group-count group-view-labor">/);
 
   /* The labour tiles print a duration rather than a count, so their text steps
      down - at the tiles' own 20px, "244h 30m" wrapped mid-value. */
@@ -10499,7 +10835,7 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
 
   /* In the header, under REFRESH, in a column of its own so it is under it at
      every width rather than only where the header happens to stack. */
-  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*<button className="down-advanced-toggle"/);
+  assert.match(page,/<div className="down-header-actions">\s*<RefreshButton\/>\s*\{!hiddenInLite\(appMode,"advancedActions"\)&&<button className="down-advanced-toggle"/);
   assert.match(css,/\.down-header-actions\{[^}]*flex-direction:column/);
 
   /* UNMISTAKABLY THIS PAGE'S. Both headers are navy, so the Defect Log's
@@ -10554,7 +10890,7 @@ test("the location under a bus number is the control that moves it on the map", 
 
   /* IT IS NOT A SELECT, and that was measured rather than preferred. A native
      select cannot wrap and this column is 72px on a phone: bound to the
-     location, 13 of the 17 labels locationLabel() can produce were cut off at
+     location, 13 of the labels locationLabel() could then produce were cut off at
      390 - Main Garage needed 49px against 38px of room, Foreman Office 59px.
      The label keeps its own type and its freedom to wrap; the whole of it is
      the target, and the editor it opens has the room the column does not. */
@@ -10719,9 +11055,62 @@ test("the app's name is drawn top-left on every page, from one place", async () 
     assert.doesNotMatch(src,/"FLEETSTEP"/,file+" must not spell the name itself");
   }
 
+  /* THE NAME OPENS THE HOME SCREEN, and the home screen is the welcome screen.
+
+     It was an <a href="/"> first, and `/` is the Facility Map — so it took you
+     to a page rather than to the screen Curtis meant. He said it twice: "I like
+     the design and how you have the name show up on the screen, but I still
+     can't access it by touching the top... the proper design is by touching the
+     title on each and every page takes you back to the home screen."
+
+     A BUTTON, not a link, because it no longer navigates — it opens a dialog
+     over the page you are on, and a link that goes nowhere is a worse lie than
+     a button that looks like a masthead. It asks with the SAME event Settings'
+     SHOW IT uses, so there is one way to open that screen rather than two that
+     can drift. */
+  assert.match(component,/<button type="button" className=\{className\?"app-name "\+className:"app-name"\}/,
+    "the name element itself is the control - a wrapper would make the whole header row tappable");
+  assert.match(component,/onClick=\{\(\)=>window\.dispatchEvent\(new CustomEvent\(WELCOME_REQUEST_EVENT\)\)\}/);
+  assert.equal(component.includes('href='),false,"it must not still claim to be a link");
+
+  /* A <button> in this stylesheet walks into a bare `button{}` rule — 28px tall,
+     navy, 9px text — so the reset is load-bearing, not tidiness. Delete any of
+     these four and the app's name renders as a small navy pill. */
+  {
+   const cssNow=await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+   const rule=cssNow.match(/\.app-name\{([^}]*)\}/)[1];
+   for(const property of ["height:auto","background:none","border-radius:0","font-family:inherit"])
+    assert.ok(rule.includes(property),".app-name must reset "+property+" against the bare button rule");
+   /* Not anchored to a line start: this file's first rules are compacted onto
+      one very long line, which is part of why the trap is easy to miss. */
+   assert.ok(cssNow.includes("button{height:28px"),"the bare button rule this defends against still exists");
+  }
+
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   /* Every page loads globals.css, so the name is styled once. */
-  assert.match(css,/\.app-name\{display:block;text-align:left/);
+  /* The <button> reset now sits between `width:fit-content` and `text-align`,
+     so this matches the pieces that carry meaning rather than the whole string
+     in order: the padding grows the tap area and the negative margin pays for
+     it, and together they keep the header the same height it always was. */
+  assert.match(css,/\.app-name\{display:block;width:fit-content;/);
+  {
+   const rule=css.match(/\.app-name\{([^}]*)\}/)[1];
+   for(const property of ["padding:5px 0","margin:-5px 0 0","text-align:left"])
+    assert.ok(rule.includes(property),".app-name must keep "+property);
+  }
+
+  /* An anchor arrives with two UA defaults that would give the game away: an
+     underline, and the browser link colour - which on six dark navy headers
+     reads as a nav link in the wrong place, or worse, as unreadable blue. */
+  const nameRule=css.match(/\.app-name\{([^}]*)\}/)[1];
+  assert.match(nameRule,/text-decoration:none/,"the masthead is not underlined");
+  assert.match(nameRule,/color:inherit/,"it takes the header's colour, never the UA link colour");
+
+  /* width:fit-content is the HIT TARGET. display:block is load-bearing for the
+     map (see below), and a full-width block anchor turns the whole empty right
+     side of the header into a link home - a mechanic reaching past the name on
+     the Down Sheet would have been thrown to the map mid-entry. */
+  assert.match(nameRule,/width:fit-content/,"the link ends at the last letter of the name");
 
   /* THE MAP'S HEADER FOUGHT THIS TWICE, and both rules are load-bearing.
 
@@ -10738,7 +11127,18 @@ test("the app's name is drawn top-left on every page, from one place", async () 
 
      Delete either and the map breaks in a way no test but this one would say. */
   assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch/);
-  assert.match(css,/\.app>header>h1\{text-align:center\}/,"the title keeps its centre on its own line");
+  /* The title no longer keeps its centre: this header now holds the same
+     left-aligned stack as the other five, and a centred title inside it is the
+     one line that reads as a mistake. `text-align:left` on `.app>header` is
+     what beats the phone block's `center` on the same selector — same
+     specificity, later rule, which only works while this file stays in order. */
+  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left\}/);
+  assert.match(css,/\.app>header>h1\{margin:2px 0 1px;font-size:25px;line-height:1\.05;text-align:left\}/,
+    "an explicit size, because the phone block drops the header to 11px and the h1 inherited it");
+  assert.match(css,/@media\(max-width:760px\)\{\.app>header>h1\{font-size:22px\}\}/,
+    "25px desktop, 22px phone - the two sizes the other five headers already use");
+  assert.match(css,/\.app-kicker\{/,"the kicker the other five headers draw");
+  assert.match(css,/\.app-subtitle\{/,"and the subtitle under it");
 
   /* Measured across all six pages at 360, 390, 820 and 1280: the name renders,
      sits 12-18px from the left on every one, and nothing overflows its header
@@ -10769,4 +11169,1746 @@ test("the farebox knows the fault that stops it being probed", async () => {
   /* Other farebox defect stays last: it is the catch-all, and a catch-all that
      is not at the end reads as just another item. */
   assert.equal(REPAIR_OPTION_GROUPS["Tech Services"]["Farebox"].at(-1),"Other farebox defect");
+});
+
+test("typing a defect finds it across every category, and near-identical wordings stay apart",()=>{
+ /* Curtis: "since there's so many defects that are similarly spelled, you know
+    this has to be a smart function." These are the cases that make a plain
+    substring match useless, so they are the cases the ranking is held to. */
+ const first=query=>searchCatalog(query)[0];
+ const labels=query=>searchCatalog(query).map(row=>row.label);
+
+ // THE POINT OF THE WHOLE CHANGE: found without naming the category first.
+ assert.equal(first("wiper motor").label,"Wiper motor (curbside)");
+ assert.equal(first("wiper motor").category,"Bus Accessories");
+
+ // WORD STARTS BEAT MID-WORD HITS. "mot" must not lead with "remote".
+ assert.ok(/motor/i.test(first("mot").label),"'mot' led with "+first("mot").label);
+
+ // EVERY TYPED WORD MUST APPEAR, so a second word narrows instead of widening.
+ assert.ok(searchCatalog("door").length>searchCatalog("rear door").length);
+ assert.ok(searchCatalog("rear door").length>searchCatalog("rear door close").length);
+ for(const row of searchCatalog("rear door close"))
+  for(const term of ["rear","door","close"])
+   assert.ok(row.haystack.includes(term),row.label+" is missing "+term);
+
+ // ORDER DOES NOT MATTER, because the group is searched with the issue.
+ assert.deepEqual(labels("door rear").slice(0,3),labels("rear door").slice(0,3));
+
+ // NEAR-IDENTICAL OPTIONS ARE ALL REACHABLE AND ALL DISTINGUISHABLE. The second
+ // line is the only thing telling some of these apart, so it must never be
+ // empty on an option whose issue text is shared with another.
+ const doors=searchCatalog("rear door").filter(row=>row.category==="Bus Accessories");
+ assert.ok(doors.length>=4,"expected the whole rear-door family, got "+doors.length);
+ for(const row of doors)assert.ok(row.groupLabel,row.label+" has no group line to be told apart by");
+
+ // PUNCTUATION IS A SEPARATOR: nobody types " / ".
+ assert.equal(first("washer reservoir leaking").label,"Washer reservoir / leaking");
+ assert.deepEqual(searchTerms("Washer reservoir / leaking"),["washer","reservoir","leaking"]);
+
+ // NO FUZZY MATCHING. A typo returns nothing rather than a confident wrong
+ // answer, because a wrong answer here is a repair filed against the wrong part.
+ assert.equal(searchCatalog("wpier motor").length,0);
+ assert.equal(searchCatalog("zzzz").length,0);
+
+ // AN EMPTY QUERY IS "SHOW ME EVERYTHING" - that is what a tap does.
+ assert.ok(searchCatalog("").length>0);
+ assert.equal(searchCategories("").length,CATEGORY_COUNT());
+ function CATEGORY_COUNT(){return Object.keys(REPAIR_OPTIONS).length}
+
+ // THE SAME QUERY ALWAYS RETURNS THE SAME LIST. A picker that reshuffles between
+ // keystrokes is a picker nobody trusts.
+ assert.deepEqual(labels("brake"),labels("brake"));
+
+ // EVERY ROW CARRIES A STORABLE IDENTITY, unchanged from what the old <select>
+ // wrote: "Group - Item" in a grouped category, the bare issue in a flat one.
+ for(const row of CATALOG_OPTIONS){
+  const flat=REPAIR_OPTIONS[row.category];
+  assert.ok(flat.includes(row.value),row.category+" / "+row.value+" is not a storable option");
+  assert.equal(row.value.includes("♿"),false,row.value+" must not store the chair mark");
+ }
+});
+
+test("choosing a category narrows the defect search without walling it off",()=>{
+ /* A bus is not a filing cabinet. Somebody who picked Brakes and then typed
+    "wiper motor" wants the wiper motor — not an empty list telling him he is in
+    the wrong drawer. Those matches follow the in-category ones and are marked,
+    so the category moving with the pick is visible before the tap. */
+ const scoped=searchCatalogForCategory("wiper motor","Brakes");
+ assert.equal(scoped.inCategory.length,0);
+ assert.ok(scoped.elsewhere.length>0,"the rest of the catalog must still be reachable");
+ assert.equal(scoped.elsewhere[0].category,"Bus Accessories");
+
+ // In-category matches lead when there are any.
+ const doors=searchCatalogForCategory("rear door","Bus Accessories");
+ assert.ok(doors.inCategory.length>0);
+ for(const row of doors.inCategory)assert.equal(row.category,"Bus Accessories");
+ for(const row of doors.elsewhere)assert.notEqual(row.category,"Bus Accessories");
+
+ // AN UNTOUCHED FIELD UNDER A CHOSEN CATEGORY SHOWS THAT CATEGORY, not the whole
+ // catalog underneath it - opening on 300 foreign rows would bury the choice.
+ const idle=searchCatalogForCategory("","Brakes");
+ assert.equal(idle.elsewhere.length,0);
+ for(const row of idle.inCategory)assert.equal(row.category,"Brakes");
+
+ // With no category chosen there is nothing to be foreign to.
+ assert.equal(searchCatalogForCategory("wiper","").elsewhere.length,0);
+});
+
+test("the defects Curtis named from the floor are in the catalog and reachable by his words",()=>{
+ /* Added from one message: "we need ramp won't lock, doesn't fully cycle...
+    curbside marker, lights and roadside marker, lights and clearance lights
+    which are at the top... Water in storage tanks. Tanks for air."
+
+    Each is asserted twice: that it EXISTS where a mechanic would look for it,
+    and that the SEARCH finds it from the words he used rather than the words the
+    catalog happens to spell it with. An option nobody can find is not in the
+    catalog in any way that counts. */
+ const ramp=REPAIR_OPTION_GROUPS["Bus Accessories"]["Ramp, Lift and Kneeler"];
+ assert.ok(ramp.includes("Ramp will not lock"));
+ assert.ok(ramp.includes("Ramp does not fully cycle"));
+ /* Beside the other ramp faults rather than appended after the kneeler ones. */
+ assert.ok(ramp.indexOf("Ramp will not lock")>ramp.indexOf("Ramp will not stow"));
+ assert.ok(ramp.indexOf("Ramp does not fully cycle")<ramp.indexOf("Kneeler"));
+
+ const lights=REPAIR_OPTIONS["Lights, Mirrors and Alarms"];
+ /* "- C/S" and "- R/S", which is how THIS category already writes a side (see
+    the mirrors below them). Bus Accessories writes "(curbside)" instead; each
+    category is internally consistent, which is what a mechanic reads. */
+ assert.ok(lights.includes("Marker lights - C/S"));
+ assert.ok(lights.includes("Marker lights - R/S"));
+ assert.ok(lights.includes("Clearance lights"));
+ assert.ok(lights.indexOf("Marker lights - C/S")<lights.indexOf("Interior lights"),
+  "the exterior lamps stay together");
+
+ /* "Water in air STORAGE tanks", because that is the word Curtis used — "Water
+    in storage tanks. Tanks for air." Named "Water in air tanks" first, and the
+    search then returned NOTHING for his own phrase, since every typed word has
+    to appear and "storage" was not in it. The option was wrong, not the rule:
+    air storage tank is the standard term anyway. Caught before it shipped only
+    because the test searched his wording rather than the catalog's. */
+ assert.ok(REPAIR_OPTIONS["Pneumatic System"].includes("Water in air storage tanks"));
+
+ const top=query=>searchCatalog(query)[0];
+ assert.equal(top("ramp lock").value,"Ramp, Lift and Kneeler - Ramp will not lock");
+ assert.equal(top("ramp cycle").value,"Ramp, Lift and Kneeler - Ramp does not fully cycle");
+ assert.equal(top("marker lights").category,"Lights, Mirrors and Alarms");
+ assert.equal(top("clearance").value,"Clearance lights");
+ /* His words were "water in storage tanks" and "tanks for air" — neither is the
+    catalog's wording, and both have to land on it anyway. */
+ assert.equal(top("water tanks").value,"Water in air storage tanks");
+ assert.equal(top("water in storage tanks").value,"Water in air storage tanks");
+ assert.equal(top("tanks air water").value,"Water in air storage tanks");
+
+ /* The ramp items sit in a group that already carries the chair mark, so they
+    must not carry a second one of their own. */
+ for(const issue of ["Ramp will not lock","Ramp does not fully cycle"])
+  assert.equal(repairIssueDisplayLabel(issue,"Ramp, Lift and Kneeler"),issue);
+});
+
+test("Lite can always be turned back off from inside Lite",async()=>{
+ /* Curtis: "make sure there's a way to go back to the full version. If I do
+    select the light version in the settings, let's not make a blooper where I
+    can't no longer select that mode because it disappeared."
+
+    A mode you can enter and not leave is a trap, and it is the kind that only
+    shows up on somebody else's phone. Lite is a drawing choice, not a
+    permission — anyone holding the device can turn it off — so the way out has
+    to survive being in Lite. This holds the three things that would break it. */
+ const [nav,settings,lite,gate]=await Promise.all([
+  readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/lite-mode.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8"),
+ ]);
+
+ /* 1. SETTINGS MUST STAY IN THE NAV. The nav filters exactly one page in Lite,
+    and if that ever becomes a list, Settings must not join it — losing the nav
+    entry is losing the only door. */
+ assert.match(nav,/page\.href==="\/lists"&&hiddenInLite\(mode,"campaignsPage"\)/);
+ assert.equal(nav.includes('"/settings"'),false,"the nav must not single out Settings at all");
+
+ /* 2. NOTHING ON THE SETTINGS PAGE IS GATED ON THE MODE. The switch is a plain
+    checkbox on an ungated page; the moment anything there starts asking
+    hiddenInLite, the door can be shut from the inside. */
+ assert.equal(settings.includes("hiddenInLite"),false,
+  "Settings must not hide anything in Lite - it is the way out");
+ assert.match(settings,/className="settings-lite-switch"/);
+ assert.match(settings,/checked=\{appMode==="lite"\}[\s\S]{0,120}setAppMode\(event\.target\.checked\?"lite":"full"\)/,
+  "the switch must set the mode both ways, not just into Lite");
+ /* And the second way out, for a device that would rather be re-asked. */
+ assert.match(settings,/className="show-welcome-again"/);
+
+ /* 3. LITE NEVER HIDES A SURFACE THAT HOLDS THE SWITCH. */
+ assert.equal(lite.includes('"settingsPage"'),false);
+ for(const feature of ["campaignsPage","advancedActions"])assert.ok(lite.includes('"'+feature+'"'));
+
+ /* The welcome screen says so too, so the choice is not made blind. */
+ assert.match(gate,/Turn it off in Settings whenever you want/);
+});
+
+test("the welcome screen names the app, not one garage",async()=>{
+ /* Curtis: "take PACE SOUTH off that page and replace it with Transit
+    Maintenance Work Solutions." The line under the name is what the app calls
+    itself; the shop's own name does not belong on the screen that greets a
+    device that has never opened it. */
+ const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ assert.match(gate,/<p className="welcome-kicker">Transit Maintenance Work Solutions<\/p>/);
+ /* Only inside the comment explaining the change, never in what renders. */
+ const rendered=gate.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+ assert.equal(/PACE SOUTH/i.test(rendered),false,"the shop's name must not render on the welcome screen");
+});
+
+test("one visit that took several fluids is one record",async()=>{
+ /* Curtis asked for coolant and transmission fluid beside the oil top-up —
+    "a lot of these buses we have to constantly add glycol to it" — and then
+    settled how they should be stored: "The one record listing several probably
+    best and is less clutter."
+
+    So the DEFECT field names the fluid the record is filed under, and the rest
+    of what went in that stop rides on that same record. Three separate repairs
+    for one stop at the fluid cart is the thing this must not become. */
+ assert.deepEqual(FLUID_TOP_UPS,["Add engine oil","Add coolant (glycol)","Add transmission fluid"]);
+ for(const fluid of FLUID_TOP_UPS){
+  assert.ok(REPAIR_OPTIONS["Preventive Maintenance"].includes(fluid),fluid+" must be in the catalog");
+  assert.equal(isFluidTopUp("Preventive Maintenance",fluid),true);
+ }
+ /* And nothing else in that category is one, so the quantity box does not
+    start appearing on a lube or an inspection. */
+ assert.equal(isFluidTopUp("Preventive Maintenance","Lubrication"),false);
+ assert.equal(isFluidTopUp("Brakes","Add engine oil"),false);
+
+ /* THE PICKED FLUID IS NEVER ALSO ONE OF THE EXTRAS. It is already the issue,
+    and listing it twice reads as "Add coolant - also added coolant". */
+ assert.deepEqual(normalizeFluids(["Add coolant (glycol)","Add engine oil"],"Preventive Maintenance","Add engine oil"),
+  ["Add coolant (glycol)"]);
+ /* Catalog order, not tick order, so the same visit reads back the same way
+    however the mechanic happened to tick it. */
+ assert.deepEqual(normalizeFluids(["Add transmission fluid","Add coolant (glycol)"],"Preventive Maintenance","Add engine oil"),
+  ["Add coolant (glycol)","Add transmission fluid"]);
+ /* Nothing outside the catalog's own three can arrive through a hand-edited
+    backup or an older record and invent a fluid the shop does not stock. */
+ assert.equal(normalizeFluids(["Add hydraulic fluid"],"Preventive Maintenance","Add engine oil"),undefined);
+ /* Absent, not empty, when there is nothing to say - and never on a repair
+    that is not a top-up at all, so a record retyped into a brake job cannot
+    keep a leftover list. */
+ assert.equal(normalizeFluids([],"Preventive Maintenance","Add engine oil"),undefined);
+ assert.equal(normalizeFluids(["Add coolant (glycol)"],"Brakes","Brake job"),undefined);
+
+ /* WHAT THE CARD SAYS. The catalog spells these as instructions ("Add engine
+    oil"); a card is a report of what was done, so the verb is said once. */
+ assert.equal(fluidsLabel({fluids:["Add coolant (glycol)","Add transmission fluid"],category:"Preventive Maintenance",issue:"Add engine oil"}),
+  "also added coolant (glycol) and transmission fluid");
+
+ /* A RECORD WITH NO FLUIDS MUST COME BACK WITH NO FLUIDS KEY AT ALL.
+
+    The cloud fingerprints each row by walking Object.keys, and a key holding
+    undefined is still a key there - so a normalizer that wrote fluids:undefined
+    onto every defect would change the fingerprint of every record the shop
+    holds and re-push the whole defect table once, over the garage's own data
+    plan, to say nothing. This is the guard on that. */
+ const [plain]=normalizeDefects([{id:"plain",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service"}]);
+ assert.equal(Object.keys(plain).includes("fluids"),false,
+  "a defect that never had fluids must not gain the key");
+ /* But a record that DOES carry one, and carries a value that is no longer
+    valid, has it taken back off rather than left standing. */
+ const [retyped]=normalizeDefects([{id:"retyped",category:"Brakes",issue:"Brake job",fluids:["Add coolant (glycol)"],details:"",state:"open",operability:"service"}]);
+ assert.equal(retyped.fluids,undefined,"a fluid list on a repair that is not a top-up is cleared");
+
+ /* END TO END: saved, normalized, read back. The quantity stays with the
+    ISSUE - Curtis: "typically here we only keep up with the [quarts] of oil we
+    use, not necessarily the coolant" - and the extra fluid follows it, which is
+    the half that predicts a road call. */
+ const [record]=normalizeDefects([{id:"fluids-1",category:"Preventive Maintenance",issue:"Add engine oil",
+  fluids:["Add transmission fluid","Add coolant (glycol)"],quantity:2,unit:"quarts",details:"",state:"open",operability:"service"}]);
+ assert.deepEqual(record.fluids,["Add coolant (glycol)","Add transmission fluid"]);
+ assert.equal(defectLabel(record),
+  "Preventive Maintenance — Add engine oil — 2 quarts — also added coolant (glycol) and transmission fluid");
+ /* The quarts sit against the oil and the extras follow, so nothing reads as
+    two quarts of glycol. */
+ assert.ok(defectLabel(record).indexOf("2 quarts")<defectLabel(record).indexOf("also added"));
+ assert.match(defectSupportingDetails(record),/also added coolant/);
+
+ const [form,filters]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/quick-filters.ts",import.meta.url),"utf8"),
+ ]);
+ /* THE QUANTITY BOX BELONGS TO ALL THREE. It was gated on the one string
+    "Add engine oil" while the catalog had already been told all three carry an
+    amount, so glycol and transmission fluid set a unit that nothing could ever
+    put a number in. One test, the catalog's own, for both. */
+ assert.equal(/quickIssue==="Add engine oil"/.test(form),false,
+  "the quantity box must not be gated on the one fluid");
+ assert.match(form,/const fluidMode=isFluidTopUp\(value\.defect\.category,value\.quickIssue\)/);
+ assert.match(form,/\{fluidMode&&<><label>[\s\S]{0,400}QUANTITY/);
+ /* Named only when there is a second fluid to confuse it with, and named with a
+    dash: the catalog's own wording is "Add coolant (glycol)", so a parenthesis
+    here renders "QUANTITY (COOLANT (GLYCOL))". */
+ assert.match(form,/extraFluids\.length\?"QUANTITY — "\+pickedFluid\.toUpperCase\(\):"QUANTITY"/);
+ /* And the picker itself offers the other two, never the one already chosen. */
+ assert.match(form,/otherFluids=FLUID_TOP_UPS\.filter\(fluid=>fluid!==value\.quickIssue\)/);
+ assert.match(form,/\{fluidMode&&<fieldset className="wide engine-symptom-picker fluid-picker"/);
+ /* Switching between the three top-ups is run through the same rule the record
+    is stored under, so the form cannot hold a state the storage would reject. */
+ assert.match(form,/fluids:normalizeFluids\(current\.defect\.fluids,category,issue\)/);
+ assert.match(form,/issue:"",symptoms:\[\],fluids:undefined/,"changing category clears the fluids with everything else");
+ /* Findable by what went in, on both the log's own search and the shared
+    filter, the same way symptoms already are. */
+ for(const source of [form,filters])assert.match(source,/\.\.\.\(\w+\.defect\.fluids\|\|\[\]\)|\.\.\.\(defect\.fluids\|\|\[\]\)/);
+});
+
+test("a deferred bus does not have to be on property",async()=>{
+ /* Curtis's rule, in his words: "deferred buses do not have to be on property,
+    so this way on the down sheet right under mystery buses it will show the
+    total of deferred buses whether they're here or on the road."
+
+    The COUNTING was already right — heldDeferredRows has never looked at a
+    location. The board's subtitle said "HELD BACK, ON PROPERTY, NOT ON THE
+    DOWN SHEET", which is the worse half of the two to get wrong: a wrong
+    number gets questioned, a wrong label invites the next person to change the
+    code until it agrees. This test exists so that cannot happen. */
+ const {heldDeferredBuses,deferredBadgeCounts}=await import("../app/deferred-counts.ts");
+ const held=at=>({id:"x",category:"Brakes",issue:"Grinding",details:"",state:"deferred",operability:"service",deferredAt:at});
+ const at="2026-09-10T00:00:00.000Z";
+ const fleet=[
+  {id:"a",n:"6301",l:"bay-1",defects:[{...held(at),id:"d1"}]},
+  {id:"b",n:"6302",l:"road-4",defects:[{...held(at),id:"d2"}]},
+  {id:"c",n:"6303",l:"offsite-2",defects:[{...held(at),id:"d3"}]},
+ ];
+ assert.deepEqual(heldDeferredBuses(fleet,[]).map(row=>row.bus.n),["6301","6302","6303"],
+  "a bus on the road and a bus off property are both still deferred");
+ assert.equal(deferredBadgeCounts(fleet,[]).listed,3);
+ /* And the label has to say so, because it is what a foreman reads. */
+ const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const rendered=board.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.equal(/ON PROPERTY/i.test(rendered),false,"the board must not claim these buses are on property");
+ assert.match(board,/<small>HELD BACK AND NOT ON THE DOWN SHEET — HERE OR ON THE ROAD<\/small>/);
+});
+
+test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses waiting",async()=>{
+ /* Curtis: "a recommended for down sheet right in the same section as in the
+    down sheet as mystery buses and deferred buses. I want this to go right
+    under both of them, same color and everything, same functionality, with the
+    same number count — that number count needs to be in sync." */
+ const {recommendedBuses,recommendedBusCount,recommendedRows}=await import("../app/recommended-counts.ts");
+ const rec=at=>({at,by:"CJ"});
+ const fleet=[
+  {id:"a",n:"6301",l:"bay-1",defects:[{id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T21:00:00.000Z")}]},
+  /* Two recommendations on ONE bus. The deferred badge shipped this bug once —
+     per-defect rows counted as per-bus — so it is guarded here from the start. */
+  {id:"b",n:"6302",l:"bay-2",defects:[
+   {id:"d2",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:30:00.000Z")},
+   {id:"d3",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:15:00.000Z")}]},
+  /* Off property, waiting days. It belongs on the list — the board is about
+     what is waiting on a decision, not about what is parked outside. */
+  {id:"c",n:"6303",l:"offsite-2",defects:[{id:"d4",category:"Engine",issue:"Oil leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-06T00:00:00.000Z")}]},
+  /* Recommended and ALREADY ON THE SHEET: covered, so not waiting on anybody. */
+  {id:"d",n:"6304",l:"bay-3",defects:[{id:"d5",category:"Engine",issue:"No start",details:"",state:"open",operability:"down",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* Recommended and FIXED. This is the "in sync" half: close the repair the
+     recommendation was about and the number drops with no tidying up. */
+  {id:"e",n:"6305",l:"bay-4",defects:[{id:"d6",category:"Engine",issue:"Done",details:"",state:"completed",operability:"service",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* Not recommended at all. */
+  {id:"f",n:"6306",l:"bay-5",defects:[{id:"d7",category:"Engine",issue:"Plain",details:"",state:"open",operability:"service"}]},
+ ];
+ const onSheet=[{id:"e1",busId:"d",busNumber:"6304",workflow:"Scheduled"}];
+ assert.equal(recommendedBusCount(fleet,onSheet),3,"buses, deduplicated — never rows");
+ assert.equal(recommendedRows(fleet,onSheet).length,4,"and four rows behind those three buses");
+ /* LONGEST WAITING FIRST. The only question this board answers is what has been
+    waiting on you, and alphabetical order answers nothing. */
+ assert.deepEqual(recommendedBuses(fleet,onSheet).map(row=>row.bus.n),["6303","6301","6302"]);
+ /* Inside a bus too, so the card's lead repair is the one waiting longest. */
+ assert.deepEqual(recommendedBuses(fleet,onSheet).find(row=>row.bus.n==="6302").defects.map(d=>d.issue),["Air leak","Misfire"]);
+
+ /* THE TIMESTAMP CURTIS ASKED FOR: "there needs to be some type of timestamp
+    for how long it's been recommended for the down sheet." The stamp was
+    already being written and nothing had ever read it back. */
+ const now=new Date("2026-09-10T00:00:00.000Z");
+ assert.equal(recommendedMinutesElapsed(fleet[0].defects[0],now),180);
+ /* null, never 0, when there is no usable time — a stamp from a device with a
+    broken clock must not read as "just now". */
+ assert.equal(recommendedMinutesElapsed({downSheetRecommendation:{by:"CJ"}},now),null);
+ assert.equal(recommendedMinutesElapsed({},now),null);
+ const {elapsedLong}=await import("../app/elapsed-label.ts");
+ assert.equal(elapsedLong(180),"3H 0M");
+ assert.equal(elapsedLong(60*24*4),"4D");
+ assert.equal(elapsedLong(-5),"0M","a clock ahead of this one must not print a negative");
+
+ /* NOTHING HERE IS OVERDUE, and that is a decision rather than an omission.
+    Curtis: "that bus could be in that status for a while, which is fine." */
+ const board=await readFile(new URL("../app/recommended-board.tsx",import.meta.url),"utf8");
+ assert.equal(/overdue/i.test(board.replace(/\/\*[\s\S]*?\*\//g,"")),false,"a recommendation is never late");
+ /* Same board classes as the two above it — "same color and everything". */
+ assert.match(board,/className=\{"mystery-board recommended-board"\+\(collapsed\?" collapsed":""\)\}/);
+ assert.match(board,/className="deferred-card-actions"/,"and the same action buttons");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.recommended-board \.mystery-head\{border-left:4px solid #0b64bd\}/);
+
+ /* Third, under both, which is where Curtis put it. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.ok(page.indexOf("<MysteryBoard")<page.indexOf("<DeferredBoard"));
+ assert.ok(page.indexOf("<DeferredBoard")<page.indexOf("<RecommendedBoard"));
+});
+
+test("unticking RECOMMEND FOR DOWN SHEET actually sticks",async()=>{
+ /* A LIVE BUG, found by driving the button in a browser and reading the record
+    back rather than by reading the code.
+
+    setDownSheetRecommendation DELETES its key when the tick comes off, the same
+    way setDefectWorkState does — and saveDefectLogRecord merges with
+    `{...existing,...incoming}`, where a missing key cannot override the value
+    `existing` still holds. So the recommendation came straight back on the next
+    read, in the editor and on both surfaces that list recommendations.
+
+    workStates had this exact bug, was found, and was fixed by pulling that one
+    field out of the spread. Nobody checked whether anything else was deleted
+    the same way. Two fields are; now both are rescued. */
+ assert.equal("downSheetRecommendation" in setDownSheetRecommendation({id:"d"},false,"2026-09-10T00:00:00.000Z"),false,
+  "the key is deleted, not set to undefined — which is why the spread cannot carry the removal");
+ const sync=await readFile(new URL("../app/defect-log/defect-log-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/\{\.\.\.existing,\.\.\.incoming,workStates:incoming\.workStates,downSheetRecommendation:incoming\.downSheetRecommendation,/);
+
+ /* THE GUARD THAT GENERALISES IT. Every field repair-catalog.ts deletes has to
+    be named in that merge; a third one added later and forgotten is the same
+    bug a third time. */
+ const catalog=await readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8");
+ const deleted=[...catalog.matchAll(/delete next\.(\w+)/g)].map(match=>match[1]);
+ assert.deepEqual([...new Set(deleted)].sort(),["downSheetRecommendation","workStates"]);
+ for(const field of deleted)assert.ok(sync.includes(field+":incoming."+field),
+  field+" is deleted by repair-catalog.ts, so saveDefectLogRecord must take it from the incoming record or the removal is lost");
+
+ /* THE OTHER HALF OF THAT FIX, driven rather than read. Pulling a field out of
+    the spread means a caller passing a PARTIAL patch would now wipe it instead
+    of inheriting it. Every caller either passes a complete record built from
+    the stored one, or mints a brand-new defect where there is nothing to
+    inherit — both paths are exercised here, because the risk of this fix is
+    the mirror image of the bug it fixes. */
+ const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const stamp={at:"2026-09-09T21:00:00.000Z",by:"CJ"};
+ const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
+  {id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:stamp}]}];
+ const kept=saveDefectLogRecord(fleet,[],"b",{...fleet[0].defects[0],details:"edited"},false,"2026-09-10T00:00:00.000Z");
+ assert.deepEqual(kept.fleet[0].defects[0].downSheetRecommendation,stamp,
+  "editing a record from a complete copy keeps the recommendation it already carried");
+ const dropped=saveDefectLogRecord(fleet,[],"b",setDownSheetRecommendation(fleet[0].defects[0],false,"2026-09-10T00:00:00.000Z"),false,"2026-09-10T00:00:00.000Z");
+ assert.equal(dropped.fleet[0].defects[0].downSheetRecommendation,undefined,
+  "and unticking it actually removes it — the bug this whole test is about");
+ /* A new defect cannot inherit a recommendation from a record that is not
+    there. This is the scan-sweep path, which mints its own ids. */
+ const minted=saveDefectLogRecord(fleet,[],"b",{id:"sweep-1",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service"},false,"2026-09-10T00:00:00.000Z");
+ assert.equal(minted.fleet[0].defects.find(defect=>defect.id==="sweep-1").downSheetRecommendation,undefined);
+ assert.deepEqual(minted.fleet[0].defects.find(defect=>defect.id==="d1").downSheetRecommendation,stamp,
+  "and adding one defect must not disturb another's recommendation");
+});
+
+test("the recommended list can be answered from the board and from the quick filter",async()=>{
+ /* Curtis: "I need quick remove or mark as fix actions just like on the down
+    sheet, so I need that functionality when that list is brought up in quick
+    filters." The Down Sheet's row actions are a tick that closes the entry out
+    and a cross that takes the row off the sheet without touching the bus. */
+ const {answerRecommendedBus}=await import("../app/recommended-actions.ts");
+ const rec=at=>({at,by:"CJ"});
+ const fleet=[{id:"b",n:"6302",l:"bay-2",s:"defect",defects:[
+  {id:"d2",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:30:00.000Z")},
+  {id:"d3",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:15:00.000Z")}]}];
+ const defects=fleet[0].defects,now="2026-09-10T00:00:00.000Z";
+
+ /* NOT FOR THE SHEET is a statement about the BUS, so every recommendation on
+    it goes. Answering per defect under a bus heading is the bug that made the
+    evening deferred prompt ask three times about one bus. */
+ const dismissed=answerRecommendedBus(fleet,[],"b",defects,"dismiss",{now});
+ assert.equal(dismissed.saved,2);
+ const after=dismissed.fleet[0].defects;
+ assert.equal(after.some(defect=>defect.downSheetRecommendation),false,"both recommendations are withdrawn");
+ assert.deepEqual(after.map(defect=>defect.state),["open","open"],"and the repairs are still open — this is not a delete");
+
+ /* PUT ON DOWN SHEET moves ONE repair, because the sheet allows a bus one
+    active entry, and it needs no more: the bus being on the sheet drops every
+    recommendation on it from the board on its own. */
+ const escalated=answerRecommendedBus(fleet,[],"b",defects,"downsheet",{now});
+ assert.equal(escalated.saved,1);
+ assert.equal(escalated.downEntries.length,1);
+ /* The longest-waiting repair is the one that goes, matching the row the
+    foreman was reading. */
+ assert.equal(escalated.downEntries[0].repair,"Air leak");
+ /* AND IT DOES NOT CLEAR THE RECOMMENDATION. The stamp is the record of who
+    asked for this; membership erasing it is what repair-catalog.ts refuses. */
+ assert.ok(escalated.fleet[0].defects.every(defect=>defect.downSheetRecommendation),
+  "putting a bus on the sheet must not erase who recommended it");
+
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The two buttons, on the row, in the Down Sheet's own order. */
+ assert.match(page,/className="fix-recommended" onClick=\{\(\)=>markRecommendedFixed\(bus,recommendedDefects\)\}/);
+ assert.match(page,/className="end-deferral" onClick=\{\(\)=>removeRecommendation\(bus,recommendedDefects\)\}/);
+ assert.match(page,/RECOMMENDED "\+elapsedLong\(recommendedMinutes\)\+" AGO"/,"and the wait time Curtis asked for");
+ /* ONE snapshot and ONE write per action, taken before anything moves —
+    endDeferralForBus's rule, for the same reason: calling the single-record
+    handler in a loop would snapshot an already-changed board. */
+ for(const name of ["const markRecommendedFixed=","const removeRecommendation="]){
+  const start=page.indexOf(name);
+  assert.ok(start>0,name+" must exist");
+  const body=page.slice(start,page.indexOf("\n };",start));
+  assert.equal((body.match(/setUndoSnapshot/g)||[]).length,1,name+" takes exactly one undo snapshot");
+  assert.equal((body.match(/persist\(/g)||[]).length,1,name+" writes once, at the end");
+ }
+ /* THE COUNTS ARE IN SYNC. The board excludes a bus already on the sheet and
+    the drawer has to as well, or one feature prints two different numbers.
+    Both go through recommendedRows rather than keeping a second copy. */
+ assert.match(page,/const recommendedRowsForFleet=useMemo\(\(\)=>recommendedRows\(fleet,downEntries\),\[fleet,downEntries\]\)/);
+ assert.match(page,/key==="down-sheet-recommended"\?recommendedCandidateIds/);
+});
+
+test("the home screen asks what you do, and nothing in the app acts on the answer",async()=>{
+ /* Curtis: "a collapsible expandable section placed somewhere sensible on the
+    screen where a person could select their role... this could be broken up
+    into two categories, transportation and maintenance." */
+ const {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,departmentRoles}=await import("../app/roles.ts");
+
+ /* HIS TWO LISTS, IN HIS ORDER — the shop's order, from the road or the floor
+    upward, not alphabetical. "Transportation, it will give you the option
+    between bus operator, then dispatch and then superintendent. Now for
+    maintenance, it will be servicer then mechanic, foreman, superintendent." */
+ assert.deepEqual(ROLE_DEPARTMENTS.map(item=>item.key),["transportation","maintenance"]);
+ /* CURTIS'S OWN SPLIT, as corrected by him: "Yes dispatch is non union. They
+    have a spot under them called Relief Supervisor which are union... also add
+    Master Mechanic in maintenance."
+
+    DISPATCH IS NON-UNION. It sat on the union side for exactly one commit
+    because it is union at many transit properties — which is not the same as
+    being union at this one, and is the whole argument for asking rather than
+    inferring. Relief Supervisor is the union spot beneath it. */
+ assert.deepEqual(departmentRoles("transportation","union"),["Bus Operator","Relief Supervisor"]);
+ assert.deepEqual(departmentRoles("transportation","non-union"),["Dispatch","Asst Supt","Supt"]);
+ assert.equal(departmentRoles("transportation","union").includes("Dispatch"),false,
+  "Dispatch is non-union here, whatever it is elsewhere");
+ /* Master Mechanic is union, at the top of the mechanic ladder — inferred from
+    the shape of the rest of the list, then confirmed: "Master mechanic is
+    union, you're correct." The title is a top classification at some transit
+    properties and a management job at others, which is why it was asked. */
+ assert.deepEqual(departmentRoles("maintenance","union"),["Servicer","Mechanic Helper","Mechanic","Master Mechanic","Body & Frame","Building Maintenance"]);
+ assert.ok(departmentRoles("maintenance","union").indexOf("Master Mechanic")>departmentRoles("maintenance","union").indexOf("Mechanic"),
+  "it is the top of the ladder, so it follows Mechanic");
+ /* FOREMAN IS NON-UNION HERE. It is the one job a transit shop cannot assume —
+    it goes either way by contract — and is exactly why the list was left
+    unfiltered until he said which. */
+ assert.deepEqual(departmentRoles("maintenance","non-union"),["Foreman","Asst Supt","Supt"]);
+ /* No job appears on both sides of one department: a person is represented or
+    not, and a row on both would make the union question decide nothing. */
+ for(const department of ["transportation","maintenance"]){
+  const union=departmentRoles(department,"union"),other=departmentRoles(department,"non-union");
+  assert.deepEqual(union.filter(role=>other.includes(role)),[],department+" has no job on both sides");
+  assert.ok(union.length&&other.length,department+" has jobs on each side");
+ }
+
+ /* ABBREVIATED BECAUSE THERE ARE TWO. Curtis: "we have asst supt, so that is
+    why I want it shortened, so the label can show both like Asst Supt & Supt
+    simultaneously." Spelled out, "Assistant Superintendent" beside
+    "Superintendent" is two long strings differing by one word at the front —
+    the hardest pair of all to tell apart at a glance on a phone. */
+ const {allDepartmentRoles}=await import("../app/roles.ts");
+ for(const department of ["transportation","maintenance"]){
+  assert.ok(allDepartmentRoles(department).includes("Asst Supt"),department+" has an assistant");
+  assert.ok(allDepartmentRoles(department).includes("Supt"));
+  assert.equal(allDepartmentRoles(department).some(role=>/Superintendent/i.test(role)),false,"spelled out, the two are too alike to scan");
+ }
+
+ /* AND THEY ARE ON BOTH LISTS, so a bare role string does not say which person
+    it means. The pair is what is stored, and the label is what tells them
+    apart on screen. */
+ const road={department:"transportation",unit:"non-union",role:"Supt"},shop={department:"maintenance",unit:"non-union",role:"Supt"};
+ assert.notEqual(roleLabel(road),roleLabel(shop));
+ assert.equal(roleLabel(shop),"Maintenance · Supt");
+ assert.deepEqual(readRole(serializeRole(road)),road);
+
+ /* Nothing on file means NO ROLE, never a default. A device that quietly
+    decided somebody was a Foreman would be putting a word on screen that
+    nobody chose, and this exists so the person says it themselves. */
+ assert.equal(readRole(null),null);
+ assert.equal(readRole("not json"),null);
+ assert.equal(readRole('{"department":"catering","unit":"union","role":"Chef"}'),null);
+ /* Validated against the PAIR: a Supt stored as union is a combination the
+    picker cannot produce, so it came from a hand-edited backup. */
+ assert.equal(readRole('{"department":"maintenance","unit":"union","role":"Supt"}'),null,"a job on the wrong side of the contract does not read back");
+ assert.deepEqual(readRole('{"department":"maintenance","unit":"non-union","role":"Supt"}'),{department:"maintenance",unit:"non-union",role:"Supt"});
+ /* A role this build no longer offers reads as not set and is NOT rewritten —
+    the same read-time rule the repair catalog follows for renamed defects. */
+ assert.equal(readRole('{"department":"maintenance","unit":"union","role":"Bodyman"}'),null);
+ assert.equal(readRole('{"department":"maintenance","unit":"non-union","role":"Superintendent"}'),null,"the spelled-out wording is not offered any more");
+ assert.equal(readRole('{"role":"Foreman"}'),null,"a role with no department cannot be resolved");
+
+ /* UNION OR NOT, asked between the department and the job. Curtis: "I want the
+    distinction after they select their dept — union or non-union." He also
+    asked whether non-union is called "bargain": it is the other way round. A
+    BARGAINING UNIT is the group a union represents, so "bargaining" names the
+    union side and cannot label the other one. */
+ const {ROLE_UNITS,unitLabel}=await import("../app/roles.ts");
+ assert.deepEqual(ROLE_UNITS.map(item=>item.key),["union","non-union"],"union first — most of the building is");
+ assert.deepEqual(ROLE_UNITS.map(item=>item.label),["Union","Non-Union"]);
+ for(const item of ROLE_UNITS)assert.equal(/bargain/i.test(item.label),false,
+  "bargaining names the union side, so it can never be the non-union label");
+ assert.equal(unitLabel("union"),"Union");
+
+ /* ALL THREE OR NOTHING. A department and a job with no union status is a
+    record that looks complete on the summary line and is not, and there is no
+    honest way to guess the missing third. */
+ assert.equal(readRole('{"department":"maintenance","role":"Foreman"}'),null,"a role with no union status is not a complete answer");
+ assert.equal(readRole('{"department":"maintenance","unit":"casual","role":"Foreman"}'),null);
+ assert.deepEqual(readRole(serializeRole({department:"maintenance",unit:"non-union",role:"Foreman"})),
+  {department:"maintenance",unit:"non-union",role:"Foreman"});
+
+ /* The union status is NOT in the name. Three parts joined by dots runs past a
+    phone's summary line, and the part that would be truncated is the end that
+    identifies the person. It is drawn as its own tag instead. */
+ assert.equal(roleLabel({department:"maintenance",unit:"union",role:"Building Maintenance"}),"Maintenance · Building Maintenance");
+
+ /* THE ONE RULE THAT MATTERS MOST. Curtis: "there will be no special conditions
+    in the app for any of the working roles. This is all cosmetic."
+
+    A list holding Foreman and Superintendent looks like a permission model. It
+    is not one: there is no login in this app, and this is an unauthenticated
+    string in LocalStorage that anybody holding the phone can change from the
+    screen that set it. The moment something gates on it, that string is
+    standing between a person and a control. */
+ const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../app/storage.ts","../app/cloud-sync.ts"]
+  .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
+ for(const source of files)assert.equal(source.includes(ROLE_STORAGE_KEY)||source.includes("readRole"),false,
+  "nothing outside the picker may read the role — it is a label, not a permission");
+ /* And it is never synced: it is a per-device label, like the app mode. */
+ const sync=await readFile(new URL("../app/cloud-sync.ts",import.meta.url),"utf8");
+ assert.equal(sync.includes("pace-role-v1"),false);
+
+ const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ /* Collapsible, as asked. */
+ assert.match(gate,/className="welcome-role-toggle" aria-expanded=\{roleOpen\}/);
+ /* Three steps, in Curtis's order: department, then union, then the job. The
+    role buttons do not render until both of the first two are answered. */
+ assert.match(gate,/\{department&&<div className="welcome-role-departments welcome-role-units">/);
+ assert.match(gate,/\{department&&unit&&<div className="welcome-role-roles">/);
+ assert.ok(gate.indexOf('className="welcome-role-departments">')<gate.indexOf('welcome-role-units">'));
+ assert.ok(gate.indexOf('welcome-role-units">')<gate.indexOf('className="welcome-role-roles">'));
+ /* Changing the department clears the union answer rather than carrying it
+    across, so a half-changed answer cannot be saved. */
+ assert.match(gate,/setDepartment\(department===item\.key\?null:item\.key\);setUnit\(null\)/);
+ /* The label is wrapped so the ellipsis lands on the job title and never on the
+    union tag — the tag is the shortest thing on the line and the first that
+    should survive a squeeze. */
+ assert.match(css,/\.welcome-role-toggle small\{display:flex[^}]*\}/);
+ assert.match(css,/\.welcome-role-toggle small>span\{min-width:0;overflow:hidden;text-overflow:ellipsis/);
+ /* UNDER the two mode choices and ABOVE the footnote: the screen already asks
+    one question a first run must answer, and stacking a second in front of it
+    would turn a gate into a form. */
+ assert.ok(gate.indexOf('className="welcome-choices"')<gate.indexOf('className={"welcome-role"'));
+ assert.ok(gate.indexOf('className={"welcome-role"')<gate.indexOf('className="welcome-foot"'));
+ /* Choosing a role must not answer the mode question for somebody. */
+ const body=gate.slice(gate.indexOf("const chooseRole="),gate.indexOf("\n };",gate.indexOf("const chooseRole=")));
+ assert.equal(body.includes("setOpen"),false,"picking a role must not close a gate that has not been answered");
+ assert.equal(body.includes(  "APP_MODE_STORAGE_KEY"),false,"and must not touch the mode");
+
+ /* globals.css line 2 gives every bare <button> height:28px. Every control here
+    is a bare button, so each one states its own height — measured at 44px in
+    Chromium at 360/390/430/820, not read off this rule. */
+ assert.match(css,/\.welcome-role-body button\{min-height:44px/);
+ assert.match(css,/\.welcome-role-toggle\{width:100%;min-height:52px/);
+ /* And it joins the reduced-motion opt-out rather than being the one panel that
+    still flies in for somebody who asked the OS for none of that. */
+ assert.match(css,/\.welcome-name span,\.welcome-kicker,\.welcome-choices,\.welcome-role,\.welcome-foot\{opacity:1/);
+});
+
+test("a bus that keeps coming back is counted, with every date kept",async()=>{
+ /* Curtis: "if a person tries to re-submit something in defects, I want a tally
+    of how many times with the date stamped as it does already. This way I know
+    how many round trips a bus is making without the repair."
+
+    The app already REFUSED the repeat — recentDefectDuplicate blocks a matching
+    unresolved defect for five days and disables the save buttons — and counted
+    nothing. The bus came back and there was nowhere for that to land. */
+ const {normalizeReportAttempts,recordReportAttempt,reportAttemptCount,mergeReportAttempts,REPORT_ATTEMPT_DEBOUNCE_MS}=await import("../app/repair-catalog.ts");
+ const base={id:"d1",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service"};
+
+ /* THE TALLY IS THE LIST, not a number. Four returns in one week and four
+    across three months are different problems, and a count cannot tell them
+    apart — which is exactly the judgement Curtis is making with it. */
+ const once=recordReportAttempt(base,"2026-09-08T10:00:00.000Z","cj");
+ assert.equal(reportAttemptCount(once),1);
+ assert.deepEqual(once.reportAttempts,[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],"initials are stored as they are shown");
+ const twice=recordReportAttempt(once,"2026-09-09T10:00:00.000Z","RM");
+ assert.deepEqual(twice.reportAttempts.map(a=>a.by),["CJ","RM"]);
+
+ /* A DOUBLE TAP IS NOT TWO ROUND TRIPS. A bus cannot leave and come back inside
+    two minutes, so a second press that close is a thumb — and a number that
+    inflates on a fumbled tap is worse than no number, because this one is meant
+    to be evidence that a repair is not working. */
+ const fumbled=recordReportAttempt(twice,"2026-09-09T10:00:30.000Z","RM");
+ assert.equal(fumbled,twice,"the defect comes back untouched, so the caller writes nothing at all");
+ const later=recordReportAttempt(twice,new Date(Date.parse("2026-09-09T10:00:00.000Z")+REPORT_ATTEMPT_DEBOUNCE_MS).toISOString(),"RM");
+ assert.equal(reportAttemptCount(later),3,"and a real return just past the window counts");
+ /* A record synced from a device whose clock runs fast holds a future stamp.
+    That must not swallow every genuine return until the clock catches up. */
+ const fromTheFuture=recordReportAttempt({...base,reportAttempts:[{at:"2027-01-01T00:00:00.000Z"}]},"2026-09-09T10:00:00.000Z","CJ");
+ assert.equal(reportAttemptCount(fromTheFuture),2,"a stamp ahead of this one cannot block it");
+
+ /* Read-time cleaning: junk out, duplicates collapsed, always oldest first. */
+ assert.deepEqual(normalizeReportAttempts([{at:"2026-09-09T10:00:00.000Z"},{at:"2026-09-08T10:00:00.000Z"},{at:"2026-09-09T10:00:00.000Z"}]).map(a=>a.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"]);
+ assert.deepEqual(normalizeReportAttempts(["nonsense",null,{at:""},{at:"not a date"},{}]),[]);
+ assert.deepEqual(normalizeReportAttempts("not an array"),[]);
+
+ /* NOTHING REMOVES A RETURN. A save can only ever add, because an editor opened
+    before a return was stamped holds the older list and the merge spread would
+    otherwise let that stale copy overwrite the stamp — losing a round trip
+    nobody would ever notice was missing. */
+ assert.deepEqual(mergeReportAttempts([{at:"2026-09-08T10:00:00.000Z"}],[{at:"2026-09-09T10:00:00.000Z"}]).map(a=>a.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"]);
+ assert.deepEqual(mergeReportAttempts([{at:"2026-09-08T10:00:00.000Z"}],[]).map(a=>a.at),["2026-09-08T10:00:00.000Z"],"an empty incoming list cannot erase a stored one");
+
+ const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[{...base,reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}]}]}];
+ const stale=saveDefectLogRecord(fleet,[],"b",{...base,details:"edited"},false,"2026-09-10T00:00:00.000Z");
+ assert.equal(reportAttemptCount(stale.fleet[0].defects[0]),1,
+  "saving an editor draft that predates the stamp must not drop it");
+
+ /* AND THE KEY STAYS ABSENT WHEN THERE IS NOTHING TO SAY. rowFingerprint walks
+    Object.keys, so an empty array on every defect in the shop would change every
+    row's fingerprint and re-push the whole table to say nothing — the same trap
+    the fluids field was caught in. */
+ const [plain]=normalizeDefects([{id:"plain",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service"}]);
+ assert.equal(Object.keys(plain).includes("reportAttempts"),false);
+ const [carried]=normalizeDefects([{id:"c",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service",reportAttempts:[{at:"2026-09-08T10:00:00.000Z"}]}]);
+ assert.equal(reportAttemptCount(carried),1);
+
+ /* A MERGE MUST NOT LOSE A ROUND TRIP either. Two copies of one repair coming
+    back together have to keep every return between them — the tally can only
+    ever grow, and a merge that quietly halved it would make the number evidence
+    of nothing. Same union symptoms and fluids already get. */
+ const {mergeDuplicateDefects}=await import("../app/duplicate-defects.ts");
+ const dupes=mergeDuplicateDefects([{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
+  {...base,id:"d1",details:"same",reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
+  {...base,id:"d2",details:"same",reportAttempts:[{at:"2026-09-09T10:00:00.000Z",by:"RM"},{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z"},
+ ]}],[],"2026-09-10T00:00:00.000Z");
+ const survivors=dupes.buses[0].defects;
+ assert.equal(survivors.length,1,"the two copies merged");
+ assert.deepEqual(survivors[0].reportAttempts.map(attempt=>attempt.at),
+  ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"],
+  "every return survives, and the one both copies held counts once");
+});
+
+test("counting a return must not take the bus off the Down Sheet",async()=>{
+ /* THE TRAP IN THE OBVIOUS REUSE. saveDefectLogRecord is how everything else on
+    this page writes a defect, and it is the wrong tool here twice over: it
+    REFUSES the save as a recent duplicate — which is the very state being
+    recorded — and saving with onDownSheet:false closes out the bus's Down Sheet
+    entry. Counting that a bus came back would have quietly taken it off the
+    sheet, which is exactly backwards.
+
+    So countReturn writes the one field on the one defect, the way saveShopNotes
+    writes a note. Driven in a browser as well: the sheet entry read
+    "6301:Scheduled" before and after three presses. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const start=page.indexOf("const countReturn=");
+ assert.ok(start>0,"the handler must exist");
+ const body=page.slice(start,page.indexOf("\n };",start));
+ assert.equal(body.includes("saveDefectLogRecord"),false,
+  "counting a return must not go through the save path that closes Down Sheet entries");
+ assert.match(body,/persist\(nextFleet,downEntries\)/,"the Down Sheet entries are passed through untouched");
+ /* The stamp goes on the STORED defect, not the copy the banner is holding, so
+    a form left open cannot write back a tally it read before somebody added to
+    it. */
+ assert.match(body,/recordReportAttempt\(current,now,settings\.defaultInitials\)/);
+ /* A press the debounce refused writes nothing and takes no undo snapshot — an
+    UNDO offering to reverse a change nobody made is worse than the fumbled tap. */
+ assert.match(body,/if\(!counted\)return;/);
+ assert.ok(body.indexOf("if(!counted)return;")<body.indexOf("setUndoSnapshot"));
+
+ /* THE BUTTON IS DELIBERATE, NOT AUTOMATIC. Counting the moment the ALREADY
+    LOGGED banner appears would count a foreman scrolling the picker and every
+    re-render. One press, one return. */
+ assert.match(page,/className="count-return" onClick=\{\(\)=>countReturn\(value\.busId,recentDuplicate\)\}/);
+ /* And the banner still refuses the duplicate — this adds a way to record the
+    return, it does not re-open the door to a second record. */
+ assert.match(page,/<button type="submit" className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}/);
+});
+
+test("ADVANCED STATS lives at the bottom of the focus view and nowhere else",async()=>{
+ /* Curtis: "I want this in a new section located in the bus's defect page. This
+    will be called Advanced stats. It will keep various info. But for now, just
+    the same defect log attempt." And on where exactly: "make it viewable only
+    in focus, like the bottom of however many defects listed. This way the list
+    can drop further down and just scroll to read." */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const focusStart=page.indexOf('<section className="log-focus"'),focusEnd=page.indexOf("{editing&&<DefectEditor");
+ const focus=page.slice(focusStart,focusEnd);
+ assert.ok(focus.includes('className="log-focus-stats"'),"it is inside the focus view");
+ /* ONLY there. A second copy on the feed card is the thing he ruled out. */
+ assert.equal(page.split('className="log-focus-stats"').length-1,1);
+ assert.equal(page.slice(0,focusStart).includes("log-focus-stats"),false,"nothing above the focus view draws it");
+ /* AFTER the records, so it lands under however many defects the bus carries. */
+ assert.ok(focus.indexOf("focusedGroup.records.map")<focus.indexOf('className="log-focus-stats"'));
+ /* Not collapsed and not capped: the focus body already scrolls, and a stat
+    that hides itself is a stat nobody reads. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.log-focus-body\{[^}]*overflow-y:auto/);
+ assert.equal(/\.log-focus-stats\{[^}]*(max-height|overflow)/.test(css),false);
+ /* A bus with no returns says so rather than rendering an empty frame. */
+ assert.match(focus,/No repeat reports on this bus\./);
+ /* The bus-level number leads — "how many round trips is this bus making" is
+    the question — with the per-defect breakdown under it. */
+ assert.match(focus,/ROUND TRIP\{trips===1\?"":"S"\}/);
+ assert.match(focus,/normalizeReportAttempts\(record\.defect\.reportAttempts\)\.map/,"every return is listed, not just the count");
+});
+
+test("a trouble bay is not the main garage",async()=>{
+ /* Curtis moved a bus to B12 from the Defect Log and the line under the bus
+    number still read Main Garage: "it believes that it's in b twelve, which is
+    in the main garage, but there is a distinction there."
+
+    There is, and everything except the label already knew it. */
+ const {locationLabel,knownLocationLabel}=await import("../app/location-label.ts");
+ const {RELOCATION_AREAS}=await import("../app/facility-areas.ts");
+ /* Read off the areas the MOVE editor writes with rather than hard-coded slot
+    ids, so this test cannot pass against a garage the move editor has since
+    renumbered. */
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 11"])assert.equal(locationLabel(slot),"Trouble Bay 11");
+ for(const slot of RELOCATION_AREAS["TROUBLE BAY 12"])assert.equal(locationLabel(slot),"Trouble Bay 12");
+ for(const slot of RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"])assert.equal(locationLabel(slot),"Main Garage");
+ /* All 84 garage spaces are covered by exactly one of the three. */
+ const garage=[...RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"],...RELOCATION_AREAS["TROUBLE BAY 11"],...RELOCATION_AREAS["TROUBLE BAY 12"]];
+ assert.equal(new Set(garage).size,84);
+ /* The prefix fallback still answers for the places no area lists — the West
+    overflow and the gaps in the East lot's numbering. */
+ assert.equal(locationLabel("west-overflow-2"),"CNG West");
+ assert.equal(locationLabel("east-3"),"CNG East");
+ /* OFF PROPERTY, which the Fixed Repairs copy of this list never had. */
+ assert.equal(locationLabel("offsite-3"),"Off Property");
+ /* An unrecognised slot is shown, not swallowed; a blank one takes the caller's
+    own wording. */
+ assert.equal(locationLabel("nonsense-9"),"nonsense-9");
+ assert.equal(locationLabel(""),"Location not set");
+ assert.equal(locationLabel("","Location not recorded"),"Location not recorded");
+ /* The share export prints nothing rather than a slot id at somebody who does
+    not have the app open. */
+ assert.equal(knownLocationLabel("nonsense-9"),"");
+ assert.equal(knownLocationLabel("garage-11"),"Trouble Bay 12");
+});
+
+test("one location table, not five",async()=>{
+ /* There were five, and they had already drifted — Fixed Repairs had no OFF
+    PROPERTY entry and the share export's SHOP WALL prefix was missing its
+    hyphen. Every one of them prefix-matched "garage-", which is the bug above.
+
+    This checks those five specifically. It is NOT a guarantee that no sixth
+    location-to-text mapper exists — two others do, and both are fine because
+    they resolve through sectionForLocation first and speak in AREA names
+    rather than labels: movedFromLabel in app/page.tsx and areaLabel in
+    app/operator-engine.ts. Both were read and both name the trouble bays
+    correctly. The claim here is the narrow one the assertions actually make. */
+ const files=["../app/defect-log/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../app/defect-log/quick-filter-share.ts"];
+ for(const file of files){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
+  assert.match(source,/from "\.\.?\/location-label/,file+" reads the shared one");
+ }
+ const shared=await readFile(new URL("../app/location-label.ts",import.meta.url),"utf8");
+ /* And in the one copy, the areas are consulted BEFORE the prefixes. Reverse
+    those two and "garage-11" answers Main Garage again. */
+ assert.ok(shared.indexOf("SLOT_LABELS.get(at)")<shared.indexOf("PREFIX_LABELS.find"));
+});
+
+test("the recency window keeps an undated row out of every narrowed list",async()=>{
+ const {withinTimeWindow,timeWindowLabel,timeWindowMinutes,TIME_WINDOWS}=await import("../app/time-window.ts");
+ /* ALL means all, including a row with no usable stamp. */
+ assert.equal(withinTimeWindow(null,"all"),true);
+ assert.equal(withinTimeWindow(99999,"all"),true);
+ /* Narrowed, an undated row falls out: a list whose whole claim is that
+    everything in it is recent cannot carry a row of unknown age. */
+ assert.equal(withinTimeWindow(null,"24h"),false);
+ /* The boundary is inclusive, and a minute past it is not. */
+ assert.equal(withinTimeWindow(240,"4h"),true);
+ assert.equal(withinTimeWindow(241,"4h"),false);
+ /* A stamp from a wrong clock reads as newer than anything real, never older. */
+ assert.equal(withinTimeWindow(-30,"1h"),true);
+ /* The heading a shared list carries. ALL says nothing, because a list with no
+    window is just the list. */
+ assert.equal(timeWindowLabel("all"),"");
+ assert.equal(timeWindowLabel("24h"),"LAST 24H");
+ assert.equal(timeWindowMinutes("7d"),7*24*60);
+ assert.equal(TIME_WINDOWS[0].key,"all");
+});
+
+test("the window narrows the shared list, not just the drawn one",async()=>{
+ /* Curtis asked for this so he could send part of a list: "if I don't want to
+    send that whole list to somebody." A filter that tidies the screen and then
+    pastes all twenty is worse than no filter — it lies at the only moment that
+    matters. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* Every share path builds from quickFilterBuses, which is the narrowed list,
+    and none from quickFilterAllBuses. */
+ assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
+ assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp\)/);
+ assert.equal(/quickFilterShareText\(\w+,quickFilterAllBuses/.test(page),false);
+ /* And the heading says which window, so somebody who cannot see the screen it
+    came off is not reading six buses as the total. */
+ assert.match(page,/quickFilterShareLabel=quickFilterLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow\)/);
+ /* Only the two lists that accumulate carry it. Curtis: "only as it relates to
+    these two fields." */
+ assert.match(page,/quickFilterWindowed=quickFilter==="deferred"\|\|quickFilter==="down-sheet-recommended"/);
+ /* Reset on open, and never written to storage — a window restored from
+    yesterday would open the drawer already hiding buses. */
+ assert.equal(page.split('setQuickFilterWindow("all")').length-1,2,"both entry points reset it");
+ const chips=await readFile(new URL("../app/time-window-chips.tsx",import.meta.url),"utf8");
+ assert.equal(/localStorage|STORAGE_KEY/.test(chips),false,"the window is not persisted");
+ /* The count of what is held back is on screen AND is the button that clears
+    it — a narrowed list that looks like the whole list is the only failure
+    this control can cause. It does not call those rows OLD: a row with no
+    stamp is held back by every narrowed window too, and it has no age. */
+ assert.match(chips,/\{hidden\} HIDDEN · SHOW ALL/);
+ /* The comment above it in that file explains the wording, so match the
+    rendered string rather than the phrase anywhere in the source. */
+ assert.equal(/\{hidden\} OLDER HIDDEN/.test(chips),false);
+ assert.match(chips,/className="time-window-hidden" onClick=\{\(\)=>onChange\("all"\)\}/);
+});
+
+test("both Down Sheet boards carry the window and say what it hides",async()=>{
+ for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(source,/<TimeWindowChips value=\{windowKey\}/,file+" draws the chips");
+  /* The count beside the chips is what the window is holding back — measured
+     against the unfiltered list, which is why both are kept. */
+  assert.match(source,/hidden=\{all\.length-buses\.length\}/,file);
+  assert.match(source,/buses=all\.filter\(group=>withinTimeWindow\(/,file);
+  /* An empty board has to say WHICH kind of empty it is. "Nothing deferred"
+     and "nothing in the last hour" are different facts and only one of them
+     means there is nothing to do. */
+  assert.match(source,/Nothing this recent\./,file);
+  /* Inside the collapse, so a collapsed board is still one line. */
+  assert.match(source,/\{!collapsed&&all\.length>0&&<TimeWindowChips/,file);
+  /* Judged on the longest wait on the bus, the same number the card prints —
+     not the newest, which would let a week-old bus reappear in "the last hour"
+     because a second repair was added to it this morning. */
+  assert.equal(/withinTimeWindow\([^)]*sort\(/.test(source),false,file+" reuses the card's own age");
+ }
+});
+
+test("the chip row escapes the quick-filter drawer's broad child rule",async()=>{
+ /* .quick-filter-drawer>div turns every direct child into a scrolling grid.
+    .quick-filter-share-actions already had to restate itself for that reason;
+    the chip row is a direct child too. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.quick-filter-drawer>\.time-window-chips\{[^}]*flex:none/);
+ assert.match(css,/\.quick-filter-drawer>\.time-window-chips\{[^}]*display:flex/);
+ const globals=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ /* The phone rule sits after the base rule it overrides. At equal specificity
+    source order decides, and this file has several earlier max-width blocks. */
+ assert.ok(globals.indexOf(".time-window-chip{")<globals.lastIndexOf(".time-window-chip{flex:1"));
+ /* Seven targets across a 360px row: 38px tall, sharing the width. */
+ assert.match(globals,/@media\(max-width:620px\)\{[^@]*\.time-window-chip\{flex:1;min-width:0;min-height:38px/);
+});
+
+test("one undated deferral cannot make a six-day-old bus disappear",async()=>{
+ /* Found by review, reproduced in a browser: sorting on deferredAt and taking
+    the first put "" ahead of every ISO stamp, so a bus carrying one undated
+    deferral beside dated ones read as undated — and an undated row falls out
+    of every narrowed window. A bus held six days vanished under 7D and was
+    counted as "1 HIDDEN". The wrong direction for a list of buses nobody has
+    ruled on. */
+ const {busDeferredMinutes}=await import("../app/deferred-counts.ts");
+ const {withinTimeWindow}=await import("../app/time-window.ts");
+ const now=new Date("2026-09-10T12:00:00.000Z");
+ const at=hours=>new Date(now.getTime()-hours*3600000).toISOString();
+ const deferred=deferredAt=>({id:"d"+deferredAt,state:"deferred",deferredAt});
+ const sixDays=deferred(at(144)),undated={id:"d-none",state:"deferred",deferredAt:""};
+ /* The undated one sorts first and must not decide. */
+ assert.equal(Math.round(busDeferredMinutes([undated,sixDays],now)),144*60);
+ assert.equal(Math.round(busDeferredMinutes([sixDays,undated],now)),144*60);
+ assert.equal(withinTimeWindow(busDeferredMinutes([undated,sixDays],now),"7d"),true);
+ /* The longest hold wins, not the newest — a bus standing since Monday does
+    not become recent because a second repair was deferred on it today. */
+ assert.equal(Math.round(busDeferredMinutes([deferred(at(1)),deferred(at(30))],now)),30*60);
+ /* A bus with nothing dated at all still has no age, and still shows under ALL. */
+ assert.equal(busDeferredMinutes([undated],now),null);
+ assert.equal(withinTimeWindow(busDeferredMinutes([undated],now),"all"),true);
+ /* And the two surfaces that draw this list read it from here rather than
+    each working it out — they disagreed before, which is the whole point. */
+ const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ for(const [name,source] of [["the board",board],["the quick filter",page]]){
+  assert.match(source,/busDeferredMinutes\(/,name+" reads the shared rule");
+  assert.equal(/localeCompare\(String\(b\.deferredAt/.test(source),false,name+" no longer sorts on a blank stamp");
+ }
+});
+
+test("a collapsed board never shows a narrowed count with nothing saying so",async()=>{
+ /* The chips and the N HIDDEN button are inside the collapse and the header
+    count is not, so a board collapsed while narrowed read as a smaller list
+    with no explanation on screen — and both boards are collapsed by DEFAULT,
+    making that the resting state rather than an edge case. */
+ for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+  const source=await readFile(new URL(file,import.meta.url),"utf8");
+  /* DERIVED through the collapse, not reset by an effect and not by a line in
+     the toggle's onClick. An effect runs after the commit, which left one
+     frame showing the reduced count — measured at 2 on a board holding 3 —
+     and the onClick would miss the page restoring `collapsed` from storage on
+     mount. Reading it through makes the two impossible to disagree at all. */
+  assert.match(source,/const activeWindow:TimeWindowKey=collapsed\?"all":windowKey;/,file);
+  assert.match(source,/withinTimeWindow\([^)]*\),activeWindow\)/,file+" filters on the derived value");
+  assert.equal(/if\(collapsed\)setWindowKey/.test(source),false,file+" does not reset it after the fact");
+  /* The chips still show the chosen window, so expanding restores the filter
+     the person set rather than silently discarding it — the count is only ever
+     narrowed while the line explaining it is on screen. */
+  assert.match(source,/<TimeWindowChips value=\{windowKey\}/,file);
+ }
+});
+
+test("the SHOW ALL button is the same size on the boards and in the drawer",async()=>{
+ /* globals.css carries `aside div button{...padding:7px...}` and the
+    quick-filter drawer is an <aside>, so an unset property on either chip
+    control is inherited there and nowhere else. .time-window-hidden declared
+    no padding and measured 7px in the drawer against 0 on the boards — one
+    control at two sizes. A class beats three elements, so the fix is simply to
+    declare it. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.time-window-hidden\{[^}]*padding:/);
+ assert.match(css,/\.time-window-chip\{[^}]*padding:/);
+ /* And the rule it is defending against is really there, so this test fails
+    honestly if somebody removes it and wonders why the padding is pinned. */
+ assert.match(css,/aside div button\{[^}]*padding:7px/);
+});
+
+test("the three view options default to off and survive a bad settings blob",async()=>{
+ /* Curtis: "I might not like it, but I just wanna make sure we can roll back at
+    any point." Off by default is what makes that true — a device that updates
+    looks exactly as it did. */
+ const {DEFAULT_SETTINGS,readSettings,normalizeViewScope,VIEW_SCOPES}=await import("../app/defect-log/defect-log-settings.ts");
+ for(const key of ["busRail","busBlueOnly","busEndMarker"]){
+  assert.equal(DEFAULT_SETTINGS[key],"off",key+" ships off");
+  assert.equal(readSettings(null)[key],"off");
+  assert.equal(readSettings(JSON.stringify({[key]:"always"}))[key],"always");
+  assert.equal(readSettings(JSON.stringify({[key]:"phone"}))[key],"phone");
+  /* A settings blob is a file somebody can hand-edit and a transfer can carry
+     between devices, so anything else reads as off rather than as itself. */
+  assert.equal(readSettings(JSON.stringify({[key]:"ALWAYS"}))[key],"off");
+  assert.equal(readSettings(JSON.stringify({[key]:true}))[key],"off");
+ }
+ assert.equal(normalizeViewScope(undefined),"off");
+ assert.deepEqual(VIEW_SCOPES.map(scope=>scope.key),["off","phone","always"]);
+});
+
+test("PHONE is a width, not a device",async()=>{
+ /* Curtis asked whether "the system is smart enough to pick up on what device
+    you're using based on the pixelation of the screen", and floated a separate
+    phone settings page. A media query knows the VIEWPORT, which is better: an
+    iPad in split screen is phone-width and wants the phone treatment, and a
+    stored "this is an iPad" answer would be wrong the moment it was rotated.
+
+    So every option is written twice — once unconditionally for "always", once
+    inside the app's own 620px block for "phone" — and nothing is stored about
+    the device. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* EVERY 620px block, each sliced to its own MATCHING BRACE.
+
+    Two earlier versions of this were wrong in the same direction — too
+    generous — and each passed. The first sliced to the END OF FILE, so "the
+    phone form is inside the 620px block" was true of any rule that merely sat
+    after it; an unguarded copy applying at every width passed. The second
+    fixed the slice but still assumed the LAST 620px block was the options
+    one, which stopped being true the moment another phone rule was appended
+    below it — that is what caught this and it is why the scan is now over all
+    of them rather than over a guess about which. */
+ const phoneBlocks=[],marker="@media(max-width:620px){";
+ for(let at=css.indexOf(marker);at>=0;at=css.indexOf(marker,at+1)){
+  let depth=0,end=css.indexOf("{",at);
+  for(;end<css.length;end++){
+   if(css[end]==="{")depth++;
+   else if(css[end]==="}"&&--depth===0)break;
+  }
+  phoneBlocks.push({start:at,end,body:css.slice(at,end)});
+ }
+ assert.ok(phoneBlocks.length>0);
+ const phoneBlock=phoneBlocks.map(block=>block.body).join("\n");
+ /* Everything OUTSIDE every one of those blocks, which is where a phone form
+    must never appear. */
+ const outside=phoneBlocks.reduce((rest,block)=>rest.replace(block.body,""),css);
+ for(const attribute of ["data-bus-rail","data-bus-blue","data-bus-end"]){
+  assert.ok(css.includes('['+attribute+'="always"]'),attribute+" has an every-screen form");
+  assert.ok(phoneBlock.includes('['+attribute+'="phone"]'),attribute+' has a phone form, inside a 620px block');
+  /* And nowhere else in the file, before or after — an unguarded copy would
+     make "phone only" apply on the shop computer too. */
+  assert.equal(outside.includes('['+attribute+'="phone"]'),false,attribute+" phone form is inside a media query only");
+ }
+ /* No user-agent sniffing anywhere in this feature. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.equal(/navigator\.(userAgent|platform)|matchMedia/.test(page),false,"the width is CSS's to answer, not JavaScript's");
+
+});
+
+test("the vertical rail runs beside the defect rows, never across them",async()=>{
+ /* Curtis asked this directly: "will they keep the defects themselves separated,
+    even though the number is written across them?" It does not run across them
+    — it is a 38px stripe in the card's left padding and the rows start after
+    it. Measured in Chromium at 360/390/430/820/1180: the rail ends at 63 and
+    the first row starts at 71.
+
+    Two rules make that true and both were found by measuring, not by reading. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* 1. grid-column:auto on the rail. An abspos child of a grid container with a
+       DEFINITE grid placement is positioned against its grid area, and the base
+       rule sets grid-column:1 — leaving it in put the rail 46px inboard with
+       the rows 30px underneath it. */
+ assert.equal(css.match(/\.log-bus-column\{position:absolute;grid-column:auto;left:0;top:0;bottom:0;width:38px/g)?.length,2,"both scopes reset the placement");
+ /* 2. Every child moves to column 1, the HEADER included. Missing it left
+       .log-card-group>.log-group-header{grid-column:2} applying, which made
+       column 2 implicit and collapsed the explicit 1fr column to 0px — defect
+       rows measured 2px wide. */
+ for(const scope of ['[data-bus-rail="always"]','[data-bus-rail="phone"]'])
+  assert.ok(new RegExp(scope.replace(/[[\]"]/g,ch=>"\\"+ch)+" \\.log-card-group>\\.log-group-header,").test(css),scope+" moves the header too");
+ /* .log-focus-row is a DEAD selector — no .tsx renders it — and the first
+    version of these rules carried two more copies of it. A rule for an element
+    that does not exist reads as coverage and is not. */
+ for(const file of ["../app/defect-log/page.tsx","../app/defect-log/defect-log-settings-modal.tsx"])
+  assert.equal((await readFile(new URL(file,import.meta.url),"utf8")).includes("log-focus-row"),false,file);
+ assert.equal(/data-bus-rail[^{]*\.log-focus-row/.test(css),false,"the option adds no rule for an element nothing renders");
+ /* grid-row:1/-1 is NOT how this is done: with rows auto-placed there is no
+    explicit grid and -1 resolves to the explicit end, which rendered 146px
+    inside a 729px card. */
+ assert.equal(/data-bus-rail[^{]*\.log-bus-column\{[^}]*grid-row:1\/-1/.test(css),false);
+});
+
+test("a chosen Repair Title color still wins when blue is locked to the bus",async()=>{
+ /* --log-repair-category-color is ALWAYS written from the settings blob, so
+    var(--log-repair-category-color, quiet) can never reach its fallback — the
+    first version of this changed nothing at all and measured rgb(11,100,189),
+    unchanged. A second variable is emitted only when the stored color differs
+    from the shipped default: undefined means nobody chose. */
+ /* This started life as a SECOND variable, --log-repair-category-chosen,
+    because --log-repair-category-color was emitted unconditionally and so
+    could never reach a fallback. Chasing that turned up the far larger bug
+    behind it — none of the theme fallbacks in the stylesheet had ever fired —
+    and once displayStyleVars omitted every unchosen colour, the plain variable
+    did the job and the extra one was retired. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ assert.equal(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"dark")["--log-repair-category-color"],undefined,"unchosen: the quiet fallback answers");
+ assert.equal(displayStyleVars(normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}}),"dark")["--log-repair-category-color"],"#c3262f","chosen: their colour wins");
+ assert.equal(/"--log-repair-category-chosen"/.test(page),false,"the workaround variable is no longer emitted");
+ const css2=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.equal(css2.includes("var(--log-repair-category-chosen"),false,"and nothing reads it");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* The repair heading and the focus view's record head share one declaration
+    now, so the assertion matches the selector list rather than the old
+    single-selector rule. */
+ assert.match(css,/data-bus-blue="always"\] \.log-repair>b,\n\.defect-log-app\[data-bus-blue="always"\] \.log-focus-record-head>b\{color:var\(--log-repair-category-color,/);
+ for(const scope of ["always","phone"]){
+  /* VIEW/CLOSE needs !important because .group-toggle already declares
+     color:var(--log-accent)!important — no specificity reaches that, and
+     without it the option measured rgb(11,100,189) on and off, all themes. */
+  assert.match(css,new RegExp('data-bus-blue="'+scope+'"\\] \\.log-meta>\\.group-toggle\\{color:[^}]*!important\\}'),scope+" reaches VIEW/CLOSE");
+  /* The numbered disc is an accent BACKGROUND — three blue circles on an
+     opened three-defect bus under a setting that says blue is the bus. */
+  /* --log-header, not a mix toward --log-text: this is a BACKGROUND behind
+     near-white text, so it must go dark on every theme, and a mix toward the
+     text colour goes dark on the light theme and LIGHT on the three dark ones.
+     At 62% it took the light theme's disc text from 5.88:1 to 4.23:1.
+     Measured with --log-header: 16.54 / 20.04 / 19.83 / 14.61. */
+  assert.match(css,new RegExp('data-bus-blue="'+scope+'"\\] \\.grouped-defect-number\\{background:var\\(--log-header\\)\\}'),scope+" quietens the disc without dimming its text");
+  /* The BUS heading over an opened list is NOT quietened: it was never blue,
+     and it is the one other place the bus is named. */
+  assert.equal(new RegExp('data-bus-blue="'+scope+'"\\] \\.grouped-defect-head').test(css),false,scope+" leaves the BUS heading alone");
+ }
+ /* FOCUS at 62% measured 4.23:1 on the light theme's white — under AA on 8px
+    900-weight uppercase, which gets no large-text exemption. 78% is 5.85:1. */
+ assert.match(css,/data-bus-blue="always"\] \.log-card-group>\.log-focus-button\{color:color-mix\(in srgb,var\(--log-text\) 78%/);
+ /* Nothing in this option uses the 62% mix any more; it failed AA once as a
+    foreground and once as a background, in opposite directions. */
+ assert.equal(/data-bus-blue[^}]*62%/.test(css),false);
+});
+
+test("the second location button is display:none, not merely invisible",async()=>{
+ /* The rail has no room for "Trouble Bay 12" on its side, so the control is in
+    the markup twice and CSS shows whichever fits. display:none takes the hidden
+    one out of the ACCESSIBILITY TREE as well as off the screen — visibility or
+    opacity would leave a screen reader announcing the same button twice on
+    every card in the feed. */
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.log-location-inline\{display:none;/);
+ assert.equal(/\.log-location-inline\{[^}]*(visibility:hidden|opacity:0)/.test(css),false);
+ /* And exactly one of the pair is ever shown: the rail hides the column copy in
+    the same rule that reveals this one. */
+ for(const scope of ['always','phone']){
+  assert.ok(css.includes('[data-bus-rail="'+scope+'"] .log-bus-column .log-location{display:none}'),scope+" hides the column copy");
+  assert.ok(css.includes('[data-bus-rail="'+scope+'"] .log-card-group>.log-location-inline{display:inline-flex}'),scope+" shows the inline copy");
+ }
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.equal(page.split("Facility location for bus ").length-1,2,"the pair, and only the pair");
+});
+
+test("a text colour nobody picked follows the theme, so the dark themes are readable",async()=>{
+ /* Every rule in defect-log.css that reads one of these already had a
+    theme-aware fallback — var(--log-repair-category-color,var(--log-accent))
+    and so on — and not one had ever fired, because the page defined all seven
+    variables from the settings blob whether or not anybody chose them, and the
+    shipped values are light-theme hex. Measured on the Defect Log at 1180px,
+    contrast against the effective background, nothing customised:
+
+                   light   dark   midnight  tactical
+      feed title   10.77   1.49   1.50      1.05
+      repair text  11.80   1.07   1.08      1.57
+      category      4.92   2.24   2.21      1.52
+
+    1.05:1 is the background. The defect text was invisible on three themes. */
+ const {displayStyleVars,followsTheme,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const untouched=DEFAULT_DEFECT_LOG_DISPLAY;
+ for(const theme of ["dark","midnight","tactical","custom"]){
+  const vars=displayStyleVars(untouched,theme);
+  assert.deepEqual(Object.keys(vars).filter(name=>name.endsWith("-color")),[],theme+" defers every unchosen colour to the theme");
+  /* Sizes are NOT theme-dependent and must still be emitted. */
+  assert.equal(Object.keys(vars).filter(name=>name.endsWith("-size")).length,7,theme+" still carries the sizes");
+ }
+ /* LIGHT KEEPS ALL SEVEN. They are light-theme colours picked by hand for this
+    app on white — LIVE REPAIR FEED's #163c70 is a deeper navy than the accent
+    on purpose. Deferring on light too swapped it for the accent and dropped it
+    from 10.77:1 to 5.77:1: legible, and a change nobody asked for on the theme
+    almost everybody uses. */
+ assert.equal(Object.keys(displayStyleVars(untouched,"light")).filter(name=>name.endsWith("-color")).length,7);
+ /* A REAL CHOICE STILL WINS, on every theme. */
+ const chosen=normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}});
+ for(const theme of ["light","dark","midnight","tactical","custom"])
+  assert.equal(displayStyleVars(chosen,theme)["--log-repair-category-color"],"#c3262f",theme+" keeps a chosen colour");
+ /* Case-insensitive, since a hand-edited blob or another device may store the
+    same colour in capitals. */
+ assert.equal(followsTheme("repairCategory","#0B64BD"),true);
+ assert.equal(followsTheme("repairCategory","#c3262f"),false);
+});
+
+test("the emitted variable names are the ones the stylesheets actually read",async()=>{
+ /* Derived from the CSS rather than listed here: this is a loop building
+    property names out of camelCase keys, and a key renamed on one side only
+    would silently stop styling anything. */
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const emitted=Object.keys(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"light"));
+ const css=(await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"))
+  +(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"));
+ for(const name of emitted)
+  assert.ok(css.includes("var("+name+","),name+" is read by a rule, with a fallback behind it");
+ /* And the page hands them over wholesale rather than restating the list — the
+    hand-written version is what drifted from the fallbacks in the first place. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/\.\.\.displayStyleVars\(settings\.display,settings\.theme\)/);
+ for(const name of emitted)
+  assert.equal(page.includes('"'+name+'"'),false,page+" no longer names "+name+" by hand");
+});
+
+test("Settings says which colours are following the theme",async()=>{
+ /* The swatch beside a following colour is showing a colour the screen is NOT
+    using. Saying so is the difference between a sensible default and a control
+    that lies — and the button pins it back the other way. */
+ const modal=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ assert.match(modal,/FOLLOWING THEME/);
+ assert.match(modal,/followsTheme\(key,settings\.display\.styles\[key\]\.color\)/);
+ /* FOLLOW THEME sets the colour back to the shipped default, which IS the
+    "no choice made" value — not a separate sentinel that would need its own
+    validation on read. */
+ assert.match(modal,/className="log-style-follow" onClick=\{\(\)=>setDisplayStyle\(key,"color",DEFAULT_DEFECT_LOG_DISPLAY\.styles\[key\]\.color\)\}/);
+ assert.match(modal,/\{!themed&&<button type="button" className="log-style-follow"/,"offered only where there is something to undo");
+});
+
+test("the closing line spans the card and an opened bus ends further from the next",async()=>{
+ /* Curtis: "that text should be a little bigger and go further across the
+    bottom of each portion, and make it a little bit darker so it is easier to
+    see... the space between the last defect and the next new bus card seems
+    thinner. Let's widen it up just a bit." */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* OUT of the defect list, so it spans the card without negative margins that
+    would have to match whichever of four .grouped-defect-list padding rules
+    wins at each breakpoint. */
+ const listStart=page.indexOf('{expanded&&<div className="grouped-defect-list"'),listEnd=page.indexOf("</div>}",listStart);
+ assert.ok(listStart>0);
+ assert.equal(page.slice(listStart,listEnd).includes("log-bus-end-marker"),false,"not inside the defect list");
+ assert.match(page,/\{expanded&&<p className="log-bus-end-marker"/,"and only on an opened bus");
+ /* Spanning BOTH columns. As a direct child of the card it auto-placed into
+    the 82px bus column and measured 64px wide — narrower than it had been
+    inside the list it left. */
+ assert.match(css,/\.log-bus-end-marker\{display:none;grid-column:1\/-1\}/);
+ /* Bigger, and darker than --log-muted. The mix goes toward --log-text, which
+    is dark on the light theme and light on the three dark ones, so "darker"
+    means "further from the background" on all four. Measured: 5.80 light,
+    8.28 dark, 7.76 midnight, 5.69 tactical. */
+ assert.match(css,/\.log-bus-end-marker\{display:block;[^}]*font-size:9px/);
+ assert.match(css,/\.log-bus-end-marker\{display:block;[^}]*color:color-mix\(in srgb,var\(--log-text\) 72%/);
+ assert.equal(/\.log-bus-end-marker\{display:block;[^}]*color:var\(--log-muted\)/.test(css),false,"muted was the old, lighter tone");
+ /* The gap after an opened card is genuinely larger, not merely equal. It was
+    already equal — 14px at 390 open or closed, measured — and read as tighter
+    because the list's grey runs to the card edge and the page grey beside it is
+    near enough that the edge stops registering. */
+ assert.match(css,/\.log-card-group\.expanded\{margin-bottom:10px\}/);
+ assert.match(css,/@media\(max-width:620px\)\{\n \.log-card-group\.expanded\{margin-bottom:8px\}/);
+});
+
+test("a hold is a fact about the bus, and only time or a person lifts it",async()=>{
+ /* Curtis: "somebody just asked me about two buses that are gonna probably come
+    in to B12, and if they do, they want me to hold those buses." */
+ const {setBusHold,isHeld,heldBuses,heldBusCount,normalizeHold,holdExpired,holdUntilLabel,heldMinutes}=await import("../app/bus-hold.ts");
+ const now=new Date("2026-09-10T22:00:00.000Z");
+ const at=hours=>new Date(now.getTime()+hours*3600000).toISOString();
+ const bus={id:"b1",n:"18505",l:"road-1"};
+ /* NO KEY UNTIL THERE IS A HOLD, and no key again once there is not. busRow
+    copies every own key of a bus into map_fields and rowFingerprint walks
+    Object.keys, so hold:undefined would change every bus's fingerprint and
+    re-push the shop's whole fleet table — the trap fluids and reportAttempts
+    were written around on the defect record. */
+ assert.equal(Object.keys(bus).includes("hold"),false);
+ const held=setBusHold(bus,true,{at:at(-2),by:"CT"});
+ assert.equal(Object.keys(setBusHold(held,false)).includes("hold"),false,"clearing DELETES the key");
+ /* The time is optional — Curtis: "I don't want a time to be required in case a
+    person doesn't know the time off hand." With none, it simply stands. */
+ assert.equal(isHeld(held,now),true);
+ assert.equal(held.hold.until,undefined);
+ assert.equal(holdUntilLabel(held.hold),"");
+ /* With one, it lifts when that time passes. */
+ const timed=setBusHold(bus,true,{at:at(-2),until:at(1)});
+ assert.equal(isHeld(timed,now),true);
+ assert.equal(holdExpired(timed.hold,now),false);
+ const past=setBusHold(bus,true,{at:at(-5),until:at(-1)});
+ assert.equal(isHeld(past,now),false,"past its time it stops counting");
+ assert.equal(holdExpired(past.hold,now),true);
+ /* Read-time only. The record is left exactly as it is on the device. */
+ assert.equal(Object.keys(past).includes("hold"),true,"an expired hold is not rewritten away");
+ /* NOTHING ABOUT WHERE THE BUS IS EVER CLEARS IT. Curtis first said a location
+    move should lift it, then chose otherwise when asked — his own buses were
+    ARRIVING, and arriving is a move, so that rule would have dropped the hold
+    at the moment it started to matter. */
+ const source=await readFile(new URL("../app/bus-hold.ts",import.meta.url),"utf8");
+ assert.equal(/\bl\b\s*[=!]==|location|lastLocationChangeAt/.test(source.replace(/\/\*[\s\S]*?\*\//g,"")),false,"no code here reads where the bus is");
+ assert.equal(isHeld(setBusHold({...held,l:"garage-0"},true,{at:at(-2)}),now),true,"moved, still held");
+ /* A hold with no readable stamp is not a hold: every screen that draws one
+    says when it was placed. Boards are files people hand-edit and transfers
+    carry between devices. */
+ assert.equal(normalizeHold({by:"CT"}),null);
+ assert.equal(normalizeHold({at:"not-a-date"}),null);
+ assert.equal(normalizeHold("yes"),null);
+ assert.equal(isHeld({hold:{at:"not-a-date"}},now),false);
+ /* Longest-held first, and expired ones are not in the list at all. */
+ assert.deepEqual(heldBuses([past,timed,held],now).map(row=>row.bus.n),["18505","18505"]);
+ assert.equal(heldBusCount([past,timed,held],now),2);
+ assert.equal(Math.round(heldMinutes(held.hold,now)),120);
+ /* Floored at zero: a device with a wrong clock can stamp the future, and
+    "-4M" on a board reads as a bug in the app rather than in a clock. */
+ assert.equal(heldMinutes(setBusHold(bus,true,{at:at(3)}).hold,now),0);
+});
+
+test("a hold stays on the phone that was told, and costs the cloud nothing",async()=>{
+ /* Curtis, reversing the original build: "If someone is asked to hold a bus
+    (like bay 12 guy) then they should know. It doesn't need to show up on
+    everybody's screen." A hold is an instruction one person is carrying, not a
+    fact about the fleet.
+
+    Two things have to be true for that, and only one of them is obvious. The
+    row must not CARRY the hold — and placing a hold must not push AT ALL. If
+    busUpdatedAt still counted the hold's stamp, a held bus would push a row
+    whose map_fields were byte-identical to the last one but stamped newer:
+    traffic that says "newer" while carrying nothing new, which is exactly the
+    out-of-order ammunition updated_at exists to deny. */
+ const {busUpdatedAt,busRow,rowFingerprint}=await import("../app/cloud-sync.ts");
+ const older="2026-09-10T18:00:00.000Z",newer="2026-09-10T21:30:00.000Z",now="2026-09-10T22:00:00.000Z";
+ const config={initials:"CT",deviceLabel:"shop"};
+ const plain={id:"b1",n:"18505",l:"road-1",s:"service",parkedAt:older,lastLocationChangeAt:older,lastStatusChangeAt:older};
+ const held={...plain,hold:{at:newer,by:"CT"}};
+
+ /* The hold's stamp is ignored: the newest OPERATIONAL stamp still wins. */
+ assert.equal(busUpdatedAt(held,now),older,"the hold's own stamp must not move updated_at");
+ assert.equal(busUpdatedAt(plain,now),busUpdatedAt(held,now),"holding a bus changes nothing about when it was last updated");
+
+ /* The row does not carry it. */
+ const heldRow=busRow(held,config,now);
+ assert.equal(Object.keys(heldRow.map_fields).includes("hold"),false,"hold never reaches map_fields");
+
+ /* And the decisive one: the pushed row is INDISTINGUISHABLE from the
+    unheld bus, so nothing is queued and no other device ever hears of it. */
+ assert.equal(rowFingerprint(heldRow),rowFingerprint(busRow(plain,config,now)),"placing a hold moves no fingerprint, so it pushes nothing");
+});
+
+test("a device transfer does not carry one person's holds onto everybody's board",async()=>{
+ /* The cloud is not the only way a record travels. Transfers are how one
+    device SEEDS another in this shop, so a hold riding an export would put bay
+    12's instructions on every board by the back door — the same outcome the
+    cloud change was made to prevent. The receiver's OWN hold has to survive the
+    import too: being told to hold a bus is not undone by somebody sending you
+    their board. */
+ const {exportFleetMapPayload,mergeFleetMap}=await import("../app/section-transfer.ts");
+ const now="2026-09-11T12:00:00.000Z";
+ const senderHold={at:"2026-09-11T09:00:00.000Z",by:"RM"};
+ const theirs=[{id:"a1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold:senderHold}];
+ const payload=exportFleetMapPayload(theirs,now);
+ assert.equal("hold" in payload.buses[0],false,"the export strips it");
+
+ /* Receiver holds a DIFFERENT bus, and has none on the bus being sent. */
+ const mineHold={at:"2026-09-11T11:00:00.000Z",by:"CT"};
+ const mine=[{id:"b1",n:"18505",l:"road-1",s:"service",defects:[],pendingRepair:"",hold:mineHold}];
+ const {buses}=mergeFleetMap(mine,payload);
+ assert.deepEqual(buses[0].hold,mineHold,"the receiver's own hold survives the import untouched");
+ assert.equal(buses[0].l,"garage-3","while the location it WAS sent still arrives");
+});
+
+test("the HOLD badge is a button that opens every held bus, and never shows the time",async()=>{
+ /* Curtis: "pressing it on one bus, I wanted to show all the buses that are
+    being held, and a time." And on the badge itself: "don't just show the time
+    of the expected arrival by default, you have to press it to see that
+    information." */
+ const board=await readFile(new URL("../app/hold-board.tsx",import.meta.url),"utf8");
+ const badge=board.slice(board.indexOf("export function HoldBadge"),board.indexOf("export default function"));
+ assert.match(badge,/<button type="button" className="work-state-badge bus-hold-badge"/,"the same look as the deferred badge, per Curtis");
+ assert.equal(/holdUntilLabel|until/.test(badge),false,"no time on the badge");
+ /* The time exists only in the list, and says so when nobody set one rather
+    than leaving a blank line. */
+ assert.match(board,/\{until\|\|"NO TIME SET"\}/);
+ /* Both surfaces open the same list. The map matters most: it is the only one
+    that draws a held bus with NO defects, which is the case this was built
+    for — two buses that had not arrived yet. */
+ for(const file of ["../app/page.tsx","../app/defect-log/page.tsx"]){
+  const page=await readFile(new URL(file,import.meta.url),"utf8");
+  assert.match(page,/<HoldBoard fleet=/,file+" opens the list");
+  assert.match(page,/<HoldBadge count=/,file+" draws the badge");
+ }
+ /* THE SAME SIZE AS THE DEFERRED BADGE. Curtis asked twice — "it can look just
+    the same, maybe the colour can be different", then "make sure the badge is
+    similar to the deferred one, in size etc" after seeing it at 47x36 beside a
+    37x24 WAS DEF. These numbers are copied from .inline-deferred-history-badge
+    rather than chosen, so they are asserted against it rather than as
+    literals: whatever that badge is, this one matches. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ const deferred=(css+logCss).match(/\.inline-deferred-history-badge\{[^}]*\}/g).join("");
+ for(const property of ["height:24px","border-radius:12px","font-size:9px"])
+  assert.ok(deferred.includes(property.replace("height:24px","height:17px"))||deferred.includes(property),"the deferred badge still declares "+property);
+ assert.match(css,/\.bus-hold-badge\{position:relative;height:24px;[^}]*border-radius:12px/);
+ assert.match(css,/\.bus-hold-badge\{[^}]*padding:0 8px;font-size:9px/);
+ /* And a rule that actually reaches it on a card: .log-meta .work-state-badge
+    (0,2,0) pins every badge in that column to 22px and beats .bus-hold-badge
+    (0,1,0), so the size set in globals.css never applied there. */
+ assert.match(logCss,/\.log-meta \.bus-hold-badge\{min-height:0;height:24px;padding:0 8px;border-radius:12px\}/);
+ assert.match(logCss,/\.log-meta \.work-state-badge\{min-height:22px/,"the rule it has to match, so this fails honestly if that one goes");
+ /* The tap target is kept without making the box bigger, because this one is a
+    button and the badges beside it are labels. Measured: a 24px pill with 40px
+    of reachable height, and nothing of its neighbours' taps stolen — the
+    timestamps below it stay topmost at their own centres. */
+ assert.match(css,/\.bus-hold-badge::after\{content:"";position:absolute;left:0;right:0;top:50%;height:40px;transform:translateY\(-50%\)\}/);
+ /* NOT in the badge slot above it. That slot is a pair of FIXED sub-slots so
+    DS and the count sit at the same x with or without each other; a third
+    badge moves them, which is the tab-stop rule two tests hold after the DS
+    badge once measured 4px on top of the repair text. */
+ const logPage=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const slot=logPage.slice(logPage.indexOf('<span className="log-badge-slot">'),logPage.indexOf("</span>",logPage.indexOf('<span className="log-badge-slot">')));
+ assert.equal(slot.includes("HoldBadge"),false,"the fixed tab stops are left alone");
+});
+
+test("the line under FLEETSTEP scales with the screen",async()=>{
+ /* Curtis: make it "a little bigger, just a bit". Clamped rather than a fixed
+    size so it grows with the viewport the way .welcome-name above it does —
+    9px was the same on a 360px phone and a 1180px shop computer.
+
+    Measured with a Range over the text node, one rect per LINE BOX, because
+    the paragraph's own box is the container width and says nothing about the
+    text in it: 254px at 320 wide, 288px at its largest, one line everywhere
+    with 66px to spare at the narrowest. A first attempt eased the tracking to
+    buy width it turned out not to need, on exactly that confusion. */
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(css,/\.welcome-kicker\{margin:11px 0 0;color:#9dc0ee;font-size:clamp\(10px,2\.9vw,12px\);font-weight:900;letter-spacing:2\.4px/);
+ /* The tracking is what it always was. */
+ assert.equal(/\.welcome-kicker\{[^}]*letter-spacing:2px/.test(css),false);
+ /* And it still grows from the same floor the name does rather than shrinking
+    below what it replaced. */
+ const floor=Number(css.match(/\.welcome-kicker\{[^}]*font-size:clamp\((\d+)px/)[1]);
+ assert.ok(floor>9,"bigger than the 9px it replaced, at every width");
+});
+
+
+test("the settings page is five sections of closed drawers, and WORDING is one of them",async()=>{
+ /* Curtis, after going through the page: "i had a few confusing moments lol.
+    Its a lot and i do mean a LOT!! ... We need to compress all of the settings
+    in such a way where there is only 5 sections ... The goal here is to make
+    the settings section very digestible and easy to navigate."
+
+    The five sections already existed. What did not was a second level: open one
+    section and every group inside it was drawn flat and wide open — thirty of
+    them across the five panels. Each group is a drawer now and drawers start
+    closed. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [drawer,css,settingsPage,mapPanel,downPanel,logPanel,fixedPanel]=await Promise.all([
+  read("app/settings/settings-drawer.tsx"),read("app/settings/settings.css"),read("app/settings/page.tsx"),
+  read("app/map-settings-panel.tsx"),read("app/down-sheet/down-sheet-settings.tsx"),
+  read("app/defect-log/defect-log-settings-modal.tsx"),read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+ ]);
+
+ /* STILL EXACTLY FIVE at the top. The drawers are a second level, not a sixth
+    section — if this ever grows, the compression has been undone. */
+ assert.match(settingsPage,/type SectionKey="master"\|"map"\|"down"\|"log"\|"fixed";/);
+
+ /* CLOSED BY DEFAULT is the whole point: an empty open list, not a list with
+    a favourite in it. */
+ assert.match(drawer,/useState<readonly string\[\]>\(\[\]\)/,"every drawer starts closed");
+
+ /* WORDING, which Curtis named: "Where you can change the title section name
+    and other things, all of that is open. That needs to be collapsed on
+    default." It appears on two surfaces and both must be behind a drawer. */
+ for(const [panel,where] of [[downPanel,"the Down Sheet"],[logPanel,"the Defect Log"]]){
+  assert.match(panel,/<SettingsDrawer title="WORDING"/,"WORDING is a drawer on "+where);
+  assert.equal(/<h3>WORDING<\/h3>/.test(panel),false,"WORDING no longer draws itself open on "+where);
+ }
+
+ /* Every panel is wrapped, so no group is left outside the system. */
+ for(const [panel,where] of [[mapPanel,"map"],[downPanel,"down sheet"],[logPanel,"defect log"],[fixedPanel,"fixed repairs"],[settingsPage,"master"]])
+  assert.match(panel,/<SettingsDrawers>/,where+" puts its groups in drawers");
+
+ /* THE WIDTH RULE. Curtis: "Accordion, but keep in mind the design for the
+    bigger screen and the PC." One-at-a-time is right on a phone and a
+    straitjacket on a shop computer, so the behaviour follows the screen and
+    the JS breakpoint is the CSS breakpoint. */
+ assert.match(drawer,/export const PHONE_QUERY="\(max-width:620px\)"/);
+ assert.match(drawer,/return phone\?\[id\]:\[\.\.\.current,id\]/,"a phone replaces the open drawer; a wide screen adds to it");
+ assert.match(drawer,/useState\(true\)/,"the phone rule is the default, because the server cannot measure a window");
+ assert.match(css,/@media\(min-width:900px\)\{[\s\S]*?\.settings-drawers\{grid-template-columns:repeat\(2[^}]*grid-auto-flow:row dense\}/,"drawers go two-up where there is room");
+ assert.match(css,/\.settings-drawer\.open\{grid-column:1\/-1\}/,"an open drawer takes the full width; dense flow stops that leaving a hole");
+ assert.equal(/settings-drawer-wide/.test(css),false,"the per-drawer width flag is gone — open state decides, so a CLOSED page is never ragged");
+
+ /* The header nav carries six links at min-width:102px and the header is a
+    flex row, so it must not be allowed to shrink: measured at 1180 it had been
+    handed 475px and every adjacent pair of links overlapped by 21.8px. */
+ assert.match(css,/@media\(min-width:761px\)\{[\s\S]*?\.settings-header nav\{flex:0 0 auto\}/,
+  "the nav keeps its own width — and ONLY in the row layout, because below 760px the header is a column where a flex-basis is a height");
+
+ /* THE BARE button{} RULE in globals.css line 2 sets height:28px, and
+    min-height cannot release a fixed height — the trap CLAUDE.md names and
+    .app-name documents. Without height:auto a two-line title on a 360px phone
+    overflows its own header, silently. */
+ const toggle=css.match(/\.settings-drawer-toggle\{[^}]*\}/)[0];
+ for(const property of ["height:auto","border:0","border-radius:0","background:","color:","padding:","font-family:inherit","font-size:inherit","font-weight:inherit"])
+  assert.ok(toggle.includes(property),".settings-drawer-toggle must answer the bare button rule's "+property);
+ assert.match(css,/\.settings-drawer-body\[hidden\]\{display:none\}/,"the body's grid display must not defeat the hidden attribute");
+
+ /* A <button> may only contain phrasing content, so the heading wraps the
+    button rather than the other way round — same shape as the section above. */
+ assert.match(drawer,/<h3 className="settings-drawer-head">\s*<button type="button" className="settings-drawer-toggle" aria-expanded=\{open\}/);
+});
+
+test("a page's settings panel does not draw a second Settings header inside its section",async()=>{
+ /* Curtis: "I also noticed that the different sections have their own settings
+    section. This looks confusing as well because the same layout is right above
+    to actually switch to that page. IT confused me a few times."
+
+    Two doublings caused that, and both are gone. The jump-link nav is asserted
+    elsewhere; this is the other one. Each page's panel carried its own
+    "DOWN SHEET ADMINISTRATION / Settings" banner, which on the Settings page
+    landed directly beneath a section header already saying the page name and
+    the word Settings. Kept for the modal path, which has no header above it —
+    hence !inline rather than deletion. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [down,log,fixed]=await Promise.all([
+  read("app/down-sheet/down-sheet-settings.tsx"),
+  read("app/defect-log/defect-log-settings-modal.tsx"),
+  read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+ ]);
+ assert.match(down,/\{!inline&&<div className="repair-editor-head">/,"the Down Sheet banner is modal-only");
+ assert.match(log,/\{!inline&&<header className="log-settings-head">/,"the Defect Log banner is modal-only");
+ assert.match(fixed,/\{!inline&&<header><span><small>FIXED REPAIRS<\/small>/,"the Fixed Repairs banner is modal-only");
+ /* The CLOSE button rode inside those headers, so it must have gone with them
+    rather than been left rendering on its own. Checked by its own markup, not
+    by "any !inline button" — the Down Sheet's DONE button is also guarded that
+    way, is unrelated, and made the first cut of this assertion fail on a
+    control that was never part of the problem. */
+ assert.equal(/\{!inline&&<button type="button" onClick=\{onClose\}>×<\/button>\}/.test(down),false,"the Down Sheet close button went with its header");
+ assert.equal(/\{!inline&&<button onClick=\{close\}>x<\/button>\}/.test(log),false,"the Defect Log close button went with its header");
+ assert.equal(/\{!inline&&<button type="button" onClick=\{close\} aria-label="Close settings">/.test(fixed),false,"the Fixed Repairs close button went with its header");
+ /* And the DONE button that IS still guarded stays guarded — it is the one
+    control here that legitimately belongs to the modal path only. */
+ assert.match(down,/\{!inline&&<button className="save-repair"/,"DONE is still modal-only");
+});
+
+test("a settings drawer follows the theme of the section it sits in",async()=>{
+ /* THE THIRD TIME THIS SHAPE HAS APPEARED. The Defect Log's own text kept
+    light-theme colours on the dark themes until the release before this one.
+    The drawers landed with the same defect one level up: DEFECT LOG and FIXED
+    REPAIRS render their section in the page's theme, three of the four themes
+    are dark, and the drawer header was pinned to a light #f1f5fb. Measured in
+    Chromium it came back rgb(241,245,251) on a rgb(16,19,24) section — a 17:1
+    jump between a control and the surface under it. Nothing was illegible,
+    which is exactly why reading the stylesheet did not catch it.
+
+    Deriving from the theme's own variables rather than pinning a second
+    palette is what stops it returning on a theme nobody has added yet, so the
+    assertion is that no drawer colour inside those two sections is a literal. */
+ const css=await readFile(new URL("../app/settings/settings.css",import.meta.url),"utf8");
+ for(const section of ["log","fixed"]){
+  const rules=css.split("\n").filter(line=>line.startsWith(".settings-section-"+section+" .settings-drawer"));
+  assert.ok(rules.length>=5,"the "+section+" section restyles its drawers ("+rules.length+" rules)");
+  for(const rule of rules){
+   const declarations=rule.slice(rule.indexOf("{")+1);
+   /* Every colour must come from a var(). A bare hex is allowed ONLY as the
+      fallback inside var(--x,#hex), which is how the fixed-repairs vars are
+      written everywhere else in this file. */
+   const literals=declarations.replace(/var\([^)]*\)/g,"").match(/#[0-9a-f]{3,8}/gi);
+   assert.equal(literals,null,"pinned colour "+literals+" in: "+rule.slice(0,90));
+  }
+ }
+ /* And the header must differ from the drawer body enough to read as a header,
+    which is why it is a mix toward the text/accent rather than the surface. */
+ assert.match(css,/\.settings-section-log \.settings-drawer-toggle\{background:color-mix\(in srgb,var\(--log-surface\) 90%,var\(--log-text\)\)/);
+});
+
+test("an imported helper is never called as a method on a record",async()=>{
+ /* HOVERING ANY BUS BLANKED THE FACILITY MAP, and it shipped — it was live as
+    Sites Version 173 until this commit.
+
+    The quick-view portal called `bus.isHeld(bus)`. There is no such method;
+    `isHeld` is a module import, used correctly as `isHeld(bus)` thirty
+    characters earlier in the same line for the token badge. Hovering threw
+    TypeError, React unmounted the root, and the board went blank until reload
+    — measured as tokens 2 -> 0 and document.body 90,569 -> 19,099 bytes.
+
+    NOTHING CAUGHT IT. eslint is not type-aware here, `vinext build` does not
+    typecheck, and 295 tests passed: the suite asserts on source text, and the
+    source text looked plausible. So the check has to be for the SHAPE — an
+    imported function invoked as a property of something else. */
+ const files=["app/page.tsx","app/defect-log/page.tsx","app/down-sheet/page.tsx",
+  "app/fixed-repairs/page.tsx","app/lists/page.tsx","app/settings/page.tsx",
+  "app/deferred-board.tsx","app/recommended-board.tsx","app/mystery-board.tsx","app/hold-board.tsx"];
+ for(const file of files){
+  const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
+  /* Every name brought in by a braced import, which is how this repo imports
+     helpers. Default imports are components and are not called this way. */
+  const imported=new Set();
+  for(const match of source.matchAll(/import\s*\{([^}]*)\}\s*from/g))
+   for(const part of match[1].split(","))
+    {const name=part.split(/\s+as\s+/).pop().trim().replace(/^type\s+/,"");if(/^[a-z]\w*$/.test(name))imported.add(name)}
+  for(const name of imported)
+   for(const hit of source.matchAll(new RegExp("([A-Za-z_$][\\w$]*)\\."+name+"\\s*\\(","g")))
+    assert.fail(file+" calls the imported helper `"+name+"` as a method: `"+hit[0]+"` — it takes the record as an argument, so this throws at runtime and unmounts the page");
+ }
+});
+
+test("the bus quick-view reads its flags the same way the token badge does",async()=>{
+ /* The second half of the same crash: a bare `deferredHeld`, undeclared in
+    that scope. `deferredHeld` is DERIVED per render at page.tsx — the stored
+    record's own value is overwritten — so the only correct reading is
+    `bus.deferredHeld`, which the token badge and the aria-label both use.
+    Pinning all three to the same spelling is what stops them drifting again. */
+ const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ const quick=page.slice(page.indexOf('className={"quick-view '));
+ assert.ok(quick.length>0,"the quick-view portal is still in this file");
+ assert.match(quick,/\{isHeld\(bus\)&&<span className="quick-detail bus-hold-detail-row"/);
+ assert.match(quick,/\{bus\.deferredHeld&&<span className="quick-detail deferred-held-detail"/);
+ assert.equal(/\{deferredHeld&&/.test(page),false,"a bare deferredHeld is not declared in that scope");
+ /* deferredHeld really is derived and really does overwrite the record. */
+ assert.match(page,/deferredHeld:deferredHeldSet\.has\(bus\.id\)/);
+});
+
+test("a hold rides MASTER EXPORT but never a share",async()=>{
+ /* Raised in review as a hole: the hold is stripped from the cloud and from a
+    section transfer, but MASTER EXPORT carries it. That is the intended
+    behaviour and the distinction is the point, so it is pinned here rather
+    than left to the next reader's judgement.
+
+    SHARING one person's instruction with everybody is what Curtis ruled out:
+    "If someone is asked to hold a bus (like bay 12 guy) then they should know.
+    It doesn't need to show up on everybody's screen." The Shop Cloud and a
+    section transfer both do that, so both are gated.
+
+    MASTER EXPORT is a device CLONE, not a share. It already carries the board,
+    Down Sheet and Defect Log settings, parts memory and findings memory —
+    every one per-device and never synced — and MASTER IMPORT is the one import
+    that REPLACES rather than merges. A foreman on a new phone should arrive
+    with the holds he was told about. */
+ const now="2026-09-11T12:00:00.000Z";
+ const hold={at:"2026-09-11T09:00:00.000Z",by:"CT"};
+ const bus={id:"b1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold};
+
+ /* The two shares drop it. */
+ const {exportFleetMapPayload}=await import("../app/section-transfer.ts");
+ assert.equal("hold" in exportFleetMapPayload([bus],now).buses[0],false,"a section transfer is a share");
+ const {busRow}=await import("../app/cloud-sync.ts");
+ assert.equal("hold" in busRow(bus,{initials:"CT",deviceLabel:"shop"},now).map_fields,false,"the Shop Cloud is a share");
+
+ /* The clone keeps it — asserted on the payload builder, which passes `buses`
+    through verbatim, and on the absence of any filter being added later. */
+ const source=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ assert.match(source,/payload=\{kind:"pace-south-fleet-board-backup",version:5,exportedAt:exportedAt\.toISOString\(\),buses,/,
+  "MASTER EXPORT passes the buses through unfiltered, holds included");
+ /* Checked against the CODE, not the comments: the comment below deliberately
+    names MAP_EXCLUDED to explain why it is not used here, and the first cut of
+    this assertion matched its own explanation. */
+ const code=source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.equal(/MAP_EXCLUDED|MAP_HELD_BACK|omit\(/.test(code),false,
+  "no filter has been added here — if one is, this distinction was broken by accident");
+ assert.match(source,/THIS FILE CARRIES A BUS'S `hold` AND THAT IS DELIBERATE/,
+  "and the reason is written where somebody would come to change it");
+});
+
+test("setHold does not offer to undo a write that was refused",async()=>{
+ /* Raised in review. `persist` returns a StorageWriteResult and returns early
+    when the write is refused — a full device, say — so setFleet never runs and
+    no HOLD badge appears. setHold called it and ignored the answer, having
+    ALREADY taken the undo snapshot, so UNDO LAST sat there offering to undo
+    "Put Bus 18505 on hold" — a change the board never took. Undoing it would
+    then write a fleet from before an edit that never happened.
+
+    The comment above setHold had claimed all along that "its result is read
+    rather than assumed". It was not. Both halves are fixed: the result is
+    read, and the snapshot moved BELOW it.
+
+    HONEST LIMIT: this asserts the source order, not a driven browser run. The
+    refused-write path could not be reached through the Defect Log UI here —
+    the seeded defect would not render a card — so what is guarded is the shape
+    that was wrong, which is the ordering. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const start=page.indexOf("const setHold=(busId:string");
+ assert.ok(start>0,"setHold is still in this file");
+ const body=page.slice(start,page.indexOf("\n };",start));
+ const persistAt=body.indexOf("persist(nextFleet,downEntries)");
+ const guardAt=body.indexOf("if(!written.ok)return");
+ const snapshotAt=body.indexOf("setUndoSnapshot(");
+ assert.ok(persistAt>0,"setHold still persists");
+ assert.ok(guardAt>persistAt,"the write result is read");
+ assert.ok(snapshotAt>guardAt,"and the undo snapshot is taken only AFTER the write is known to have landed");
+ assert.match(body,/const written=persist\(nextFleet,downEntries\);/);
+});
+
+test("wrapping the panels in drawers did not sever their child-combinator rules",async()=>{
+ /* Putting the settings groups inside <SettingsDrawers>/<SettingsDrawer> pushed
+    their contents one level deeper, and THREE `>` rules quietly stopped
+    matching. Nothing failed; the styling just evaporated. Measured in Chromium:
+    the DEFAULT INITIALS caption rendered display:block at the browser default
+    16px instead of an 8px all-caps flex column, the amber "Records live on this
+    device" note lost its border, background and padding entirely, and Fixed
+    Repairs' inner sections lost their border and padding so RESET LOOK sat flush
+    against the colour grid.
+
+    Then fixing those introduced a fourth: `.down-settings-body
+    .settings-drawer-body>label` is (0,2,1), which out-specifies
+    `.down-settings-body .settings-check` at (0,2,0), and SHOW COMPLETED became
+    a column. Every rule re-rooted through the drawer has to carry its
+    override with it.
+
+    The rule this encodes: a selector rooted at a panel body with a `>` must
+    also name the drawer body, or it describes a DOM that no longer exists. */
+ const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
+ const [down,fixed]=await Promise.all([
+  read("app/down-sheet/down-sheet.css"),read("app/fixed-repairs/fixed-repairs.css"),
+ ]);
+ assert.match(down,/\.down-settings-body>label,\.down-settings-body \.settings-drawer-body>label\{/);
+ assert.match(down,/\.down-settings-body>p,\.down-settings-body \.settings-drawer-body>p\{/);
+ assert.match(fixed,/\.fixed-settings>div>section,\.fixed-settings \.settings-drawer-body>section\{/);
+ /* And the override that the re-rooting out-specified, re-rooted to match. */
+ assert.match(down,/\.down-settings-body \.settings-check,\.down-settings-body \.settings-drawer-body>label\.settings-check\{flex-direction:row/);
+
+ /* No OTHER rule reaches through a bare `>` into content the drawers now wrap.
+    Only two roots are affected — `.down-settings-body>` and
+    `.fixed-settings>div>` — because those are the elements the drawers were
+    inserted directly beneath. `.fixed-settings>header` and `.log-settings>div`
+    are NOT affected: the drawers sit inside those, not around them, and an
+    earlier cut of this scan flagged `.fixed-settings>header span` for no
+    reason. */
+ for(const [css,file,root] of [[down,"down-sheet.css",".down-settings-body>"],[fixed,"fixed-repairs.css",".fixed-settings>div>"]])
+  for(const match of css.matchAll(new RegExp("^"+root.replace(/[.>]/g,ch=>"\\"+ch)+"[^,{\n]*","gm"))){
+   const full=css.slice(match.index,css.indexOf("{",match.index));
+   assert.ok(full.includes(".settings-drawer-body"),
+    file+" reaches through a bare `>` into drawer-wrapped content and will silently stop matching: "+match[0].trim());
+  }
 });

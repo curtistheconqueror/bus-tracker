@@ -62,7 +62,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
 }
 
 function defectText(defect:StructuredDefect){
- return [defect.category,defect.issue,...(defect.symptoms||[]),defect.details,defect.diagnosticNote,defect.actionTaken,defect.shopNotes].filter(Boolean).join(" ");
+ return [defect.category,defect.issue,...(defect.symptoms||[]),...(defect.fluids||[]),defect.details,defect.diagnosticNote,defect.actionTaken,defect.shopNotes].filter(Boolean).join(" ");
 }
 
 /* Whether a work-state stamp falls inside the road-call window. */

@@ -1,9 +1,16 @@
-import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,mergeReportAttempts,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
 import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
+/* The plain name of a parking space, for reports that leave the app. Lived on
+   the Defect Log page, then here; now re-exported from location-label.ts,
+   which is the one copy that knows a trouble bay from the rest of the garage.
+   Kept exported from here because every caller already imports it from this
+   module. */
+import {locationLabel} from "../location-label.ts";
+export {locationLabel};
 
 export type DefectLogFleetBus={
  id:string;n:string;s:FleetStatus;l:string;mechanic?:string;shift?:string;roadcall?:boolean;down?:boolean;
@@ -200,6 +207,16 @@ export function groupDefectLogRecords(records:DefectLogRecord[]):DefectLogBusGro
  return [...groups.values()].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/* Returns take the UNION of what is stored and what is being saved, rather than
+   letting the spread pick a winner. An editor opened before a return was
+   stamped carries the older, shorter list, and would otherwise overwrite the
+   stamp with its stale copy — losing a return silently, which is the one thing
+   a tally must never do. Absent stays absent so no fingerprint moves. */
+function attemptsPatch(existing:StructuredDefect|undefined,incoming:StructuredDefect){
+ const merged=mergeReportAttempts(existing?.reportAttempts,incoming.reportAttempts);
+ return merged.length?{reportAttempts:merged}:{};
+}
+
 export function saveDefectLogRecord(
  fleet:DefectLogFleetBus[],
  downEntries:DefectLogDownEntry[],
@@ -222,18 +239,28 @@ export function saveDefectLogRecord(
  const strayOn=busHoldingDefect(fleet,incoming.id,bus.id);
  const leaving=existing?undefined:strayOn;
  const state=incoming.state;
- /* workStates is taken from the incoming record rather than left to the
-   spread, because unticking the LAST box produces a defect with no workStates
-   KEY AT ALL - setDefectWorkState deletes it rather than leaving an undefined
-   behind, to keep stored records clean - and a missing key cannot override the
-   one `existing` still carries. Unticking your only ticked box therefore did
-   not stick: it came back on the next read.
+ /* THE TWO FIELDS THAT ARE DELETED RATHER THAN SET TO UNDEFINED are taken from
+   the incoming record instead of being left to the spread.
+
+   `{...existing,...incoming}` cannot express "this field is gone". Both
+   setDefectWorkState and setDownSheetRecommendation DELETE their key when the
+   last tick comes off — deliberately, to keep stored records clean — and a
+   missing key does not override the one `existing` still carries. So the value
+   came straight back on the next read and the untick looked like it had not
+   worked.
+
+   workStates was fixed when it was found; downSheetRecommendation had the same
+   bug and was found the same way, by driving the button in a browser and
+   reading the record back. Turning RECOMMEND FOR DOWN SHEET off did nothing
+   that survived a save — in the editor, and on the two surfaces that list
+   recommendations. Anything else added to repair-catalog.ts that deletes its
+   key belongs on this line too; grep it for `delete next.`.
 
    Every caller passes a complete defect built from the record it is editing,
-   never a partial patch, so reading this field straight off the incoming copy
-   is what the callers already mean. A future caller that passes a patch would
-   have to carry workStates with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
+   never a partial patch, so reading these straight off the incoming copy is
+   what the callers already mean. A future caller that passes a patch would
+   have to carry both fields with it. */
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;
@@ -304,12 +331,4 @@ export function syncLinkedDownEntriesFromFleet<T extends DefectLogDownEntry>(ent
   if(!changed)return entry;
   return {...entry,category:defect.category,repair:defect.issue,customReason:supportingDetails,workflow,operationalStatus:completed?roadServiceStatus({...bus,defects,pendingRepair:defectSummary(defects)}):defect.operability==="down"?"out":defect.state==="in-progress"?"shop":"defect",updatedAt:now,updatedBy:updatedBy||defect.reportedBy||entry.updatedBy,completedAt:completed?(entry.completedAt||now):"",history:[...(entry.history||[]),{at:now,initials:updatedBy||defect.reportedBy||"",action:completed?"Completed from Bus Settings":"Updated from Bus Settings"}]} as T;
  });
-}
-
-/* The plain name of a parking space, for reports that leave the app. Lived on
-   the Defect Log page; moved here so the report export can be built from the
-   shared Settings page as well. */
-export function locationLabel(location:string){
- const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
- const found=labels.find(([prefix])=>location.startsWith(prefix));return found?found[1]:location||"Location not set";
 }

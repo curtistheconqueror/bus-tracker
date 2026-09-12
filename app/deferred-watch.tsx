@@ -33,6 +33,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,RECORD
 import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
+import {locationLabel} from "./location-label";
 import {QUICK_FILTER_EVENT,quickFilterHref} from "./quick-filters";
 import {deferredBadgeCounts,heldDeferredBuses} from "./deferred-counts";
 import {answerDeferredBus} from "./deferred-actions";
@@ -41,11 +42,6 @@ import {SETTINGS_KEY as LOG_SETTINGS_KEY} from "./defect-log/defect-log-settings
 const REVIEW_MINUTES=60;
 const REVIEW_HOUR=20,REVIEW_MINUTE=30;
 const DISMISS_KEY="pace-deferred-review-dismissed-v1";
-
-function locationLabel(location:string){
- const labels:[string,string][]=[["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"]];
- return labels.find(([prefix])=>location.startsWith(prefix))?.[1]||location||"Location not set";
-}
 
 function readFleet():DefectLogFleetBus[]{
  if(typeof window==="undefined")return [];
