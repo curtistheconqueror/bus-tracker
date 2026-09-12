@@ -1,43 +1,42 @@
 # Publish next
 
-**STATUS: 173 IS LIVE from `3de6dab`, `main` still does not have it, and there
-is now UNPUBLISHED WORK ON TOP — build the next release from the branch head,
-not from `3de6dab`. PR #6 is still open.**
+**STATUS: 173 IS LIVE from `3de6dab`, and `main` NOW CONTAINS IT. There is
+UNPUBLISHED WORK ON TOP — build the next release from `main`'s head, not from
+`3de6dab`. PR #6 is MERGED.**
 
-## ⚠️ THE LIVE CODE IS NOT ON `main`
+## ✅ THE LIVE CODE IS ON `main` AGAIN
 
 Codex published `3de6dab` as **Sites Version 173** (the number went 171 → 173;
-172 was skipped). The build is live and passed all 291 tests, lint and build.
+172 was skipped). For three days `main` did not contain it — the site was
+serving code that existed only on `claude/codex-workflow-docs-fn9any`, and
+`RELEASES.md` says "Git commits remain the authoritative rollback points" while
+the commit this release was built from was not on the branch anybody would roll
+back to.
 
-At the time of writing, `main` is still `5a36d35` and `3de6dab` is **not an
-ancestor of it**. PR #6 is open, unmerged, mergeable-clean. So:
+That is resolved. Curtis asked for the merge; PR #6 was merged on 2026-09-12 as
+a **clean fast-forward**, `5a36d35..52ac1a9`. No commit was rewritten, so
+`3de6dab` still exists under its own hash and is still a valid rollback point.
+`main` is now `52ac1a9` and `claude-contributions` mirrors the same tree.
 
-- The site is serving code that exists only on
-  `claude/codex-workflow-docs-fn9any`.
-- `docs/PUBLISH_NEXT.md` **on main** still reads "NONE PENDING — 171 is live".
-- `docs/RELEASES.md` **on main** has no row for 173; its newest row is 171.
-- `RELEASES.md` says "Git commits remain the authoritative rollback points" —
-  and the commit this release was built from is not on the branch anybody would
-  roll back to.
-
-**The fix is to merge PR #6**, after which the 173 record belongs in
-`RELEASES.md` and `PROJECT_HANDOFF.md` and this file gets reset, all of which
-are Codex's to do. Nothing needs rebuilding: the published artifact is correct.
+**What is still Codex's to do:** the 173 record belongs in `docs/RELEASES.md`
+and `PROJECT_HANDOFF.md` — `RELEASES.md`'s newest row is still 171 — and this
+file gets reset after the next publish. Nothing needs rebuilding for 173
+itself: the published artifact is correct.
 
 This STATUS line is the one thing Claude keeps current, and it is deliberately
-NOT saying "172 is pending" any more — leaving that would have had the next
-session publish `3de6dab` a second time under a number that is already taken.
+NOT saying "172 is pending" — leaving that would have had the next session
+publish `3de6dab` a second time under a number that is already taken.
 
 ---
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Two changes landed on this branch AFTER `3de6dab` was published. **They are not
-live.** Whatever number comes next — 174 unless Codex has taken it — should be
-built from the branch head, not from `3de6dab`.
+Four commits landed AFTER `3de6dab` was published and are now on `main`.
+**They are not live.** Whatever number comes next — 174 unless Codex has taken
+it — should be built from `main`'s head, not from `3de6dab`.
 
 ```
-git log --oneline origin/main..HEAD --format="%h" -- app/ tests/ | head -1
+git log --oneline 3de6dab..origin/main -- app/ tests/
 ```
 
 ### 1. A HOLD is now DEVICE-LOCAL
