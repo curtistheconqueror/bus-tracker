@@ -31,13 +31,45 @@ publish `3de6dab` a second time under a number that is already taken.
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Four commits landed AFTER `3de6dab` was published and are now on `main`.
+Five commits landed AFTER `3de6dab` was published and are now on `main`.
 **They are not live.** Whatever number comes next — 174 unless Codex has taken
 it — should be built from `main`'s head, not from `3de6dab`.
 
 ```
 git log --oneline 3de6dab..origin/main -- app/ tests/
 ```
+
+### 0. A TRANSFER FILE NOW CARRIES REMOVALS
+
+A section transfer could only ever ADD to the receiving device. Every merge in
+this app keeps whatever only one side holds, and nothing in the file said a
+record had been taken off on purpose — so a sheet cleared on the phone could not
+be cleared on the iPad by file. Curtis, on a 50-entry sheet arriving at a device
+holding 60: *"what should happen is it just updates to what the phone is sending
+it."*
+
+Both exporters now include the tombstone ledger they own (`pace-cloud-merged-v1`
+for defects, `pace-cloud-removed-entries-v1` for sheet entries) and both
+importers apply it through the functions a cloud pull already uses —
+`dropTombstonedDefects` and `dropTombstonedEntries`, unchanged.
+
+Three things it needed beyond moving the ledgers:
+
+- **The receiver adopts the tombstones**, or the import undoes itself on the
+  next sync — the device drops the record, then its own pull hands it back.
+- **The bulk-loss guard is lifted for a tombstoned defect import**, keyed to
+  whether anything dropped, exactly as `applyCloudPull` does it. The guard
+  refuses a write losing five or more defects; the shop phone carries 49
+  tombstones, so left armed it would have refused the first real import.
+- **The import prompt stopped promising** "anything only on this device is
+  kept", which is now false for the two sections with a ledger. Still true for
+  the Fleet Map, which has none — a bus is moved, never removed.
+
+**No storage key changed.** Both ledgers already existed and are already pushed
+to the cloud; only the transfer file is new to carrying them. An older file
+still imports (the ledgers are optional, and a missing one makes the drop a
+no-op), and a file written by this version imports into an older app, which
+ignores keys it does not know.
 
 ### 1. A HOLD is now DEVICE-LOCAL
 
