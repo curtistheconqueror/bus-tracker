@@ -10340,6 +10340,113 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
+ const {buildScoreboard,scoreboardText,mysteryLabel,INSPECTION_SECTION,SCOREBOARD_ROAD_CALL_HOURS}=
+  await import("../app/fleet-scoreboard.ts");
+
+ const now="2026-09-13T18:00:00.000Z";
+ const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
+
+ /* The five sections actually on the shop's sheet, plus an Inspection - which
+    the live sheet has none of today, and which is exactly why it has to be in
+    the fixture rather than tested against real data. */
+ const fleet=[
+  {id:"b1",n:"17501",l:"bay-1",s:"defect",defects:[{id:"x1",category:"Brakes",issue:"Air leak",state:"open"}]},
+  {id:"b2",n:"17502",l:"bay-2",s:"defect",defects:[]},
+  {id:"b3",n:"17503",l:"bay-3",s:"defect",defects:[]},
+  /* On property, in a work area, nothing on the sheet: a mystery. */
+  {id:"b4",n:"17504",l:"east-1",s:"unknown",defects:[{id:"x4",category:"A/C and HVAC",issue:"No cooling",state:"open"}]},
+  {id:"b5",n:"17505",l:"west-1",s:"unknown",defects:[]},
+  /* Road call 6 hours ago and NOT on the sheet - the row somebody must chase. */
+  {id:"b6",n:"17506",l:"garage-1",s:"defect",roadCalls:[{at:hoursAgo(6)}],defects:[]},
+  /* Road call 6 hours ago and already written up. */
+  {id:"b7",n:"17507",l:"garage-2",s:"defect",roadCalls:[{at:hoursAgo(6)}],defects:[]},
+  /* Road call four days ago: outside the window, and must not appear. */
+  {id:"b8",n:"17508",l:"garage-3",s:"defect",roadCalls:[{at:hoursAgo(96)}],defects:[]},
+ ];
+ const entries=[
+  {busId:"b1",section:"Pending",workflow:"Scheduled"},
+  /* SAME BUS, second write-up. One downed bus, not two. */
+  {busId:"b1",section:"Scheduled Repair",workflow:"Scheduled"},
+  {busId:"b2",section:"Vendor Repair",workflow:"Scheduled"},
+  {busId:"b3",section:INSPECTION_SECTION,workflow:"Scheduled"},
+  {busId:"b7",section:"Roadcall",workflow:"Scheduled"},
+  /* Completed: off the sheet as far as every count goes. */
+  {busId:"b5",section:"Pending",workflow:"Completed"},
+ ];
+ const board=buildScoreboard(fleet,entries,now);
+
+ /* THE HEADLINE. b1 (twice), b2 and b7 are down; b3 is in for an inspection and
+    is not. Curtis: "the downed number normally does not count inspections." */
+ assert.equal(board.downed,3,"an inspection is not a downed bus, and one bus written up twice is one bus");
+ assert.equal(board.onSheet,4,"the sheet total still counts the inspection, so the two numbers can be reconciled");
+ assert.equal(board.inspections,1,"and the difference is named rather than left to be worked out");
+
+ /* A bus in for an inspection AND for brakes is DOWN - the brakes are what is
+    holding it, and the inspection must not subtract it. */
+ const alsoDown=buildScoreboard(fleet,[...entries,{busId:"b3",section:"Pending",workflow:"Scheduled"}],now);
+ assert.equal(alsoDown.downed,4,"an inspection alongside a real repair does not excuse the bus");
+ assert.equal(alsoDown.inspections,0,"and it stops counting as an inspection-only bus");
+
+ /* MYSTERY: on property, in a work area, nothing active on the sheet. b5's only
+    entry is Completed, so it is a mystery too. */
+ assert.deepEqual(board.mystery.map(bus=>bus.n),["17504","17505"],"sorted by fleet number, as somebody reads them");
+ assert.equal(board.mystery[0].note,"1 open repair");
+ assert.equal(board.mystery[1].note,"nothing logged","the most interesting row says so plainly");
+
+ /* Curtis's wording, and the reason for it: a mystery bus is an admission that
+    nobody has decided anything about it yet. */
+ assert.equal(mysteryLabel(2),"2 PENDING CONFIRMATION OF STATUS");
+ assert.equal(mysteryLabel(0),"0","at zero the caveat goes - a zero needs no hedge");
+
+ /* ROAD CALLS: the window is 48 hours and nothing older leaks in. */
+ assert.equal(SCOREBOARD_ROAD_CALL_HOURS,48);
+ assert.deepEqual(board.roadCalls.map(bus=>bus.n),["17506","17507"],"the four-day-old call is outside the window");
+ assert.deepEqual(board.roadCallsOffSheet.map(bus=>bus.n),["17506"],"and only the one nobody has written up needs chasing");
+
+ /* THE LOCK-SCREEN TEXT. */
+ const text=scoreboardText(board,{title:"PACE SOUTH"});
+ assert.match(text,/DOWNED BUSES\s+3/);
+ assert.match(text,/MYSTERY BUSES\s+2\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat sits under the number, not beside it - together they wrap on a phone");
+ assert.match(text,/ROAD CALLS \(48H\)\s+2/);
+ assert.match(text,/\* NOT ON THE SHEET \u2014 1/,"marked once against the row, counted once underneath");
+
+ /* Numbers for MYSTERY and ROAD CALLS only. Curtis: "not the entire downed bus
+    list" - thirty fleet numbers would bury the ones that need chasing. */
+ assert.ok(text.includes("17504")&&text.includes("17506"),"the two lists somebody must act on name their buses");
+ assert.equal(text.includes("17501"),false,"the downed list is a figure, not a roll call");
+ assert.equal(text.includes("17502"),false);
+
+ /* Defects are OFF by default and only arrive when asked for. */
+ assert.equal(text.includes("Brakes"),false,"the short version is the one that gets read");
+ const full=scoreboardText(board,{includeDefects:true});
+ assert.match(full,/A\/C and HVAC/,"and the checkbox brings the repairs in");
+
+ /* Every line has to survive a phone. */
+ const {SCOREBOARD_WIDTH}=await import("../app/fleet-scoreboard.ts");
+ for(const line of scoreboardText(board,{includeDefects:true,title:"PACE SOUTH"}).split("\n"))
+  assert.ok(line.length<=SCOREBOARD_WIDTH,"line too wide for a lock screen ("+line.length+"): "+line);
+
+ /* A long location gives up room before the note does, and a fleet number is
+    never cut - a truncated bus number is a wrong bus number. */
+ const wordy=buildScoreboard([{id:"w",n:"17588",l:"east-1",s:"unknown",
+  defects:[{id:"d",category:"Transmission and Drivetrain",issue:"Will not shift out of second",state:"open"}]}],[],now);
+ for(const line of scoreboardText(wordy,{includeDefects:true}).split("\n"))
+  assert.ok(line.length<=SCOREBOARD_WIDTH,"wordy record too wide ("+line.length+"): "+line);
+ assert.match(scoreboardText(wordy),/17588/,"and the number itself survives intact");
+
+ /* An empty shop reports zeroes rather than throwing. */
+ const quiet=buildScoreboard([],[],now);
+ assert.equal(quiet.downed,0);
+ assert.match(scoreboardText(quiet),/DOWNED BUSES\s+0/);
+
+ /* A record missing the fields defectLabel reads must not take the report down
+    at the moment somebody is standing there waiting for it. */
+ const thin=buildScoreboard([{id:"t",n:"17599",l:"east-2",s:"unknown",defects:[{id:"d"}]}],[],now);
+ assert.equal(thin.mystery.length,1);
+ assert.ok(scoreboardText(thin,{includeDefects:true}).length>0,"a thin defect record still renders");
+});
+
 test("a MYSTERY BUS card opens, because it already looked like it would",async()=>{
  const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
