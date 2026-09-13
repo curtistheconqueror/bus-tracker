@@ -4,6 +4,24 @@
 UNPUBLISHED WORK ON TOP — build the next release from `main`'s head, not from
 `3de6dab`. PR #6 is MERGED.**
 
+## PUBLISH SOON: THE LIVE BUILD CRASHES ON TOUCH
+
+**173 carries a crash that blanks the whole app, and the fix is sitting here
+unpublished.** `3de6dab` predates `b4460a3` and still contains
+`bus.isHeld(bus)` — an imported helper called as a method on the bus record, so
+`undefined(bus)` throws the moment a quick view renders. At a desk that fires
+on hover; on the shop's iPad and phone it fires on TOUCH, because
+`onPointerUp` opens the same quick view.
+
+Reported from the floor as *"if I touch a bus and hold it down the entire
+screen goes white ... when you bookmark it, there's no way to refresh, and it's
+just stuck."* Saved to a home screen there is no address bar and no
+pull-to-refresh, so the app is unusable until iOS kills it.
+
+Publishing the current head fixes it. It is also why `app/crash-guard.tsx` now
+exists: the crash is fixed, but nothing stopped the NEXT one stranding somebody
+the same way.
+
 ## ✅ THE LIVE CODE IS ON `main` AGAIN
 
 Codex published `3de6dab` as **Sites Version 173** (the number went 171 → 173;
@@ -31,7 +49,7 @@ publish `3de6dab` a second time under a number that is already taken.
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Five commits landed AFTER `3de6dab` was published and are now on `main`.
+Seven commits landed AFTER `3de6dab` was published and are now on `main`.
 **They are not live.** Whatever number comes next — 174 unless Codex has taken
 it — should be built from `main`'s head, not from `3de6dab`.
 
