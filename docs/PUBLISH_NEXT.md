@@ -49,13 +49,28 @@ publish `3de6dab` a second time under a number that is already taken.
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Seven commits landed AFTER `3de6dab` was published and are now on `main`.
+Eleven commits landed AFTER `3de6dab` was published and are now on `main`.
 **They are not live.** Whatever number comes next — 174 unless Codex has taken
 it — should be built from `main`'s head, not from `3de6dab`.
 
 ```
 git log --oneline 3de6dab..origin/main -- app/ tests/
 ```
+
+### 0a. THE FLEET SCOREBOARD AND FULL SWEEP
+
+A SCOREBOARD button on the Down Sheet produces the four answers a
+superintendent asks for — downed buses, inspections, mystery buses, road calls
+in the last 36 hours — in two versions, with the message version shown in full
+before anything is sent. No PDF library: it prints through a same-document
+iframe, because in standalone mode a popup leaves the app for Safari.
+
+FULL SWEEP is a device-local mode (`pace-sweep-v1`, documented in CLAUDE.md)
+that the Facility Map and the Down Sheet's scan prompt can both start, in
+either order. Ending it offers the Scoreboard.
+
+DOWNED excludes inspections, which is the shop's own definition and matches
+what `down-sheet-replace.ts` already did with omitted inspections.
 
 ### 0. A TRANSFER FILE NOW CARRIES REMOVALS
 

@@ -10345,6 +10345,81 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("FULL SWEEP is a state either surface can start, and ending it offers the report",async()=>{
+ const {readSweep,startSweep,endSweep,sweepLabel,sweepMinutes,SWEEP_MAX_HOURS,SWEEP_STORAGE_KEY}=
+  await import("../app/facility-sweep.ts");
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+
+ const store=new Map();
+ const storage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>{store.set(k,String(v))},removeItem:k=>{store.delete(k)}};
+ const at=h=>new Date(Date.UTC(2026,8,14,h,0,0)).toISOString();
+
+ /* A STATE, NOT A SEQUENCE. Curtis does these in either order - "if a foreman
+    or someone else decide to do the facility map sweep first and then upload
+    the down sheet that could be a thing" - so one flag, either surface. */
+ assert.equal(readSweep(storage,at(7)),null,"nothing on a fresh device");
+ const begun=startSweep(storage,"map",at(7));
+ assert.equal(begun.startedFrom,"map");
+ assert.equal(readSweep(storage,at(7)).startedAt,at(7));
+
+ /* STARTING AGAIN FROM THE OTHER SURFACE MUST NOT RESET THE CLOCK. The walk
+    began when it began, and the scan prompt firing mid-walk is exactly the
+    case that would otherwise restart it. */
+ const again=startSweep(storage,"scan",at(8));
+ assert.equal(again.startedAt,at(7),"the original start time survives");
+ assert.equal(again.startedFrom,"map");
+
+ /* How long somebody has been at it, which is what they want off the banner. */
+ assert.equal(sweepMinutes(readSweep(storage,at(8)),at(8)),60);
+ assert.equal(sweepLabel(readSweep(storage,at(8)),at(8)),"1h");
+ assert.equal(sweepLabel(begun,at(7)),"just started");
+
+ /* A WALK SOMEBODY NEVER ENDED. The app cannot tell a foreman who went home
+    from one still out there, so it takes the reading that cannot mislead. */
+ assert.equal(readSweep(storage,at(7+SWEEP_MAX_HOURS)),null,"expired at read time");
+ assert.ok(storage.getItem(SWEEP_STORAGE_KEY),"and the record is left alone - a read must not be a write");
+
+ assert.equal(endSweep(storage),true);
+ assert.equal(storage.getItem(SWEEP_STORAGE_KEY),null);
+ assert.equal(readSweep(storage,at(7)),null);
+
+ /* Junk must not take the map down with it. */
+ storage.setItem(SWEEP_STORAGE_KEY,"{not json");
+ assert.equal(readSweep(storage,at(7)),null);
+ storage.setItem(SWEEP_STORAGE_KEY,JSON.stringify({startedAt:"whenever"}));
+ assert.equal(readSweep(storage,at(7)),null,"an unreadable start time is not a sweep");
+
+ /* IT HOLDS NO FLEET DATA - only when the walk began and where from - so
+    starting or ending one can never lose anybody's work. */
+ const shape=Object.keys(JSON.parse(JSON.stringify(startSweep(storage,"scan",at(9)))));
+ assert.deepEqual(shape.sort(),["startedAt","startedFrom"]);
+
+ /* THE MAP SIDE. Ending the walk offers the report: finishing the walk and
+    producing the answer are one act, and the report is what the walk was for. */
+ assert.match(map,/endSweep\(localStorage\);\s*setSweep\(null\);/);
+ assert.match(map,/setSweepScoreboard\(true\)/);
+ assert.match(map,/className=\{"sweep-command"/);
+ assert.match(map,/\{sweep&&<div className="sweep-banner"/,"a mode has to stay on screen while somebody scrolls the facility");
+
+ /* THE BUG THIS TEST EXISTS FOR. The Facility Map has never carried Down Sheet
+    ENTRIES - only activeDownIds, which is membership - and the Scoreboard needs
+    the entries to tell a downed bus from an inspection. Handed an empty array
+    it reported DOWNED 0 with total confidence, which is worse than no report:
+    a zero reads as good news. */
+ assert.match(map,/setSweepEntries\(readDownSheetPayload<unknown>\(localStorage\.getItem\(DOWN_KEY\)\)\.entries\)/,
+  "the sheet is read from storage when the report opens");
+ assert.equal(/entries=\{\[\] as never\}/.test(map),false,"and never handed an empty sheet");
+
+ /* THE SCAN SIDE. Asked AFTER the import - the scan is what the person came to
+    do - and only when not already sweeping, because a prompt that appears
+    mid-walk to ask whether you are walking is one people learn to dismiss. */
+ assert.match(scanner,/onImport\(imports\);[\s\S]{0,900}?if\(!readSweep\(localStorage\)&&confirm\(/,
+  "asked after the import, and only when not already mid-sweep");
+ assert.match(scanner,/full sweep of the facility for bus count/);
+ assert.match(scanner,/startSweep\(localStorage,"scan"\)/);
+});
+
 test("the SCOREBOARD sends either version, and both tell the same story",async()=>{
  const {buildScoreboard,scoreboardText}=await import("../app/fleet-scoreboard.ts");
  const {scoreboardPrintHtml}=await import("../app/fleet-scoreboard-print.ts");

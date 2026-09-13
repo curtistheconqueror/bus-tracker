@@ -1245,3 +1245,18 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
  .bus-hold-row{grid-template-columns:52px minmax(0,1fr)}
  .bus-hold-elapsed{grid-column:2}
 }
+/* FULL SWEEP. Fixed above the command bar, which is itself fixed — a mode
+   somebody is walking around in has to stay on screen while they scroll the
+   facility, or they lose track of being in it. */
+.sweep-command{height:28px;border:1px solid #f97316;border-radius:4px;background:transparent;color:#f97316;padding:0 11px;font-size:9px;font-weight:900;letter-spacing:.06em;white-space:nowrap}
+.sweep-command.sweeping{background:#f97316;color:#0b1020}
+.sweep-banner{position:fixed;bottom:52px;left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:10px;max-width:min(94vw,560px);padding:8px 12px;border-radius:7px;border:2px solid #f97316;background:linear-gradient(#3a2208,#1d1205);color:#ffe6cf;box-shadow:0 4px 16px #0007}
+.sweep-banner b{font-size:11px;font-weight:900;letter-spacing:.1em;color:#f97316;white-space:nowrap}
+.sweep-banner span{font-size:10px;font-weight:700;line-height:1.35;min-width:0}
+.sweep-banner>button{min-height:34px;height:auto;border:0;border-radius:5px;background:#f97316;color:#231205;padding:0 12px;font-size:10px;font-weight:900;letter-spacing:.05em;white-space:nowrap;cursor:pointer;margin-left:auto}
+.sweep-banner>button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media(max-width:620px){
+ .sweep-banner{flex-wrap:wrap;bottom:58px;gap:6px 10px;padding:8px 10px}
+ .sweep-banner span{flex:1 1 100%;order:3}
+ .sweep-banner>button{min-height:38px}
+}
