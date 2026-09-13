@@ -10340,6 +10340,49 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("a MYSTERY BUS card opens, because it already looked like it would",async()=>{
+ const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+
+ /* The card carried cursor:pointer, border:0 and text-align:left — every
+    property you give a button — on a <div> that did nothing. Curtis: "I can't
+    click on any of them to get any other details about them." A row that looks
+    pressable and is not is worse than one that looks inert. */
+ assert.match(board,/<button className="mystery-card-main" type="button" aria-expanded=\{open\} aria-controls=/,
+  "the card main is a real button, not a div with a click handler");
+ assert.equal(/<div className="mystery-card-main"/.test(board),false,"and the div it used to be is gone");
+ assert.match(css,/\.mystery-card-main\{[^}]*cursor:pointer/,"the styling that made it look pressable is still there");
+
+ /* height:auto looks redundant beside display:grid and is not: a bare <button>
+    takes a height from the user agent, and this card has to grow with the panel
+    it opens. Same class of trap as the bare header{height:38px} rule. */
+ assert.match(css,/\.mystery-card-main\{width:100%;height:auto;/,"a button needs its UA height undone to grow with its panel");
+
+ /* It expands IN PLACE. The person reading this board is walking the facility
+    with a phone, working down a list of buses nobody can account for;
+    navigating away costs them their place in it. */
+ assert.match(board,/id=\{"mystery-detail-"\+bus\.id\} className="mystery-detail"|className="mystery-card-detail" id=\{"mystery-detail-"\+bus\.id\}/,
+  "the panel is a sibling of the button, addressed by aria-controls");
+ assert.equal(/router\.push|<a href=/.test(board),false,"opening a card must not navigate away from the list");
+
+ /* One at a time: several open at once turns the board back into the wall of
+    text the collapse exists to prevent. */
+ assert.match(board,/setOpenBusId\(open\?"":bus\.id\)/,"opening one card closes the one before it");
+
+ /* A mystery bus with NOTHING logged is the most interesting row on the board —
+    on property with nothing at all explaining why — so that line is an answer,
+    not an empty state. */
+ assert.match(board,/Nothing is logged against this bus\./);
+ assert.equal(/No defects found|None|n\/a/i.test(board.split("mystery-detail-none")[1]?.slice(0,120)||""),false,
+  "and it is not worded as an error");
+
+ /* defectLabel wants a whole defect; a record written by an older version can
+    be missing any field, and a board that throws takes the Down Sheet with it —
+    which is how a bus hover once blanked the Facility Map. */
+ assert.match(board,/const whole=\{category:"",issue:"",details:"",operability:"unknown",state:"open",\.\.\.defect\}/,
+  "a partial defect is filled in rather than trusted");
+});
+
 test("a transfer file carries removals, so an import can make the other device MATCH rather than only grow",async()=>{
  const {exportDownSheetPayload,exportDefectLogPayload,mergeDownSheet,mergeDefectLog,mergeSummary,TRANSFER_KINDS}=await import("../app/section-transfer.ts");
  const {dropTombstonedEntries,dropTombstonedDefects}=await import("../app/cloud-live.ts");
