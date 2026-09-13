@@ -10347,7 +10347,19 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
 
  /* Curtis: "the hours entered field is janky and doesn't allow u to just
-    simply erase all the numbers and the decimal point." */
+    simply erase all the numbers and the decimal point."
+
+    MEASURED IN CHROMIUM at 390px, driving the real ESTIMATED HOURS box on the
+    Down Sheet one keystroke at a time. The box now reports type="text" and the
+    trace reads:
+
+      1        -> "1"
+      .        -> "1."     (previously snapped back to 0.5)
+      5        -> "1.5"    (previously 15 on the Defect Log)
+      <- x4    -> "1." "1" "" ""   (previously stuck at 0.5)
+
+    The same run confirmed ADD DOWN BUS opens with {value:"", text:"Select
+    bus"} rather than a bus chosen by array order. */
 
  /* EMPTY IS NOT ZERO. An unrecorded hour is not the claim that it took none. */
  assert.equal(parseHours(""),undefined);
