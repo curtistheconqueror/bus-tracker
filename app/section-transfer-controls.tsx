@@ -33,8 +33,18 @@ export default function SectionTransferControls({kind,buildPayload,applyPayload}
   if(!read.ok){setStatus("");alert(read.error);return}
   /* Named rather than counted, because "import 12 buses" reads like a number of
      records while the thing being asked is whether to let another device's work
-     land on this one. */
-  if(!confirm("Import this "+label+" from another device?\n\nRecords both devices have will take the incoming version. Anything only on this device is kept."))return;
+     land on this one.
+
+     The second line differs by section and has to. A Defect Log or Down Sheet
+     file now carries the sender's tombstones, so importing one CAN take records
+     off this device — and a prompt that still said "anything only on this device
+     is kept" would be asking for consent to something other than what happens.
+     A Fleet Map file carries no tombstones, because a bus is moved and never
+     removed, so that promise is still true there and is still made. */
+  const removalNote=TRANSFER_KINDS[kind].carriesRemovals
+   ?"Records both devices have will take the incoming version, and records the other device REMOVED will be taken off this one. Anything else only on this device is kept."
+   :"Records both devices have will take the incoming version. Anything only on this device is kept.";
+  if(!confirm("Import this "+label+" from another device?\n\n"+removalNote))return;
   setStatus(applyPayload(read.payload));
  };
 
@@ -42,6 +52,6 @@ export default function SectionTransferControls({kind,buildPayload,applyPayload}
   <button type="button" onClick={exportSection}>EXPORT {label.toUpperCase()}</button>
   <button type="button" onClick={()=>fileRef.current?.click()}>IMPORT {label.toUpperCase()}</button>
   <input ref={fileRef} type="file" accept="application/json,.json" onChange={importSection} hidden/>
-  <small>Moves only the {label} between devices. Records both devices have take the incoming version; anything only here is kept.{status?" — "+status:""}</small>
+  <small>Moves only the {label} between devices. Records both devices have take the incoming version; {TRANSFER_KINDS[kind].carriesRemovals?"records the other device removed are taken off here too, and anything else only here is kept":"anything only here is kept"}.{status?" — "+status:""}</small>
  </div>;
 }

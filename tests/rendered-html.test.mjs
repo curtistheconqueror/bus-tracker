@@ -3690,8 +3690,63 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  assert.match(page,/<SectionTransferControls kind="down-sheet"/);
  assert.equal(/SectionTransferControls/.test(logPage),false);
  assert.equal(/SectionTransferControls/.test(downPage),false);
- assert.match(page,/persist\(buses as SettingsBus\[\],downEntries\)\.ok\?mergeSummary\("defect-log",merged\):refused/);
- assert.match(page,/persist\(reconcileDownSheetMembership\(fleet,active\),entries\)\.ok\?mergeSummary\("down-sheet",merged\):refused/,"an imported sheet marks its buses down on the map at once");
+ assert.match(page,/if\(!persist\(after\.buses as SettingsBus\[\],downEntries,\{[^}]*\}\)\.ok\)return refused;/,"a refused Defect Log import says so instead of claiming a merge");
+ assert.match(page,/if\(!persist\(reconcileDownSheetMembership\(fleet,active\),entries\)\.ok\)return refused;/,"an imported sheet marks its buses down on the map at once, and a refused write says so");
+
+ /* THE TOMBSTONE LEDGERS TRAVEL ON A TRANSFER FILE.
+
+    Without them an import could only ever ADD, so a sheet cleared on the phone
+    could never be cleared on the iPad by file — the receiver keeps whatever only
+    it has, by design, and "missing" never meant "deleted". */
+ assert.match(page,/exportDefectLogPayload\(fleet,undefined,readMergedAway\(localStorage\)\)/,"the Defect Log export carries what this device folded away");
+ assert.match(page,/exportDownSheetPayload\(downEntries,undefined,readRemovedEntries\(localStorage\)\)/,"the Down Sheet export carries what this device took off");
+
+ /* Dropped AFTER the merge, never before: the records that have to go are the
+    ones the merge has just put back, and the receiver's own stale copy is the
+    half that filtering the incoming payload alone would miss. */
+ assert.match(page,/mergeDefectLog\(fleet,payload\);[\s\S]{0,900}?dropTombstonedDefects\(buses,payload\.deleted\)/,"defect tombstones are applied after the merge");
+ assert.match(page,/mergeDownSheet\(downEntries,payload,fleet\);[\s\S]{0,600}?dropTombstonedEntries\(/,"entry tombstones are applied after the merge");
+
+ /* Membership is reconciled from what SURVIVED the drop. From the merged list
+    instead, a removed entry leaves its bus flagged down — and the Down Sheet
+    mints a brand new entry for a bus marked down with nothing behind it, under
+    an id nothing has tombstoned, so the removal returns under another name. */
+ assert.match(page,/const entries=after\.entries as typeof mergedEntries;/,"the surviving entries are what the rest of the handler uses");
+
+ /* THE GUARD HAS TO BE LIFTED FOR A TOMBSTONED IMPORT, and only there.
+
+    writeFleetStorage refuses any write that drops five or more defects. That is
+    right everywhere else and exactly wrong here: a merge cannot lose a record,
+    so the only subtraction is the tombstones, and those are a confirmed removal
+    from another device. Left armed, the import this feature exists for would be
+    refused outright — the phone in the shop carries 49 defect tombstones. */
+ assert.match(page,/persist\(after\.buses as SettingsBus\[\],downEntries,\{allowBulkDefectLoss:after\.dropped\.length>0\}\)/,"a tombstoned Defect Log import is allowed past the bulk-loss guard");
+ assert.equal(/reconcileDownSheetMembership\(fleet,active\),entries,\{allowBulkDefectLoss/.test(page),false,"the sheet import drops entries, not defects, so its guard stays armed");
+
+ /* And the flag is load-bearing rather than decorative: the same write is
+    refused without it and accepted with it. */
+ {
+  const {writeFleetStorageResult,FLEET_STORAGE_KEY}=await import("../app/storage.ts");
+  const withDefects=count=>[{id:"b1",n:"17549",defects:Array.from({length:count},(unused,index)=>({id:"d"+index}))}];
+  const store=new Map();
+  const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))}};
+  assert.ok(writeFleetStorageResult(storage,withDefects(9)).ok,"the first write lands");
+  const warn=console.warn;console.warn=()=>{};
+  try{
+   assert.equal(writeFleetStorageResult(storage,withDefects(3)).reason,"bulk-loss","six defects gone is refused by default");
+   assert.ok(writeFleetStorageResult(storage,withDefects(3),{allowBulkDefectLoss:true}).ok,"and allowed when the caller says the loss is a confirmed removal");
+  }finally{console.warn=warn}
+  assert.ok(String(storage.getItem(FLEET_STORAGE_KEY)).includes("17549"));
+ }
+
+ /* Adopted only once the board is actually saved. A ledger written before a
+    refused write would leave this device refusing records it never removed. */
+ for(const [ledger,reader,writer] of [["defect","readMergedAway","writeMergedAway"],["entry","readRemovedEntries","writeRemovedEntries"]]){
+  const at=page.indexOf(writer+"(localStorage,adoptTombstones(");
+  assert.ok(at>0,"the "+ledger+" ledger adopts the tombstones that arrived");
+  assert.ok(page.lastIndexOf("return refused;",at)>0,"the "+ledger+" ledger is written only after the save is checked");
+  assert.ok(page.includes(writer+"(localStorage,adoptTombstones("+reader+"(localStorage),payload."),"the "+ledger+" ledger merges rather than replaces");
+ }
 
  const response=await render("/settings");
  assert.equal(response.status,200);
@@ -10283,6 +10338,82 @@ test("the handoff files stay true: every storage key is documented, and the entr
  // PUBLISH_NEXT.md is only useful if its first job — saying what is pending — is done.
  assert.match(publishNext,/^\*\*STATUS: /m,"PUBLISH_NEXT.md must open with a STATUS line");
  assert.ok(readme.length>0);
+});
+
+test("a transfer file carries removals, so an import can make the other device MATCH rather than only grow",async()=>{
+ const {exportDownSheetPayload,exportDefectLogPayload,mergeDownSheet,mergeDefectLog,mergeSummary,TRANSFER_KINDS}=await import("../app/section-transfer.ts");
+ const {dropTombstonedEntries,dropTombstonedDefects}=await import("../app/cloud-live.ts");
+ const {adoptTombstones,trimTombstoneLedger,REMOVED_ENTRY_LEDGER_LIMIT}=await import("../app/cloud-sync.ts");
+
+ /* THE CASE FROM THE FLOOR. The phone's sheet has 2 entries; the iPad's has
+    those 2 plus a third the phone took off this morning. Curtis expected the
+    import to leave the iPad matching the phone, and before the ledger travelled
+    it could not: every merge in this app keeps whatever only the receiver has. */
+ const sender=[{id:"e1",busId:"b1",workflow:"Open",updatedAt:"2026-09-13T10:00:00.000Z"},
+               {id:"e2",busId:"b2",workflow:"Open",updatedAt:"2026-09-13T10:00:00.000Z"}];
+ const receiver=[...sender.map(entry=>({...entry})),
+                 {id:"e3",busId:"b3",workflow:"Open",updatedAt:"2026-09-13T09:00:00.000Z"}];
+ const removedOnSender={e3:"2026-09-13T09:30:00.000Z"};
+
+ const payload=exportDownSheetPayload(sender,"2026-09-13T11:00:00.000Z",removedOnSender);
+ assert.deepEqual(payload.removedEntries,removedOnSender,"the export carries the ledger");
+
+ const {entries:merged,report}=mergeDownSheet(receiver,payload,[]);
+ assert.equal(merged.length,3,"the merge alone still keeps the receiver's extra entry");
+ const after=dropTombstonedEntries(merged,payload.removedEntries);
+ assert.equal(after.entries.length,2,"and the tombstone is what takes it off");
+ assert.deepEqual(after.dropped,["e3"]);
+ assert.match(mergeSummary("down-sheet",report,after.dropped.length),/1 removed/,"the summary says a record LEFT");
+
+ /* Work done on this device AFTER the other one removed the entry is real work,
+    and it wins. Losing it silently is the one outcome worse than a stale row. */
+ const editedLater=[{id:"e3",busId:"b3",workflow:"Open",updatedAt:"2026-09-13T10:45:00.000Z"}];
+ assert.equal(dropTombstonedEntries(editedLater,removedOnSender).entries.length,1,
+  "an entry edited after the removal survives it");
+
+ /* An OLD file, written before ledgers travelled, must still import. */
+ const legacy=exportDownSheetPayload(sender,"2026-09-13T11:00:00.000Z");
+ assert.equal("removedEntries" in legacy,false,"no removals means no key, so the file looks exactly as it always did");
+ assert.equal(dropTombstonedEntries(merged,legacy.removedEntries).entries.length,3,"and it takes nothing away");
+
+ /* The Defect Log half, same rules. */
+ const buses=[{id:"b1",n:"17549",defects:[{id:"d1",updatedAt:"2026-09-13T08:00:00.000Z"},{id:"d2",updatedAt:"2026-09-13T08:00:00.000Z"}],pendingRepair:""}];
+ const logPayload=exportDefectLogPayload(buses,"2026-09-13T11:00:00.000Z",{d2:"2026-09-13T09:00:00.000Z"});
+ assert.deepEqual(logPayload.deleted,{d2:"2026-09-13T09:00:00.000Z"});
+ const {buses:logMerged}=mergeDefectLog(buses.map(bus=>({...bus,defects:bus.defects.map(d=>({...d}))})),logPayload);
+ const logAfter=dropTombstonedDefects(logMerged,logPayload.deleted);
+ assert.equal(logAfter.buses[0].defects.length,1,"a defect the other device folded away is taken off here too");
+
+ /* The FLEET MAP carries none, and must not start: a bus is moved, never
+    removed, so a map import genuinely cannot take anything away. */
+ assert.equal(TRANSFER_KINDS["fleet-map"].carriesRemovals,false);
+ assert.equal(TRANSFER_KINDS["down-sheet"].carriesRemovals,true);
+ assert.equal(TRANSFER_KINDS["defect-log"].carriesRemovals,true);
+
+ /* ADOPTING what arrived. Without this the import undoes itself: the receiver
+    drops the record, then its next cloud pull hands it straight back. */
+ assert.deepEqual(adoptTombstones({a:"2026-09-13T10:00:00.000Z"},{b:"2026-09-13T11:00:00.000Z"}),
+  {a:"2026-09-13T10:00:00.000Z",b:"2026-09-13T11:00:00.000Z"},"incoming tombstones join the ones already held");
+ assert.deepEqual(adoptTombstones({a:"2026-09-13T10:00:00.000Z"},undefined),{a:"2026-09-13T10:00:00.000Z"},"a file with no ledger changes nothing");
+
+ /* Each id keeps its OWN time rather than being stamped now, and where both
+    sides name one, the EARLIER wins — the more conservative of the two, because
+    a local record edited after that moment still out-dates it and survives. */
+ assert.deepEqual(adoptTombstones({a:"2026-09-13T12:00:00.000Z"},{a:"2026-09-13T10:00:00.000Z"}),
+  {a:"2026-09-13T10:00:00.000Z"},"the earlier removal time wins");
+ assert.deepEqual(adoptTombstones({a:"2026-09-13T10:00:00.000Z"},{a:"2026-09-13T12:00:00.000Z"}),
+  {a:"2026-09-13T10:00:00.000Z"},"and is kept when it is the one already held");
+ assert.deepEqual(adoptTombstones({},{bad:"not a date"}),{},"an unreadable stamp is refused rather than stored");
+
+ /* Bounded, for the same reason the ledger has always been: this app's storage
+    is shared with a four-hundred-bus board that must never be what fails to save. */
+ const oversized={};
+ for(let index=0;index<REMOVED_ENTRY_LEDGER_LIMIT+50;index++)
+  oversized["e"+index]=new Date(Date.UTC(2026,0,1)+index*1000).toISOString();
+ const trimmed=trimTombstoneLedger(oversized);
+ assert.equal(Object.keys(trimmed).length,REMOVED_ENTRY_LEDGER_LIMIT,"the ledger is held to its limit");
+ assert.equal("e0" in trimmed,false,"oldest dropped first — an un-pushed tombstone is one of the newest");
+ assert.ok("e"+(REMOVED_ENTRY_LEDGER_LIMIT+49) in trimmed,"and the newest is kept");
 });
 
 test("REFRESH is on every page, because a home-screen app has no address bar to reload from",async()=>{

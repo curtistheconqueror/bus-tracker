@@ -531,19 +531,62 @@ export function writeRemovedEntries(storage:StorageWriter,removed:RemovedEntries
 
 /* Record a removal. Returns the ledger it wrote, so a caller that needs to push
    immediately does not have to read it back. */
+/* Hold a tombstone ledger to its limit.
+
+   Oldest dropped first, which is the safe end: an un-pushed tombstone is by
+   definition one of the newest, and anything old enough to fall off here landed
+   on the server days ago and is kept there.
+
+   Shared by every writer of a ledger rather than written out at each one. Both
+   ledgers are the same shape and the same size problem, and a trim that applied
+   in one place and not another would be a leak nobody noticed until a board
+   failed to save. */
+export function trimTombstoneLedger<T extends Record<string,string>>(ledger:T):T{
+ const keys=Object.keys(ledger);
+ if(keys.length<=REMOVED_ENTRY_LEDGER_LIMIT)return ledger;
+ const next={...ledger} as T;
+ keys.sort((a,b)=>(Date.parse(ledger[a])||0)-(Date.parse(ledger[b])||0));
+ for(const key of keys.slice(0,keys.length-REMOVED_ENTRY_LEDGER_LIMIT))delete next[key];
+ return next;
+}
+
+/* Fold tombstones that arrived on a TRANSFER FILE into this device's own ledger.
+
+   Without this, a file import quietly undoes itself. The receiver drops the
+   records the sender removed — and then its next cloud PULL hands them straight
+   back, because the server may still hold them live and every merge in this app
+   keeps whatever only one side has. A removal that travelled by file has to be
+   written down for exactly the reason a removal made on this device is: absence
+   is not evidence, so the refusal has to be recorded somewhere.
+
+   Each id keeps its OWN removal time rather than being stamped now. That time is
+   what dropTombstonedEntries measures a local edit against, so re-stamping would
+   silently widen the deletion to cover work done in between.
+
+   Where both ledgers name the same id, the EARLIER time wins. It is the more
+   conservative of the two: an earlier tombstone is easier for a local record to
+   out-date, so work done on this device after that moment survives. */
+export function adoptTombstones<T extends Record<string,string>>(existing:T,incoming:Record<string,string>|undefined):T{
+ if(!incoming)return existing;
+ const next={...existing} as T;
+ let changed=false;
+ for(const [rawId,rawAt] of Object.entries(incoming)){
+  const id=clean(rawId),at=clean(rawAt);
+  if(!id||!at||!Number.isFinite(Date.parse(at)))continue;
+  const held=next[id];
+  if(held&&Number.isFinite(Date.parse(held))&&Date.parse(held)<=Date.parse(at))continue;
+  (next as Record<string,string>)[id]=at;
+  changed=true;
+ }
+ return changed?trimTombstoneLedger(next):existing;
+}
+
 export function rememberRemovedEntries(storage:StorageWriter,ids:Iterable<string>,at:string):RemovedEntries{
  const next={...readRemovedEntries(storage)};
  for(const id of ids){const key=clean(id);if(key)next[key]=at}
- const keys=Object.keys(next);
- if(keys.length>REMOVED_ENTRY_LEDGER_LIMIT){
-  /* Oldest dropped first, which is the safe end: an un-pushed tombstone is by
-     definition one of the newest, and anything old enough to fall off here
-     landed on the server days ago and is kept there. */
-  keys.sort((a,b)=>(Date.parse(next[a])||0)-(Date.parse(next[b])||0));
-  for(const key of keys.slice(0,keys.length-REMOVED_ENTRY_LEDGER_LIMIT))delete next[key];
- }
- writeRemovedEntries(storage,next);
- return next;
+ const trimmed=trimTombstoneLedger(next);
+ writeRemovedEntries(storage,trimmed);
+ return trimmed;
 }
 
 /* Take entries back off the ledger — UNDO CLEAR and UNDO IMPORT. An id that was
