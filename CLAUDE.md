@@ -148,6 +148,7 @@ undo and recovery, never synced
   pace-down-sheet-entry-undo-v1    PUT BACK, for one deleted Down Sheet row
   pace-scan-batch-undo-v1          PUT BACK, for a Defect Log scan sweep
   pace-facility-defect-clear-undo-v1  UNDO MAP CLEANUP
+  pace-crash-report-v1             the last render error, for the next session
 
 the cloud's bookkeeping, per device
   pace-cloud-config-v1             project, account, initials, device label
@@ -177,6 +178,15 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
+each time. A render error unmounts the whole tree, and saved to a home screen
+there is no address bar, no reload button and no pull-to-refresh — so the app
+does not misbehave, it VANISHES, and the person holding the phone has no
+console to check and no way back in. `app/crash-guard.tsx` catches it, shows a
+screen carrying the one control standalone mode cannot otherwise offer, and
+writes the fault here so the next session can read it rather than guess from
+"it went white".
 
 **`pace-role-v1` names a person's job and must not gate anything yet.** It holds
 three things picked on the home screen, in this order: **department**, then

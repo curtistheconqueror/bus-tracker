@@ -10340,6 +10340,40 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("a render error shows a screen with a way out, not a white one",async()=>{
+ const guard=await readFile(new URL("../app/crash-guard.tsx",import.meta.url),"utf8");
+ const layout=await readFile(new URL("../app/layout.tsx",import.meta.url),"utf8");
+
+ /* Curtis, from the floor: "if I touch a bus and hold it down without letting
+    it go the entire screen goes white ... when you bookmark it, there's no way
+    to refresh, and it's just stuck." A render error unmounts the entire tree,
+    and in standalone mode there is no address bar, no reload button and no
+    pull-to-refresh. The app is bricked until iOS kills the process. */
+ assert.match(layout,/<CrashGuard>\{children\}<\/CrashGuard>/,"every page is inside the boundary");
+ assert.match(guard,/static getDerivedStateFromError/,"a class component, because componentDidCatch has no hook equivalent");
+ assert.match(guard,/componentDidCatch/);
+ assert.match(guard,/location\.reload/,"the one control a standalone app cannot otherwise offer");
+ assert.match(guard,/RELOAD THE APP/);
+
+ /* It must not be taken down by the same broken module it exists to catch. */
+ const imports=[...guard.matchAll(/^import .*?from "([^"]+)";/gm)].map(match=>match[1]);
+ assert.deepEqual(imports,["react"],"the boundary imports nothing of the app's own");
+ assert.equal(/\.css"/.test(guard),false,"and no stylesheet, since a stylesheet that failed to load is a way to arrive here");
+
+ /* Storage throws on a full device. Throwing inside the handler that exists to
+    survive a throw would be absurd. */
+ assert.match(guard,/try\{[\s\S]{0,600}?localStorage\.setItem[\s\S]{0,600}?\}catch\{\}/,"the crash record is written defensively");
+
+ /* Nothing is lost, and the screen has to say so - a person who sees this
+    needs to know the board is still on the device. */
+ assert.match(guard,/Nothing on this device was lost/);
+
+ /* The key is written down, because a key that exists and is recorded nowhere
+    is how the next session renames one. */
+ const claudeMd=await readFile(new URL("../CLAUDE.md",import.meta.url),"utf8");
+ assert.match(claudeMd,/pace-crash-report-v1/);
+});
+
 test("a road call logged on the sheet reaches the bus, whichever source saw it first",async()=>{
  const {reconcileRoadCallsFromSheet,standingRoadCalls,SHEET_ROAD_CALL_PREFIX}=await import("../app/road-calls.ts");
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
