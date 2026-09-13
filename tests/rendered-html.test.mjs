@@ -10382,7 +10382,42 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
  /* A completed entry is history, not a live road call. */
  assert.deepEqual(reconcileRoadCallsFromSheet(fleet,[{id:"e3",busId:"b2",section:"Roadcall",workflow:"Completed"}],now).started,[]);
 
- /* ADDITIVE ONLY. It never clears: clearRoadCall moves a bus back off the road
+ /* FIXED ON THE SHEET MUST DISAPPEAR. Curtis: "If a road call happened within
+    the last thirty six hours, but it was updated as fixed, then it should not
+    show." Closing the Roadcall row is where a foreman actually records that a
+    bus is fixed, so the flag has to come off there — otherwise a repaired bus
+    stays on the report for a day and a half. */
+ const completed=reconcileRoadCallsFromSheet(first.fleet,
+  [{...entries[0],workflow:"Completed"},entries[1]],now);
+ assert.deepEqual(completed.ended,["b1"]);
+ const fixed=completed.fleet.find(bus=>bus.id==="b1");
+ assert.equal(fixed.roadcall,false,"marking the row fixed takes the bus out of road-call status");
+ assert.equal(standingRoadCalls(fixed,now,36).length,0,"so it drops off the Scoreboard at once");
+
+ /* Moving the row OUT of Roadcall does the same - it is no longer a road call
+    whatever else it now is. */
+ assert.equal(reconcileRoadCallsFromSheet(first.fleet,[{...entries[0],section:"Pending"},entries[1]],now)
+  .fleet.find(bus=>bus.id==="b1").roadcall,false);
+
+ /* But the bus is NOT moved back. clearRoadCall restores a location inside a
+    one-minute undo window; this may run days later, and a stale `from` would
+    move a vehicle somebody has since parked by hand. */
+ assert.equal(fixed.l,"garage-1");
+
+ /* A bus out on BOTH a map-ticked call and a sheet-ticked one keeps the flag
+    when only the sheet's half closes: it is still out on the other. */
+ const both=[{id:"b4",n:"17504",l:"road-2",roadcall:true,roadCalls:[
+  {id:"road-call-map-b4",at:hoursAgo(3)},{id:SHEET_ROAD_CALL_PREFIX+"e9",at:hoursAgo(4)}]}];
+ const half=reconcileRoadCallsFromSheet(both,[],now).fleet[0];
+ assert.equal(half.roadcall,true,"the map's call still stands");
+ assert.equal(half.roadCalls.length,1,"and only the sheet's half was withdrawn");
+
+ /* SCOPED, which is what makes it safe to run on every write of the sheet: the
+    sheet ends only what the sheet started. A call ticked on the Facility Map or
+    the Defect Log is somebody's direct statement about a bus and is not the
+    sheet's to withdraw.
+
+    Formerly ADDITIVE ONLY: clearRoadCall moves a bus back off the road
     and withdraws history, which is a decision a person makes. A reconciler that
     ran on every sheet write and could also un-ring the bell would eventually
     clear a road call ticked on the map for a bus never on the sheet. */

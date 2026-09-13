@@ -240,7 +240,7 @@ export const SHEET_ROAD_CALL_SECTION="Roadcall";
 
 export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairBus>(
  fleet:T[],entries:SheetRoadCallEntry[],now=new Date().toISOString()
-):{fleet:T[];started:string[]}{
+):{fleet:T[];started:string[];ended:string[]}{
  const started:string[]=[];
  let next=fleet;
  for(const entry of entries||[]){
@@ -267,7 +267,46 @@ export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairB
   next=applied.fleet;
   started.push(busId);
  }
- return {fleet:next,started};
+ /* AND THE SHEET CAN END ONE IT STARTED.
+
+    Curtis: "If a road call happened within the last thirty six hours, but it
+    was updated as fixed, then it should not show." The flag is what the
+    Scoreboard filters on, and closing a Roadcall row on the sheet is where a
+    foreman actually records that a bus is fixed — so leaving the flag set there
+    would have kept a repaired bus on the report for a day and a half.
+
+    Scoped to events this module minted, by their `road-call-sheet-` id. A call
+    ticked on the Facility Map or the Defect Log is somebody's direct statement
+    about a bus and is not the sheet's to withdraw; only clearRoadCall, pressed
+    by a person, takes one of those off. So the reconciler can end what it
+    started and nothing else — which is what keeps it safe to run on every
+    single write of the sheet.
+
+    The flag only comes off when NO road call is left standing. A bus out on a
+    map-ticked call and a sheet-ticked one keeps the flag when the sheet's half
+    closes, because it is still out on the other.
+
+    The bus is not moved back. clearRoadCall restores a location inside a
+    one-minute undo window; this is a reconciliation that may run days later,
+    and putting a bus somewhere on the strength of a stale `from` would move a
+    vehicle somebody has since parked by hand. */
+ const live=new Set((entries||[])
+  .filter(entry=>String(entry?.section??"")===SHEET_ROAD_CALL_SECTION&&String(entry?.workflow??"")!=="Completed")
+  .map(entry=>SHEET_ROAD_CALL_PREFIX+(String(entry?.id??"").trim()||String(entry?.busId??"").trim())));
+ /* Rebuilt only if something actually changed. `.map` always returns a new
+    array, and this runs inside the Down Sheet's effect on every render — a new
+    array every time means a fleet write to LocalStorage every time, on a
+    four-hundred-bus board. Caught by the test that asserts an unchanged fleet
+    comes back by identity, which is exactly what that assertion is for. */
+ const ended:string[]=[];
+ const cleared=next.map(bus=>{
+  const events=normalizeRoadCalls(bus.roadCalls);
+  const kept=events.filter(event=>!event.id.startsWith(SHEET_ROAD_CALL_PREFIX)||live.has(event.id));
+  if(kept.length===events.length)return bus;
+  ended.push(bus.id);
+  return {...bus,roadcall:kept.length>0,...(kept.length?{roadCalls:kept}:{roadCalls:undefined})} as T;
+ });
+ return {fleet:ended.length?cleared:next,started,ended};
 }
 
 /* Road calls still standing: inside the window AND not taken back off that
