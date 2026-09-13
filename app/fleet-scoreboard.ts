@@ -12,7 +12,7 @@
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
 import {mysteryBusIds} from "./mystery-buses.ts";
-import {roadCallsWithin} from "./road-calls.ts";
+import {standingRoadCalls} from "./road-calls.ts";
 import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
 import {locationLabel} from "./location-label.ts";
 
@@ -26,8 +26,12 @@ import {locationLabel} from "./location-label.ts";
    than eyeballed, which is how the first draft shipped a 54-character row. */
 export const SCOREBOARD_WIDTH=38;
 
-export const SCOREBOARD_ROAD_CALL_HOURS=48;
-const ROAD_CALL_DAYS=SCOREBOARD_ROAD_CALL_HOURS/24;
+/* 36 hours, and only calls the bus is STILL out on. Curtis: "only roadcalls
+   within the last 36 hours that have not been taken off out of that status
+   should show on scoreboard." Both halves matter — clearRoadCall takes the flag
+   off and leaves the history, so a bus fixed and returned to service this
+   morning still has a dated event from last night and must not be counted. */
+export const SCOREBOARD_ROAD_CALL_HOURS=36;
 
 /* AN INSPECTION IS NOT A DOWNED BUS, and this is the one line that says so.
 
@@ -122,7 +126,7 @@ export function buildScoreboard(
  const roadCalls:ScoreboardBusLine[]=[];
  const roadCallsOffSheet:ScoreboardBusLine[]=[];
  for(const bus of fleet){
-  const recent=roadCallsWithin(bus.roadCalls,now,ROAD_CALL_DAYS);
+  const recent=standingRoadCalls(bus,now,SCOREBOARD_ROAD_CALL_HOURS);
   if(!recent.length)continue;
   /* The note says only what happened. WHETHER the bus is on the sheet is
      carried by membership of roadCallsOffSheet, and how that gets shown is the
@@ -177,15 +181,30 @@ export function scoreboardStamp(at:string){
    four that need chasing. */
 export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean;title?:string}={}){
  const lines:string[]=[];
- const rule="-".repeat(30);
+ /* The heavy band fences the two numbers that are NOT like the others; the
+    light rule separates the ordinary ones. Different weights on purpose — a
+    reader should be able to see which block is set apart without reading it. */
+ const band="=".repeat(SCOREBOARD_WIDTH-8);
+ const rule="-".repeat(SCOREBOARD_WIDTH-8);
  lines.push(clean(options.title)||"PACE SOUTH");
  const stamp=scoreboardStamp(board.at);
  if(stamp)lines.push(stamp);
- lines.push(rule);
+ /* THE TWO NUMBERS THAT ARE NOT LIKE THE OTHERS, fenced off so nobody has to
+    be told twice. Curtis: "The downed bus number and inspection number should
+    be separated from the rest of the metrics given and it should be obvious to
+    the person reading it. So they know the counts do not include them."
+
+    A heavy rule above and below rather than a footnote, because a footnote is
+    the thing a person skips when somebody is standing in front of them. Two
+    lines, plainly worded, and the parenthetical says what the number IS rather
+    than what it excludes — "downed buses only" answers the question before it
+    is asked. */
+ lines.push(band);
  lines.push("DOWNED BUSES        "+board.downed);
- lines.push("ON THE DOWN SHEET   "+board.onSheet);
- if(board.inspections)lines.push("  (inspections not counted as down: "+board.inspections+")");
- lines.push("");
+ lines.push("  (downed buses only)");
+ lines.push("INSPECTIONS         "+board.inspections);
+ lines.push("  (not counted above)");
+ lines.push(band);
  /* The count first, the caveat under it. On one line the two ran to 45
     characters and wrapped on a phone — caught by the test that holds every line
     to a lock screen, not by reading it. The number is what somebody is looking
@@ -193,8 +212,8 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
  lines.push("MYSTERY BUSES       "+board.mystery.length);
  if(board.mystery.length)lines.push("  "+MYSTERY_CAVEAT);
  if(board.mystery.length)for(const bus of board.mystery)lines.push(...busBlock(bus,options.includeDefects));
- lines.push("");
- lines.push("ROAD CALLS (" +SCOREBOARD_ROAD_CALL_HOURS+"H)    "+board.roadCalls.length);
+ lines.push(rule);
+ lines.push("ROAD CALLS ("+SCOREBOARD_ROAD_CALL_HOURS+"H)    "+board.roadCalls.length);
  /* Both facts Curtis asked for, without saying either of them twice. The first
     draft printed "NOT on the sheet" against each bus AND listed the same
     numbers again underneath — 54 characters wide to deliver one fact twice. A

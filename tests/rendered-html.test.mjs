@@ -10340,6 +10340,68 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("a road call logged on the sheet reaches the bus, whichever source saw it first",async()=>{
+ const {reconcileRoadCallsFromSheet,standingRoadCalls,SHEET_ROAD_CALL_PREFIX}=await import("../app/road-calls.ts");
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+
+ /* MEASURED ON THE SHOP'S OWN CLOUD before this was written: 109 buses, zero
+    with the roadcall flag, zero with any dated event - and four live sheet
+    entries in section Roadcall. Every road call in that garage arrives on
+    paper, so the map's ROADCALL flag had never once lit, and a report reading
+    the bus record would have said "0 road calls" while the sheet in somebody's
+    hand said four. Curtis: "All sources should update no matter where it was
+    first logged." */
+ const now="2026-09-13T18:00:00.000Z";
+ const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
+ const fleet=[{id:"b1",n:"17501",l:"garage-1",roadcall:false},{id:"b2",n:"17502",l:"bay-3",roadcall:false}];
+ const entries=[{id:"e1",busId:"b1",section:"Roadcall",workflow:"Scheduled",createdAt:hoursAgo(5)},
+                {id:"e2",busId:"b2",section:"Pending",workflow:"Scheduled",createdAt:hoursAgo(5)}];
+
+ const first=reconcileRoadCallsFromSheet(fleet,entries,now);
+ assert.deepEqual(first.started,["b1"],"only the bus the sheet calls a road call");
+ const b1=first.fleet.find(bus=>bus.id==="b1");
+ assert.equal(b1.roadcall,true,"the flag the map draws from is finally set");
+ assert.equal(b1.roadCalls.length,1);
+ assert.ok(b1.roadCalls[0].id.startsWith(SHEET_ROAD_CALL_PREFIX),"and where it came from stays legible");
+
+ /* Dated from the ENTRY, not from now: "in the last 36 hours" has to mean 36
+    hours since the breakdown, not since somebody scanned the sheet. */
+ assert.equal(b1.roadCalls[0].at,hoursAgo(5));
+
+ /* The bus is NOT moved. The sheet says it broke down; it does not say where it
+    is now, and the person who scanned it has usually already parked it. */
+ assert.equal(b1.l,"garage-1","a paper heading must not undo a location somebody set by hand");
+
+ /* Reconciling runs on EVERY write of the sheet, so it has to be idempotent -
+    otherwise one scan becomes a road call event per keystroke. */
+ const second=reconcileRoadCallsFromSheet(first.fleet,entries,now);
+ assert.deepEqual(second.started,[],"a second pass starts nothing");
+ assert.equal(second.fleet.find(bus=>bus.id==="b1").roadCalls.length,1,"and appends nothing");
+ assert.equal(second.fleet,first.fleet,"an unchanged fleet is returned by identity, so React does not rewrite storage");
+
+ /* A completed entry is history, not a live road call. */
+ assert.deepEqual(reconcileRoadCallsFromSheet(fleet,[{id:"e3",busId:"b2",section:"Roadcall",workflow:"Completed"}],now).started,[]);
+
+ /* ADDITIVE ONLY. It never clears: clearRoadCall moves a bus back off the road
+    and withdraws history, which is a decision a person makes. A reconciler that
+    ran on every sheet write and could also un-ring the bell would eventually
+    clear a road call ticked on the map for a bus never on the sheet. */
+ const onMap=[{id:"b3",n:"17503",l:"road-1",roadcall:true,roadCalls:[{id:"road-call-map-b3",at:hoursAgo(1)}]}];
+ assert.equal(reconcileRoadCallsFromSheet(onMap,[],now).fleet[0].roadcall,true,
+  "a road call ticked on the map survives a sheet that has never heard of the bus");
+
+ /* STANDING means both halves: inside the window AND still in that status. */
+ assert.equal(standingRoadCalls({roadcall:true,roadCalls:[{id:"a",at:hoursAgo(5)}]},now,36).length,1);
+ assert.equal(standingRoadCalls({roadcall:true,roadCalls:[{id:"a",at:hoursAgo(40)}]},now,36).length,0,"outside 36 hours");
+ assert.equal(standingRoadCalls({roadcall:false,roadCalls:[{id:"a",at:hoursAgo(2)}]},now,36).length,0,
+  "fixed and back in service: the flag is off and the history stays, and it must not be counted");
+
+ /* Wired where EVERY change to the sheet passes through - a scan, a typed row,
+    a cloud merge - rather than on the scanner alone, which is one of the three. */
+ assert.match(page,/reconcileRoadCallsFromSheet\(membership,entries\)\.fleet/,
+  "reconciled beside DS membership, at the one chokepoint every sheet write crosses");
+});
+
 test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  const {buildScoreboard,scoreboardText,mysteryLabel,INSPECTION_SECTION,SCOREBOARD_ROAD_CALL_HOURS}=
   await import("../app/fleet-scoreboard.ts");
@@ -10358,11 +10420,15 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
   {id:"b4",n:"17504",l:"east-1",s:"unknown",defects:[{id:"x4",category:"A/C and HVAC",issue:"No cooling",state:"open"}]},
   {id:"b5",n:"17505",l:"west-1",s:"unknown",defects:[]},
   /* Road call 6 hours ago and NOT on the sheet - the row somebody must chase. */
-  {id:"b6",n:"17506",l:"garage-1",s:"defect",roadCalls:[{at:hoursAgo(6)}],defects:[]},
+  {id:"b6",n:"17506",l:"garage-1",s:"defect",roadcall:true,roadCalls:[{id:"r6",at:hoursAgo(6)}],defects:[]},
   /* Road call 6 hours ago and already written up. */
-  {id:"b7",n:"17507",l:"garage-2",s:"defect",roadCalls:[{at:hoursAgo(6)}],defects:[]},
+  {id:"b7",n:"17507",l:"garage-2",s:"defect",roadcall:true,roadCalls:[{id:"r7",at:hoursAgo(6)}],defects:[]},
   /* Road call four days ago: outside the window, and must not appear. */
-  {id:"b8",n:"17508",l:"garage-3",s:"defect",roadCalls:[{at:hoursAgo(96)}],defects:[]},
+  {id:"b8",n:"17508",l:"garage-3",s:"defect",roadcall:true,roadCalls:[{id:"r8",at:hoursAgo(96)}],defects:[]},
+  /* FIXED AND BACK IN SERVICE: the event is two hours old and inside any
+     window, but clearRoadCall took the flag off and left the history. Curtis:
+     "only roadcalls ... that have not been taken off out of that status." */
+  {id:"b9",n:"17509",l:"garage-4",s:"service",roadcall:false,roadCalls:[{id:"r9",at:hoursAgo(2)}],defects:[]},
  ];
  const entries=[
   {busId:"b1",section:"Pending",workflow:"Scheduled"},
@@ -10379,7 +10445,7 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  /* THE HEADLINE. b1 (twice), b2 and b7 are down; b3 is in for an inspection and
     is not. Curtis: "the downed number normally does not count inspections." */
  assert.equal(board.downed,3,"an inspection is not a downed bus, and one bus written up twice is one bus");
- assert.equal(board.onSheet,4,"the sheet total still counts the inspection, so the two numbers can be reconciled");
+ assert.equal(board.onSheet,4,"the sheet total is still computed, for anyone who needs to reconcile the two");
  assert.equal(board.inspections,1,"and the difference is named rather than left to be worked out");
 
  /* A bus in for an inspection AND for brakes is DOWN - the brakes are what is
@@ -10400,15 +10466,19 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  assert.equal(mysteryLabel(0),"0","at zero the caveat goes - a zero needs no hedge");
 
  /* ROAD CALLS: the window is 48 hours and nothing older leaks in. */
- assert.equal(SCOREBOARD_ROAD_CALL_HOURS,48);
- assert.deepEqual(board.roadCalls.map(bus=>bus.n),["17506","17507"],"the four-day-old call is outside the window");
+ assert.equal(SCOREBOARD_ROAD_CALL_HOURS,36,"Curtis moved the window from 48 to 36");
+ assert.deepEqual(board.roadCalls.map(bus=>bus.n),["17506","17507"],
+  "the four-day-old call is outside the window, and the one taken back off that status is excluded though it is only two hours old");
  assert.deepEqual(board.roadCallsOffSheet.map(bus=>bus.n),["17506"],"and only the one nobody has written up needs chasing");
 
  /* THE LOCK-SCREEN TEXT. */
  const text=scoreboardText(board,{title:"PACE SOUTH"});
- assert.match(text,/DOWNED BUSES\s+3/);
+ /* The two numbers that are not like the others, fenced off rather than
+    footnoted - a footnote is what a person skips when somebody is waiting. */
+ assert.match(text,/={10,}\nDOWNED BUSES\s+3\n\s+\(downed buses only\)\nINSPECTIONS\s+1\n\s+\(not counted above\)\n={10,}/,
+  "downed and inspections sit inside a heavy band, two lines each, so the reader sees the other counts exclude them");
  assert.match(text,/MYSTERY BUSES\s+2\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat sits under the number, not beside it - together they wrap on a phone");
- assert.match(text,/ROAD CALLS \(48H\)\s+2/);
+ assert.match(text,/ROAD CALLS \(36H\)\s+2/);
  assert.match(text,/\* NOT ON THE SHEET \u2014 1/,"marked once against the row, counted once underneath");
 
  /* Numbers for MYSTERY and ROAD CALLS only. Curtis: "not the entire downed bus
