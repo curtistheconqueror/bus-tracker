@@ -10340,6 +10340,117 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+
+ /* It used to seed fleet.find(item=>!active.some(...)) - the first bus that
+    happened to have no entry, chosen by array order and nothing else - into
+    busId, busNumber and operationalStatus. So the form opened already pointed
+    at a real bus, the "Select bus" option was never the state anybody saw, and
+    filling in a repair and pressing SAVE without touching the bus field wrote
+    a live entry against a bus picked at random. */
+ assert.match(page,/setEditing\(\{id:"repair-"[^}]*?busId:"",busNumber:"",/,
+  "the new-entry draft opens with no bus");
+ assert.equal(/busId:bus\.id,busNumber:bus\.n,/.test(page),false,
+  "and never seeds one from whichever bus sorted first");
+ assert.equal(/operationalStatus:bus\.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate\(undefined/.test(page),false,
+  "nor that bus's tracker status");
+
+ /* The availability check is worth keeping - telling somebody the sheet is
+    full before they fill in a form is a kindness - it just must not hand its
+    answer to the draft. */
+ assert.match(page,/const available=fleet\.some\(item=>!active\.some\(entry=>entry\.busId===item\.id\)\);if\(!available\)/,
+  "the capacity guard survives without seeding the form");
+
+ /* And the guard that could never fire now can. */
+ assert.match(editor,/if\(!bus\)\{alert\("Select a bus number\."\);return\}/);
+ /* The editor fills the number and the tracker status from whichever bus is
+    chosen, which is why opening empty loses nothing. */
+ assert.match(editor,/busNumber:bus\?\.n\|\|"",operationalStatus:bus\?\.s\|\|current\.operationalStatus/);
+});
+
+test("the AI operator keeps hold of the bus, and answers a question instead of offering to cause it",async()=>{
+ const {planOperatorCommand,isQuestion}=await import("../app/operator-engine.ts");
+ const areas=[{name:"CNG East",slots:["east-1","east-2"]},{name:"Main Garage",slots:["garage-1","garage-2"]}];
+ const oil={id:"d1",category:"Engine",issue:"Oil leak",details:"",operability:"service",state:"open"};
+ const fleet=[
+  {id:"b1",n:"17559",s:"defect",l:"garage-1",down:true,pendingRepair:"",defects:[oil]},
+  {id:"b2",n:"17560",s:"service",l:"garage-2",down:false,pendingRepair:"",defects:[]},
+ ];
+
+ /* THE EXACT CONVERSATION Curtis screenshotted.
+    "Does bus 17559 have an oil leak in it defects or is it on the down sheet"
+    -> "Bus 17559 is already marked on the down sheet."
+    "Why?" -> "Tell me which bus you mean." */
+ const first=planOperatorCommand("Does bus 17559 have an oil leak in it defects or is it on the down sheet",fleet,areas);
+ assert.equal(first.kind,"message");
+ assert.match(first.message,/17559/);
+ assert.ok(first.context?.lastBusId,"the answer now says which bus it was about");
+ assert.equal(first.context.lastBusId,"b1");
+
+ const why=planOperatorCommand("Why?",fleet,areas,first.context);
+ assert.equal(why.kind,"message");
+ assert.equal(/Tell me which bus you mean/.test(why.message),false,"the follow-up must not lose the subject");
+ assert.match(why.message,/17559/,"it is still about the same bus");
+ assert.match(why.message,/down sheet/i,"and it explains the answer it just gave");
+ assert.equal(why.context.lastBusId,"b1","and stays available for the turn after that");
+
+ /* A QUESTION MUST NEVER BECOME A WRITE. Asked with the SINGULAR "defect",
+    this used to return a PLAN offering to ADD Engine - Oil leak to the bus: a
+    question about what is true, answered with an offer to make it true.
+
+    The plural missed the branch altogether, because \bdefect\b does not match
+    "defects" - the trailing boundary fails on the s - so Curtis's own wording
+    fell to the generic "I need an action". Both spellings are tested here
+    because they used to fail in two different ways. */
+ for(const wording of ["Does bus 17559 have an oil leak defect?","Does bus 17559 have an oil leak in its defects?"]){
+  const probe=planOperatorCommand(wording,fleet,areas);
+  assert.equal(probe.kind,"message","a question returns an answer, never a plan: "+wording);
+  assert.match(probe.message,/^Yes\./,"read off the record: "+wording);
+ }
+
+ const askedAbsent=planOperatorCommand("Does bus 17560 have an oil leak in its defects?",fleet,areas);
+ assert.equal(askedAbsent.kind,"message");
+ assert.match(askedAbsent.message,/^No\./);
+
+ /* Told rather than asked still plans, or the Operator would stop working. */
+ const told=planOperatorCommand("Add an oil leak defect to bus 17560",fleet,areas);
+ assert.equal(told.kind,"plan");
+ assert.equal(told.plan.kind,"defect");
+ assert.match(told.plan.summary,/Add Engine/);
+
+ /* And the down-sheet branch the same way. */
+ const shouldI=planOperatorCommand("Should I take bus 17559 off the down sheet?",fleet,areas);
+ assert.equal(shouldI.kind,"message","an interrogative must not build a removal");
+ const doIt=planOperatorCommand("Take bus 17559 off the down sheet",fleet,areas);
+ assert.equal(doIt.kind,"plan");
+ assert.equal(doIt.plan.kind,"downsheet");
+
+ /* isQuestion reads the "?" off the RAW command, because normalized() strips
+    every non-alphanumeric character before the rest of the engine sees it. */
+ assert.equal(isQuestion("does bus 25 have a horn defect"),true);
+ assert.equal(isQuestion("move bus 25 to CNG East?"),true,"a trailing question mark is enough");
+ assert.equal(isQuestion("move bus 25 to CNG East"),false);
+ assert.equal(isQuestion("add a horn defect to bus 25"),false);
+
+ /* INSPECT now reads bus.defects. It never did, so the one intent whose job is
+    to describe a bus could not say what was wrong with it. */
+ const look=planOperatorCommand("what is the status of bus 17559",fleet,areas);
+ assert.equal(look.plan.kind,"inspect");
+ assert.match(look.plan.response,/Open repairs: Engine \u2014 Oil leak/);
+ const clean=planOperatorCommand("what is the status of bus 17560",fleet,areas);
+ assert.match(clean.plan.response,/No open repairs are recorded/);
+
+ /* THE CARRY IS SCOPED. A sentence that names no bus and refers to nothing
+    still asks - silently acting on a bus from five turns ago is worse than
+    asking, and this is the line that keeps the fix from becoming a hazard. */
+ const orphan=planOperatorCommand("mark it down",fleet,areas,null);
+ assert.match(orphan.message,/Tell me which bus you mean/,"with no context there is nothing to carry");
+ const vague=planOperatorCommand("how many buses are sitting",fleet,areas,first.context);
+ assert.notEqual(vague.kind,"message","a fleet-wide question is not hijacked by the remembered bus");
+});
+
 test("a render error shows a screen with a way out, not a white one",async()=>{
  const guard=await readFile(new URL("../app/crash-guard.tsx",import.meta.url),"utf8");
  const layout=await readFile(new URL("../app/layout.tsx",import.meta.url),"utf8");

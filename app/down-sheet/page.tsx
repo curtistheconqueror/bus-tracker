@@ -306,7 +306,23 @@ export default function DownSheet(){
  const downBusCount=useMemo(()=>shown.filter(downSheetMentionsDefect).length,[shown]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
- const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}const bus=fleet.find(item=>!active.some(entry=>entry.busId===item.id));if(!bus){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:bus.id,busNumber:bus.n,category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:bus.s,priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
+ const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}/* THE FORM OPENS WITH NO BUS CHOSEN, and that is the whole point of this line.
+
+     It used to seed `fleet.find(item=>!active.some(...))` — the first bus that
+     happened not to have an entry yet — into busId, busNumber and
+     operationalStatus. So "+ ADD DOWN BUS" opened already pointed at a real
+     bus, chosen by array order and nothing else, and the `Select bus` option
+     was never the state anybody actually saw. A person who filled in the repair
+     and pressed SAVE without touching the bus field wrote a live Down Sheet
+     entry against a bus picked at random, with no warning, because the
+     `if(!bus)` guard in the editor could never fire.
+
+     Empty instead. The editor already fills busNumber and operationalStatus
+     from whichever bus is chosen, so nothing is lost — and that guard now
+     works. The availability check stays, because telling somebody the sheet is
+     full before they fill in a form is worth doing; it just no longer hands its
+     answer to the draft. */
+ const available=fleet.some(item=>!active.some(entry=>entry.busId===item.id));if(!available){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();setEditing({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:"",busNumber:"",category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:"unknown",priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]})};
  const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}};
  /* The DEFERRED board hands its answer back here rather than writing, so a
     refused write is reported by this page like every other one and the board
