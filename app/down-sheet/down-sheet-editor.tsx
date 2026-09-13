@@ -1,5 +1,6 @@
 "use client";
 
+import HoursField from "../hours-field";
 import {useEffect, useMemo, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "../findings-memory";
@@ -163,8 +164,8 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                    </span>;
                   })}</div>
                  </div>}
-                 <label>REPAIR HOURS<input inputMode="decimal" value={item.repairHours===undefined?"":String(item.repairHours)} placeholder=".5" onChange={event=>updateItem(item.id,current=>({...current,repairHours:normalizeRepairHours(event.target.value)}))}/></label>
-                 <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={item.diagnosticHours===undefined?"":String(item.diagnosticHours)} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} onChange={event=>updateItem(item.id,current=>({...current,diagnosticHours:normalizeDiagnosticHours(event.target.value)}))}/><small>{MINIMUM_DIAGNOSTIC_HOURS} hour minimum.</small></label>
+                 <label>REPAIR HOURS<HoursField value={item.repairHours} placeholder=".5" ariaLabel="Repair hours" onChange={hours=>updateItem(item.id,current=>({...current,repairHours:normalizeRepairHours(hours===undefined?"":String(hours))}))}/></label>
+                 <label>DIAGNOSTIC HOURS<HoursField value={item.diagnosticHours} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} ariaLabel="Diagnostic hours" onChange={hours=>updateItem(item.id,current=>({...current,diagnosticHours:normalizeDiagnosticHours(hours===undefined?"":String(hours))}))}/><small>{MINIMUM_DIAGNOSTIC_HOURS} hour minimum.</small></label>
                 </div>}
               </div>
               <label className="estimate-toggle"><input type="checkbox" checked={item.estimateEnabled} onChange={event=>updateItem(item.id,current=>({...current,estimateEnabled:event.target.checked}))}/><span>ESTIMATE TIME</span><small>Optional. Category and specific repair load a starting allowance.</small></label>
@@ -174,10 +175,10 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     and the other six are almost always zero. The breakdown is
                     still there behind the tick, and the line carries the whole
                     estimate, so keeping it shut hides no number. */}
-                <label className="estimate-simple">ESTIMATED HOURS<input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(repairTimeTotal(item.timeEstimate))} onChange={event=>setSimpleTotal(item,event.target.value)}/><small>The whole estimate. Break it down only if the split matters.</small></label>
+                <label className="estimate-simple">ESTIMATED HOURS<HoursField value={hoursValue(repairTimeTotal(item.timeEstimate))} max={40} placeholder="1.5" ariaLabel="Estimated hours" onChange={hours=>setSimpleTotal(item,hours===undefined?"":String(hours))}/><small>The whole estimate. Break it down only if the split matters.</small></label>
                 <label className="estimate-advanced-toggle"><input type="checkbox" checked={showBreakdown(item)} onChange={event=>setAdvancedEstimates(current=>{const next=new Set(current);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next})}/><span>BREAK THE ESTIMATE DOWN</span></label>
                 {showBreakdown(item)&&<>
-                <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(item.timeEstimate[field.key])} onChange={event=>updateEstimateHours(item.id,field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
+                <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><HoursField value={hoursValue(item.timeEstimate[field.key])} max={40} placeholder="0" ariaLabel={field.label} onChange={hours=>updateEstimateHours(item.id,field.key,hours===undefined?"":String(hours))}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
                 <label className="estimate-notes wide">ESTIMATE NOTES<textarea value={item.timeEstimate.notes} onChange={event=>updateItem(item.id,current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Optional conditions supporting this estimate"/></label>
                 </>}
               </div>}

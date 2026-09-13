@@ -1,5 +1,6 @@
 "use client";
 
+import HoursField from "../hours-field";
 import {useEffect,useMemo,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "./defect-log-settings";
 import {displayStyleVars} from "./defect-log-display-settings";
@@ -562,8 +563,8 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <fieldset className={"wide billable-time"+(diagnosticDefect?" diagnostic":"")}><legend>BILLABLE TIME — OPTIONAL</legend>
      <div>
-      <label>REPAIR HOURS<input inputMode="decimal" value={value.defect.repairHours===undefined?"":String(value.defect.repairHours)} placeholder=".5" onChange={event=>updateDefect("repairHours",normalizeRepairHours(event.target.value))}/></label>
-      <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={value.defect.diagnosticHours===undefined?"":String(value.defect.diagnosticHours)} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} onChange={event=>updateDefect("diagnosticHours",normalizeDiagnosticHours(event.target.value))}/></label>
+      <label>REPAIR HOURS<HoursField value={value.defect.repairHours} placeholder=".5" ariaLabel="Repair hours" onChange={hours=>updateDefect("repairHours",normalizeRepairHours(hours===undefined?"":String(hours)))}/></label>
+      <label>DIAGNOSTIC HOURS<HoursField value={value.defect.diagnosticHours} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} ariaLabel="Diagnostic hours" onChange={hours=>updateDefect("diagnosticHours",normalizeDiagnosticHours(hours===undefined?"":String(hours)))}/></label>
      </div>
      <small>{diagnosticDefect
       ?"This is a diagnostic defect. Record diagnostic hours even when the bus is not fixed — press SAVE DEFECT rather than SAVE AS FIXED and the time is kept against an open repair."

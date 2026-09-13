@@ -10340,6 +10340,62 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("an hours box can be typed in and emptied, on both surfaces",async()=>{
+ const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../app/hours-value.ts");
+ const field=await readFile(new URL("../app/hours-field.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* Curtis: "the hours entered field is janky and doesn't allow u to just
+    simply erase all the numbers and the decimal point." */
+
+ /* EMPTY IS NOT ZERO. An unrecorded hour is not the claim that it took none. */
+ assert.equal(parseHours(""),undefined);
+ assert.equal(parseHours("."),undefined,"a lone point is not a number yet");
+ assert.equal(parseHours("0"),0,"but a typed zero is a real zero");
+
+ /* THE DECIMAL POINT. 1 . 5 produced FIFTEEN on the Defect Log, because
+    Number("1.") is 1 and the controlled value rewrote the box to "1". */
+ assert.equal(parseHours("1."),1,"a trailing point parses, and the draft keeps the character on screen");
+ assert.equal(parseHours("1.5"),1.5);
+ assert.equal(parseHours(".5"),0.5,"the placeholder's own suggestion has to work");
+ assert.equal(parseHours("2.25"),2.25);
+
+ /* Every intermediate state of typing 1.5 must be legal, or the keystroke that
+    produces it is the one that gets eaten. */
+ const TYPING=/^(\d*\.?\d*)$/;
+ for(const step of ["","1","1.","1.5",".",".5","0","0."])
+  assert.ok(TYPING.test(step),"must be typeable: "+JSON.stringify(step));
+ for(const junk of ["1.2.3","abc","1a","-1"])
+  assert.equal(TYPING.test(junk),false,"must be refused: "+junk);
+
+ /* type="number" is the rule that eats the point: per the HTML
+    value-sanitising algorithm "1." is not a valid floating-point number, so
+    event.target.value reads "" the instant it is pressed. */
+ /* Checked against the CODE, not the prose — the comment above the input
+    explains why type=number is wrong and would match a naive search. */
+ const fieldCode=field.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.equal(/type="number"/.test(fieldCode),false,"the shared field must never be type=number");
+ assert.match(fieldCode,/type="text"/,"text, so the browser stops sanitising away a trailing point");
+ assert.match(fieldCode,/inputMode="decimal"/,"but still a numeric keypad on a phone");
+ assert.match(field,/onBlur=\{\(\)=>setDraft\(null\)\}/,"the draft is dropped on blur so the stored value takes over");
+
+ /* ALL SIX inputs go through it. The decimal fault existed on BOTH surfaces, so
+    fixing the Down Sheet alone would have left the Defect Log turning 1.5 into
+    15. */
+ assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
+ assert.equal((log.match(/<HoursField /g)||[]).length,2,"Defect Log: repair and diagnostic");
+ /* Scoped to HOURS. The Defect Log's quantity box is also type=number and is
+    left alone on purpose: it counts quarts, not time, so a trailing decimal
+    point is not the thing people type into it. (It has a smaller relative of
+    this bug — `value={quantity||""}` cannot hold a typed zero — noted, not
+    fixed here, because min=0.5 makes a zero meaningless in that field.) */
+ for(const [name,source] of [["down-sheet-editor",editor],["defect-log/page",log]]){
+  assert.equal(/<input type="number"[^>]*(?:repairHours|diagnosticHours|timeEstimate)/.test(source),false,name+" has no type=number hour box left");
+  assert.equal(/<input inputMode="decimal"[^>]*(?:repairHours|diagnosticHours|timeEstimate)/.test(source),false,name+" has no hand-rolled hour box left");
+ }
+});
+
 test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
