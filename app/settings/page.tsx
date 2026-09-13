@@ -48,8 +48,9 @@ import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repair
 import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {normalizeDefects} from "../repair-catalog";
 import {mergeDuplicateDefects} from "../duplicate-defects";
-import {readMergedAway,writeMergedAway,type MergedAwayDefects} from "../cloud-sync";
+import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "../cloud-sync";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
+import {dropTombstonedDefects,dropTombstonedEntries} from "../cloud-live";
 import SectionTransferControls from "../section-transfer-controls";
 import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "../section-transfer";
 import {shareOrDownloadFile} from "../share-file";
@@ -315,9 +316,42 @@ export default function SettingsPage(){
  /* A snapshot to read or send to somebody; it cannot be imported back. */
  const exportLog=()=>{const records=defectLogRecords(fleet,downEntries),payload={kind:"fleet-real-time-defect-log",version:1,exportedAt:new Date().toISOString(),records:records.map(record=>({busNumber:record.bus.n,busStatus:record.bus.s,location:locationLabel(record.bus.l),...record.defect,onDownSheet:record.onDownSheet}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-defect-log-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Defect Log report")};
 
- const logTransfer=<SectionTransferControls kind="defect-log" buildPayload={()=>exportDefectLogPayload(fleet)} applyPayload={payload=>{const {buses,report:merged}=mergeDefectLog(fleet,payload);return persist(buses as SettingsBus[],downEntries).ok?mergeSummary("defect-log",merged):refused}}/>;
- const downTransfer=<SectionTransferControls kind="down-sheet" buildPayload={()=>exportDownSheetPayload(downEntries)} applyPayload={payload=>{
-  const {entries,report:merged}=mergeDownSheet(downEntries,payload,fleet);
+ /* The ledger rides along, so the receiving device learns what this one folded
+    away rather than only what it still holds. */
+ const logTransfer=<SectionTransferControls kind="defect-log" buildPayload={()=>exportDefectLogPayload(fleet,undefined,readMergedAway(localStorage))} applyPayload={payload=>{
+  const {buses,report:merged}=mergeDefectLog(fleet,payload);
+  /* AFTER the merge, never before — exactly as applyCloudPull does it. The
+     records that have to go are the ones the merge would otherwise have just
+     put back, and filtering the incoming payload alone would miss the other
+     half: this device's own stale copy, which the merge keeps because only it
+     has it. */
+  const after=dropTombstonedDefects(buses,payload.deleted);
+  /* allowBulkDefectLoss, keyed to whether anything was actually tombstoned —
+     the same call applyCloudPull makes, for the same reason.
+
+     The guard refuses any write that drops five or more defects, which is right
+     for every other path: nothing in normal use removes five repairs at once,
+     so five gone means something went wrong. It is exactly wrong here. A merge
+     cannot lose a record, so the ONLY way this write ends with fewer is the
+     tombstones — and those are a person's confirmed removal on another device,
+     confirmed a second time by the person who just pressed IMPORT and read a
+     prompt that says records will be taken off. Curtis's phone alone carries 49
+     of them, so leaving the guard armed would refuse the very import this
+     feature exists for. The recovery snapshot is still taken first, so RESTORE
+     LAST GOOD COPY stands behind it either way. */
+  if(!persist(after.buses as SettingsBus[],downEntries,{allowBulkDefectLoss:after.dropped.length>0}).ok)return refused;
+  /* Recorded only once the board is actually saved. Writing the ledger first
+     and then failing the write would leave this device refusing records it had
+     not managed to remove. */
+  writeMergedAway(localStorage,adoptTombstones(readMergedAway(localStorage),payload.deleted));
+  return mergeSummary("defect-log",merged,after.dropped.length);
+ }}/>;
+ const downTransfer=<SectionTransferControls kind="down-sheet" buildPayload={()=>exportDownSheetPayload(downEntries,undefined,readRemovedEntries(localStorage))} applyPayload={payload=>{
+  const {entries:mergedEntries,report:merged}=mergeDownSheet(downEntries,payload,fleet);
+  /* AFTER the merge, for the reason applyCloudPull gives: these are the entries
+     the merge has just put back. */
+  const after=dropTombstonedEntries(mergedEntries as {id?:string;updatedAt?:string;createdAt?:string}[],payload.removedEntries);
+  const entries=after.entries as typeof mergedEntries;
   /* Entries are stored as they arrive. The Down Sheet normalizes every entry
      it reads - at hydration and on the storage event - so a field another
      device never wrote is filled in there, the way it always has been.
@@ -326,9 +360,21 @@ export default function SettingsPage(){
      badges from each bus's down flag, and only the Down Sheet page reconciles
      that from the entries; imported here with the flags left alone, a bus the
      other device put on the sheet would carry no badge until somebody opened
-     the sheet on this one. */
+     the sheet on this one.
+
+     Reconciled from the entries that SURVIVED the drop, not from the merged
+     list: a removed entry left with its bus still flagged down is not inert.
+     The Down Sheet mints a brand new entry for a bus marked down with nothing
+     behind it, under an id nothing has ever tombstoned, and the removal comes
+     straight back wearing a different name.
+
+     No allowBulkDefectLoss here, unlike the Defect Log import above. This drops
+     ENTRIES; the only thing it writes to the board is each bus's down flag, so
+     the guard cannot be tripped by it and stays armed. */
   const active=entries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId);
-  return persist(reconcileDownSheetMembership(fleet,active),entries).ok?mergeSummary("down-sheet",merged):refused;
+  if(!persist(reconcileDownSheetMembership(fleet,active),entries).ok)return refused;
+  writeRemovedEntries(localStorage,adoptTombstones(readRemovedEntries(localStorage),payload.removedEntries));
+  return mergeSummary("down-sheet",merged,after.dropped.length);
  }}/>;
 
  /* Fixed Repairs has no settings of its own: it reads the Defect Log's theme,

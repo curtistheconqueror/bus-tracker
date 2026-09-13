@@ -20,10 +20,16 @@
 
 export type TransferKind="defect-log"|"down-sheet"|"fleet-map";
 
-export const TRANSFER_KINDS:Record<TransferKind,{payloadKind:string;label:string;filePrefix:string}>={
- "defect-log":{payloadKind:"pace-south-defect-log-transfer",label:"Defect Log",filePrefix:"defect-log"},
- "down-sheet":{payloadKind:"pace-south-down-sheet-transfer",label:"Down Sheet",filePrefix:"down-sheet"},
- "fleet-map":{payloadKind:"pace-south-fleet-map-transfer",label:"Fleet Map",filePrefix:"fleet-map"},
+/* `carriesRemovals` drives what the import prompt promises, and it is a fact
+   about the section rather than a display choice: the Defect Log and the Down
+   Sheet both have a tombstone ledger, the Fleet Map has none — a bus is moved,
+   never removed — so a map import genuinely cannot take anything away. Saying
+   "anything only on this device is kept" on the two that CAN now remove records
+   would be a promise the code no longer keeps. */
+export const TRANSFER_KINDS:Record<TransferKind,{payloadKind:string;label:string;filePrefix:string;carriesRemovals:boolean}>={
+ "defect-log":{payloadKind:"pace-south-defect-log-transfer",label:"Defect Log",filePrefix:"defect-log",carriesRemovals:true},
+ "down-sheet":{payloadKind:"pace-south-down-sheet-transfer",label:"Down Sheet",filePrefix:"down-sheet",carriesRemovals:true},
+ "fleet-map":{payloadKind:"pace-south-fleet-map-transfer",label:"Fleet Map",filePrefix:"fleet-map",carriesRemovals:false},
 };
 
 /* What belongs to the Defect Log and therefore travels with it. Everything else
@@ -61,7 +67,17 @@ const HOLD_FIELDS=["hold"] as const;
 const MAP_EXCLUDED=[...DEFECT_FIELDS,...DOWN_SHEET_FIELDS,...HOLD_FIELDS];
 
 export type TransferBus={id?:string;n?:string;[key:string]:unknown};
-export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[]};
+/* `deleted` and `removedEntries` are the two tombstone ledgers, carried on a
+   transfer for the same reason the cloud carries them: a removal cannot travel
+   as an absence. Without them an import could only ever ADD to the receiver, so
+   a sheet cleared on the phone could never be cleared on the iPad by file.
+
+   Named exactly as CloudPullPayload names them, because they mean exactly the
+   same thing and are applied by the same two functions. Both optional, so a file
+   written by an older version still imports — its ledgers are simply absent and
+   the drop is a no-op — and a file written by this version imports into an older
+   app, which ignores keys it does not know. */
+export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[];deleted?:Record<string,string>;removedEntries?:Record<string,string>};
 
 function busKey(bus:{n?:unknown;id?:unknown}){
  const number=String(bus?.n??"").trim();
@@ -102,14 +118,18 @@ function envelope(kind:TransferKind,body:Partial<TransferPayload>,now=new Date()
  return {kind:TRANSFER_KINDS[kind].payloadKind,version:1,exportedAt:now,...body};
 }
 
-export function exportDefectLogPayload(buses:TransferBus[],now?:string){
- return envelope("defect-log",{buses:buses.map(bus=>({id:bus.id,n:bus.n,...pick(bus,DEFECT_FIELDS)}))},now);
+/* The ledger is omitted rather than sent empty: a file with no removals to carry
+   should look exactly like the files this app wrote before it could carry any. */
+export function exportDefectLogPayload(buses:TransferBus[],now?:string,deleted?:Record<string,string>){
+ const removals=deleted&&Object.keys(deleted).length?{deleted}:{};
+ return envelope("defect-log",{buses:buses.map(bus=>({id:bus.id,n:bus.n,...pick(bus,DEFECT_FIELDS)})),...removals},now);
 }
 export function exportFleetMapPayload(buses:TransferBus[],now?:string){
  return envelope("fleet-map",{buses:buses.map(bus=>omit(bus,MAP_EXCLUDED))},now);
 }
-export function exportDownSheetPayload(entries:unknown[],now?:string){
- return envelope("down-sheet",{entries},now);
+export function exportDownSheetPayload(entries:unknown[],now?:string,removedEntries?:Record<string,string>){
+ const removals=removedEntries&&Object.keys(removedEntries).length?{removedEntries}:{};
+ return envelope("down-sheet",{entries,...removals},now);
 }
 
 export type TransferRead={ok:true;kind:TransferKind;payload:TransferPayload}|{ok:false;error:string};
@@ -240,10 +260,14 @@ export function transferFilename(kind:TransferKind,now=new Date()){
  return "pace-"+TRANSFER_KINDS[kind].filePrefix+"-"+now.toISOString().slice(0,10)+".json";
 }
 
-export function mergeSummary(kind:TransferKind,report:MergeReport){
+export function mergeSummary(kind:TransferKind,report:MergeReport,removed=0){
  const label=TRANSFER_KINDS[kind].label;
  const parts=[report.updated+" updated"];
  if(report.added)parts.push(report.added+" added");
+ /* Counted separately and named plainly. Added and updated are both a record
+    arriving; this is a record LEAVING, which is the one outcome somebody would
+    want to know about without having to go and look. */
+ if(removed)parts.push(removed+" removed");
  const lines=[label+" imported: "+parts.join(", ")+"."];
  if(report.unmatched.length)lines.push("Not on this device, so skipped: "+report.unmatched.slice(0,12).join(", ")+(report.unmatched.length>12?" and "+(report.unmatched.length-12)+" more":"")+". Import the Fleet Map first to add them.");
  return lines.join("\n");
