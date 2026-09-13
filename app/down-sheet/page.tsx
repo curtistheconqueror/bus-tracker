@@ -1,5 +1,6 @@
 "use client";
 
+import ScoreboardModal from "../scoreboard-modal";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
@@ -306,6 +307,8 @@ export default function DownSheet(){
  const downBusCount=useMemo(()=>shown.filter(downSheetMentionsDefect).length,[shown]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
+ /* Opened after the round, which is when somebody is about to be asked. */
+ const [scoreboardOpen,setScoreboardOpen]=useState(false);
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}/* THE FORM OPENS WITH NO BUS CHOSEN, and that is the whole point of this line.
 
      It used to seed `fleet.find(item=>!active.some(...))` — the first bus that
@@ -639,6 +642,11 @@ export default function DownSheet(){
    {/* The one thing this page is for, first and full width — and now directly
        above SEARCH rather than separated from it by six other controls. */}
    <button className="down-primary-action" type="button" onClick={openNewEntry} disabled={active.length>=MAX_ENTRIES} title={active.length>=MAX_ENTRIES?"The sheet is full at "+MAX_ENTRIES+" buses":"Add a bus to the Down Sheet"}>+ ADD DOWN BUS</button>
+   {/* Beside ADD DOWN BUS, never in front of it. That row was deliberately
+       cleared — SHOW COMPLETED and CLEAR DOWNSHEET went behind ADVANCED
+       ACTIONS — so the primary action still leads it. Curtis asked for the
+       report here because here is where the round ends. */}
+   <button className="down-scoreboard-action" type="button" onClick={()=>setScoreboardOpen(true)}>SCOREBOARD</button>
   </section>
 
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
@@ -798,6 +806,9 @@ export default function DownSheet(){
    </div>
   </section>
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
+  {/* The sheet and the board are handed over as they stand; the Scoreboard
+      computes and never writes, so there is no save path to go around. */}
+  {scoreboardOpen&&<ScoreboardModal fleet={fleet as never} entries={entries as never} close={()=>setScoreboardOpen(false)}/>}
   {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}

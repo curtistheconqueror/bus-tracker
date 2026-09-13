@@ -1260,7 +1260,12 @@ test("renders the interactive down sheet with All as the default shift view", as
      it. SHOW COMPLETED and CLEAR DOWNSHEET are behind ADVANCED ACTIONS and are
      asserted absent above. */
   assert.match(html, /\+ ADD DOWN BUS/);
-  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS is alone in its row now");
+  /* ADD DOWN BUS still LEADS the row. SHOW COMPLETED and CLEAR DOWNSHEET went
+     behind ADVANCED ACTIONS to clear it and must not creep back; SCOREBOARD
+     sits after the primary action rather than in front of it, because adding a
+     bus is the job and sending the report is what you do once at the end. */
+  assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS still leads its row");
+  assert.match(html, /<\/button><button class="down-scoreboard-action"[^>]*>SCOREBOARD<\/button>/,"the scoreboard sits beside it, not before it");
   assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
   // QUICK NOTES is off by default now — a permanent panel between the counts
@@ -10340,6 +10345,95 @@ test("the handoff files stay true: every storage key is documented, and the entr
  assert.ok(readme.length>0);
 });
 
+test("the SCOREBOARD sends either version, and both tell the same story",async()=>{
+ const {buildScoreboard,scoreboardText}=await import("../app/fleet-scoreboard.ts");
+ const {scoreboardPrintHtml}=await import("../app/fleet-scoreboard-print.ts");
+ const modal=await readFile(new URL("../app/scoreboard-modal.tsx",import.meta.url),"utf8");
+
+ const now="2026-09-13T18:00:00.000Z";
+ const fleet=[
+  {id:"b1",n:"17501",l:"bay-1",s:"defect",defects:[{id:"x",category:"Brakes",issue:"Air leak",state:"open"}]},
+  {id:"b2",n:"17502",l:"bay-2",s:"defect",defects:[]},
+  /* A MYSTERY bus carrying a defect. It has to be this one: the checkbox can
+     only reveal repairs on buses the report actually LISTS, and Curtis asked
+     for numbers on the mystery and road-call lists only - "not the entire
+     downed bus list". So 17501 being downed with an air leak proves the
+     opposite point, and did, when this fixture was wrong. */
+  {id:"b3",n:"17504",l:"east-1",s:"unknown",defects:[{id:"y",category:"A/C and HVAC",issue:"No cooling",state:"open"}]},
+ ];
+ const entries=[{busId:"b1",section:"Pending",workflow:"Scheduled"},{busId:"b2",section:"Inspection",workflow:"Scheduled"}];
+ const board=buildScoreboard(fleet,entries,now);
+
+ /* THE TWO VERSIONS MUST NOT DISAGREE. They are built for different jobs - one
+    to arrive as a message, one to be handed on - but a superintendent holding
+    the PDF and a foreman reading the text have to see the same numbers. */
+ const text=scoreboardText(board,{title:"PACE SOUTH"});
+ const html=scoreboardPrintHtml(board,{title:"PACE SOUTH"});
+ assert.match(text,/DOWNED BUSES\s+1/);
+ assert.match(html,/<dt>Downed buses<\/dt><dd>1<\/dd>/);
+ assert.match(text,/INSPECTIONS\s+1/);
+ assert.match(html,/<dt>Inspections<\/dt><dd>1<\/dd>/);
+ assert.match(html,/Downed buses only/,"the PDF fences the pair the same way the text does");
+ assert.match(html,/Not counted above/);
+ assert.match(html,/17504/,"and names the mystery bus");
+
+ /* Everything on the page is a value from the board, including free text
+    somebody typed into a repair. Written into markup, so it is escaped - an
+    unescaped "<" silently eats the rest of a line, which is a report a foreman
+    would have to notice rather than an error anybody sees. */
+ const nasty=buildScoreboard([{id:"n",n:"17<b>99",l:"east-2",s:"unknown",
+  defects:[{id:"d",category:"Engine",issue:'Leak "big" & <fast>',state:"open"}]}],[],now);
+ const escaped=scoreboardPrintHtml(nasty,{includeDefects:true});
+ assert.equal(/<b>99/.test(escaped),false,"a fleet number carrying markup is escaped");
+ assert.match(escaped,/17&lt;b&gt;99/);
+ assert.match(escaped,/&quot;big&quot; &amp; &lt;fast&gt;/);
+
+ /* Defects are opt-in in BOTH versions, and the checkbox drives both. */
+ assert.equal(/No cooling/.test(scoreboardPrintHtml(board,{})),false);
+ assert.match(scoreboardPrintHtml(board,{includeDefects:true}),/No cooling/);
+ assert.equal(/Air leak/.test(scoreboardPrintHtml(board,{includeDefects:true})),false,
+  "a DOWNED bus contributes to the count and is never named or itemised");
+ assert.equal(/Air leak/.test(scoreboardText(board,{includeDefects:true})),false,"and the text version agrees");
+
+ /* NO PDF LIBRARY. This is an offline-first app with no build step for new
+    dependencies, and the browser already knows how to make a PDF from a
+    printable page. */
+ const pkg=JSON.parse(await readFile(new URL("../package.json",import.meta.url),"utf8"));
+ const deps=Object.keys({...pkg.dependencies,...pkg.devDependencies});
+ for(const banned of ["jspdf","pdfkit","html2pdf.js","pdfmake","html2canvas"])
+  assert.equal(deps.includes(banned),false,"no PDF library was added: "+banned);
+
+ /* Printed through a same-document iframe. window.open leaves the app for
+    Safari in standalone mode, which is the trapdoor this app exists to avoid. */
+ const modalCode=modal.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.equal(/window\.open/.test(modalCode),false,"never a popup");
+ assert.match(modalCode,/createElement\("iframe"\)/);
+ assert.match(modalCode,/contentWindow\?\.print\(\)/);
+
+ /* The message version goes as TEXT, not as a file - that is the whole point:
+    it arrives as the message body and is readable on a locked phone. */
+ assert.match(modalCode,/navigator\.share\(\{text\}\)/);
+ assert.match(modalCode,/navigator\.clipboard\.writeText\(text\)/,"and falls back to the clipboard where there is no share sheet");
+
+ /* A share sheet somebody dismissed is not a failure and must not be reported
+    as one. */
+ assert.match(modalCode,/AbortError/);
+
+ /* Nothing leaves before it has been read. */
+ assert.match(modalCode,/<pre className="scoreboard-preview"/);
+ assert.match(modalCode,/SEND AS A MESSAGE/);
+ assert.match(modalCode,/SEND AS A PDF/);
+
+ /* The stamp is the moment the report was produced. A report whose own
+    timestamp moved while somebody read it would be lying about when it was
+    true, so it is fixed on open rather than recomputed per render. */
+ assert.match(modalCode,/const at=useMemo\(\(\)=>new Date\(\)\.toISOString\(\),\[\]\)/);
+
+ /* It computes and never writes. There is no save path for it to go around. */
+ for(const banned of ["setItem","writeFleetStorage","writeDownSheetStorage"])
+  assert.equal(modalCode.includes(banned),false,"the scoreboard must not write: "+banned);
+});
+
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../app/hours-value.ts");
  const field=await readFile(new URL("../app/hours-field.tsx",import.meta.url),"utf8");
@@ -10375,11 +10469,14 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
 
  /* Every intermediate state of typing 1.5 must be legal, or the keystroke that
     produces it is the one that gets eaten. */
- const TYPING=/^(\d*\.?\d*)$/;
+ /* Against the REAL export, not a copy of the regex. A second copy here would
+    keep passing after the app's rule changed, which is the whole failure mode
+    this suite exists to catch. */
  for(const step of ["","1","1.","1.5",".",".5","0","0."])
-  assert.ok(TYPING.test(step),"must be typeable: "+JSON.stringify(step));
- for(const junk of ["1.2.3","abc","1a","-1"])
-  assert.equal(TYPING.test(junk),false,"must be refused: "+junk);
+  assert.ok(isTypeableHours(step),"must be typeable: "+JSON.stringify(step));
+ for(const junk of ["1.2.3","abc","1a","-1","1,5"])
+  assert.equal(isTypeableHours(junk),false,"must be refused: "+junk);
+ assert.ok(HOURS_TYPING instanceof RegExp,"the rule is exported so nothing has to re-declare it");
 
  /* type="number" is the rule that eats the point: per the HTML
     value-sanitising algorithm "1." is not a valid floating-point number, so
@@ -10752,6 +10849,33 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  for(const line of scoreboardText(wordy,{includeDefects:true}).split("\n"))
   assert.ok(line.length<=SCOREBOARD_WIDTH,"wordy record too wide ("+line.length+"): "+line);
  assert.match(scoreboardText(wordy),/17588/,"and the number itself survives intact");
+
+ /* A LONG LIST MUST NOT BECOME A WALL OF TEXT. Measured against the real board:
+    22 mystery buses became 25 lines and 1,800 characters, which is no longer
+    something anybody reads on a lock screen - the format's whole reason for
+    existing. The first few keep their location, which is what somebody walking
+    out to find them needs; the rest pack across the width. Every number stays,
+    because Curtis asked for the numbers and a bare "+14 more" would defeat the
+    list. */
+ {
+  const {SCOREBOARD_DETAIL_LIMIT,SCOREBOARD_WIDTH}=await import("../app/fleet-scoreboard.ts");
+  const many=Array.from({length:22},(unused,index)=>({id:"m"+index,n:String(17500+index),l:"east-1",s:"unknown",defects:[]}));
+  const crowded=scoreboardText(buildScoreboard(many,[],now));
+  assert.equal(crowded.split("\n").filter(line=>/^  \d{5}  /.test(line)).length,SCOREBOARD_DETAIL_LIMIT,
+   "only the first few get a line of their own");
+  assert.match(crowded,/\+ 14 more:/);
+  for(const bus of many)assert.ok(crowded.includes(bus.n),"every fleet number survives the packing: "+bus.n);
+  for(const line of crowded.split("\n"))
+   assert.ok(line.length<=SCOREBOARD_WIDTH,"packed line too wide ("+line.length+"): "+line);
+  /* The claim is about the SECTION, not the whole report - the headers and the
+     fences are there either way. 22 buses have to cost well under 22 lines. */
+  const body=crowded.split("\n");
+  const start=body.findIndex(line=>line.startsWith("MYSTERY BUSES"));
+  const end=body.findIndex((line,index)=>index>start&&/^-{5,}$/.test(line));
+  const section=(end<0?body.length:end)-start;
+  assert.ok(section<16,"22 mystery buses must cost well under one line each, got "+section);
+  assert.ok(section>=SCOREBOARD_DETAIL_LIMIT,"but the detailed ones are still there");
+ }
 
  /* An empty shop reports zeroes rather than throwing. */
  const quiet=buildScoreboard([],[],now);

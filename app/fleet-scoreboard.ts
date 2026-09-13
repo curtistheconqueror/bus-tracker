@@ -211,7 +211,14 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
     for, so it goes where the eye lands. */
  lines.push("MYSTERY BUSES       "+board.mystery.length);
  if(board.mystery.length)lines.push("  "+MYSTERY_CAVEAT);
- if(board.mystery.length)for(const bus of board.mystery)lines.push(...busBlock(bus,options.includeDefects));
+ /* NOT ONE LINE EACH, PAST A POINT. Measured against the real board: twenty-two
+    mystery buses became twenty-five lines and 1,800 characters, which is no
+    longer something anybody reads on a lock screen — the format's whole reason
+    for existing. So the first few carry their location, which is what somebody
+    walking out to find them needs, and the rest arrive as bare fleet numbers
+    packed across the width. Every number is still there; Curtis asked for the
+    numbers and losing them to a "+14 more" would defeat the list. */
+ lines.push(...busList(board.mystery,options.includeDefects));
  lines.push(rule);
  lines.push("ROAD CALLS ("+SCOREBOARD_ROAD_CALL_HOURS+"H)    "+board.roadCalls.length);
  /* Both facts Curtis asked for, without saying either of them twice. The first
@@ -220,6 +227,8 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
     star against the row and one line explaining it says the same thing in a
     third of the space, and the reader can see at a glance which rows carry it. */
  const offSheet=new Set(board.roadCallsOffSheet.map(bus=>bus.id));
+ /* Road calls are not capped: the 36-hour window keeps the list short by
+    construction, and each one is a bus somebody has to chase. */
  for(const bus of board.roadCalls)lines.push(...busBlock(bus,options.includeDefects,offSheet.has(bus.id)?" *":""));
  if(board.roadCallsOffSheet.length)lines.push("  * NOT ON THE SHEET \u2014 "+board.roadCallsOffSheet.length);
  return lines.join("\n").replace(/\n{3,}/g,"\n\n").trim();
@@ -232,6 +241,27 @@ function fit(text:string,max:number){
  const value=clean(text);
  if(max<=1||value.length<=max)return value;
  return value.slice(0,max-1).trimEnd()+"\u2026";
+}
+
+/* How many buses get a line of their own before the rest are packed into a run
+   of numbers. Eight fills about a third of a phone screen, which is as much of
+   one list as a reader will take before the next heading has to appear. */
+export const SCOREBOARD_DETAIL_LIMIT=8;
+
+function busList(buses:ScoreboardBusLine[],includeDefects?:boolean){
+ const out:string[]=[];
+ for(const bus of buses.slice(0,SCOREBOARD_DETAIL_LIMIT))out.push(...busBlock(bus,includeDefects));
+ const rest=buses.slice(SCOREBOARD_DETAIL_LIMIT);
+ if(!rest.length)return out;
+ out.push("  + "+rest.length+" more:");
+ /* Packed to the width rather than one per line — that is the entire saving. */
+ let row="   ";
+ for(const bus of rest){
+  if((row+" "+bus.n).length>SCOREBOARD_WIDTH){out.push(row);row="   "}
+  row+=" "+bus.n;
+ }
+ if(row.trim())out.push(row);
+ return out;
 }
 
 function busBlock(bus:ScoreboardBusLine,includeDefects?:boolean,mark=""){
