@@ -635,6 +635,14 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    the job, sending the report is what you do once. */
 .down-scoreboard-action{min-height:38px;height:auto;border:1px solid var(--log-header,#06275c);border-radius:6px;background:transparent;color:var(--log-header,#06275c);font-size:10px;font-weight:900;letter-spacing:.08em;padding:0 12px;cursor:pointer}
 .down-scoreboard-action:focus-visible{outline:2px solid #f97316;outline-offset:2px}
+/* Said in the form, where the choice is, rather than by an alert at save time
+   that threw the draft away. */
+.repair-existing-entry{grid-column:1/-1;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border:1px solid #f97316;border-left-width:4px;border-radius:6px;background:color-mix(in srgb,#f97316 8%,var(--log-surface,#fff));color:var(--log-text,#172b4d)}
+.repair-existing-entry b{font-size:12px;font-weight:900}
+.repair-existing-entry span{font-size:10px;font-weight:700;color:var(--log-muted,#5b6b85);min-width:0}
+.repair-existing-entry>button{min-height:38px;height:auto;margin-left:auto;border:0;border-radius:6px;background:#f97316;color:#231205;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.05em;cursor:pointer;white-space:nowrap}
+.repair-existing-entry>button:focus-visible{outline:2px solid var(--log-text,#172b4d);outline-offset:2px}
+@media(max-width:620px){.repair-existing-entry>button{margin-left:0;width:100%}}
 .scoreboard-modal{width:min(560px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
 .scoreboard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
 .scoreboard-head small{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9db4da}

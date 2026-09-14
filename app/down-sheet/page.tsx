@@ -809,7 +809,10 @@ export default function DownSheet(){
   {/* The sheet and the board are handed over as they stand; the Scoreboard
       computes and never writes, so there is no save path to go around. */}
   {scoreboardOpen&&<ScoreboardModal fleet={fleet as never} entries={entries as never} close={()=>setScoreboardOpen(false)}/>}
-  {editing&&<DownSheetEditor entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
+  {/* "we just add to it" — the existing entry is opened with a fresh blank
+      repair card on the end, so the new work is typed straight into the row
+      that is already there rather than refused. */}
+  {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
  </main>;

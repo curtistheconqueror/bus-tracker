@@ -1,5 +1,6 @@
 "use client";
 
+import BusSelector from "../bus-selector";
 import HoursField from "../hours-field";
 import {useEffect, useMemo, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
@@ -52,7 +53,7 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;onOpenExisting?:(entryId:string)=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
   /* Named so the "leave it" option can say where that actually is. A foreman
@@ -61,7 +62,18 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
   const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
   const updateItem=(id:string,change:(item:DownSheetRepairItem)=>DownSheetRepairItem)=>setDraft(current=>({...current,repairItems:current.repairItems.map(item=>item.id===id?change(item):item)}));
   const updateEstimateHours=(id:string,key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>updateItem(id,item=>({...item,timeEstimate:{...item.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
-  const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
+  /* THE BUS ALREADY ON THE SHEET — said HERE, not at save time.
+
+     The list used to hide any bus that already had an active entry, so the only
+     way to find out was to fill the form in, press SAVE, and be told "That bus
+     already has an active down-sheet entry" by an alert that threw the draft
+     away. Curtis: "once u type in bus number if it already has defects that put
+     it on downsheet then we just add to it. That's all."
+
+     So the picker shows the whole fleet, typing a number that is already on the
+     sheet RESOLVES, and this says so the moment it does — with the way through.
+     A number that silently matched nothing read as the app not knowing the bus. */
+  const existingEntry=useMemo(()=>entries.find(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===draft.busId&&Boolean(draft.busId)),[entries,draft.busId,draft.id]);
   const isNew=!entries.some(item=>item.id===entry.id);
   const estimateTotal=repairItemsTotal(draft.repairItems);
 
@@ -129,7 +141,25 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <form className="repair-editor" onSubmit={submit}>
       <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
       <div className="repair-form">
-        <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker.</small></label>
+        {/* THE SAME PICKER THE DEFECT LOG USES, not a second one.
+
+           This was a bare <select> over `availableFleet` — no way to type a
+           fleet number at all, and the list additionally hid every bus that
+           already had an active entry, so a bus could be both un-typable and
+           un-listable. The Defect Log had solved this twice over already, with
+           generation chips and a typed box backed by a datalist, and copying it
+           across would have made two of them to keep in step.
+
+           `fleet` rather than `availableFleet`: typing a number that is already
+           on the sheet has to RESOLVE, so the uniqueness rule below can say so
+           in words. A number that silently matches nothing reads as the app not
+           knowing the bus.
+
+           autoFocus off, because this editor opens with the section and the
+           workflow above it and stealing focus moves the page under a thumb. */}
+          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false}
+           select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">

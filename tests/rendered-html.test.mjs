@@ -2419,9 +2419,14 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/groupDefectLogRecords\(visible\)/);
   assert.match(page,/className="defect-count-badge">×\{group\.records\.length\}/);
   assert.match(page,/\+ ADD DEFECT/);
-  assert.match(page,/className="bus-generations"/);
-  assert.match(page,/input autoFocus inputMode="numeric"/);
-  assert.match(page,/Choose generation first/);
+  /* The picker is a SHARED component now — the Down Sheet had a bare <select>
+     with no way to type a number at all, and copying this across would have
+     made two of them. Asserted where it lives. */
+  const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
+  assert.match(picker,/className="bus-generations"/);
+  assert.match(picker,/input autoFocus=\{autoFocus\} inputMode="numeric"/);
+  assert.match(picker,/Choose generation first/);
+  assert.match(page,/<BusSelector /,"and the Defect Log uses it rather than its own copy");
   assert.match(page,/className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}>\{saveLabel\}/);
   assert.match(page,/className="close-log-middle" onClick=\{close\}>CLOSE/);
   assert.doesNotMatch(page,/className="log-header-save/);
@@ -8838,13 +8843,22 @@ test("the sweep lists buses ticked OK that the board still holds open, and files
 });
 
 test("the defect form asks for the bus the way a mechanic reaches for it",async()=>{
+ /* The PICKER moved into a shared component so the Down Sheet could stop being
+    a bare <select>; the rest of this test is still about the Defect Log's own
+    form, so both sources are read and each assertion uses the right one. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/bus-selector.css",import.meta.url),"utf8");
+ /* Every colour in the SHARED sheet carries a fallback. They read --log-*
+    because that is where they came from and the Defect Log still sets them; the
+    Down Sheet does not, and a var with no value and no fallback is an invalid
+    declaration — a control with no edges on the surface nobody tested. */
+ assert.equal(/var\(--[a-z-]+\)/.test(css),false,"no bare var survives into the shared picker stylesheet");
 
  // TWO BOXES, NAMED FOR WHAT THEY DO. The one box used to be called BUS NUMBER
  // and the first thing inside it was a row of generations.
- const generations=page.slice(page.indexOf('bus-picker-generations'),page.indexOf('bus-picker-number'));
- const number=page.slice(page.indexOf('bus-picker-number'),page.indexOf('</fieldset>\n </>'));
+ const generations=picker.slice(picker.indexOf('bus-picker-generations'),picker.indexOf('bus-picker-number'));
+ const number=picker.slice(picker.indexOf('bus-picker-number'),picker.indexOf('</fieldset>\n </>'));
  assert.match(generations,/<legend>BUS GENERATIONS<\/legend>/);
  assert.match(number,/<legend>BUS NUMBER<\/legend>/);
  // The chips belong to the generations box, and only to it.
@@ -8860,11 +8874,18 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
  // rule below sits LATER in this file at the same specificity, so an unscoped
  // `.type-bus-number>input` loses the tie and silently renders at 16px. That
  // exact bug was measured in a browser before this test existed.
- assert.match(css,/\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
- assert.match(css,/\.log-form \.type-bus-number>input\{[^}]*color:var\(--log-text\)/);
- assert.match(css,/\.log-form input,\.log-form select[^}]*font-size:16px\}/,
+ /* That override is genuinely the Defect Log's - it is scoped to .log-form -
+    so it stayed behind when the shared rules moved out. */
+ const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(logCss,/\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
+ assert.match(logCss,/\.log-form \.type-bus-number>input\{[^}]*color:var\(--log-text\)/);
+ /* Both sides of this specificity fight live in defect-log.css: the generic
+    .log-form input rule and the .log-form .type-bus-number>input that has to
+    outrank it. Moving the SHARED picker rules out did not separate them, and
+    this reads the file they are both in. */
+ assert.match(logCss,/\.log-form input,\.log-form select[^}]*font-size:16px\}/,
   "the generic rule this one has to outrank must still be here");
- assert.ok(css.indexOf(".log-form .type-bus-number>input")<css.indexOf("font-size:16px}")
+ assert.ok(logCss.indexOf(".log-form .type-bus-number>input")<logCss.indexOf("font-size:16px}")
   ||true,"scoping wins regardless of order, which is the point");
 
  // The list is disabled until a generation is picked, and that control now
@@ -10617,6 +10638,61 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
   assert.equal(/<input type="number"[^>]*(?:repairHours|diagnosticHours|timeEstimate)/.test(source),false,name+" has no type=number hour box left");
   assert.equal(/<input inputMode="decimal"[^>]*(?:repairHours|diagnosticHours|timeEstimate)/.test(source),false,name+" has no hand-rolled hour box left");
  }
+});
+
+test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already on the sheet",async()=>{
+ const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
+ const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* Every "this must be gone" check reads the CODE. The comments here explain
+    what was removed and why, and a naive search matches the explanation — which
+    has now caught me three separate times in this suite. */
+ const strip=source=>source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ const editorCode=strip(editor),logCode=strip(log);
+
+ /* ONE PICKER, TWO SURFACES. The Down Sheet's bus control was a bare <select>
+    with no way to type a fleet number at all. Copying the Defect Log's across
+    would have made two of them to keep in step, and this project has paid for
+    duplicated logic more than once — five copies of the location table, all
+    five carrying the same bug, and two road-call records that had drifted. */
+ assert.match(editor,/<BusSelector fleet=\{fleet\}/);
+ assert.match(log,/<BusSelector /);
+ assert.equal(/<select value=\{draft\.busId\}/.test(editorCode),false,"the bare select is gone");
+ assert.equal(/function BusSelector/.test(logCode),false,"and the Defect Log no longer declares its own");
+ assert.match(picker,/export default function BusSelector/);
+
+ /* The whole FLEET, not availableFleet. Typing a number already on the sheet
+    has to RESOLVE so the notice below can say so in words; a number that
+    silently matches nothing reads as the app not knowing the bus. */
+ assert.equal(/availableFleet/.test(editorCode),false,"the list no longer hides buses that already have an entry");
+
+ /* SAID IN THE FORM, NOT AT SAVE TIME. It used to be an alert on SAVE that
+    threw the whole draft away. Curtis: "once u type in bus number if it already
+    has defects that put it on downsheet then we just add to it." */
+ assert.match(editor,/const existingEntry=useMemo/);
+ /* Checked as a CONDITIONAL RENDER, not as a string present in the file. A
+    mutation that disabled the render with {false&&...} left every string
+    assertion passing, which is a test describing the source rather than the
+    behaviour. */
+ assert.match(editorCode,/\{existingEntry&&<p className="repair-existing-entry">/,
+  "the notice renders when the bus is already on the sheet");
+ assert.match(editorCode,/is already on the sheet\./);
+ assert.match(editorCode,/\{onOpenExisting&&<button type="button" onClick=\{\(\)=>onOpenExisting\(existingEntry\.id\)\}>ADD TO THAT ENTRY<\/button>\}/,
+  "and the way through is wired to that entry");
+
+ /* And "add to it" means exactly that: the existing entry opens with a fresh
+    blank repair card on the end, so the new work is typed into the row that is
+    already there rather than refused. */
+ assert.match(page,/onOpenExisting=\{entryId=>/);
+ assert.match(page,/\.\.\.normalizeRepairItems\(found\.repairItems[^)]*\),blankRepairItem\(\)\]/);
+
+ /* autoFocus off here: this editor opens with the section and the workflow
+    above the picker, and stealing focus moves the page under a thumb. */
+ assert.match(editor,/autoFocus=\{false\}/);
+ /* Two of these on one page would otherwise share a datalist id. */
+ assert.match(editor,/listId="down-sheet-bus-numbers"/);
+ assert.match(picker,/listId="bus-number-options"/,"and the default is its own");
 });
 
 test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{

@@ -1,0 +1,21 @@
+/* THE BUS PICKER'S OWN STYLES.
+
+   Lifted verbatim out of defect-log.css when the picker became a shared
+   component, so the Down Sheet gets them by importing the component rather than
+   by loading the whole Defect Log stylesheet - and so a change to the picker
+   cannot style one surface and miss the other.
+
+   Every colour carries a FALLBACK now. They read --log-* because that is where
+   they came from and the Defect Log still sets them; the Down Sheet does not,
+   and a var with no value and no fallback is an invalid declaration - which
+   would have meant a control with no edges on the surface nobody tested.
+
+   The .log-form overrides stayed in defect-log.css, because they are scoped to
+   that form and are genuinely the Defect Log's. */
+.bus-picker{grid-column:1/-1;display:flex;min-width:0;flex-direction:column;gap:7px;margin:0;border:1px solid var(--log-border,#b7c3d5);border-radius:8px;background:color-mix(in srgb,var(--log-accent,#0b64bd) 4%,var(--log-surface,#fff));padding:10px}.bus-picker legend{padding:0 5px;color:var(--log-accent,#0b64bd);font-size:8px;font-weight:900}.bus-generations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.bus-generations button{min-height:34px;border:1px solid var(--log-border,#b7c3d5);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);font-size:9px;font-weight:900;cursor:pointer}.bus-generations button.active{border-color:var(--log-accent,#0b64bd);background:var(--log-accent,#0b64bd);color:var(--log-header-text,#fff)}.bus-picker-fields{display:grid;grid-template-columns:minmax(140px,.7fr) minmax(220px,1.3fr);gap:8px}.bus-picker>small{color:var(--log-muted,#5b6b85);font-size:8px;font-weight:800}.bus-picker-generations{margin-bottom:-2px}.bus-picker-number .bus-picker-fields{grid-template-columns:1fr}
+
+@media(max-width:390px){.bus-generations{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* The typed number is the way in that gets used, so it is the biggest thing in
+   the form on either surface. The Defect Log keeps a heavier override of its
+   own at phone width; this is the floor under both. */
+@media(max-width:760px){.type-bus-number>input{font-size:24px;min-height:52px}}

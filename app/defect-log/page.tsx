@@ -1,5 +1,6 @@
 "use client";
 
+import BusSelector from "../bus-selector";
 import HoursField from "../hours-field";
 import {useEffect,useMemo,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "./defect-log-settings";
@@ -78,45 +79,7 @@ async function copyText(text:string){
  const field=document.createElement("textarea");field.value=text;field.style.position="fixed";field.style.opacity="0";document.body.appendChild(field);field.focus();field.select();const copied=document.execCommand("copy");field.remove();if(!copied)throw new Error("Copy failed");
 }
 
-function busGeneration(number:string){const value=number.slice(0,2);return /^\d{2}$/.test(value)?value:"OTHER"}
-function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
-function BusSelector({fleet,busId,select}:{fleet:DefectLogFleetBus[];busId:string;select:(busId:string)=>void}){
- const selected=fleet.find(bus=>bus.id===busId),standard=["15","17","18","20"],available=[...new Set(fleet.map(bus=>busGeneration(bus.n)))],generations=[...standard,...available.filter(value=>!standard.includes(value)).sort()];
- const [generation,setGeneration]=useState(selected?busGeneration(selected.n):"");
- const [number,setNumber]=useState(selected?.n||"");
- useEffect(()=>{const bus=fleet.find(item=>item.id===busId);if(bus){setNumber(bus.n);setGeneration(busGeneration(bus.n))}},[busId,fleet]);
- const candidates=[...fleet].filter(bus=>!generation||busGeneration(bus.n)===generation).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true}));
- const chooseGeneration=(next:string)=>{setGeneration(next);const current=fleet.find(bus=>bus.id===busId);if(current&&busGeneration(current.n)!==next)select("");if(!number.startsWith(next))setNumber("")};
- const typeNumber=(raw:string)=>{const digits=raw.replace(/\D/g,"");setNumber(digits);const prefix=digits.slice(0,2);if(digits.length>=2&&generations.includes(prefix))setGeneration(prefix);const exact=fleet.find(bus=>bus.n===digits);select(exact?.id||"")};
- const chooseBus=(id:string)=>{const bus=fleet.find(item=>item.id===id);select(id);setNumber(bus?.n||"");if(bus)setGeneration(busGeneration(bus.n))};
- /* Two boxes, because the old single box was called BUS NUMBER and the first
-    thing in it was a row of generations. The chips narrow the fleet; the number
-    names one bus. Naming each box for what it does is the whole change.
 
-    They stay wired the way they always were - a generation filters the list AND
-    the type-ahead, typing a number lights its generation, picking from the list
-    fills the number - so the split is what a person reads, not what the code
-    does. */
- return <>
-  <fieldset className="wide bus-picker bus-picker-generations"><legend>BUS GENERATIONS</legend>
-   <div className="bus-generations" aria-label="Bus generation">{generations.map(value=><button type="button" className={generation===value?"active":""} aria-pressed={generation===value} onClick={()=>chooseGeneration(value)} key={value}>{generationLabel(value)}</button>)}</div>
-   <small>{generation?candidates.length+" buses in "+generationLabel(generation):"Narrows the bus list below. Skip it if you know the number."}</small>
-  </fieldset>
-  <fieldset className="wide bus-picker bus-picker-number"><legend>BUS NUMBER</legend>
-   <div className="bus-picker-fields">
-    <label>BUS LIST<select value={busId} disabled={!generation} onChange={event=>chooseBus(event.target.value)}><option value="">{generation?"Choose a "+generationLabel(generation)+" bus":"Choose generation first"}</option>{candidates.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n} - {locationLabel(bus.l)}</option>)}</select></label>
-    {/* The typed number is the way in that gets used, so it is the biggest
-        thing in the form and it reads in the page's own text colour rather
-        than the muted grey every other field uses. */}
-    <label className="type-bus-number">TYPE BUS #<input autoFocus inputMode="numeric" value={number} onChange={event=>typeNumber(event.target.value)} list="defect-log-bus-numbers" placeholder="Enter full bus number"/><datalist id="defect-log-bus-numbers">{candidates.map(bus=><option value={bus.n} key={bus.id}/>)}</datalist></label>
-   </div>
-   {/* The list is disabled until a generation is picked, and that control now
-       lives in the box above, so the reason has to be said here or it reads as
-       broken. */}
-   {!generation&&<small>Pick a generation above to use the bus list, or type the full number.</small>}
-  </fieldset>
- </>;
-}
 
 /* Asked at the moment a repair is closed out with a part on it.
 
