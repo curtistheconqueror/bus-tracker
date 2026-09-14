@@ -7,7 +7,11 @@ import {describeScanBatch,scanBatches,type ScanBatch} from "./defect-log/scan-ba
 export type OperatorBus=FleetInsightBus;
 
 export type OperatorArea={name:string;slots:string[]};
-export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string;pendingStatus?:FleetStatus;pendingIntent?:"status"|"clarify-bus";pendingCommand?:string;ambiguousQuery?:string;candidateBusIds?:string[]};
+/* `lastBusId` / `lastBusNumber` are the subject of the previous turn. The
+   group fields above answer "those", "them", "the rest"; these answer "it",
+   "that bus", and a bare "why?" — which is what the Operator lost when Curtis
+   asked one. */
+export type OperatorSelectionContext={busIds:string[];busNumbers:string[];label:string;pendingStatus?:FleetStatus;pendingIntent?:"status"|"clarify-bus";pendingCommand?:string;ambiguousQuery?:string;candidateBusIds?:string[];lastBusId?:string;lastBusNumber?:string;lastAnswer?:string};
 
 type DefectDraft=Omit<StructuredDefect,"id">;
 export type OperatorBatchItem={busId:string;busNumber:string;areaName?:string;status?:FleetStatus};
@@ -96,14 +100,78 @@ function batchCapacityShortage(items:OperatorBatchItem[],fleet:OperatorBus[],are
  return null;
 }
 
-function resolveOne(fleet:OperatorBus[],command:string):{bus?:OperatorBus;query:string;message?:string;ambiguous?:{query:string;matches:OperatorBus[]}}{
+function resolveOne(fleet:OperatorBus[],command:string,context:OperatorSelectionContext|null=null):{bus?:OperatorBus;query:string;message?:string;ambiguous?:{query:string;matches:OperatorBus[]}}{
  const query=busQuery(command);
+ /* THE FOLLOW-UP THAT LOST ITS SUBJECT.
+
+    Curtis asked about bus 17559, got an answer, typed "Why?" and was told
+    "Tell me which bus you mean." The engine resolved the bus fresh on every
+    turn from the text alone, so a pronoun — or a bare question — had nothing
+    to hold on to.
+
+    This is the ONLY place a single bus is resolved, and it is called once, so
+    every per-bus intent inherits the fix: move, down sheet, defect, inspect,
+    locate. Scoped to anaphora and to short follow-ups on purpose. A sentence
+    that names no bus and is not referring back ("mark it down" out of nowhere)
+    still asks, because silently acting on a bus from five turns ago is worse
+    than asking. */
+ if(!query&&context?.lastBusId){
+  const text=normalized(command);
+  const refersBack=/\b(it|its|that|this|the bus|same|same one|the one|him|her|them)\b/.test(text)||FOLLOW_UP.test(text);
+  const carried=refersBack?fleet.find(item=>item.id===context.lastBusId):undefined;
+  if(carried)return {query:carried.n,bus:carried};
+ }
  if(!query)return {query,message:"Tell me which bus you mean. Use the full fleet number or its last two digits."};
  const resolution=resolveBusNumber(fleet,query);
  if(resolution.kind==="invalid")return {query,message:"Enter a complete fleet number or exactly two ending digits."};
  if(resolution.kind==="not-found")return {query,message:"I could not find a bus matching "+query+" on this device."};
  if(resolution.kind==="ambiguous")return {query,message:query+" matches multiple buses: "+candidateBusNumbers(resolution.matches).join(", ")+". Reply with the complete fleet number and I will continue this command.",ambiguous:{query,matches:resolution.matches}};
  return {query,bus:resolution.bus};
+}
+
+/* A QUESTION MUST NEVER BECOME A WRITE.
+
+   "Does bus 17559 have an oil leak in its defects?" used to produce a PLAN:
+   `defectFromCommand` substring-matched "oil leak" against the catalog and the
+   Operator offered to ADD Engine — Oil leak to the bus. A question about what
+   is already true was answered with an offer to make it true. Nothing was
+   written without APPLY CHANGE, so it was never silent — but the direction was
+   inverted, and the person who confirms without reading is exactly the person
+   in a hurry.
+
+   The engine had no notion of an interrogative at all. It has one now, and the
+   two branches that can create a record consult it before they build a plan.
+
+   The question mark is read off the RAW command, because normalized() strips
+   every non-alphanumeric character — by the time the rest of the engine sees
+   the text, the "?" is gone. */
+const QUESTION_LEAD=/^(does|do|did|is|are|was|were|has|have|had|can|could|should|would|will|any|anything|which|who|whose|whether)\b/;
+/* Short follow-ups that mean "about the thing we were just discussing". Kept
+   deliberately small: these are utterances with no subject of their own, and
+   widening the list is how a command meant for nothing in particular starts
+   landing on a bus somebody mentioned earlier. */
+export const FOLLOW_UP=/^(why|why is that|why not|how come|says who|because|what about it|and|so|ok|okay|really|since when|when|what else|anything else|explain|says)\b/;
+
+export function isQuestion(rawCommand:string){
+ const raw=String(rawCommand??"").trim();
+ if(raw.endsWith("?"))return true;
+ return QUESTION_LEAD.test(normalized(raw));
+}
+
+/* Does this bus already carry the repair being asked about? Answers the
+   question the mutation branch used to answer with an offer. */
+/* What the NEXT turn needs to know: which bus this answer was about. Without it
+   a one-word follow-up has nothing to resolve — see resolveOne. */
+function busContext(bus:OperatorBus,label?:string):OperatorSelectionContext{
+ return {busIds:[bus.id],busNumbers:[bus.n],label:label||("Bus "+bus.n),lastBusId:bus.id,lastBusNumber:bus.n};
+}
+
+function matchingDefects(bus:OperatorBus,draft:{category:string;issue:string}){
+ const defects=Array.isArray(bus.defects)?bus.defects:[];
+ return defects.filter(defect=>{
+  if(defect?.state==="completed")return false;
+  return String(defect?.category??"")===draft.category&&String(defect?.issue??"")===draft.issue;
+ });
 }
 
 function areaFromCommand(command:string,areas:OperatorArea[]){
@@ -292,7 +360,10 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  if(/\b(down sheet|downsheet)\b/.test(text)&&/\b(undo|restore)\b/.test(text)&&/\b(clear|reset|empty)\b/.test(text))return {kind:"plan",plan:{kind:"undoDownSheetClear",requiresConfirmation:true,summary:"Restore the last cleared down sheet and its tracker checkboxes"}};
  if(/\b(down sheet|downsheet)\b/.test(text)&&/\b(clear|reset|empty)\b/.test(text))return {kind:"plan",plan:{kind:"clearDownSheet",requiresConfirmation:true,summary:"Clear the entire down sheet and uncheck every tracker bus marked on it. Save one undo snapshot"}};
 
- const resolved=resolveOne(fleet,command);
+ const resolved=resolveOne(fleet,command,context);
+ /* Read once, here, so the two branches that can create a record agree on what
+    counts as being asked rather than told. */
+ const asked=isQuestion(command);
  const isLocate=/\b(locate|find|highlight)\b/.test(text);
  if(isLocate){
   const query=resolved.query;
@@ -307,6 +378,24 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  if(!resolved.bus)return {kind:"message",message:resolved.message||"Tell me which bus you mean.",context:clarificationContext(command,resolved)};
  const bus=resolved.bus;
 
+ /* "WHY?" — the turn that started this. The subject has been carried by
+    resolveOne above, so by the time we are here we know which bus is meant;
+    what is left is to say something about it rather than treat a bare
+    follow-up as a command with no verb, which is what dropped it into the
+    "I need an action" fallback.
+
+    Placed before every mutating branch so a follow-up can never be read as an
+    instruction. It re-derives the answer from the record rather than storing
+    prose from the previous turn: the board may have changed between the two,
+    and a remembered sentence would be the older of the two truths. */
+ if(FOLLOW_UP.test(text)&&!busQuery(command)){
+  const openNow=(Array.isArray(bus.defects)?bus.defects:[]).filter(defect=>defect?.state!=="completed");
+  const reason=bus.down
+   ?"Bus "+bus.n+" is on the active down sheet"+(openNow.length?", and it has "+openNow.length+" open repair"+(openNow.length===1?"":"s")+" on record: "+openNow.slice(0,3).map(defect=>String(defect?.category??"")+" \u2014 "+String(defect?.issue??"")).join("; ")+".":", though no open repair is recorded against it here. The sheet is what put it there \u2014 open the DOWN SHEET to see the entry.")
+   :"Bus "+bus.n+" is not on the active down sheet."+(openNow.length?" It does have "+openNow.length+" open repair"+(openNow.length===1?"":"s")+": "+openNow.slice(0,3).map(defect=>String(defect?.category??"")+" \u2014 "+String(defect?.issue??"")).join("; ")+".":" No open repairs are recorded against it.");
+  return {kind:"message",message:reason,context:busContext(bus)};
+ }
+
  if(moveAction){
   const area=areaFromCommand(command,areas);
   if(!area)return {kind:"message",message:"I found Bus "+bus.n+", but I could not identify the destination area. Try a label such as CNG East, Shop Wall, Main Garage, or On Road."};
@@ -318,19 +407,44 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
  if(text.includes("down sheet")||text.includes("downsheet")){
   const remove=/\b(remove|take|clear|complete|off)\b/.test(text);
   const selected=!remove;
-  if(bus.down===selected)return {kind:"message",message:"Bus "+bus.n+(selected?" is already marked on the down sheet.":" is already off the active down sheet.")};
+  /* Asked rather than told: report, never plan. "Should I take 25 off the down
+     sheet?" was building a removal out of a question. */
+  if(asked)return {kind:"message",message:"Bus "+bus.n+(bus.down?" IS on the active down sheet.":" is NOT on the active down sheet."),context:busContext(bus)};
+  if(bus.down===selected)return {kind:"message",message:"Bus "+bus.n+(selected?" is already marked on the down sheet.":" is already off the active down sheet."),context:busContext(bus)};
   return {kind:"plan",plan:{kind:"downsheet",requiresConfirmation:true,busId:bus.id,busNumber:bus.n,selected,summary:(selected?"Add Bus ":"Complete and remove Bus ")+bus.n+(selected?" on the active down sheet":" from the active down sheet")}};
  }
 
- if(/\b(defect|issue|check engine|horn|ramp|kneeler)\b/.test(text)){
+ /* Plurals included. `\bdefect\b` does not match "defects" — the trailing word
+    boundary fails on the s — so "does 17559 have an oil leak in its defects"
+    missed this branch entirely and fell through to the generic "I need an
+    action". The singular DID reach it, which is where the inverted answer came
+    from. Both spellings route here now, and `asked` decides what happens. */
+ if(/\b(defects?|issues?|check engine|horn|ramp|kneeler)\b/.test(text)){
   const selected=defectFromCommand(command);
-  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp."};
+  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp.",context:busContext(bus)};
+  /* THE INVERSION, CLOSED. Asked whether a bus HAS a repair, answer from the
+     record rather than offering to create it. */
+  if(asked){
+   const found=matchingDefects(bus,selected.defect);
+   const label=selected.defect.category+" \u2014 "+selected.defect.issue;
+   return {kind:"message",message:found.length
+    ?"Yes. Bus "+bus.n+" has "+label+" open"+(found.length>1?" ("+found.length+" records)":"")+"."
+    :"No. Bus "+bus.n+" has no open "+label+" on record."+(bus.down?" It IS on the active down sheet.":" It is NOT on the active down sheet."),context:busContext(bus)};
+  }
   return {kind:"plan",plan:{kind:"defect",requiresConfirmation:true,busId:bus.id,busNumber:bus.n,defect:selected.defect,flag:selected.flag,summary:"Add "+selected.defect.category+" — "+selected.defect.issue+" to Bus "+bus.n+(selected.defect.operability==="down"?" as a downing defect":" as a serviceable defect")}};
  }
 
  if(/\b(where|status|inspect|tell|what)\b/.test(text)){
   const repair=bus.pendingRepair?.trim()?" Pending repair: "+bus.pendingRepair.trim()+".":" No pending repair is recorded.";
-  return {kind:"plan",plan:{kind:"inspect",requiresConfirmation:false,busId:bus.id,busNumber:bus.n,summary:"Inspect Bus "+bus.n,response:"Bus "+bus.n+" is in "+areaLabel(bus,areas)+" with status “"+(STATUS_LABELS[bus.s]||bus.s)+".”"+repair+(bus.down?" It is on the active down sheet.":" It is not marked on the active down sheet.")}};
+  /* INSPECT NEVER READ bus.defects, though the array is on the type. So the one
+     intent whose whole job is to describe a bus could not answer "does it have
+     an oil leak" even when it routed there — it reported area, status and the
+     pending-repair string and stopped. */
+  const openDefects=(Array.isArray(bus.defects)?bus.defects:[]).filter(defect=>defect?.state!=="completed");
+  const defectLine=openDefects.length
+   ?" Open repairs: "+openDefects.slice(0,4).map(defect=>String(defect?.category??"")+" \u2014 "+String(defect?.issue??"")).join("; ")+(openDefects.length>4?" and "+(openDefects.length-4)+" more":"")+"."
+   :" No open repairs are recorded.";
+  return {kind:"plan",plan:{kind:"inspect",requiresConfirmation:false,busId:bus.id,busNumber:bus.n,summary:"Inspect Bus "+bus.n,response:"Bus "+bus.n+" is in "+areaLabel(bus,areas)+" with status “"+(STATUS_LABELS[bus.s]||bus.s)+".”"+repair+defectLine+(bus.down?" It is on the active down sheet.":" It is not marked on the active down sheet.")}};
  }
 
  return {kind:"message",message:"I found Bus "+bus.n+", but I need an action. I can answer fleet questions, inspect or locate buses, move them to an area, add a catalog defect, or add/remove them from the down sheet."};

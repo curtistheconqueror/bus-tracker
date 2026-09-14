@@ -1,7 +1,11 @@
 "use client";
 
+import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "../defect-search";
+import ComboField from "../combo-field";
+import BusSelector from "../bus-selector";
+import HoursField from "../hours-field";
 import {useEffect, useMemo, useState} from "react";
-import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "../repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "../findings-memory";
 import {lockPageScroll} from "../scroll-lock";
 import {
@@ -51,7 +55,7 @@ const ESTIMATE_FIELDS:{key:Exclude<keyof RepairTimeEstimate,"notes">;label:strin
 
 function hoursValue(minutes:number){return Number((minutes/60).toFixed(2))}
 
-export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void}){
+export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onClose,onSave,onOpenExisting}:{entry:DownSheetRecord;fleet:FleetBus[];entries:DownSheetRecord[];defaultInitials:string;onClose:()=>void;onSave:(entry:DownSheetRecord)=>void;onOpenExisting?:(entryId:string)=>void}){
   const [draft,setDraft]=useState(()=>({...entry,repairItems:normalizeRepairItems(entry.repairItems,{category:entry.category,repair:entry.repair,details:entry.customReason,timeEstimate:entry.timeEstimate})}));
   const [initials,setInitials]=useState(defaultInitials||entry.updatedBy);
   /* Named so the "leave it" option can say where that actually is. A foreman
@@ -60,7 +64,18 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
   const update=<K extends keyof DownSheetRecord>(key:K,value:DownSheetRecord[K])=>setDraft(current=>({...current,[key]:value}));
   const updateItem=(id:string,change:(item:DownSheetRepairItem)=>DownSheetRepairItem)=>setDraft(current=>({...current,repairItems:current.repairItems.map(item=>item.id===id?change(item):item)}));
   const updateEstimateHours=(id:string,key:Exclude<keyof RepairTimeEstimate,"notes">,value:string)=>updateItem(id,item=>({...item,timeEstimate:{...item.timeEstimate,[key]:Math.max(0,Math.round((Number(value)||0)*60))}}));
-  const availableFleet=useMemo(()=>fleet.filter(bus=>bus.id===draft.busId||!entries.some(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===bus.id)).sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})),[fleet,entries,draft.busId,draft.id]);
+  /* THE BUS ALREADY ON THE SHEET — said HERE, not at save time.
+
+     The list used to hide any bus that already had an active entry, so the only
+     way to find out was to fill the form in, press SAVE, and be told "That bus
+     already has an active down-sheet entry" by an alert that threw the draft
+     away. Curtis: "once u type in bus number if it already has defects that put
+     it on downsheet then we just add to it. That's all."
+
+     So the picker shows the whole fleet, typing a number that is already on the
+     sheet RESOLVES, and this says so the moment it does — with the way through.
+     A number that silently matched nothing read as the app not knowing the bus. */
+  const existingEntry=useMemo(()=>entries.find(other=>other.id!==draft.id&&other.workflow!=="Completed"&&other.busId===draft.busId&&Boolean(draft.busId)),[entries,draft.busId,draft.id]);
   const isNew=!entries.some(item=>item.id===entry.id);
   const estimateTotal=repairItemsTotal(draft.repairItems);
 
@@ -128,21 +143,84 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
     <form className="repair-editor" onSubmit={submit}>
       <div className="repair-editor-head"><span>DOWN SHEET ENTRY<h2>{isNew?"Add Down Bus":"Bus "+draft.busNumber}</h2></span><button type="button" onClick={onClose}>X</button></div>
       <div className="repair-form">
-        <label>BUS NUMBER<select value={draft.busId} onChange={event=>{const bus=fleet.find(item=>item.id===event.target.value);setDraft(current=>({...current,busId:event.target.value,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}><option value="">Select bus</option>{availableFleet.map(bus=><option value={bus.id} key={bus.id}>Bus {bus.n}</option>)}</select><small>Fleet numbers come from the tracker.</small></label>
+        {/* THE SAME PICKER THE DEFECT LOG USES, not a second one.
+
+           This was a bare <select> over `availableFleet` — no way to type a
+           fleet number at all, and the list additionally hid every bus that
+           already had an active entry, so a bus could be both un-typable and
+           un-listable. The Defect Log had solved this twice over already, with
+           generation chips and a typed box backed by a datalist, and copying it
+           across would have made two of them to keep in step.
+
+           `fleet` rather than `availableFleet`: typing a number that is already
+           on the sheet has to RESOLVE, so the uniqueness rule below can say so
+           in words. A number that silently matches nothing reads as the app not
+           knowing the bus.
+
+           autoFocus off, because this editor opens with the section and the
+           workflow above it and stealing focus moves the page under a thumb. */}
+          <BusSelector fleet={fleet} busId={draft.busId} listId="down-sheet-bus-numbers" autoFocus={false}
+           select={busId=>{const bus=fleet.find(item=>item.id===busId);setDraft(current=>({...current,busId,busNumber:bus?.n||"",operationalStatus:bus?.s||current.operationalStatus}))}}/>
+          {existingEntry&&<p className="repair-existing-entry"><b>Bus {existingEntry.busNumber} is already on the sheet.</b><span>{existingEntry.section} &middot; {existingEntry.repair||existingEntry.category||"no repair named"}</span>{onOpenExisting&&<button type="button" onClick={()=>onOpenExisting(existingEntry.id)}>ADD TO THAT ENTRY</button>}</p>}
         <label>SECTION<select value={draft.section} onChange={event=>update("section",event.target.value as RepairSection)}>{SECTIONS.map(value=><option key={value}>{value}</option>)}</select></label>
 
         <fieldset className="repair-items wide">
           <legend>REPAIRS & ESTIMATES</legend>
           <div className="repair-items-head"><span><b>BUS TOTAL</b><small>Each repair keeps its own optional estimate.</small></span><strong>{estimateTotal?formatRepairTime(estimateTotal):"NOT SET"}</strong></div>
           <div className="repair-item-list">{draft.repairItems.map((item,index)=>{
-            const repairs=REPAIR_OPTIONS[item.category]||[];
             const itemTotal=item.estimateEnabled?repairItemsTotal([item]):0;
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
               <div className="repair-item-fields">
-                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
-                <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,quantity:undefined,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{item.repair&&!repairs.includes(item.repair)&&<option value={item.repair}>{item.repair} (as logged)</option>}{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
+                {/* TYPE OR TAP, and the repair box is NOT locked behind the
+                    category. These were two plain <select>s, and the second
+                    carried disabled={!item.category} — so you had to know a
+                    wiper motor lives under Bus Accessories before you could look
+                    for one. That is the exact failure the Defect Log's
+                    ComboField was built to remove, and this is that component,
+                    not a second copy of it.
+
+                    It also fixes the wording. The old <select> printed the raw
+                    REPAIR_OPTIONS value, which for a grouped category is the
+                    stored "Group - Item" identity — a flat wall of prefixed
+                    strings with no optgroup and no display label. The stored
+                    identity is untouched; only what is drawn changes. */}
+                <ComboField label="CATEGORY" className="wide"
+                 value={item.category}
+                 display={item.category?repairCategoryLabel(item.category):""}
+                 placeholder="Type or tap to choose a category"
+                 emptyText="No category matches that"
+                 search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
+                 onPick={category=>updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}/>
+                <ComboField label="SPECIFIC REPAIR" className="wide"
+                 value={item.repair}
+                 display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
+                 placeholder={item.category?"Type or tap - or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+                 emptyText="Nothing in the catalog matches that"
+                 footnote={item.category?undefined:"Searching every category. Picking one sets the category for you."}
+                 search={query=>{
+                  const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category);
+                  /* Headings while browsing, the group on each row while
+                     searching - the same split the Defect Log measured, kept
+                     identical here so the two surfaces read the same. */
+                  const browsing=!query.trim();
+                  return [
+                   ...inCategory.map(row=>({value:row.value,label:row.label,category:row.category,
+                    section:browsing?(item.category?(row.groupLabel||row.categoryLabel):(row.groupLabel?row.categoryLabel+" \u00b7 "+row.groupLabel:row.categoryLabel)):undefined,
+                    hint:browsing?undefined:(row.groupLabel?row.groupLabel+" \u00b7 "+row.categoryLabel:row.categoryLabel)})),
+                   ...elsewhere.map(row=>({value:row.value,label:row.label,category:row.category,foreign:true,
+                    hint:(row.groupLabel?row.groupLabel+" \u00b7 ":"")+row.categoryLabel+" \u2014 switches category"})),
+                  ];
+                 }}
+                 onPick={(repair,row)=>{
+                  /* Picking a repair from ANOTHER category sets the category
+                     too, which is the whole point of not locking the second box:
+                     type "wiper motor", and Bus Accessories fills itself in. */
+                  const category=row?.category||item.category;
+                  updateItem(item.id,current=>({...current,category,repair,quantity:undefined,estimateEnabled:Boolean(repair||category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,repair)}));
+                  if(category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop");
+                 }}/>
                 <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
                 {/* Sits with the repair, not inside the completion block: a fan
                     count is what was reported and an air bag count is what the
@@ -163,8 +241,8 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                    </span>;
                   })}</div>
                  </div>}
-                 <label>REPAIR HOURS<input inputMode="decimal" value={item.repairHours===undefined?"":String(item.repairHours)} placeholder=".5" onChange={event=>updateItem(item.id,current=>({...current,repairHours:normalizeRepairHours(event.target.value)}))}/></label>
-                 <label>DIAGNOSTIC HOURS<input inputMode="decimal" value={item.diagnosticHours===undefined?"":String(item.diagnosticHours)} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} onChange={event=>updateItem(item.id,current=>({...current,diagnosticHours:normalizeDiagnosticHours(event.target.value)}))}/><small>{MINIMUM_DIAGNOSTIC_HOURS} hour minimum.</small></label>
+                 <label>REPAIR HOURS<HoursField value={item.repairHours} placeholder=".5" ariaLabel="Repair hours" onChange={hours=>updateItem(item.id,current=>({...current,repairHours:normalizeRepairHours(hours===undefined?"":String(hours))}))}/></label>
+                 <label>DIAGNOSTIC HOURS<HoursField value={item.diagnosticHours} placeholder={String(MINIMUM_DIAGNOSTIC_HOURS)} ariaLabel="Diagnostic hours" onChange={hours=>updateItem(item.id,current=>({...current,diagnosticHours:normalizeDiagnosticHours(hours===undefined?"":String(hours))}))}/><small>{MINIMUM_DIAGNOSTIC_HOURS} hour minimum.</small></label>
                 </div>}
               </div>
               <label className="estimate-toggle"><input type="checkbox" checked={item.estimateEnabled} onChange={event=>updateItem(item.id,current=>({...current,estimateEnabled:event.target.checked}))}/><span>ESTIMATE TIME</span><small>Optional. Category and specific repair load a starting allowance.</small></label>
@@ -174,10 +252,10 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                     and the other six are almost always zero. The breakdown is
                     still there behind the tick, and the line carries the whole
                     estimate, so keeping it shut hides no number. */}
-                <label className="estimate-simple">ESTIMATED HOURS<input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(repairTimeTotal(item.timeEstimate))} onChange={event=>setSimpleTotal(item,event.target.value)}/><small>The whole estimate. Break it down only if the split matters.</small></label>
+                <label className="estimate-simple">ESTIMATED HOURS<HoursField value={hoursValue(repairTimeTotal(item.timeEstimate))} max={40} placeholder="1.5" ariaLabel="Estimated hours" onChange={hours=>setSimpleTotal(item,hours===undefined?"":String(hours))}/><small>The whole estimate. Break it down only if the split matters.</small></label>
                 <label className="estimate-advanced-toggle"><input type="checkbox" checked={showBreakdown(item)} onChange={event=>setAdvancedEstimates(current=>{const next=new Set(current);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next})}/><span>BREAK THE ESTIMATE DOWN</span></label>
                 {showBreakdown(item)&&<>
-                <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><input type="number" min="0" max="40" step="0.25" inputMode="decimal" value={hoursValue(item.timeEstimate[field.key])} onChange={event=>updateEstimateHours(item.id,field.key,event.target.value)}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
+                <div className="estimate-grid">{ESTIMATE_FIELDS.map(field=><label key={field.key}>{field.label}<span><HoursField value={hoursValue(item.timeEstimate[field.key])} max={40} placeholder="0" ariaLabel={field.label} onChange={hours=>updateEstimateHours(item.id,field.key,hours===undefined?"":String(hours))}/><b>HOURS</b></span><small>{field.help}</small></label>)}</div>
                 <label className="estimate-notes wide">ESTIMATE NOTES<textarea value={item.timeEstimate.notes} onChange={event=>updateItem(item.id,current=>({...current,timeEstimate:{...current.timeEstimate,notes:event.target.value}}))} placeholder="Optional conditions supporting this estimate"/></label>
                 </>}
               </div>}

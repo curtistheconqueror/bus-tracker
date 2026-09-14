@@ -4,6 +4,24 @@
 UNPUBLISHED WORK ON TOP — build the next release from `main`'s head, not from
 `3de6dab`. PR #6 is MERGED.**
 
+## PUBLISH SOON: THE LIVE BUILD CRASHES ON TOUCH
+
+**173 carries a crash that blanks the whole app, and the fix is sitting here
+unpublished.** `3de6dab` predates `b4460a3` and still contains
+`bus.isHeld(bus)` — an imported helper called as a method on the bus record, so
+`undefined(bus)` throws the moment a quick view renders. At a desk that fires
+on hover; on the shop's iPad and phone it fires on TOUCH, because
+`onPointerUp` opens the same quick view.
+
+Reported from the floor as *"if I touch a bus and hold it down the entire
+screen goes white ... when you bookmark it, there's no way to refresh, and it's
+just stuck."* Saved to a home screen there is no address bar and no
+pull-to-refresh, so the app is unusable until iOS kills it.
+
+Publishing the current head fixes it. It is also why `app/crash-guard.tsx` now
+exists: the crash is fixed, but nothing stopped the NEXT one stranding somebody
+the same way.
+
 ## ✅ THE LIVE CODE IS ON `main` AGAIN
 
 Codex published `3de6dab` as **Sites Version 173** (the number went 171 → 173;
@@ -31,13 +49,61 @@ publish `3de6dab` a second time under a number that is already taken.
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Four commits landed AFTER `3de6dab` was published and are now on `main`.
-**They are not live.** Whatever number comes next — 174 unless Codex has taken
+Twenty-six commits landed AFTER `3de6dab` was published; twenty-three of them
+are on `main` and the newest three are on
+`claude/codex-workflow-docs-fn9any`. **None of them is live.** Whatever number comes next — 174 unless Codex has taken
 it — should be built from `main`'s head, not from `3de6dab`.
 
 ```
 git log --oneline 3de6dab..origin/main -- app/ tests/
 ```
+
+### 0a. THE FLEET SCOREBOARD AND FULL SWEEP
+
+A SCOREBOARD button on the Down Sheet produces the four answers a
+superintendent asks for — downed buses, inspections, mystery buses, road calls
+in the last 36 hours — in two versions, with the message version shown in full
+before anything is sent. No PDF library: it prints through a same-document
+iframe, because in standalone mode a popup leaves the app for Safari.
+
+FULL SWEEP is a device-local mode (`pace-sweep-v1`, documented in CLAUDE.md)
+that the Facility Map and the Down Sheet's scan prompt can both start, in
+either order. Ending it offers the Scoreboard.
+
+DOWNED excludes inspections, which is the shop's own definition and matches
+what `down-sheet-replace.ts` already did with omitted inspections.
+
+### 0. A TRANSFER FILE NOW CARRIES REMOVALS
+
+A section transfer could only ever ADD to the receiving device. Every merge in
+this app keeps whatever only one side holds, and nothing in the file said a
+record had been taken off on purpose — so a sheet cleared on the phone could not
+be cleared on the iPad by file. Curtis, on a 50-entry sheet arriving at a device
+holding 60: *"what should happen is it just updates to what the phone is sending
+it."*
+
+Both exporters now include the tombstone ledger they own (`pace-cloud-merged-v1`
+for defects, `pace-cloud-removed-entries-v1` for sheet entries) and both
+importers apply it through the functions a cloud pull already uses —
+`dropTombstonedDefects` and `dropTombstonedEntries`, unchanged.
+
+Three things it needed beyond moving the ledgers:
+
+- **The receiver adopts the tombstones**, or the import undoes itself on the
+  next sync — the device drops the record, then its own pull hands it back.
+- **The bulk-loss guard is lifted for a tombstoned defect import**, keyed to
+  whether anything dropped, exactly as `applyCloudPull` does it. The guard
+  refuses a write losing five or more defects; the shop phone carries 49
+  tombstones, so left armed it would have refused the first real import.
+- **The import prompt stopped promising** "anything only on this device is
+  kept", which is now false for the two sections with a ledger. Still true for
+  the Fleet Map, which has none — a bus is moved, never removed.
+
+**No storage key changed.** Both ledgers already existed and are already pushed
+to the cloud; only the transfer file is new to carrying them. An older file
+still imports (the ledgers are optional, and a missing one makes the drop a
+no-op), and a file written by this version imports into an older app, which
+ignores keys it does not know.
 
 ### 1. A HOLD is now DEVICE-LOCAL
 
@@ -101,10 +167,73 @@ the section under them; three of five section stripes silently lost to a
 `border-color` shorthand in a later rule; and a `flex-basis` became a height in
 the phone's column layout and opened a 340px gap.
 
+### 3. The Down Sheet's entry form now matches the Defect Log's
+
+Curtis, comparing the two: *"the Down Sheet having a more narrow entry
+field ... I believe the defect log handles everything very well."* Three
+changes, all of them the Defect Log's own components rather than copies:
+
+- **The bus field is the Defect Log's `BusSelector`**, so a bus can be TYPED
+  rather than only chosen from a drop-down. Typing a bus that is already on the
+  sheet now says so and offers ADD TO THAT ENTRY instead of quietly opening a
+  second row for the same bus.
+- **CATEGORY and SPECIFIC REPAIR are `ComboField`s**, and the repair box is no
+  longer locked behind naming the category — `disabled={!item.category}` is
+  gone. You had to know a wiper motor lives under Bus Accessories before you
+  could go looking for one, which is the exact failure that component was built
+  to remove. Picking a repair from another category sets the category behind
+  you.
+- **A grouped category draws its labels.** The old `<select>` printed the raw
+  `REPAIR_OPTIONS` value, which for a grouped category is the stored
+  `"Group - Item"` identity — a flat wall of prefixed strings with no optgroup.
+  Measured in Chromium at 390px: Tech Services draws its five group headings
+  with bare item names under them, and zero rows print the raw identity.
+  **Nothing stored changed**; only what is drawn.
+
+A retired repair still reads back on the record that carries it. The guarantee
+moved from an injected `(as logged)` option to the `display` prop, where it is
+stated once instead of per-option.
+
+### 4. Quick filters on the Down Sheet, and the filtered sheet can be sent
+
+Curtis: *"we should have a quick filters list for that actually so I can share
+the downsheet with someone wanting details."*
+
+Nine filters in `app/down-sheet/down-sheet-filters.ts`, and deliberately **not**
+the Defect Log's thirteen. Those all ask whether a BUS carries a defect whose
+wording mentions a ramp or a farebox; the Down Sheet's rows are ENTRIES, and
+what gets asked of it is about the entry — who has this bus, is it even here,
+has anybody picked it up, how long has it been sitting, is any of it estimated.
+ON THE ROAD is asked of the MAP rather than of the row, because a bus out
+working while its entry still says Scheduled is the case that filter exists for.
+
+The two narrowings compose: the road tallies cut the sheet and the quick filter
+cuts that, so the bar's "1 of 5" is always the rows underneath it. The menu's
+own counts stay on the whole sheet — taken off the filtered rows, every number
+but the active one would read 0 the moment a filter was on.
+
+COPY LIST / SHARE TEXT / SHARE PAGE send exactly what is on screen. The page
+inlines everything and fetches nothing, and names places through
+`location-label.ts` — `garage-10` reads as Trouble Bay 11, not Main Garage.
+
+**No storage key was added or changed.** The filter is not persisted: it is a
+question asked of the sheet in the moment, like the road tallies beside it.
+
+Two things this took that were not the feature. `QuickFilterMenu` now takes its
+items as a prop instead of being copied, and `copyText` — which existed twice,
+character for character, on the Defect Log and Fleet Campaigns — moved into
+`share-file.ts`; all three call sites were re-checked in a browser.
+
+**One defect found only in Chromium:** the first build of the share bar used
+`copyText` without importing it. Lint, the build and all 311 tests passed over
+it; the ReferenceError was swallowed by the handler's own catch and reported to
+the mechanic as "could not share". There is a test for that now.
+
 ### Gates
 
-`npm test` — **295 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
-clean. Measured in Chromium at 360 / 390 / 1180 on all four themes.
+`npm test` — **312 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+clean. Measured in Chromium at 390 / 820 / 1180: no horizontal overflow, 44px
+targets on the phone, and both share outputs opened and read back.
 
 ---
 

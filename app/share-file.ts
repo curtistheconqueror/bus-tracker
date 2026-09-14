@@ -47,3 +47,17 @@ export async function shareOrDownloadFile(blob:Blob,filename:string,title:string
 export function shareOutcomeLabel(outcome:ShareOutcome,filename:string){
  return outcome==="shared"?"Sent.":outcome==="cancelled"?"":"Saved as "+filename;
 }
+
+/* Getting text off the device, which is the same errand one step smaller.
+
+   This existed twice — once on the Defect Log and once on Fleet Campaigns —
+   character for character, and the Down Sheet's shared lists would have made a
+   third. Both copies already carried the fallback, and that fallback is the
+   whole reason this cannot be one line: navigator.clipboard is unavailable on
+   a page served without TLS and throws rather than returning false when the
+   document is not focused, which on a phone is most of the time the share sheet
+   is open. */
+export async function copyText(text:string){
+ if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);return}catch{/* Use the selection-based fallback below. */}}
+ const field=document.createElement("textarea");field.value=text;field.style.position="fixed";field.style.opacity="0";document.body.appendChild(field);field.focus();field.select();const copied=document.execCommand("copy");field.remove();if(!copied)throw new Error("Copy failed");
+}

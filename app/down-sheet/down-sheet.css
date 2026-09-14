@@ -628,3 +628,76 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-table td.row-actions{text-align:center}
 .row-actions-slots{display:inline-grid;grid-template-columns:36px 36px;justify-content:center;gap:8px;align-items:center}
 @media(max-width:760px){.row-actions-slots{grid-template-columns:44px 44px;gap:10px}}
+/* THE SCOREBOARD. Shares .shade with the other Down Sheet modals so the
+   backdrop and the scroll lock behave identically; everything below is its
+   own, because it is a report rather than a form. */
+/* Beside + ADD DOWN BUS, and deliberately quieter than it: adding a bus is
+   the job, sending the report is what you do once. */
+.down-scoreboard-action{min-height:38px;height:auto;border:1px solid var(--log-header,#06275c);border-radius:6px;background:transparent;color:var(--log-header,#06275c);font-size:10px;font-weight:900;letter-spacing:.08em;padding:0 12px;cursor:pointer}
+.down-scoreboard-action:focus-visible{outline:2px solid #f97316;outline-offset:2px}
+/* Said in the form, where the choice is, rather than by an alert at save time
+   that threw the draft away. */
+.repair-existing-entry{grid-column:1/-1;margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 12px;border:1px solid #f97316;border-left-width:4px;border-radius:6px;background:color-mix(in srgb,#f97316 8%,var(--log-surface,#fff));color:var(--log-text,#172b4d)}
+.repair-existing-entry b{font-size:12px;font-weight:900}
+.repair-existing-entry span{font-size:10px;font-weight:700;color:var(--log-muted,#5b6b85);min-width:0}
+.repair-existing-entry>button{min-height:38px;height:auto;margin-left:auto;border:0;border-radius:6px;background:#f97316;color:#231205;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.05em;cursor:pointer;white-space:nowrap}
+.repair-existing-entry>button:focus-visible{outline:2px solid var(--log-text,#172b4d);outline-offset:2px}
+@media(max-width:620px){.repair-existing-entry>button{margin-left:0;width:100%}}
+.scoreboard-modal{width:min(560px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
+.scoreboard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
+.scoreboard-head small{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9db4da}
+.scoreboard-head h2{margin:2px 0 0;font-size:20px;font-weight:900;letter-spacing:.01em}
+.scoreboard-head>button{min-width:40px;min-height:40px;height:auto;border:0;border-radius:8px;background:#ffffff1f;color:#fff;font-size:22px;line-height:1;cursor:pointer}
+/* The fenced pair, drawn the same way the text and the PDF fence them. */
+.scoreboard-headline{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border:3px solid var(--log-header,#06275c);border-radius:8px;padding:12px}
+.scoreboard-headline div{display:grid;gap:1px;min-width:0}
+.scoreboard-headline small{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--log-muted,#5b6b85)}
+.scoreboard-headline b{font-size:34px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;color:var(--log-header,#06275c)}
+.scoreboard-headline i{font-style:normal;font-size:9px;font-weight:700;color:var(--log-muted,#5b6b85)}
+.scoreboard-defects{margin:0 16px;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--log-border,#c4cedd);border-radius:8px;cursor:pointer}
+.scoreboard-defects input{width:22px;height:22px;margin:1px 0 0;flex:none}
+.scoreboard-defects span{display:grid;gap:2px;font-size:13px;font-weight:700}
+.scoreboard-defects small{font-size:10px;font-weight:600;color:var(--log-muted,#5b6b85)}
+.scoreboard-preview{margin:0 16px;padding:12px;border:1px solid var(--log-border,#c4cedd);border-radius:8px;background:var(--log-page,#f4f6fa);color:var(--log-text,#172b4d);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre;overflow-x:auto;max-height:38vh}
+.scoreboard-actions{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.scoreboard-actions button{min-height:52px;height:auto;border:0;border-radius:8px;font-size:12px;font-weight:900;letter-spacing:.06em;cursor:pointer;padding:0 10px}
+.scoreboard-send-text{background:#0969d9;color:#fff}
+.scoreboard-send-pdf{background:var(--log-header,#06275c);color:#fff}
+.scoreboard-actions button:focus-visible{outline:2px solid #f97316;outline-offset:2px}
+.scoreboard-note{margin:0 16px;font-size:10px;font-weight:700;line-height:1.5;color:var(--log-muted,#5b6b85)}
+@media(max-width:620px){
+ .scoreboard-modal{width:100vw;max-height:100vh;border-radius:0}
+ .scoreboard-head{border-radius:0}
+ .scoreboard-headline{grid-template-columns:1fr}
+ .scoreboard-headline b{font-size:30px}
+ .scoreboard-actions{grid-template-columns:1fr}
+ .scoreboard-preview{font-size:11px;max-height:30vh}
+}
+
+/* THE QUICK FILTER BAR, and why it is not .down-road-filter-note.
+
+   That rule sets `button{width:100%}` below 760px, which is right for the one
+   button it has and would have stacked these four down half a phone screen. It
+   is also why the class is new rather than added alongside: a broader selector
+   already owned every button inside that box. */
+.down-quick-filter-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:9px 11px;border:1px solid #9a86c4;border-left:4px solid #6b3fc4;border-radius:6px;background:#f3eefc;color:#33215e}
+.down-quick-filter-note>p{flex:1;min-width:180px;margin:0;font-size:10px;font-weight:800;line-height:1.45}
+.down-quick-filter-note>p>b{color:#4a2a8c}
+.down-quick-filter-note>p>small{color:#5c4a86;font-size:9px;font-weight:700}
+.down-quick-filter-actions{display:flex;flex-wrap:wrap;gap:6px}
+.down-quick-filter-actions button{min-height:32px;border:1px solid #6b3fc4;border-radius:5px;background:#6b3fc4;color:#fff;padding:0 11px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.down-quick-filter-actions button+button{background:#fff;color:#4a2a8c}
+.down-quick-filter-note>small{flex-basis:100%;color:#4a2a8c;font-size:9px;font-weight:900}
+/* The trigger takes this page's own control styling. Bare, it inherits nothing
+   but display:inline-flex from globals.css and renders as unstyled text. */
+.down-view-controls .quick-filter-trigger{height:32px;border:1px solid #aebbd0;border-radius:5px;background:#f2f5f9;color:#294264;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
+@media(max-width:760px){
+ .down-quick-filter-note{margin:0 8px 8px}
+ /* Two across rather than one per row: four full-width buttons is a screen of
+    buttons above the rows they describe. */
+ .down-quick-filter-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .down-quick-filter-actions button{min-height:44px;font-size:10px}
+ .down-quick-filter-actions .down-quick-filter-clear{grid-column:1/-1}
+ .down-view-controls>.quick-filter-control{flex:1}
+ .down-view-controls .quick-filter-trigger{width:100%;height:44px;min-height:44px;font-size:9px}
+}

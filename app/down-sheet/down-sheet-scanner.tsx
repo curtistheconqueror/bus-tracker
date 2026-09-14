@@ -10,6 +10,7 @@ import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "../scan-notes";
 import {writeSetting} from "../storage";
+import {readSweep,startSweep} from "../facility-sweep";
 
 type SelectedPhoto={file:File;url:string;key:string};
 
@@ -101,6 +102,21 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
   if(!imports.length){setError("Select at least one fleet-matched row.");return}
   if(!confirm(`Replace the current Down Sheet with ${imports.length} reviewed bus${imports.length===1?"":"es"}?\n\n${comingOff.length} bus${comingOff.length===1?" is":"es are"} coming off the current sheet. Physical locations and saved defects will remain unchanged. Omitted inspections return to service according to their unresolved defects.`))return;
   onImport(imports);
+  /* THE SECOND WAY INTO FULL SWEEP. Curtis: "when a person scans a sheet on the
+     down sheet. There should be a pop-up question to ask are you doing a full
+     sweep of the facility for bus count if they hit yes then the facility map
+     goes into that mode automatically."
+
+     Asked AFTER the import, not before: the scan is the thing the person came
+     to do, and a question about what they intend to do next has no business
+     standing between them and it. Asked only when NOT already sweeping — a
+     prompt that appears mid-walk to ask whether you are walking is the kind of
+     dialog people learn to dismiss without reading.
+
+     startSweep does not reset a walk already under way, so answering yes here
+     after starting on the map keeps the original clock. */
+  if(!readSweep(localStorage)&&confirm("Are you doing a full sweep of the facility for bus count?\n\nThe Facility Map will show you are mid-sweep, and ending it offers the Scoreboard."))
+   startSweep(localStorage,"scan");
  };
 
  /* Curtis: "I can't seem to move this page. It only moves what's behind the

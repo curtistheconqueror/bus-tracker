@@ -148,6 +148,7 @@ undo and recovery, never synced
   pace-down-sheet-entry-undo-v1    PUT BACK, for one deleted Down Sheet row
   pace-scan-batch-undo-v1          PUT BACK, for a Defect Log scan sweep
   pace-facility-defect-clear-undo-v1  UNDO MAP CLEANUP
+  pace-crash-report-v1             the last render error, for the next session
 
 the cloud's bookkeeping, per device
   pace-cloud-config-v1             project, account, initials, device label
@@ -159,6 +160,7 @@ the cloud's bookkeeping, per device
 
 per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
+  pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-board-settings-v1
   pace-down-sheet-settings-v1
@@ -177,6 +179,34 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
 ```
+
+**`pace-sweep-v1` is one person's walk, and it never travels.** FULL SWEEP is a
+STATE rather than a sequence: the Facility Map can start it and so can the
+Down Sheet's scan prompt, because Curtis does them in either order — *"if a
+foreman or someone else decide to do the facility map sweep first and then
+upload the down sheet that could be a thing"*. Building it as a sequence would
+have made one of those two orders work and the other not.
+
+Device-local for the reason a HOLD is: two foremen sweeping on the same morning
+are on two different walks, and a sweep that synced would have each of them
+ending the other's. It holds no fleet data at all — only when the walk began
+and which surface started it — so starting or ending one can never lose
+anybody's work. An unended walk is cut off on IDLE, not on total length: twenty quiet minutes
+end it, and every board write restarts that clock. Curtis: *"a sweep will never
+last that long. If I have not pressed anything then just cut it off within 20
+minutes."* A cap on total length would have ended a forty-minute walk somebody
+was actively working through while still leaving a pocketed phone looking live.
+Expired at READ time and the record is left alone rather than rewritten,
+because a read must not be a write.
+
+**`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
+each time. A render error unmounts the whole tree, and saved to a home screen
+there is no address bar, no reload button and no pull-to-refresh — so the app
+does not misbehave, it VANISHES, and the person holding the phone has no
+console to check and no way back in. `app/crash-guard.tsx` catches it, shows a
+screen carrying the one control standalone mode cannot otherwise offer, and
+writes the fault here so the next session can read it rather than guess from
+"it went white".
 
 **`pace-role-v1` names a person's job and must not gate anything yet.** It holds
 three things picked on the home screen, in this order: **department**, then

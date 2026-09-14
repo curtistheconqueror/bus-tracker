@@ -200,3 +200,125 @@ export function clearRoadCall<T extends RoadCallBus&MovableRepairBus>(
   return {fleet:cleared,withdrawn:Boolean(taken),restored:""};
  return {fleet:moveOrSwapBuses(cleared,busId,home,now),withdrawn:true,restored:home};
 }
+
+/* ---------------------------------------------------------------------------
+   THE SHEET CAN START A ROAD CALL TOO.
+
+   There were two road-call records in this app and the link between them ran
+   one way. A tick on the Facility Map or the Defect Log calls applyRoadCall,
+   which sets the bus's flag and dates an event; the sheet then derives its
+   section from that flag (`section: bus.roadcall ? "Roadcall" : "Pending"`).
+   But the SCANNER goes the other way and nothing caught it: a paper sheet with
+   a ROAD CALL heading becomes an entry in section "Roadcall" and the bus record
+   never hears about it.
+
+   Measured on the shop's own cloud before this was written: 109 buses, ZERO
+   with the flag set, ZERO with any dated event — and four live sheet entries in
+   section Roadcall. Every road call in that garage arrives on paper, so the
+   map's ROADCALL flag had never once lit, and any report reading the bus record
+   would have said "0 road calls" with total confidence while the sheet in
+   somebody's hand said four.
+
+   Curtis: "All sources should update no matter where it was first logged."
+
+   ADDITIVE ONLY, deliberately. This turns a road call ON and dates it; it never
+   turns one off. Clearing moves a bus back off the road and withdraws history,
+   which is a decision a person makes through clearRoadCall — a reconciler that
+   ran on every sheet write and could also un-ring the bell would eventually
+   clear a road call ticked on the map for a bus that was never on the sheet.
+
+   The event is dated FROM THE ENTRY rather than from now, because "in the last
+   36 hours" has to mean 36 hours since the breakdown, not since somebody got
+   round to scanning the sheet.
+
+   Its id is prefixed `road-call-sheet-` in the same spirit as the map's
+   `road-call-map-`, so where a call came from stays legible afterwards. */
+export type SheetRoadCallEntry={id?:string;busId?:string;section?:string;workflow?:string;createdAt?:string;updatedAt?:string};
+
+export const SHEET_ROAD_CALL_PREFIX="road-call-sheet-";
+export const SHEET_ROAD_CALL_SECTION="Roadcall";
+
+export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairBus>(
+ fleet:T[],entries:SheetRoadCallEntry[],now=new Date().toISOString()
+):{fleet:T[];started:string[];ended:string[]}{
+ const started:string[]=[];
+ let next=fleet;
+ for(const entry of entries||[]){
+  if(String(entry?.section??"")!==SHEET_ROAD_CALL_SECTION)continue;
+  if(String(entry?.workflow??"")==="Completed")continue;
+  const busId=String(entry?.busId??"").trim();
+  if(!busId)continue;
+  const bus=next.find(item=>item.id===busId);
+  if(!bus)continue;
+  /* Already carrying the event this entry would add. This is what makes the
+     reconciler idempotent, and it has to be: it runs on EVERY write of the
+     sheet, so without it one scanned road call becomes a fresh dated event per
+     keystroke. Keyed on the event id rather than on the roadcall flag, because
+     the flag alone would also skip a SECOND, genuinely new breakdown on a bus
+     already out on the first one. */
+  const eventId=SHEET_ROAD_CALL_PREFIX+(String(entry?.id??"").trim()||busId);
+  if(normalizeRoadCalls(bus.roadCalls).some(event=>event.id===eventId))continue;
+  const at=[entry.createdAt,entry.updatedAt,now].map(value=>String(value??"")).find(value=>Number.isFinite(Date.parse(value)))||now;
+  /* move:false. The sheet says the bus broke down; it does not say where the
+     bus is now, and the person who scanned it has very often already parked it.
+     Moving it to the road on the strength of a paper heading would undo a
+     location somebody set by hand. */
+  const applied=applyRoadCall(next,busId,{id:eventId,at},RELOCATION_AREAS,now,{move:false});
+  next=applied.fleet;
+  started.push(busId);
+ }
+ /* AND THE SHEET CAN END ONE IT STARTED.
+
+    Curtis: "If a road call happened within the last thirty six hours, but it
+    was updated as fixed, then it should not show." The flag is what the
+    Scoreboard filters on, and closing a Roadcall row on the sheet is where a
+    foreman actually records that a bus is fixed — so leaving the flag set there
+    would have kept a repaired bus on the report for a day and a half.
+
+    Scoped to events this module minted, by their `road-call-sheet-` id. A call
+    ticked on the Facility Map or the Defect Log is somebody's direct statement
+    about a bus and is not the sheet's to withdraw; only clearRoadCall, pressed
+    by a person, takes one of those off. So the reconciler can end what it
+    started and nothing else — which is what keeps it safe to run on every
+    single write of the sheet.
+
+    The flag only comes off when NO road call is left standing. A bus out on a
+    map-ticked call and a sheet-ticked one keeps the flag when the sheet's half
+    closes, because it is still out on the other.
+
+    The bus is not moved back. clearRoadCall restores a location inside a
+    one-minute undo window; this is a reconciliation that may run days later,
+    and putting a bus somewhere on the strength of a stale `from` would move a
+    vehicle somebody has since parked by hand. */
+ const live=new Set((entries||[])
+  .filter(entry=>String(entry?.section??"")===SHEET_ROAD_CALL_SECTION&&String(entry?.workflow??"")!=="Completed")
+  .map(entry=>SHEET_ROAD_CALL_PREFIX+(String(entry?.id??"").trim()||String(entry?.busId??"").trim())));
+ /* Rebuilt only if something actually changed. `.map` always returns a new
+    array, and this runs inside the Down Sheet's effect on every render — a new
+    array every time means a fleet write to LocalStorage every time, on a
+    four-hundred-bus board. Caught by the test that asserts an unchanged fleet
+    comes back by identity, which is exactly what that assertion is for. */
+ const ended:string[]=[];
+ const cleared=next.map(bus=>{
+  const events=normalizeRoadCalls(bus.roadCalls);
+  const kept=events.filter(event=>!event.id.startsWith(SHEET_ROAD_CALL_PREFIX)||live.has(event.id));
+  if(kept.length===events.length)return bus;
+  ended.push(bus.id);
+  return {...bus,roadcall:kept.length>0,...(kept.length?{roadCalls:kept}:{roadCalls:undefined})} as T;
+ });
+ return {fleet:ended.length?cleared:next,started,ended};
+}
+
+/* Road calls still standing: inside the window AND not taken back off that
+   status. Curtis: "only roadcalls within the last 36 hours that have not been
+   taken off out of that status should show on scoreboard."
+
+   The flag is what says "out on a road call right now" — clearRoadCall takes it
+   off while leaving the history, which is exactly the case this must exclude.
+   So both halves are required: a dated event inside the window, and a bus that
+   is still in that status. */
+export function standingRoadCalls(bus:{roadcall?:boolean;roadCalls?:unknown},now=new Date().toISOString(),hours:number){
+ if(!bus?.roadcall)return [] as RoadCallEvent[];
+ return roadCallsWithin(bus.roadCalls,now,hours/24);
+}
+
