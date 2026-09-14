@@ -1,6 +1,7 @@
 # Publish next
 
-**STATUS: 176 PENDING — 175 SHIPPED THE WRONG SHIFT HOURS AND THEY ARE LIVE.**
+**STATUS: 176 PENDING — 175 SHIPPED THE WRONG SHIFT HOURS AND THEY ARE LIVE,
+and the sheet ledger starts recording the day this goes out.**
 
 Sites Version 175 was published from `9bac8ed62ae6171b75f1200e0d5e032c4e558d85`
 on 2026-09-14. The rollback tag is `sites-v175` at that exact source commit. The
@@ -66,14 +67,46 @@ to the END of the next shift now.
 and keeps its shape. A device that already saved custom hours keeps them; a
 device that never opened the panel picks up the corrected defaults.
 
+## Also in 176: the sheet ledger starts keeping the tempo
+
+**The app has been throwing this away.** A scanned sheet REPLACES the live one,
+`pace-down-sheet-scan-undo-v1` keeps exactly one snapshot so the last import can
+be taken back, and nothing retained the sheet before that. Sheet-to-sheet tempo
+— what got added, what cleared, what stuck, and how fast — had never once been
+recorded, on a shop that swaps eight or more sheets a fortnight.
+
+Curtis: *"When downsheets are swapped out, there is a tempo to what gets
+repaired. The type of repairs that are getting done per downsheet update."* That
+tempo is the whole input to the Fleet Forecast, and **it begins existing the day
+this ships.** Everything before it is gone unless the photographs are re-scanned
+through a backfill path, which is not built yet — Curtis has kept them.
+
+`app/sheet-ledger.ts` writes one compact snapshot per swap into
+**`pace-sheet-ledger-v1`**: the bus id and catalog category per row, which buses
+came off, and which shift the swap happened in. Rolling cap of 40, dropping the
+oldest. Sorted oldest-first so a backfilled swap lands in its own place.
+
+It is wired inside `importScan`, the one chokepoint every sheet swap crosses —
+a route that forgot to call it would silently stop recording while the ledger
+looked healthy. It sits AFTER the undo copy and is deliberately NOT guarded like
+it: a failed undo copy stops the import, because replacing a sheet with no way
+back is a one-way door, while a failed ledger write is a rounding error in a
+forecast and must never cost a foreman the sheet he just photographed.
+
+**Nothing reads the ledger yet.** No surface changes, no number moves. This
+release only starts the recording.
+
 ## Gates
 
-`npm test` — **315 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **316 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-**4 mutations, 4 caught**: first-match-wins, the overlap removed from the
+**11 mutations, 11 caught.** On the hours: first-match-wins, the overlap removed from the
 defaults, the two-shift window summed again, and the evening shift read as
-22:00.
+22:00. On the ledger: the cap dropping the newest, completed rows counted as
+on the sheet, a bus counted twice, phantom removals credited as cleared, the
+first snapshot reported as a swap, a ledger failure stopping the import, and
+the shift recomputed later instead of stored.
 
 Verified in Chromium at 390px against the real clock: 18:29 reads as `2ND
 SHIFT`, `4h 1m` left, `11h 31m` to the a.m. pullout; the panel shows all six
@@ -86,6 +119,10 @@ edited times and the reset copy matches the defaults.
 2. Press **USE THE SHOP'S HOURS** and confirm it restores those, not the 175
    guess.
 3. Between 14:00 and 14:30, the live line should say **2ND SHIFT**, not 1ST.
+4. Scan a sheet, then check `pace-sheet-ledger-v1` holds one snapshot naming the
+   buses that stayed and the ones that came off. Verified in Chromium through
+   the real scanner — photo, review, IMPORT APPROVED — with the API response
+   stubbed: one snapshot, three surviving buses, `off:["b2"]`, shift `2nd`.
 
 ## The way back
 

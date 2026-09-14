@@ -14277,3 +14277,116 @@ test("the garage's hours are editable on the device, and nothing re-implements t
  assert.match(code,/if\(clockMinutes\(value\)!==null\)save\(next\)/,
   "a half-typed time is not committed");
 });
+
+test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
+ const {SHEET_LEDGER_KEY,SHEET_LEDGER_LIMIT,appendSnapshot,ledgerTempo,normalizeSheetLedger,
+  recordSheetSwap,snapshotFromEntries}=await import("../app/sheet-ledger.ts");
+
+ /* THE PROBLEM THIS EXISTS FOR: a scanned sheet REPLACES the live one and
+    nothing retained the sheet before that, so sheet-to-sheet tempo had never
+    once been recorded — on a shop that swaps eight or more sheets a fortnight.
+    Curtis: "When downsheets are swapped out, there is a tempo to what gets
+    repaired." */
+ assert.equal(SHEET_LEDGER_KEY,"pace-sheet-ledger-v1");
+ assert.equal(SHEET_LEDGER_LIMIT,40);
+
+ const entry=(busId,category,over={})=>({id:"e"+busId,busId,category,workflow:"Scheduled",...over});
+ const day=(d,h=8)=>`2026-09-${String(d).padStart(2,"0")}T${String(h).padStart(2,"0")}:00:00.000Z`;
+
+ /* Only bus and category are kept. The wording, the mechanic, the estimate and
+    the history are on the live record and none of them is a tempo question. */
+ const first=snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b2","Brakes")],[],day(1));
+ assert.deepEqual(first.rows,[{b:"b1",c:"A/C and HVAC"},{b:"b2",c:"Brakes"}]);
+
+ /* A CLOSED ROW IS NOT ON THE SHEET. Counting one would report work as stuck
+    that somebody had finished. */
+ assert.deepEqual(snapshotFromEntries([entry("b1","Brakes"),entry("b9","Engine",{workflow:"Completed"})],[],day(1)).rows,
+  [{b:"b1",c:"Brakes"}]);
+ /* ONE ROW PER BUS. A merge or a half-finished edit can leave two entries on
+    one bus, and counting it twice overstates every tempo number it appears in. */
+ assert.deepEqual(snapshotFromEntries([entry("b1","Brakes"),entry("b1","Engine")],[],day(1)).rows,
+  [{b:"b1",c:"Brakes"}]);
+
+ /* The shift is resolved ONCE and stored rather than recomputed later from
+    `at`: if somebody edits the shift hours in six weeks, the tempo of a swap
+    that already happened must not move to a different crew. */
+ assert.equal(snapshotFromEntries([],[],"2026-09-14T18:00:00").shift,"2nd");
+
+ const ledger=[
+  snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b2","Brakes"),entry("b3","Engine")],[],day(1)),
+  /* b2 cleared, b4 added, b1 and b3 stuck. */
+  snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b3","Engine"),entry("b4","Doors, Ramp and ADA")],["b2"],day(3)),
+ ].reduce((acc,snapshot)=>appendSnapshot(acc,snapshot),[]);
+
+ const tempo=ledgerTempo(ledger);
+ /* N snapshots yield N-1 tempos. The first is a photograph of a sheet, not a
+    measurement of a change — reporting it as "3 added" would put a spike at the
+    start of every fresh ledger. */
+ assert.equal(tempo.length,1);
+ assert.equal(tempo[0].added,1);
+ assert.equal(tempo[0].cleared,1);
+ assert.equal(tempo[0].stuck,2);
+ assert.equal(tempo[0].sinceHours,48);
+ assert.deepEqual(tempo[0].addedBy,{"Doors, Ramp and ADA":1});
+ assert.deepEqual(tempo[0].clearedBy,{Brakes:1});
+ /* The divergence Curtis described — "AC repairs and Check engine lights tend
+    to stay on the longest" — is a statement about these tallies, and cannot be
+    checked without them. */
+ assert.deepEqual(tempo[0].stuckBy,{"A/C and HVAC":1,Engine:1});
+
+ /* `off` can name a bus the previous snapshot never held: a backfilled gap, or
+    a row removed by hand between swaps. Counting it would credit the shift with
+    clearing work it never had. */
+ const phantom=appendSnapshot(ledger,snapshotFromEntries([entry("b1","A/C and HVAC")],["b3","b99"],day(5)));
+ const after=ledgerTempo(phantom);
+ assert.equal(after[1].cleared,1,"only the bus that was actually there counts as cleared");
+
+ /* A rescan of the same photograph would otherwise land twice and report zero
+    added and zero cleared — which reads as a quiet shift, not as a duplicate. */
+ const twice=appendSnapshot(ledger,ledger[1]);
+ assert.equal(twice.length,2,"the same swap does not land again");
+
+ /* Sorted OLDEST FIRST so a backfilled swap from two weeks ago lands in its own
+    place rather than at the end. Curtis has the photographs for eight sheets
+    the app never kept. */
+ const backfilled=appendSnapshot(ledger,snapshotFromEntries([entry("b7","Engine")],[],day(2,6)));
+ assert.deepEqual(backfilled.map(s=>s.at.slice(0,10)),["2026-09-01","2026-09-02","2026-09-03"]);
+
+ /* THE CAP DROPS THE OLDEST. Dropping the newest to make room gives a ledger
+    that never learns anything after its fortieth swap — the failure a naive
+    `if(length>=LIMIT)return` produces, and very hard to see from outside. */
+ let big=[];
+ for(let n=1;n<=45;n++)big=appendSnapshot(big,snapshotFromEntries([entry("b"+n,"Engine")],[],day(1,n%24)+"#"+n,undefined,"s"+n),5);
+ assert.equal(big.length,5);
+ assert.deepEqual(big.map(s=>s.id),["s41","s42","s43","s44","s45"],"the newest five survive");
+
+ assert.deepEqual(normalizeSheetLedger(null),[]);
+ assert.deepEqual(normalizeSheetLedger([{at:"nonsense",rows:[]},{rows:[]},{at:day(1)}]),[],
+  "a snapshot with no usable time or no rows is not a snapshot");
+
+ /* BEST EFFORT, and that is the whole contract: this runs from the middle of a
+    sheet import, and failing the import because a history file could not be
+    written would cost a foreman the sheet he just photographed. */
+ const store=(()=>{let value=null;return {getItem:()=>value,setItem:(_k,v)=>{value=v}}})();
+ const wrote=recordSheetSwap(store,[entry("b1","Brakes")],[],day(1));
+ assert.equal(wrote.ok,true);
+ assert.equal(JSON.parse(store.getItem()).length,1);
+ const full={getItem:()=>"[]",setItem:()=>{throw new Error("QuotaExceeded")}};
+ assert.equal(recordSheetSwap(full,[entry("b1","Brakes")],[],day(1)).ok,false,
+  "a full device reports the failure rather than throwing into the import");
+
+ /* WIRED AT THE CHOKEPOINT every sheet swap crosses, not on the scanner — a
+    route that forgot to call it would silently stop recording and the ledger
+    would look healthy while going stale. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
+  "the swap is recorded inside importScan, from the entries that won and the buses that came off");
+ /* AFTER the undo copy and deliberately NOT guarded like it. The undo copy
+    stops the import when it cannot be written, because replacing a sheet with
+    no way back is a one-way door. The ledger is the opposite trade. */
+ assert.ok(pageCode.indexOf("SCAN_UNDO_KEY")<pageCode.indexOf("recordSheetSwap("),
+  "the undo copy is secured before the ledger is touched");
+ assert.equal(/if\(!recordSheetSwap\(|recordSheetSwap\([^)]*\)\.ok\)\s*\{[^}]*return/.test(pageCode),false,
+  "and a ledger failure never stops the import");
+});

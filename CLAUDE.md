@@ -163,6 +163,7 @@ per-device settings, never synced
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-shift-settings-v1           when each shift runs, and the pullout times
+  pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
@@ -235,6 +236,41 @@ length of that one" — with overlaps the sum double-counts every handover.
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running
 different hours.
+
+**`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
+scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps
+exactly one snapshot so the last import can be taken back, and nothing retained
+the sheet before that. Sheet-to-sheet tempo — what got added, what cleared, what
+stuck, and how fast — had never once been recorded, on a shop that swaps eight
+or more sheets a fortnight. Curtis: *"When downsheets are swapped out, there is
+a tempo to what gets repaired. The type of repairs that are getting done per
+downsheet update."* That tempo is the whole input to the Fleet Forecast.
+
+One snapshot per swap, holding **only the bus id and the catalog category** per
+row, plus which buses came off and which shift the swap happened in. The
+wording, the mechanic, the estimate and the history are all on the live record
+and none of them is a tempo question. Rolling cap of **40 swaps**, dropping the
+OLDEST — dropping the newest gives a ledger that never learns anything after its
+fortieth swap, which is what a naive `if(length>=LIMIT)return` produces and is
+very hard to see from outside.
+
+Sorted **oldest first**, because tempo is read as consecutive pairs and a
+backfilled swap from two weeks ago has to land in its own place. Curtis kept the
+photographs of the eight sheets the app never did, so a backfill can seed it.
+
+**The write is BEST EFFORT and that is the whole contract.** It runs from the
+middle of a sheet import. Losing one swap's tempo is a rounding error in a
+forecast; failing an import because a history file could not be written would
+cost a foreman the sheet he just photographed — unlike the undo copy beside it,
+which genuinely must stop the import.
+
+The shift is resolved once and **stored**, not recomputed later from the stamp:
+if somebody edits the shift hours in six weeks, the tempo of a swap that already
+happened must not move to a different crew. What shift it WAS is a fact about
+that morning.
+
+Device-local and never synced, for the reason the sweep is: it is one garage's
+tempo, and two devices merging ledgers would double-count every swap.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen
