@@ -250,7 +250,7 @@ hardest pair to scan on a phone. Both appear in both departments, so the pair is
 stored: the role alone does not say which one.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
-STATS panel it opened was a second scoreboard saying most of what the tiles
+STATS panel it opened was a second status report saying most of what the tiles
 below already said; those tiles absorbed the numbers worth keeping and the
 panel went. The key is left listed, and left alone on devices that hold it,
 because it is still a name this repository has used — removing the line is how

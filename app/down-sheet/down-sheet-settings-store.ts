@@ -20,7 +20,7 @@ export type Shift="1st"|"2nd"|"3rd";
 
 /* The tiles that are NOT on by default.
 
-   The scoreboard grew to fourteen tiles and became a wall somebody has to read
+   The status report grew to fourteen tiles and became a wall somebody has to read
    past to reach the sheet. Eight of them are what the shop actually reads —
    they are hard-coded in the order Curtis gave, because that order is the
    point. These six are real numbers that most days nobody needs, so they are

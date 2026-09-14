@@ -1,4 +1,4 @@
-/* THE PAPER HALF OF THE SCOREBOARD.
+/* THE PAPER HALF OF THE STATUS REPORT.
 
    Curtis asked for both: "Will build both out PDF and on the lock screen
    version and give me the choice to send either one before sending."
@@ -20,7 +20,7 @@
    this app exists to avoid — and the print sheet has to come up over the board,
    not somewhere else. */
 
-import {mysteryLabel,scoreboardStamp,SCOREBOARD_ROAD_CALL_HOURS,type Scoreboard,type ScoreboardBusLine} from "./fleet-scoreboard.ts";
+import {mysteryLabel,statusReportStamp,STATUS_REPORT_ROAD_CALL_HOURS,type FleetStatusReport,type StatusReportBusLine} from "./fleet-status-report.ts";
 
 /* Everything that reaches the page is a value from the board — fleet numbers,
    locations, catalog wording, and free text somebody typed into a repair. It is
@@ -33,7 +33,7 @@ function escapeHtml(value:unknown){
   .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
-function busRows(buses:ScoreboardBusLine[],includeDefects?:boolean){
+function busRows(buses:StatusReportBusLine[],includeDefects?:boolean){
  if(!buses.length)return '<p class="none">None.</p>';
  return '<ul class="buses">'+buses.map(bus=>{
   const head='<b>'+escapeHtml(bus.n)+'</b><span>'+escapeHtml(bus.where)+'</span><em>'+escapeHtml(bus.note)+'</em>';
@@ -47,20 +47,20 @@ function busRows(buses:ScoreboardBusLine[],includeDefects?:boolean){
 /* The counts-only version's two lists: fleet numbers and nothing else. Same
    split the text version makes — downed and inspections are figures to quote,
    these two are errands, and an errand needs the number and not the paragraph. */
-function numberList(buses:ScoreboardBusLine[]){
+function numberList(buses:StatusReportBusLine[]){
  if(!buses.length)return '<p class="none">None.</p>';
  return '<p class="numbers">'+buses.map(bus=>escapeHtml(bus.n)).join("  \u00b7  ")+'</p>';
 }
 
-export function scoreboardPrintHtml(board:Scoreboard,options:{includeDefects?:boolean;counts?:boolean;title?:string}={}){
+export function statusReportPrintHtml(board:FleetStatusReport,options:{includeDefects?:boolean;counts?:boolean;title?:string}={}){
  const title=escapeHtml(String(options.title||"PACE SOUTH").trim()||"PACE SOUTH");
- const stamp=escapeHtml(scoreboardStamp(board.at));
+ const stamp=escapeHtml(statusReportStamp(board.at));
  /* One list, and the "NOT ON THE SHEET" tag against each row is gone with it:
     not on the sheet is the definition of pending now, said once in the heading
     rather than repeated against every bus. */
  const counts=options.counts===true;
  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>${title} — Fleet Scoreboard</title>
+<title>${title} — Fleet Status Report</title>
 <style>
  @page{margin:14mm}
  *{box-sizing:border-box}
@@ -88,12 +88,12 @@ export function scoreboardPrintHtml(board:Scoreboard,options:{includeDefects?:bo
  footer{margin-top:22px;padding-top:8px;border-top:1px solid #c6cee0;font-size:8.5pt;color:#7f8ca6}
  @media print{body{font-size:11pt}}
 </style></head><body>
-<header><h1>${title} — FLEET SCOREBOARD</h1><p class="stamp">${stamp}</p></header>
+<header><h1>${title} — FLEET STATUS REPORT</h1><p class="stamp">${stamp}</p></header>
 <dl class="headline">
  <div><dt>Downed buses</dt><dd>${board.downed}</dd></div>
  <div><dt>Inspections</dt><dd>${board.inspections}</dd><small>Not counted above</small></div>
 </dl>
-<h2>Roadcalls pending — last ${SCOREBOARD_ROAD_CALL_HOURS} hours — ${board.roadCallsPending.length}</h2>
+<h2>Roadcalls pending — last ${STATUS_REPORT_ROAD_CALL_HOURS} hours — ${board.roadCallsPending.length}</h2>
 <p class="caveat">Currently not on the down sheet</p>
 ${counts?numberList(board.roadCallsPending):busRows(board.roadCallsPending,options.includeDefects)}
 <h2>Mystery buses — ${escapeHtml(mysteryLabel(board.mystery.length))}</h2>

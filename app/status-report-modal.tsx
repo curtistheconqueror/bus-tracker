@@ -1,6 +1,6 @@
 "use client";
 
-/* SEND THE SCOREBOARD — pick the version, then send it.
+/* SEND THE STATUS REPORT — pick the version, then send it.
 
    Curtis, on why this exists at all: a foreman with a clipboard was answering
    the superintendent almost as fast as he was. The numbers were never the
@@ -13,12 +13,12 @@
    before you have read it. */
 
 import {useMemo,useState} from "react";
-import {buildScoreboard,scoreboardCountsText,scoreboardText,type ScoreboardBus,type ScoreboardEntry} from "./fleet-scoreboard";
-import {scoreboardPrintHtml} from "./fleet-scoreboard-print";
+import {buildFleetStatusReport,statusReportCountsText,statusReportText,type StatusReportBus,type StatusReportEntry} from "./fleet-status-report";
+import {statusReportPrintHtml} from "./fleet-status-report-print";
 
-export default function ScoreboardModal({fleet,entries,title,close}:{
- fleet:ScoreboardBus[];
- entries:ScoreboardEntry[];
+export default function StatusReportModal({fleet,entries,title,close}:{
+ fleet:StatusReportBus[];
+ entries:StatusReportEntry[];
  title?:string;
  close:()=>void;
 }){
@@ -33,8 +33,8 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
     it was produced, and a report whose own timestamp moved while somebody read
     it would be lying about when it was true. */
  const at=useMemo(()=>new Date().toISOString(),[]);
- const board=useMemo(()=>buildScoreboard(fleet,entries,at),[fleet,entries,at]);
- const text=useMemo(()=>countsOnly?scoreboardCountsText(board,{title}):scoreboardText(board,{includeDefects,title}),[board,countsOnly,includeDefects,title]);
+ const board=useMemo(()=>buildFleetStatusReport(fleet,entries,at),[fleet,entries,at]);
+ const text=useMemo(()=>countsOnly?statusReportCountsText(board,{title}):statusReportText(board,{includeDefects,title}),[board,countsOnly,includeDefects,title]);
 
  /* navigator.share with TEXT rather than a file. That is the whole point of
     this version: it arrives as the message body, so it is readable on a locked
@@ -66,7 +66,7 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
   document.body.appendChild(frame);
   const doc=frame.contentDocument;
   if(!doc){frame.remove();setStatus("Printing is not available on this device.");return}
-  doc.open();doc.write(scoreboardPrintHtml(board,{includeDefects:countsOnly?false:includeDefects,counts:countsOnly,title}));doc.close();
+  doc.open();doc.write(statusReportPrintHtml(board,{includeDefects:countsOnly?false:includeDefects,counts:countsOnly,title}));doc.close();
   const go=()=>{
    try{frame.contentWindow?.focus();frame.contentWindow?.print()}
    catch{setStatus("Printing is not available on this device.")}
@@ -77,41 +77,41 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
   if(frame.contentWindow?.document.readyState==="complete")go();else frame.onload=go;
  };
 
- return <div className="shade scoreboard-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
-  <section className="scoreboard-modal" role="dialog" aria-modal="true" aria-labelledby="scoreboard-title">
-   <header className="scoreboard-head">
-    <span><small>AFTER THE ROUND</small><h2 id="scoreboard-title">Fleet Scoreboard</h2></span>
-    <button type="button" onClick={close} aria-label="Close the scoreboard">&times;</button>
+ return <div className="shade status-report-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
+  <section className="status-report-modal" role="dialog" aria-modal="true" aria-labelledby="status-report-title">
+   <header className="status-report-head">
+    <span><small>AFTER THE ROUND</small><h2 id="status-report-title">Fleet Status Report</h2></span>
+    <button type="button" onClick={close} aria-label="Close the status report">&times;</button>
    </header>
 
    {/* No "downed buses only" under the number. It repeated the heading back at
        the reader; "not counted above" under INSPECTIONS stays, because that one
        says something the heading does not. */}
-   <div className="scoreboard-headline">
+   <div className="status-report-headline">
     <div><small>DOWNED BUSES</small><b>{board.downed}</b></div>
     <div><small>INSPECTIONS</small><b>{board.inspections}</b><i>not counted above</i></div>
    </div>
 
-   <label className="scoreboard-defects">
+   <label className="status-report-defects">
     <input type="checkbox" checked={countsOnly} onChange={event=>{setCountsOnly(event.target.checked);setStatus("")}}/>
     <span>Counts only — no locations<small>Downed and inspections as numbers. Bus numbers for roadcalls pending and mystery buses, because those are the two somebody has to go and find.</small></span>
    </label>
    {/* Disabled rather than hidden while COUNTS ONLY is on: a switch that
        vanishes reads as a bug, and a person who ticked it needs to see that the
        other one is still there and still off. */}
-   <label className={"scoreboard-defects"+(countsOnly?" unavailable":"")}>
+   <label className={"status-report-defects"+(countsOnly?" unavailable":"")}>
     <input type="checkbox" checked={includeDefects&&!countsOnly} disabled={countsOnly} onChange={event=>setIncludeDefects(event.target.checked)}/>
     <span>Include the defects of each bus<small>{countsOnly?"Not used by the counts-only version — it carries no repair lines.":"Off by default — the short version is the one that gets read."}</small></span>
    </label>
 
    {/* Shown in full, before anything is sent. */}
-   <pre className="scoreboard-preview" aria-label="The message that will be sent">{text}</pre>
+   <pre className="status-report-preview" aria-label="The message that will be sent">{text}</pre>
 
-   <div className="scoreboard-actions">
-    <button type="button" className="scoreboard-send-text" onClick={sendText}>SEND AS A MESSAGE</button>
-    <button type="button" className="scoreboard-send-pdf" onClick={sendPdf}>SEND AS A PDF</button>
+   <div className="status-report-actions">
+    <button type="button" className="status-report-send-text" onClick={sendText}>SEND AS A MESSAGE</button>
+    <button type="button" className="status-report-send-pdf" onClick={sendPdf}>SEND AS A PDF</button>
    </div>
-   <p className="scoreboard-note">{status||"A message arrives as text somebody can read on a locked phone. A PDF is the one to hand on or keep."}</p>
+   <p className="status-report-note">{status||"A message arrives as text somebody can read on a locked phone. A PDF is the one to hand on or keep."}</p>
   </section>
  </div>;
 }

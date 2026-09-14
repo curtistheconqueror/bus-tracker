@@ -271,7 +271,7 @@ export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairB
 
     Curtis: "If a road call happened within the last thirty six hours, but it
     was updated as fixed, then it should not show." The flag is what the
-    Scoreboard filters on, and closing a Roadcall row on the sheet is where a
+    Status Report filters on, and closing a Roadcall row on the sheet is where a
     foreman actually records that a bus is fixed — so leaving the flag set there
     would have kept a repaired bus on the report for a day and a half.
 

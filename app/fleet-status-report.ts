@@ -1,4 +1,4 @@
-/* THE FLEET SCOREBOARD: the four answers, computed once, in one place.
+/* THE FLEET STATUS REPORT: the four answers, computed once, in one place.
 
    Curtis, on why this exists: a foreman with a clipboard was answering the
    superintendent almost as fast as he was. "If that's the case then paper it is
@@ -24,14 +24,14 @@ import {locationLabel} from "./location-label.ts";
    roughly this before it truncates, and a report that wraps mid-number is
    exactly as useless as no report. Enforced by a test over every line rather
    than eyeballed, which is how the first draft shipped a 54-character row. */
-export const SCOREBOARD_WIDTH=38;
+export const STATUS_REPORT_WIDTH=38;
 
 /* 36 hours, and only calls the bus is STILL out on. Curtis: "only roadcalls
    within the last 36 hours that have not been taken off out of that status
-   should show on scoreboard." Both halves matter — clearRoadCall takes the flag
+   should show on status report." Both halves matter — clearRoadCall takes the flag
    off and leaves the history, so a bus fixed and returned to service this
    morning still has a dated event from last night and must not be counted. */
-export const SCOREBOARD_ROAD_CALL_HOURS=36;
+export const STATUS_REPORT_ROAD_CALL_HOURS=36;
 
 /* AN INSPECTION IS NOT A DOWNED BUS, and this is the one line that says so.
 
@@ -44,16 +44,16 @@ export const SCOREBOARD_ROAD_CALL_HOURS=36;
    superintendent is asking about the second kind. */
 export const INSPECTION_SECTION="Inspection";
 
-export type ScoreboardEntry={busId?:string;busNumber?:string;section?:string;workflow?:string;repair?:string;category?:string};
-export type ScoreboardBus={
+export type StatusReportEntry={busId?:string;busNumber?:string;section?:string;workflow?:string;repair?:string;category?:string};
+export type StatusReportBus={
  id:string;n:string;l:string;s?:string;
  roadCalls?:unknown;
  defects?:Partial<StructuredDefect>[];
  pendingRepair?:string;
 };
 
-export type ScoreboardBusLine={id:string;n:string;where:string;note:string;defects:string[]};
-export type Scoreboard={
+export type StatusReportBusLine={id:string;n:string;where:string;note:string;defects:string[]};
+export type FleetStatusReport={
  at:string;
  /* Buses with an active sheet entry, minus the ones only there for an
     inspection. The headline number and the reason this page exists. */
@@ -63,7 +63,7 @@ export type Scoreboard={
     rather than wonder whether the app is wrong. */
  onSheet:number;
  inspections:number;
- mystery:ScoreboardBusLine[];
+ mystery:StatusReportBusLine[];
  /* ROAD CALLS STILL PENDING: broken down inside the window, still in that
     status, and NOT written up on the sheet.
 
@@ -73,14 +73,14 @@ export type Scoreboard={
     in roadcall status should not be counted here." On the sheet means somebody
     has it; what is pending is what nobody has written down yet. One list, and
     the star and its footnote go with the second. */
- roadCallsPending:ScoreboardBusLine[];
+ roadCallsPending:StatusReportBusLine[];
 };
 
 function clean(value:unknown){return String(value??"").trim()}
-function isActive(entry:ScoreboardEntry){return clean(entry.workflow)!=="Completed"}
-function isInspection(entry:ScoreboardEntry){return clean(entry.section)===INSPECTION_SECTION}
+function isActive(entry:StatusReportEntry){return clean(entry.workflow)!=="Completed"}
+function isInspection(entry:StatusReportEntry){return clean(entry.section)===INSPECTION_SECTION}
 
-function openDefects(bus:ScoreboardBus){
+function openDefects(bus:StatusReportBus){
  return (bus.defects||[]).filter(defect=>defect.state!=="completed");
 }
 
@@ -88,24 +88,24 @@ function openDefects(bus:ScoreboardBus){
    a stored record can be missing any field — a report that throws is worse than
    one that is thin, because it fails at the moment somebody is standing there
    waiting for it. */
-function defectLines(bus:ScoreboardBus){
+function defectLines(bus:StatusReportBus){
  return openDefects(bus).map(defect=>{
   const whole={category:"",issue:"",details:"",operability:"unknown",state:"open",...defect} as StructuredDefect;
   return defectLabel(whole).trim()||"Repair recorded with no description";
  });
 }
 
-function busLine(bus:ScoreboardBus,note:string):ScoreboardBusLine{
+function busLine(bus:StatusReportBus,note:string):StatusReportBusLine{
  return {id:bus.id,n:clean(bus.n),where:locationLabel(bus.l),note,defects:defectLines(bus)};
 }
 
-function byNumber(a:ScoreboardBusLine,b:ScoreboardBusLine){return a.n.localeCompare(b.n,undefined,{numeric:true})}
+function byNumber(a:StatusReportBusLine,b:StatusReportBusLine){return a.n.localeCompare(b.n,undefined,{numeric:true})}
 
-export function buildScoreboard(
- fleet:ScoreboardBus[],
- entries:ScoreboardEntry[],
+export function buildFleetStatusReport(
+ fleet:StatusReportBus[],
+ entries:StatusReportEntry[],
  now=new Date().toISOString()
-):Scoreboard{
+):FleetStatusReport{
  const active=entries.filter(isActive);
  const activeBusIds=new Set(active.map(entry=>clean(entry.busId)).filter(Boolean));
 
@@ -125,14 +125,14 @@ export function buildScoreboard(
  const mystery=mysteryBusIds(fleet as never,[...activeBusIds])
   .map(id=>byId.get(clean(id)))
   .filter(Boolean)
-  .map(bus=>busLine(bus as ScoreboardBus,""))
+  .map(bus=>busLine(bus as StatusReportBus,""))
   .sort(byNumber);
 
  /* The list somebody still has to act on: broke down, still in that status,
     and nobody has written it up. */
- const roadCallsPending:ScoreboardBusLine[]=[];
+ const roadCallsPending:StatusReportBusLine[]=[];
  for(const bus of fleet){
-  const recent=standingRoadCalls(bus,now,SCOREBOARD_ROAD_CALL_HOURS);
+  const recent=standingRoadCalls(bus,now,STATUS_REPORT_ROAD_CALL_HOURS);
   if(!recent.length)continue;
   /* The sheet check is here as well as in the reconciler, on purpose. The
      reconciler takes the flag off the bus record and is the real rule; this
@@ -168,7 +168,7 @@ export function mysteryLabel(count:number){
  return count?count+" "+MYSTERY_CAVEAT:"0";
 }
 
-export function scoreboardStamp(at:string){
+export function statusReportStamp(at:string){
  const when=new Date(at);
  if(Number.isNaN(when.getTime()))return "";
  return when.toLocaleString([],{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).toUpperCase();
@@ -186,15 +186,15 @@ export function scoreboardStamp(at:string){
    downed bus list." Those two are lists somebody has to go and DO something
    about; the downed count is a figure, and thirty fleet numbers would bury the
    four that need chasing. */
-export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean;title?:string}={}){
+export function statusReportText(board:FleetStatusReport,options:{includeDefects?:boolean;title?:string}={}){
  const lines:string[]=[];
  /* The heavy band fences the two numbers that are NOT like the others; the
     light rule separates the ordinary ones. Different weights on purpose — a
     reader should be able to see which block is set apart without reading it. */
- const band="=".repeat(SCOREBOARD_WIDTH-8);
- const rule="-".repeat(SCOREBOARD_WIDTH-8);
+ const band="=".repeat(STATUS_REPORT_WIDTH-8);
+ const rule="-".repeat(STATUS_REPORT_WIDTH-8);
  lines.push(clean(options.title)||"PACE SOUTH");
- const stamp=scoreboardStamp(board.at);
+ const stamp=statusReportStamp(board.at);
  if(stamp)lines.push(stamp);
  /* THE TWO NUMBERS THAT ARE NOT LIKE THE OTHERS, fenced off so nobody has to
     be told twice. Curtis: "The downed bus number and inspection number should
@@ -220,6 +220,23 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
     characters and wrapped on a phone — caught by the test that holds every line
     to a lock screen, not by reading it. The number is what somebody is looking
     for, so it goes where the eye lands. */
+ /* ROADCALLS PENDING FIRST, THEN MYSTERY — the same order as the counts-only
+    version. Curtis: "also match the reports." They ran in opposite orders, and
+    a person comparing the one they were sent against the one on their screen
+    should not have to work out that the two blocks swapped places.
+
+    Pending leads because it is the more urgent errand: a bus that broke down
+    and nobody has written up is a known problem going unrecorded, where a
+    mystery bus is a question. */
+ lines.push("ROADCALLS PENDING   "+board.roadCallsPending.length);
+ /* The star and its footnote are gone with the second list. Not on the sheet
+    IS the definition now, so it is said once, under the heading, instead of
+    against every row and again at the bottom. */
+ lines.push("  (not on the down sheet)");
+ /* Road calls are not capped: the 36-hour window keeps the list short by
+    construction, and each one is a bus somebody has to chase. */
+ for(const bus of board.roadCallsPending)lines.push(...busBlock(bus,options.includeDefects));
+ lines.push(rule);
  lines.push("MYSTERY BUSES       "+board.mystery.length);
  /* A blank line between the number and the caveat. Curtis: "put a space in
     between (like a tabbed space so its not so bunced up) in between Mystery
@@ -235,15 +252,6 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
     packed across the width. Every number is still there; Curtis asked for the
     numbers and losing them to a "+14 more" would defeat the list. */
  lines.push(...busList(board.mystery,options.includeDefects));
- lines.push(rule);
- lines.push("ROADCALLS PENDING   "+board.roadCallsPending.length);
- /* The star and its footnote are gone with the second list. Not on the sheet
-    IS the definition now, so it is said once, under the heading, instead of
-    against every row and again at the bottom. */
- lines.push("  (not on the down sheet)");
- /* Road calls are not capped: the 36-hour window keeps the list short by
-    construction, and each one is a bus somebody has to chase. */
- for(const bus of board.roadCallsPending)lines.push(...busBlock(bus,options.includeDefects));
  return lines.join("\n").replace(/\n{3,}/g,"\n\n").trim();
 }
 
@@ -261,11 +269,11 @@ export function scoreboardText(board:Scoreboard,options:{includeDefects?:boolean
    is noise. Road calls pending and mystery buses are errands — each one is a
    bus somebody has to walk out to — so those carry their numbers and nothing
    else: no location, no note, no repairs. */
-export function scoreboardCountsText(board:Scoreboard,options:{title?:string}={}){
+export function statusReportCountsText(board:FleetStatusReport,options:{title?:string}={}){
  const lines:string[]=[];
- const band="=".repeat(SCOREBOARD_WIDTH-8);
+ const band="=".repeat(STATUS_REPORT_WIDTH-8);
  lines.push(clean(options.title)||"PACE SOUTH");
- const stamp=scoreboardStamp(board.at);
+ const stamp=statusReportStamp(board.at);
  if(stamp)lines.push(stamp);
  lines.push(band);
  lines.push("DOWNED BUSES        "+board.downed);
@@ -285,11 +293,11 @@ export function scoreboardCountsText(board:Scoreboard,options:{title?:string}={}
 /* Fleet numbers packed across the width, nothing else. Every number is there —
    losing one to a "+6 more" would defeat a list whose entire content is which
    buses to go and find. */
-function numberRows(buses:ScoreboardBusLine[]){
+function numberRows(buses:StatusReportBusLine[]){
  const out:string[]=[];
  let row="  ";
  for(const bus of buses){
-  if((row+" "+bus.n).length>SCOREBOARD_WIDTH){out.push(row);row="  "}
+  if((row+" "+bus.n).length>STATUS_REPORT_WIDTH){out.push(row);row="  "}
   row+=" "+bus.n;
  }
  if(row.trim())out.push(row);
@@ -308,36 +316,36 @@ function fit(text:string,max:number){
 /* How many buses get a line of their own before the rest are packed into a run
    of numbers. Eight fills about a third of a phone screen, which is as much of
    one list as a reader will take before the next heading has to appear. */
-export const SCOREBOARD_DETAIL_LIMIT=8;
+export const STATUS_REPORT_DETAIL_LIMIT=8;
 
-function busList(buses:ScoreboardBusLine[],includeDefects?:boolean){
+function busList(buses:StatusReportBusLine[],includeDefects?:boolean){
  const out:string[]=[];
- for(const bus of buses.slice(0,SCOREBOARD_DETAIL_LIMIT))out.push(...busBlock(bus,includeDefects));
- const rest=buses.slice(SCOREBOARD_DETAIL_LIMIT);
+ for(const bus of buses.slice(0,STATUS_REPORT_DETAIL_LIMIT))out.push(...busBlock(bus,includeDefects));
+ const rest=buses.slice(STATUS_REPORT_DETAIL_LIMIT);
  if(!rest.length)return out;
  out.push("  + "+rest.length+" more:");
  /* Packed to the width rather than one per line — that is the entire saving. */
  let row="   ";
  for(const bus of rest){
-  if((row+" "+bus.n).length>SCOREBOARD_WIDTH){out.push(row);row="   "}
+  if((row+" "+bus.n).length>STATUS_REPORT_WIDTH){out.push(row);row="   "}
   row+=" "+bus.n;
  }
  if(row.trim())out.push(row);
  return out;
 }
 
-function busBlock(bus:ScoreboardBusLine,includeDefects?:boolean,mark=""){
+function busBlock(bus:StatusReportBusLine,includeDefects?:boolean,mark=""){
  /* The number is fixed, the mark is fixed, and the location gives up whatever
     room the note needs — of the three it is the one a reader can infer. */
  const head="  "+bus.n+"  ";
  /* An empty note prints nothing at all rather than an empty "()" — mystery
     buses lost their note when the open-repair count went. */
  const note=bus.note?" ("+bus.note+")":"";
- const room=SCOREBOARD_WIDTH-head.length-note.length-mark.length;
+ const room=STATUS_REPORT_WIDTH-head.length-note.length-mark.length;
  const out=[head+fit(bus.where,Math.max(room,4))+note+mark];
  /* Curtis: "have a check mark that says (include defects of each bus) in case
     they request it. Since defects are on buses no matter the status." Off by
     default: the short version is the one that gets read. */
- if(includeDefects)for(const line of bus.defects)out.push("    - "+fit(line,SCOREBOARD_WIDTH-6));
+ if(includeDefects)for(const line of bus.defects)out.push("    - "+fit(line,STATUS_REPORT_WIDTH-6));
  return out;
 }

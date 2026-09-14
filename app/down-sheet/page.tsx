@@ -1,6 +1,6 @@
 "use client";
 
-import ScoreboardModal from "../scoreboard-modal";
+import StatusReportModal from "../status-report-modal";
 import QuickFilterMenu from "../quick-filter-menu";
 import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "./down-sheet-filters";
 import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "./down-sheet-share";
@@ -284,7 +284,7 @@ export default function DownSheet(){
     empty the other one out from under the person reading it. Both stay on
     screen saying what they always said; only the sheet below narrows. */
  const roadCounts=useMemo(()=>downSheetRoadCounts(shown,locations),[shown,locations]);
- /* The scoreboard is grouped from the whole sheet and the table from the road
+ /* The status report is grouped from the whole sheet and the table from the road
     filter, which is why these are two groupings rather than one.
 
     Pressing INSPECTIONS ON ROAD is a request to SEE those buses, not a claim
@@ -339,7 +339,7 @@ export default function DownSheet(){
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  /* Opened after the round, which is when somebody is about to be asked. */
- const [scoreboardOpen,setScoreboardOpen]=useState(false);
+ const [reportOpen,setReportOpen]=useState(false);
  /* What gets sent is exactly what is on the screen: `visible`, after both
     narrowings, in the order the sheet is drawn. Rebuilding the list from the
     filter alone would send something nobody had looked at. */
@@ -702,7 +702,7 @@ export default function DownSheet(){
        cleared — SHOW COMPLETED and CLEAR DOWNSHEET went behind ADVANCED
        ACTIONS — so the primary action still leads it. Curtis asked for the
        report here because here is where the round ends. */}
-   <button className="down-scoreboard-action" type="button" onClick={()=>setScoreboardOpen(true)}>SCOREBOARD</button>
+   <button className="down-status-report-action" type="button" onClick={()=>setReportOpen(true)}>STATUS REPORT</button>
   </section>
 
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
@@ -883,9 +883,9 @@ export default function DownSheet(){
    </div>
   </section>
   <footer className="down-footnote"><span>ACTIVE DOWN COUNT EXCLUDES COMPLETED REPAIRS</span><span>BUS LOCATION IS CONTROLLED ONLY FROM THE FACILITY MAP</span></footer>
-  {/* The sheet and the board are handed over as they stand; the Scoreboard
+  {/* The sheet and the board are handed over as they stand; the Status Report
       computes and never writes, so there is no save path to go around. */}
-  {scoreboardOpen&&<ScoreboardModal fleet={fleet as never} entries={entries as never} close={()=>setScoreboardOpen(false)}/>}
+  {reportOpen&&<StatusReportModal fleet={fleet as never} entries={entries as never} close={()=>setReportOpen(false)}/>}
   {/* "we just add to it" — the existing entry is opened with a fresh blank
       repair card on the end, so the new work is typed straight into the row
       that is already there rather than refused. */}

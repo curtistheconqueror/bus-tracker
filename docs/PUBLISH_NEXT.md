@@ -86,7 +86,21 @@ their shapes. A device on an older build reading a board written by this one
 sees a bus whose flag is off and whose history is intact, which is exactly what
 it would see after somebody unticked the box by hand.
 
-## 3. The report is shorter, and has a counts-only version
+## 3. SCOREBOARD is now the FLEET STATUS REPORT
+
+Curtis asked for a term that holds up when a superintendent forwards it upward,
+where "scoreboard" reads as an in-house nickname. The button says STATUS
+REPORT; the modal, the message and the PDF all say Fleet Status Report.
+
+Renamed through the code as well as the interface, on purpose: this repo has
+been bitten twice by one thing carrying two names (five copies of the location
+table, two road-call records that had drifted). `fleet-scoreboard.ts`,
+`fleet-scoreboard-print.ts` and `scoreboard-modal.tsx` become
+`fleet-status-report.ts`, `fleet-status-report-print.ts` and
+`status-report-modal.tsx`; the exported symbols and every `.scoreboard-*` CSS
+class follow. **No storage key is involved** — none of this was ever persisted.
+
+## 4. The report is shorter, and has a counts-only version
 
 Curtis: *"I think its still too much info."*
 
@@ -103,6 +117,10 @@ Three trims he named:
   stays, because that one says what the heading does not;
 - a **blank line** separates `MYSTERY BUSES` from `PENDING CONFIRMATION OF
   STATUS`, which were reading as one wrapped sentence.
+
+Both blocks also run in the SAME ORDER in both versions now — roadcalls
+pending, then mystery. They were opposite ways round, and Curtis asked for
+them matched.
 
 A **counts-only checkbox** sits above the defects one, and disables it rather
 than hiding it. The split is by what the reader does with each number: downed

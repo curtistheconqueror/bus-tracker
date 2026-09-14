@@ -1072,7 +1072,7 @@ export default function DefectLog(){
   </section>}
   {/* Closed by default. Five tiles were the first thing the page said, above
       the filters and the button that logs a defect, so a first-time user had
-      to scroll past a scoreboard to reach the thing the page is for. The
+      to scroll past a wall of tallies to reach the thing the page is for. The
       numbers still matter to a foreman, so they are one tap away and the
       choice is remembered per device. */}
   <section className={"daily-stats"+(statsOpen?" open":"")}>
