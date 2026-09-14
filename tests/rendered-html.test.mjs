@@ -14222,3 +14222,35 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
  assert.equal(untilLabel(45),"45m");
  assert.equal(untilLabel(null),"");
 });
+
+test("the garage's hours are editable on the device, and nothing re-implements the clock",async()=>{
+ const [panel,settings]=await Promise.all([
+  readFile(new URL("../app/settings/shift-settings.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=panel.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis asked for the panel in the same breath as the clock: "a settings
+    option to fine tune both of these options in case changes need to be made
+    without you writing code." Both halves — the shift windows AND the pullout
+    times — have to be editable, which is what "both of these options" names. */
+ assert.match(settings,/<ShiftSettingsPanel\/>/,"the panel is actually on the Settings page");
+ assert.match(code,/settings\.shifts\.map/,"every shift window is editable");
+ assert.match(code,/settings\.pullouts\.map/,"and so is every pullout time");
+ assert.match(code,/localStorage\.setItem\(SHIFT_SETTINGS_KEY/,"and the edit is written to the device");
+
+ /* ONE PLACE KNOWS WHAT A SHIFT IS. The panel reads the same module the report
+    and the forecast do rather than parsing "HH:MM" itself — this repo has paid
+    for five copies of one table and two road-call records that drifted, and a
+    second opinion about when 2nd shift starts would be the next one. */
+ assert.match(code,/from "\.\.\/shift-clock"/);
+ assert.equal(/\d+\s*\*\s*60\s*\+/.test(code),false,"the panel never converts a clock time itself");
+ assert.equal(/getHours\(\)/.test(code),false,"nor reads the wall clock behind the module's back");
+
+ /* A time input hands back "0" halfway through somebody typing "06:00", and
+    writing that through would move the whole shift under them mid-edit — the
+    same lesson the Down Sheet's hours boxes cost us. An edge that is not yet a
+    real time is held in state and simply not saved. */
+ assert.match(code,/if\(clockMinutes\(value\)!==null\)save\(next\)/,
+  "a half-typed time is not committed");
+});
