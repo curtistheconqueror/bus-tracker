@@ -673,3 +673,31 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .scoreboard-actions{grid-template-columns:1fr}
  .scoreboard-preview{font-size:11px;max-height:30vh}
 }
+
+/* THE QUICK FILTER BAR, and why it is not .down-road-filter-note.
+
+   That rule sets `button{width:100%}` below 760px, which is right for the one
+   button it has and would have stacked these four down half a phone screen. It
+   is also why the class is new rather than added alongside: a broader selector
+   already owned every button inside that box. */
+.down-quick-filter-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:9px 11px;border:1px solid #9a86c4;border-left:4px solid #6b3fc4;border-radius:6px;background:#f3eefc;color:#33215e}
+.down-quick-filter-note>p{flex:1;min-width:180px;margin:0;font-size:10px;font-weight:800;line-height:1.45}
+.down-quick-filter-note>p>b{color:#4a2a8c}
+.down-quick-filter-note>p>small{color:#5c4a86;font-size:9px;font-weight:700}
+.down-quick-filter-actions{display:flex;flex-wrap:wrap;gap:6px}
+.down-quick-filter-actions button{min-height:32px;border:1px solid #6b3fc4;border-radius:5px;background:#6b3fc4;color:#fff;padding:0 11px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.down-quick-filter-actions button+button{background:#fff;color:#4a2a8c}
+.down-quick-filter-note>small{flex-basis:100%;color:#4a2a8c;font-size:9px;font-weight:900}
+/* The trigger takes this page's own control styling. Bare, it inherits nothing
+   but display:inline-flex from globals.css and renders as unstyled text. */
+.down-view-controls .quick-filter-trigger{height:32px;border:1px solid #aebbd0;border-radius:5px;background:#f2f5f9;color:#294264;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
+@media(max-width:760px){
+ .down-quick-filter-note{margin:0 8px 8px}
+ /* Two across rather than one per row: four full-width buttons is a screen of
+    buttons above the rows they describe. */
+ .down-quick-filter-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .down-quick-filter-actions button{min-height:44px;font-size:10px}
+ .down-quick-filter-actions .down-quick-filter-clear{grid-column:1/-1}
+ .down-view-controls>.quick-filter-control{flex:1}
+ .down-view-controls .quick-filter-trigger{width:100%;height:44px;min-height:44px;font-size:9px}
+}

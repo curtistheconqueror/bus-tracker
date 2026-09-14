@@ -1,6 +1,10 @@
 "use client";
 
 import ScoreboardModal from "../scoreboard-modal";
+import QuickFilterMenu from "../quick-filter-menu";
+import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "./down-sheet-filters";
+import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "./down-sheet-share";
+import {copyText,shareOrDownloadFile} from "../share-file";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
@@ -215,6 +219,18 @@ export default function DownSheet(){
  /* Which of the two road tallies is being read, if either. Not persisted: it is
     a question somebody asks of the sheet in the moment, not a preference. */
  const [roadFilter,setRoadFilter]=useState<DownSheetRoadKind|null>(null);
+ /* The sheet narrowed to one question, so that what is shared IS the answer.
+
+    Curtis asked for this to make the sheet sendable: "we should have a quick
+    filters list for that actually so I can share the downsheet with someone
+    wanting details." The person being sent it is asking which buses are waiting
+    on parts, not for all forty rows, and a list is worth sending only when it
+    is that list. */
+ const [quickFilter,setQuickFilter]=useState<DownSheetFilterKey|null>(null);
+ /* Two failure states rather than one. The first version of this bar reported a
+    failed COPY LIST as "COULD NOT SHARE — TRY COPY LIST", which sends somebody
+    to press the button that had just failed. */
+ const [shareStatus,setShareStatus]=useState<""|"copied"|"shared"|"saved"|"copy-error"|"share-error">("");
  const [undoClearAvailable,setUndoClearAvailable]=useState(false);
  const [undoScanAvailable,setUndoScanAvailable]=useState(false);
  /* The bus number is held with the id so the notice can name the bus it would
@@ -292,8 +308,23 @@ export default function DownSheet(){
     are not bands at all - COMPLETED TODAY sits between SCHEDULED and
     UNSCHEDULED. The bands below the sheet still read sheetGroups directly. */
  const tileFor=(key:string)=>{const group=sheetGroups.find(item=>item.key===key);return group?<div className={"group-count group-"+group.key} key={group.key}><strong>{group.entries.length}</strong><span>{group.label}</span></div>:null};
- const groups=useMemo(()=>roadFilter?orderDownSheetGroups(groupDownSheetEntries(downSheetRoadEntries(shown,locations,roadFilter),"number-asc",locations),sectionOrder):sheetGroups,[sheetGroups,shown,locations,roadFilter,sectionOrder]);
+ /* Both narrowings compose, and the quick filter goes LAST so that what it
+    reports is what is on the screen. Applied the other way round, the count in
+    the note would have been the quick filter's own tally of the whole sheet
+    while the rows below it were also cut down by the road filter — a bar
+    reading "9 of 41" above six rows. */
+ const groups=useMemo(()=>{
+  if(!roadFilter&&!quickFilter)return sheetGroups;
+  let rows=roadFilter?downSheetRoadEntries(shown,locations,roadFilter):shown;
+  if(quickFilter)rows=downSheetFilterEntries(rows,locations,quickFilter);
+  return orderDownSheetGroups(groupDownSheetEntries(rows,"number-asc",locations),sectionOrder);
+ },[sheetGroups,shown,locations,roadFilter,quickFilter,sectionOrder]);
  const visible=useMemo(()=>groups.flatMap(group=>group.entries),[groups]);
+ /* Counted off `shown` rather than off `visible`, so the menu says how many
+    each filter WOULD show. Counted off the filtered list, every number but the
+    active one would read 0 the moment a filter was on, and the menu would stop
+    being a way to choose the next question. */
+ const quickFilterCounts=useMemo(()=>downSheetFilterCounts(shown,locations),[shown,locations]);
  /* Down buses: on the sheet for a fault rather than only for maintenance.
 
     A bus whose row says nothing but PM'S is due for service, not broken, and a
@@ -309,6 +340,31 @@ export default function DownSheet(){
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  /* Opened after the round, which is when somebody is about to be asked. */
  const [scoreboardOpen,setScoreboardOpen]=useState(false);
+ /* What gets sent is exactly what is on the screen: `visible`, after both
+    narrowings, in the order the sheet is drawn. Rebuilding the list from the
+    filter alone would send something nobody had looked at. */
+ const shareRows=visible as unknown as Parameters<typeof downSheetShareText>[1];
+ const shareLabel=quickFilter?downSheetFilterLabel(quickFilter):"";
+ const copyFilteredList=async()=>{if(!quickFilter)return;try{await copyText(downSheetShareText(quickFilter,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
+ /* Text first, and the clipboard when there is no share sheet — the same order
+    the Defect Log settled on. A browser with no navigator.share must not leave
+    somebody pressing a button that does nothing. */
+ const shareFilteredList=async()=>{
+  if(!quickFilter)return;
+  const text=downSheetShareText(quickFilter,shareRows,locations);
+  if(typeof navigator.share!=="function"){await copyFilteredList();return}
+  try{await navigator.share({title:"Down Sheet — "+shareLabel,text});setShareStatus("shared")}
+  catch(error){if((error as Error).name!=="AbortError")setShareStatus("share-error")}
+ };
+ const shareFilteredPage=async()=>{
+  if(!quickFilter)return;
+  const stamp=new Date().toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  const html=downSheetShareHtml(quickFilter,shareRows,locations,stamp);
+  try{
+   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(quickFilter),"Down Sheet — "+shareLabel);
+   setShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"saved");
+  }catch{setShareStatus("share-error")}
+ };
  const openNewEntry=()=>{if(active.length>=MAX_ENTRIES){alert("The active down sheet has reached its 98-entry capacity.");return}/* THE FORM OPENS WITH NO BUS CHOSEN, and that is the whole point of this line.
 
      It used to seed `fleet.find(item=>!active.some(...))` — the first bus that
@@ -652,6 +708,10 @@ export default function DownSheet(){
   <section className="down-view-controls" aria-label="Search and order Down Sheet">
    <label className="down-search"><b>SEARCH</b><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, repair, mechanic or vendor" aria-label="Search Down Sheet"/></label>
    {search&&<button className="clear-search" type="button" onClick={()=>setSearch("")}>CLEAR</button>}
+   {/* Beside SEARCH rather than behind ADVANCED ACTIONS. Both narrow the sheet
+       to the rows somebody is about to read or send, and a filter nobody can
+       see is a filter nobody uses. */}
+   <QuickFilterMenu<DownSheetFilterKey> active={quickFilter} counts={quickFilterCounts} items={DOWN_SHEET_FILTERS} title="QUICK FILTERS" menuLabel="Quick down sheet filters" onSelect={value=>{setQuickFilter(value);setShareStatus("")}}/>
    <span className="view-results"><b>{visible.length}</b> IN VIEW</span>
   </section>
 
@@ -745,6 +805,23 @@ export default function DownSheet(){
       available in Lite — hiding only the board would be the odd half. */}
   <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
    collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
+  {/* Its own class rather than the road note's, deliberately: that rule gives
+      every button inside it width:100% below 760px, which reads correctly for
+      one SHOW THE WHOLE SHEET button and would stack these four down the
+      screen. */}
+  {quickFilter&&<section className="down-quick-filter-note" aria-label={shareLabel+" — share the filtered sheet"}>
+   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint}</small></p>
+   <div className="down-quick-filter-actions">
+    <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
+    <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
+    <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
+    <button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>
+   </div>
+   {shareStatus==="shared"&&<small role="status">SENT</small>}
+   {shareStatus==="saved"&&<small role="status">SAVED TO THIS DEVICE</small>}
+   {shareStatus==="share-error"&&<small role="status">COULD NOT SHARE — TRY COPY LIST</small>}
+   {shareStatus==="copy-error"&&<small role="status">COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT</small>}
+  </section>}
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet

@@ -33,6 +33,8 @@ import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recomme
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
+import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch } from "../app/down-sheet/down-sheet-filters.ts";
+import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText } from "../app/down-sheet/down-sheet-share.ts";
 import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
@@ -11550,7 +11552,36 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
  assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the scoreboard is grouped from the whole sheet, in the reader's band order");
- assert.match(page,/const groups=useMemo\(\(\)=>roadFilter\?orderDownSheetGroups\(groupDownSheetEntries\(downSheetRoadEntries\(shown,locations,roadFilter\),"number-asc",locations\),sectionOrder\):sheetGroups/,"only the table follows the filter");
+ /* ONLY THE TABLE FOLLOWS THE FILTERS, and there are two of them now — the
+    road tallies and the quick filter share one pipeline. The shape is asserted
+    rather than the exact old expression, because what has to hold is the
+    relationship: the table starts from `shown`, both narrowings are applied to
+    it, and everything anybody reads a count off still comes from `shown`
+    itself. Comments are stripped so the prose explaining the pipeline cannot
+    stand in for the pipeline. */
+ const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ const pipeline=pageCode.match(/const groups=useMemo\(\(\)=>\{[\s\S]*?\n \},\[[^\]]*\]\);/)?.[0]||"";
+ assert.ok(pipeline,"the table's grouping is still one memo");
+ assert.match(pipeline,/if\(!roadFilter&&!quickFilter\)return sheetGroups;/,"unfiltered, the table is the whole sheet");
+ assert.match(pipeline,/rows=roadFilter\?downSheetRoadEntries\(shown,locations,roadFilter\):shown;/,"the road tallies narrow the sheet");
+ assert.match(pipeline,/if\(quickFilter\)rows=downSheetFilterEntries\(rows,locations,quickFilter\);/,"and the quick filter narrows that, so the two compose");
+ assert.match(pipeline,/orderDownSheetGroups\(groupDownSheetEntries\(rows,"number-asc",locations\),sectionOrder\)/);
+ /* The quick filter's own counts come off `shown` for the same reason the road
+    tallies do: taken off the filtered rows, every number but the active one
+    would read 0 the moment a filter was on. */
+ assert.match(pageCode,/const quickFilterCounts=useMemo\(\(\)=>downSheetFilterCounts\(shown,locations\)/,"the menu counts the whole sheet, not the filtered view");
+ /* EVERY HELPER THE SHARE BAR CALLS IS IMPORTED. This is here because the first
+    build of that bar was not: `copyText` was used and never imported, and lint,
+    the build and this whole suite all passed over it. It failed only in a
+    browser, where the thrown ReferenceError was swallowed by the handler's own
+    catch and reported to the mechanic as "could not share". */
+ for(const name of ["copyText","shareOrDownloadFile","downSheetShareText","downSheetShareHtml","downSheetShareFilename","downSheetFilterEntries","downSheetFilterCounts","downSheetFilterLabel","DOWN_SHEET_FILTERS"])
+  assert.match(pageCode,new RegExp("import \\{[^}]*\\b"+name+"\\b[^}]*\\} from"),name+" is imported, not assumed");
+ /* A failed COPY LIST used to be reported as "COULD NOT SHARE — TRY COPY LIST",
+    which sends somebody to press the button that had just failed. */
+ assert.match(pageCode,/shareStatus==="copy-error"/);
+ assert.match(pageCode,/shareStatus==="share-error"/);
+ assert.doesNotMatch(pageCode,/setShareStatus\("error"\)/,"the two failures are told apart");
  assert.ok(page.indexOf("const roadCounts=")<page.indexOf("const groups=useMemo"),"counted from the unfiltered set");
 
  /* AND SO IS EVERY OTHER TILE. Pressing INSPECTIONS ON ROAD is a request to
@@ -13834,4 +13865,124 @@ test("wrapping the panels in drawers did not sever their child-combinator rules"
    assert.ok(full.includes(".settings-drawer-body"),
     file+" reaches through a bare `>` into drawer-wrapped content and will silently stop matching: "+match[0].trim());
   }
+});
+
+test("the Down Sheet's quick filters ask about the entry, and what is shared is what is on the screen",async()=>{
+ const now="2026-09-14T15:00:00.000Z";
+ const entry=(over={})=>({id:"e"+(over.busNumber||"x"),busId:over.busId||"b"+(over.busNumber||"x"),busNumber:"17500",category:"",repair:"",customReason:"",
+  assignmentType:"Mechanic",assignedTo:"",section:"Pending",workflow:"Scheduled",createdAt:now,repairItems:[],timeEstimate:{totalMinutes:0},...over});
+
+ /* THESE ARE NOT THE DEFECT LOG'S FILTERS, and that is the point of the module.
+    Every one of them asks something only the ENTRY knows — who has the bus, how
+    long it has been on the sheet, whether anything is estimated — or something
+    only the MAP knows. None of it is answerable from a defect's wording, which
+    is all the Defect Log's thirteen filters ever look at. */
+ assert.deepEqual(DOWN_SHEET_FILTERS.map(item=>item.key),
+  ["unassigned","waiting-parts","off-property","on-road","aging","body-shop","road-call","inspection","no-estimate"]);
+ assert.ok(DOWN_SHEET_FILTERS.every(item=>item.label&&item.shortLabel&&item.hint));
+ assert.equal(downSheetFilterFromValue("waiting-parts"),"waiting-parts");
+ // A key off a link or an old device reads as no filter rather than as a crash.
+ assert.equal(downSheetFilterFromValue("farebox"),null);
+ assert.equal(downSheetFilterFromValue(undefined),null);
+
+ assert.equal(downSheetFilterMatch(entry({assignedTo:""}),"garage-4","unassigned",now),true);
+ assert.equal(downSheetFilterMatch(entry({assignedTo:"CJ"}),"garage-4","unassigned",now),false);
+ assert.equal(downSheetFilterMatch(entry({workflow:"Waiting for Parts"}),"garage-4","waiting-parts",now),true);
+ /* Off property is the sheet's own band, not a second reading of it: a bus
+    parked at an offsite slot counts however the row is written, and so does one
+    with a vendor in the MECHANIC/LOCATION column. */
+ assert.equal(downSheetFilterMatch(entry({assignedTo:"CJ"}),"offsite-0","off-property",now),true);
+ assert.equal(downSheetFilterMatch(entry({assignedTo:"CUMMINS"}),"garage-4","off-property",now),true);
+ /* WHERE THE BUS IS is asked of the map and can never be asked of the row. A
+    bus out working while its entry still says Scheduled is exactly the case
+    this list exists for, and the entry's own fields say nothing about it. */
+ assert.equal(downSheetFilterMatch(entry({workflow:"Scheduled"}),"road-3","on-road",now),true);
+ assert.equal(downSheetFilterMatch(entry({workflow:"Scheduled"}),"garage-4","on-road",now),false);
+ assert.equal(downSheetFilterMatch(entry({section:"Accident"}),"garage-4","body-shop",now),true);
+ assert.equal(downSheetFilterMatch(entry({repair:"Collision damage - rear cap"}),"garage-4","body-shop",now),true);
+ assert.equal(downSheetFilterMatch(entry({section:"Roadcall"}),"garage-4","road-call",now),true);
+ assert.equal(downSheetFilterMatch(entry({repair:"A15"}),"garage-4","inspection",now),true);
+ assert.equal(downSheetFilterMatch(entry({repair:"Misfire"}),"garage-4","inspection",now),false);
+
+ /* An estimate can be written in either of two places, and a row estimated only
+    on its repairs would otherwise have been reported as carrying none. */
+ assert.equal(downSheetFilterMatch(entry({timeEstimate:{totalMinutes:0}}),"garage-4","no-estimate",now),true);
+ assert.equal(downSheetFilterMatch(entry({timeEstimate:{totalMinutes:90}}),"garage-4","no-estimate",now),false);
+ assert.equal(downSheetFilterMatch(entry({repairItems:[{repair:"Air leak",estimateEnabled:true,timeEstimate:{totalMinutes:45}}]}),"garage-4","no-estimate",now),false);
+ assert.equal(downSheetFilterMatch(entry({repairItems:[{repair:"Air leak",estimateEnabled:false,timeEstimate:{totalMinutes:45}}]}),"garage-4","no-estimate",now),true);
+
+ // Three days on the sheet, counted from when the row was written.
+ const old=entry({createdAt:"2026-09-10T15:00:00.000Z"});
+ assert.equal(Math.round(downSheetEntryAgeDays(old,now)),4);
+ assert.equal(downSheetFilterMatch(old,"garage-4","aging",now),true);
+ assert.equal(downSheetFilterMatch(entry({createdAt:"2026-09-13T15:00:00.000Z"}),"garage-4","aging",now),false);
+ assert.equal(DOWN_SHEET_AGING_DAYS,3);
+ /* A device with its clock set ahead writes rows stamped in the future. Floored
+    at zero, so one cannot sort to the top of a list headed "down the longest". */
+ assert.equal(downSheetEntryAgeDays(entry({createdAt:"2026-09-20T15:00:00.000Z"}),now),0);
+ // A row with no stamp is not asserted to be any age at all.
+ assert.equal(downSheetEntryAgeDays(entry({createdAt:""}),now),null);
+ assert.equal(downSheetFilterMatch(entry({createdAt:""}),"garage-4","aging",now),false);
+
+ const sheet=[
+  entry({busId:"a",busNumber:"17512",assignedTo:"",repair:"Misfire"}),
+  entry({busId:"b",busNumber:"17514",assignedTo:"CJ",workflow:"Waiting for Parts",repair:"Air dryer"}),
+  entry({busId:"c",busNumber:"17517",assignedTo:"CJ",repair:"A15"}),
+ ];
+ /* garage-10 IS Trouble Bay 11 — the bays are one grid and the trouble bays are
+    its eleventh and twelfth columns. Which is exactly why a prefix match is
+    banned here: "garage-" would answer Main Garage for this bus. */
+ const locations={a:"garage-4",b:"garage-10",c:"road-2"};
+ assert.deepEqual(downSheetFilterEntries(sheet,locations,"waiting-parts",now).map(row=>row.busNumber),["17514"]);
+ assert.deepEqual(downSheetFilterEntries(sheet,locations,"on-road",now).map(row=>row.busNumber),["17517"]);
+ /* Every count in one pass, and each one counts the WHOLE sheet. Counted off
+    the filtered rows, every number but the active one would read 0 the moment a
+    filter was on and the menu would stop being a way to choose the next
+    question. */
+ const counts=downSheetFilterCounts(sheet,locations,now);
+ assert.equal(counts["waiting-parts"],1);
+ assert.equal(counts.unassigned,1);
+ assert.equal(counts.inspection,1);
+ assert.equal(counts["no-estimate"],3);
+ assert.deepEqual(Object.keys(counts).sort(),DOWN_SHEET_FILTERS.map(item=>item.key).sort());
+
+ /* A REPAIR WRITTEN TWICE IS ONE PROBLEM. A sheet photographed on three
+    mornings mints a fresh record each time; the same sentence printed twice
+    reads to the person on the other end as two faults. */
+ assert.deepEqual(downSheetShareLines({busNumber:"17512",repairItems:[
+  {repair:"Air leak",details:"front bag"},{repair:"Air leak",details:"front bag"},{repair:"No cooling",details:"",done:true}]}),
+  ["Air leak — front bag","No cooling  (done)"]);
+ // A row with nothing on it says so rather than printing an empty bullet.
+ assert.deepEqual(downSheetShareLines({busNumber:"17512",repairItems:[]}),["No repair written on this row"]);
+ assert.deepEqual(downSheetShareLines({busNumber:"17512",repairItems:[],repair:"Misfire"}),["Misfire"]);
+
+ /* THE SAME WORDS THE APP SAYS, from the same table. Five copies of that table
+    have existed in this repo and all five called Trouble Bay 11 "Main Garage";
+    a shared list that does it sends somebody to the wrong bay. */
+ const context=downSheetShareContext(sheet[1],"garage-10",now);
+ assert.match(context,/TROUBLE BAY 11/i);
+ assert.match(context,/CJ/);
+ assert.match(context,/Waiting for Parts/);
+ assert.match(context,/Since today/);
+ // Nothing known is nothing printed, rather than a row of empty separators.
+ assert.doesNotMatch(downSheetShareContext(entry({createdAt:""}),"",now),/·\s*·/);
+
+ const text=downSheetShareText("waiting-parts",[sheet[1]],locations,now);
+ assert.match(text,/DOWN SHEET — WAITING FOR PARTS {2}\(1 bus\)/);
+ assert.match(text,/Bus 17514/);
+ assert.match(text,/• Air dryer|No repair written/);
+ assert.match(downSheetShareText("waiting-parts",[],locations,now),/No buses on the sheet match this filter/);
+ // Plural only when it is plural — this is read by somebody outside the shop.
+ assert.match(downSheetShareText("unassigned",sheet,locations,now),/\(3 buses\)/);
+
+ /* The page is inlined and escaped. It is opened from a text message on a phone
+    that may have no signal, so it fetches nothing; and a bus number typed off a
+    paper sheet can carry anything, so nothing reaches the markup unescaped. */
+ const html=downSheetShareHtml("waiting-parts",[{...sheet[1],busNumber:"<script>x</script>"}],locations,"Sep 14, 3:00 PM",now);
+ assert.doesNotMatch(html,/<script>/);
+ assert.match(html,/&lt;script&gt;/);
+ assert.doesNotMatch(html,/https?:\/\//,"nothing is fetched from the network");
+ assert.match(html,/PACE SOUTH · DOWN SHEET/);
+ assert.match(html,/Snapshot taken when this was shared/);
+ assert.equal(downSheetShareFilename("waiting-parts",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
 });

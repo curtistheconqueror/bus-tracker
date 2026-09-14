@@ -36,7 +36,7 @@ import {candidateBusNumbers,resolveBusNumberList} from "../bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "./quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
-import {shareOrDownloadFile} from "../share-file";
+import {copyText,shareOrDownloadFile} from "../share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {useAppMode} from "../welcome-gate";
@@ -74,10 +74,6 @@ function isToday(value:string){return Boolean(value)&&new Date(value).toDateStri
 function timeLabel(value:string){const date=new Date(value);return Number.isNaN(date.getTime())?"Previous record":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}).format(date)}
 function newDraft():LogDraft{const now=new Date().toISOString();return {busId:"",quickIssue:"",onDownSheet:false,defect:{id:"defect-log-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),category:"",issue:"",details:"",operability:"service",state:"open",createdAt:now,updatedAt:now,diagnosticNote:"",actionTaken:"",partNumber:"",reportedBy:"",source:"defect-log"}}}
 function recordDraft(record:DefectLogRecord):LogDraft{return {busId:record.bus.id,quickIssue:record.defect.issue==="Manual entry"||record.defect.issue==="Unspecified issue"?"":record.defect.issue,onDownSheet:record.onDownSheet,defect:{...record.defect}}}
-async function copyText(text:string){
- if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);return}catch{/* Use the selection-based fallback below. */}}
- const field=document.createElement("textarea");field.value=text;field.style.position="fixed";field.style.opacity="0";document.body.appendChild(field);field.focus();field.select();const copied=document.execCommand("copy");field.remove();if(!copied)throw new Error("Copy failed");
-}
 
 
 

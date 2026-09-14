@@ -9,7 +9,7 @@ import WorkTimePanel from "../work-time-panel";
 import type {WorkTimeBus} from "../work-time";
 import {REPORT_EXPORT_HINT} from "../fleet-backup";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
-import {shareOrDownloadFile} from "../share-file";
+import {copyText,shareOrDownloadFile} from "../share-file";
 import {FLEET_STORAGE_KEY,readFleetPayload} from "../storage";
 import {addBusListEntries,busListColumnCount,busListCounts,busListExportText,busListTemplateOptions,createBusList,deleteBusListTemplate,normalizeBusListTemplates,normalizeBusLists,saveBusListTemplate,setBusListColumns,setBusListEntryCell,setBusListEntryDone,setBusListEntryHours,busListHours,
  BUS_LIST_COLUMN_LIMIT,BUS_LIST_TEMPLATES_STORAGE_KEY,BUS_LISTS_STORAGE_KEY,type BusList,type BusListExportMode,type BusListTemplate} from "../bus-lists";
@@ -29,14 +29,6 @@ function dayLabel(value:string){
  return Number.isNaN(date.getTime())?"":new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric"}).format(date);
 }
 
-async function copyText(text:string){
- if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);return}catch{/* fall through */}}
- const field=document.createElement("textarea");
- field.value=text;field.style.position="fixed";field.style.opacity="0";
- document.body.appendChild(field);field.focus();field.select();
- const copied=document.execCommand("copy");field.remove();
- if(!copied)throw new Error("Copy failed");
-}
 
 export default function Lists(){
  const [lists,setLists]=useState<BusList[]>([]);
