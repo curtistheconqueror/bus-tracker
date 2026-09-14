@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-09-10
+Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 171 (repository release 171)
-Live feature checkpoint: commit 649cef5
+Live release: Sites Version 174 (repository release 174)
+Live feature checkpoint: commit 2c06463
 
 ## Read this first
 
@@ -53,7 +53,9 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 171 is live as Sites Version 171 from commit 649cef5. Version 171 keeps the existing offline-first model and makes no database or schema migration. It adds two per-device LocalStorage preferences (`pace-down-sheet-recommended-collapsed-v1` and `pace-role-v1`) plus optional `fluids` and `reportAttempts` fields on individual defects; absent fields remain absent, so existing records are not rewritten. It brings the Facility Map header and phone navigation into the same pattern as the other pages, adds Wipers and Washers plus floor-reported ramp, lighting and air-tank catalog choices, makes Defect Log pickers searchable typing fields, adds a Recommended for Down Sheet board, records an intentional duplicate report as a dated return, and keeps role selection cosmetic and per-device. Version 170 (commit bdca898) is the normal rollback target.
+Repository release 174 is live as Sites Version 174 from commit 2c06463. It fixes the phone and iPad touch crash with a crash guard, adds the Down Sheet Scoreboard and Full Sweep workflows, keeps intentional Down Sheet and Defect Log removals in section transfers, makes holds device-local, and brings the Down Sheet form, quick filters, and offline-safe sharing in line with the Defect Log. It adds no storage-key rename, database migration, or dependency change. The normal rollback target is Version 173 from commit 3de6dab.
+
+The Version 171 baseline details below remain useful historical context:
 
 Known responsive follow-up: an iPad audit found 15 editor controls below the 44px touch-target guideline. Those sizes predate Version 117 and were intentionally left unchanged in this phone-focused release; review them in a separate iPad-scoped pass without collapsing the tablet editor's two-column layout.
 
