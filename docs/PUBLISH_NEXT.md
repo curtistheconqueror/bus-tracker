@@ -118,12 +118,28 @@ live database — Curtis's call, every time, and not taken.
 **Nothing reads the ledger yet.** No surface changes, no number moves. This
 release only starts the recording.
 
+## Also in 176: the report has a way out you can see
+
+Curtis opened the Fleet Status Report to send it and could not find the close
+control: *"I don't see the X button clearly to close the page."*
+
+Measured, the button was never missing — 40x40 and in view at 360, 390, 430 and
+820, with the glyph itself around 8.8:1 against the header. What was missing was
+any sign that it WAS a button: `border:0` over a 12% white fill on a navy
+gradient measures **1.42:1** against the header behind it, so what a person saw
+was a bare × floating beside a large white title that pulls the eye past it.
+
+It reads **CLOSE** now, with a real edge. The border is what does the work: at
+45% white it measures **3.72:1** against the header — past the 3:1 a control
+boundary needs — where the fill alone is still only 1.55:1. 74x44 on a phone,
+74x40 above it, in view and clear of the title at every width measured.
+
 ## Gates
 
-`npm test` — **316 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **317 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-**17 mutations, 17 caught.** On the hours: first-match-wins, the overlap removed from the
+**19 mutations, 19 caught.** On the hours: first-match-wins, the overlap removed from the
 defaults, the two-shift window summed again, and the evening shift read as
 22:00. On the ledger: the cap dropping the newest, completed rows counted as
 on the sheet, a bus counted twice, phantom removals credited as cleared, the
@@ -144,6 +160,7 @@ edited times and the reset copy matches the defaults.
 2. Press **USE THE SHOP'S HOURS** and confirm it restores those, not the 175
    guess.
 3. Between 14:00 and 14:30, the live line should say **2ND SHIFT**, not 1ST.
+5. Open the Fleet Status Report and find the way out without looking for it.
 4. Scan a sheet, then check `pace-sheet-ledger-v1` holds one snapshot naming the
    buses that stayed and the ones that came off. Verified in Chromium through
    the real scanner — photo, review, IMPORT APPROVED — with the API response

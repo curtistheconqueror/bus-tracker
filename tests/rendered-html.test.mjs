@@ -14457,3 +14457,36 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
  assert.equal(/if\(!recordSheetSwap\(|recordSheetSwap\([^)]*\)\.ok\)\s*\{[^}]*return/.test(pageCode),false,
   "and a ledger failure never stops the import");
 });
+
+test("the Fleet Status Report has a way out you can see",async()=>{
+ const [modal,css]=await Promise.all([
+  readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+ const code=modal.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+
+ /* Curtis opened the report to send it and could not find the way out: "I don't
+    see the X button clearly to close the page."
+
+    MEASURED, the button was never missing — 40x40 and in view at 360, 390, 430
+    and 820, with the glyph itself around 8.8:1 against the header. What was
+    missing was any sign that it WAS a button: border:0 over a 12% white fill on
+    a navy gradient measures 1.42:1 against the header behind it, so what a
+    person saw was a bare × floating beside a large white title.
+
+    The border is what fixes it, not the fill. At 45% white the edge measures
+    3.72:1 against the header — past the 3:1 a control boundary needs — where
+    the fill alone is still only 1.55:1. */
+ assert.match(code,/<button type="button" className="status-report-close" onClick=\{close\}>CLOSE<\/button>/,
+  "a word rather than a glyph: this is a read-and-dismiss surface, so the label costs nothing");
+ assert.equal(/&times;/.test(code),false,"the bare × is gone");
+
+ const rules=css.match(/(?:^|[\s,}])\.status-report-head>button(?=[\s,{])[^{}]*\{[^}]*\}/g)||[];
+ assert.ok(rules.length,"the close button still has a rule");
+ const base=rules[0];
+ assert.equal(/border:0/.test(base),false,"it no longer has border:0, which is what made it invisible");
+ assert.match(base,/border:1px solid #ffffff73/,"the edge is what draws the box against the header");
+ /* 44px on a phone, because this is the control somebody reaches for with a
+    thumb while holding the report open in one hand. */
+ assert.ok(rules.some(rule=>/min-height:44px/.test(rule)),"and it is a 44px target on a phone");
+});

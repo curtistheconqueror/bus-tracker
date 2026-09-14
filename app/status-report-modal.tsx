@@ -81,7 +81,20 @@ export default function StatusReportModal({fleet,entries,title,close}:{
   <section className="status-report-modal" role="dialog" aria-modal="true" aria-labelledby="status-report-title">
    <header className="status-report-head">
     <span><small>AFTER THE ROUND</small><h2 id="status-report-title">Fleet Status Report</h2></span>
-    <button type="button" onClick={close} aria-label="Close the status report">&times;</button>
+    {/* A WORD, NOT A GLYPH, and real button chrome behind it.
+
+        Curtis opened this to send a report and could not find the way out: "I
+        don't see the X button clearly to close the page." Measured, the button
+        was never missing — 40x40 and in view at every width, with the glyph
+        itself at about 8.8:1 against the header. What was missing was any sign
+        that it WAS a button. Its background was a 12% white wash on a dark navy
+        gradient, which is very nearly no difference at all, so what a person
+        actually saw was a bare × floating in the corner beside a large white
+        title that pulls the eye straight past it.
+
+        This is a read-and-dismiss surface rather than a dense editor, so a word
+        costs nothing and removes the doubt entirely. */}
+    <button type="button" className="status-report-close" onClick={close}>CLOSE</button>
    </header>
 
    {/* No "downed buses only" under the number. It repeated the heading back at

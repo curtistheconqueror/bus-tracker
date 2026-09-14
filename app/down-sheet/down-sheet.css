@@ -647,7 +647,13 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .status-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
 .status-report-head small{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9db4da}
 .status-report-head h2{margin:2px 0 0;font-size:20px;font-weight:900;letter-spacing:.01em}
-.status-report-head>button{min-width:40px;min-height:40px;height:auto;border:0;border-radius:8px;background:#ffffff1f;color:#fff;font-size:22px;line-height:1;cursor:pointer}
+/* Chrome you can see. The old rule was border:0 on a 12% white fill over a navy
+   gradient — a button with no edge and almost no fill, which reads as a stray
+   character rather than a control. The border is what does the work here: at
+   45% white it draws the box even where the fill barely separates from the
+   header behind it. */
+.status-report-head>button{min-width:74px;min-height:40px;height:auto;border:1px solid #ffffff73;border-radius:8px;background:#ffffff26;color:#fff;padding:0 13px;font-family:inherit;font-size:10px;font-weight:900;letter-spacing:.09em;line-height:1;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.status-report-head>button:hover,.status-report-head>button:focus-visible{background:#ffffff3d;border-color:#fff}
 /* The fenced pair, drawn the same way the text and the PDF fence them. */
 .status-report-headline{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border:3px solid var(--log-header,#06275c);border-radius:8px;padding:12px}
 .status-report-headline div{display:grid;gap:1px;min-width:0}
@@ -667,6 +673,7 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .status-report-note{margin:0 16px;font-size:10px;font-weight:700;line-height:1.5;color:var(--log-muted,#5b6b85)}
 @media(max-width:620px){
  .status-report-modal{width:100vw;max-height:100vh;border-radius:0}
+ .status-report-head>button{min-height:44px;font-size:11px}
  .status-report-head{border-radius:0}
  .status-report-headline{grid-template-columns:1fr}
  .status-report-headline b{font-size:30px}
