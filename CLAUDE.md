@@ -180,6 +180,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
+  pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
 ```
 
 **`pace-sweep-v1` is one person's walk, and it never travels.** FULL SWEEP is a
@@ -357,6 +358,50 @@ holds that line.
 have them — spelled out they differ by one word at the front, which is the
 hardest pair to scan on a phone. Both appear in both departments, so the pair is
 stored: the role alone does not say which one.
+
+**`pace-status-report-picks-v1` is the Fleet Status Report's include list, and
+it replaced two hard-coded versions.** Every audience wanted a different report
+and every difference came back as a code change. Curtis: *"can we have, like,
+maybe widen the user interface of it a little bit so we can include different
+things to check mark that I want included... instead of coming to you and
+getting coding every time I need it done."* And the case that settles it: *"when
+my superintendent sends that list out to his superiors, they don't need to know
+about mystery buses. and they don't need to know about inspection buses."*
+
+Seven sections — inspections, roadcalls pending, mystery buses, Farebox, Ventra,
+CUBIC screens, the Fleet Forecast — and three detail switches that COMPOSE
+rather than branch: bus numbers, then locations, then the specific repairs. Off,
+on, on-with-where, on-with-repairs. The old COUNTS ONLY version is now just
+numbers-without-locations and nothing special-cases it.
+
+**DOWNED BUSES is not on the list.** It is the question the report answers; a
+status report without it is a covering note.
+
+The three detail switches are a LADDER and the modal enforces it: locations
+without bus numbers has nothing to hang off, repairs without locations is a list
+of repairs with no bus against them. Ticking one brings the ones above it;
+unticking one takes the ones below.
+
+Remembered because the same person sends roughly the same report every morning,
+and per-device for the reason every view-state key is: it describes what this
+phone's owner sends, not anything about the fleet. Losing it costs one round of
+ticking. It is the ONE thing the report writes — `status-report-modal.tsx`
+touches no record, and a test names the single permitted key.
+
+**Farebox, Ventra and the CUBIC screens are counted APART, through
+`app/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
+moved up to critical levels, period. So they need a count of that as well...
+Fairbox and Venture separate. and cubic screen EV or... I'm sorry. MV, bus MV or
+MREV error. Whatever those errors say, I forgot."*
+
+He could not remember the wording, which is the clearest possible sign the app
+should not depend on somebody typing "CUBIC": the module matches **BUS ER** and
+**MV ER** by name as well. The CUBIC screens ARE Ventra hardware — the quick
+filter still offers them together as `ibs-ventra`, and that filter now reads
+this same table rather than a regex of its own, because two tables that must
+agree about what a Ventra is are two tables that will eventually disagree.
+Counted by BUS, not by defect, and fleet-wide rather than off the sheet: a
+farebox fault does not down a bus, and the question is how many are out there.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
 STATS panel it opened was a second status report saying most of what the tiles

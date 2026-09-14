@@ -6,9 +6,40 @@ shift or over the next 2 shifts or select probability by pull out time... AC
 repairs and Check engine lights tend to stay on the longest. Producing a higher
 rate of downsheet stick!"*
 
-A third checkbox on the Fleet Status Report. The name carries the hedge he
-asked for: **FLEET FORECAST (not guaranteed — based on work flow and
+A checkbox on the Fleet Status Report's include list. The name carries the hedge
+he asked for: **FLEET FORECAST (not guaranteed — based on work flow and
 probability logistics)**.
+
+---
+
+## WHERE THIS STANDS
+
+**Stage 1 is built. Most of Stage 2 is built, and what is not built is what has
+no data behind it yet.**
+
+| | Built | Where |
+| --- | --- | --- |
+| 1a. The sheet ledger | ✅ | `app/sheet-ledger.ts`, and it travels |
+| 1b. Shifts and pullout times | ✅ | `app/shift-clock.ts`, editable in Settings |
+| 1c. Road-call rate, censored dwell | ✅ | `app/fleet-forecast.ts` |
+| 1d. A descriptive panel to check it against | ❌ | not started |
+| 2. Road calls per window, with a range | ✅ | in the report, behind the checkbox |
+| 2. Downed = arrivals − clearances | ✅ | refuses until 3 swaps are recorded |
+| 2. Category-weighted clearance | ❌ | needs swaps the shop has not recorded yet |
+| 3. Calibration, labour hours | ❌ | not started |
+
+**It went in behind the include list rather than as its own button.** Curtis: *"I
+don't know if in your responses, you said that that should be a separate button
+or if we wire it into this one so we can send everything in one shot."* One
+shot: it is a row on the list like the others, and it appends to whatever else
+is ticked rather than replacing it.
+
+**Two gates are live and both currently refuse on a fresh device**, which is the
+intended behaviour and not a bug: twelve road calls on record before a rate is
+quoted, and three sheet swaps before a clearance rate is. Until then the section
+names what it is waiting for. A third refusal was added after the first draft
+was caught quoting a confident zero: enough road calls fleet-wide but none on
+the shift being forecast now reads "none on record", never "0% chance".
 
 ---
 
@@ -69,8 +100,11 @@ Rolling cap, oldest dropped first. Sized so a busy month fits; a forecast is not
 worth a storage failure that costs somebody their board, and the bulk-loss guard
 in `writeFleetStorageResult` exists because that has nearly happened before.
 
-**Never synced.** Like `pace-sweep-v1` and the holds: this is one garage's
-tempo, and two devices merging ledgers would double-count every swap.
+**~~Never synced.~~ IT TRAVELS — this was written wrong and Curtis corrected
+it:** *"I will be scanning from multiple devices, period."* Left device-local,
+each phone would hold only the swaps IT performed. Merging is safe because a
+swap is an EVENT that happened once on one device, so the union IS the history —
+see `CLAUDE.md` and `app/sheet-ledger.ts`.
 
 ### 1b. Shifts and pullout times — `pace-shift-settings-v1`
 
@@ -244,14 +278,16 @@ Said plainly, because a forecast that overreaches gets switched off:
 - **It will not replace the foreman's read.** The range is deliberately wide
   enough that his judgement usually sits inside it. When the forecast disagrees
   with the person who walked the yard, the person is probably right.
-- **It stays device-local.** The ledger is one garage's tempo, and merging two
-  would double-count every swap.
+- **It will not quote a rate for a shift it has not watched.** Enough road calls
+  fleet-wide is not enough road calls on 3rd shift, and the first draft answered
+  "0 expected, 0% chance" for exactly that case. It says "none on record" now.
 
 ## Storage keys this adds
 
 ```
 pace-sheet-ledger-v1      one compact snapshot per sheet swap, rolling cap
 pace-shift-settings-v1    shift boundaries and pullout times, editable
+pace-status-report-picks-v1  which sections the report carries, this one included
 pace-forecast-scores-v1   Stage 3: forecasts made, and what actually happened
 ```
 

@@ -20,7 +20,8 @@
    this app exists to avoid — and the print sheet has to come up over the board,
    not somewhere else. */
 
-import {mysteryLabel,statusReportStamp,STATUS_REPORT_ROAD_CALL_HOURS,type FleetStatusReport,type StatusReportBusLine} from "./fleet-status-report.ts";
+import {DEFAULT_STATUS_REPORT_PICK,mysteryLabel,statusReportStamp,techSections,STATUS_REPORT_ROAD_CALL_HOURS,type FleetStatusReport,type StatusReportBusLine,type StatusReportPick} from "./fleet-status-report.ts";
+import {FORECAST_HEDGE,rangeLabel,type FleetForecast} from "./fleet-forecast.ts";
 
 /* Everything that reaches the page is a value from the board — fleet numbers,
    locations, catalog wording, and free text somebody typed into a repair. It is
@@ -52,13 +53,64 @@ function numberList(buses:StatusReportBusLine[]){
  return '<p class="numbers">'+buses.map(bus=>escapeHtml(bus.n)).join("  \u00b7  ")+'</p>';
 }
 
-export function statusReportPrintHtml(board:FleetStatusReport,options:{includeDefects?:boolean;counts?:boolean;title?:string}={}){
+/* The SAME include list the message version reads, applied to a document that
+   can afford type and white space. Two documents, one selection: a
+   superintendent holding the PDF and a foreman reading the text must not be
+   able to see different sections, which is exactly what two separate sets of
+   switches would eventually produce. */
+function section(buses:StatusReportBusLine[],pick:StatusReportPick){
+ if(!pick.numbers)return "";
+ if(!pick.locations)return numberList(buses);
+ return busRows(buses,pick.defects);
+}
+
+/* The forecast SET IN TYPE rather than printed as the 38-character block the
+   message carries. Same numbers, same wording, same hedge — this document has
+   room, and a monospace paste of a lock-screen layout in the middle of a
+   typeset page reads as something that was forwarded rather than produced. */
+function forecastHtml(forecast:FleetForecast){
+ const rows:string[]=[];
+ rows.push(row("Window",escapeHtml(forecast.window.label.toLowerCase())));
+ rows.push(forecast.roadCalls.enough
+  ?row("Road calls expected",escapeHtml(rangeLabel(forecast.roadCalls.range)))
+   +row("Chance of any",forecast.roadCalls.chance+"%")
+  :row("Road calls","Not enough history yet \u2014 "+forecast.roadCalls.need+" more on record"));
+ rows.push(forecast.downed.enough
+  ?row("Downed at the end of it",escapeHtml(rangeLabel(forecast.downed.range))
+   +' <em>now '+forecast.downed.now+", +"+escapeHtml(rangeLabel(forecast.downed.inRange))
+   +" in, \u2212"+escapeHtml(rangeLabel(forecast.downed.outRange))+" out</em>")
+  :row("Downed at the end of it","Not enough history yet \u2014 "+forecast.downed.need
+   +" more sheet swap"+(forecast.downed.need===1?"":"s")));
+ const slowest=forecast.slowest.length
+  ?'<h2>Slowest on the sheet</h2><ul class="buses">'+forecast.slowest.map(item=>
+   '<li><b>'+escapeHtml(String(item.days))+'d</b><span>'+escapeHtml(item.category)+'</span><em>'
+   +(item.open?item.open+" of "+item.total+" still open, so at least this":item.total+" repairs")+'</em></li>').join("")+'</ul>'
+  :"";
+ return '<dl class="forecast">'+rows.join("")+'</dl>'+slowest;
+}
+
+function row(label:string,value:string){
+ return "<dt>"+escapeHtml(label)+"</dt><dd>"+value+"</dd>";
+}
+
+export function statusReportPrintHtml(
+ board:FleetStatusReport,
+ options:{pick?:StatusReportPick;title?:string;forecast?:FleetForecast|null}={}
+){
+ const pick=options.pick||DEFAULT_STATUS_REPORT_PICK;
  const title=escapeHtml(String(options.title||"PACE SOUTH").trim()||"PACE SOUTH");
  const stamp=escapeHtml(statusReportStamp(board.at));
  /* One list, and the "NOT ON THE SHEET" tag against each row is gone with it:
     not on the sheet is the definition of pending now, said once in the heading
     rather than repeated against every bus. */
- const counts=options.counts===true;
+ const forecast=pick.forecast&&options.forecast
+  ?`<h2>Fleet forecast</h2>
+<p class="caveat">${escapeHtml(FORECAST_HEDGE)}</p>
+${forecastHtml(options.forecast)}`
+  :"";
+ const techHtml=techSections(board,pick).map(item=>
+  `<h2>${escapeHtml(item.title)} — ${item.buses.length}</h2>
+${section(item.buses,pick)}`).join("");
  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${title} — Fleet Status Report</title>
 <style>
@@ -84,6 +136,10 @@ export function statusReportPrintHtml(board:FleetStatusReport,options:{includeDe
  ul.buses em{font-style:normal;font-size:9.5pt;color:#5b6b85}
  ol.defects{margin:3px 0 2px 72px;padding:0 0 0 14px;font-size:9.5pt;color:#33415c}
  .none{margin:2px 0 0;font-size:10pt;color:#5b6b85}
+ dl.forecast{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 18px}
+ dl.forecast dt{margin:0;font-size:10pt;font-weight:800;color:#5b6b85}
+ dl.forecast dd{margin:0;font-size:12pt;font-weight:900;color:#112657}
+ dl.forecast em{font-style:normal;font-size:9.5pt;font-weight:700;color:#5b6b85}
  .numbers{margin:2px 0 0;font-size:13pt;font-weight:900;line-height:1.7;font-variant-numeric:tabular-nums;color:#112657}
  footer{margin-top:22px;padding-top:8px;border-top:1px solid #c6cee0;font-size:8.5pt;color:#7f8ca6}
  @media print{body{font-size:11pt}}
@@ -91,14 +147,16 @@ export function statusReportPrintHtml(board:FleetStatusReport,options:{includeDe
 <header><h1>${title} — FLEET STATUS REPORT</h1><p class="stamp">${stamp}</p></header>
 <dl class="headline">
  <div><dt>Downed buses</dt><dd>${board.downed}</dd></div>
- <div><dt>Inspections</dt><dd>${board.inspections}</dd><small>Not counted above</small></div>
+ ${pick.inspections?`<div><dt>Inspections</dt><dd>${board.inspections}</dd><small>Not counted above</small></div>`:""}
 </dl>
-<h2>Roadcalls pending — last ${STATUS_REPORT_ROAD_CALL_HOURS} hours — ${board.roadCallsPending.length}</h2>
+${pick.roadCalls?`<h2>Roadcalls pending — last ${STATUS_REPORT_ROAD_CALL_HOURS} hours — ${board.roadCallsPending.length}</h2>
 <p class="caveat">Currently not on the down sheet</p>
-${counts?numberList(board.roadCallsPending):busRows(board.roadCallsPending,options.includeDefects)}
-<h2>Mystery buses — ${escapeHtml(mysteryLabel(board.mystery.length))}</h2>
+${section(board.roadCallsPending,pick)}`:""}
+${pick.mystery?`<h2>Mystery buses — ${escapeHtml(mysteryLabel(board.mystery.length))}</h2>
 ${board.mystery.length?'<p class="caveat">Pending confirmation of status</p>':""}
-${counts?numberList(board.mystery):busRows(board.mystery,options.includeDefects)}
+${section(board.mystery,pick)}`:""}
+${techHtml}
+${forecast}
 <footer>${board.onSheet} bus${board.onSheet===1?"":"es"} on the down sheet in total, inspections included. Downed excludes inspections.</footer>
 </body></html>`;
 }

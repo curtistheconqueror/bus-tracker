@@ -1,5 +1,6 @@
 import {hasWorkState,isDownSheetRecommended,isUnresolved,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
 import {hasRecentRoadCall,ROAD_CALL_WINDOW_DAYS,type RoadCallEvent} from "./road-calls.ts";
+import {isFarebox,isIbsVentra} from "./tech-services.ts";
 
 export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred"|"road-call";
 export type QuickFilterBus={
@@ -46,11 +47,17 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  if(key==="check-engine")return /\b(?:check|stop)\s+(?:engine|eng)\b|\bengine\s+light\b/i.test(text);
  if(key==="bad-ramp")return /\b(?:ramp|kneeler|wheelchair lift|wheelchair ramp)\b/i.test(text);
  if(key==="no-horn")return /\bhorn\b/i.test(text);
- if(key==="farebox")return /\bfare\s*box\b|\bfarebox\b/i.test(text);
- /* The CUBIC screens ARE the Ventra hardware — BUS ER and MV ER are the two
+ /* Both of these read the ONE table, in tech-services.ts, rather than keeping
+    a regex of their own. The Fleet Status Report needs the same devices counted
+    APART — Curtis: "Fairbox and Venture separate" — and two tables that must
+    agree about what a Ventra is are two tables that will eventually disagree.
+
+    The CUBIC screens ARE the Ventra hardware — BUS ER and MV ER are the two
     Ventra devices — but neither word appears in their wording, so the filter
-    named for them missed every one. Twelve live records at the time of writing. */
- if(key==="ibs-ventra")return /\b(?:ibs|ventra|cubic)\b/i.test(text);
+    named for them missed every one. Twelve live records at the time of writing;
+    the shared table now matches the screen wording itself as well. */
+ if(key==="farebox")return isFarebox(text);
+ if(key==="ibs-ventra")return isIbsVentra(text);
  if(key==="leak")return /\b(?:leak|leaks|leaking|seep|seeping)\b/i.test(text);
  /* Matched on the repair rather than on the word "heat", which appears in
     Amerex heat sensors, in Overheating, and in half the estimate notes in the
