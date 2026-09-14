@@ -289,6 +289,44 @@ Deduped by swap id, so a file imported twice does not double-count, and swap ids
 carry a random tail precisely so two devices scanning in the same millisecond
 with the same row count cannot mint the same one.
 
+**A ROW IS KEYED BY FLEET NUMBER, NOT BY BUS ID**, and that was wrong for two
+releases. A bus id is DEVICE-LOCAL — `section-transfer.ts` says so in its own
+words, *"two devices set up separately give the same bus different ids"*, and it
+re-points every arriving Down Sheet ENTRY by fleet number for exactly that
+reason. The ledger rode along in the same payload and nothing re-pointed it, so
+a swap scanned on the iPad and merged onto the phone shared no keys with the
+phone's own swaps: two buses still sitting on the sheet reported as `added 2,
+stuck 0`. Measured through `snapshotFromEntries`, not reasoned about. The fleet
+number is the one name both devices agree on, it is what the cloud keys `buses`
+on, and it is legible in a stored file. A record thin enough to have lost its
+number still falls back to the id rather than vanishing out of the tempo.
+
+The cutover costs exactly one distorted pair — the swap either side of it
+compares old keys against new — and that is the whole price of the fix.
+
+**`gap` marks a snapshot with unrecorded swaps in front of it.** Set only by the
+backfill; a scan always follows the sheet it replaced, so a snapshot the app
+wrote itself never carries one. `ledgerTempo` returns `sinceHours:null` for such
+a pair, which every rate already skips — the escape hatch was there from the
+first build and this is the missing input to it. Without it the baseline's
+nine-day hole reads as one swap that added fourteen buses and cleared thirty.
+Normalised with `delete` rather than `undefined`, the spelling `setBusHold`
+uses, so a hand-edited `gap:"no"` cannot spread through and read as truthy.
+
+**OLD SHEETS COME IN THROUGH `app/sheet-ledger-backfill.ts`**, behind LOAD OLD
+DOWN SHEETS in Settings. It writes `pace-sheet-ledger-v1` and nothing else —
+**a scanned sheet REPLACES the live one and a backfill must not**, because the
+sheets being loaded are weeks old and the live sheet is today's. The only
+trustworthy way to say that is a path with no access to `pace-down-sheet-v1` at
+all, and a test asserts the module cannot name it.
+
+`planBackfill` computes the entire outcome without writing a byte — what is new,
+what is already held, what the cap will drop — and `applyBackfill` takes the
+PLAN rather than the text, so the thing written is provably the thing shown.
+**The cap bites at import time**: a backfill is by definition the oldest thing
+in the ledger, so a device near forty drops most of it the instant it merges.
+Counted and shown before the button rather than discovered afterwards.
+
 Two carriers today, both already in the app: the **Down Sheet section transfer**
 (the sheet is what a swap IS), and **MASTER EXPORT**. The ledger is **the one key
 a whole-app import MERGES instead of replacing** — everything else in a restore

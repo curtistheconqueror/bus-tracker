@@ -104,9 +104,57 @@ against (Stage 1d), category-weighted clearance, calibration, labour hours, and
 the backfill of the eight photographed sheets. `docs/roadmap/fleet-forecast.md`
 carries a status table.
 
+## Also in 177: the swap ledger keys on the fleet number now
+
+**A bug fix in shipped code, found by measuring.** The ledger keyed its rows on
+the Down Sheet entry's `busId`, and a bus id is DEVICE-LOCAL.
+`section-transfer.ts` says so in its own words — *"two devices set up separately
+give the same bus different ids"* — and it re-points every arriving Down Sheet
+ENTRY by fleet number for exactly that reason. The ledger travels in the same
+payload and nothing re-pointed it.
+
+Driven through `snapshotFromEntries`: two devices, the same two buses, still
+down, nothing repaired between the swaps. The ledger reported **`added 2, stuck
+0`**. It now reports `added 0, stuck 2`.
+
+Curtis: *"I will be scanning from multiple devices, period."* That is the normal
+case here, not a corner. The cutover costs exactly one distorted pair — the swap
+either side of it compares old keys against new — and that is the whole price.
+
+## Also in 177: LOAD OLD DOWN SHEETS
+
+Settings → LOAD OLD DOWN SHEETS, beside the shift clock. Loads down sheets from
+before the app started keeping the swap history, so the Fleet Forecast has
+something to measure before the shop has scanned for a month.
+
+**It writes `pace-sheet-ledger-v1` and nothing else.** A scanned sheet REPLACES
+the live one — that is what a swap IS — and a backfill must not, because the
+sheets being loaded are weeks old and the live sheet is today's. The only
+trustworthy way to say that is a path with no access to `pace-down-sheet-v1` at
+all, and a test asserts the module cannot name it.
+
+- `planBackfill` computes the whole outcome without writing a byte;
+  `applyBackfill` takes the PLAN rather than the text, so what lands is provably
+  what was shown.
+- **The cap is said before the button.** A backfill is by definition the oldest
+  thing in the ledger, so a device near forty drops most of it the instant it
+  merges. Counted and shown rather than discovered afterwards.
+- Loading the same file twice is a no-op, deduped by swap id.
+- A master export or a Down Sheet transfer dropped in here is refused by name.
+
+**New optional field: `SheetSnapshot.gap`.** Set only by the backfill — a scan
+always follows the sheet it replaced. `ledgerTempo` returns `sinceHours:null` for
+such a pair, which every rate already skips; the escape hatch was there from the
+first build and this was the missing input. Without it the baseline's nine-day
+hole reads as one swap that added fourteen buses and cleared thirty. Normalised
+with `delete`, the spelling `setBusHold` uses.
+
+**No storage key is added.** The backfill writes the ledger key that shipped in
+176.
+
 ## Gates
 
-`npm test` — **320 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **322 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
 **Three mutations, three caught**, each aimed at a decision that would have been

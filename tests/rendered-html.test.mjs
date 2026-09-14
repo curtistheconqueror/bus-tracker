@@ -10871,6 +10871,113 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
  assert.deepEqual(forecastTextLines(null,STATUS_REPORT_WIDTH),[]);
 });
 
+test("the swap ledger keys on the fleet number, because bus ids are one device's own",async()=>{
+ const {snapshotFromEntries,ledgerTempo,mergeSheetLedgers,normalizeSheetLedger}=await import("../app/sheet-ledger.ts");
+
+ /* MEASURED, NOT REASONED ABOUT. The ledger keyed rows on the Down Sheet
+    entry's `busId` for two releases, and that was wrong the moment it started
+    travelling. `section-transfer.ts` says why in its own words - "two devices
+    set up separately give the same bus different ids" - and it re-points every
+    arriving ENTRY by fleet number for exactly that reason. The ledger rode in
+    the same payload and nothing re-pointed it.
+
+    Curtis: "I will be scanning from multiple devices, period." So this is not a
+    corner: it is the normal case. */
+ const entry=(busId,busNumber,category)=>({id:"e"+busId,busId,busNumber,category,workflow:"Scheduled"});
+ const ipad =snapshotFromEntries([entry("bus-a1","17510","Engine"),entry("bus-a2","17520","Brakes")],[],"2026-09-14T11:00:00.000Z",undefined,"swap-ipad");
+ const phone=snapshotFromEntries([entry("bus-p1","17510","Engine"),entry("bus-p2","17520","Brakes")],[],"2026-09-14T19:00:00.000Z",undefined,"swap-phone");
+ assert.deepEqual(ipad.rows.map(row=>row.b),["17510","17520"],"the stored key is the number on the bus");
+
+ const [tempo]=ledgerTempo(mergeSheetLedgers([ipad],[phone]));
+ assert.equal(tempo.stuck,2,"the same two buses, still down, read as stuck across two devices");
+ assert.equal(tempo.added,0,"and not as two brand-new arrivals - which is what the bus-id key reported");
+ assert.equal(tempo.cleared,0);
+
+ /* A record thin enough to have lost its number still counts as a bus on the
+    sheet rather than vanishing out of the tempo. */
+ const thin=snapshotFromEntries([{id:"x",busId:"bus-z",category:"Engine",workflow:"Scheduled"}],[],"2026-09-14T11:00:00.000Z");
+ assert.deepEqual(thin.rows.map(row=>row.b),["bus-z"]);
+
+ /* THE GAP FLAG. A backfilled pair can span days with an unknown number of
+    swaps inside it; the arithmetic between two snapshots is only a SWAP's worth
+    of arithmetic when exactly one swap happened between them. `sinceHours` was
+    always the escape hatch and this is the missing input to it. */
+ const a={id:"a",at:"2026-08-29T21:52:00.000Z",shift:"3rd",rows:[{b:"17510",c:"Engine"}],off:[]};
+ const b={id:"b",at:"2026-09-07T19:43:00.000Z",shift:"2nd",rows:[{b:"17520",c:"Brakes"}],off:["17510"],gap:true};
+ const [across]=ledgerTempo([a,b]);
+ assert.equal(across.sinceHours,null,"a pair that admits to a gap has no usable denominator");
+ const [closed]=ledgerTempo([a,{...b,gap:undefined}]);
+ assert.ok(closed.sinceHours>200,"and one that does not, still reports its hours");
+
+ /* Set only when exactly true, and DELETED otherwise - the spelling setBusHold
+    uses, so a hand-edited gap:"no" cannot spread through and read as truthy. */
+ assert.equal("gap" in normalizeSheetLedger([{...a,gap:"no"}])[0],false);
+ assert.equal(normalizeSheetLedger([{...a,gap:true}])[0].gap,true);
+});
+
+test("the backfill loads old sheets into the swap history and touches nothing else",async()=>{
+ const {planBackfill,applyBackfill,BACKFILL_KIND}=await import("../app/sheet-ledger-backfill.ts");
+ const {SHEET_LEDGER_KEY}=await import("../app/sheet-ledger.ts");
+ const panel=await readFile(new URL("../app/settings/sheet-backfill.tsx",import.meta.url),"utf8");
+ const module_=await readFile(new URL("../app/sheet-ledger-backfill.ts",import.meta.url),"utf8");
+
+ const snap=(id,at,rows,extra={})=>({id,at,shift:"1st",rows:rows.map(b=>({b,c:"Engine"})),off:[],...extra});
+ const file=JSON.stringify({kind:BACKFILL_KIND,version:1,snapshots:[
+  snap("backfill-1","2026-08-26T20:03:00.000Z",["17510","17520"]),
+  snap("backfill-2","2026-08-27T16:59:00.000Z",["17510"],{gap:true}),
+ ]});
+
+ const plan=planBackfill([],file);
+ assert.equal(plan.ok,true);
+ assert.equal(plan.fresh.length,2);
+ assert.equal(plan.gaps,1,"the screen can say how many follow a stretch nobody recorded");
+
+ /* LOADING THE SAME FILE TWICE IS A NO-OP. A swap is an event that happened
+    once; the union is the history, deduped by id. */
+ const again=planBackfill(plan.next,file);
+ assert.equal(again.fresh.length,0);
+ assert.equal(again.duplicates,2);
+
+ /* THE CAP BITES AT IMPORT TIME AND HAS TO BE SAID FIRST. A backfill is by
+    definition the oldest thing in the ledger, so a device already near the cap
+    drops most of it the instant it merges - silently, unless this is counted
+    and shown BEFORE the button. */
+ const full=Array.from({length:3},(unused,index)=>snap("have-"+index,"2026-09-1"+index+"T12:00:00.000Z",["17999"]));
+ const tight=planBackfill(full,file,3);
+ assert.ok(tight.dropped>0,"it says how many will not fit");
+ assert.equal(tight.next.length,3,"and the cap still holds");
+
+ /* The wrong file is refused whole, never half-loaded. A master export and a
+    Down Sheet transfer are both JSON with a `kind`. */
+ assert.match(planBackfill([],'{"kind":"pace-south-fleet-board-backup","buses":[]}').problem,/not a sheet-ledger backfill/);
+ assert.match(planBackfill([],"not json").problem,/not a file this can read/);
+ assert.match(planBackfill([],JSON.stringify({kind:BACKFILL_KIND,snapshots:[]})).problem,/no readable swaps/);
+ for(const refused of [planBackfill([],"not json"),planBackfill([],'{"kind":"x"}')])
+  assert.equal(applyBackfill({setItem(){throw new Error("must not write")}},refused).ok,false);
+
+ /* IT WRITES THE LEDGER AND NOTHING ELSE. A scanned sheet REPLACES the live
+    one; these sheets are weeks old and the live one is today's. The only safe
+    way to say that is a path with no access to the Down Sheet at all. */
+ const written=[];
+ applyBackfill({setItem(key,value){written.push(key)}},plan);
+ assert.deepEqual(written,[SHEET_LEDGER_KEY]);
+ /* Comments stripped first. The module's own prose names the key it must never
+    touch, and matching that is how a test passes for the wrong reason - or in
+    this case fails for one. */
+ const moduleCode=module_.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ for(const banned of ["pace-down-sheet-v1","DOWN_SHEET_STORAGE_KEY","pace-board-v1","writeDownSheetStorage","writeFleetStorage"])
+  assert.equal(moduleCode.includes(banned),false,"the backfill must not be able to reach: "+banned);
+ const panelCode=panel.replace(/\/\*[\s\S]*?\*\//g,"");
+ const writes=[...panelCode.matchAll(/setItem\(/g)].length;
+ assert.equal(writes,0,"the panel writes through applyBackfill or not at all");
+
+ /* Nothing lands before it has been read: the plan is computed, shown, and only
+    then applied - and applyBackfill takes the PLAN rather than the text, so the
+    thing written is provably the thing displayed. */
+ assert.match(panelCode,/disabled=\{!plan\?\.ok\}/);
+ assert.match(panelCode,/applyBackfill\(localStorage,plan\)/);
+});
+
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../app/hours-value.ts");
  const field=await readFile(new URL("../app/hours-field.tsx",import.meta.url),"utf8");
@@ -14719,7 +14826,9 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
     would look healthy while going stale. */
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
- assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
+ /* By fleet NUMBER, falling back to the id. A bus id is one device's own, so a
+    swap that travelled shared no keys with the receiving device's swaps. */
+ assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busNumber\|\|entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
   "the swap is recorded inside importScan, from the entries that won and the buses that came off");
  /* AFTER the undo copy and deliberately NOT guarded like it. The undo copy
     stops the import when it cannot be written, because replacing a sheet with
