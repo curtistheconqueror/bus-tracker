@@ -13,7 +13,7 @@
    before you have read it. */
 
 import {useMemo,useState} from "react";
-import {buildScoreboard,scoreboardText,type ScoreboardBus,type ScoreboardEntry} from "./fleet-scoreboard";
+import {buildScoreboard,scoreboardCountsText,scoreboardText,type ScoreboardBus,type ScoreboardEntry} from "./fleet-scoreboard";
 import {scoreboardPrintHtml} from "./fleet-scoreboard-print";
 
 export default function ScoreboardModal({fleet,entries,title,close}:{
@@ -23,13 +23,18 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
  close:()=>void;
 }){
  const [includeDefects,setIncludeDefects]=useState(false);
+ /* THE SHORT ONE, and it sits ABOVE the defects switch because it decides
+    whether that switch means anything. Curtis: "I think its still too much
+    info... place an option above that one with a check box that will just give
+    the downed bus count, inspections, and a ROADCALLS PENDING." */
+ const [countsOnly,setCountsOnly]=useState(false);
  const [status,setStatus]=useState("");
  /* Built once per open, not per render: the stamp on the report is the moment
     it was produced, and a report whose own timestamp moved while somebody read
     it would be lying about when it was true. */
  const at=useMemo(()=>new Date().toISOString(),[]);
  const board=useMemo(()=>buildScoreboard(fleet,entries,at),[fleet,entries,at]);
- const text=useMemo(()=>scoreboardText(board,{includeDefects,title}),[board,includeDefects,title]);
+ const text=useMemo(()=>countsOnly?scoreboardCountsText(board,{title}):scoreboardText(board,{includeDefects,title}),[board,countsOnly,includeDefects,title]);
 
  /* navigator.share with TEXT rather than a file. That is the whole point of
     this version: it arrives as the message body, so it is readable on a locked
@@ -61,7 +66,7 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
   document.body.appendChild(frame);
   const doc=frame.contentDocument;
   if(!doc){frame.remove();setStatus("Printing is not available on this device.");return}
-  doc.open();doc.write(scoreboardPrintHtml(board,{includeDefects,title}));doc.close();
+  doc.open();doc.write(scoreboardPrintHtml(board,{includeDefects:countsOnly?false:includeDefects,counts:countsOnly,title}));doc.close();
   const go=()=>{
    try{frame.contentWindow?.focus();frame.contentWindow?.print()}
    catch{setStatus("Printing is not available on this device.")}
@@ -79,14 +84,24 @@ export default function ScoreboardModal({fleet,entries,title,close}:{
     <button type="button" onClick={close} aria-label="Close the scoreboard">&times;</button>
    </header>
 
+   {/* No "downed buses only" under the number. It repeated the heading back at
+       the reader; "not counted above" under INSPECTIONS stays, because that one
+       says something the heading does not. */}
    <div className="scoreboard-headline">
-    <div><small>DOWNED BUSES</small><b>{board.downed}</b><i>downed buses only</i></div>
+    <div><small>DOWNED BUSES</small><b>{board.downed}</b></div>
     <div><small>INSPECTIONS</small><b>{board.inspections}</b><i>not counted above</i></div>
    </div>
 
    <label className="scoreboard-defects">
-    <input type="checkbox" checked={includeDefects} onChange={event=>setIncludeDefects(event.target.checked)}/>
-    <span>Include the defects of each bus<small>Off by default — the short version is the one that gets read.</small></span>
+    <input type="checkbox" checked={countsOnly} onChange={event=>{setCountsOnly(event.target.checked);setStatus("")}}/>
+    <span>Counts only — no locations<small>Downed and inspections as numbers. Bus numbers for roadcalls pending and mystery buses, because those are the two somebody has to go and find.</small></span>
+   </label>
+   {/* Disabled rather than hidden while COUNTS ONLY is on: a switch that
+       vanishes reads as a bug, and a person who ticked it needs to see that the
+       other one is still there and still off. */}
+   <label className={"scoreboard-defects"+(countsOnly?" unavailable":"")}>
+    <input type="checkbox" checked={includeDefects&&!countsOnly} disabled={countsOnly} onChange={event=>setIncludeDefects(event.target.checked)}/>
+    <span>Include the defects of each bus<small>{countsOnly?"Not used by the counts-only version — it carries no repair lines.":"Off by default — the short version is the one that gets read."}</small></span>
    </label>
 
    {/* Shown in full, before anything is sent. */}

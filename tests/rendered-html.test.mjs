@@ -10493,7 +10493,7 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
 });
 
 test("the SCOREBOARD sends either version, and both tell the same story",async()=>{
- const {buildScoreboard,scoreboardText}=await import("../app/fleet-scoreboard.ts");
+ const {buildScoreboard,scoreboardCountsText,scoreboardText}=await import("../app/fleet-scoreboard.ts");
  const {scoreboardPrintHtml}=await import("../app/fleet-scoreboard-print.ts");
  const modal=await readFile(new URL("../app/scoreboard-modal.tsx",import.meta.url),"utf8");
 
@@ -10520,9 +10520,24 @@ test("the SCOREBOARD sends either version, and both tell the same story",async()
  assert.match(html,/<dt>Downed buses<\/dt><dd>1<\/dd>/);
  assert.match(text,/INSPECTIONS\s+1/);
  assert.match(html,/<dt>Inspections<\/dt><dd>1<\/dd>/);
- assert.match(html,/Downed buses only/,"the PDF fences the pair the same way the text does");
- assert.match(html,/Not counted above/);
+ /* "Downed buses only" is gone from both, together. Curtis called it redundant
+    "on either version", and the two documents have to stay in step — a PDF
+    that still carried it while the message had dropped it is exactly the kind
+    of drift this whole test exists to catch. */
+ assert.doesNotMatch(html,/Downed buses only/i);
+ assert.doesNotMatch(text,/downed buses only/i);
+ assert.match(html,/Not counted above/,"the line that says something the heading does not stays on both");
  assert.match(html,/17504/,"and names the mystery bus");
+ /* The counts-only version, on both. Bus numbers for the two lists somebody
+    has to walk out to, and no locations or repairs anywhere. */
+ const counts=scoreboardCountsText(board,{title:"PACE SOUTH"});
+ const countsHtml=scoreboardPrintHtml(board,{counts:true,title:"PACE SOUTH"});
+ assert.match(counts,/DOWNED BUSES\s+1/);
+ assert.match(counts,/ROADCALLS PENDING\s+\d/);
+ assert.match(counts,/17504/,"a mystery bus is an errand, so it keeps its number");
+ assert.equal(counts.includes("Main Garage")||counts.includes("CNG"),false,"and carries no location");
+ assert.match(countsHtml,/class="numbers"/,"the PDF prints the same two lists as bare numbers");
+ assert.doesNotMatch(countsHtml,/ol class="defects"/,"and never repairs, whatever the defects switch said");
 
  /* Everything on the page is a value from the board, including free text
     somebody typed into a repair. Written into markup, so it is escaped - an
@@ -10872,9 +10887,24 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
  const first=reconcileRoadCallsFromSheet(fleet,entries,now);
  assert.deepEqual(first.started,["b1"],"only the bus the sheet calls a road call");
  const b1=first.fleet.find(bus=>bus.id==="b1");
- assert.equal(b1.roadcall,true,"the flag the map draws from is finally set");
- assert.equal(b1.roadCalls.length,1);
+ assert.equal(b1.roadCalls.length,1,"the breakdown is logged from the paper sheet, which is the whole point");
  assert.ok(b1.roadCalls[0].id.startsWith(SHEET_ROAD_CALL_PREFIX),"and where it came from stays legible");
+ /* AND THE FLAG DOES NOT GO ON, which is the opposite of what this asserted
+    when it was written, and deliberate.
+
+    Curtis set the rule from the floor: "any bus that is added to the downsheet
+    while it is in roadcall status should not be counted here. Once its placed
+    on downsheet the roadcall status is canceled (although still logged per our
+    design already)... Anyone taking counts and see a bus that is on property
+    that just came in from roadcall, marks it down on sheet it is no longer in
+    the roadcall count."
+
+    The EVENT and the STATUS were being conflated. The event is the breakdown
+    and is permanent; the flag says the bus is out on one RIGHT NOW, and a bus
+    somebody is standing next to writing up is back. So the sheet still logs
+    what the paper says — which is why this reconciler exists at all — and the
+    pending status it used to raise is exactly what a sheet row now cancels. */
+ assert.equal(b1.roadcall,false,"on the sheet is not pending: the status is cancelled, the history is not");
 
  /* Dated from the ENTRY, not from now: "in the last 36 hours" has to mean 36
     hours since the breakdown, not since somebody scanned the sheet. */
@@ -10915,6 +10945,21 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
     one-minute undo window; this may run days later, and a stale `from` would
     move a vehicle somebody has since parked by hand. */
  assert.equal(fixed.l,"garage-1");
+
+ /* A MAP-TICKED CALL IS CANCELLED BY THE SHEET TOO, and its event survives.
+    Curtis said ANY bus added to the sheet, not only one filed under Roadcall —
+    a bus that came in off a road call and was written up for brakes is still
+    written up. The flag comes off; nothing else about the bus is touched. */
+ const ticked=[{id:"b5",n:"17505",l:"road-4",roadcall:true,roadCalls:[{id:"road-call-map-b5",at:hoursAgo(2)}]}];
+ const writtenUp=reconcileRoadCallsFromSheet(ticked,[{id:"e5",busId:"b5",section:"Pending",workflow:"Scheduled"}],now).fleet[0];
+ assert.equal(writtenUp.roadcall,false,"written up on the sheet, whatever the section, is no longer pending");
+ assert.equal(writtenUp.roadCalls.length,1,"and the map's own event is never withdrawn by the sheet");
+ assert.equal(standingRoadCalls(writtenUp,now,36).length,0,"so it leaves the report");
+ /* Taking the row back off does NOT re-raise it. Re-raising would be the app
+    deciding a bus is out on the road because somebody deleted a row, and every
+    reader that goes by events rather than status still has the breakdown. */
+ assert.equal(reconcileRoadCallsFromSheet([writtenUp],[],now).fleet[0].roadcall,false,
+  "and deleting the row does not put the bus back out on the road");
 
  /* A bus out on BOTH a map-ticked call and a sheet-ticked one keeps the flag
     when only the sheet's half closes: it is still out on the other. */
@@ -11004,8 +11049,11 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  /* MYSTERY: on property, in a work area, nothing active on the sheet. b5's only
     entry is Completed, so it is a mystery too. */
  assert.deepEqual(board.mystery.map(bus=>bus.n),["17504","17505"],"sorted by fleet number, as somebody reads them");
- assert.equal(board.mystery[0].note,"1 open repair");
- assert.equal(board.mystery[1].note,"nothing logged","the most interesting row says so plainly");
+ /* NO OPEN-REPAIR COUNT against them any more. Curtis: "as far as the open
+    repair count don't include that." It answered a question nobody asks of
+    this list — a mystery bus is one the sheet does not explain, and what is
+    already logged against it is a different report. */
+ assert.deepEqual(board.mystery.map(bus=>bus.note),["",""],"the row carries the bus and where it is, and nothing else");
 
  /* Curtis's wording, and the reason for it: a mystery bus is an admission that
     nobody has decided anything about it yet. */
@@ -11013,20 +11061,35 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  assert.equal(mysteryLabel(0),"0","at zero the caveat goes - a zero needs no hedge");
 
  /* ROAD CALLS: the window is 48 hours and nothing older leaks in. */
- assert.equal(SCOREBOARD_ROAD_CALL_HOURS,36,"Curtis moved the window from 48 to 36");
- assert.deepEqual(board.roadCalls.map(bus=>bus.n),["17506","17507"],
-  "the four-day-old call is outside the window, and the one taken back off that status is excluded though it is only two hours old");
- assert.deepEqual(board.roadCallsOffSheet.map(bus=>bus.n),["17506"],"and only the one nobody has written up needs chasing");
+ assert.equal(SCOREBOARD_ROAD_CALL_HOURS,36,"Curtis moved the window from 48 to 36, and confirmed it again");
+ /* ONE LIST NOW, not two. It used to report every call in the window and then
+    star the ones off the sheet; Curtis collapsed that by changing the rule
+    rather than the report — "any bus that is added to the downsheet while it
+    is in roadcall status should not be counted here." 17507 is inside the
+    window and still in that status, and it is on the sheet, so it is not
+    pending: somebody has it. */
+ assert.deepEqual(board.roadCallsPending.map(bus=>bus.n),["17506"],
+  "the four-day-old call is outside the window, the one taken off that status is excluded though it is two hours old, and the one already written up is somebody's job rather than a pending call");
+ assert.equal("roadCallsOffSheet" in board,false,"the second list went with the rule that needed it");
 
  /* THE LOCK-SCREEN TEXT. */
  const text=scoreboardText(board,{title:"PACE SOUTH"});
  /* The two numbers that are not like the others, fenced off rather than
     footnoted - a footnote is what a person skips when somebody is waiting. */
- assert.match(text,/={10,}\nDOWNED BUSES\s+3\n\s+\(downed buses only\)\nINSPECTIONS\s+1\n\s+\(not counted above\)\n={10,}/,
-  "downed and inspections sit inside a heavy band, two lines each, so the reader sees the other counts exclude them");
- assert.match(text,/MYSTERY BUSES\s+2\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat sits under the number, not beside it - together they wrap on a phone");
- assert.match(text,/ROAD CALLS \(36H\)\s+2/);
- assert.match(text,/\* NOT ON THE SHEET \u2014 1/,"marked once against the row, counted once underneath");
+ /* "(downed buses only)" is gone: it repeated the heading back at the reader.
+    Curtis: "get rid of the extra redundant (downed buses only) line under
+    downed buses. Not necessary on either version." The line under INSPECTIONS
+    stays — that one says what the heading does not. */
+ assert.match(text,/={10,}\nDOWNED BUSES\s+3\nINSPECTIONS\s+1\n\s+\(not counted above\)\n={10,}/,
+  "downed and inspections sit inside a heavy band, so the reader sees the other counts exclude them");
+ assert.doesNotMatch(text,/downed buses only/i);
+ /* A BLANK LINE between the number and the caveat. Curtis: "put a space in
+    between (like a tabbed space so its not so bunced up)". Stacked directly
+    the two read as one wrapped sentence. */
+ assert.match(text,/MYSTERY BUSES\s+2\n\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat is a note about the number, set apart from it");
+ assert.match(text,/ROADCALLS PENDING\s+1\n\s+\(not on the down sheet\)/,
+  "named for what it is, with the qualifier said once under the heading");
+ assert.doesNotMatch(text,/NOT ON THE SHEET \u2014/,"the star and its footnote went with the second list");
 
  /* Numbers for MYSTERY and ROAD CALLS only. Curtis: "not the entire downed bus
     list" - thirty fleet numbers would bury the ones that need chasing. */
