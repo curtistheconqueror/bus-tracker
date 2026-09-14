@@ -1,197 +1,94 @@
 # Publish next
 
-**STATUS: 174 IS LIVE. UNPUBLISHED WORK SITS ON TOP OF IT — build the next
-release from `main`'s head.**
+**STATUS: 176 PENDING — 175 SHIPPED THE WRONG SHIFT HOURS AND THEY ARE LIVE.**
 
-Sites Version 174 was published from `2c0646397785270b491c22d2abc0be239e14d29a`
-on 2026-09-14. The rollback tag is `sites-v174` at that exact source commit. The
-prior production rollback point is Version 173 from `3de6dab`.
+Sites Version 175 was published from `9bac8ed62ae6171b75f1200e0d5e032c4e558d85`
+on 2026-09-14. The rollback tag is `sites-v175` at that exact source commit. The
+prior production rollback point is Version 174 from `2c06463`.
 
-Whatever number comes next — 175 unless Codex has taken it — should be built
-from `main`'s head, not from `2c06463`.
+## ⚠ WHY THIS SHOULD GO OUT SOON
 
-```
-git log --oneline sites-v174..origin/main -- app/ tests/
-```
+175 shipped the shift clock with **placeholder shift boundaries** — 06:00-14:00,
+14:00-22:00, 22:00-06:00. Those were a guess, marked as a guess in the module,
+and they are wrong. Curtis gave the real hours one commit later:
 
----
+| | Start | End |
+| --- | --- | --- |
+| 1st | 06:00 | **14:30** |
+| 2nd | 14:00 | **22:30** |
+| 3rd | 22:00 | **06:30** |
 
-## 1. Fixed Repairs is themed all the way into the card
+Pullouts are unaffected — 06:00 and 13:00 were his from the start and are
+correct in 175.
 
-Reported from the floor as an unreadable repair title on the Tactical theme.
-Measured in Chromium on all four themes rather than read off the CSS, the
-problem was larger than the title: **14 elements under AA on Tactical, 12 on
-Dark, 12 on Midnight, 1 on Light. Zero on all four now.**
+Nothing in 175 is broken by this. The shift clock is not yet read by any
+surface — it was built for the Fleet Forecast, which does not exist yet — and
+the Settings panel lets anybody correct the hours on their own device. But the
+panel's "USE THE SHOP'S HOURS" button restores the WRONG hours in 175, so a
+foreman who opens it and presses reset gets the guess back.
 
-The theme section only ever repainted the OUTSIDE of a card. Three things
-inside it were still light-theme constants:
+## What 176 is
 
-- **The FIX / STEPS TAKEN panel** carried a hard-coded `#f3fbf6`, a pale green
-  chosen for the light theme, so a dark theme drew its themed cream text on a
-  near-white box. **1.13:1** — the sentence that page exists to show,
-  effectively invisible.
-- **The card head** mixed 10% of the accent into the surface and then drew the
-  bus number, the category and the timestamp in that same accent — a colour set
-  against a background it had just been blended into. Self-defeating by
-  construction; Tactical had the least headroom at **3.92:1**. It tints from
-  the page now, which every theme has spare, and that holds for a CUSTOM theme
-  where the accent is whatever the user picked.
-- **The tallies and the completion stamp** used `--fixed-green`, a dark green
-  on a dark surface, **1.86:1**.
+**One commit**, on top of 175, plus the merge that brings 175's own record into
+the branch.
 
-The active nav tab was themed and still wrong: surface behind HEADER text puts
-near-black on dark olive, **1.63:1**. It reads as ink now.
+### The hours, and the rule the overlap forces
 
-Card small print is mixed 68% toward the ink rather than left at the theme's
-muted value, which self-corrects per theme instead of hard-coding a second
-muted colour a custom theme would never get.
+Every shift is 8.5 hours and they **overlap by 30 minutes** at each handover:
+14:00-14:30, 22:00-22:30 and 06:00-06:30 each belong to two shifts. That is a
+relief window, and it breaks the assumption 175's `shiftAt` was built on — that
+at most one window matches a given minute.
 
-**No storage key, no data shape, nothing to migrate.** CSS only.
+175 returns the FIRST window that matches, which would credit every one of those
+half-hours to the **outgoing** shift purely because of array order: thirty
+minutes of arrivals landing on the wrong crew's tally, three times a day, in a
+number nobody would have had reason to double-check.
 
-## 2. On the down sheet means not pending — a road-call rule change
+**The incoming shift wins a handover** — Curtis's call, asked and answered: the
+relief has started and they are the crew who will work whatever arrives. Of the
+windows that match, the one that STARTED MOST RECENTLY wins, which is what
+"incoming" means in a sentence and needs no separate table of handover times to
+keep in step.
 
-**This one changes behaviour on the bus record, so read it before publishing.**
+The overlap breaks a second thing. A two-shift window was "what is left of this
+shift plus the length of the next", which double-counts each handover — at 14:15
+it reported 16h45m where the clock says 16h15m. It is measured straight through
+to the END of the next shift now.
 
-Curtis: *"any bus that is added to the downsheet while it is in roadcall status
-should not be counted here. Once its placed on downsheet the roadcall status is
-canceled (although still logged per our design already)... Anyone taking counts
-and see a bus that is on property that just came in from roadcall, marks it
-down on sheet it is no longer in the roadcall count."*
+### Also in it
 
-It inverts half of `reconcileRoadCallsFromSheet`, with his explicit
-confirmation, because the EVENT and the STATUS were being conflated:
+- The reset button reads **USE THE SHOP'S HOURS** rather than "the built-in
+  hours", and its summary line is drawn from the defaults rather than typed, so
+  it cannot drift from what the button does.
+- `CLAUDE.md` no longer calls the hours a guess, and records the handover rule.
 
-- The **event** is the breakdown and stays on the bus forever. That reconciler
-  exists because the shop's cloud held 109 buses with zero `roadcall` flags and
-  four live `Roadcall` sheet rows — every road call there arrives on paper — so
-  the sheet must go on logging what the paper says.
-- The **flag** says the bus is out on one RIGHT NOW. A bus somebody is standing
-  next to, writing up, is back. So a sheet row now CANCELS the status the same
-  row used to raise.
-
-Any active entry counts, not only a `Roadcall`-section one: a bus that came in
-off a road call and was written up for brakes is still written up. The flag
-comes off the bus record, so the **Facility Map's ROADCALL badge agrees with the
-report** — Curtis chose that when asked, over filtering the report alone.
-
-Taking the row back off does NOT re-raise the call. Re-raising would be the app
-deciding a bus is out on the road because somebody deleted a row, and every
-reader that goes by events rather than status still has the breakdown.
-
-`standingRoadCalls` is unchanged, and so is the 36-hour window — he confirmed
-36 again rather than the 48 he first said.
-
-**No storage key changed.** `roadcall` and `roadCalls` already existed and keep
-their shapes. A device on an older build reading a board written by this one
-sees a bus whose flag is off and whose history is intact, which is exactly what
-it would see after somebody unticked the box by hand.
-
-## 3. SCOREBOARD is now the FLEET STATUS REPORT
-
-Curtis asked for a term that holds up when a superintendent forwards it upward,
-where "scoreboard" reads as an in-house nickname. The button says STATUS
-REPORT; the modal, the message and the PDF all say Fleet Status Report.
-
-Renamed through the code as well as the interface, on purpose: this repo has
-been bitten twice by one thing carrying two names (five copies of the location
-table, two road-call records that had drifted). `fleet-scoreboard.ts`,
-`fleet-scoreboard-print.ts` and `scoreboard-modal.tsx` become
-`fleet-status-report.ts`, `fleet-status-report-print.ts` and
-`status-report-modal.tsx`; the exported symbols and every `.scoreboard-*` CSS
-class follow. **No storage key is involved** — none of this was ever persisted.
-
-## 4. A shift clock, with the garage's hours editable on the device
-
-Curtis: *"A timer must be built in if it isn't already... it must be shift aware
-and pull out time aware. Also a settings option to fine tune both of these
-options in case changes need to be made without you writing code."*
-
-The app had `Shift` as a LABEL on a Down Sheet entry and nothing that mapped a
-clock time onto one; pullout times appeared nowhere. `app/shift-clock.ts` is
-that missing half, and it is the only place that knows — every window the Fleet
-Forecast will quote resolves through it.
-
-**The hours are the shop's real ones:** 1st 06:00-14:30, 2nd 14:00-22:30, 3rd
-22:00-06:30, pullouts at 06:00 and 13:00. Each shift is 8.5 hours and they
-**overlap by 30 minutes** at each handover, which is a relief window rather than
-an error. **The incoming shift owns a handover** — Curtis's call — so 14:15
-reads as 2ND SHIFT. Taking the first matching window instead would have credited
-every one of those half-hours to the outgoing crew purely because of array
-order, three times a day.
-
-Two things the night shift forces: it runs 22:00 to 06:30, so its start is
-numerically AFTER its end and the obvious `start<=m&&m<end` reports every hour of
-the night as belonging to no shift at all. And a two-shift window is measured
-straight through to the END of the next shift rather than summed, because with
-overlaps the sum double-counts each handover.
-
-**Settings -> SHIFTS & PULLOUT TIMES** makes every window and both pullouts
-editable, with a live line showing the current shift, time left in it and time
-to the next pullout. A half-typed time is held rather than saved — a time input
-hands back a partial value mid-keystroke, and committing it would move the shift
-under the person typing.
-
-**Adds `pace-shift-settings-v1`** — device-local, never synced, documented in
-CLAUDE.md. Nothing else changed shape; a device that has never opened the panel
-runs on the shop's hours as the built-in defaults.
-
-## 5. The report is shorter, and has a counts-only version
-
-Curtis: *"I think its still too much info."*
-
-Because "not on the sheet" is now the DEFINITION of pending, the two road-call
-lists collapse into one: the `*` against each row and the footnote counting
-them underneath both go. It reads `ROADCALLS PENDING` with the qualifier said
-once under the heading.
-
-Three trims he named:
-
-- the per-bus **open-repair count** is gone from the mystery rows;
-- **`(downed buses only)`** is gone from the message, the PDF and the modal tile
-  — it repeated the heading back. `(not counted above)` under INSPECTIONS
-  stays, because that one says what the heading does not;
-- a **blank line** separates `MYSTERY BUSES` from `PENDING CONFIRMATION OF
-  STATUS`, which were reading as one wrapped sentence.
-
-Both blocks also run in the SAME ORDER in both versions now — roadcalls
-pending, then mystery. They were opposite ways round, and Curtis asked for
-them matched.
-
-A **counts-only checkbox** sits above the defects one, and disables it rather
-than hiding it. The split is by what the reader does with each number: downed
-and inspections are figures to quote, so no bus numbers; roadcalls pending and
-mystery buses are errands somebody walks out to, so those carry their numbers
-and nothing else. Both the message and the PDF honour it.
+**No storage key is added or changed.** `pace-shift-settings-v1` shipped in 175
+and keeps its shape. A device that already saved custom hours keeps them; a
+device that never opened the panel picks up the corrected defaults.
 
 ## Gates
 
-`npm test` — **313 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **315 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-Measured in Chromium, not read:
+**4 mutations, 4 caught**: first-match-wins, the overlap removed from the
+defaults, the two-shift window summed again, and the evening shift read as
+22:00.
 
-- Fixed Repairs on light / dark / midnight / tactical: **0 elements under AA**
-  (from 1 / 12 / 12 / 14).
-- The report at 390px on a seeded board: a bus carrying a live road call AND a
-  sheet row is **absent** from ROADCALLS PENDING while two with road calls and
-  no row are present; both versions fit the lock-screen width with no
-  horizontal overflow.
+Verified in Chromium at 390px against the real clock: 18:29 reads as `2ND
+SHIFT`, `4h 1m` left, `11h 31m` to the a.m. pullout; the panel shows all six
+edited times and the reset copy matches the defaults.
 
 ## What to check once it is live
 
-1. Open **Fixed Repairs** on Tactical and read a completed repair's FIX / STEPS
-   TAKEN panel. That is the text that was invisible.
-2. On the **Facility Map**, tick ROADCALL on a bus, then add that bus to the
-   Down Sheet. The badge should clear and the bus should leave ROADCALLS
-   PENDING on the report.
-3. Confirm the bus still shows its road call on the **Defect Log** card and in
-   the ROAD CALLS quick filter — the history must survive the status being
-   cancelled.
+1. Settings → **SHIFTS & PULLOUT TIMES**. The three windows should read
+   06:00-14:30, 14:00-22:30, 22:00-06:30.
+2. Press **USE THE SHOP'S HOURS** and confirm it restores those, not the 175
+   guess.
+3. Between 14:00 and 14:30, the live line should say **2ND SHIFT**, not 1ST.
 
 ## The way back
 
-Nothing here migrates data, so rolling back to `sites-v174` is a straight
-redeploy. The one asymmetry: buses whose `roadcall` flag was cleared by a sheet
-write under this build stay cleared after a rollback. Their events are intact,
-so 174 would show them in ROAD CALLS (36H) again only if somebody re-ticked the
-box, which is the same position as any bus fixed and returned to service.
+A straight redeploy of `sites-v175`. Nothing migrates. A device that saved its
+own hours under 175 is unaffected either way; one running on defaults goes back
+to the guess.

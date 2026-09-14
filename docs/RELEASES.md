@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 174 / release 174 | Live | 2c06463 | Fixes the phone and iPad touch crash with a crash guard; adds the Down Sheet Status Report and Full Sweep workflows; makes holds device-local; carries intentional Down Sheet and Defect Log removals through section transfers; and gives the Down Sheet the Defect Log-style typed repair form, nine entry-focused quick filters, and filtered offline-safe sharing. |
+| 175 / release 175 | Live | 9bac8ed | Corrects road-call status when a bus is formally placed on the Down Sheet while preserving road-call history; renames and shortens the Fleet Status Report; repairs Fixed Repairs contrast across all themes; and adds editable device-local shift and pullout hours. |
+| 174 / release 174 | Previous live | 2c06463 | Fixes the phone and iPad touch crash with a crash guard; adds the Down Sheet Status Report and Full Sweep workflows; makes holds device-local; carries intentional Down Sheet and Defect Log removals through section transfers; and gives the Down Sheet the Defect Log-style typed repair form, nine entry-focused quick filters, and filtered offline-safe sharing. |
 | 173 / release 173 | Previous live | 3de6dab | Published the preceding Fleet Tracker source; Version 174 is its direct rollback successor. |
 | 171 / release 171 | Previous live | 649cef5 | Aligns the Facility Map header and phone nav; adds wiper, washer, ramp, lighting and air-tank catalog choices; gives the Defect Log typing pickers, a return tally and optional phone card-separation settings; adds fluid top-up details, the Recommended for Down Sheet board, and a cosmetic per-device role picker |
 | 166 / release 170 | Live | bdca898 | Restores the Scan Sheet Cancel control and its modal scrolling, and makes the FLEETSTEP masthead return to the Facility Map |
