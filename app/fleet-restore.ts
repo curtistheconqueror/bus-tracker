@@ -20,6 +20,7 @@ import {BOARD_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,DOWN_SHEET_SE
 import {PARTS_MEMORY_STORAGE_KEY,normalizePartsMemory} from "./parts-memory.ts";
 import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY,normalizeBusLists,normalizeBusListTemplates} from "./bus-lists.ts";
 import {FINDINGS_MEMORY_STORAGE_KEY,normalizeFindingsMemory} from "./findings-memory.ts";
+import {SHEET_LEDGER_KEY,mergeSheetLedgers,readSheetLedger} from "./sheet-ledger.ts";
 
 export type FleetBackupBus={id:string;n:string;l:string;[key:string]:unknown};
 export type FleetBackup={
@@ -36,6 +37,7 @@ export type FleetBackup={
  busLists?:unknown;
  busListTemplates?:unknown;
  findingsMemory?:unknown;
+ sheetLedger?:unknown;
 };
 
 export type FleetBackupRead={ok:true;backup:FleetBackup}|{ok:false;error:FleetBackupError};
@@ -64,7 +66,7 @@ export function readFleetBackup(text:string):FleetBackupRead{
  return {ok:true,backup:{buses,legacy,
   settings:rest.settings,downSheet:rest.downSheet,downSheetSettings:rest.downSheetSettings,
   defectLogSettings:rest.defectLogSettings,partsMemory:rest.partsMemory,
-  busLists:rest.busLists,busListTemplates:rest.busListTemplates,findingsMemory:rest.findingsMemory}};
+  busLists:rest.busLists,busListTemplates:rest.busListTemplates,findingsMemory:rest.findingsMemory,sheetLedger:rest.sheetLedger}};
 }
 
 export const FLEET_BACKUP_ERRORS:Record<FleetBackupError,string>={
@@ -103,6 +105,24 @@ export function restoreFleetBackup(storage:Storage,backup:FleetBackup):FleetRest
  put(BUS_LISTS_STORAGE_KEY,backup.busLists,"campaigns",normalizeBusLists);
  put(BUS_LIST_TEMPLATES_STORAGE_KEY,backup.busListTemplates,"campaign templates",normalizeBusListTemplates);
  put(FINDINGS_MEMORY_STORAGE_KEY,backup.findingsMemory,"remembered findings",normalizeFindingsMemory);
+ /* THE ONE THING A WHOLE-APP IMPORT MERGES INSTEAD OF REPLACING, and the
+    exception is deliberate.
+
+    Everything above is STATE — the board as it stands, the settings in force —
+    and a device clone is supposed to overwrite it; that is what the confirm in
+    front of this promises. The swap ledger is not state, it is HISTORY, and
+    Curtis scans from more than one device: restoring his phone onto the iPad
+    would otherwise throw away every swap the iPad had recorded itself, which is
+    the half of the shop's tempo the phone never saw.
+
+    Merging is safe for exactly the reason it is safe on a transfer: a swap
+    happened once, on one device, and two devices never perform the same one. So
+    there is nothing to reconcile and the union is the history, deduped by swap
+    id. Same shape as the road-call events, for the same reason. */
+ if(backup.sheetLedger!==undefined&&backup.sheetLedger!==null){
+  writeSetting(storage,SHEET_LEDGER_KEY,JSON.stringify(mergeSheetLedgers(readSheetLedger(storage),backup.sheetLedger)));
+  restored.push("swap history");
+ }
  return {ok:true,restored};
 }
 

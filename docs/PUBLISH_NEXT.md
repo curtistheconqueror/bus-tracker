@@ -93,6 +93,28 @@ it: a failed undo copy stops the import, because replacing a sheet with no way
 back is a one-way door, while a failed ledger write is a rounding error in a
 forecast and must never cost a foreman the sheet he just photographed.
 
+**THE LEDGER TRAVELS**, which reverses how it was first built. Curtis: *"I will
+be scanning from multiple devices, period."* Device-local, each phone would hold
+only the swaps IT performed — two half-histories, and a forecast built on either
+would read half the shop's tempo as all of it.
+
+Merging is safe here in a way it is not for the fleet or the sheet: **a swap is
+an event that happened once, on one device.** Two devices never perform the same
+swap — one scans the paper, the other receives the resulting sheet through the
+cloud and performs none — so there is nothing to reconcile and the union is the
+history. Deduped by swap id, and swap ids carry a random tail so two devices
+scanning in the same millisecond cannot mint the same one.
+
+Two carriers, both already in the app: the **Down Sheet section transfer**, and
+**MASTER EXPORT**. The ledger is **the one key a whole-app import MERGES instead
+of replacing** — everything else in a restore is state and is meant to be
+overwritten, while this is history, and restoring a phone onto the iPad must not
+throw away the swaps the iPad recorded itself.
+
+**Automatic cloud sync is NOT in this release.** `shop_memory` is constrained to
+`kind in ('part','finding')`, so it would need a schema migration against the
+live database — Curtis's call, every time, and not taken.
+
 **Nothing reads the ledger yet.** No surface changes, no number moves. This
 release only starts the recording.
 
@@ -101,12 +123,15 @@ release only starts the recording.
 `npm test` — **316 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-**11 mutations, 11 caught.** On the hours: first-match-wins, the overlap removed from the
+**17 mutations, 17 caught.** On the hours: first-match-wins, the overlap removed from the
 defaults, the two-shift window summed again, and the evening shift read as
 22:00. On the ledger: the cap dropping the newest, completed rows counted as
 on the sheet, a bus counted twice, phantom removals credited as cleared, the
 first snapshot reported as a swap, a ledger failure stopping the import, and
-the shift recomputed later instead of stored.
+the shift recomputed later instead of stored. On the multi-device paths: the
+merge appending instead of interleaving by time, swap ids colliding across
+devices, a master import replacing the ledger, a transfer import overwriting
+it, the export dropping the ledger, and an empty ledger written as [].
 
 Verified in Chromium at 390px against the real clock: 18:29 reads as `2ND
 SHIFT`, `4h 1m` left, `11h 31m` to the a.m. pullout; the panel shows all six

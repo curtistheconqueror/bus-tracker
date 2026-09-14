@@ -63,6 +63,7 @@ import AppName from "../app-name";
 import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
 import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
+import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "../sheet-ledger";
 import ShiftSettingsPanel from "./shift-settings";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
@@ -347,7 +348,14 @@ export default function SettingsPage(){
   writeMergedAway(localStorage,adoptTombstones(readMergedAway(localStorage),payload.deleted));
   return mergeSummary("defect-log",merged,after.dropped.length);
  }}/>;
- const downTransfer=<SectionTransferControls kind="down-sheet" buildPayload={()=>exportDownSheetPayload(downEntries,undefined,readRemovedEntries(localStorage))} applyPayload={payload=>{
+ const downTransfer=<SectionTransferControls kind="down-sheet" buildPayload={()=>exportDownSheetPayload(downEntries,undefined,readRemovedEntries(localStorage),readSheetLedger(localStorage))} applyPayload={payload=>{
+  /* THE SWAP HISTORY MERGES, it does not replace. A swap happened once, on one
+     device — two devices never perform the same one — so there is nothing to
+     reconcile and the union is the history. Deduped by swap id, so importing
+     the same file twice does not double-count. Written before the entries
+     below because it cannot fail them: a ledger that will not save is a
+     rounding error in a forecast, not a reason to refuse somebody's sheet. */
+  writeSheetLedger(localStorage,mergeSheetLedgers(readSheetLedger(localStorage),payload.ledger));
   const {entries:mergedEntries,report:merged}=mergeDownSheet(downEntries,payload,fleet);
   /* AFTER the merge, for the reason applyCloudPull gives: these are the entries
      the merge has just put back. */

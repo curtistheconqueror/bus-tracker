@@ -105,7 +105,13 @@ export function snapshotFromEntries(
  }
  const off=[...new Set([...removedBusIds].map(clean).filter(Boolean))];
  return {
-  id:clean(id)||"swap-"+(when(at)??Date.now())+"-"+rows.length,
+  /* Unique across DEVICES, not just within one. Two phones scanning different
+     sheets in the same millisecond with the same row count would otherwise mint
+     the same id, and the merge would silently drop one of the two swaps as a
+     duplicate. The random tail is generated once, here, and then travels with
+     the snapshot — so the SAME swap keeps its identity through a transfer while
+     two different ones never collide. */
+  id:clean(id)||"swap-"+(when(at)??Date.now())+"-"+rows.length+"-"+Math.random().toString(36).slice(2,8),
   at:new Date(when(at)??Date.now()).toISOString(),
   shift:shiftAt(at,settings),
   rows,
@@ -208,6 +214,33 @@ export function ledgerTempo(value:unknown):SwapTempo[]{
   });
  }
  return out;
+}
+
+/* TWO DEVICES, ONE HISTORY.
+
+   Curtis: "I will be scanning from multiple devices, period." That changes what
+   this ledger is. Built device-local, each phone would hold only the swaps IT
+   performed — two half-histories, and a forecast built on either one would be
+   reading half the shop's tempo as if it were all of it.
+
+   Merging is safe here in a way it is NOT for the fleet or the sheet, and the
+   reason is worth stating: a swap is an EVENT that happened once, on one
+   device. Two devices never perform the same swap — one scans the paper, the
+   other receives the resulting sheet through the cloud and performs no swap of
+   its own. So there is no such thing as the same swap held differently by two
+   devices, and therefore nothing to reconcile: the union IS the history.
+
+   That is the same shape as the road-call events, and for the same reason.
+   Where two records genuinely describe the same thing — a bus, a repair — this
+   app compares timestamps and picks a winner. Where they are separate events,
+   it keeps both.
+
+   Deduped by id so a transfer imported twice does not double-count, ordered by
+   time, and capped to the newest — a merged pair can exceed the cap, and the
+   swaps worth keeping are the recent ones. */
+export function mergeSheetLedgers(mine:unknown,theirs:unknown,limit=SHEET_LEDGER_LIMIT):SheetLedger{
+ const merged=normalizeSheetLedger([...normalizeSheetLedger(mine),...normalizeSheetLedger(theirs)]);
+ return merged.length>limit?merged.slice(merged.length-limit):merged;
 }
 
 export function readSheetLedger(storage:Pick<Storage,"getItem">):SheetLedger{

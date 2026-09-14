@@ -3711,7 +3711,16 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
     could never be cleared on the iPad by file — the receiver keeps whatever only
     it has, by design, and "missing" never meant "deleted". */
  assert.match(page,/exportDefectLogPayload\(fleet,undefined,readMergedAway\(localStorage\)\)/,"the Defect Log export carries what this device folded away");
- assert.match(page,/exportDownSheetPayload\(downEntries,undefined,readRemovedEntries\(localStorage\)\)/,"the Down Sheet export carries what this device took off");
+ /* And the swap ledger with it. Curtis: "I will be scanning from multiple
+    devices, period" — a ledger that stayed device-local would leave each phone
+    holding half the shop's tempo while a forecast read it as all of it. */
+ assert.match(page,/exportDownSheetPayload\(downEntries,undefined,readRemovedEntries\(localStorage\),readSheetLedger\(localStorage\)\)/,
+  "the Down Sheet export carries what this device took off, and the swaps it recorded");
+ /* MERGED on arrival, never replaced. A swap is an event that happened once on
+    one device — two devices never perform the same one — so there is nothing to
+    reconcile and the union is the history, deduped by swap id. */
+ assert.match(page,/writeSheetLedger\(localStorage,mergeSheetLedgers\(readSheetLedger\(localStorage\),payload\.ledger\)\)/,
+  "an incoming ledger is merged into this device's own, not written over it");
 
  /* Dropped AFTER the merge, never before: the records that have to go are the
     ones the merge has just put back, and the receiver's own stale copy is the
@@ -14374,6 +14383,64 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
  const full={getItem:()=>"[]",setItem:()=>{throw new Error("QuotaExceeded")}};
  assert.equal(recordSheetSwap(full,[entry("b1","Brakes")],[],day(1)).ok,false,
   "a full device reports the failure rather than throwing into the import");
+
+ /* TWO DEVICES, ONE HISTORY. Curtis: "I will be scanning from multiple devices,
+    period." Device-local, each phone would hold only the swaps IT performed —
+    two half-histories, and a forecast built on either would read half the
+    shop's tempo as all of it.
+
+    Merging is safe here in a way it is NOT for the fleet or the sheet: a swap
+    is an EVENT that happened once, on one device. Two devices never perform the
+    same swap — one scans the paper, the other receives the resulting sheet
+    through the cloud and performs none. So there is nothing to reconcile and
+    the union IS the history. Same shape as the road-call events. */
+ const {mergeSheetLedgers}=await import("../app/sheet-ledger.ts");
+ const mine=[snapshotFromEntries([entry("b1","Brakes")],[],day(1),undefined,"a1"),
+             snapshotFromEntries([entry("b2","Engine")],[],day(3),undefined,"a2")];
+ const theirs=[snapshotFromEntries([entry("b3","A/C and HVAC")],[],day(2),undefined,"b1"),
+               snapshotFromEntries([entry("b4","Doors, Ramp and ADA")],[],day(4),undefined,"b2")];
+ const both=mergeSheetLedgers(mine,theirs);
+ assert.deepEqual(both.map(s=>s.id),["a1","b1","a2","b2"],"interleaved by time, not appended");
+ /* Importing the same file twice must not double-count. */
+ assert.deepEqual(mergeSheetLedgers(both,theirs).map(s=>s.id),["a1","b1","a2","b2"]);
+ assert.deepEqual(mergeSheetLedgers(mine,null).map(s=>s.id),["a1","a2"],"a device that has never scanned takes nothing away");
+ /* A merged pair can exceed the cap, and the swaps worth keeping are recent. */
+ assert.deepEqual(mergeSheetLedgers(mine,theirs,2).map(s=>s.id),["a2","b2"]);
+
+ /* IDS ARE UNIQUE ACROSS DEVICES now that ledgers travel. Two phones scanning
+    different sheets in the same millisecond with the same row count would
+    otherwise mint the same id, and the merge would drop one as a duplicate. */
+ const twin=()=>snapshotFromEntries([entry("b1","Brakes")],[],day(1)).id;
+ assert.notEqual(twin(),twin(),"two swaps built from identical inputs still get different ids");
+
+ /* MASTER IMPORT MERGES THIS ONE KEY. Everything else in a whole-app restore is
+    STATE and is meant to be overwritten; the ledger is HISTORY, and restoring a
+    phone onto the iPad must not throw away the swaps the iPad recorded itself. */
+ const restore=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ const restoreCode=restore.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.match(restoreCode,/mergeSheetLedgers\(readSheetLedger\(storage\),backup\.sheetLedger\)/,
+  "the swap history is merged into what this device already holds");
+ assert.equal(/put\(SHEET_LEDGER_KEY/.test(restoreCode),false,
+  "and never goes through the plain replace every other key uses");
+ const backup=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ assert.match(backup,/sheetLedger:readSavedValue\(storage,SHEET_LEDGER_KEY\)/,"and a master export carries it");
+
+ /* THE FILE FORMAT ROUND-TRIP, which is the part that actually has to hold: a
+    field that survives in memory and is dropped by the envelope or the reader
+    would lose the history silently, on the one path built to move it between
+    devices. Written, serialised, and read back through the app's own reader. */
+ const {exportDownSheetPayload,readTransferPayload}=await import("../app/section-transfer.ts");
+ const written=exportDownSheetPayload([{id:"e1",busId:"b1"}],day(5),{},mine);
+ const reread=readTransferPayload(JSON.stringify(written),"down-sheet");
+ assert.equal(reread.ok,true,"a Down Sheet transfer carrying a ledger still reads as one");
+ assert.deepEqual((reread.payload.ledger||[]).map(row=>row.id),["a1","a2"],
+  "and the swaps come back through the envelope intact");
+ assert.deepEqual(mergeSheetLedgers(theirs,reread.payload.ledger).map(row=>row.id),
+  ["a1","b1","a2","b2"],"so the receiving device ends with both halves of the history");
+ /* Omitted rather than written as [] when there is nothing to say, so a file
+    from a device that has never scanned does not assert an empty history. */
+ assert.equal("ledger" in exportDownSheetPayload([],day(5),{},[]),false);
+ assert.equal("ledger" in exportDownSheetPayload([],day(5),{}),false);
 
  /* WIRED AT THE CHOKEPOINT every sheet swap crosses, not on the scanner — a
     route that forgot to call it would silently stop recording and the ledger

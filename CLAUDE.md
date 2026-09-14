@@ -269,8 +269,44 @@ if somebody edits the shift hours in six weeks, the tempo of a swap that already
 happened must not move to a different crew. What shift it WAS is a fact about
 that morning.
 
-Device-local and never synced, for the reason the sweep is: it is one garage's
-tempo, and two devices merging ledgers would double-count every swap.
+**IT TRAVELS, and that reversed an earlier decision.** It was built device-local
+on the assumption that one device did the scanning. Curtis: *"I will be
+scanning from multiple devices, period."* Left local, each phone would hold only
+the swaps IT performed — two half-histories, and a forecast built on either
+would read half the shop's tempo as all of it.
+
+Merging is safe here in a way it is NOT for the fleet or the sheet, and the
+reason is the whole justification: **a swap is an EVENT that happened once, on
+one device.** Two devices never perform the same swap — one scans the paper, the
+other receives the resulting sheet through the cloud and performs none. So there
+is nothing to reconcile and the union IS the history. Same shape as the
+road-call events, for the same reason: where two records describe the same
+thing this app compares timestamps and picks a winner; where they are separate
+events it keeps both.
+
+Deduped by swap id, so a file imported twice does not double-count, and swap ids
+carry a random tail precisely so two devices scanning in the same millisecond
+with the same row count cannot mint the same one.
+
+Two carriers today, both already in the app: the **Down Sheet section transfer**
+(the sheet is what a swap IS), and **MASTER EXPORT**. The ledger is **the one key
+a whole-app import MERGES instead of replacing** — everything else in a restore
+is STATE and is meant to be overwritten, while this is history, and restoring a
+phone onto the iPad must not throw away the swaps the iPad recorded itself.
+
+**Automatic cloud sync would need a schema migration** — `shop_memory` is
+constrained to `kind in ('part','finding')` — which is a write to the live
+database and therefore Curtis's call. Not done.
+
+**WHY A SWAP AND NOT A REPAIR.** Curtis, on the granularity: *"the reason that
+we're not doing it per repair is because we don't have enough users. So
+literally, I cannot voucher or validate when a bus gets repaired until actually
+I see sheets updated across shifts, because no other mechanic really has this
+app except for one."* A completion nobody records is not evidence, and a sheet
+that comes back without a bus on it is. When more mechanics carry the app, a
+repair marked done by the mechanic who did it becomes the finer signal and the
+sheet updates from it — at which point this ledger becomes the coarse check on
+that, not the only input.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen
