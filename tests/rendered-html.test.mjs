@@ -13986,3 +13986,74 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
  assert.match(html,/Snapshot taken when this was shared/);
  assert.equal(downSheetShareFilename("waiting-parts",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
 });
+
+test("Fixed Repairs is themed all the way into the card, not just around it",async()=>{
+ const raw=await readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8");
+ /* Comments stripped first. Every rule below is explained in prose directly
+    above it in that file, and matching the prose instead of the rule is a
+    mistake this suite has made three times. */
+ const css=raw.replace(/\/\*[\s\S]*?\*\//g,"");
+
+ /* MEASURED, NOT READ. Chromium on all four themes, seeded with one completed
+    repair: Fixed Repairs had 14 elements under AA on Tactical, 12 on Dark, 12
+    on Midnight and 1 on Light. Zero on all four after these rules. The numbers
+    are here because the failures were invisible to every gate this repo has —
+    the suite was green the whole time. */
+
+ /* 1.13:1, and the worst of them: the fix text on a completed repair. The
+    panel carried a hard-coded #f3fbf6 chosen for the light theme, so a dark
+    theme drew its cream text on a near-white box. The repair-result panel must
+    be tinted from theme tokens and can never name a literal colour again. */
+ /* The LAST rule for the panel is the one that paints it. The base stylesheet
+    still carries #f3fbf6 and should: it is the light theme's own value, and a
+    var() fallback needs somewhere to fall back to. What matters is that a
+    themed rule comes after it and wins. */
+ const repairRules=css.match(/\.fixed-card-body \.repair-result\{[^}]*\}/g)||[];
+ assert.ok(repairRules.length>1,"a themed rule follows the light-theme default");
+ const repairResult=repairRules[repairRules.length-1];
+ assert.match(repairResult,/background:color-mix\([\s\S]*?--fixed-accent[\s\S]*?--fixed-surface/,
+  "its background is mixed from the theme rather than painted a fixed colour");
+ assert.doesNotMatch(repairResult,/background:\s*#[0-9a-f]{3,8}/i,
+  "and the winning rule names no literal colour");
+
+ /* THE HEAD MUST NOT TINT ITSELF WITH THE ACCENT IT THEN DRAWS ON. Mixing the
+    accent into the surface and writing the bus number, the category and the
+    timestamp in that same accent is self-defeating by construction; Tactical
+    had the least headroom and measured 3.92:1. It tints from the page now. */
+ /* Same shape: the last rule whose selector is exactly .fixed-card-head wins.
+    The base stylesheet's copy sits mid-line inside a long concatenated block,
+    so this cannot be anchored to a line start. */
+ const headRules=css.match(/(?:^|[\s,}])\.fixed-card-head\{[^}]*\}/g)||[];
+ assert.ok(headRules.length>1,"a themed head rule follows the light-theme default");
+ const head=headRules[headRules.length-1];
+ assert.match(head,/background:color-mix\([^)]*--fixed-page/,"the head tints from the page");
+ assert.doesNotMatch(head,/background:color-mix\([^)]*--fixed-accent/,
+  "and never from the accent it draws its own text in");
+
+ /* Surface behind HEADER text put #15180f on #393e30 — 1.63:1 on a tab you
+    press to know where you are. An active tab is a piece of the page surface,
+    so it reads as ink. */
+ /* LAST RULE WINS, every time. Three assertions in the first draft of this
+    test read the base stylesheet's light-theme copy and reported the themed
+    override missing — the test was measuring the wrong half of the cascade. */
+ const lastRule=selector=>{
+  /* The selector may sit in a comma list — the themed rule pairs the summary
+     tally with the card-head timestamp — so this matches it anywhere in the
+     selector list, not only immediately before the brace. The lookahead is
+     what keeps ".fixed-card-head" from also matching ".fixed-card-head>span". */
+  const found=css.match(new RegExp("(?:^|[\\s,}])"+selector.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?=[\\s,{])[^{}]*\\{[^}]*\\}","g"))||[];
+  return found[found.length-1]||"";
+ };
+ const activeTab=lastRule(".fixed-header nav a.active");
+ assert.ok(activeTab,"the active tab still has a rule");
+ assert.match(activeTab,/color:var\(--fixed-ink/,"the active tab reads as ink on the surface it sits on");
+
+ /* The tallies and the completion stamp were a fixed dark green on a dark
+    surface, 1.86:1. --fixed-green is a light-theme constant and must not be
+    what a themed number is drawn in. */
+ for(const selector of [".fixed-summary strong",".fixed-card-head time"]){
+  const rule=lastRule(selector);
+  assert.ok(rule,selector+" still has a rule");
+  assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
+ }
+});
