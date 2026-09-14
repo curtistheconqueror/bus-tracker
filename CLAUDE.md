@@ -191,10 +191,13 @@ Device-local for the reason a HOLD is: two foremen sweeping on the same morning
 are on two different walks, and a sweep that synced would have each of them
 ending the other's. It holds no fleet data at all — only when the walk began
 and which surface started it — so starting or ending one can never lose
-anybody's work. An unended walk expires at READ time after
-`SWEEP_MAX_HOURS`, longer than any shift and shorter than "it was still on from
-Tuesday"; the record is left alone rather than rewritten, because a read must
-not be a write.
+anybody's work. An unended walk is cut off on IDLE, not on total length: twenty quiet minutes
+end it, and every board write restarts that clock. Curtis: *"a sweep will never
+last that long. If I have not pressed anything then just cut it off within 20
+minutes."* A cap on total length would have ended a forty-minute walk somebody
+was actively working through while still leaving a pocketed phone looking live.
+Expired at READ time and the record is left alone rather than rewritten,
+because a read must not be a write.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen

@@ -24,17 +24,29 @@
 export const SWEEP_STORAGE_KEY="pace-sweep-v1";
 
 export type SweepOrigin="map"|"scan";
-export type FacilitySweep={startedAt:string;startedFrom:SweepOrigin};
+/* `lastActiveAt` is the last time the person did something as part of the
+   walk. It is what the cut-off measures from, not `startedAt`. */
+export type FacilitySweep={startedAt:string;startedFrom:SweepOrigin;lastActiveAt:string};
 
 type Reader=Pick<Storage,"getItem">;
 type Writer=Pick<Storage,"getItem"|"setItem"|"removeItem">;
 
-/* A walk somebody never ended. The app cannot tell a foreman who went home mid
-   sweep from one still out there, so it picks the reading that cannot mislead:
-   after this long the mode is treated as over. Twelve hours is longer than any
-   shift and shorter than "it was still on from Tuesday", which is the state
-   that would have somebody sending yesterday's report believing it was live. */
-export const SWEEP_MAX_HOURS=12;
+/* A walk somebody never ended, cut off on IDLE rather than on total length.
+
+   Curtis: "a sweep will never last that long. If I have not pressed anything
+   then just cut it off within 20 minutes." That is an IDLE rule, and it is the
+   better one — a cap on total length would end a forty-minute walk somebody was
+   actively working through, while still leaving a phone in a pocket looking
+   live. Measured from lastActiveAt, which every board write bumps: walking the
+   building keeps the mode alive for as long as the building takes, and twenty
+   quiet minutes end it however long ago it started.
+
+   The failure this closes is the asymmetric one. Ending early costs a tap.
+   Ending too late has somebody open the app the next morning still reading FULL
+   SWEEP, press END & REPORT, and send a report believing it reflects a walk
+   they finished yesterday — a wrong answer handed to a superintendent, which is
+   the thing this feature exists to prevent. */
+export const SWEEP_IDLE_MINUTES=20;
 
 export function readSweep(storage:Reader,now=new Date().toISOString()):FacilitySweep|null{
  try{
@@ -44,12 +56,15 @@ export function readSweep(storage:Reader,now=new Date().toISOString()):FacilityS
   const startedAt=String(parsed?.startedAt??"");
   const began=Date.parse(startedAt);
   if(!Number.isFinite(began))return null;
-  const age=Date.parse(now)-began;
+  /* A record written before this field existed falls back to its start time,
+     which is the conservative reading: it expires sooner, never later. */
+  const lastActiveAt=Number.isFinite(Date.parse(String(parsed?.lastActiveAt??"")))?String(parsed?.lastActiveAt):startedAt;
+  const idle=Date.parse(now)-Date.parse(lastActiveAt);
   /* Expired at READ time, and the record is left alone rather than rewritten —
      the same rule a hold's `until` follows. A read must not be a write. */
-  if(Number.isFinite(age)&&age>=SWEEP_MAX_HOURS*3600000)return null;
+  if(Number.isFinite(idle)&&idle>=SWEEP_IDLE_MINUTES*60000)return null;
   const from=parsed?.startedFrom==="scan"?"scan":"map";
-  return {startedAt,startedFrom:from};
+  return {startedAt,startedFrom:from,lastActiveAt};
  }catch{return null}
 }
 
@@ -59,9 +74,24 @@ export function startSweep(storage:Writer,from:SweepOrigin,now=new Date().toISOS
     prompt firing mid-walk is exactly the case that would have restarted it. */
  const current=readSweep(storage,now);
  if(current)return current;
- const sweep:FacilitySweep={startedAt:now,startedFrom:from};
+ const sweep:FacilitySweep={startedAt:now,startedFrom:from,lastActiveAt:now};
  try{storage.setItem(SWEEP_STORAGE_KEY,JSON.stringify(sweep));return sweep}
  catch{return null}
+}
+
+/* "I pressed something." Called when the person does something that is part of
+   the walk — a bus moved, a status changed, an edit saved — so the idle clock
+   restarts and the mode outlives however long the building takes today.
+
+   A no-op when no sweep is running, so callers never have to check first, and
+   silent on a full device: failing to extend a sweep is not worth an alert in
+   the middle of somebody's round. */
+export function touchSweep(storage:Writer,now=new Date().toISOString()):FacilitySweep|null{
+ const current=readSweep(storage,now);
+ if(!current)return null;
+ const next:FacilitySweep={...current,lastActiveAt:now};
+ try{storage.setItem(SWEEP_STORAGE_KEY,JSON.stringify(next));return next}
+ catch{return current}
 }
 
 export function endSweep(storage:Writer){

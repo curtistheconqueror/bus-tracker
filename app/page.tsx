@@ -9,7 +9,7 @@ import OperatorModal from "./operator-modal";
 import {planOperatorCommand,type OperatorPlan,type OperatorSelectionContext} from "./operator-engine";
 import {hasBusNumberConflict,validateBusUpdate} from "./fleet-validation";
 import {reconcileDownSheetMembership} from "./down-sheet-counter";
-import {endSweep,readSweep,startSweep,sweepLabel,type FacilitySweep} from "./facility-sweep";
+import {endSweep,readSweep,startSweep,sweepLabel,touchSweep,type FacilitySweep} from "./facility-sweep";
 import ScoreboardModal from "./scoreboard-modal";
 import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "./road-calls";
 import {sectionBusCount} from "./section-count";
@@ -226,6 +226,11 @@ useEffect(()=>{const touchDrop=(event:Event)=>{const detail=(event as CustomEven
   }
   setSweep(startSweep(localStorage,"map"));
  };
+ /* "I pressed something." Every board write while a sweep is running restarts
+    the idle clock, so the mode lasts as long as the walk does and twenty quiet
+    minutes end it. Keyed on `buses` rather than on each handler, so nothing can
+    be added later that moves a bus without extending the walk. */
+ useEffect(()=>{if(hydrated)touchSweep(localStorage)},[buses,hydrated]);
  useEffect(()=>{if(hydrated)setBuses(current=>reconcileDownSheetMembership(current,activeDownIds))},[activeDownIds,hydrated]);
 const showBase=q?buses.filter(x=>x.n.includes(q)):buses;
  const actualDownSet=new Set(activeDownIds),downSheetBadgeCounts=downSheetBadgeViewCounts(buses,actualDownSet),downSheetBadgeSet=new Set(showDownSheetBadges?downSheetBadgeViewBusIds(buses,actualDownSet,downSheetBadgeView):[]),acIssueSet=new Set(acIssueIds),defectLogCount=activeDefectLogCount(buses),fixedRepairCount=buses.reduce((count,bus)=>count+normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").length,0),mysteryIds=mysteryBusIds(buses,actualDownSet),mysterySet=new Set(mysteryIds),awarenessSet=new Set(bay12AwarenessBusIds(buses,actualDownSet));
