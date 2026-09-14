@@ -49,8 +49,9 @@ publish `3de6dab` a second time under a number that is already taken.
 
 ## ⬆ THERE IS NOW UNPUBLISHED WORK ON TOP OF 173
 
-Eleven commits landed AFTER `3de6dab` was published and are now on `main`.
-**They are not live.** Whatever number comes next — 174 unless Codex has taken
+Twenty-six commits landed AFTER `3de6dab` was published; twenty-three of them
+are on `main` and the newest three are on
+`claude/codex-workflow-docs-fn9any`. **None of them is live.** Whatever number comes next — 174 unless Codex has taken
 it — should be built from `main`'s head, not from `3de6dab`.
 
 ```
@@ -166,10 +167,73 @@ the section under them; three of five section stripes silently lost to a
 `border-color` shorthand in a later rule; and a `flex-basis` became a height in
 the phone's column layout and opened a 340px gap.
 
+### 3. The Down Sheet's entry form now matches the Defect Log's
+
+Curtis, comparing the two: *"the Down Sheet having a more narrow entry
+field ... I believe the defect log handles everything very well."* Three
+changes, all of them the Defect Log's own components rather than copies:
+
+- **The bus field is the Defect Log's `BusSelector`**, so a bus can be TYPED
+  rather than only chosen from a drop-down. Typing a bus that is already on the
+  sheet now says so and offers ADD TO THAT ENTRY instead of quietly opening a
+  second row for the same bus.
+- **CATEGORY and SPECIFIC REPAIR are `ComboField`s**, and the repair box is no
+  longer locked behind naming the category — `disabled={!item.category}` is
+  gone. You had to know a wiper motor lives under Bus Accessories before you
+  could go looking for one, which is the exact failure that component was built
+  to remove. Picking a repair from another category sets the category behind
+  you.
+- **A grouped category draws its labels.** The old `<select>` printed the raw
+  `REPAIR_OPTIONS` value, which for a grouped category is the stored
+  `"Group - Item"` identity — a flat wall of prefixed strings with no optgroup.
+  Measured in Chromium at 390px: Tech Services draws its five group headings
+  with bare item names under them, and zero rows print the raw identity.
+  **Nothing stored changed**; only what is drawn.
+
+A retired repair still reads back on the record that carries it. The guarantee
+moved from an injected `(as logged)` option to the `display` prop, where it is
+stated once instead of per-option.
+
+### 4. Quick filters on the Down Sheet, and the filtered sheet can be sent
+
+Curtis: *"we should have a quick filters list for that actually so I can share
+the downsheet with someone wanting details."*
+
+Nine filters in `app/down-sheet/down-sheet-filters.ts`, and deliberately **not**
+the Defect Log's thirteen. Those all ask whether a BUS carries a defect whose
+wording mentions a ramp or a farebox; the Down Sheet's rows are ENTRIES, and
+what gets asked of it is about the entry — who has this bus, is it even here,
+has anybody picked it up, how long has it been sitting, is any of it estimated.
+ON THE ROAD is asked of the MAP rather than of the row, because a bus out
+working while its entry still says Scheduled is the case that filter exists for.
+
+The two narrowings compose: the road tallies cut the sheet and the quick filter
+cuts that, so the bar's "1 of 5" is always the rows underneath it. The menu's
+own counts stay on the whole sheet — taken off the filtered rows, every number
+but the active one would read 0 the moment a filter was on.
+
+COPY LIST / SHARE TEXT / SHARE PAGE send exactly what is on screen. The page
+inlines everything and fetches nothing, and names places through
+`location-label.ts` — `garage-10` reads as Trouble Bay 11, not Main Garage.
+
+**No storage key was added or changed.** The filter is not persisted: it is a
+question asked of the sheet in the moment, like the road tallies beside it.
+
+Two things this took that were not the feature. `QuickFilterMenu` now takes its
+items as a prop instead of being copied, and `copyText` — which existed twice,
+character for character, on the Defect Log and Fleet Campaigns — moved into
+`share-file.ts`; all three call sites were re-checked in a browser.
+
+**One defect found only in Chromium:** the first build of the share bar used
+`copyText` without importing it. Lint, the build and all 311 tests passed over
+it; the ReferenceError was swallowed by the handler's own catch and reported to
+the mechanic as "could not share". There is a test for that now.
+
 ### Gates
 
-`npm test` — **295 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
-clean. Measured in Chromium at 360 / 390 / 1180 on all four themes.
+`npm test` — **312 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+clean. Measured in Chromium at 390 / 820 / 1180: no horizontal overflow, 44px
+targets on the phone, and both share outputs opened and read back.
 
 ---
 
