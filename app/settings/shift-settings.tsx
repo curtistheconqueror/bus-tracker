@@ -102,12 +102,13 @@ export default function ShiftSettingsPanel(){
   {problem&&<p className="shift-settings-problem" role="alert">{problem}</p>}
 
   <div className="shift-settings-actions">
-   {/* The built-in shift hours are a GUESS — Curtis gave the pullout times and
-       never gave the boundaries — so getting back to them has to be one press
-       rather than three careful edits. */}
-   <button type="button" onClick={()=>save(DEFAULT_SHIFT_SETTINGS)}>USE THE BUILT-IN HOURS</button>
-   <small>06:00&ndash;14:00, 14:00&ndash;22:00, 22:00&ndash;06:00, with pullouts at {
-    DEFAULT_SHIFT_SETTINGS.pullouts.map(item=>formatClock(clockMinutes(item.at) as number)).join(" and ")}.</small>
+   {/* Back to the hours the shop actually runs, in one press rather than six
+       careful edits. Drawn from the defaults rather than typed here, so this
+       line cannot drift away from what the button does. */}
+   <button type="button" onClick={()=>save(DEFAULT_SHIFT_SETTINGS)}>USE THE SHOP&rsquo;S HOURS</button>
+   <small>{DEFAULT_SHIFT_SETTINGS.shifts.map(shift=>shift.start+"\u2013"+shift.end).join(", ")}, with pullouts at {
+    DEFAULT_SHIFT_SETTINGS.pullouts.map(item=>formatClock(clockMinutes(item.at) as number)).join(" and ")}. Each shift is
+    8.5 hours, overlapping the next by 30 minutes at the handover.</small>
   </div>
  </section>;
 }

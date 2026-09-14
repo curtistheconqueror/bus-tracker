@@ -3711,7 +3711,16 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
     could never be cleared on the iPad by file — the receiver keeps whatever only
     it has, by design, and "missing" never meant "deleted". */
  assert.match(page,/exportDefectLogPayload\(fleet,undefined,readMergedAway\(localStorage\)\)/,"the Defect Log export carries what this device folded away");
- assert.match(page,/exportDownSheetPayload\(downEntries,undefined,readRemovedEntries\(localStorage\)\)/,"the Down Sheet export carries what this device took off");
+ /* And the swap ledger with it. Curtis: "I will be scanning from multiple
+    devices, period" — a ledger that stayed device-local would leave each phone
+    holding half the shop's tempo while a forecast read it as all of it. */
+ assert.match(page,/exportDownSheetPayload\(downEntries,undefined,readRemovedEntries\(localStorage\),readSheetLedger\(localStorage\)\)/,
+  "the Down Sheet export carries what this device took off, and the swaps it recorded");
+ /* MERGED on arrival, never replaced. A swap is an event that happened once on
+    one device — two devices never perform the same one — so there is nothing to
+    reconcile and the union is the history, deduped by swap id. */
+ assert.match(page,/writeSheetLedger\(localStorage,mergeSheetLedgers\(readSheetLedger\(localStorage\),payload\.ledger\)\)/,
+  "an incoming ledger is merged into this device's own, not written over it");
 
  /* Dropped AFTER the merge, never before: the records that have to go are the
     ones the merge has just put back, and the receiver's own stale copy is the
@@ -14142,9 +14151,18 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
     mapped a clock time onto one, and no pullout time anywhere. Curtis: "it must
     be shift aware and pull out time aware." */
  assert.equal(SHIFT_SETTINGS_KEY,"pace-shift-settings-v1");
- /* His own times, and the only part of the defaults that is not a guess:
-    "Pull out for a.m. is 6:00 am and for evening is 13:00 hours." */
+ /* THE SHOP'S REAL HOURS, given by Curtis: "first shift is 6 am to 14:30,
+    second is 14:00 to 10:30 and night shift is 10:00 til 6:30", plus "Pull out
+    for a.m. is 6:00 am and for evening is 13:00 hours." He wrote the shifts in
+    mixed notation — the evening 10:30 and 10:00 are 22:30 and 22:00 — and
+    confirmed the reading before they were written down. */
  assert.deepEqual(DEFAULT_SHIFT_SETTINGS.pullouts.map(p=>p.at),["06:00","13:00"]);
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.shifts.map(s=>[s.key,s.start,s.end]),
+  [["1st","06:00","14:30"],["2nd","14:00","22:30"],["3rd","22:00","06:30"]]);
+ /* Every shift is 8.5 hours and they OVERLAP by 30 minutes at each handover.
+    That is a relief window, not a typo. */
+ const span=s=>{const a=clockMinutes(s.start),b=clockMinutes(s.end);return a<b?b-a:1440-a+b};
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.shifts.map(span),[510,510,510]);
 
  assert.equal(clockMinutes("06:00"),360);
  assert.equal(clockMinutes("13:45"),825);
@@ -14171,9 +14189,19 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
  assert.equal(shiftAt(at(15)),"2nd");
  assert.equal(shiftAt(at(23)),"3rd");
  assert.equal(shiftAt(at(2)),"3rd","the small hours belong to the shift that started last night");
- /* A boundary belongs to the shift it OPENS, not the one it closes — 14:00 is
-    2nd shift's first minute, and counting it twice would double a tally. */
- assert.equal(shiftAt(at(14)),"2nd");
+ /* THE HANDOVER GOES TO THE INCOMING SHIFT. Between 14:00 and 14:30 both 1st
+    and 2nd genuinely match, and returning the first window in the list would
+    have credited every one of those half-hours to the OUTGOING crew purely
+    because of array order — 30 minutes of arrivals on the wrong tally, three
+    times a day. Curtis chose the incoming shift: the relief has started and
+    they are the crew who will work whatever comes in. */
+ assert.equal(shiftAt(at(14)),"2nd","the handover opens the incoming shift immediately");
+ assert.equal(shiftAt(at(14,15)),"2nd","and holds it through the overlap");
+ assert.equal(shiftAt(at(14,29)),"2nd");
+ assert.equal(shiftAt(at(13,59)),"1st","right up to the handover it is still the outgoing shift");
+ assert.equal(shiftAt(at(22,15)),"3rd","the same at the evening handover");
+ assert.equal(shiftAt(at(6,15)),"1st","and at the morning one, where the incoming shift is the next day's");
+ assert.equal(shiftAt(at(5,59)),"3rd");
  assert.equal(shiftAt("not a date"),null);
  assert.equal(shiftLabel("1st"),"1ST SHIFT");
  assert.equal(shiftLabel(null),"OFF SHIFT");
@@ -14188,15 +14216,19 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
  assert.deepEqual(nextPullout(at(9)),{key:"pm",label:"EVENING PULLOUT",at:"13:00",minutesAway:240});
  assert.equal(nextPullout(at(14)).key,"am","after the last pullout of the day the next is tomorrow morning's");
 
- assert.equal(shiftRemainingMinutes(at(13)),60,"1st shift ends at 14:00");
- assert.equal(shiftRemainingMinutes(at(23)),420,"and the night shift's remainder counts past midnight");
+ assert.equal(shiftRemainingMinutes(at(13)),90,"1st shift ends at 14:30");
+ assert.equal(shiftRemainingMinutes(at(23)),450,"and the night shift's remainder counts past midnight");
 
  /* Every forecast window resolves through here, in hours, because a rate per
     hour is what multiplies by one. */
- assert.equal(windowHours(at(13),"shift"),1);
- assert.equal(windowHours(at(13),"two-shifts"),9,"the rest of this shift plus the whole of the next");
+ assert.equal(windowHours(at(13),"shift"),1.5);
+/* Measured straight through to the END of the next shift rather than summed.
+    With half-hour overlaps, "what is left of this one plus the length of that
+    one" double-counts every handover — at 13:00 it would say 10h where the
+    clock from 13:00 to 22:30 says 9.5. */
+ assert.equal(windowHours(at(13),"two-shifts"),9.5,"13:00 to the end of 2nd shift at 22:30");
  assert.equal(windowHours(at(4),"pullout"),2);
- assert.equal(windowHours(at(23),"two-shifts"),15,"7 hours of the night shift left, plus 8 of the morning");
+ assert.equal(windowHours(at(23),"two-shifts"),15.5,"23:00 to the end of 1st shift at 14:30");
 
  /* EDITABLE WITHOUT A RELEASE, which is the half Curtis asked for twice. Shift
     hours are a property of this garage's contract, not of the software. */
@@ -14253,4 +14285,208 @@ test("the garage's hours are editable on the device, and nothing re-implements t
     real time is held in state and simply not saved. */
  assert.match(code,/if\(clockMinutes\(value\)!==null\)save\(next\)/,
   "a half-typed time is not committed");
+});
+
+test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
+ const {SHEET_LEDGER_KEY,SHEET_LEDGER_LIMIT,appendSnapshot,ledgerTempo,normalizeSheetLedger,
+  recordSheetSwap,snapshotFromEntries}=await import("../app/sheet-ledger.ts");
+
+ /* THE PROBLEM THIS EXISTS FOR: a scanned sheet REPLACES the live one and
+    nothing retained the sheet before that, so sheet-to-sheet tempo had never
+    once been recorded — on a shop that swaps eight or more sheets a fortnight.
+    Curtis: "When downsheets are swapped out, there is a tempo to what gets
+    repaired." */
+ assert.equal(SHEET_LEDGER_KEY,"pace-sheet-ledger-v1");
+ assert.equal(SHEET_LEDGER_LIMIT,40);
+
+ const entry=(busId,category,over={})=>({id:"e"+busId,busId,category,workflow:"Scheduled",...over});
+ const day=(d,h=8)=>`2026-09-${String(d).padStart(2,"0")}T${String(h).padStart(2,"0")}:00:00.000Z`;
+
+ /* Only bus and category are kept. The wording, the mechanic, the estimate and
+    the history are on the live record and none of them is a tempo question. */
+ const first=snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b2","Brakes")],[],day(1));
+ assert.deepEqual(first.rows,[{b:"b1",c:"A/C and HVAC"},{b:"b2",c:"Brakes"}]);
+
+ /* A CLOSED ROW IS NOT ON THE SHEET. Counting one would report work as stuck
+    that somebody had finished. */
+ assert.deepEqual(snapshotFromEntries([entry("b1","Brakes"),entry("b9","Engine",{workflow:"Completed"})],[],day(1)).rows,
+  [{b:"b1",c:"Brakes"}]);
+ /* ONE ROW PER BUS. A merge or a half-finished edit can leave two entries on
+    one bus, and counting it twice overstates every tempo number it appears in. */
+ assert.deepEqual(snapshotFromEntries([entry("b1","Brakes"),entry("b1","Engine")],[],day(1)).rows,
+  [{b:"b1",c:"Brakes"}]);
+
+ /* The shift is resolved ONCE and stored rather than recomputed later from
+    `at`: if somebody edits the shift hours in six weeks, the tempo of a swap
+    that already happened must not move to a different crew. */
+ assert.equal(snapshotFromEntries([],[],"2026-09-14T18:00:00").shift,"2nd");
+
+ const ledger=[
+  snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b2","Brakes"),entry("b3","Engine")],[],day(1)),
+  /* b2 cleared, b4 added, b1 and b3 stuck. */
+  snapshotFromEntries([entry("b1","A/C and HVAC"),entry("b3","Engine"),entry("b4","Doors, Ramp and ADA")],["b2"],day(3)),
+ ].reduce((acc,snapshot)=>appendSnapshot(acc,snapshot),[]);
+
+ const tempo=ledgerTempo(ledger);
+ /* N snapshots yield N-1 tempos. The first is a photograph of a sheet, not a
+    measurement of a change — reporting it as "3 added" would put a spike at the
+    start of every fresh ledger. */
+ assert.equal(tempo.length,1);
+ assert.equal(tempo[0].added,1);
+ assert.equal(tempo[0].cleared,1);
+ assert.equal(tempo[0].stuck,2);
+ assert.equal(tempo[0].sinceHours,48);
+ assert.deepEqual(tempo[0].addedBy,{"Doors, Ramp and ADA":1});
+ assert.deepEqual(tempo[0].clearedBy,{Brakes:1});
+ /* The divergence Curtis described — "AC repairs and Check engine lights tend
+    to stay on the longest" — is a statement about these tallies, and cannot be
+    checked without them. */
+ assert.deepEqual(tempo[0].stuckBy,{"A/C and HVAC":1,Engine:1});
+
+ /* `off` can name a bus the previous snapshot never held: a backfilled gap, or
+    a row removed by hand between swaps. Counting it would credit the shift with
+    clearing work it never had. */
+ const phantom=appendSnapshot(ledger,snapshotFromEntries([entry("b1","A/C and HVAC")],["b3","b99"],day(5)));
+ const after=ledgerTempo(phantom);
+ assert.equal(after[1].cleared,1,"only the bus that was actually there counts as cleared");
+
+ /* A rescan of the same photograph would otherwise land twice and report zero
+    added and zero cleared — which reads as a quiet shift, not as a duplicate. */
+ const twice=appendSnapshot(ledger,ledger[1]);
+ assert.equal(twice.length,2,"the same swap does not land again");
+
+ /* Sorted OLDEST FIRST so a backfilled swap from two weeks ago lands in its own
+    place rather than at the end. Curtis has the photographs for eight sheets
+    the app never kept. */
+ const backfilled=appendSnapshot(ledger,snapshotFromEntries([entry("b7","Engine")],[],day(2,6)));
+ assert.deepEqual(backfilled.map(s=>s.at.slice(0,10)),["2026-09-01","2026-09-02","2026-09-03"]);
+
+ /* THE CAP DROPS THE OLDEST. Dropping the newest to make room gives a ledger
+    that never learns anything after its fortieth swap — the failure a naive
+    `if(length>=LIMIT)return` produces, and very hard to see from outside. */
+ let big=[];
+ for(let n=1;n<=45;n++)big=appendSnapshot(big,snapshotFromEntries([entry("b"+n,"Engine")],[],day(1,n%24)+"#"+n,undefined,"s"+n),5);
+ assert.equal(big.length,5);
+ assert.deepEqual(big.map(s=>s.id),["s41","s42","s43","s44","s45"],"the newest five survive");
+
+ assert.deepEqual(normalizeSheetLedger(null),[]);
+ assert.deepEqual(normalizeSheetLedger([{at:"nonsense",rows:[]},{rows:[]},{at:day(1)}]),[],
+  "a snapshot with no usable time or no rows is not a snapshot");
+
+ /* BEST EFFORT, and that is the whole contract: this runs from the middle of a
+    sheet import, and failing the import because a history file could not be
+    written would cost a foreman the sheet he just photographed. */
+ const store=(()=>{let value=null;return {getItem:()=>value,setItem:(_k,v)=>{value=v}}})();
+ const wrote=recordSheetSwap(store,[entry("b1","Brakes")],[],day(1));
+ assert.equal(wrote.ok,true);
+ assert.equal(JSON.parse(store.getItem()).length,1);
+ const full={getItem:()=>"[]",setItem:()=>{throw new Error("QuotaExceeded")}};
+ assert.equal(recordSheetSwap(full,[entry("b1","Brakes")],[],day(1)).ok,false,
+  "a full device reports the failure rather than throwing into the import");
+
+ /* TWO DEVICES, ONE HISTORY. Curtis: "I will be scanning from multiple devices,
+    period." Device-local, each phone would hold only the swaps IT performed —
+    two half-histories, and a forecast built on either would read half the
+    shop's tempo as all of it.
+
+    Merging is safe here in a way it is NOT for the fleet or the sheet: a swap
+    is an EVENT that happened once, on one device. Two devices never perform the
+    same swap — one scans the paper, the other receives the resulting sheet
+    through the cloud and performs none. So there is nothing to reconcile and
+    the union IS the history. Same shape as the road-call events. */
+ const {mergeSheetLedgers}=await import("../app/sheet-ledger.ts");
+ const mine=[snapshotFromEntries([entry("b1","Brakes")],[],day(1),undefined,"a1"),
+             snapshotFromEntries([entry("b2","Engine")],[],day(3),undefined,"a2")];
+ const theirs=[snapshotFromEntries([entry("b3","A/C and HVAC")],[],day(2),undefined,"b1"),
+               snapshotFromEntries([entry("b4","Doors, Ramp and ADA")],[],day(4),undefined,"b2")];
+ const both=mergeSheetLedgers(mine,theirs);
+ assert.deepEqual(both.map(s=>s.id),["a1","b1","a2","b2"],"interleaved by time, not appended");
+ /* Importing the same file twice must not double-count. */
+ assert.deepEqual(mergeSheetLedgers(both,theirs).map(s=>s.id),["a1","b1","a2","b2"]);
+ assert.deepEqual(mergeSheetLedgers(mine,null).map(s=>s.id),["a1","a2"],"a device that has never scanned takes nothing away");
+ /* A merged pair can exceed the cap, and the swaps worth keeping are recent. */
+ assert.deepEqual(mergeSheetLedgers(mine,theirs,2).map(s=>s.id),["a2","b2"]);
+
+ /* IDS ARE UNIQUE ACROSS DEVICES now that ledgers travel. Two phones scanning
+    different sheets in the same millisecond with the same row count would
+    otherwise mint the same id, and the merge would drop one as a duplicate. */
+ const twin=()=>snapshotFromEntries([entry("b1","Brakes")],[],day(1)).id;
+ assert.notEqual(twin(),twin(),"two swaps built from identical inputs still get different ids");
+
+ /* MASTER IMPORT MERGES THIS ONE KEY. Everything else in a whole-app restore is
+    STATE and is meant to be overwritten; the ledger is HISTORY, and restoring a
+    phone onto the iPad must not throw away the swaps the iPad recorded itself. */
+ const restore=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ const restoreCode=restore.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.match(restoreCode,/mergeSheetLedgers\(readSheetLedger\(storage\),backup\.sheetLedger\)/,
+  "the swap history is merged into what this device already holds");
+ assert.equal(/put\(SHEET_LEDGER_KEY/.test(restoreCode),false,
+  "and never goes through the plain replace every other key uses");
+ const backup=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ assert.match(backup,/sheetLedger:readSavedValue\(storage,SHEET_LEDGER_KEY\)/,"and a master export carries it");
+
+ /* THE FILE FORMAT ROUND-TRIP, which is the part that actually has to hold: a
+    field that survives in memory and is dropped by the envelope or the reader
+    would lose the history silently, on the one path built to move it between
+    devices. Written, serialised, and read back through the app's own reader. */
+ const {exportDownSheetPayload,readTransferPayload}=await import("../app/section-transfer.ts");
+ const written=exportDownSheetPayload([{id:"e1",busId:"b1"}],day(5),{},mine);
+ const reread=readTransferPayload(JSON.stringify(written),"down-sheet");
+ assert.equal(reread.ok,true,"a Down Sheet transfer carrying a ledger still reads as one");
+ assert.deepEqual((reread.payload.ledger||[]).map(row=>row.id),["a1","a2"],
+  "and the swaps come back through the envelope intact");
+ assert.deepEqual(mergeSheetLedgers(theirs,reread.payload.ledger).map(row=>row.id),
+  ["a1","b1","a2","b2"],"so the receiving device ends with both halves of the history");
+ /* Omitted rather than written as [] when there is nothing to say, so a file
+    from a device that has never scanned does not assert an empty history. */
+ assert.equal("ledger" in exportDownSheetPayload([],day(5),{},[]),false);
+ assert.equal("ledger" in exportDownSheetPayload([],day(5),{}),false);
+
+ /* WIRED AT THE CHOKEPOINT every sheet swap crosses, not on the scanner — a
+    route that forgot to call it would silently stop recording and the ledger
+    would look healthy while going stale. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
+  "the swap is recorded inside importScan, from the entries that won and the buses that came off");
+ /* AFTER the undo copy and deliberately NOT guarded like it. The undo copy
+    stops the import when it cannot be written, because replacing a sheet with
+    no way back is a one-way door. The ledger is the opposite trade. */
+ assert.ok(pageCode.indexOf("SCAN_UNDO_KEY")<pageCode.indexOf("recordSheetSwap("),
+  "the undo copy is secured before the ledger is touched");
+ assert.equal(/if\(!recordSheetSwap\(|recordSheetSwap\([^)]*\)\.ok\)\s*\{[^}]*return/.test(pageCode),false,
+  "and a ledger failure never stops the import");
+});
+
+test("the Fleet Status Report has a way out you can see",async()=>{
+ const [modal,css]=await Promise.all([
+  readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
+ ]);
+ const code=modal.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+
+ /* Curtis opened the report to send it and could not find the way out: "I don't
+    see the X button clearly to close the page."
+
+    MEASURED, the button was never missing — 40x40 and in view at 360, 390, 430
+    and 820, with the glyph itself around 8.8:1 against the header. What was
+    missing was any sign that it WAS a button: border:0 over a 12% white fill on
+    a navy gradient measures 1.42:1 against the header behind it, so what a
+    person saw was a bare × floating beside a large white title.
+
+    The border is what fixes it, not the fill. At 45% white the edge measures
+    3.72:1 against the header — past the 3:1 a control boundary needs — where
+    the fill alone is still only 1.55:1. */
+ assert.match(code,/<button type="button" className="status-report-close" onClick=\{close\}>CLOSE<\/button>/,
+  "a word rather than a glyph: this is a read-and-dismiss surface, so the label costs nothing");
+ assert.equal(/&times;/.test(code),false,"the bare × is gone");
+
+ const rules=css.match(/(?:^|[\s,}])\.status-report-head>button(?=[\s,{])[^{}]*\{[^}]*\}/g)||[];
+ assert.ok(rules.length,"the close button still has a rule");
+ const base=rules[0];
+ assert.equal(/border:0/.test(base),false,"it no longer has border:0, which is what made it invisible");
+ assert.match(base,/border:1px solid #ffffff73/,"the edge is what draws the box against the header");
+ /* 44px on a phone, because this is the control somebody reaches for with a
+    thumb while holding the report open in one hand. */
+ assert.ok(rules.some(rule=>/min-height:44px/.test(rule)),"and it is a 44px target on a phone");
 });

@@ -163,6 +163,7 @@ per-device settings, never synced
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-shift-settings-v1           when each shift runs, and the pullout times
+  pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
@@ -213,14 +214,99 @@ that missing half and is the only place that knows: every window the Fleet
 Forecast quotes — "next shift", "the next two", "before the 06:00 pullout" —
 resolves through it, so hours change once.
 
-The **pullout times are Curtis's own** — a.m. 06:00 and evening 13:00. The
-**shift boundaries are a guess** (06-14, 14-22, 22-06) and are marked as one in
-the module, so nobody later reads them as something he said; they are editable
-precisely so the guess costs nothing.
+The times are the shop's own: **1st 06:00-14:30, 2nd 14:00-22:30, 3rd
+22:00-06:30**, pullouts at **06:00 and 13:00**. Curtis gave the shifts in mixed
+notation — "second is 14:00 to 10:30 and night shift is 10:00 til 6:30", where
+the evening 10:30 and 10:00 are 22:30 and 22:00 — and confirmed the reading
+before they were written down.
+
+**Every shift is 8.5 hours and they OVERLAP by 30 minutes** at each handover:
+14:00-14:30, 22:00-22:30 and 06:00-06:30 each belong to two shifts. That is a
+relief window, and it is why `shiftAt` cannot take the first window that
+matches. **The INCOMING shift wins a handover** — of the windows that match, the
+one that started most recently. Curtis chose that: the relief has started and
+they are the crew who will work whatever arrives. Taking the first match instead
+would have credited every one of those half-hours to the outgoing crew purely
+because of array order, three times a day.
+
+For the same reason a two-shift window is measured straight through to the END
+of the next shift rather than summed as "what is left of this one plus the
+length of that one" — with overlaps the sum double-counts every handover.
 
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running
 different hours.
+
+**`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
+scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps
+exactly one snapshot so the last import can be taken back, and nothing retained
+the sheet before that. Sheet-to-sheet tempo — what got added, what cleared, what
+stuck, and how fast — had never once been recorded, on a shop that swaps eight
+or more sheets a fortnight. Curtis: *"When downsheets are swapped out, there is
+a tempo to what gets repaired. The type of repairs that are getting done per
+downsheet update."* That tempo is the whole input to the Fleet Forecast.
+
+One snapshot per swap, holding **only the bus id and the catalog category** per
+row, plus which buses came off and which shift the swap happened in. The
+wording, the mechanic, the estimate and the history are all on the live record
+and none of them is a tempo question. Rolling cap of **40 swaps**, dropping the
+OLDEST — dropping the newest gives a ledger that never learns anything after its
+fortieth swap, which is what a naive `if(length>=LIMIT)return` produces and is
+very hard to see from outside.
+
+Sorted **oldest first**, because tempo is read as consecutive pairs and a
+backfilled swap from two weeks ago has to land in its own place. Curtis kept the
+photographs of the eight sheets the app never did, so a backfill can seed it.
+
+**The write is BEST EFFORT and that is the whole contract.** It runs from the
+middle of a sheet import. Losing one swap's tempo is a rounding error in a
+forecast; failing an import because a history file could not be written would
+cost a foreman the sheet he just photographed — unlike the undo copy beside it,
+which genuinely must stop the import.
+
+The shift is resolved once and **stored**, not recomputed later from the stamp:
+if somebody edits the shift hours in six weeks, the tempo of a swap that already
+happened must not move to a different crew. What shift it WAS is a fact about
+that morning.
+
+**IT TRAVELS, and that reversed an earlier decision.** It was built device-local
+on the assumption that one device did the scanning. Curtis: *"I will be
+scanning from multiple devices, period."* Left local, each phone would hold only
+the swaps IT performed — two half-histories, and a forecast built on either
+would read half the shop's tempo as all of it.
+
+Merging is safe here in a way it is NOT for the fleet or the sheet, and the
+reason is the whole justification: **a swap is an EVENT that happened once, on
+one device.** Two devices never perform the same swap — one scans the paper, the
+other receives the resulting sheet through the cloud and performs none. So there
+is nothing to reconcile and the union IS the history. Same shape as the
+road-call events, for the same reason: where two records describe the same
+thing this app compares timestamps and picks a winner; where they are separate
+events it keeps both.
+
+Deduped by swap id, so a file imported twice does not double-count, and swap ids
+carry a random tail precisely so two devices scanning in the same millisecond
+with the same row count cannot mint the same one.
+
+Two carriers today, both already in the app: the **Down Sheet section transfer**
+(the sheet is what a swap IS), and **MASTER EXPORT**. The ledger is **the one key
+a whole-app import MERGES instead of replacing** — everything else in a restore
+is STATE and is meant to be overwritten, while this is history, and restoring a
+phone onto the iPad must not throw away the swaps the iPad recorded itself.
+
+**Automatic cloud sync would need a schema migration** — `shop_memory` is
+constrained to `kind in ('part','finding')` — which is a write to the live
+database and therefore Curtis's call. Not done.
+
+**WHY A SWAP AND NOT A REPAIR.** Curtis, on the granularity: *"the reason that
+we're not doing it per repair is because we don't have enough users. So
+literally, I cannot voucher or validate when a bus gets repaired until actually
+I see sheets updated across shifts, because no other mechanic really has this
+app except for one."* A completion nobody records is not evidence, and a sheet
+that comes back without a bus on it is. When more mechanics carry the app, a
+repair marked done by the mechanic who did it becomes the finer signal and the
+sheet updates from it — at which point this ledger becomes the coarse check on
+that, not the only input.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen

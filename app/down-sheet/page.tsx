@@ -22,6 +22,8 @@ import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type Repair
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "./down-sheet-repair-items";
 import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
+import {recordSheetSwap} from "../sheet-ledger";
+import {readShiftSettings} from "../shift-clock";
 import {downSheetMentionsDefect,downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
@@ -484,6 +486,24 @@ export default function DownSheet(){
      that travelled least: the buses it dropped stayed live in the cloud, came
      back on the next pull, and were counted again. */
   rememberRemovedEntries(localStorage,removed.map(entry=>entry.id),now);
+  /* THE SWAP ITSELF IS RECORDED, and this is the only place it can be.
+
+     A scanned sheet replaces the live one and the app kept nothing of the sheet
+     it replaced, so what got added, what cleared and what stuck between two
+     sheets had never been written down — the whole input to the Fleet Forecast,
+     thrown away on every scan.
+
+     It goes here rather than in the scanner because this is the chokepoint: a
+     route that forgot to call it would silently stop recording, and the ledger
+     would look healthy while going stale.
+
+     AFTER the undo copy and deliberately NOT guarded like it. If the undo copy
+     cannot be written the import is stopped, because replacing a sheet with no
+     way back is a one-way door. The ledger is the opposite trade: losing one
+     swap's tempo is a rounding error in a forecast, and refusing an import over
+     it would cost a foreman the sheet he just photographed. So its failure is
+     taken and ignored. */
+  recordSheetSwap(localStorage,nextEntries,removed.map(entry=>entry.busId),now,readShiftSettings(localStorage));
   writeDownSheetStorage(localStorage,nextEntries);
   setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");
   setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);

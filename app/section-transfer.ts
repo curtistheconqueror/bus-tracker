@@ -77,7 +77,13 @@ export type TransferBus={id?:string;n?:string;[key:string]:unknown};
    written by an older version still imports — its ledgers are simply absent and
    the drop is a no-op — and a file written by this version imports into an older
    app, which ignores keys it does not know. */
-export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[];deleted?:Record<string,string>;removedEntries?:Record<string,string>};
+/* `ledger` rides the Down Sheet transfer because the Down Sheet is what a swap
+   IS. Curtis scans from more than one device — "I will be scanning from
+   multiple devices, period" — and a ledger that stayed device-local would leave
+   each phone holding half the shop's tempo while a forecast read it as all of
+   it. Merged on arrival, never replaced: a swap is an event that happened once
+   on one device, so the union is the history. */
+export type TransferPayload={kind:string;version:number;exportedAt:string;buses?:TransferBus[];entries?:unknown[];deleted?:Record<string,string>;removedEntries?:Record<string,string>;ledger?:unknown[]};
 
 function busKey(bus:{n?:unknown;id?:unknown}){
  const number=String(bus?.n??"").trim();
@@ -127,9 +133,13 @@ export function exportDefectLogPayload(buses:TransferBus[],now?:string,deleted?:
 export function exportFleetMapPayload(buses:TransferBus[],now?:string){
  return envelope("fleet-map",{buses:buses.map(bus=>omit(bus,MAP_EXCLUDED))},now);
 }
-export function exportDownSheetPayload(entries:unknown[],now?:string,removedEntries?:Record<string,string>){
+export function exportDownSheetPayload(entries:unknown[],now?:string,removedEntries?:Record<string,string>,ledger?:unknown[]){
  const removals=removedEntries&&Object.keys(removedEntries).length?{removedEntries}:{};
- return envelope("down-sheet",{entries,...removals},now);
+ /* Omitted when empty rather than written as [], so a file from a device that
+    has never scanned says nothing about the ledger instead of appearing to
+    assert an empty one. Same rule the tombstones above follow. */
+ const history=ledger&&ledger.length?{ledger}:{};
+ return envelope("down-sheet",{entries,...removals,...history},now);
 }
 
 export type TransferRead={ok:true;kind:TransferKind;payload:TransferPayload}|{ok:false;error:string};
