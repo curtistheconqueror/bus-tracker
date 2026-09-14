@@ -115,7 +115,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
 
      startSweep does not reset a walk already under way, so answering yes here
      after starting on the map keeps the original clock. */
-  if(!readSweep(localStorage)&&confirm("Are you doing a full sweep of the facility for bus count?\n\nThe Facility Map will show you are mid-sweep, and ending it offers the Scoreboard."))
+  if(!readSweep(localStorage)&&confirm("Are you doing a full sweep of the facility for bus count?\n\nThe Facility Map will show you are mid-sweep, and ending it offers the Status Report."))
    startSweep(localStorage,"scan");
  };
 

@@ -63,6 +63,7 @@ import AppName from "../app-name";
 import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
 import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
+import ShiftSettingsPanel from "./shift-settings";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -433,6 +434,13 @@ export default function SettingsPage(){
          a new iPad had to know to open a section called "Board settings" and
          scroll, to find the one thing they came for. It is a whole-app control
          and it is now the first whole-app control anybody sees. */}
+     </SettingsDrawer>
+     {/* Whole-app, like the two around it: the shift clock is what the Down
+         Sheet, the Fleet Status Report and the forecast all read to know what
+         "this shift" and "next pullout" mean, so it does not belong to any one
+         page's settings. */}
+     <SettingsDrawer title="SHIFTS &amp; PULLOUT TIMES" note="When each shift runs and when buses pull out. Change them here whenever the contract does.">
+      <ShiftSettingsPanel/>
      </SettingsDrawer>
      <SettingsDrawer title="SHOP CLOUD" note="Connect this device so the map, Defect Log and Down Sheet reach the others.">
      {/* No aria-labelledby: the <h3 id="master-cloud-heading"> it named became the

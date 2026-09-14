@@ -292,3 +292,31 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .settings-drawer-chevron{width:34px;height:34px}
  .settings-drawer-body{padding:11px 9px 12px}
 }
+
+/* SHIFTS & PULLOUT TIMES.
+
+   The time inputs get an explicit font-size:16px like every other input on this
+   page: iOS Safari zooms the whole viewport when a field under 16px takes
+   focus, and a settings page that jumps as you tap into it reads as broken. */
+.shift-settings{display:grid;gap:10px}
+.shift-settings-note{margin:0;font-size:11px;line-height:1.45;color:var(--settings-muted,#5b6b85)}
+.shift-now{display:flex;flex-wrap:wrap;gap:14px;padding:10px 12px;border:1px solid var(--settings-border,#c4cedd);border-radius:8px;background:var(--settings-soft,#f3f6fa)}
+.shift-now>span{display:grid;gap:2px;min-width:92px}
+.shift-now small{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--settings-muted,#5b6b85)}
+.shift-now b{font-size:15px}
+.shift-rows{display:grid;gap:8px}
+.shift-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.shift-row>b{font-size:10px;letter-spacing:.5px}
+.shift-row>span{display:flex;align-items:center;gap:7px}
+.shift-row input{min-height:44px;border:1px solid var(--settings-border,#aebbd0);border-radius:6px;background:var(--settings-surface,#fff);color:inherit;padding:0 9px;font-size:16px;font-family:inherit}
+.shift-row i{font-style:normal;font-size:10px;color:var(--settings-muted,#5b6b85)}
+.shift-settings-problem{margin:0;padding:9px 11px;border:1px solid #d08b2e;border-left:4px solid #b3670c;border-radius:6px;background:#fff6e6;color:#6b3d00;font-size:11px;font-weight:700;line-height:1.45}
+.shift-settings-actions{display:grid;gap:5px}
+.shift-settings-actions button{justify-self:start;min-height:40px;border:1px solid var(--settings-border,#aebbd0);border-radius:6px;background:var(--settings-surface,#fff);color:inherit;padding:0 13px;font-size:9px;font-weight:900;cursor:pointer}
+.shift-settings-actions small{font-size:10px;color:var(--settings-muted,#5b6b85)}
+@media(max-width:620px){
+ .shift-row{align-items:stretch;flex-direction:column;gap:5px}
+ .shift-row>span{width:100%}
+ .shift-row input{flex:1;min-width:0}
+ .shift-settings-actions button{justify-self:stretch;width:100%;min-height:46px}
+}

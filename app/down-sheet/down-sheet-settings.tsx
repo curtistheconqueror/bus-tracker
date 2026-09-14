@@ -39,7 +39,7 @@ export default function DownSheetSettings({transfer,defaultInitials,setDefaultIn
     <SettingsDrawer title="LAYOUT" note="Band order, the extra count tiles, and QUICK NOTES.">
     {/* The eight tiles the shop reads are always on the board, in the order
         Curtis set. These six are real numbers that most days nobody needs, so
-        they are asked for rather than assumed — the scoreboard had grown into
+        they are asked for rather than assumed — the status report had grown into
         a wall you scroll past to reach the sheet. Per device, like every other
         view preference here. */}
     {/* Which band is read first is a shop preference, not a property of the

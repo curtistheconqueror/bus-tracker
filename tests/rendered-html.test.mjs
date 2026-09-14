@@ -1236,7 +1236,7 @@ test("renders the interactive down sheet with All as the default shift view", as
   assert.match(html, /BUS NUMBER/);
   assert.match(html, /REASON DOWN/);
   assert.match(html, /MECHANIC \/ VENDOR/);
-  /* SHEET STATS is gone. It was a second scoreboard behind its own bar saying
+  /* SHEET STATS is gone. It was a second status report behind its own bar saying
      most of what the tiles below already said, in a different shape; the ones
      worth keeping moved down into those tiles and the panel with them.
 
@@ -1263,11 +1263,11 @@ test("renders the interactive down sheet with All as the default shift view", as
      asserted absent above. */
   assert.match(html, /\+ ADD DOWN BUS/);
   /* ADD DOWN BUS still LEADS the row. SHOW COMPLETED and CLEAR DOWNSHEET went
-     behind ADVANCED ACTIONS to clear it and must not creep back; SCOREBOARD
+     behind ADVANCED ACTIONS to clear it and must not creep back; STATUS REPORT
      sits after the primary action rather than in front of it, because adding a
      bus is the job and sending the report is what you do once at the end. */
   assert.match(html, /class="down-controls"><button class="down-primary-action"/,"ADD DOWN BUS still leads its row");
-  assert.match(html, /<\/button><button class="down-scoreboard-action"[^>]*>SCOREBOARD<\/button>/,"the scoreboard sits beside it, not before it");
+  assert.match(html, /<\/button><button class="down-status-report-action"[^>]*>STATUS REPORT<\/button>/,"the status report sits beside it, not before it");
   assert.match(html, /class="down-view-controls"/,"with SEARCH directly under it");
   assert.match(html, /SETTINGS/);
   // QUICK NOTES is off by default now — a permanent panel between the counts
@@ -7092,7 +7092,7 @@ test("COMPLETED TODAY is a view you can press, and it means today",async()=>{
  // It counted the right thing and did nothing when pressed, so "what did we
  // actually finish today" could only be reached by turning on SHOW COMPLETED
  // and reading past the whole live sheet.
- assert.match(page,/className=\{"group-count group-completed completed-today-tile"/,"it moved into the scoreboard with the rest of SHEET STATS");
+ assert.match(page,/className=\{"group-count group-completed completed-today-tile"/,"it moved into the status report with the rest of SHEET STATS");
  assert.match(page,/aria-pressed=\{fixedToday\}/);
  // Pressing replaces the view rather than adding to it: completed, and today.
  // A repair finished last week is not what the tile counts and must not appear.
@@ -9100,7 +9100,7 @@ test("the collapsed bus card carries no category glyph; each expanded row keeps 
  assert.match(css,/@media\(max-width:390px\)\{\.log-card-group>\.log-group-header\{grid-template-columns:64px minmax\(0,1fr\)\}\}/);
 });
 
-test("the Defect Log opens on what it is for, not on a scoreboard", async () => {
+test("the Defect Log opens on what it is for, not on a status report", async () => {
  const [logPage,css]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
@@ -10465,7 +10465,7 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
  /* THE MAP SIDE. Ending the walk offers the report: finishing the walk and
     producing the answer are one act, and the report is what the walk was for. */
  assert.match(map,/endSweep\(localStorage\);\s*setSweep\(null\);/);
- assert.match(map,/setSweepScoreboard\(true\)/);
+ assert.match(map,/setSweepReportOpen\(true\)/);
  assert.match(map,/className=\{"sweep-command"/);
  assert.match(map,/\{sweep&&<div className="sweep-banner"/,"a mode has to stay on screen while somebody scrolls the facility");
 
@@ -10475,7 +10475,7 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
   "every board write restarts the idle clock");
 
  /* THE BUG THIS TEST EXISTS FOR. The Facility Map has never carried Down Sheet
-    ENTRIES - only activeDownIds, which is membership - and the Scoreboard needs
+    ENTRIES - only activeDownIds, which is membership - and the Status Report needs
     the entries to tell a downed bus from an inspection. Handed an empty array
     it reported DOWNED 0 with total confidence, which is worse than no report:
     a zero reads as good news. */
@@ -10492,10 +10492,10 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
  assert.match(scanner,/startSweep\(localStorage,"scan"\)/);
 });
 
-test("the SCOREBOARD sends either version, and both tell the same story",async()=>{
- const {buildScoreboard,scoreboardText}=await import("../app/fleet-scoreboard.ts");
- const {scoreboardPrintHtml}=await import("../app/fleet-scoreboard-print.ts");
- const modal=await readFile(new URL("../app/scoreboard-modal.tsx",import.meta.url),"utf8");
+test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
+ const {buildFleetStatusReport,statusReportCountsText,statusReportText}=await import("../app/fleet-status-report.ts");
+ const {statusReportPrintHtml}=await import("../app/fleet-status-report-print.ts");
+ const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
 
  const now="2026-09-13T18:00:00.000Z";
  const fleet=[
@@ -10509,38 +10509,53 @@ test("the SCOREBOARD sends either version, and both tell the same story",async()
   {id:"b3",n:"17504",l:"east-1",s:"unknown",defects:[{id:"y",category:"A/C and HVAC",issue:"No cooling",state:"open"}]},
  ];
  const entries=[{busId:"b1",section:"Pending",workflow:"Scheduled"},{busId:"b2",section:"Inspection",workflow:"Scheduled"}];
- const board=buildScoreboard(fleet,entries,now);
+ const board=buildFleetStatusReport(fleet,entries,now);
 
  /* THE TWO VERSIONS MUST NOT DISAGREE. They are built for different jobs - one
     to arrive as a message, one to be handed on - but a superintendent holding
     the PDF and a foreman reading the text have to see the same numbers. */
- const text=scoreboardText(board,{title:"PACE SOUTH"});
- const html=scoreboardPrintHtml(board,{title:"PACE SOUTH"});
+ const text=statusReportText(board,{title:"PACE SOUTH"});
+ const html=statusReportPrintHtml(board,{title:"PACE SOUTH"});
  assert.match(text,/DOWNED BUSES\s+1/);
  assert.match(html,/<dt>Downed buses<\/dt><dd>1<\/dd>/);
  assert.match(text,/INSPECTIONS\s+1/);
  assert.match(html,/<dt>Inspections<\/dt><dd>1<\/dd>/);
- assert.match(html,/Downed buses only/,"the PDF fences the pair the same way the text does");
- assert.match(html,/Not counted above/);
+ /* "Downed buses only" is gone from both, together. Curtis called it redundant
+    "on either version", and the two documents have to stay in step — a PDF
+    that still carried it while the message had dropped it is exactly the kind
+    of drift this whole test exists to catch. */
+ assert.doesNotMatch(html,/Downed buses only/i);
+ assert.doesNotMatch(text,/downed buses only/i);
+ assert.match(html,/Not counted above/,"the line that says something the heading does not stays on both");
  assert.match(html,/17504/,"and names the mystery bus");
+ /* The counts-only version, on both. Bus numbers for the two lists somebody
+    has to walk out to, and no locations or repairs anywhere. */
+ const counts=statusReportCountsText(board,{title:"PACE SOUTH"});
+ const countsHtml=statusReportPrintHtml(board,{counts:true,title:"PACE SOUTH"});
+ assert.match(counts,/DOWNED BUSES\s+1/);
+ assert.match(counts,/ROADCALLS PENDING\s+\d/);
+ assert.match(counts,/17504/,"a mystery bus is an errand, so it keeps its number");
+ assert.equal(counts.includes("Main Garage")||counts.includes("CNG"),false,"and carries no location");
+ assert.match(countsHtml,/class="numbers"/,"the PDF prints the same two lists as bare numbers");
+ assert.doesNotMatch(countsHtml,/ol class="defects"/,"and never repairs, whatever the defects switch said");
 
  /* Everything on the page is a value from the board, including free text
     somebody typed into a repair. Written into markup, so it is escaped - an
     unescaped "<" silently eats the rest of a line, which is a report a foreman
     would have to notice rather than an error anybody sees. */
- const nasty=buildScoreboard([{id:"n",n:"17<b>99",l:"east-2",s:"unknown",
+ const nasty=buildFleetStatusReport([{id:"n",n:"17<b>99",l:"east-2",s:"unknown",
   defects:[{id:"d",category:"Engine",issue:'Leak "big" & <fast>',state:"open"}]}],[],now);
- const escaped=scoreboardPrintHtml(nasty,{includeDefects:true});
+ const escaped=statusReportPrintHtml(nasty,{includeDefects:true});
  assert.equal(/<b>99/.test(escaped),false,"a fleet number carrying markup is escaped");
  assert.match(escaped,/17&lt;b&gt;99/);
  assert.match(escaped,/&quot;big&quot; &amp; &lt;fast&gt;/);
 
  /* Defects are opt-in in BOTH versions, and the checkbox drives both. */
- assert.equal(/No cooling/.test(scoreboardPrintHtml(board,{})),false);
- assert.match(scoreboardPrintHtml(board,{includeDefects:true}),/No cooling/);
- assert.equal(/Air leak/.test(scoreboardPrintHtml(board,{includeDefects:true})),false,
+ assert.equal(/No cooling/.test(statusReportPrintHtml(board,{})),false);
+ assert.match(statusReportPrintHtml(board,{includeDefects:true}),/No cooling/);
+ assert.equal(/Air leak/.test(statusReportPrintHtml(board,{includeDefects:true})),false,
   "a DOWNED bus contributes to the count and is never named or itemised");
- assert.equal(/Air leak/.test(scoreboardText(board,{includeDefects:true})),false,"and the text version agrees");
+ assert.equal(/Air leak/.test(statusReportText(board,{includeDefects:true})),false,"and the text version agrees");
 
  /* NO PDF LIBRARY. This is an offline-first app with no build step for new
     dependencies, and the browser already knows how to make a PDF from a
@@ -10567,7 +10582,7 @@ test("the SCOREBOARD sends either version, and both tell the same story",async()
  assert.match(modalCode,/AbortError/);
 
  /* Nothing leaves before it has been read. */
- assert.match(modalCode,/<pre className="scoreboard-preview"/);
+ assert.match(modalCode,/<pre className="status-report-preview"/);
  assert.match(modalCode,/SEND AS A MESSAGE/);
  assert.match(modalCode,/SEND AS A PDF/);
 
@@ -10578,7 +10593,7 @@ test("the SCOREBOARD sends either version, and both tell the same story",async()
 
  /* It computes and never writes. There is no save path for it to go around. */
  for(const banned of ["setItem","writeFleetStorage","writeDownSheetStorage"])
-  assert.equal(modalCode.includes(banned),false,"the scoreboard must not write: "+banned);
+  assert.equal(modalCode.includes(banned),false,"the status report must not write: "+banned);
 });
 
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
@@ -10872,9 +10887,24 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
  const first=reconcileRoadCallsFromSheet(fleet,entries,now);
  assert.deepEqual(first.started,["b1"],"only the bus the sheet calls a road call");
  const b1=first.fleet.find(bus=>bus.id==="b1");
- assert.equal(b1.roadcall,true,"the flag the map draws from is finally set");
- assert.equal(b1.roadCalls.length,1);
+ assert.equal(b1.roadCalls.length,1,"the breakdown is logged from the paper sheet, which is the whole point");
  assert.ok(b1.roadCalls[0].id.startsWith(SHEET_ROAD_CALL_PREFIX),"and where it came from stays legible");
+ /* AND THE FLAG DOES NOT GO ON, which is the opposite of what this asserted
+    when it was written, and deliberate.
+
+    Curtis set the rule from the floor: "any bus that is added to the downsheet
+    while it is in roadcall status should not be counted here. Once its placed
+    on downsheet the roadcall status is canceled (although still logged per our
+    design already)... Anyone taking counts and see a bus that is on property
+    that just came in from roadcall, marks it down on sheet it is no longer in
+    the roadcall count."
+
+    The EVENT and the STATUS were being conflated. The event is the breakdown
+    and is permanent; the flag says the bus is out on one RIGHT NOW, and a bus
+    somebody is standing next to writing up is back. So the sheet still logs
+    what the paper says — which is why this reconciler exists at all — and the
+    pending status it used to raise is exactly what a sheet row now cancels. */
+ assert.equal(b1.roadcall,false,"on the sheet is not pending: the status is cancelled, the history is not");
 
  /* Dated from the ENTRY, not from now: "in the last 36 hours" has to mean 36
     hours since the breakdown, not since somebody scanned the sheet. */
@@ -10904,7 +10934,7 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
  assert.deepEqual(completed.ended,["b1"]);
  const fixed=completed.fleet.find(bus=>bus.id==="b1");
  assert.equal(fixed.roadcall,false,"marking the row fixed takes the bus out of road-call status");
- assert.equal(standingRoadCalls(fixed,now,36).length,0,"so it drops off the Scoreboard at once");
+ assert.equal(standingRoadCalls(fixed,now,36).length,0,"so it drops off the Status Report at once");
 
  /* Moving the row OUT of Roadcall does the same - it is no longer a road call
     whatever else it now is. */
@@ -10915,6 +10945,21 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
     one-minute undo window; this may run days later, and a stale `from` would
     move a vehicle somebody has since parked by hand. */
  assert.equal(fixed.l,"garage-1");
+
+ /* A MAP-TICKED CALL IS CANCELLED BY THE SHEET TOO, and its event survives.
+    Curtis said ANY bus added to the sheet, not only one filed under Roadcall —
+    a bus that came in off a road call and was written up for brakes is still
+    written up. The flag comes off; nothing else about the bus is touched. */
+ const ticked=[{id:"b5",n:"17505",l:"road-4",roadcall:true,roadCalls:[{id:"road-call-map-b5",at:hoursAgo(2)}]}];
+ const writtenUp=reconcileRoadCallsFromSheet(ticked,[{id:"e5",busId:"b5",section:"Pending",workflow:"Scheduled"}],now).fleet[0];
+ assert.equal(writtenUp.roadcall,false,"written up on the sheet, whatever the section, is no longer pending");
+ assert.equal(writtenUp.roadCalls.length,1,"and the map's own event is never withdrawn by the sheet");
+ assert.equal(standingRoadCalls(writtenUp,now,36).length,0,"so it leaves the report");
+ /* Taking the row back off does NOT re-raise it. Re-raising would be the app
+    deciding a bus is out on the road because somebody deleted a row, and every
+    reader that goes by events rather than status still has the breakdown. */
+ assert.equal(reconcileRoadCallsFromSheet([writtenUp],[],now).fleet[0].roadcall,false,
+  "and deleting the row does not put the bus back out on the road");
 
  /* A bus out on BOTH a map-ticked call and a sheet-ticked one keeps the flag
     when only the sheet's half closes: it is still out on the other. */
@@ -10949,9 +10994,9 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
   "reconciled beside DS membership, at the one chokepoint every sheet write crosses");
 });
 
-test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
- const {buildScoreboard,scoreboardText,mysteryLabel,INSPECTION_SECTION,SCOREBOARD_ROAD_CALL_HOURS}=
-  await import("../app/fleet-scoreboard.ts");
+test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()=>{
+ const {buildFleetStatusReport,statusReportCountsText,statusReportText,mysteryLabel,INSPECTION_SECTION,STATUS_REPORT_ROAD_CALL_HOURS}=
+  await import("../app/fleet-status-report.ts");
 
  const now="2026-09-13T18:00:00.000Z";
  const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
@@ -10987,7 +11032,7 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
   /* Completed: off the sheet as far as every count goes. */
   {busId:"b5",section:"Pending",workflow:"Completed"},
  ];
- const board=buildScoreboard(fleet,entries,now);
+ const board=buildFleetStatusReport(fleet,entries,now);
 
  /* THE HEADLINE. b1 (twice), b2 and b7 are down; b3 is in for an inspection and
     is not. Curtis: "the downed number normally does not count inspections." */
@@ -10997,15 +11042,18 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
 
  /* A bus in for an inspection AND for brakes is DOWN - the brakes are what is
     holding it, and the inspection must not subtract it. */
- const alsoDown=buildScoreboard(fleet,[...entries,{busId:"b3",section:"Pending",workflow:"Scheduled"}],now);
+ const alsoDown=buildFleetStatusReport(fleet,[...entries,{busId:"b3",section:"Pending",workflow:"Scheduled"}],now);
  assert.equal(alsoDown.downed,4,"an inspection alongside a real repair does not excuse the bus");
  assert.equal(alsoDown.inspections,0,"and it stops counting as an inspection-only bus");
 
  /* MYSTERY: on property, in a work area, nothing active on the sheet. b5's only
     entry is Completed, so it is a mystery too. */
  assert.deepEqual(board.mystery.map(bus=>bus.n),["17504","17505"],"sorted by fleet number, as somebody reads them");
- assert.equal(board.mystery[0].note,"1 open repair");
- assert.equal(board.mystery[1].note,"nothing logged","the most interesting row says so plainly");
+ /* NO OPEN-REPAIR COUNT against them any more. Curtis: "as far as the open
+    repair count don't include that." It answered a question nobody asks of
+    this list — a mystery bus is one the sheet does not explain, and what is
+    already logged against it is a different report. */
+ assert.deepEqual(board.mystery.map(bus=>bus.note),["",""],"the row carries the bus and where it is, and nothing else");
 
  /* Curtis's wording, and the reason for it: a mystery bus is an admission that
     nobody has decided anything about it yet. */
@@ -11013,20 +11061,47 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
  assert.equal(mysteryLabel(0),"0","at zero the caveat goes - a zero needs no hedge");
 
  /* ROAD CALLS: the window is 48 hours and nothing older leaks in. */
- assert.equal(SCOREBOARD_ROAD_CALL_HOURS,36,"Curtis moved the window from 48 to 36");
- assert.deepEqual(board.roadCalls.map(bus=>bus.n),["17506","17507"],
-  "the four-day-old call is outside the window, and the one taken back off that status is excluded though it is only two hours old");
- assert.deepEqual(board.roadCallsOffSheet.map(bus=>bus.n),["17506"],"and only the one nobody has written up needs chasing");
+ assert.equal(STATUS_REPORT_ROAD_CALL_HOURS,36,"Curtis moved the window from 48 to 36, and confirmed it again");
+ /* ONE LIST NOW, not two. It used to report every call in the window and then
+    star the ones off the sheet; Curtis collapsed that by changing the rule
+    rather than the report — "any bus that is added to the downsheet while it
+    is in roadcall status should not be counted here." 17507 is inside the
+    window and still in that status, and it is on the sheet, so it is not
+    pending: somebody has it. */
+ assert.deepEqual(board.roadCallsPending.map(bus=>bus.n),["17506"],
+  "the four-day-old call is outside the window, the one taken off that status is excluded though it is two hours old, and the one already written up is somebody's job rather than a pending call");
+ assert.equal("roadCallsOffSheet" in board,false,"the second list went with the rule that needed it");
 
  /* THE LOCK-SCREEN TEXT. */
- const text=scoreboardText(board,{title:"PACE SOUTH"});
+ const text=statusReportText(board,{title:"PACE SOUTH"});
  /* The two numbers that are not like the others, fenced off rather than
     footnoted - a footnote is what a person skips when somebody is waiting. */
- assert.match(text,/={10,}\nDOWNED BUSES\s+3\n\s+\(downed buses only\)\nINSPECTIONS\s+1\n\s+\(not counted above\)\n={10,}/,
-  "downed and inspections sit inside a heavy band, two lines each, so the reader sees the other counts exclude them");
- assert.match(text,/MYSTERY BUSES\s+2\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat sits under the number, not beside it - together they wrap on a phone");
- assert.match(text,/ROAD CALLS \(36H\)\s+2/);
- assert.match(text,/\* NOT ON THE SHEET \u2014 1/,"marked once against the row, counted once underneath");
+ /* "(downed buses only)" is gone: it repeated the heading back at the reader.
+    Curtis: "get rid of the extra redundant (downed buses only) line under
+    downed buses. Not necessary on either version." The line under INSPECTIONS
+    stays — that one says what the heading does not. */
+ assert.match(text,/={10,}\nDOWNED BUSES\s+3\nINSPECTIONS\s+1\n\s+\(not counted above\)\n={10,}/,
+  "downed and inspections sit inside a heavy band, so the reader sees the other counts exclude them");
+ assert.doesNotMatch(text,/downed buses only/i);
+ /* A BLANK LINE between the number and the caveat. Curtis: "put a space in
+    between (like a tabbed space so its not so bunced up)". Stacked directly
+    the two read as one wrapped sentence. */
+ assert.match(text,/MYSTERY BUSES\s+2\n\n\s+PENDING CONFIRMATION OF STATUS/,"the caveat is a note about the number, set apart from it");
+ assert.match(text,/ROADCALLS PENDING\s+1\n\s+\(not on the down sheet\)/,
+  "named for what it is, with the qualifier said once under the heading");
+ assert.doesNotMatch(text,/NOT ON THE SHEET \u2014/,"the star and its footnote went with the second list");
+ /* THE TWO VERSIONS RUN IN THE SAME ORDER. Curtis: "also match the reports."
+    They had ROADCALLS and MYSTERY in opposite orders, and somebody comparing
+    the one they were sent against the one on their screen should not have to
+    notice that two blocks swapped places. Pending leads in both: a breakdown
+    nobody has written up is a known problem going unrecorded, where a mystery
+    bus is still a question. */
+ const order=body=>[body.indexOf("ROADCALLS PENDING"),body.indexOf("MYSTERY BUSES")];
+ const [fullRoad,fullMystery]=order(text);
+ assert.ok(fullRoad>=0&&fullMystery>=0,"both blocks are in the message version");
+ assert.ok(fullRoad<fullMystery,"roadcalls pending leads the message version");
+ const [shortRoad,shortMystery]=order(statusReportCountsText(board,{title:"PACE SOUTH"}));
+ assert.ok(shortRoad<shortMystery,"and leads the counts-only version the same way");
 
  /* Numbers for MYSTERY and ROAD CALLS only. Curtis: "not the entire downed bus
     list" - thirty fleet numbers would bury the ones that need chasing. */
@@ -11036,21 +11111,21 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
 
  /* Defects are OFF by default and only arrive when asked for. */
  assert.equal(text.includes("Brakes"),false,"the short version is the one that gets read");
- const full=scoreboardText(board,{includeDefects:true});
+ const full=statusReportText(board,{includeDefects:true});
  assert.match(full,/A\/C and HVAC/,"and the checkbox brings the repairs in");
 
  /* Every line has to survive a phone. */
- const {SCOREBOARD_WIDTH}=await import("../app/fleet-scoreboard.ts");
- for(const line of scoreboardText(board,{includeDefects:true,title:"PACE SOUTH"}).split("\n"))
-  assert.ok(line.length<=SCOREBOARD_WIDTH,"line too wide for a lock screen ("+line.length+"): "+line);
+ const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+ for(const line of statusReportText(board,{includeDefects:true,title:"PACE SOUTH"}).split("\n"))
+  assert.ok(line.length<=STATUS_REPORT_WIDTH,"line too wide for a lock screen ("+line.length+"): "+line);
 
  /* A long location gives up room before the note does, and a fleet number is
     never cut - a truncated bus number is a wrong bus number. */
- const wordy=buildScoreboard([{id:"w",n:"17588",l:"east-1",s:"unknown",
+ const wordy=buildFleetStatusReport([{id:"w",n:"17588",l:"east-1",s:"unknown",
   defects:[{id:"d",category:"Transmission and Drivetrain",issue:"Will not shift out of second",state:"open"}]}],[],now);
- for(const line of scoreboardText(wordy,{includeDefects:true}).split("\n"))
-  assert.ok(line.length<=SCOREBOARD_WIDTH,"wordy record too wide ("+line.length+"): "+line);
- assert.match(scoreboardText(wordy),/17588/,"and the number itself survives intact");
+ for(const line of statusReportText(wordy,{includeDefects:true}).split("\n"))
+  assert.ok(line.length<=STATUS_REPORT_WIDTH,"wordy record too wide ("+line.length+"): "+line);
+ assert.match(statusReportText(wordy),/17588/,"and the number itself survives intact");
 
  /* A LONG LIST MUST NOT BECOME A WALL OF TEXT. Measured against the real board:
     22 mystery buses became 25 lines and 1,800 characters, which is no longer
@@ -11060,15 +11135,15 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
     because Curtis asked for the numbers and a bare "+14 more" would defeat the
     list. */
  {
-  const {SCOREBOARD_DETAIL_LIMIT,SCOREBOARD_WIDTH}=await import("../app/fleet-scoreboard.ts");
+  const {STATUS_REPORT_DETAIL_LIMIT,STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
   const many=Array.from({length:22},(unused,index)=>({id:"m"+index,n:String(17500+index),l:"east-1",s:"unknown",defects:[]}));
-  const crowded=scoreboardText(buildScoreboard(many,[],now));
-  assert.equal(crowded.split("\n").filter(line=>/^  \d{5}  /.test(line)).length,SCOREBOARD_DETAIL_LIMIT,
+  const crowded=statusReportText(buildFleetStatusReport(many,[],now));
+  assert.equal(crowded.split("\n").filter(line=>/^  \d{5}  /.test(line)).length,STATUS_REPORT_DETAIL_LIMIT,
    "only the first few get a line of their own");
   assert.match(crowded,/\+ 14 more:/);
   for(const bus of many)assert.ok(crowded.includes(bus.n),"every fleet number survives the packing: "+bus.n);
   for(const line of crowded.split("\n"))
-   assert.ok(line.length<=SCOREBOARD_WIDTH,"packed line too wide ("+line.length+"): "+line);
+   assert.ok(line.length<=STATUS_REPORT_WIDTH,"packed line too wide ("+line.length+"): "+line);
   /* The claim is about the SECTION, not the whole report - the headers and the
      fences are there either way. 22 buses have to cost well under 22 lines. */
   const body=crowded.split("\n");
@@ -11076,19 +11151,19 @@ test("the FLEET SCOREBOARD counts downed buses the way the shop does",async()=>{
   const end=body.findIndex((line,index)=>index>start&&/^-{5,}$/.test(line));
   const section=(end<0?body.length:end)-start;
   assert.ok(section<16,"22 mystery buses must cost well under one line each, got "+section);
-  assert.ok(section>=SCOREBOARD_DETAIL_LIMIT,"but the detailed ones are still there");
+  assert.ok(section>=STATUS_REPORT_DETAIL_LIMIT,"but the detailed ones are still there");
  }
 
  /* An empty shop reports zeroes rather than throwing. */
- const quiet=buildScoreboard([],[],now);
+ const quiet=buildFleetStatusReport([],[],now);
  assert.equal(quiet.downed,0);
- assert.match(scoreboardText(quiet),/DOWNED BUSES\s+0/);
+ assert.match(statusReportText(quiet),/DOWNED BUSES\s+0/);
 
  /* A record missing the fields defectLabel reads must not take the report down
     at the moment somebody is standing there waiting for it. */
- const thin=buildScoreboard([{id:"t",n:"17599",l:"east-2",s:"unknown",defects:[{id:"d"}]}],[],now);
+ const thin=buildFleetStatusReport([{id:"t",n:"17599",l:"east-2",s:"unknown",defects:[{id:"d"}]}],[],now);
  assert.equal(thin.mystery.length,1);
- assert.ok(scoreboardText(thin,{includeDefects:true}).length>0,"a thin defect record still renders");
+ assert.ok(statusReportText(thin,{includeDefects:true}).length>0,"a thin defect record still renders");
 });
 
 test("a MYSTERY BUS card opens, because it already looked like it would",async()=>{
@@ -11551,7 +11626,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
- assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the scoreboard is grouped from the whole sheet, in the reader's band order");
+ assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the status report is grouped from the whole sheet, in the reader's band order");
  /* ONLY THE TABLE FOLLOWS THE FILTERS, and there are two of them now — the
     road tallies and the quick filter share one pipeline. The shape is asserted
     rather than the exact old expression, because what has to hold is the
@@ -11586,7 +11661,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
 
  /* AND SO IS EVERY OTHER TILE. Pressing INSPECTIONS ON ROAD is a request to
     SEE those buses, not a claim that the sheet now holds seven of them.
-    Sharing one grouping made the tally rewrite the scoreboard above it - press
+    Sharing one grouping made the tally rewrite the status report above it - press
     it on a 57-bus sheet and TOTAL ON SHEET read 7 - so the foreman lost the
     numbers he had pressed it from. Reported off the live sheet. */
  assert.match(page,/<div className="group-count total"><strong>\{shown\.length\}<\/strong><span>TOTAL ON SHEET<\/span><\/div>/,"TOTAL ON SHEET counts the sheet, not the filtered view");
@@ -11611,7 +11686,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
   "the eight always-on tiles are in the order Curtis set, with the opt-in ones after them",
  );
  for(const filtered of [/<div className="group-count total"><strong>\{visible\.length\}/,/\{groups\.map\(group=><div className=\{"group-count group-"/])
-  assert.doesNotMatch(page,filtered,"no scoreboard tile may be recomputed from the road-filtered set");
+  assert.doesNotMatch(page,filtered,"no status report tile may be recomputed from the road-filtered set");
  /* What DOES follow the filter: the row count in view, the estimate, and the
     note that says so - each of those describes the view rather than the sheet. */
  assert.match(page,/<span className="view-results"><b>\{visible\.length\}<\/b> IN VIEW<\/span>/);
@@ -11755,12 +11830,12 @@ test("SHEET STATS folds into the tiles the foreman actually reads, without losin
   for(const dead of [/className=\{"sheet-stats"/,/className="sheet-stats-toggle"/,/className="down-summary"/,/STATS_OPEN_KEY/,/statsOpen/])
    assert.doesNotMatch(page,dead,"SHEET STATS left something behind");
 
-  /* Its numbers came down into the scoreboard. All of them except ACTIVE DOWN,
+  /* Its numbers came down into the status report. All of them except ACTIVE DOWN,
      which counted the whole active sheet while TOTAL ON SHEET counts the
      current view - the same number on ALL with no search, which is why it read
      as a duplicate. SHEET CAPACITY still carries the whole-sheet count. */
   for(const tile of ["group-pending","group-accident","group-waiting","group-completed","group-labor","group-capacity"])
-   assert.match(page,new RegExp('className=(\\{)?"?group-count '+tile),tile+" must be in the scoreboard");
+   assert.match(page,new RegExp('className=(\\{)?"?group-count '+tile),tile+" must be in the status report");
   assert.match(page,/<div className="group-count group-capacity"><strong>\{active\.length\}<small> \/ \{MAX_ENTRIES\}/,"capacity keeps the whole-sheet count ACTIVE DOWN used to carry");
 
   /* EST. CURRENT VIEW renders only when it has something of its own to say.
@@ -13985,4 +14060,197 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
  assert.match(html,/PACE SOUTH · DOWN SHEET/);
  assert.match(html,/Snapshot taken when this was shared/);
  assert.equal(downSheetShareFilename("waiting-parts",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
+});
+
+test("Fixed Repairs is themed all the way into the card, not just around it",async()=>{
+ const raw=await readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8");
+ /* Comments stripped first. Every rule below is explained in prose directly
+    above it in that file, and matching the prose instead of the rule is a
+    mistake this suite has made three times. */
+ const css=raw.replace(/\/\*[\s\S]*?\*\//g,"");
+
+ /* MEASURED, NOT READ. Chromium on all four themes, seeded with one completed
+    repair: Fixed Repairs had 14 elements under AA on Tactical, 12 on Dark, 12
+    on Midnight and 1 on Light. Zero on all four after these rules. The numbers
+    are here because the failures were invisible to every gate this repo has —
+    the suite was green the whole time. */
+
+ /* 1.13:1, and the worst of them: the fix text on a completed repair. The
+    panel carried a hard-coded #f3fbf6 chosen for the light theme, so a dark
+    theme drew its cream text on a near-white box. The repair-result panel must
+    be tinted from theme tokens and can never name a literal colour again. */
+ /* The LAST rule for the panel is the one that paints it. The base stylesheet
+    still carries #f3fbf6 and should: it is the light theme's own value, and a
+    var() fallback needs somewhere to fall back to. What matters is that a
+    themed rule comes after it and wins. */
+ const repairRules=css.match(/\.fixed-card-body \.repair-result\{[^}]*\}/g)||[];
+ assert.ok(repairRules.length>1,"a themed rule follows the light-theme default");
+ const repairResult=repairRules[repairRules.length-1];
+ assert.match(repairResult,/background:color-mix\([\s\S]*?--fixed-accent[\s\S]*?--fixed-surface/,
+  "its background is mixed from the theme rather than painted a fixed colour");
+ assert.doesNotMatch(repairResult,/background:\s*#[0-9a-f]{3,8}/i,
+  "and the winning rule names no literal colour");
+
+ /* THE HEAD MUST NOT TINT ITSELF WITH THE ACCENT IT THEN DRAWS ON. Mixing the
+    accent into the surface and writing the bus number, the category and the
+    timestamp in that same accent is self-defeating by construction; Tactical
+    had the least headroom and measured 3.92:1. It tints from the page now. */
+ /* Same shape: the last rule whose selector is exactly .fixed-card-head wins.
+    The base stylesheet's copy sits mid-line inside a long concatenated block,
+    so this cannot be anchored to a line start. */
+ const headRules=css.match(/(?:^|[\s,}])\.fixed-card-head\{[^}]*\}/g)||[];
+ assert.ok(headRules.length>1,"a themed head rule follows the light-theme default");
+ const head=headRules[headRules.length-1];
+ assert.match(head,/background:color-mix\([^)]*--fixed-page/,"the head tints from the page");
+ assert.doesNotMatch(head,/background:color-mix\([^)]*--fixed-accent/,
+  "and never from the accent it draws its own text in");
+
+ /* Surface behind HEADER text put #15180f on #393e30 — 1.63:1 on a tab you
+    press to know where you are. An active tab is a piece of the page surface,
+    so it reads as ink. */
+ /* LAST RULE WINS, every time. Three assertions in the first draft of this
+    test read the base stylesheet's light-theme copy and reported the themed
+    override missing — the test was measuring the wrong half of the cascade. */
+ const lastRule=selector=>{
+  /* The selector may sit in a comma list — the themed rule pairs the summary
+     tally with the card-head timestamp — so this matches it anywhere in the
+     selector list, not only immediately before the brace. The lookahead is
+     what keeps ".fixed-card-head" from also matching ".fixed-card-head>span". */
+  const found=css.match(new RegExp("(?:^|[\\s,}])"+selector.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(?=[\\s,{])[^{}]*\\{[^}]*\\}","g"))||[];
+  return found[found.length-1]||"";
+ };
+ const activeTab=lastRule(".fixed-header nav a.active");
+ assert.ok(activeTab,"the active tab still has a rule");
+ assert.match(activeTab,/color:var\(--fixed-ink/,"the active tab reads as ink on the surface it sits on");
+
+ /* The tallies and the completion stamp were a fixed dark green on a dark
+    surface, 1.86:1. --fixed-green is a light-theme constant and must not be
+    what a themed number is drawn in. */
+ for(const selector of [".fixed-summary strong",".fixed-card-head time"]){
+  const rule=lastRule(selector);
+  assert.ok(rule,selector+" still has a rule");
+  assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
+ }
+});
+
+test("the shift clock knows which shift it is and when the next pullout is",async()=>{
+ const {DEFAULT_SHIFT_SETTINGS,SHIFT_SETTINGS_KEY,clockMinutes,formatClock,minutesUntilClock,
+  nextPullout,normalizeShiftSettings,shiftAt,shiftLabel,shiftRemainingMinutes,untilLabel,
+  windowHours,withinWindow}=await import("../app/shift-clock.ts");
+
+ /* The app already had `Shift` as a LABEL on a sheet entry and nothing that
+    mapped a clock time onto one, and no pullout time anywhere. Curtis: "it must
+    be shift aware and pull out time aware." */
+ assert.equal(SHIFT_SETTINGS_KEY,"pace-shift-settings-v1");
+ /* His own times, and the only part of the defaults that is not a guess:
+    "Pull out for a.m. is 6:00 am and for evening is 13:00 hours." */
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.pullouts.map(p=>p.at),["06:00","13:00"]);
+
+ assert.equal(clockMinutes("06:00"),360);
+ assert.equal(clockMinutes("13:45"),825);
+ assert.equal(clockMinutes("23:59"),1439);
+ /* Null, never 0. A malformed setting reading as midnight would sit inside the
+    night shift and quietly move every window that depends on it. */
+ assert.equal(clockMinutes("24:00"),null);
+ assert.equal(clockMinutes("6pm"),null);
+ assert.equal(clockMinutes(""),null);
+ assert.equal(clockMinutes(undefined),null);
+ assert.equal(formatClock(360),"06:00");
+ assert.equal(formatClock(1440+90),"01:30","a window that runs past midnight wraps rather than overflowing");
+
+ /* THE NIGHT SHIFT RUNS PAST MIDNIGHT, so its start is numerically after its
+    end. The obvious `start<=m&&m<end` reports every hour of the night as
+    belonging to no shift at all. */
+ assert.equal(withinWindow(1380,1320,360),true,"23:00 is inside 22:00-06:00");
+ assert.equal(withinWindow(120,1320,360),true,"and so is 02:00");
+ assert.equal(withinWindow(720,1320,360),false,"but midday is not");
+ assert.equal(withinWindow(420,360,840),true,"07:00 is inside 06:00-14:00");
+
+ const at=(h,m=0)=>{const d=new Date("2026-09-14T00:00:00");d.setHours(h,m,0,0);return d};
+ assert.equal(shiftAt(at(7)),"1st");
+ assert.equal(shiftAt(at(15)),"2nd");
+ assert.equal(shiftAt(at(23)),"3rd");
+ assert.equal(shiftAt(at(2)),"3rd","the small hours belong to the shift that started last night");
+ /* A boundary belongs to the shift it OPENS, not the one it closes — 14:00 is
+    2nd shift's first minute, and counting it twice would double a tally. */
+ assert.equal(shiftAt(at(14)),"2nd");
+ assert.equal(shiftAt("not a date"),null);
+ assert.equal(shiftLabel("1st"),"1ST SHIFT");
+ assert.equal(shiftLabel(null),"OFF SHIFT");
+
+ /* Standing exactly ON the pullout, the next one is tomorrow's — which is what
+    somebody asking "how long until pullout" means at 06:00 sharp. */
+ assert.equal(minutesUntilClock(at(6),"06:00"),1440);
+ assert.equal(minutesUntilClock(at(5),"06:00"),60);
+ assert.equal(minutesUntilClock(at(23),"06:00"),420,"and it counts across midnight");
+
+ assert.deepEqual(nextPullout(at(4)),{key:"am",label:"A.M. PULLOUT",at:"06:00",minutesAway:120});
+ assert.deepEqual(nextPullout(at(9)),{key:"pm",label:"EVENING PULLOUT",at:"13:00",minutesAway:240});
+ assert.equal(nextPullout(at(14)).key,"am","after the last pullout of the day the next is tomorrow morning's");
+
+ assert.equal(shiftRemainingMinutes(at(13)),60,"1st shift ends at 14:00");
+ assert.equal(shiftRemainingMinutes(at(23)),420,"and the night shift's remainder counts past midnight");
+
+ /* Every forecast window resolves through here, in hours, because a rate per
+    hour is what multiplies by one. */
+ assert.equal(windowHours(at(13),"shift"),1);
+ assert.equal(windowHours(at(13),"two-shifts"),9,"the rest of this shift plus the whole of the next");
+ assert.equal(windowHours(at(4),"pullout"),2);
+ assert.equal(windowHours(at(23),"two-shifts"),15,"7 hours of the night shift left, plus 8 of the morning");
+
+ /* EDITABLE WITHOUT A RELEASE, which is the half Curtis asked for twice. Shift
+    hours are a property of this garage's contract, not of the software. */
+ const custom=normalizeShiftSettings({shifts:[{key:"1st",start:"05:30",end:"13:30"}],
+  pullouts:[{key:"early",label:"early",at:"05:00"}]});
+ assert.equal(custom.shifts[0].start,"05:30");
+ assert.equal(custom.shifts[1].key,"2nd","a shift the saved settings never mention keeps its default");
+ assert.deepEqual(custom.pullouts,[{key:"early",label:"EARLY",at:"05:00"}]);
+ assert.equal(shiftAt(at(5,45),custom),"1st","and the clock follows the edit");
+
+ /* A half-edited blob must still produce a working clock: this is consulted
+    every time the report draws, and throwing would take the report with it. */
+ const broken=normalizeShiftSettings({shifts:[{key:"1st",start:"06:00",end:"nonsense"}],pullouts:[]});
+ assert.deepEqual(broken.shifts[0],DEFAULT_SHIFT_SETTINGS.shifts[0],
+  "one bad edge falls back whole rather than mixing the garage's hours with the default's");
+ assert.deepEqual(broken.pullouts,DEFAULT_SHIFT_SETTINGS.pullouts,
+  "and no pullouts reads as not configured, because a garage with none is not a thing");
+ assert.deepEqual(normalizeShiftSettings(null),DEFAULT_SHIFT_SETTINGS);
+ assert.deepEqual(normalizeShiftSettings("garbage"),DEFAULT_SHIFT_SETTINGS);
+
+ assert.equal(untilLabel(260),"4h 20m");
+ assert.equal(untilLabel(60),"1h");
+ assert.equal(untilLabel(45),"45m");
+ assert.equal(untilLabel(null),"");
+});
+
+test("the garage's hours are editable on the device, and nothing re-implements the clock",async()=>{
+ const [panel,settings]=await Promise.all([
+  readFile(new URL("../app/settings/shift-settings.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=panel.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis asked for the panel in the same breath as the clock: "a settings
+    option to fine tune both of these options in case changes need to be made
+    without you writing code." Both halves — the shift windows AND the pullout
+    times — have to be editable, which is what "both of these options" names. */
+ assert.match(settings,/<ShiftSettingsPanel\/>/,"the panel is actually on the Settings page");
+ assert.match(code,/settings\.shifts\.map/,"every shift window is editable");
+ assert.match(code,/settings\.pullouts\.map/,"and so is every pullout time");
+ assert.match(code,/localStorage\.setItem\(SHIFT_SETTINGS_KEY/,"and the edit is written to the device");
+
+ /* ONE PLACE KNOWS WHAT A SHIFT IS. The panel reads the same module the report
+    and the forecast do rather than parsing "HH:MM" itself — this repo has paid
+    for five copies of one table and two road-call records that drifted, and a
+    second opinion about when 2nd shift starts would be the next one. */
+ assert.match(code,/from "\.\.\/shift-clock"/);
+ assert.equal(/\d+\s*\*\s*60\s*\+/.test(code),false,"the panel never converts a clock time itself");
+ assert.equal(/getHours\(\)/.test(code),false,"nor reads the wall clock behind the module's back");
+
+ /* A time input hands back "0" halfway through somebody typing "06:00", and
+    writing that through would move the whole shift under them mid-edit — the
+    same lesson the Down Sheet's hours boxes cost us. An edge that is not yet a
+    real time is held in state and simply not saved. */
+ assert.match(code,/if\(clockMinutes\(value\)!==null\)save\(next\)/,
+  "a half-typed time is not committed");
 });

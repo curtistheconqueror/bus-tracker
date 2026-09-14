@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 174 is live as Sites Version 174 from commit 2c06463. It fixes the phone and iPad touch crash with a crash guard, adds the Down Sheet Scoreboard and Full Sweep workflows, keeps intentional Down Sheet and Defect Log removals in section transfers, makes holds device-local, and brings the Down Sheet form, quick filters, and offline-safe sharing in line with the Defect Log. It adds no storage-key rename, database migration, or dependency change. The normal rollback target is Version 173 from commit 3de6dab.
+Repository release 174 is live as Sites Version 174 from commit 2c06463. It fixes the phone and iPad touch crash with a crash guard, adds the Down Sheet Status Report and Full Sweep workflows, keeps intentional Down Sheet and Defect Log removals in section transfers, makes holds device-local, and brings the Down Sheet form, quick filters, and offline-safe sharing in line with the Defect Log. It adds no storage-key rename, database migration, or dependency change. The normal rollback target is Version 173 from commit 3de6dab.
 
 The Version 171 baseline details below remain useful historical context:
 

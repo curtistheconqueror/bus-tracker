@@ -73,11 +73,56 @@
 .fixed-repairs-app{background:var(--fixed-page,#e8eef6);color:var(--fixed-ink,#172b4d);font-family:var(--fixed-font,Arial,Helvetica,sans-serif);font-size:calc(1em * var(--fixed-scale,1))}
 .fixed-header{background:var(--fixed-header,#061d45);color:var(--fixed-header-text,#fff)}
 .fixed-header nav a{color:var(--fixed-header-text,#fff)}
-.fixed-header nav a.active{background:var(--fixed-surface,#fff);color:var(--fixed-header,#061d45)}
+/* THE THEMED HALF OF THIS PAGE, and the four rules below are here because the
+   base stylesheet paints a light-theme card and the theme section only ever
+   re-painted the OUTSIDE of it.
+
+   Measured in Chromium on every theme rather than read: Fixed Repairs had
+   TWELVE elements under AA on each of Dark, Midnight and Tactical, and the
+   worst was 1.13:1 — the fix text on a completed repair, which is the sentence
+   this whole page exists to show. Its panel carries a hard-coded #f3fbf6, a
+   pale green chosen for the light theme, so on a dark theme the themed text
+   colour was landing on a near-white box. Invisible, not merely low.
+
+   The active nav tab was themed and still wrong: surface behind HEADER text
+   puts near-black (#15180f) on dark olive (#393e30), 1.63:1. It reads as ink,
+   because the tab IS a piece of the page surface once it is active. */
+.fixed-header nav a.active{background:var(--fixed-surface,#fff);color:var(--fixed-ink,#061d45)}
+/* The tallies and the completion stamp were a fixed #087347 — a dark green on
+   a dark surface, 1.86:1. The accent is the colour this theme nominates for
+   "read this number", and it is the one colour guaranteed to have been chosen
+   against the surface. */
+.fixed-summary strong,.fixed-card-head time{color:var(--fixed-accent,#087347)}
+.fixed-summary .attention strong{color:var(--fixed-accent,#9c5a00)}
+/* The two panels inside a card. Tinted from the page and the accent rather
+   than painted a fixed colour, so they separate from the card on every theme
+   and can never be lighter than the text written on them. */
+.fixed-card-body section{border-color:var(--fixed-border,#d9e1ec);background:color-mix(in srgb,var(--fixed-page,#fff) 45%,var(--fixed-surface,#fff))}
+.fixed-card-body .repair-result{border-color:color-mix(in srgb,var(--fixed-accent,#a9d2bc) 45%,var(--fixed-border,#a9d2bc));background:color-mix(in srgb,var(--fixed-accent,#f3fbf6) 9%,var(--fixed-surface,#fff))}
+.fixed-card-head{border-bottom-color:var(--fixed-border,#d9e1ec)}
 .fixed-summary>div,.fixed-controls,.fixed-card{background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
 .fixed-feed{background:color-mix(in srgb,var(--fixed-page,#e8eef6) 70%,var(--fixed-surface,#fff))}
 .fixed-feed>header{background:var(--fixed-header,#102e58);color:var(--fixed-header-text,#fff)}
-.fixed-card-head{background:color-mix(in srgb,var(--fixed-surface,#fff) 90%,var(--fixed-accent,#0b64bd));color:var(--fixed-ink,#172b4d)}
+/* THE HEAD TINTS TOWARD THE PAGE, NOT TOWARD THE ACCENT.
+
+   It used to mix 10% of the accent into the surface and then draw the bus
+   number, the category and the timestamp in that same accent — a colour set
+   against the background it had just been blended into. That is self-defeating
+   by construction, and Tactical had the least headroom to absorb it: 3.92:1
+   measured, under the 4.5 an 9px label needs.
+
+   Tinting from the page instead separates the head by LIGHTNESS, which every
+   theme has spare, and leaves the accent at full strength against it. Measured
+   in Chromium: Tactical 3.92 -> 4.9, and the other three improved too. It also
+   holds for a CUSTOM theme, where the accent is whatever the user picked. */
+.fixed-card-head{background:color-mix(in srgb,var(--fixed-page,#e8eef6) 18%,var(--fixed-surface,#fff));color:var(--fixed-ink,#172b4d)}
+/* The small print inside a card, pulled toward the ink rather than left at the
+   theme's muted value. Muted is chosen against the CARD; these sit on a panel
+   tinted a step away from it, which was enough to put every one of them in the
+   4.2-4.4 band on the light theme. Mixing toward ink self-corrects per theme —
+   it darkens on a light one and lightens on a dark one — instead of hard-coding
+   a second muted colour that a custom theme would not get. */
+.fixed-card-head>span small,.fixed-card-body section>b,.fixed-card-body small,.fixed-card-body em{color:color-mix(in srgb,var(--fixed-muted,#60728c) 68%,var(--fixed-ink,#172b4d))}
 .fixed-card-head>span strong,.fixed-card-head>div b{color:var(--fixed-accent,#0b64bd)}
 .fixed-controls input,.fixed-controls select{background:var(--fixed-surface,#fff);color:var(--fixed-ink,#172b4d)}
 .fixed-settings-button{background:var(--fixed-accent,#0b64bd)!important}

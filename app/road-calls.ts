@@ -271,7 +271,7 @@ export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairB
 
     Curtis: "If a road call happened within the last thirty six hours, but it
     was updated as fixed, then it should not show." The flag is what the
-    Scoreboard filters on, and closing a Roadcall row on the sheet is where a
+    Status Report filters on, and closing a Roadcall row on the sheet is where a
     foreman actually records that a bus is fixed — so leaving the flag set there
     would have kept a repaired bus on the report for a day and a half.
 
@@ -299,14 +299,52 @@ export function reconcileRoadCallsFromSheet<T extends RoadCallBus&MovableRepairB
     four-hundred-bus board. Caught by the test that asserts an unchanged fleet
     comes back by identity, which is exactly what that assertion is for. */
  const ended:string[]=[];
+ /* AND BEING ON THE SHEET AT ALL CANCELS THE PENDING STATUS.
+
+    Curtis set this from the floor: "any bus that is added to the downsheet
+    while it is in roadcall status should not be counted here. Once its placed
+    on downsheet the roadcall status is canceled (although still logged per our
+    design already)... Anyone taking counts and see a bus that is on property
+    that just came in from roadcall, marks it down on sheet it is no longer in
+    the roadcall count."
+
+    Which is what the flag has always meant. `roadcall` says the bus is OUT on
+    one right now; a bus somebody is standing next to, writing up, is back. The
+    pending question is "who has broken down and nobody has written it up yet",
+    and a row on the sheet is exactly the thing that answers it.
+
+    ANY active entry, not only a Roadcall-section one. A bus that came in off a
+    road call and was written up for brakes is still written up.
+
+    THE EVENT IS NEVER TOUCHED HERE. Only the flag comes off. The breakdown
+    happened and stays on the bus forever — that is the whole premise of this
+    module, and it is what lets the seven-day filter, the card note and the
+    lifetime counter go on being right about a bus whose status was cancelled
+    ten minutes after it arrived.
+
+    It follows that taking a bus back OFF the sheet does not re-raise the call.
+    That is deliberate: re-raising would mean the app deciding a bus is out on
+    the road because a row was deleted, and the history is still there for
+    every reader that goes by events rather than by status. */
+ const onSheet=new Set((entries||[])
+  .filter(entry=>String(entry?.workflow??"")!=="Completed")
+  .map(entry=>String(entry?.busId??"").trim())
+  .filter(Boolean));
  const cleared=next.map(bus=>{
   const events=normalizeRoadCalls(bus.roadCalls);
   const kept=events.filter(event=>!event.id.startsWith(SHEET_ROAD_CALL_PREFIX)||live.has(event.id));
-  if(kept.length===events.length)return bus;
-  ended.push(bus.id);
-  return {...bus,roadcall:kept.length>0,...(kept.length?{roadCalls:kept}:{roadCalls:undefined})} as T;
+  const standDown=bus.roadcall===true&&onSheet.has(bus.id);
+  if(kept.length===events.length&&!standDown)return bus;
+  if(kept.length!==events.length)ended.push(bus.id);
+  return {...bus,roadcall:standDown?false:kept.length>0,...(kept.length?{roadCalls:kept}:{roadCalls:undefined})} as T;
  });
- return {fleet:ended.length?cleared:next,started,ended};
+ /* Rebuilt only when something actually changed — `.map` always hands back a
+    new array, and this runs inside the Down Sheet's render effect on a
+    four-hundred-bus board. `ended` alone no longer covers it: a stand-down
+    changes a bus without ending any event, so the two conditions are counted
+    separately and the check is whether ANY bus came back a different object. */
+ const changed=cleared.some((bus,index)=>bus!==next[index]);
+ return {fleet:changed?cleared:next,started,ended};
 }
 
 /* Road calls still standing: inside the window AND not taken back off that
