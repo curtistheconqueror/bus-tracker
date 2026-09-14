@@ -213,10 +213,24 @@ that missing half and is the only place that knows: every window the Fleet
 Forecast quotes — "next shift", "the next two", "before the 06:00 pullout" —
 resolves through it, so hours change once.
 
-The **pullout times are Curtis's own** — a.m. 06:00 and evening 13:00. The
-**shift boundaries are a guess** (06-14, 14-22, 22-06) and are marked as one in
-the module, so nobody later reads them as something he said; they are editable
-precisely so the guess costs nothing.
+The times are the shop's own: **1st 06:00-14:30, 2nd 14:00-22:30, 3rd
+22:00-06:30**, pullouts at **06:00 and 13:00**. Curtis gave the shifts in mixed
+notation — "second is 14:00 to 10:30 and night shift is 10:00 til 6:30", where
+the evening 10:30 and 10:00 are 22:30 and 22:00 — and confirmed the reading
+before they were written down.
+
+**Every shift is 8.5 hours and they OVERLAP by 30 minutes** at each handover:
+14:00-14:30, 22:00-22:30 and 06:00-06:30 each belong to two shifts. That is a
+relief window, and it is why `shiftAt` cannot take the first window that
+matches. **The INCOMING shift wins a handover** — of the windows that match, the
+one that started most recently. Curtis chose that: the relief has started and
+they are the crew who will work whatever arrives. Taking the first match instead
+would have credited every one of those half-hours to the outgoing crew purely
+because of array order, three times a day.
+
+For the same reason a two-shift window is measured straight through to the END
+of the next shift rather than summed as "what is left of this one plus the
+length of that one" — with overlaps the sum double-counts every handover.
 
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running

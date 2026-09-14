@@ -31,19 +31,22 @@ export type ShiftSettings={shifts:ShiftWindow[];pullouts:Pullout[]};
 
 export const SHIFT_SETTINGS_KEY="pace-shift-settings-v1";
 
-/* THE PULLOUT TIMES ARE CURTIS'S OWN: "Pull out for a.m. is 6:00 am and for
-   evening is 13:00 hours."
+/* THESE ARE THE SHOP'S REAL HOURS, given by Curtis: "first shift is 6 am to
+   14:30, second is 14:00 to 10:30 and night shift is 10:00 til 6:30", plus
+   "Pull out for a.m. is 6:00 am and for evening is 13:00 hours."
 
-   THE SHIFT BOUNDARIES ARE A GUESS and are flagged as one here so nobody later
-   reads them as something he said. He has never given them. These are the
-   ordinary transit split, lined up so each pullout falls at the start of the
-   shift that drives it, which is the only thing about them that is more than a
-   guess. They are editable precisely so the guess costs nothing. */
+   He wrote the shifts in mixed notation — 10:30 and 10:00 are the evening ones,
+   22:30 and 22:00 — and confirmed the reading before these were written down.
+
+   EVERY SHIFT IS 8.5 HOURS AND THEY OVERLAP BY 30 MINUTES at each handover:
+   14:00-14:30, 22:00-22:30 and 06:00-06:30 each belong to two shifts. That is a
+   relief window, not an error, and it is the reason shiftAt below cannot just
+   take the first window that matches. */
 export const DEFAULT_SHIFT_SETTINGS:ShiftSettings={
  shifts:[
-  {key:"1st",start:"06:00",end:"14:00"},
-  {key:"2nd",start:"14:00",end:"22:00"},
-  {key:"3rd",start:"22:00",end:"06:00"},
+  {key:"1st",start:"06:00",end:"14:30"},
+  {key:"2nd",start:"14:00",end:"22:30"},
+  {key:"3rd",start:"22:00",end:"06:30"},
  ],
  pullouts:[
   {key:"am",label:"A.M. PULLOUT",at:"06:00"},
@@ -116,15 +119,34 @@ export function withinWindow(minute:number,start:number,end:number){
  return start<end?minute>=start&&minute<end:minute>=start||minute<end;
 }
 
+/* How long ago a window began, wrapping past midnight. The overlap rule is
+   decided on this and nothing else. */
+function minutesSinceStart(minute:number,start:number){return ((minute-start)%1440+1440)%1440}
+
+/* WHICH SHIFT IT IS — and during a handover, THE INCOMING ONE.
+
+   The shop's shifts overlap by half an hour at each changeover, so between
+   14:00 and 14:30 both 1st and 2nd genuinely match. Returning the first window
+   in the list would have credited every one of those half-hours to the OUTGOING
+   shift, purely because of array order — a silent 30 minutes of every shift's
+   arrivals landing on the wrong crew's tally, three times a day.
+
+   Curtis chose the incoming shift: the relief has started, and they are the
+   crew who will work whatever arrives. So of the windows that match, the one
+   that STARTED MOST RECENTLY wins, which is what "incoming" means in a sentence
+   and needs no separate table of handover times to maintain. */
 export function shiftAt(at:string|Date,settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):ShiftKey|null{
  const minute=minuteOfDay(at);
  if(minute===null)return null;
+ let best:{key:ShiftKey;since:number}|null=null;
  for(const shift of settings.shifts){
   const start=clockMinutes(shift.start),end=clockMinutes(shift.end);
   if(start===null||end===null)continue;
-  if(withinWindow(minute,start,end))return shift.key;
+  if(!withinWindow(minute,start,end))continue;
+  const since=minutesSinceStart(minute,start);
+  if(!best||since<best.since)best={key:shift.key,since};
  }
- return null;
+ return best?best.key:null;
 }
 
 /* How many minutes from `at` forward to the next occurrence of a clock time.
@@ -172,15 +194,16 @@ export function windowHours(at:string|Date,span:"shift"|"two-shifts"|"pullout",s
  const remaining=shiftRemainingMinutes(at,settings);
  if(remaining===null)return null;
  if(span==="shift")return remaining/60;
- /* The rest of this shift plus the whole of the one after it, which is what
-    "over the next 2 shifts" means to somebody standing in the middle of one. */
+ /* Measured straight through to the END of the next shift, rather than added
+    up as "what is left of this one plus the length of that one". With shifts
+    that overlap by half an hour the sum double-counts the handover — at 14:15
+    it reports 16h45m where the clock says 16h15m. Elapsed time is elapsed time;
+    the only honest way to measure it is from here to the far edge. */
  const key=shiftAt(at,settings);
  const order=settings.shifts.map(shift=>shift.key);
  const next=settings.shifts[(order.indexOf(key as ShiftKey)+1)%order.length];
- const start=clockMinutes(next.start),end=clockMinutes(next.end);
- if(start===null||end===null)return null;
- const length=start<end?end-start:1440-start+end;
- return (remaining+length)/60;
+ const until=minutesUntilClock(at,next.end);
+ return until===null?null:until/60;
 }
 
 export function shiftLabel(key:ShiftKey|null){return key?key.toUpperCase()+" SHIFT":"OFF SHIFT"}

@@ -100,7 +100,42 @@ table, two road-call records that had drifted). `fleet-scoreboard.ts`,
 `status-report-modal.tsx`; the exported symbols and every `.scoreboard-*` CSS
 class follow. **No storage key is involved** — none of this was ever persisted.
 
-## 4. The report is shorter, and has a counts-only version
+## 4. A shift clock, with the garage's hours editable on the device
+
+Curtis: *"A timer must be built in if it isn't already... it must be shift aware
+and pull out time aware. Also a settings option to fine tune both of these
+options in case changes need to be made without you writing code."*
+
+The app had `Shift` as a LABEL on a Down Sheet entry and nothing that mapped a
+clock time onto one; pullout times appeared nowhere. `app/shift-clock.ts` is
+that missing half, and it is the only place that knows — every window the Fleet
+Forecast will quote resolves through it.
+
+**The hours are the shop's real ones:** 1st 06:00-14:30, 2nd 14:00-22:30, 3rd
+22:00-06:30, pullouts at 06:00 and 13:00. Each shift is 8.5 hours and they
+**overlap by 30 minutes** at each handover, which is a relief window rather than
+an error. **The incoming shift owns a handover** — Curtis's call — so 14:15
+reads as 2ND SHIFT. Taking the first matching window instead would have credited
+every one of those half-hours to the outgoing crew purely because of array
+order, three times a day.
+
+Two things the night shift forces: it runs 22:00 to 06:30, so its start is
+numerically AFTER its end and the obvious `start<=m&&m<end` reports every hour of
+the night as belonging to no shift at all. And a two-shift window is measured
+straight through to the END of the next shift rather than summed, because with
+overlaps the sum double-counts each handover.
+
+**Settings -> SHIFTS & PULLOUT TIMES** makes every window and both pullouts
+editable, with a live line showing the current shift, time left in it and time
+to the next pullout. A half-typed time is held rather than saved — a time input
+hands back a partial value mid-keystroke, and committing it would move the shift
+under the person typing.
+
+**Adds `pace-shift-settings-v1`** — device-local, never synced, documented in
+CLAUDE.md. Nothing else changed shape; a device that has never opened the panel
+runs on the shop's hours as the built-in defaults.
+
+## 5. The report is shorter, and has a counts-only version
 
 Curtis: *"I think its still too much info."*
 

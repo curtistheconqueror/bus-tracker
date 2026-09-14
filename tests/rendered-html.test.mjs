@@ -14142,9 +14142,18 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
     mapped a clock time onto one, and no pullout time anywhere. Curtis: "it must
     be shift aware and pull out time aware." */
  assert.equal(SHIFT_SETTINGS_KEY,"pace-shift-settings-v1");
- /* His own times, and the only part of the defaults that is not a guess:
-    "Pull out for a.m. is 6:00 am and for evening is 13:00 hours." */
+ /* THE SHOP'S REAL HOURS, given by Curtis: "first shift is 6 am to 14:30,
+    second is 14:00 to 10:30 and night shift is 10:00 til 6:30", plus "Pull out
+    for a.m. is 6:00 am and for evening is 13:00 hours." He wrote the shifts in
+    mixed notation — the evening 10:30 and 10:00 are 22:30 and 22:00 — and
+    confirmed the reading before they were written down. */
  assert.deepEqual(DEFAULT_SHIFT_SETTINGS.pullouts.map(p=>p.at),["06:00","13:00"]);
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.shifts.map(s=>[s.key,s.start,s.end]),
+  [["1st","06:00","14:30"],["2nd","14:00","22:30"],["3rd","22:00","06:30"]]);
+ /* Every shift is 8.5 hours and they OVERLAP by 30 minutes at each handover.
+    That is a relief window, not a typo. */
+ const span=s=>{const a=clockMinutes(s.start),b=clockMinutes(s.end);return a<b?b-a:1440-a+b};
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.shifts.map(span),[510,510,510]);
 
  assert.equal(clockMinutes("06:00"),360);
  assert.equal(clockMinutes("13:45"),825);
@@ -14171,9 +14180,19 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
  assert.equal(shiftAt(at(15)),"2nd");
  assert.equal(shiftAt(at(23)),"3rd");
  assert.equal(shiftAt(at(2)),"3rd","the small hours belong to the shift that started last night");
- /* A boundary belongs to the shift it OPENS, not the one it closes — 14:00 is
-    2nd shift's first minute, and counting it twice would double a tally. */
- assert.equal(shiftAt(at(14)),"2nd");
+ /* THE HANDOVER GOES TO THE INCOMING SHIFT. Between 14:00 and 14:30 both 1st
+    and 2nd genuinely match, and returning the first window in the list would
+    have credited every one of those half-hours to the OUTGOING crew purely
+    because of array order — 30 minutes of arrivals on the wrong tally, three
+    times a day. Curtis chose the incoming shift: the relief has started and
+    they are the crew who will work whatever comes in. */
+ assert.equal(shiftAt(at(14)),"2nd","the handover opens the incoming shift immediately");
+ assert.equal(shiftAt(at(14,15)),"2nd","and holds it through the overlap");
+ assert.equal(shiftAt(at(14,29)),"2nd");
+ assert.equal(shiftAt(at(13,59)),"1st","right up to the handover it is still the outgoing shift");
+ assert.equal(shiftAt(at(22,15)),"3rd","the same at the evening handover");
+ assert.equal(shiftAt(at(6,15)),"1st","and at the morning one, where the incoming shift is the next day's");
+ assert.equal(shiftAt(at(5,59)),"3rd");
  assert.equal(shiftAt("not a date"),null);
  assert.equal(shiftLabel("1st"),"1ST SHIFT");
  assert.equal(shiftLabel(null),"OFF SHIFT");
@@ -14188,15 +14207,19 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
  assert.deepEqual(nextPullout(at(9)),{key:"pm",label:"EVENING PULLOUT",at:"13:00",minutesAway:240});
  assert.equal(nextPullout(at(14)).key,"am","after the last pullout of the day the next is tomorrow morning's");
 
- assert.equal(shiftRemainingMinutes(at(13)),60,"1st shift ends at 14:00");
- assert.equal(shiftRemainingMinutes(at(23)),420,"and the night shift's remainder counts past midnight");
+ assert.equal(shiftRemainingMinutes(at(13)),90,"1st shift ends at 14:30");
+ assert.equal(shiftRemainingMinutes(at(23)),450,"and the night shift's remainder counts past midnight");
 
  /* Every forecast window resolves through here, in hours, because a rate per
     hour is what multiplies by one. */
- assert.equal(windowHours(at(13),"shift"),1);
- assert.equal(windowHours(at(13),"two-shifts"),9,"the rest of this shift plus the whole of the next");
+ assert.equal(windowHours(at(13),"shift"),1.5);
+/* Measured straight through to the END of the next shift rather than summed.
+    With half-hour overlaps, "what is left of this one plus the length of that
+    one" double-counts every handover — at 13:00 it would say 10h where the
+    clock from 13:00 to 22:30 says 9.5. */
+ assert.equal(windowHours(at(13),"two-shifts"),9.5,"13:00 to the end of 2nd shift at 22:30");
  assert.equal(windowHours(at(4),"pullout"),2);
- assert.equal(windowHours(at(23),"two-shifts"),15,"7 hours of the night shift left, plus 8 of the morning");
+ assert.equal(windowHours(at(23),"two-shifts"),15.5,"23:00 to the end of 1st shift at 14:30");
 
  /* EDITABLE WITHOUT A RELEASE, which is the half Curtis asked for twice. Shift
     hours are a property of this garage's contract, not of the software. */
