@@ -14132,3 +14132,93 @@ test("Fixed Repairs is themed all the way into the card, not just around it",asy
   assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
  }
 });
+
+test("the shift clock knows which shift it is and when the next pullout is",async()=>{
+ const {DEFAULT_SHIFT_SETTINGS,SHIFT_SETTINGS_KEY,clockMinutes,formatClock,minutesUntilClock,
+  nextPullout,normalizeShiftSettings,shiftAt,shiftLabel,shiftRemainingMinutes,untilLabel,
+  windowHours,withinWindow}=await import("../app/shift-clock.ts");
+
+ /* The app already had `Shift` as a LABEL on a sheet entry and nothing that
+    mapped a clock time onto one, and no pullout time anywhere. Curtis: "it must
+    be shift aware and pull out time aware." */
+ assert.equal(SHIFT_SETTINGS_KEY,"pace-shift-settings-v1");
+ /* His own times, and the only part of the defaults that is not a guess:
+    "Pull out for a.m. is 6:00 am and for evening is 13:00 hours." */
+ assert.deepEqual(DEFAULT_SHIFT_SETTINGS.pullouts.map(p=>p.at),["06:00","13:00"]);
+
+ assert.equal(clockMinutes("06:00"),360);
+ assert.equal(clockMinutes("13:45"),825);
+ assert.equal(clockMinutes("23:59"),1439);
+ /* Null, never 0. A malformed setting reading as midnight would sit inside the
+    night shift and quietly move every window that depends on it. */
+ assert.equal(clockMinutes("24:00"),null);
+ assert.equal(clockMinutes("6pm"),null);
+ assert.equal(clockMinutes(""),null);
+ assert.equal(clockMinutes(undefined),null);
+ assert.equal(formatClock(360),"06:00");
+ assert.equal(formatClock(1440+90),"01:30","a window that runs past midnight wraps rather than overflowing");
+
+ /* THE NIGHT SHIFT RUNS PAST MIDNIGHT, so its start is numerically after its
+    end. The obvious `start<=m&&m<end` reports every hour of the night as
+    belonging to no shift at all. */
+ assert.equal(withinWindow(1380,1320,360),true,"23:00 is inside 22:00-06:00");
+ assert.equal(withinWindow(120,1320,360),true,"and so is 02:00");
+ assert.equal(withinWindow(720,1320,360),false,"but midday is not");
+ assert.equal(withinWindow(420,360,840),true,"07:00 is inside 06:00-14:00");
+
+ const at=(h,m=0)=>{const d=new Date("2026-09-14T00:00:00");d.setHours(h,m,0,0);return d};
+ assert.equal(shiftAt(at(7)),"1st");
+ assert.equal(shiftAt(at(15)),"2nd");
+ assert.equal(shiftAt(at(23)),"3rd");
+ assert.equal(shiftAt(at(2)),"3rd","the small hours belong to the shift that started last night");
+ /* A boundary belongs to the shift it OPENS, not the one it closes — 14:00 is
+    2nd shift's first minute, and counting it twice would double a tally. */
+ assert.equal(shiftAt(at(14)),"2nd");
+ assert.equal(shiftAt("not a date"),null);
+ assert.equal(shiftLabel("1st"),"1ST SHIFT");
+ assert.equal(shiftLabel(null),"OFF SHIFT");
+
+ /* Standing exactly ON the pullout, the next one is tomorrow's — which is what
+    somebody asking "how long until pullout" means at 06:00 sharp. */
+ assert.equal(minutesUntilClock(at(6),"06:00"),1440);
+ assert.equal(minutesUntilClock(at(5),"06:00"),60);
+ assert.equal(minutesUntilClock(at(23),"06:00"),420,"and it counts across midnight");
+
+ assert.deepEqual(nextPullout(at(4)),{key:"am",label:"A.M. PULLOUT",at:"06:00",minutesAway:120});
+ assert.deepEqual(nextPullout(at(9)),{key:"pm",label:"EVENING PULLOUT",at:"13:00",minutesAway:240});
+ assert.equal(nextPullout(at(14)).key,"am","after the last pullout of the day the next is tomorrow morning's");
+
+ assert.equal(shiftRemainingMinutes(at(13)),60,"1st shift ends at 14:00");
+ assert.equal(shiftRemainingMinutes(at(23)),420,"and the night shift's remainder counts past midnight");
+
+ /* Every forecast window resolves through here, in hours, because a rate per
+    hour is what multiplies by one. */
+ assert.equal(windowHours(at(13),"shift"),1);
+ assert.equal(windowHours(at(13),"two-shifts"),9,"the rest of this shift plus the whole of the next");
+ assert.equal(windowHours(at(4),"pullout"),2);
+ assert.equal(windowHours(at(23),"two-shifts"),15,"7 hours of the night shift left, plus 8 of the morning");
+
+ /* EDITABLE WITHOUT A RELEASE, which is the half Curtis asked for twice. Shift
+    hours are a property of this garage's contract, not of the software. */
+ const custom=normalizeShiftSettings({shifts:[{key:"1st",start:"05:30",end:"13:30"}],
+  pullouts:[{key:"early",label:"early",at:"05:00"}]});
+ assert.equal(custom.shifts[0].start,"05:30");
+ assert.equal(custom.shifts[1].key,"2nd","a shift the saved settings never mention keeps its default");
+ assert.deepEqual(custom.pullouts,[{key:"early",label:"EARLY",at:"05:00"}]);
+ assert.equal(shiftAt(at(5,45),custom),"1st","and the clock follows the edit");
+
+ /* A half-edited blob must still produce a working clock: this is consulted
+    every time the report draws, and throwing would take the report with it. */
+ const broken=normalizeShiftSettings({shifts:[{key:"1st",start:"06:00",end:"nonsense"}],pullouts:[]});
+ assert.deepEqual(broken.shifts[0],DEFAULT_SHIFT_SETTINGS.shifts[0],
+  "one bad edge falls back whole rather than mixing the garage's hours with the default's");
+ assert.deepEqual(broken.pullouts,DEFAULT_SHIFT_SETTINGS.pullouts,
+  "and no pullouts reads as not configured, because a garage with none is not a thing");
+ assert.deepEqual(normalizeShiftSettings(null),DEFAULT_SHIFT_SETTINGS);
+ assert.deepEqual(normalizeShiftSettings("garbage"),DEFAULT_SHIFT_SETTINGS);
+
+ assert.equal(untilLabel(260),"4h 20m");
+ assert.equal(untilLabel(60),"1h");
+ assert.equal(untilLabel(45),"45m");
+ assert.equal(untilLabel(null),"");
+});

@@ -162,6 +162,7 @@ per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
+  pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-board-settings-v1
   pace-down-sheet-settings-v1
   pace-defect-log-settings-v1
@@ -198,6 +199,28 @@ minutes."* A cap on total length would have ended a forty-minute walk somebody
 was actively working through while still leaving a pocketed phone looking live.
 Expired at READ time and the record is left alone rather than rewritten,
 because a read must not be a write.
+
+**`pace-shift-settings-v1` holds the garage's hours, and it is EDITABLE ON THE
+DEVICE on purpose.** Curtis: *"a settings option to fine tune both of these
+options in case changes need to be made without you writing code."* Shift
+boundaries and pullout times are a property of this property's contract rather
+than of the software, and a contract changes on a schedule nobody here controls.
+
+The app already had `Shift` as a LABEL on a Down Sheet entry — "1st", "2nd",
+"3rd", typed or defaulted by hand — and nothing anywhere that mapped a CLOCK
+TIME onto one. Pullout times appeared nowhere at all. `app/shift-clock.ts` is
+that missing half and is the only place that knows: every window the Fleet
+Forecast quotes — "next shift", "the next two", "before the 06:00 pullout" —
+resolves through it, so hours change once.
+
+The **pullout times are Curtis's own** — a.m. 06:00 and evening 13:00. The
+**shift boundaries are a guess** (06-14, 14-22, 22-06) and are marked as one in
+the module, so nobody later reads them as something he said; they are editable
+precisely so the guess costs nothing.
+
+Device-local for the reason the sweep is: it describes the building somebody is
+standing in, and a device that synced it would overwrite a garage running
+different hours.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen
