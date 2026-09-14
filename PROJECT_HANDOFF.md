@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 174 (repository release 174)
-Live feature checkpoint: commit 2c06463
+Live release: Sites Version 175 (repository release 175)
+Live feature checkpoint: commit 9bac8ed
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 174 is live as Sites Version 174 from commit 2c06463. It fixes the phone and iPad touch crash with a crash guard, adds the Down Sheet Status Report and Full Sweep workflows, keeps intentional Down Sheet and Defect Log removals in section transfers, makes holds device-local, and brings the Down Sheet form, quick filters, and offline-safe sharing in line with the Defect Log. It adds no storage-key rename, database migration, or dependency change. The normal rollback target is Version 173 from commit 3de6dab.
+Repository release 175 is live as Sites Version 175 from commit 9bac8ed. It corrects road-call status when a bus is formally placed on the Down Sheet while preserving its road-call history, renames and shortens the Fleet Status Report, repairs Fixed Repairs contrast across all themes, and adds editable device-local shift and pullout hours. The new optional `pace-shift-settings-v1` preference falls back to built-in hours when absent, changes no fleet record, and is not synchronized. The normal rollback target is Version 174 from commit 2c06463.
 
 The Version 171 baseline details below remain useful historical context:
 
