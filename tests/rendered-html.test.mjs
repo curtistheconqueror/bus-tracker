@@ -4909,7 +4909,17 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  // picker. The Down Sheet card was the one with no such option, so a retired
  // entry would have rendered there as an empty select.
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
- assert.match(editor,/item\.repair&&!repairs\.includes\(item\.repair\)&&<option value=\{item\.repair\}>\{item\.repair\} \(as logged\)<\/option>/);
+ /* The card is a ComboField now rather than a <select>, so the guarantee moved
+    from an injected "(as logged)" <option> to the `display` prop — and it is
+    the same guarantee, stated once instead of per-option: a wording the catalog
+    no longer knows falls through to itself rather than rendering blank. */
+ assert.match(editor,/display=\{item\.repair\?\(CATALOG_OPTIONS\.find[\s\S]{0,220}?\|\|item\.repair\):""\}/,
+  "a retired repair reads back as logged rather than as an empty field");
+ // Comments are stripped first: the sentence above names the prop it removed,
+ // and matching that would have passed the test over source that still carries it.
+ const editorCode=editor.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.equal(/disabled=\{!item\.category\}/.test(editorCode),false,
+  "and the repair box is no longer locked behind naming the category first");
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
  assert.deepEqual(REPAIR_OPTIONS["Pneumatic System"].slice(0,4),

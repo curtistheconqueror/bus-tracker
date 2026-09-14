@@ -1,9 +1,11 @@
 "use client";
 
+import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "../defect-search";
+import ComboField from "../combo-field";
 import BusSelector from "../bus-selector";
 import HoursField from "../hours-field";
 import {useEffect, useMemo, useState} from "react";
-import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,REPAIR_OPTIONS,repairCategoryLabel} from "../repair-catalog";
+import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "../repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "../findings-memory";
 import {lockPageScroll} from "../scroll-lock";
 import {
@@ -166,14 +168,59 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
           <legend>REPAIRS & ESTIMATES</legend>
           <div className="repair-items-head"><span><b>BUS TOTAL</b><small>Each repair keeps its own optional estimate.</small></span><strong>{estimateTotal?formatRepairTime(estimateTotal):"NOT SET"}</strong></div>
           <div className="repair-item-list">{draft.repairItems.map((item,index)=>{
-            const repairs=REPAIR_OPTIONS[item.category]||[];
             const itemTotal=item.estimateEnabled?repairItemsTotal([item]):0;
             return <section className="repair-item-card" key={item.id}>
               <header><b>DEFECT {index+1}</b><span>{item.estimateEnabled?formatRepairTime(itemTotal):"No estimate"}</span>{draft.repairItems.length>1&&<button type="button" onClick={()=>setDraft(current=>({...current,repairItems:current.repairItems.filter(candidate=>candidate.id!==item.id)}))}>REMOVE</button>}</header>
               <label className="repair-item-done"><input type="checkbox" checked={item.done===true} onChange={event=>setRepairDone(item.id,event.target.checked)}/><span>{item.done?"FINISHED":"MARK THIS REPAIR FINISHED"}</span></label>
               <div className="repair-item-fields">
-                <label>CATEGORY<select value={item.category} onChange={event=>{const category=event.target.value;updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}}><option value="">Optional category</option>{Object.keys(REPAIR_OPTIONS).map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label>
-                <label>SPECIFIC REPAIR<select value={item.repair} onChange={event=>{const repair=event.target.value;updateItem(item.id,current=>({...current,repair,quantity:undefined,estimateEnabled:Boolean(repair||current.category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,current.category,repair)}));if(item.category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop")}} disabled={!item.category}><option value="">{item.category?"Optional specific repair":"Select category first"}</option>{item.repair&&!repairs.includes(item.repair)&&<option value={item.repair}>{item.repair} (as logged)</option>}{repairs.map(value=><option key={value}>{value}</option>)}</select></label>
+                {/* TYPE OR TAP, and the repair box is NOT locked behind the
+                    category. These were two plain <select>s, and the second
+                    carried disabled={!item.category} — so you had to know a
+                    wiper motor lives under Bus Accessories before you could look
+                    for one. That is the exact failure the Defect Log's
+                    ComboField was built to remove, and this is that component,
+                    not a second copy of it.
+
+                    It also fixes the wording. The old <select> printed the raw
+                    REPAIR_OPTIONS value, which for a grouped category is the
+                    stored "Group - Item" identity — a flat wall of prefixed
+                    strings with no optgroup and no display label. The stored
+                    identity is untouched; only what is drawn changes. */}
+                <ComboField label="CATEGORY" className="wide"
+                 value={item.category}
+                 display={item.category?repairCategoryLabel(item.category):""}
+                 placeholder="Type or tap to choose a category"
+                 emptyText="No category matches that"
+                 search={query=>searchCategories(query).map(row=>({value:row.value,label:row.label}))}
+                 onPick={category=>updateItem(item.id,current=>({...current,category,repair:"",quantity:undefined,estimateEnabled:Boolean(category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,"")}))}/>
+                <ComboField label="SPECIFIC REPAIR" className="wide"
+                 value={item.repair}
+                 display={item.repair?(CATALOG_OPTIONS.find(row=>row.value===item.repair&&(!item.category||row.category===item.category))?.label||CATALOG_OPTIONS.find(row=>row.value===item.repair)?.label||item.repair):""}
+                 placeholder={item.category?"Type or tap - or leave it and save the category alone":"Type what is wrong, or tap to browse"}
+                 emptyText="Nothing in the catalog matches that"
+                 footnote={item.category?undefined:"Searching every category. Picking one sets the category for you."}
+                 search={query=>{
+                  const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category);
+                  /* Headings while browsing, the group on each row while
+                     searching - the same split the Defect Log measured, kept
+                     identical here so the two surfaces read the same. */
+                  const browsing=!query.trim();
+                  return [
+                   ...inCategory.map(row=>({value:row.value,label:row.label,category:row.category,
+                    section:browsing?(item.category?(row.groupLabel||row.categoryLabel):(row.groupLabel?row.categoryLabel+" \u00b7 "+row.groupLabel:row.categoryLabel)):undefined,
+                    hint:browsing?undefined:(row.groupLabel?row.groupLabel+" \u00b7 "+row.categoryLabel:row.categoryLabel)})),
+                   ...elsewhere.map(row=>({value:row.value,label:row.label,category:row.category,foreign:true,
+                    hint:(row.groupLabel?row.groupLabel+" \u00b7 ":"")+row.categoryLabel+" \u2014 switches category"})),
+                  ];
+                 }}
+                 onPick={(repair,row)=>{
+                  /* Picking a repair from ANOTHER category sets the category
+                     too, which is the whole point of not locking the second box:
+                     type "wiper motor", and Bus Accessories fills itself in. */
+                  const category=row?.category||item.category;
+                  updateItem(item.id,current=>({...current,category,repair,quantity:undefined,estimateEnabled:Boolean(repair||category),timeEstimate:resetCoreRepairEstimate(current.timeEstimate,category,repair)}));
+                  if(category==="Interior Cleaning"&&repair==="Cleaning Required")update("operationalStatus","shop");
+                 }}/>
                 <label className="wide">DETAILS<textarea value={item.details} onChange={event=>updateItem(item.id,current=>({...current,details:event.target.value}))} placeholder="Optional notes for this repair"/></label>
                 {/* Sits with the repair, not inside the completion block: a fan
                     count is what was reported and an air bag count is what the
