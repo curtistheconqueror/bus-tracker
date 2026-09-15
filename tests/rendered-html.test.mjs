@@ -922,7 +922,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   /* Bays 11 and 12 still take the special-slot colour. The expression now also
      carries the ready-bay divider, so both classes are composed rather than one
      replacing the other — asserted on the composition, not on the old shape. */
-  assert.match(page, /className=\{\[c>=10\?"garage-special-slot":"",c===6\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
+  assert.match(page, /className=\{\[c>=GARAGE_TROUBLE_BAY_FIRST_COLUMN\?"garage-special-slot":"",c===GARAGE_READY_BAY_DIVIDER_COLUMN\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
   assert.match(page, /"--garage-special",visuals\.garageSpecial/);
   assert.match(page, /"--garage-frame",visuals\.garageFrame/);
   assert.match(css, /\.garage\{border-color:var\(--garage-frame\)\}/);
@@ -10311,8 +10311,11 @@ test("the Main Garage marks BAYS 1-6 as ready, with a line down the grid and a m
     nothing itself, so the border has to land on the actual cells. Nothing here
     disturbs the existing bay 11/12 special-slot logic, which shares the same
     className expression. */
- assert.match(page,/\{Array\.from\(\{length:12\},\(_,i\)=><b key=\{i\} className=\{i===6\?"ready-bay-divider":undefined\}>\{String\(i\+1\)\.padStart\(2,"0"\)\}<\/b>\)\}/);
- assert.match(page,/className=\{\[c>=10\?"garage-special-slot":"",c===6\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
+ assert.match(page,/\{Array\.from\(\{length:GARAGE_COLUMNS\},\(_,i\)=><b key=\{i\} className=\{i===GARAGE_READY_BAY_DIVIDER_COLUMN\?"ready-bay-divider":undefined\}>\{String\(i\+1\)\.padStart\(2,"0"\)\}<\/b>\)\}/);
+ /* Named, not numbered. The column indices are the garage grid's geometry and
+    live in facility-layout.ts; spelling them as literals here is what let five
+    files disagree about the width in the first place. */
+ assert.match(page,/className=\{\[c>=GARAGE_TROUBLE_BAY_FIRST_COLUMN\?"garage-special-slot":"",c===GARAGE_READY_BAY_DIVIDER_COLUMN\?"ready-bay-divider":""\]\.filter\(Boolean\)\.join\(" "\)\|\|undefined\}/);
  assert.equal((page.match(/ready-bay-divider/g)||[]).length,2,"the column header and the cell, and nothing else");
  assert.equal((page.match(/ready-rows-divider/g)||[]).length,0,"the row divider is gone");
  assert.equal((css.match(/ready-rows-divider/g)||[]).length,0);
@@ -15125,4 +15128,80 @@ test("the forecast adds the two queues it can see, and counts neither twice",asy
  const modalCode=modal.replace(/\/\*[\s\S]*?\*\//g,"");
  assert.match(modalCode,/inspections:board\.inspections/);
  assert.match(modalCode,/roadCallsPending:board\.roadCallsPending\.length/);
+});
+
+test("the garage's shape is one set of numbers, and everything that reads the grid agrees",async()=>{
+ /* PHASE 0 OF PULLING THE SITE OUT OF THE CODE (issue #21).
+
+    A `garage-N` slot id carries its position arithmetically: row N/COLUMNS,
+    column N%COLUMNS. So every question about where a garage slot IS depends on
+    the WIDTH — and the width was written as a bare 12 in five separate files.
+
+    `mystery-buses.ts` is the one that made this worth fixing before anything
+    else. It asked `slot%12>=10` to mean "the last two columns". Change the
+    garage to ten wide or fourteen and that expression still runs, still returns
+    a boolean, and marks the WRONG buses on the awareness board a foreman
+    reads. No error, no failing test.
+
+    This test is the net that makes a width change safe rather than merely
+    centralised: it drives the two independent definitions of "trouble bay" -
+    the awareness predicate, and the move destinations the editor offers - over
+    EVERY slot in the garage and requires them to agree. */
+ const {GARAGE_CAPACITY,GARAGE_COLUMNS,GARAGE_ROWS,GARAGE_TROUBLE_BAY_FIRST_COLUMN,isGarageTroubleBayIndex}=
+  await import("../app/facility-layout.ts");
+ const {RELOCATION_AREAS,SECTION_SLOTS}=await import("../app/facility-areas.ts");
+ const {isBay12AwarenessArea}=await import("../app/mystery-buses.ts");
+
+ /* Derived, never typed: 84 is 7x12 and must stay that way by construction. */
+ assert.equal(GARAGE_CAPACITY,GARAGE_ROWS*GARAGE_COLUMNS);
+ assert.equal(SECTION_SLOTS["MAIN GARAGE (BAYS 1-12)"].length,GARAGE_CAPACITY);
+
+ const bay11=new Set(RELOCATION_AREAS["TROUBLE BAY 11"]);
+ const bay12=new Set(RELOCATION_AREAS["TROUBLE BAY 12"]);
+ const standard=new Set(RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"]);
+ /* One bay per row, and the three destinations partition the grid exactly:
+    nothing is in two of them, and no slot is left out of all three. */
+ assert.equal(bay11.size,GARAGE_ROWS);
+ assert.equal(bay12.size,GARAGE_ROWS);
+ assert.equal(standard.size,GARAGE_CAPACITY-2*GARAGE_ROWS);
+
+ for(let slot=0;slot<GARAGE_CAPACITY;slot++){
+  const id="garage-"+slot,column=slot%GARAGE_COLUMNS;
+  const inTroubleBay=bay11.has(id)||bay12.has(id);
+  const places=[standard.has(id),bay11.has(id),bay12.has(id)].filter(Boolean).length;
+  assert.equal(places,1,id+" must belong to exactly one move destination");
+  /* THE ASSERTION THAT BITES. The awareness test and the move destinations are
+     written independently and must never disagree about which slots are the
+     trouble bays. */
+  assert.equal(isBay12AwarenessArea(id),inTroubleBay,
+   id+" (column "+column+"): the awareness test and the move destinations disagree");
+  assert.equal(isGarageTroubleBayIndex(slot),inTroubleBay,
+   id+": the shared predicate disagrees with the move destinations");
+  assert.equal(column>=GARAGE_TROUBLE_BAY_FIRST_COLUMN,inTroubleBay,
+   id+": the boundary column does not match where the trouble bays actually are");
+ }
+
+ /* A slot one past the end is not a trouble bay by accident of the modulo. */
+ assert.equal(isGarageTroubleBayIndex(-1),false);
+ assert.equal(isGarageTroubleBayIndex(1.5),false);
+ assert.equal(isBay12AwarenessArea("garage-"),false,"a garage id with no number is not an area");
+
+ /* And the literals are gone from the four files that used to carry them, so a
+    future width change has exactly one place to happen. */
+ const [layout,areas,mystery,page]=await Promise.all([
+  readFile(new URL("../app/facility-layout.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/facility-areas.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/mystery-buses.ts",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+ const code=source=>source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.equal(/%\s*12/.test(code(mystery)),false,"mystery-buses must not spell the garage width itself");
+ assert.equal(/row\s*\*\s*12|r\s*\*\s*12/.test(code(areas)+code(page)),false,
+  "the garage grid must be indexed through GARAGE_COLUMNS, not a literal");
+ assert.equal(/facilitySlots\("garage",\s*84\)/.test(code(areas)),false,
+  "the garage capacity must be derived from the grid");
+ /* The numbers themselves live in exactly one file. */
+ assert.match(code(layout),/export const GARAGE_COLUMNS=12;/);
+ for(const [name,source] of [["facility-areas",areas],["mystery-buses",mystery],["page",page]])
+  assert.match(code(source),/from "\.\/facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
 });
