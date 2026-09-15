@@ -644,7 +644,30 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .repair-existing-entry>button:focus-visible{outline:2px solid var(--log-text,#172b4d);outline-offset:2px}
 @media(max-width:620px){.repair-existing-entry>button{margin-left:0;width:100%}}
 .status-report-modal{width:min(760px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
-.status-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
+/* STICKY, AND height:auto, AND BOTH ARE LOAD-BEARING.
+
+   Curtis, on a phone: "The X button is to the upper right. I can see it unless
+   I pull the screen down on phone. But even then I can't touch it because while
+   pulling down screen it's not responsive."
+
+   Two separate faults, both measured rather than read.
+
+   1. THE HEADER SCROLLED AWAY. The modal is the scroll container
+      (`overflow:auto`) and this header was `position:static` inside it, so on a
+      41-bus report - 1208px of content in a 745px box - scrolling to the end put
+      CLOSE at top:-449px. The only way back to it was to overscroll, and a
+      rubber-band gesture does not deliver taps. A dismiss control has to be
+      reachable from wherever the reader actually is, which on a long report is
+      the bottom.
+
+   2. `height:auto` IS NOT REDUNDANT - DO NOT DELETE IT. `globals.css` gives
+      every bare `<header>` a fixed `height:38px`, and this element is a
+      `<header>`. This rule never declared `height`, so that one still won: the
+      header measured 38px tall while the 44px CLOSE button inside it overflowed
+      its own bottom edge by 20px. `min-height` cannot undo a fixed height; only
+      `height:auto` releases it. Third time this repository has been bitten by
+      that rule, which is why the reason is written here. */
+.status-report-head{position:sticky;top:0;z-index:3;height:auto;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
 .status-report-head small{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9db4da}
 .status-report-head h2{margin:2px 0 0;font-size:20px;font-weight:900;letter-spacing:.01em}
 /* Chrome you can see. The old rule was border:0 on a 12% white fill over a navy
@@ -684,7 +707,15 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .status-report-actions button:focus-visible{outline:2px solid #f97316;outline-offset:2px}
 .status-report-note{margin:0 16px;font-size:10px;font-weight:700;line-height:1.5;color:var(--log-muted,#5b6b85)}
 @media(max-width:620px){
- .status-report-modal{width:100vw;max-height:100vh;border-radius:0}
+ /* 100dvh, not 100vh. On iOS `100vh` is the LARGE viewport - the height the
+    page would have if the browser chrome were hidden - while the shade next
+    door is `height:100dvh`, the height actually on screen. A modal capped at
+    the larger of the two is a centred flex item taller than its container, and
+    a centred item overflows its container EQUALLY top and bottom. The bottom
+    overflow you can scroll to; the top is simply unreachable, which is the
+    other half of why the header could not be tapped. The `100vh` line stays
+    first as the fallback for anything without dvh. */
+ .status-report-modal{width:100vw;max-height:100vh;max-height:100dvh;border-radius:0}
  .status-report-head>button{min-height:44px;font-size:11px}
  .status-report-head{border-radius:0}
  .status-report-headline{grid-template-columns:1fr}
@@ -724,4 +755,3 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
 /* The two switches now stack, so the second needs a gap above it, and the
    disabled one has to read as unavailable rather than as broken. */
-
