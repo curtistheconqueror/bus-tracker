@@ -150,8 +150,42 @@ the garage being one section drawn as one grid but three move destinations.
 Tidying any of them is a visible change and belongs to whoever decides to make
 it, on purpose.
 
-**Still to do in Step 2:** point `facility-areas.ts`, `location-label.ts`,
-`map-settings.ts` and `fleet-intelligence.ts` at the config, one per commit.
+**Step 2 is done.** Three consumers read the config; the fourth deliberately
+does not.
+
+| Consumer | Outcome |
+| --- | --- |
+| `facility-areas.ts` | reads the config — `SECTION_SLOTS`, `RELOCATION_AREAS`, `EAST_SLOTS` and the capacity constants |
+| `location-label.ts` | reads the config — area labels and the prefix fallback |
+| `fleet-intelligence.ts` | reads the config — the alias table, order included |
+| `map-settings.ts` | **not switched, on purpose** |
+
+**Why `map-settings.ts` stays.** `SECTION_THEME_KEYS` is `as const` and
+`SectionThemeKey` is the literal union derived from it, which types
+`Visuals.sections` and every theme. Reading the array at runtime gives identical
+values and a type of plain `string` — measured — so a misspelt section key would
+start type-checking in the file that types all the theming. The equivalence test
+requires the two to match in content and order, so it cannot drift.
+
+**Two tests had to change character, not just address.** Nine assertions that
+matched source text (`"PIT":facilitySlots("pit",2)`) became assertions on the
+table itself; a text match only ever proved a spelling.
+
+**And one test stopped biting because of this work.** The alias-order assertion
+resolved a phrase through the config and required `findOperatorArea` to agree —
+which worked while they were two lists, and became a tautology the moment
+`fleet-intelligence.ts` began reading the config. The mutation that removes the
+config's sort passed. It is pinned to the expected area now. Caught only by
+re-running the mutation after the swap; a green suite meant something different
+after the change than before it.
+
+**Proofs, per commit:** the whole map rendered before and after at 1180 — 355
+spots, 16 sections, facility innerHTML identical at 86,943 characters; all 355
+slots labelling exactly as before; the operator parser resolving every alias and
+still splitting "bays 11 and 12" into two mentions.
+
+**Phase 1 is complete.** The decision gate is now: Phase 2 is the CSS, and it
+only pays if a second garage is real.
 
 The gate, and it is not negotiable: **`npm test` reports 325 with zero edits to
 any test file.** The suite carries 431 slot-name literals and 71 section-name
