@@ -92,6 +92,18 @@ export type RoadCallForecast={
 export type DownedForecast={
  now:number;
  range:ForecastRange;
+ /* THE SINGLE NUMBER, always computed and not shown by default.
+
+    Curtis asked for one number; a range is what seven swaps can honestly
+    carry, and he took that — "if it hasn't beaten my judgement yet based on a
+    lack of samples then I will go with your recommendation on a range... u can
+    build it for single number ability now so we don't have to revisit from
+    scratch."
+
+    So it is computed either way and the caller picks the spelling. Switching to
+    it later is a parameter, not a rewrite, and nothing has to be recomputed to
+    find out what it would have said. */
+ expected:number;
  inRange:ForecastRange;
  outRange:ForecastRange;
  enough:boolean;
@@ -293,7 +305,8 @@ function downedRows(ledger:unknown){
 function downedForecast(ledger:unknown,downedNow:number,hours:number){
  const tempo=ledgerTempo(downedRows(ledger)).filter(row=>row.sinceHours!==null&&row.sinceHours>0);
  if(tempo.length<FORECAST_MIN_SWAPS-1)
-  return {now:downedNow,range:{low:downedNow,high:downedNow},inRange:{low:0,high:0},outRange:{low:0,high:0},
+  return {now:downedNow,range:{low:downedNow,high:downedNow},expected:downedNow,
+   inRange:{low:0,high:0},outRange:{low:0,high:0},
    enough:false,need:(FORECAST_MIN_SWAPS-1)-tempo.length};
  const totalHours=tempo.reduce((sum,row)=>sum+(row.sinceHours as number),0);
  const added=tempo.reduce((sum,row)=>sum+row.added,0);
@@ -310,6 +323,9 @@ function downedForecast(ledger:unknown,downedNow:number,hours:number){
      down, and a range whose floor is negative reads as a bug to the one person
      whose job it is to notice. */
   range:{low:Math.max(0,downedNow+inRange.low-outRange.high),high:Math.max(0,downedNow+inRange.high-outRange.low)},
+  /* The point estimate is the rates straight through, rounded — buses are
+     whole. Never below zero, for the reason the range's floor is not. */
+  expected:Math.max(0,Math.round(downedNow+addedRate*hours-clearedRate*hours)),
   inRange,outRange,enough:true,need:0,
  };
 }
@@ -370,60 +386,60 @@ export function buildFleetForecast(
  };
 }
 
-/* The forecast as lines of the same width the rest of the report is built to.
-   Built here rather than in the report module so there is one wording, and the
-   printed version renders the same object rather than parsing these back. */
-export function forecastTextLines(forecast:FleetForecast|null,width:number){
+/* THE FORECAST IS ONE NUMBER.
+
+   Curtis: "Most important number is Forecasted Total Down buses by pullout
+   times... So far, I only want this one number for the forecast. I'll let you
+   know if I'm gonna add more lines or details."
+
+   So the road-call rate, the chance-of-any and the per-category dwell are all
+   still COMPUTED — they are on the FleetForecast object and the tests hold them
+   — and none of them is printed. Adding a line back is a display change here
+   rather than a rebuild of the model, which is the whole reason they stay.
+
+   WHICH PULLOUT is not a rule this module needs. Curtis described it as "if
+   numbers was updated on 2nd shift then a forecast for am pullout... if it's
+   first shift then a pm pullout number", and that is exactly what
+   `nextPullout` already returns from the shift clock — 2nd shift to 06:00, 1st
+   to 13:00, 3rd to 06:00. No second table to keep in step. */
+export type ForecastStyle="range"|"single";
+
+export function forecastTextLines(
+ forecast:FleetForecast|null,
+ width:number,
+ options:{style?:ForecastStyle}={}
+){
  if(!forecast)return [];
- const lines:string[]=[];
- const column=20;
- const row=(label:string,value:string)=>(label.length>=column?label+" ":label.padEnd(column))+value;
- lines.push("FLEET FORECAST");
+ const lines:string[]=["FLEET FORECAST"];
  /* The hedge rides with the heading, every time, wrapped to the width rather
     than trusted to fit. Curtis asked for it in those words and it is not a
-    disclaimer to be tucked at the bottom: it is what the section IS. */
- /* Wrapped well short of the width on purpose. At the full width the break
+    disclaimer to be tucked at the bottom: it is what the section IS.
+
+    Wrapped well short of the width on purpose. At the full width the break
     lands between "work" and "flow", which reads as a typo rather than a wrap;
-    at 26 the three lines break where the phrase does. */
+    at 26 the three lines break where the phrase does. One bracket around the
+    whole thing, opened on the first line and closed on the last. */
  const hedge=wrap(FORECAST_HEDGE,26);
- /* One bracket around the whole thing, opened on the first line and closed on
-    the last. Bracketing every line separately turned one parenthetical into
-    three, each reading as its own truncated aside. */
  hedge.forEach((part,index)=>lines.push((index?"   ":"  (")+part+(index===hedge.length-1?")":"")));
- /* The window on a line of its own rather than as a labelled row. "BEFORE THE
-    06:00 PULLOUT" against a 20-character heading column runs to 44 and wraps on
-    the very phone this width exists for — caught by the test that holds every
-    line to a lock screen, which is the only reason it was ever caught. */
- lines.push(forecast.window.label);
- if(forecast.roadCalls.enough){
-  lines.push(row("ROAD CALLS",rangeLabel(forecast.roadCalls.range)));
-  lines.push(row("CHANCE OF ANY",forecast.roadCalls.chance+"%"));
- }else{
-  lines.push(row("ROAD CALLS",forecast.roadCalls.quiet?"none on record":"not yet"));
-  if(forecast.roadCalls.quiet){
-   lines.push("  (no road call on this shift in");
-   lines.push("   the last "+FORECAST_LOOKBACK_DAYS+" days)");
-  }else{
-   lines.push("  ("+forecast.roadCalls.need+" more road calls on");
-   lines.push("   record before this reads)");
-  }
+ lines.push("");
+ lines.push("DOWNED BUSES");
+ /* The window on its own line rather than as a labelled row. "BEFORE THE 06:00
+    PULLOUT" against a 20-character heading column runs to 44 and wraps on the
+    very phone this width exists for — caught by the test that holds every line
+    to a lock screen, which is the only reason it was ever caught. */
+ lines.push(fitText(forecast.window.label,width));
+ if(!forecast.downed.enough){
+  lines.push("  not yet - "+forecast.downed.need+" more sheet swap"+(forecast.downed.need===1?"":"s"));
+  return lines;
  }
- if(forecast.downed.enough){
-  lines.push(row("DOWNED AT END",rangeLabel(forecast.downed.range)));
-  lines.push("  (now "+forecast.downed.now+", +"+rangeLabel(forecast.downed.inRange)
-   +" in, -"+rangeLabel(forecast.downed.outRange)+" out)");
- }else{
-  lines.push(row("DOWNED AT END","not yet"));
-  lines.push("  ("+forecast.downed.need+" more sheet swap"+(forecast.downed.need===1?"":"s")+" before");
-  lines.push("   this reads)");
- }
- if(forecast.slowest.length){
-  lines.push("");
-  lines.push("SLOWEST ON THE SHEET");
-  for(const item of forecast.slowest)
-   lines.push("  "+fitText(item.category,width-16).padEnd(width-16)+" "+item.days+"d"+(item.open?"*":""));
-  if(forecast.slowest.some(item=>item.open))lines.push("  * still open, so at least this");
- }
+ const figure=options.style==="single"
+  ?String(forecast.downed.expected)
+  :rangeLabel(forecast.downed.range);
+ /* NOT through fitText, which trims: the leading indent is what puts this line
+    under the heading with every other indented line in the block, and trimming
+    it left the one number flush against the margin. The content cannot overflow
+    38 anyway — two three-digit figures and "(now NNN)" is twenty-two. */
+ lines.push("  "+figure+"   (now "+forecast.downed.now+")");
  return lines;
 }
 

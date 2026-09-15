@@ -10786,7 +10786,11 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
  const thin=buildFleetForecast(onShift(4),[],{now,downed:14});
  assert.equal(thin.roadCalls.enough,false);
  assert.equal(thin.roadCalls.need,FORECAST_MIN_ROAD_CALLS-4,"and says how many more it needs");
- assert.match(forecastTextLines(thin,STATUS_REPORT_WIDTH).join("\n"),/ROAD CALLS\s+not yet/);
+ /* The road-call rate is COMPUTED and no longer PRINTED. Curtis: "So far, I
+    only want this one number for the forecast." It stays on the object so
+    putting a line back is a display change rather than a rebuild, and this
+    test holds that line by asserting the object rather than the text. */
+ assert.doesNotMatch(forecastTextLines(thin,STATUS_REPORT_WIDTH).join("\n"),/ROAD CALLS/);
 
  const ready=buildFleetForecast(onShift(FORECAST_MIN_ROAD_CALLS+4),[],{now,downed:14});
  assert.equal(ready.roadCalls.enough,true);
@@ -10807,13 +10811,16 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
  assert.equal(quiet.roadCalls.observed,0,"and none of it on the shift being forecast");
  assert.equal(quiet.roadCalls.enough,false,"so it refuses");
  assert.equal(quiet.roadCalls.quiet,true);
+ /* A zero would read as a prediction, so nothing quotes one - and the report
+    no longer prints the road-call line at all, which is the strongest form of
+    that guarantee. */
  const quietText=forecastTextLines(quiet,STATUS_REPORT_WIDTH).join("\n");
- assert.match(quietText,/none on record/);
- assert.doesNotMatch(quietText,/CHANCE OF ANY\s+0%/,"a zero would read as a prediction");
+ assert.doesNotMatch(quietText,/CHANCE OF ANY/);
+ assert.doesNotMatch(quietText,/0%/);
 
  /* THE DOWNED HALF NEEDS SHEET SWAPS and says so until it has them. */
  assert.equal(ready.downed.enough,false);
- assert.match(forecastTextLines(ready,STATUS_REPORT_WIDTH).join("\n"),/more sheet swaps? before/);
+ assert.match(forecastTextLines(ready,STATUS_REPORT_WIDTH).join("\n"),/not yet - \d+ more sheet swaps?/);
  assert.equal(ready.downed.now,14,"and still reports where the fleet stands");
 
  /* RIGHT-CENSORING, and the reason it is the whole ballgame. Curtis: "AC
@@ -14906,4 +14913,66 @@ test("the downed forecast measures the same population it projects",async()=>{
   rows:snapshot.rows.map(item=>item.c===INSPECTION_CATEGORY?{...item,c:"Engine"}:item)}));
  const wrong=buildFleetForecast([],[],{now:at(4),ledger:naive,downed:4,span:"pullout"});
  assert.ok(wrong.downed.inRange.high>0,"the fixture really does move once inspections count");
+});
+
+test("the forecast is one number, and the single-number spelling is already there",async()=>{
+ const {buildFleetForecast,forecastTextLines}=await import("../app/fleet-forecast.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+
+ /* Curtis: "Most important number is Forecasted Total Down buses by pullout
+    times... So far, I only want this one number for the forecast." */
+ const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*24*3600000).toISOString();
+ /* Four swaps, two buses arriving each day and one clearing, so the rates are
+    real and the projection has to move. */
+ const ledger=[0,1,2,3].map(index=>({
+  id:"s"+index,at:at(index),shift:"1st",
+  rows:Array.from({length:4+index},(unused,n)=>({b:"170"+n+index,c:"Engine"})),
+  off:index?["170"+index+(index-1)]:[],
+ }));
+ const forecast=buildFleetForecast([],[],{now:at(4),ledger,downed:20,span:"pullout"});
+ assert.equal(forecast.downed.enough,true);
+
+ const ranged=forecastTextLines(forecast,STATUS_REPORT_WIDTH).join("\n");
+ const single=forecastTextLines(forecast,STATUS_REPORT_WIDTH,{style:"single"}).join("\n");
+
+ /* THE RANGE IS THE DEFAULT, because seven swaps cannot carry a decimal point
+    and a figure that looks more confident than the data is how a forecast
+    stops being believed. Curtis took that: "if it hasn't beaten my judgement
+    yet based on a lack of samples then I will go with your recommendation on a
+    range." */
+ assert.match(ranged,/\d+-\d+/,"the default spells a range");
+ /* AND THE SINGLE NUMBER IS ALREADY BUILT, so the switch is a parameter rather
+    than a rewrite - "u can build it for single number ability now so we don't
+    have to revisit from scratch". */
+ assert.doesNotMatch(single,/\d+-\d+/,"the single spelling carries no dash");
+ assert.ok(single.includes("  "+forecast.downed.expected+"   (now "),"it prints the point estimate");
+ assert.ok(forecast.downed.expected>=forecast.downed.range.low
+  &&forecast.downed.expected<=forecast.downed.range.high,"and it sits inside the range it replaces");
+ /* AND IT ACTUALLY MOVES WITH THE RATES. Containment alone does not bite: a
+    point estimate hard-wired to today's count sits inside its own range every
+    time, and the mutation that did exactly that survived until this line. This
+    fixture takes two buses a day and clears one, so a figure that does not rise
+    above the twenty on the board is not reading the ledger at all. */
+ assert.ok(forecast.downed.expected>forecast.downed.now,
+  "arrivals beat clearances in this fixture, so the projection has to rise");
+
+ /* BOTH spellings carry the window and where the fleet stands right now. */
+ for(const text of [ranged,single]){
+  assert.match(text,/DOWNED BUSES/);
+  assert.match(text,/PULLOUT/,"the window is named, and it is the next pullout");
+  assert.match(text,/\(now 20\)/);
+  assert.match(text,/not guaranteed/,"the hedge rides with it every time");
+ }
+
+ /* EVERYTHING ELSE IS STILL COMPUTED AND SIMPLY NOT DRAWN, so putting a line
+    back is a display change and not a rebuild of the model. */
+ assert.equal(typeof forecast.roadCalls.chance,"number");
+ assert.ok(Array.isArray(forecast.slowest));
+ for(const gone of ["ROAD CALLS","CHANCE OF ANY","SLOWEST ON THE SHEET"])
+  assert.equal(ranged.includes(gone),false,"no longer printed: "+gone);
+
+ /* Still a lock screen. */
+ for(const text of [ranged,single])
+  for(const line of text.split("\n"))
+   assert.ok(line.length<=STATUS_REPORT_WIDTH,"too wide ("+line.length+"): "+line);
 });

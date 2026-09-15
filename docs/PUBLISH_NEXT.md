@@ -179,9 +179,52 @@ the Status Report's ROADCALLS PENDING; the conversion rate has to come off the
 board's own `roadCalls` history, because a road call that never converted never
 appears on a sheet and is invisible to the paper. Noted in the module, not built.
 
+## Also in 177: the forecast is one number
+
+Curtis: *"Most important number is Forecasted Total Down buses by pullout
+times... So far, I only want this one number for the forecast. I'll let you know
+if I'm gonna add more lines or details."*
+
+The block was five rows and a dwell table. It is now:
+
+```
+FLEET FORECAST
+  (not guaranteed - based on
+   work flow and probability
+   logistics)
+
+DOWNED BUSES
+BEFORE THE 06:00 PULLOUT
+  33-37   (now 35)
+```
+
+**Everything else is still computed and simply not drawn** — the road-call rate,
+the chance-of-any and the per-category dwell are all on the `FleetForecast`
+object and the tests assert them there rather than in the text. Putting a line
+back is a change in `forecastTextLines` and nowhere else.
+
+**WHICH PULLOUT needed no new code.** Curtis described the rule as *"if numbers
+was updated on 2nd shift then a forecast for am pullout... if it's first shift
+then a pm pullout number"*, and that is exactly `nextPullout` off the shift
+clock. Verified in Chromium with the context clock set to `America/Chicago`
+against the real nine-sheet baseline: **2nd shift 20:00 to the 06:00 pullout, a
+10-hour window; 1st shift 09:00 to the 13:00 pullout, a 4-hour window.**
+
+### The single number is already built
+
+A range is what seven swaps can honestly carry, and Curtis took that — *"if it
+hasn't beaten my judgement yet based on a lack of samples then I will go with
+your recommendation on a range."* And then: *"u can build it for single number
+ability now so we don't have to revisit from scratch."*
+
+So `DownedForecast.expected` is computed on every call and
+`forecastTextLines(forecast, width, {style:"single"})` prints it. Switching is a
+parameter, not a rewrite, and nothing is recomputed to find out what the single
+figure would have said.
+
 ## Gates
 
-`npm test` — **323 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **324 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
 **Three mutations, three caught**, each aimed at a decision that would have been

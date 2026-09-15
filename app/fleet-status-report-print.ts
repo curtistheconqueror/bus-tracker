@@ -64,29 +64,17 @@ function section(buses:StatusReportBusLine[],pick:StatusReportPick){
  return busRows(buses,pick.defects);
 }
 
-/* The forecast SET IN TYPE rather than printed as the 38-character block the
-   message carries. Same numbers, same wording, same hedge — this document has
-   room, and a monospace paste of a lock-screen layout in the middle of a
-   typeset page reads as something that was forwarded rather than produced. */
-function forecastHtml(forecast:FleetForecast){
- const rows:string[]=[];
- rows.push(row("Window",escapeHtml(forecast.window.label.toLowerCase())));
- rows.push(forecast.roadCalls.enough
-  ?row("Road calls expected",escapeHtml(rangeLabel(forecast.roadCalls.range)))
-   +row("Chance of any",forecast.roadCalls.chance+"%")
-  :row("Road calls","Not enough history yet \u2014 "+forecast.roadCalls.need+" more on record"));
- rows.push(forecast.downed.enough
-  ?row("Downed at the end of it",escapeHtml(rangeLabel(forecast.downed.range))
-   +' <em>now '+forecast.downed.now+", +"+escapeHtml(rangeLabel(forecast.downed.inRange))
-   +" in, \u2212"+escapeHtml(rangeLabel(forecast.downed.outRange))+" out</em>")
-  :row("Downed at the end of it","Not enough history yet \u2014 "+forecast.downed.need
-   +" more sheet swap"+(forecast.downed.need===1?"":"s")));
- const slowest=forecast.slowest.length
-  ?'<h2>Slowest on the sheet</h2><ul class="buses">'+forecast.slowest.map(item=>
-   '<li><b>'+escapeHtml(String(item.days))+'d</b><span>'+escapeHtml(item.category)+'</span><em>'
-   +(item.open?item.open+" of "+item.total+" still open, so at least this":item.total+" repairs")+'</em></li>').join("")+'</ul>'
-  :"";
- return '<dl class="forecast">'+rows.join("")+'</dl>'+slowest;
+/* THE SAME ONE NUMBER, set in type rather than as the 38-character block the
+   message carries. Curtis wants one figure on this report; the road-call rate
+   and the per-category dwell are still computed on the forecast object and
+   simply not drawn, so adding a row back later is a change here and nowhere
+   else. */
+function forecastHtml(forecast:FleetForecast,style:"range"|"single"="range"){
+ const figure=forecast.downed.enough
+  ?(style==="single"?String(forecast.downed.expected):escapeHtml(rangeLabel(forecast.downed.range)))
+  :"Not enough history yet \u2014 "+forecast.downed.need+" more sheet swap"+(forecast.downed.need===1?"":"s");
+ const note=forecast.downed.enough?' <em>now '+forecast.downed.now+"</em>":"";
+ return '<dl class="forecast">'+row("Downed buses "+forecast.window.label.toLowerCase(),figure+note)+'</dl>';
 }
 
 function row(label:string,value:string){
