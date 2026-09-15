@@ -111,9 +111,47 @@ Deleting it is safe only once the bay migration is **persisted** rather than
 held in one page's state — a change to how the board is written, so it belongs
 to Phase 1.
 
-**Phase 1 — one `site-config.ts`, values byte-identical to today.**
-The five TS tables above become one exported object; each current module reads
-from it instead of holding literals. Nothing a user sees moves.
+**Phase 1 — one `site-config.ts`, values byte-identical to today. STEP 1 DONE.**
+
+Split in two on purpose. **Step 1 writes the config and proves it, changing no
+consumer** — a pure addition, so nothing in the running app can move. **Step 2**
+points the five tables at it one at a time, with the rendered map diffed at each.
+
+Step 1 is in: `app/site-config.ts` holds one record per section — the slot plan,
+the theme entry, and the move destinations with their labels and spoken aliases
+— and a test requires it to reproduce `SECTION_SLOTS`, `RELOCATION_AREAS`, the
+label table, `SECTION_THEME_KEYS` and the alias table **exactly**. That
+equivalence is what makes Step 2 a refactor rather than a rewrite.
+
+**It found two things reading would not have, and both are ORDER.**
+
+- **The swatch list and the section list are ordered differently.** FOREMAN
+  OFFICE is sixth among the theme swatches and ninth among the sections. Deriving
+  the swatches from section order silently reorders somebody's colour picker, so
+  the theme carries its own `order`.
+- **The alias order is behaviour, not presentation.** `findOperatorArea` returns
+  the FIRST area one of whose aliases appears in the command. TROUBLE BAY 11 owns
+  `"bay 11"` and SHOP BAYS owns `"service bay"`, and both sit inside
+  *"service bay 11"* — the trouble bays are listed first, so it resolves the way
+  somebody in the shop means it. Ordered by section instead it quietly becomes
+  SHOP BAYS.
+
+**A mutation survived the first draft and that is worth recording.** Removing the
+config's alias sort passed, because feeding each alias in on its own proves
+nothing about order, and asking `findOperatorArea` about an overlapping phrase
+exercises *fleet-intelligence's own private table* rather than the config. The
+test now resolves the phrase through the **config's** list and requires it to
+agree with the app.
+
+Four asymmetries are preserved deliberately rather than tidied, each commented
+where it appears: the theme key `bays` against the slot prefix `bay`; "Shop
+Bays" against "Shop Bay"; OFF PROPERTY having no theme entry and no alias; and
+the garage being one section drawn as one grid but three move destinations.
+Tidying any of them is a visible change and belongs to whoever decides to make
+it, on purpose.
+
+**Still to do in Step 2:** point `facility-areas.ts`, `location-label.ts`,
+`map-settings.ts` and `fleet-intelligence.ts` at the config, one per commit.
 
 The gate, and it is not negotiable: **`npm test` reports 325 with zero edits to
 any test file.** The suite carries 431 slot-name literals and 71 section-name
