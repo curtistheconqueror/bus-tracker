@@ -15276,6 +15276,12 @@ test("site-config describes this building exactly as the five tables already do"
     swatches and ninth among the sections - and the swatch order is what a
     person scrolls in Settings. Sorting the config by section order silently
     reorders somebody's colour picker. */
+ /* AND THIS ASSERTION IS THE GUARD FOR THE ONE CONSUMER NOT SWITCHED.
+    `map-settings.ts` keeps its literal `as const` array, because
+    `SectionThemeKey` is the union derived from it and reading the array at
+    runtime would degrade that to plain `string` — a misspelt section key would
+    start type-checking in the file that types all theming. So the two lists
+    genuinely coexist, and this is what stops them drifting. */
  assert.deepEqual(siteThemeKeys(),SECTION_THEME_KEYS.map(([key,label])=>[key,label]),
   "the theme swatches must match in content AND order");
  assert.equal(siteThemeKeys().length,SECTION_THEME_KEYS.length);
