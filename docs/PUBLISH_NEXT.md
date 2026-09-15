@@ -8,7 +8,14 @@ Sites Version 176 was published from
 `sites-v176` at that exact source commit. The prior production rollback point is
 Version 175 from `9bac8ed`.
 
-**One commit**, on top of 176.
+**Six commits**, on top of the 176 release record (`07114e5`), oldest first:
+
+- `c4ea1a0` Let the report be picked rather than coded, every time
+- `deae2a3` Let the old sheets in, and fix the key they join on
+- `51146a0` Count the same buses the forecast is about
+- `3f1cdeb` Write down the two queues, and the forms the drivers fill in
+- `964275a` Make the forecast one number, and build the second spelling now
+- `91025bf` Count the queue standing in the yard, not just the average
 
 ## What 177 is
 
