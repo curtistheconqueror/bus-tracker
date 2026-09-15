@@ -1,11 +1,16 @@
 # Every push to main and every pull request runs the same gate a person would
 # run by hand: lint, build, and the full suite.
 #
-# The suite is the reason this exists. There are 161 tests covering the things
-# this app must never get wrong — a board that refuses to save, a merge that
-# resurrects records, a defect written under an id nothing can read back — and
-# until now they only ran when somebody remembered to run them. A repository
-# where the checks are optional has checks nobody can rely on.
+# The suite is the reason this exists. It covers the things this app must never
+# get wrong — a board that refuses to save, a merge that resurrects records, a
+# defect written under an id nothing can read back — and until now they only ran
+# when somebody remembered to run them. A repository where the checks are
+# optional has checks nobody can rely on.
+#
+# No count here on purpose. This line read "161 tests" for long enough that the
+# suite had doubled past it, and a stale number in the file that guards the
+# suite is worse than no number: it is read as a fact about today. The run's own
+# output is the count, and it cannot go stale.
 name: CI
 
 on:
