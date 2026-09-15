@@ -10773,9 +10773,9 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
   await import("../app/fleet-forecast.ts");
  const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
 
- const now="2026-09-14T10:00:00.000Z";
+ const now="2026-09-14T10:00:00.000-05:00";
  const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
- /* 10:00 UTC is 1st shift under the shop's hours, and the next pullout is
+ /* 10:00 Central is 1st shift under the shop's hours, and the next pullout is
     13:00, so the window is three hours of 1st shift. */
  const onShift=count=>Array.from({length:count},(unused,index)=>
   ({id:"r"+index,n:String(17600+index),roadCalls:[{id:"e"+index,at:hoursAgo(1+index*24)}],defects:[]}));

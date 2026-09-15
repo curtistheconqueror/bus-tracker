@@ -724,4 +724,3 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
 /* The two switches now stack, so the second needs a gap above it, and the
    disabled one has to read as unavailable rather than as broken. */
-
