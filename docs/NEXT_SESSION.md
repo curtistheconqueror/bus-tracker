@@ -164,26 +164,31 @@ Put the control in the popup that appears when Deferred is chosen. Extending is
 an edit to an existing deferral, so it belongs in the repair's history like any
 other edit, and it must not clear `wasDeferred`.
 
-### 2. A DELETE button per Down Sheet entry
+### 2. A DELETE button per Down Sheet entry — BUILT, in `5dd3a99`
 
 > "There is no quick remove as fix or just undo, and just a simply DELETE button
 > on the downsheet list like the defect log for each entry... Best is to fold it
 > in on face card of each bus."
 
-Fold it into the face card, as he asked. His fallback — buttons at the top with
-a search — is worse and he said so; only fall back if the card genuinely cannot
-hold it, and say why.
+**Done, and kept here as a worked example rather than as work.** The `×` sits on
+the bus's own cell beside the `✓` — folded into the face card as asked, not in a
+tenth column, because this table scrolls sideways on a phone and a control off
+the right edge is one you have to go looking for. Curtis on the result: *"that X
+next to the check mark is fine visually. Very easy to see."*
 
-**This one has a trap, and the plumbing for it is already built.** A Down Sheet
-removal has to be recorded in the removal ledger or it will not travel, and the
-entry will come back from the cloud on the next sync. Call
-`rememberRemovedEntries(localStorage, [entry.id], new Date().toISOString())`
-from `app/cloud-sync.ts` at the moment of deletion, exactly as
-`clearEntireDownSheet` and `importScan` in `app/down-sheet/page.tsx` already do.
-If you add an undo for it, call `forgetRemovedEntries` and restamp the entry's
-`updatedAt`, or it will lose to its own tombstone on the next pull. Read the
-Version 159 section of `docs/PUBLISH_NEXT.md` before writing this — it explains
-why in full.
+The removal travels: `rememberRemovedEntries` is called at deletion and PUT BACK
+calls `forgetRemovedEntries` **and restamps `updatedAt`**, or the row would lose
+to its own tombstone and delete itself again. The tombstone is written only
+after a storage write that succeeded — the other order reads identically until a
+device is full, and then tells the shop cloud to drop a row this device still
+holds.
+
+**WHY IT IS STILL WRITTEN DOWN.** This entry sat in the queue as pending for
+eight days after it shipped, and a GitHub issue was opened from it. In one
+session it was twice recommended to Curtis as available work, from the title
+alone, without the code being checked. **A queue is a claim about the code, and
+the code is the only thing that can settle it** — check before offering, and
+strike the item the day it lands.
 
 ### 3. Parked, older, still open
 
