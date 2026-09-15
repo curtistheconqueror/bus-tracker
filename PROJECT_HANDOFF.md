@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 176 (repository release 176)
-Live feature checkpoint: commit 5e6fd58
+Live release: Sites Version 177 (repository release 177)
+Live feature checkpoint: commit c18f635
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 176 is live as Sites Version 176 from commit 5e6fd58. It restores the garage's actual shift hours, gives the incoming shift ownership during 30-minute handovers, and corrects two-shift timing. It starts an append-only, capped Down Sheet swap ledger under `pace-sheet-ledger-v1`, merged through device transfers and master imports; no existing fleet, Down Sheet, or cloud record is rewritten. It also makes the Fleet Status Report close control plainly visible and touch-sized. The normal rollback target is Version 175 from commit 9bac8ed.
+Repository release 177 is live as Sites Version 177 from commit c18f635. It turns the Fleet Status Report into a per-device checkbox list, adds its first Fleet Forecast, and independently counts Farebox, Ventra, and CUBIC-screen buses. It supports safe old-sheet backfill into the Down Sheet history ledger and corrects that ledger to use fleet numbers across devices. The new optional `pace-status-report-picks-v1` preference saves report inclusions only; no fleet, Down Sheet, or cloud record is migrated. The normal rollback target is Version 176 from commit 5e6fd58.
 
 The Version 171 baseline details below remain useful historical context:
 
