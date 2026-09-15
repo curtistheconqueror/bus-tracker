@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 175 (repository release 175)
-Live feature checkpoint: commit 9bac8ed
+Live release: Sites Version 176 (repository release 176)
+Live feature checkpoint: commit 5e6fd58
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 175 is live as Sites Version 175 from commit 9bac8ed. It corrects road-call status when a bus is formally placed on the Down Sheet while preserving its road-call history, renames and shortens the Fleet Status Report, repairs Fixed Repairs contrast across all themes, and adds editable device-local shift and pullout hours. The new optional `pace-shift-settings-v1` preference falls back to built-in hours when absent, changes no fleet record, and is not synchronized. The normal rollback target is Version 174 from commit 2c06463.
+Repository release 176 is live as Sites Version 176 from commit 5e6fd58. It restores the garage's actual shift hours, gives the incoming shift ownership during 30-minute handovers, and corrects two-shift timing. It starts an append-only, capped Down Sheet swap ledger under `pace-sheet-ledger-v1`, merged through device transfers and master imports; no existing fleet, Down Sheet, or cloud record is rewritten. It also makes the Fleet Status Report close control plainly visible and touch-sized. The normal rollback target is Version 175 from commit 9bac8ed.
 
 The Version 171 baseline details below remain useful historical context:
 

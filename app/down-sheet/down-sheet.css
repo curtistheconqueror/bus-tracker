@@ -643,7 +643,7 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .repair-existing-entry>button{min-height:38px;height:auto;margin-left:auto;border:0;border-radius:6px;background:#f97316;color:#231205;padding:0 14px;font-size:10px;font-weight:900;letter-spacing:.05em;cursor:pointer;white-space:nowrap}
 .repair-existing-entry>button:focus-visible{outline:2px solid var(--log-text,#172b4d);outline-offset:2px}
 @media(max-width:620px){.repair-existing-entry>button{margin-left:0;width:100%}}
-.status-report-modal{width:min(560px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
+.status-report-modal{width:min(760px,96vw);max-height:92vh;overflow:auto;border-radius:10px;background:var(--log-surface,#fff);color:var(--log-text,#172b4d);padding:0 0 14px;display:grid;gap:12px;box-shadow:0 12px 40px #0b1a3a55}
 .status-report-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 12px;background:linear-gradient(#0a326e,#041d47);color:#fff;border-radius:10px 10px 0 0}
 .status-report-head small{display:block;font-size:9px;font-weight:900;letter-spacing:.16em;color:#9db4da}
 .status-report-head h2{margin:2px 0 0;font-size:20px;font-weight:900;letter-spacing:.01em}
@@ -660,10 +660,22 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .status-report-headline small{font-size:9px;font-weight:900;letter-spacing:.12em;color:var(--log-muted,#5b6b85)}
 .status-report-headline b{font-size:34px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;color:var(--log-header,#06275c)}
 .status-report-headline i{font-style:normal;font-size:9px;font-weight:700;color:var(--log-muted,#5b6b85)}
-.status-report-defects{margin:0 16px;display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--log-border,#c4cedd);border-radius:8px;cursor:pointer}
-.status-report-defects input{width:22px;height:22px;margin:1px 0 0;flex:none}
-.status-report-defects span{display:grid;gap:2px;font-size:13px;font-weight:700}
-.status-report-defects small{font-size:10px;font-weight:600;color:var(--log-muted,#5b6b85)}
+/* THE INCLUDE LIST. Two columns on a shop computer and an iPad, one on a phone,
+   with the modal widened from 560 to 760 to hold them — Curtis: "maybe widen the
+   user interface of it a little bit so we can include different things to check
+   mark that I want included."
+
+   22px boxes and the whole row a label, so a gloved thumb has the line rather
+   than the box to hit. */
+.status-report-picks{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+.status-report-picks fieldset{margin:0;min-width:0;border:1px solid var(--log-border,#c4cedd);border-radius:8px;padding:6px 10px 10px;display:grid;gap:6px}
+.status-report-picks legend{padding:0 6px;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--log-muted,#5b6b85)}
+.status-report-pick{display:flex;align-items:flex-start;gap:10px;padding:5px 4px;border-radius:6px;cursor:pointer}
+.status-report-pick:hover{background:var(--log-page,#f4f6fa)}
+.status-report-pick input{width:22px;height:22px;margin:1px 0 0;flex:none}
+.status-report-pick span{display:grid;gap:2px;min-width:0;font-size:13px;font-weight:700}
+.status-report-pick small{font-size:10px;font-weight:600;line-height:1.35;color:var(--log-muted,#5b6b85)}
+.status-report-pick input:focus-visible{outline:2px solid #f97316;outline-offset:2px}
 .status-report-preview{margin:0 16px;padding:12px;border:1px solid var(--log-border,#c4cedd);border-radius:8px;background:var(--log-page,#f4f6fa);color:var(--log-text,#172b4d);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre;overflow-x:auto;max-height:38vh}
 .status-report-actions{margin:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .status-report-actions button{min-height:52px;height:auto;border:0;border-radius:8px;font-size:12px;font-weight:900;letter-spacing:.06em;cursor:pointer;padding:0 10px}
@@ -677,6 +689,7 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .status-report-head{border-radius:0}
  .status-report-headline{grid-template-columns:1fr}
  .status-report-headline b{font-size:30px}
+ .status-report-picks{grid-template-columns:1fr}
  .status-report-actions{grid-template-columns:1fr}
  .status-report-preview{font-size:11px;max-height:30vh}
 }
@@ -711,6 +724,4 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
 /* The two switches now stack, so the second needs a gap above it, and the
    disabled one has to read as unavailable rather than as broken. */
-.status-report-defects+.status-report-defects{margin-top:8px}
-.status-report-defects.unavailable{opacity:.55;cursor:default}
-.status-report-defects.unavailable input{cursor:default}
+

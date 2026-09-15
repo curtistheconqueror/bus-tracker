@@ -503,7 +503,7 @@ export default function DownSheet(){
      swap's tempo is a rounding error in a forecast, and refusing an import over
      it would cost a foreman the sheet he just photographed. So its failure is
      taken and ignored. */
-  recordSheetSwap(localStorage,nextEntries,removed.map(entry=>entry.busId),now,readShiftSettings(localStorage));
+  recordSheetSwap(localStorage,nextEntries,removed.map(entry=>entry.busNumber||entry.busId),now,readShiftSettings(localStorage));
   writeDownSheetStorage(localStorage,nextEntries);
   setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");
   setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);

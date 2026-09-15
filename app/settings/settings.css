@@ -320,3 +320,30 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
  .shift-row input{flex:1;min-width:0}
  .shift-settings-actions button{justify-self:stretch;width:100%;min-height:46px}
 }
+
+/* LOAD OLD DOWN SHEETS. A one-time administrative panel, so it borrows the
+   master-transfer chrome rather than inventing its own. */
+.sheet-backfill{display:grid;gap:10px}
+.sheet-backfill-blurb{margin:0;font-size:12px;line-height:1.5;color:var(--settings-muted,#5b6b85)}
+.sheet-backfill-row{display:flex;flex-wrap:wrap;gap:10px}
+.sheet-backfill-file,.sheet-backfill-load{min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;padding:0 14px;font-size:11px;font-weight:900;letter-spacing:.07em;cursor:pointer}
+.sheet-backfill-file{border:1px solid var(--settings-border,#c4cedd);background:var(--settings-surface,#fff);color:var(--settings-text,#172b4d)}
+.sheet-backfill-file input{display:none}
+.sheet-backfill-load{border:0;background:var(--settings-accent,#06275c);color:#fff}
+.sheet-backfill-load:disabled{opacity:.45;cursor:default}
+.sheet-backfill-file:focus-within,.sheet-backfill-load:focus-visible{outline:2px solid #f97316;outline-offset:2px}
+.sheet-backfill-text{width:100%;min-height:104px;box-sizing:border-box;border:1px solid var(--settings-border,#c4cedd);border-radius:8px;padding:9px 10px;background:var(--settings-page,#f4f6fa);color:var(--settings-text,#172b4d);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.45;resize:vertical}
+.sheet-backfill-plan{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.sheet-backfill-plan div{border:1px solid var(--settings-border,#c4cedd);border-radius:8px;padding:8px 10px;min-width:0}
+.sheet-backfill-plan dt{margin:0;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--settings-muted,#5b6b85)}
+.sheet-backfill-plan dd{margin:2px 0 0;font-size:22px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;color:var(--settings-accent,#06275c)}
+/* The cap warning reads as a warning without relying on colour alone: it keeps
+   the border weight too, so it still separates in a monochrome print. */
+.sheet-backfill-plan .sheet-backfill-warn{border-width:2px;border-color:#9a5416}
+.sheet-backfill-plan .sheet-backfill-warn dd{color:#9a5416}
+.sheet-backfill-problem{margin:0;font-size:11px;font-weight:700;line-height:1.5;color:#9a5416}
+.sheet-backfill-note{margin:0;font-size:10px;font-weight:600;line-height:1.5;color:var(--settings-muted,#5b6b85)}
+@media(max-width:620px){
+ .sheet-backfill-row{display:grid;grid-template-columns:1fr}
+ .sheet-backfill-plan{grid-template-columns:1fr 1fr}
+}

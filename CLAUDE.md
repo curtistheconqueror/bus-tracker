@@ -180,6 +180,7 @@ per-device view state — which panel is open, what has been dismissed
   pace-defect-log-advanced-open-v1     ADVANCED ACTIONS, open or closed
   pace-defect-log-mystery-collapsed-v1 MYSTERY BUSES — now on the DOWN SHEET
   pace-deferred-review-dismissed-v1
+  pace-status-report-picks-v1          which boxes are ticked on the STATUS REPORT
 ```
 
 **`pace-sweep-v1` is one person's walk, and it never travels.** FULL SWEEP is a
@@ -288,6 +289,44 @@ Deduped by swap id, so a file imported twice does not double-count, and swap ids
 carry a random tail precisely so two devices scanning in the same millisecond
 with the same row count cannot mint the same one.
 
+**A ROW IS KEYED BY FLEET NUMBER, NOT BY BUS ID**, and that was wrong for two
+releases. A bus id is DEVICE-LOCAL — `section-transfer.ts` says so in its own
+words, *"two devices set up separately give the same bus different ids"*, and it
+re-points every arriving Down Sheet ENTRY by fleet number for exactly that
+reason. The ledger rode along in the same payload and nothing re-pointed it, so
+a swap scanned on the iPad and merged onto the phone shared no keys with the
+phone's own swaps: two buses still sitting on the sheet reported as `added 2,
+stuck 0`. Measured through `snapshotFromEntries`, not reasoned about. The fleet
+number is the one name both devices agree on, it is what the cloud keys `buses`
+on, and it is legible in a stored file. A record thin enough to have lost its
+number still falls back to the id rather than vanishing out of the tempo.
+
+The cutover costs exactly one distorted pair — the swap either side of it
+compares old keys against new — and that is the whole price of the fix.
+
+**`gap` marks a snapshot with unrecorded swaps in front of it.** Set only by the
+backfill; a scan always follows the sheet it replaced, so a snapshot the app
+wrote itself never carries one. `ledgerTempo` returns `sinceHours:null` for such
+a pair, which every rate already skips — the escape hatch was there from the
+first build and this is the missing input to it. Without it the baseline's
+nine-day hole reads as one swap that added fourteen buses and cleared thirty.
+Normalised with `delete` rather than `undefined`, the spelling `setBusHold`
+uses, so a hand-edited `gap:"no"` cannot spread through and read as truthy.
+
+**OLD SHEETS COME IN THROUGH `app/sheet-ledger-backfill.ts`**, behind LOAD OLD
+DOWN SHEETS in Settings. It writes `pace-sheet-ledger-v1` and nothing else —
+**a scanned sheet REPLACES the live one and a backfill must not**, because the
+sheets being loaded are weeks old and the live sheet is today's. The only
+trustworthy way to say that is a path with no access to `pace-down-sheet-v1` at
+all, and a test asserts the module cannot name it.
+
+`planBackfill` computes the entire outcome without writing a byte — what is new,
+what is already held, what the cap will drop — and `applyBackfill` takes the
+PLAN rather than the text, so the thing written is provably the thing shown.
+**The cap bites at import time**: a backfill is by definition the oldest thing
+in the ledger, so a device near forty drops most of it the instant it merges.
+Counted and shown before the button rather than discovered afterwards.
+
 Two carriers today, both already in the app: the **Down Sheet section transfer**
 (the sheet is what a swap IS), and **MASTER EXPORT**. The ledger is **the one key
 a whole-app import MERGES instead of replacing** — everything else in a restore
@@ -357,6 +396,50 @@ holds that line.
 have them — spelled out they differ by one word at the front, which is the
 hardest pair to scan on a phone. Both appear in both departments, so the pair is
 stored: the role alone does not say which one.
+
+**`pace-status-report-picks-v1` is the Fleet Status Report's include list, and
+it replaced two hard-coded versions.** Every audience wanted a different report
+and every difference came back as a code change. Curtis: *"can we have, like,
+maybe widen the user interface of it a little bit so we can include different
+things to check mark that I want included... instead of coming to you and
+getting coding every time I need it done."* And the case that settles it: *"when
+my superintendent sends that list out to his superiors, they don't need to know
+about mystery buses. and they don't need to know about inspection buses."*
+
+Seven sections — inspections, roadcalls pending, mystery buses, Farebox, Ventra,
+CUBIC screens, the Fleet Forecast — and three detail switches that COMPOSE
+rather than branch: bus numbers, then locations, then the specific repairs. Off,
+on, on-with-where, on-with-repairs. The old COUNTS ONLY version is now just
+numbers-without-locations and nothing special-cases it.
+
+**DOWNED BUSES is not on the list.** It is the question the report answers; a
+status report without it is a covering note.
+
+The three detail switches are a LADDER and the modal enforces it: locations
+without bus numbers has nothing to hang off, repairs without locations is a list
+of repairs with no bus against them. Ticking one brings the ones above it;
+unticking one takes the ones below.
+
+Remembered because the same person sends roughly the same report every morning,
+and per-device for the reason every view-state key is: it describes what this
+phone's owner sends, not anything about the fleet. Losing it costs one round of
+ticking. It is the ONE thing the report writes — `status-report-modal.tsx`
+touches no record, and a test names the single permitted key.
+
+**Farebox, Ventra and the CUBIC screens are counted APART, through
+`app/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
+moved up to critical levels, period. So they need a count of that as well...
+Fairbox and Venture separate. and cubic screen EV or... I'm sorry. MV, bus MV or
+MREV error. Whatever those errors say, I forgot."*
+
+He could not remember the wording, which is the clearest possible sign the app
+should not depend on somebody typing "CUBIC": the module matches **BUS ER** and
+**MV ER** by name as well. The CUBIC screens ARE Ventra hardware — the quick
+filter still offers them together as `ibs-ventra`, and that filter now reads
+this same table rather than a regex of its own, because two tables that must
+agree about what a Ventra is are two tables that will eventually disagree.
+Counted by BUS, not by defect, and fleet-wide rather than off the sheet: a
+farebox fault does not down a bus, and the question is how many are out there.
 
 **`pace-down-sheet-stats-open-v1` is no longer read or written.** The SHEET
 STATS panel it opened was a second status report saying most of what the tiles

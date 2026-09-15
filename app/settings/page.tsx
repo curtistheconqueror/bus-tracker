@@ -65,6 +65,7 @@ import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "..
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
 import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "../sheet-ledger";
 import ShiftSettingsPanel from "./shift-settings";
+import SheetBackfillPanel from "./sheet-backfill";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
@@ -449,6 +450,12 @@ export default function SettingsPage(){
          page's settings. */}
      <SettingsDrawer title="SHIFTS &amp; PULLOUT TIMES" note="When each shift runs and when buses pull out. Change them here whenever the contract does.">
       <ShiftSettingsPanel/>
+     </SettingsDrawer>
+     {/* Beside the shift clock because they are the two halves of the same
+         question — the clock says what a shift IS, this says what happened on
+         the ones the app was not running for. */}
+     <SettingsDrawer title="LOAD OLD DOWN SHEETS" note="Sheets from before the app started keeping the swap history. Writes the history only; the live Down Sheet is never touched.">
+      <SheetBackfillPanel/>
      </SettingsDrawer>
      <SettingsDrawer title="SHOP CLOUD" note="Connect this device so the map, Defect Log and Down Sheet reach the others.">
      {/* No aria-labelledby: the <h3 id="master-cloud-heading"> it named became the

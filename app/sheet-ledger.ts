@@ -44,8 +44,21 @@ export const SHEET_LEDGER_LIMIT=40;
    multiply the size of every snapshot to answer questions the Defect Log
    already answers better. */
 export type SheetLedgerRow={
- /* The bus. The join key for everything: added, cleared and stuck are all set
-    arithmetic over these between two consecutive snapshots. */
+ /* The bus, BY FLEET NUMBER. The join key for everything: added, cleared and
+    stuck are all set arithmetic over these between two consecutive snapshots.
+
+    It was the Down Sheet entry's `busId` for two releases and that was wrong the
+    moment the ledger started travelling. A bus id is DEVICE-LOCAL — the merge in
+    `section-transfer.ts` says so in its own words, "two devices set up
+    separately give the same bus different ids", and it re-points every arriving
+    ENTRY by fleet number for exactly that reason. The ledger rode along in the
+    same payload and nothing re-pointed it, so a swap scanned on the iPad and
+    merged onto the phone shared no keys with the phone's own swaps: three buses
+    still sitting on the sheet reported as `added 3, stuck 0`. Measured, not
+    reasoned about.
+
+    The fleet number is the one name both devices agree on, it is what the cloud
+    keys `buses` on, and it is legible in a stored file. */
  b:string;
  /* The catalog category, which is what "the type of repairs that are getting
     done" means. Kept as the stored identity rather than a display label, so a
@@ -71,6 +84,19 @@ export type SheetSnapshot={
     after a gap in the ledger would otherwise report every missing bus as
     cleared in one go. */
  off:string[];
+ /* THERE ARE SWAPS BETWEEN THIS ONE AND THE ONE BEFORE IT THAT NOBODY RECORDED.
+
+    Set only by the backfill: a scan always follows the sheet it replaced, so a
+    snapshot the app wrote itself never carries this. A backfilled pair can span
+    days — the baseline has a nine-day hole in it with roughly twenty-five
+    unseen shifts inside — and the arithmetic between two snapshots is only a
+    SWAP's worth of arithmetic when there was exactly one swap between them.
+
+    Without this flag that pair reads as one swap that added twelve buses and
+    cleared twenty-two, and a per-swap average built on it is off by a factor of
+    eight. `ledgerTempo` already has the right escape hatch — `sinceHours:null`
+    for an interval it cannot vouch for — and this is the missing input to it. */
+ gap?:boolean;
 };
 
 export type SheetLedger=SheetSnapshot[];
@@ -78,7 +104,7 @@ export type SheetLedger=SheetSnapshot[];
 function clean(value:unknown){return String(value??"").trim()}
 function when(value:unknown){const parsed=Date.parse(clean(value));return Number.isNaN(parsed)?null:parsed}
 
-export type LedgerSourceEntry={id?:string;busId?:string;category?:string;workflow?:string};
+export type LedgerSourceEntry={id?:string;busId?:string;busNumber?:string;category?:string;workflow?:string};
 
 /* Build the snapshot for one swap. Completed rows are left out: the sheet's own
    active/complete distinction is what "on the sheet" means everywhere else in
@@ -95,7 +121,11 @@ export function snapshotFromEntries(
  const rows:SheetLedgerRow[]=[];
  for(const entry of entries||[]){
   if(clean(entry?.workflow)==="Completed")continue;
-  const bus=clean(entry?.busId);
+  /* The number, falling back to the id. A record thin enough to have lost its
+     fleet number should still count as a bus on the sheet rather than vanish
+     from the tempo — it just cannot be joined across devices, which is no worse
+     than every row was before. */
+  const bus=clean(entry?.busNumber)||clean(entry?.busId);
   /* One row per BUS, not per entry. The sheet folds a bus into the one row it
      is allowed, but a merge or a half-finished edit can leave two, and counting
      the bus twice would overstate every tempo number it appears in. */
@@ -142,8 +172,15 @@ export function normalizeSheetLedger(value:unknown):SheetLedger{
   const id=clean(snapshot.id)||"swap-"+at+"-"+rows.length;
   if(seen.has(id))continue;
   seen.add(id);
-  out.push({...snapshot,id,at:new Date(at).toISOString(),shift:snapshot.shift??null,rows,
-   off:Array.isArray(snapshot.off)?[...new Set(snapshot.off.map(clean).filter(Boolean))]:[]} as SheetSnapshot);
+  const normalized={...snapshot,id,at:new Date(at).toISOString(),shift:snapshot.shift??null,rows,
+   off:Array.isArray(snapshot.off)?[...new Set(snapshot.off.map(clean).filter(Boolean))]:[]} as SheetSnapshot;
+  /* The flag is set only when it is exactly true, and DELETED otherwise rather
+     than left as undefined — the same spelling `setBusHold` uses, and for the
+     same reason: a hand-edited payload carrying gap:"no" would otherwise spread
+     through and read as truthy, which silently voids the denominator on a pair
+     that has a perfectly good one. */
+  if(snapshot.gap===true)normalized.gap=true;else delete normalized.gap;
+  out.push(normalized);
  }
  return out.sort((left,right)=>Date.parse(left.at)-Date.parse(right.at));
 }
@@ -202,11 +239,15 @@ export function ledgerTempo(value:unknown):SwapTempo[]{
      backfilled gap, or a row removed by hand between swaps — and counting it
      would credit the shift with clearing work it never had. */
   const cleared=previous.rows.filter(row=>current.off.includes(row.b)&&!afterIds.has(row.b));
-  const gap=Date.parse(current.at)-Date.parse(previous.at);
+  const elapsed=Date.parse(current.at)-Date.parse(previous.at);
   out.push({
    at:current.at,
    shift:current.shift,
-   sinceHours:gap>0?gap/3600000:null,
+   /* A backfilled snapshot that admits to a gap in front of it has no usable
+      denominator: real time passed but an unknown number of swaps passed with
+      it. Null rather than the elapsed hours, so every rate built on this
+      ledger skips the pair instead of dividing by the wrong thing. */
+   sinceHours:current.gap?null:elapsed>0?elapsed/3600000:null,
    added:added.length,cleared:cleared.length,stuck:stuck.length,
    addedBy:tally(added,()=>true),
    clearedBy:tally(cleared,()=>true),

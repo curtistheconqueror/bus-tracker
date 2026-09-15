@@ -10502,7 +10502,8 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
- const {buildFleetStatusReport,statusReportCountsText,statusReportText}=await import("../app/fleet-status-report.ts");
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const COUNTS={...DEFAULT_STATUS_REPORT_PICK,locations:false,defects:false};
  const {statusReportPrintHtml}=await import("../app/fleet-status-report-print.ts");
  const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
 
@@ -10539,8 +10540,8 @@ test("the STATUS REPORT sends either version, and both tell the same story",asyn
  assert.match(html,/17504/,"and names the mystery bus");
  /* The counts-only version, on both. Bus numbers for the two lists somebody
     has to walk out to, and no locations or repairs anywhere. */
- const counts=statusReportCountsText(board,{title:"PACE SOUTH"});
- const countsHtml=statusReportPrintHtml(board,{counts:true,title:"PACE SOUTH"});
+ const counts=statusReportText(board,{pick:COUNTS,title:"PACE SOUTH"});
+ const countsHtml=statusReportPrintHtml(board,{pick:COUNTS,title:"PACE SOUTH"});
  assert.match(counts,/DOWNED BUSES\s+1/);
  assert.match(counts,/ROADCALLS PENDING\s+\d/);
  assert.match(counts,/17504/,"a mystery bus is an errand, so it keeps its number");
@@ -10554,17 +10555,18 @@ test("the STATUS REPORT sends either version, and both tell the same story",asyn
     would have to notice rather than an error anybody sees. */
  const nasty=buildFleetStatusReport([{id:"n",n:"17<b>99",l:"east-2",s:"unknown",
   defects:[{id:"d",category:"Engine",issue:'Leak "big" & <fast>',state:"open"}]}],[],now);
- const escaped=statusReportPrintHtml(nasty,{includeDefects:true});
+ const escaped=statusReportPrintHtml(nasty,{pick:{...DEFAULT_STATUS_REPORT_PICK,defects:true}});
  assert.equal(/<b>99/.test(escaped),false,"a fleet number carrying markup is escaped");
  assert.match(escaped,/17&lt;b&gt;99/);
  assert.match(escaped,/&quot;big&quot; &amp; &lt;fast&gt;/);
 
  /* Defects are opt-in in BOTH versions, and the checkbox drives both. */
+ const withRepairs={...DEFAULT_STATUS_REPORT_PICK,defects:true};
  assert.equal(/No cooling/.test(statusReportPrintHtml(board,{})),false);
- assert.match(statusReportPrintHtml(board,{includeDefects:true}),/No cooling/);
- assert.equal(/Air leak/.test(statusReportPrintHtml(board,{includeDefects:true})),false,
+ assert.match(statusReportPrintHtml(board,{pick:withRepairs}),/No cooling/);
+ assert.equal(/Air leak/.test(statusReportPrintHtml(board,{pick:withRepairs})),false,
   "a DOWNED bus contributes to the count and is never named or itemised");
- assert.equal(/Air leak/.test(statusReportText(board,{includeDefects:true})),false,"and the text version agrees");
+ assert.equal(/Air leak/.test(statusReportText(board,{pick:withRepairs})),false,"and the text version agrees");
 
  /* NO PDF LIBRARY. This is an offline-first app with no build step for new
     dependencies, and the browser already knows how to make a PDF from a
@@ -10600,9 +10602,387 @@ test("the STATUS REPORT sends either version, and both tell the same story",asyn
     true, so it is fixed on open rather than recomputed per render. */
  assert.match(modalCode,/const at=useMemo\(\(\)=>new Date\(\)\.toISOString\(\),\[\]\)/);
 
- /* It computes and never writes. There is no save path for it to go around. */
- for(const banned of ["setItem","writeFleetStorage","writeDownSheetStorage"])
-  assert.equal(modalCode.includes(banned),false,"the status report must not write: "+banned);
+ /* IT NEVER WRITES THE FLEET OR THE SHEET. That has not changed and must not:
+    this is a surface somebody opens to ANSWER a question, and a report that can
+    edit the board is a report that can lose a mechanic's work while being read.
+
+    What it does write now is the include list itself, and nothing else. Curtis
+    sends roughly the same report every morning; making him re-tick six boxes
+    daily would be a slower version of the thing the list replaced. So the one
+    permitted key is asserted by name — a per-device view-state key, like every
+    other panel-open key in the app — and every route to the records stays shut. */
+ for(const banned of ["writeFleetStorage","writeDownSheetStorage","BOARD_KEY","DOWN_SHEET_STORAGE_KEY","pace-board-v1","pace-down-sheet-v1"])
+  assert.equal(modalCode.includes(banned),false,"the status report must not write the records: "+banned);
+ const written=[...modalCode.matchAll(/setItem\(([^,]+),/g)].map(hit=>hit[1].trim());
+ assert.deepEqual(written,["STATUS_REPORT_PICK_KEY"],"the only thing it saves is which boxes are ticked");
+});
+
+test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is ticked",async()=>{
+ const {buildFleetStatusReport,statusReportText,normalizeStatusReportPick,DEFAULT_STATUS_REPORT_PICK}=
+  await import("../app/fleet-status-report.ts");
+ const {statusReportPrintHtml}=await import("../app/fleet-status-report-print.ts");
+ const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+
+ const now="2026-09-13T18:00:00.000Z";
+ const fleet=[
+  {id:"b1",n:"17501",l:"bay-1",s:"defect",defects:[{id:"x",category:"Brakes",issue:"Air leak",state:"open"}]},
+  {id:"b2",n:"17502",l:"bay-2",s:"defect",defects:[]},
+  {id:"b3",n:"17504",l:"east-1",s:"unknown",defects:[{id:"y",category:"A/C and HVAC",issue:"No cooling",state:"open"}]},
+ ];
+ const entries=[{busId:"b1",section:"Pending",workflow:"Scheduled"},{busId:"b2",section:"Inspection",workflow:"Scheduled"}];
+ const board=buildFleetStatusReport(fleet,entries,now);
+ const pick=extra=>({...DEFAULT_STATUS_REPORT_PICK,...extra});
+
+ /* THE CASE THAT DECIDED THE WHOLE DESIGN. Curtis: "when my superintendent
+    sends that list out to his superiors, they don't need to know about mystery
+    buses. and they don't need to know about inspection buses." Both have to
+    leave BOTH documents, together — a PDF still carrying a section the message
+    had dropped is exactly the drift two sets of switches would produce. */
+ const upward=pick({mystery:false,inspections:false});
+ const text=statusReportText(board,{pick:upward,title:"PACE SOUTH"});
+ const html=statusReportPrintHtml(board,{pick:upward,title:"PACE SOUTH"});
+ assert.doesNotMatch(text,/MYSTERY/);
+ assert.doesNotMatch(html,/Mystery/);
+ assert.doesNotMatch(text,/INSPECTIONS/);
+ assert.doesNotMatch(html,/<dt>Inspections<\/dt>/);
+ /* And the line that only made sense beside the inspections number leaves with
+    it, rather than hanging under nothing. */
+ assert.doesNotMatch(text,/not counted above/i);
+ assert.doesNotMatch(html,/Not counted above/i);
+ assert.doesNotMatch(text,/17504/,"the mystery bus goes with its section");
+
+ /* DOWNED BUSES IS NOT ON THE LIST. It is the question the report answers, and
+    it survives every combination of the switches — including all of them off. */
+ const nothing=pick({inspections:false,roadCalls:false,mystery:false,farebox:false,ventra:false,cubic:false,numbers:false});
+ assert.match(statusReportText(board,{pick:nothing}),/DOWNED BUSES\s+1/);
+ assert.match(statusReportPrintHtml(board,{pick:nothing}),/<dt>Downed buses<\/dt><dd>1<\/dd>/);
+ for(const key of Object.keys(DEFAULT_STATUS_REPORT_PICK))
+  assert.equal(/^downed$/.test(key),false,"downed is never offered as a switch: "+key);
+
+ /* THE THREE DETAIL SWITCHES COMPOSE RATHER THAN BRANCH, and that is what
+    replaced the old COUNTS ONLY version outright: it is now just the middle
+    row of this table and nothing special-cases it. */
+ const bare=statusReportText(board,{pick:pick({numbers:false})});
+ assert.match(bare,/MYSTERY BUSES\s+1/,"the count is still there");
+ assert.doesNotMatch(bare,/17504/,"but no fleet number anywhere");
+
+ const numbersOnly=statusReportText(board,{pick:pick({locations:false})});
+ assert.match(numbersOnly,/17504/,"numbers on their own");
+ assert.doesNotMatch(numbersOnly,/East/i,"and no location beside them");
+
+ const located=statusReportText(board,{pick:DEFAULT_STATUS_REPORT_PICK});
+ assert.match(located,/17504/);
+ assert.match(located,/East/i,"locations bring the where");
+ assert.doesNotMatch(located,/No cooling/,"repairs stay off until asked for");
+ assert.match(statusReportText(board,{pick:pick({defects:true})}),/No cooling/);
+
+ /* THE LADDER IS ENFORCED IN THE MODAL, not by disabling controls. Locations
+    with no bus numbers has nothing to hang off; repairs with no locations is a
+    list of repairs with no bus against them. Ticking one brings the ones above
+    it, so a person who ticks "the specific repairs" gets them. */
+ const modalCode=modal.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.match(modalCode,/if\(key==="numbers"&&!value\)\{next\.locations=false;next\.defects=false\}/);
+ assert.match(modalCode,/if\(key==="locations"\)\{if\(value\)next\.numbers=true;else next\.defects=false\}/);
+ assert.match(modalCode,/if\(key==="defects"&&value\)\{next\.numbers=true;next\.locations=true\}/);
+
+ /* Every switch in the type is drawn. A key added to the pick and not to the
+    list is a section nobody can ever turn on, and it would be invisible. */
+ for(const key of Object.keys(DEFAULT_STATUS_REPORT_PICK))
+  assert.ok(modalCode.includes('key:"'+key+'"'),"every pick has a checkbox: "+key);
+
+ /* A stored selection from an older build cannot put an undefined into a
+    checkbox and turn it into an uncontrolled input mid-session. */
+ assert.deepEqual(normalizeStatusReportPick(null),DEFAULT_STATUS_REPORT_PICK);
+ assert.deepEqual(normalizeStatusReportPick({mystery:"yes",farebox:false}),
+  {...DEFAULT_STATUS_REPORT_PICK,farebox:false},"a non-boolean falls back rather than leaking through");
+});
+
+test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const {techServicesGroup}=await import("../app/tech-services.ts");
+ const {quickFilterMatch}=await import("../app/quick-filters.ts");
+
+ /* Curtis: "now the Ventura and the fare boxes have been moved up to critical
+    levels, period. So they need a count of that as well... Fairbox and Venture
+    separate. and cubic screen EV or... I'm sorry. MV, bus MV or MREV error.
+    Whatever those errors say, I forgot."
+
+    He could not remember the wording, which is the clearest possible sign the
+    app must not depend on somebody typing "CUBIC". BUS ER and MV ER are matched
+    by name. */
+ assert.equal(techServicesGroup("Tech Services CUBIC Screen - MV ER"),"cubic");
+ assert.equal(techServicesGroup("screen showing BUS ER since monday"),"cubic");
+ assert.equal(techServicesGroup("mv er on the operator screen"),"cubic");
+ assert.equal(techServicesGroup("Ventra - INOP (general)"),"ventra");
+ assert.equal(techServicesGroup("Farebox - Coin mech INOP"),"farebox");
+ assert.equal(techServicesGroup("IBS Screen - Screen black"),"ibs");
+ assert.equal(techServicesGroup("Brakes - Air leak"),null);
+
+ const now="2026-09-13T18:00:00.000Z";
+ const fleet=[
+  /* THREE farebox faults on one bus. One bus, counted once: the question is how
+     many vehicles are affected, same as the downed count and for the reason. */
+  {id:"f1",n:"17510",l:"bay-1",s:"defect",defects:[
+   {id:"a",category:"Tech Services",issue:"Farebox - Coin mech INOP",state:"open"},
+   {id:"b",category:"Tech Services",issue:"Farebox - No power",state:"open"},
+   {id:"c",category:"Tech Services",issue:"Farebox - Won't probe & open",state:"open"}]},
+  /* A CUBIC screen, which IS Ventra hardware and must still be counted apart
+     from it — "six Ventra" and "six screens showing BUS ER" are two different
+     conversations with two different vendors. */
+  {id:"c1",n:"17511",l:"bay-2",s:"defect",defects:[{id:"d",category:"Tech Services",issue:"CUBIC Screen - MV ER",state:"open"}]},
+  {id:"v1",n:"17512",l:"bay-3",s:"defect",defects:[{id:"e",category:"Tech Services",issue:"Ventra - INOP (general)",state:"open"}]},
+  /* Flagged from the map and never written up. The flag is the fallback, so a
+     count that only read defects cannot come back lower than the board shows. */
+  {id:"v2",n:"17513",l:"bay-4",s:"defect",ibsVentra:true,defects:[]},
+  /* Flag ticked AND a repair naming the actual device: counted once, under the
+     device the repair names rather than twice. */
+  {id:"c2",n:"17514",l:"bay-5",s:"defect",ibsVentra:true,defects:[{id:"f",category:"Tech Services",issue:"CUBIC Screen - BUS ER",state:"open"}]},
+  /* A COMPLETED farebox repair is not a farebox bus. */
+  {id:"f2",n:"17515",l:"bay-6",s:"service",defects:[{id:"g",category:"Tech Services",issue:"Farebox - No power",state:"completed"}]},
+ ];
+ const board=buildFleetStatusReport(fleet,[],now);
+ assert.deepEqual(board.tech.farebox.map(bus=>bus.n),["17510"],"one bus with three farebox faults is one farebox bus, and a completed one is none");
+ assert.deepEqual(board.tech.ventra.map(bus=>bus.n),["17512","17513"],"the written-up Ventra and the flagged one, and not the CUBIC screens");
+ assert.deepEqual(board.tech.cubic.map(bus=>bus.n),["17511","17514"],"the screens by their own wording, counted apart from Ventra");
+
+ /* THE COUNTS REACH THE REPORT, and only when ticked. */
+ const pick=extra=>({...DEFAULT_STATUS_REPORT_PICK,...extra});
+ const all=statusReportText(board,{pick:pick({})});
+ assert.match(all,/FAREBOX\s+1/);
+ assert.match(all,/VENTRA\s+2/);
+ assert.match(all,/CUBIC SCREENS\s+2/);
+ const none=statusReportText(board,{pick:pick({farebox:false,ventra:false,cubic:false})});
+ assert.doesNotMatch(none,/FAREBOX|VENTRA|CUBIC/);
+
+ /* ONE TABLE. The quick filter that offers them TOGETHER now reads the same
+    module rather than a regex of its own — two tables that must agree about
+    what a Ventra is are two tables that will eventually disagree. */
+ const filters=await readFile(new URL("../app/quick-filters.ts",import.meta.url),"utf8");
+ const filterCode=filters.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.match(filterCode,/if\(key==="farebox"\)return isFarebox\(text\)/);
+ assert.match(filterCode,/if\(key==="ibs-ventra"\)return isIbsVentra\(text\)/);
+ assert.doesNotMatch(filterCode,/ventra\|cubic/i,"and keeps no second copy of the wording");
+ for(const bus of [fleet[1],fleet[2],fleet[4]])
+  assert.equal(quickFilterMatch(bus,"ibs-ventra",now),true,"the combined filter still catches all three devices: "+bus.n);
+ assert.equal(quickFilterMatch(fleet[0],"farebox",now),true);
+ assert.equal(quickFilterMatch(fleet[0],"ibs-ventra",now),false,"and a farebox is not one of them");
+});
+
+test("the FLEET FORECAST refuses before it can count, and counts open repairs at their age",async()=>{
+ const {buildFleetForecast,forecastTextLines,categoryDwell,roadCallRates,FORECAST_MIN_ROAD_CALLS,FORECAST_LOOKBACK_DAYS}=
+  await import("../app/fleet-forecast.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+
+ const now="2026-09-14T10:00:00.000Z";
+ const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
+ /* 10:00 UTC is 1st shift under the shop's hours, and the next pullout is
+    13:00, so the window is three hours of 1st shift. */
+ const onShift=count=>Array.from({length:count},(unused,index)=>
+  ({id:"r"+index,n:String(17600+index),roadCalls:[{id:"e"+index,at:hoursAgo(1+index*24)}],defects:[]}));
+
+ /* THE GATE. Curtis is owed a number he can act on, and a number produced from
+    four observations is wrong in a way that looks authoritative. Below the
+    threshold the forecast says what it is waiting for instead. */
+ const thin=buildFleetForecast(onShift(4),[],{now,downed:14});
+ assert.equal(thin.roadCalls.enough,false);
+ assert.equal(thin.roadCalls.need,FORECAST_MIN_ROAD_CALLS-4,"and says how many more it needs");
+ /* The road-call rate is COMPUTED and no longer PRINTED. Curtis: "So far, I
+    only want this one number for the forecast." It stays on the object so
+    putting a line back is a display change rather than a rebuild, and this
+    test holds that line by asserting the object rather than the text. */
+ assert.doesNotMatch(forecastTextLines(thin,STATUS_REPORT_WIDTH).join("\n"),/ROAD CALLS/);
+
+ const ready=buildFleetForecast(onShift(FORECAST_MIN_ROAD_CALLS+4),[],{now,downed:14});
+ assert.equal(ready.roadCalls.enough,true);
+ assert.equal(ready.window.label,"BEFORE THE 13:00 PULLOUT","the window is named the way somebody says it");
+ /* A RANGE, NOT A NUMBER. Two weeks of data gives a wide interval, and "3.4
+    road calls" out of a dozen observations is lying about its own precision. */
+ assert.ok(ready.roadCalls.range.high>ready.roadCalls.range.low,"the forecast reports a range");
+ assert.ok(ready.roadCalls.chance>0&&ready.roadCalls.chance<100,"and a chance that is neither certainty nor nothing");
+
+ /* ENOUGH HISTORY, NONE OF IT ON THIS SHIFT. The first draft gated on the fleet
+    total and then quoted the current shift's rate: twenty road calls on record,
+    none on the shift being forecast, and the report said "0 expected, 0% chance
+    of any" — a confident answer drawn from no observations at all. */
+ const elsewhere=Array.from({length:FORECAST_MIN_ROAD_CALLS+4},(unused,index)=>
+  ({id:"n"+index,roadCalls:[{id:"x"+index,at:hoursAgo(20+index*24)}],defects:[]}));
+ const quiet=buildFleetForecast(elsewhere,[],{now,downed:14});
+ assert.equal(quiet.roadCalls.total>=FORECAST_MIN_ROAD_CALLS,true,"the fleet has plenty on record");
+ assert.equal(quiet.roadCalls.observed,0,"and none of it on the shift being forecast");
+ assert.equal(quiet.roadCalls.enough,false,"so it refuses");
+ assert.equal(quiet.roadCalls.quiet,true);
+ /* A zero would read as a prediction, so nothing quotes one - and the report
+    no longer prints the road-call line at all, which is the strongest form of
+    that guarantee. */
+ const quietText=forecastTextLines(quiet,STATUS_REPORT_WIDTH).join("\n");
+ assert.doesNotMatch(quietText,/CHANCE OF ANY/);
+ assert.doesNotMatch(quietText,/0%/);
+
+ /* THE DOWNED HALF NEEDS SHEET SWAPS and says so until it has them. */
+ assert.equal(ready.downed.enough,false);
+ assert.match(forecastTextLines(ready,STATUS_REPORT_WIDTH).join("\n"),/not yet - \d+ more sheet swaps?/);
+ assert.equal(ready.downed.now,14,"and still reports where the fleet stands");
+
+ /* RIGHT-CENSORING, and the reason it is the whole ballgame. Curtis: "AC
+    repairs and Check engine lights tend to stay on the longest. Producing a
+    higher rate of downsheet stick!"
+
+    Averaging completedAt - createdAt over COMPLETED repairs only would report
+    A/C as the FASTEST category here, because the two A/C jobs that stuck are
+    not in that average — they are still open. Counted at their current age they
+    are exactly what Curtis is describing. This fixture is built so the naive
+    implementation gets the answer backwards rather than merely imprecise. */
+ const stuck=[{id:"s",n:"17700",defects:[
+  {id:"a1",category:"A/C and HVAC",issue:"No cooling",state:"open",createdAt:hoursAgo(24*20)},
+  {id:"a2",category:"A/C and HVAC",issue:"No cooling",state:"open",createdAt:hoursAgo(24*18)},
+  {id:"a3",category:"A/C and HVAC",issue:"No cooling",state:"completed",createdAt:hoursAgo(24*2),completedAt:hoursAgo(24)},
+  {id:"b1",category:"Brakes",issue:"Air leak",state:"completed",createdAt:hoursAgo(48),completedAt:hoursAgo(24)},
+  {id:"b2",category:"Brakes",issue:"Air leak",state:"completed",createdAt:hoursAgo(48),completedAt:hoursAgo(24)},
+  {id:"b3",category:"Brakes",issue:"Air leak",state:"completed",createdAt:hoursAgo(48),completedAt:hoursAgo(20)},
+ ]}];
+ const dwell=categoryDwell(stuck,now);
+ const ac=dwell.find(row=>row.category==="A/C and HVAC");
+ const brakes=dwell.find(row=>row.category==="Brakes");
+ assert.ok(ac.days>brakes.days,"A/C sticks and brakes clear, which is what the shop already knows");
+ assert.ok(ac.days>=18,"the open jobs are counted at the age they have reached, got "+ac.days);
+ assert.equal(ac.open,2,"and the reader is told how many of them are still running");
+ assert.equal(ac.total,3);
+
+ /* A category with almost nothing behind it does not get a median: two
+    observations produce a median that is just one of them. */
+ assert.equal(categoryDwell([{id:"t",defects:[
+  {id:"one",category:"Bodywork",issue:"Paint",state:"completed",createdAt:hoursAgo(48),completedAt:hoursAgo(24)},
+ ]}],now).length,0);
+
+ /* THE RATE IS PER SHIFT, not per day. A morning pullout spike is real and an
+    all-day average erases it, which is the whole reason the shift clock owns
+    the windows. */
+ const rates=roadCallRates(onShift(FORECAST_MIN_ROAD_CALLS+4),now);
+ assert.equal(rates.observed,FORECAST_MIN_ROAD_CALLS+4);
+ assert.ok(rates.rates["1st"]>0,"the shift they landed on carries the rate");
+ assert.equal(rates.rates["2nd"],0,"and the shifts they did not are not credited with them");
+ assert.equal(FORECAST_LOOKBACK_DAYS,21,"seven days of a quiet week is four events, and four events cannot carry a rate");
+
+ /* EVERY LINE STILL HAS TO SURVIVE A LOCK SCREEN. The forecast is appended to
+    the same message, and a block that wraps mid-number is exactly as useless as
+    no forecast. The first draft put "BEFORE THE 06:00 PULLOUT" in a labelled
+    row and ran to 44 characters; this test is what caught it. */
+ for(const forecast of [thin,ready,quiet,buildFleetForecast(stuck,[],{now,downed:3})])
+  for(const line of forecastTextLines(forecast,STATUS_REPORT_WIDTH))
+   assert.ok(line.length<=STATUS_REPORT_WIDTH,"forecast line too wide ("+line.length+"): "+line);
+
+ /* A garage whose hours have been edited into a gap has no window, and a window
+    of null is not a window of zero: "0 road calls expected" would be a
+    confident answer to a question that was never asked. */
+ assert.equal(buildFleetForecast(onShift(20),[],{now,settings:{shifts:[],pullouts:[]}}),null);
+ assert.deepEqual(forecastTextLines(null,STATUS_REPORT_WIDTH),[]);
+});
+
+test("the swap ledger keys on the fleet number, because bus ids are one device's own",async()=>{
+ const {snapshotFromEntries,ledgerTempo,mergeSheetLedgers,normalizeSheetLedger}=await import("../app/sheet-ledger.ts");
+
+ /* MEASURED, NOT REASONED ABOUT. The ledger keyed rows on the Down Sheet
+    entry's `busId` for two releases, and that was wrong the moment it started
+    travelling. `section-transfer.ts` says why in its own words - "two devices
+    set up separately give the same bus different ids" - and it re-points every
+    arriving ENTRY by fleet number for exactly that reason. The ledger rode in
+    the same payload and nothing re-pointed it.
+
+    Curtis: "I will be scanning from multiple devices, period." So this is not a
+    corner: it is the normal case. */
+ const entry=(busId,busNumber,category)=>({id:"e"+busId,busId,busNumber,category,workflow:"Scheduled"});
+ const ipad =snapshotFromEntries([entry("bus-a1","17510","Engine"),entry("bus-a2","17520","Brakes")],[],"2026-09-14T11:00:00.000Z",undefined,"swap-ipad");
+ const phone=snapshotFromEntries([entry("bus-p1","17510","Engine"),entry("bus-p2","17520","Brakes")],[],"2026-09-14T19:00:00.000Z",undefined,"swap-phone");
+ assert.deepEqual(ipad.rows.map(row=>row.b),["17510","17520"],"the stored key is the number on the bus");
+
+ const [tempo]=ledgerTempo(mergeSheetLedgers([ipad],[phone]));
+ assert.equal(tempo.stuck,2,"the same two buses, still down, read as stuck across two devices");
+ assert.equal(tempo.added,0,"and not as two brand-new arrivals - which is what the bus-id key reported");
+ assert.equal(tempo.cleared,0);
+
+ /* A record thin enough to have lost its number still counts as a bus on the
+    sheet rather than vanishing out of the tempo. */
+ const thin=snapshotFromEntries([{id:"x",busId:"bus-z",category:"Engine",workflow:"Scheduled"}],[],"2026-09-14T11:00:00.000Z");
+ assert.deepEqual(thin.rows.map(row=>row.b),["bus-z"]);
+
+ /* THE GAP FLAG. A backfilled pair can span days with an unknown number of
+    swaps inside it; the arithmetic between two snapshots is only a SWAP's worth
+    of arithmetic when exactly one swap happened between them. `sinceHours` was
+    always the escape hatch and this is the missing input to it. */
+ const a={id:"a",at:"2026-08-29T21:52:00.000Z",shift:"3rd",rows:[{b:"17510",c:"Engine"}],off:[]};
+ const b={id:"b",at:"2026-09-07T19:43:00.000Z",shift:"2nd",rows:[{b:"17520",c:"Brakes"}],off:["17510"],gap:true};
+ const [across]=ledgerTempo([a,b]);
+ assert.equal(across.sinceHours,null,"a pair that admits to a gap has no usable denominator");
+ const [closed]=ledgerTempo([a,{...b,gap:undefined}]);
+ assert.ok(closed.sinceHours>200,"and one that does not, still reports its hours");
+
+ /* Set only when exactly true, and DELETED otherwise - the spelling setBusHold
+    uses, so a hand-edited gap:"no" cannot spread through and read as truthy. */
+ assert.equal("gap" in normalizeSheetLedger([{...a,gap:"no"}])[0],false);
+ assert.equal(normalizeSheetLedger([{...a,gap:true}])[0].gap,true);
+});
+
+test("the backfill loads old sheets into the swap history and touches nothing else",async()=>{
+ const {planBackfill,applyBackfill,BACKFILL_KIND}=await import("../app/sheet-ledger-backfill.ts");
+ const {SHEET_LEDGER_KEY}=await import("../app/sheet-ledger.ts");
+ const panel=await readFile(new URL("../app/settings/sheet-backfill.tsx",import.meta.url),"utf8");
+ const module_=await readFile(new URL("../app/sheet-ledger-backfill.ts",import.meta.url),"utf8");
+
+ const snap=(id,at,rows,extra={})=>({id,at,shift:"1st",rows:rows.map(b=>({b,c:"Engine"})),off:[],...extra});
+ const file=JSON.stringify({kind:BACKFILL_KIND,version:1,snapshots:[
+  snap("backfill-1","2026-08-26T20:03:00.000Z",["17510","17520"]),
+  snap("backfill-2","2026-08-27T16:59:00.000Z",["17510"],{gap:true}),
+ ]});
+
+ const plan=planBackfill([],file);
+ assert.equal(plan.ok,true);
+ assert.equal(plan.fresh.length,2);
+ assert.equal(plan.gaps,1,"the screen can say how many follow a stretch nobody recorded");
+
+ /* LOADING THE SAME FILE TWICE IS A NO-OP. A swap is an event that happened
+    once; the union is the history, deduped by id. */
+ const again=planBackfill(plan.next,file);
+ assert.equal(again.fresh.length,0);
+ assert.equal(again.duplicates,2);
+
+ /* THE CAP BITES AT IMPORT TIME AND HAS TO BE SAID FIRST. A backfill is by
+    definition the oldest thing in the ledger, so a device already near the cap
+    drops most of it the instant it merges - silently, unless this is counted
+    and shown BEFORE the button. */
+ const full=Array.from({length:3},(unused,index)=>snap("have-"+index,"2026-09-1"+index+"T12:00:00.000Z",["17999"]));
+ const tight=planBackfill(full,file,3);
+ assert.ok(tight.dropped>0,"it says how many will not fit");
+ assert.equal(tight.next.length,3,"and the cap still holds");
+
+ /* The wrong file is refused whole, never half-loaded. A master export and a
+    Down Sheet transfer are both JSON with a `kind`. */
+ assert.match(planBackfill([],'{"kind":"pace-south-fleet-board-backup","buses":[]}').problem,/not a sheet-ledger backfill/);
+ assert.match(planBackfill([],"not json").problem,/not a file this can read/);
+ assert.match(planBackfill([],JSON.stringify({kind:BACKFILL_KIND,snapshots:[]})).problem,/no readable swaps/);
+ for(const refused of [planBackfill([],"not json"),planBackfill([],'{"kind":"x"}')])
+  assert.equal(applyBackfill({setItem(){throw new Error("must not write")}},refused).ok,false);
+
+ /* IT WRITES THE LEDGER AND NOTHING ELSE. A scanned sheet REPLACES the live
+    one; these sheets are weeks old and the live one is today's. The only safe
+    way to say that is a path with no access to the Down Sheet at all. */
+ const written=[];
+ applyBackfill({setItem(key){written.push(key)}},plan);
+ assert.deepEqual(written,[SHEET_LEDGER_KEY]);
+ /* Comments stripped first. The module's own prose names the key it must never
+    touch, and matching that is how a test passes for the wrong reason - or in
+    this case fails for one. */
+ const moduleCode=module_.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ for(const banned of ["pace-down-sheet-v1","DOWN_SHEET_STORAGE_KEY","pace-board-v1","writeDownSheetStorage","writeFleetStorage"])
+  assert.equal(moduleCode.includes(banned),false,"the backfill must not be able to reach: "+banned);
+ const panelCode=panel.replace(/\/\*[\s\S]*?\*\//g,"");
+ const writes=[...panelCode.matchAll(/setItem\(/g)].length;
+ assert.equal(writes,0,"the panel writes through applyBackfill or not at all");
+
+ /* Nothing lands before it has been read: the plan is computed, shown, and only
+    then applied - and applyBackfill takes the PLAN rather than the text, so the
+    thing written is provably the thing displayed. */
+ assert.match(panelCode,/disabled=\{!plan\?\.ok\}/);
+ assert.match(panelCode,/applyBackfill\(localStorage,plan\)/);
 });
 
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
@@ -11004,8 +11384,14 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
 });
 
 test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()=>{
- const {buildFleetStatusReport,statusReportCountsText,statusReportText,mysteryLabel,INSPECTION_SECTION,STATUS_REPORT_ROAD_CALL_HOURS}=
+ const {buildFleetStatusReport,statusReportText,mysteryLabel,DEFAULT_STATUS_REPORT_PICK,INSPECTION_SECTION,STATUS_REPORT_ROAD_CALL_HOURS}=
   await import("../app/fleet-status-report.ts");
+ /* The two fixed versions are gone; both are now points on the include list.
+    Curtis: "I could just pick what I want sent, and it'll auto format to that."
+    COUNTS is what the old counts-only version was — numbers, no locations — and
+    WITH_REPAIRS is the long one with the defects switch on. */
+ const COUNTS={...DEFAULT_STATUS_REPORT_PICK,locations:false,defects:false};
+ const WITH_REPAIRS={...DEFAULT_STATUS_REPORT_PICK,defects:true};
 
  const now="2026-09-13T18:00:00.000Z";
  const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
@@ -11109,7 +11495,7 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
  const [fullRoad,fullMystery]=order(text);
  assert.ok(fullRoad>=0&&fullMystery>=0,"both blocks are in the message version");
  assert.ok(fullRoad<fullMystery,"roadcalls pending leads the message version");
- const [shortRoad,shortMystery]=order(statusReportCountsText(board,{title:"PACE SOUTH"}));
+ const [shortRoad,shortMystery]=order(statusReportText(board,{pick:COUNTS,title:"PACE SOUTH"}));
  assert.ok(shortRoad<shortMystery,"and leads the counts-only version the same way");
 
  /* Numbers for MYSTERY and ROAD CALLS only. Curtis: "not the entire downed bus
@@ -11120,19 +11506,19 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
 
  /* Defects are OFF by default and only arrive when asked for. */
  assert.equal(text.includes("Brakes"),false,"the short version is the one that gets read");
- const full=statusReportText(board,{includeDefects:true});
+ const full=statusReportText(board,{pick:WITH_REPAIRS});
  assert.match(full,/A\/C and HVAC/,"and the checkbox brings the repairs in");
 
  /* Every line has to survive a phone. */
  const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
- for(const line of statusReportText(board,{includeDefects:true,title:"PACE SOUTH"}).split("\n"))
+ for(const line of statusReportText(board,{pick:WITH_REPAIRS,title:"PACE SOUTH"}).split("\n"))
   assert.ok(line.length<=STATUS_REPORT_WIDTH,"line too wide for a lock screen ("+line.length+"): "+line);
 
  /* A long location gives up room before the note does, and a fleet number is
     never cut - a truncated bus number is a wrong bus number. */
  const wordy=buildFleetStatusReport([{id:"w",n:"17588",l:"east-1",s:"unknown",
   defects:[{id:"d",category:"Transmission and Drivetrain",issue:"Will not shift out of second",state:"open"}]}],[],now);
- for(const line of statusReportText(wordy,{includeDefects:true}).split("\n"))
+ for(const line of statusReportText(wordy,{pick:WITH_REPAIRS}).split("\n"))
   assert.ok(line.length<=STATUS_REPORT_WIDTH,"wordy record too wide ("+line.length+"): "+line);
  assert.match(statusReportText(wordy),/17588/,"and the number itself survives intact");
 
@@ -11172,7 +11558,7 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
     at the moment somebody is standing there waiting for it. */
  const thin=buildFleetStatusReport([{id:"t",n:"17599",l:"east-2",s:"unknown",defects:[{id:"d"}]}],[],now);
  assert.equal(thin.mystery.length,1);
- assert.ok(statusReportText(thin,{includeDefects:true}).length>0,"a thin defect record still renders");
+ assert.ok(statusReportText(thin,{pick:WITH_REPAIRS}).length>0,"a thin defect record still renders");
 });
 
 test("a MYSTERY BUS card opens, because it already looked like it would",async()=>{
@@ -14447,7 +14833,9 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
     would look healthy while going stale. */
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
- assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
+ /* By fleet NUMBER, falling back to the id. A bus id is one device's own, so a
+    swap that travelled shared no keys with the receiving device's swaps. */
+ assert.match(pageCode,/recordSheetSwap\(localStorage,nextEntries,removed\.map\(entry=>entry\.busNumber\|\|entry\.busId\),now,readShiftSettings\(localStorage\)\)/,
   "the swap is recorded inside importScan, from the entries that won and the buses that came off");
  /* AFTER the undo copy and deliberately NOT guarded like it. The undo copy
     stops the import when it cannot be written, because replacing a sheet with
@@ -14489,4 +14877,203 @@ test("the Fleet Status Report has a way out you can see",async()=>{
  /* 44px on a phone, because this is the control somebody reaches for with a
     thumb while holding the report open in one hand. */
  assert.ok(rules.some(rule=>/min-height:44px/.test(rule)),"and it is a 44px target on a phone");
+});
+
+test("the downed forecast measures the same population it projects",async()=>{
+ const {buildFleetForecast,INSPECTION_CATEGORY}=await import("../app/fleet-forecast.ts");
+
+ /* AN INSPECTION IS NOT A DOWNED BUS. The ledger records the whole sheet; the
+    number this forecast projects is DOWNED buses, the line Curtis drew himself
+    - "the downed number normally does not count inspections". Measuring
+    arrivals over the whole sheet and charging them to a downed-only base is
+    measuring one population and billing another.
+
+    MEASURED against the real nine-sheet baseline: leaving inspections in runs
+    the arrival rate 49% hot (0.330/h against 0.222/h). */
+ const at=index=>new Date(Date.parse("2026-09-01T06:00:00.000Z")+index*24*3600000).toISOString();
+ const row=(b,c)=>({b,c});
+ /* Four repairs sit still across every swap. The only thing that MOVES is a
+    stream of inspections coming and going, so a rate that counts them reports
+    churn where the downed population never changed at all. */
+ const stayers=[row("17510","Engine"),row("17520","Brakes"),row("17530","Engine"),row("17540","Brakes")];
+ const ledger=[0,1,2,3].map(index=>({
+  id:"swap-"+index,at:at(index),shift:"1st",
+  rows:[...stayers,row("9000"+index,INSPECTION_CATEGORY),row("9100"+index,INSPECTION_CATEGORY)],
+  off:index?["9000"+(index-1),"9100"+(index-1)]:[],
+ }));
+ const forecast=buildFleetForecast([],[],{now:at(4),ledger,downed:4,span:"pullout"});
+ assert.equal(forecast.downed.enough,true,"four swaps is past the gate");
+ assert.deepEqual(forecast.downed.inRange,{low:0,high:0},"no DOWNED bus arrived, so none is forecast");
+ assert.deepEqual(forecast.downed.outRange,{low:0,high:0},"and none cleared");
+ assert.deepEqual(forecast.downed.range,{low:4,high:4},"the projection holds at the four that never moved");
+
+ /* And the same ledger WITH the inspections counted as downed work reports a
+    fleet churning twice a day. This is the mutation the strip exists to stop. */
+ const naive=ledger.map(snapshot=>({...snapshot,
+  rows:snapshot.rows.map(item=>item.c===INSPECTION_CATEGORY?{...item,c:"Engine"}:item)}));
+ const wrong=buildFleetForecast([],[],{now:at(4),ledger:naive,downed:4,span:"pullout"});
+ assert.ok(wrong.downed.inRange.high>0,"the fixture really does move once inspections count");
+});
+
+test("the forecast is one number, and the single-number spelling is already there",async()=>{
+ const {buildFleetForecast,forecastTextLines}=await import("../app/fleet-forecast.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+
+ /* Curtis: "Most important number is Forecasted Total Down buses by pullout
+    times... So far, I only want this one number for the forecast." */
+ /* Twelve hours between swaps, not twenty-four. The window to the next pullout
+    can be as little as four hours, and at one net bus a day the projection moves
+    less than half a bus across it - which rounds away to nothing and makes a
+    real rate look like no rate at all. */
+ const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
+ /* Four swaps, two buses arriving each day and one clearing, so the rates are
+    real and the projection has to rise.
+
+    A STABLE ROSTER THAT SLIDES. The first draft of this fixture minted new bus
+    numbers on every snapshot, so every bus read as an arrival AND a clearance
+    and the projection rose for a reason that had nothing to do with the rates.
+    A fixture that passes for the wrong reason is worse than one that fails. */
+ const ledger=[0,1,2,3].map(index=>({
+  id:"s"+index,at:at(index),shift:"1st",
+  rows:Array.from({length:4+3*index},(unused,n)=>({b:String(17500+index+n),c:"Engine"})),
+  off:index?[String(17500+index-1)]:[],
+ }));
+ const forecast=buildFleetForecast([],[],{now:at(4),ledger,downed:20,span:"pullout"});
+ assert.equal(forecast.downed.enough,true);
+
+ const ranged=forecastTextLines(forecast,STATUS_REPORT_WIDTH).join("\n");
+ const single=forecastTextLines(forecast,STATUS_REPORT_WIDTH,{style:"single"}).join("\n");
+
+ /* THE RANGE IS THE DEFAULT, because seven swaps cannot carry a decimal point
+    and a figure that looks more confident than the data is how a forecast
+    stops being believed. Curtis took that: "if it hasn't beaten my judgement
+    yet based on a lack of samples then I will go with your recommendation on a
+    range." */
+ assert.match(ranged,/\d+-\d+/,"the default spells a range");
+ /* AND THE SINGLE NUMBER IS ALREADY BUILT, so the switch is a parameter rather
+    than a rewrite - "u can build it for single number ability now so we don't
+    have to revisit from scratch". */
+ assert.doesNotMatch(single,/\d+-\d+/,"the single spelling carries no dash");
+ assert.ok(single.includes("  "+forecast.downed.expected+"   (now "),"it prints the point estimate");
+ assert.ok(forecast.downed.expected>=forecast.downed.range.low
+  &&forecast.downed.expected<=forecast.downed.range.high,"and it sits inside the range it replaces");
+ /* AND IT ACTUALLY MOVES WITH THE RATES. Containment alone does not bite: a
+    point estimate hard-wired to today's count sits inside its own range every
+    time, and the mutation that did exactly that survived until this line. This
+    fixture takes two buses a day and clears one, so a figure that does not rise
+    above the twenty on the board is not reading the ledger at all. */
+ assert.ok(forecast.downed.expected>forecast.downed.now,
+  "arrivals beat clearances in this fixture, so the projection has to rise");
+
+ /* BOTH spellings carry the window and where the fleet stands right now. */
+ for(const text of [ranged,single]){
+  assert.match(text,/DOWNED BUSES/);
+  assert.match(text,/PULLOUT/,"the window is named, and it is the next pullout");
+  assert.match(text,/\(now 20\)/);
+  assert.match(text,/not guaranteed/,"the hedge rides with it every time");
+ }
+
+ /* EVERYTHING ELSE IS STILL COMPUTED AND SIMPLY NOT DRAWN, so putting a line
+    back is a display change and not a rebuild of the model. */
+ assert.equal(typeof forecast.roadCalls.chance,"number");
+ assert.ok(Array.isArray(forecast.slowest));
+ for(const gone of ["ROAD CALLS","CHANCE OF ANY","SLOWEST ON THE SHEET"])
+  assert.equal(ranged.includes(gone),false,"no longer printed: "+gone);
+
+ /* Still a lock screen. */
+ for(const text of [ranged,single])
+  for(const line of text.split("\n"))
+   assert.ok(line.length<=STATUS_REPORT_WIDTH,"too wide ("+line.length+"): "+line);
+});
+
+test("the forecast adds the two queues it can see, and counts neither twice",async()=>{
+ const {buildFleetForecast,INSPECTION_CATEGORY,FORECAST_MIN_INSPECTIONS,FORECAST_MIN_CONVERSIONS,
+  FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS}=await import("../app/fleet-forecast.ts");
+ const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+
+ const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
+ const down=(...buses)=>buses.map(b=>({b,c:"Engine"}));
+ const insp=(...buses)=>buses.map(b=>({b,c:INSPECTION_CATEGORY}));
+
+ /* THE INSPECTION QUEUE. Four swaps; on each one a pair of inspections that sat
+    on the previous sheet comes back as a downed bus. Curtis: "we need inspection
+    also counted in that rate if half of them are counted as down buses or become
+    downed buses with PM defects. That is a factor we cannot ignore." */
+ const ledger=[0,1,2,3].map(index=>({
+  id:"s"+index,at:at(index),shift:"1st",off:[],
+  rows:[...down("17500","17501"),
+   /* last swap's inspections, now written up */
+   ...(index?down(String(17600+index-1),String(17700+index-1)):[]),
+   ...insp(String(17600+index),String(17700+index))],
+ }));
+ const quiet=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:0,roadCallsPending:0});
+ const queued=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:8,roadCallsPending:0});
+ assert.equal(queued.downed.fromInspections.enough,true,"four swaps of inspections is past the floor");
+ assert.equal(queued.downed.fromInspections.pool,8,"and it carries the queue standing right now");
+ assert.ok(queued.downed.fromInspections.expected>0,"eight waiting inspections contribute");
+ assert.ok(queued.downed.expected>quiet.downed.expected,
+  "the same shop with eight inspections queued forecasts MORE than one with none");
+ /* THE QUEUE IS WHY, not the base rate: an empty yard and a full one share a
+    ledger, so anything that moved between them came from the pool. */
+ assert.equal(quiet.downed.fromInspections.expected,0);
+
+ /* A HANDFUL OF INSPECTIONS IS NOT A RATE. Below the floor it says what it is
+    waiting for and contributes nothing, rather than quoting a conversion off
+    two observations. */
+ const thin=buildFleetForecast([],[],{now:at(2),inspections:8,roadCallsPending:0,
+  ledger:[{id:"a",at:at(0),shift:"1st",off:[],rows:[...down("17500"),...insp("17600")]},
+          {id:"b",at:at(1),shift:"1st",off:[],rows:down("17500","17600")}]});
+ assert.equal(thin.downed.fromInspections.enough,false);
+ assert.equal(thin.downed.fromInspections.expected,0,"and contributes nothing while it is thin");
+ assert.equal(thin.downed.fromInspections.need,FORECAST_MIN_INSPECTIONS-1);
+
+ /* THE ROAD-CALL QUEUE, which the sheets alone cannot measure - a road call
+    that never converted never appears on one. The denominator comes off the
+    board's own events and the numerator off the ledger.
+
+    Eight buses road-call; six of them show up on the next sheet. Curtis: "if we
+    have 10 roll calls and only two of them are converted to the down sheet,
+    then that's a 20% chance." */
+ const called=[];
+ const rcLedger=[{id:"r0",at:at(0),shift:"1st",off:[],rows:down("17500")}];
+ for(let index=0;index<8;index++){
+  const number=String(17800+index);
+  called.push({id:"rc"+index,n:number,roadCalls:[{id:"e"+index,at:at(0)}]});
+  if(index<6)rcLedger.push({id:"r"+(index+1),at:at(1),shift:"1st",off:[],rows:down(number)});
+ }
+ /* One snapshot per converted bus would double the swap count, so they share a
+    stamp - the conversion check asks whether ANY snapshot inside the window saw
+    the bus, not how many did. */
+ /* TWO EVENTS NO SNAPSHOT EVER LOOKED AT. They fell in a hole in the ledger,
+    which is a failure to OBSERVE and not a failure to convert - counting them as
+    the latter quietly drags the rate toward zero every time the shop goes a few
+    days without scanning. They must not appear in the denominator at all. */
+ called.push({id:"rcOld",n:"17899",roadCalls:[{id:"eOld",at:new Date(Date.parse(at(0))-30*24*3600000).toISOString()}]});
+ called.push({id:"rcOld2",n:"17898",roadCalls:[{id:"eOld2",at:new Date(Date.parse(at(0))-20*24*3600000).toISOString()}]});
+ const rc=buildFleetForecast(called,[],{now:at(2),ledger:rcLedger,downed:10,inspections:0,roadCallsPending:5});
+ assert.equal(Math.round(rc.downed.fromRoadCalls.rate*100),75,
+  "six of the EIGHT judged converted; the two nobody looked at are not in the denominator");
+ assert.equal(rc.downed.fromRoadCalls.enough,true,"eight judged events is past the floor");
+ assert.equal(rc.downed.fromRoadCalls.pool,5);
+ assert.ok(rc.downed.fromRoadCalls.rate>0.5&&rc.downed.fromRoadCalls.rate<1,
+  "six of eight converted, so the rate sits between a half and certainty: "+rc.downed.fromRoadCalls.rate);
+ assert.equal(Math.round(rc.downed.fromRoadCalls.expected),Math.round(5*rc.downed.fromRoadCalls.rate),
+  "five standing at that rate is what the queue contributes");
+ assert.equal(FORECAST_MIN_CONVERSIONS,6);
+ assert.ok(FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS>0);
+
+ /* AND NEITHER IS COUNTED TWICE. The base rate is an average over past windows,
+    so it already carries the TYPICAL conversion of both queues; adding the queue
+    terms on top of the RAW rate would count those arrivals once in the average
+    and again in the queue. An arrival that was an inspection on the previous
+    sheet is taken out of the base, so a ledger made entirely of such arrivals
+    has a base rate of nothing at all. */
+ const allFromInspections=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:0,roadCallsPending:0});
+ assert.deepEqual(allFromInspections.downed.inRange,{low:0,high:0},
+  "every arrival in this ledger converted from an inspection, so the base carries none of them");
+
+ /* The pools are handed over by the report rather than worked out twice. */
+ const modalCode=modal.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.match(modalCode,/inspections:board\.inspections/);
+ assert.match(modalCode,/roadCallsPending:board\.roadCallsPending\.length/);
 });
