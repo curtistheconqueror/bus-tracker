@@ -10959,7 +10959,7 @@ test("the backfill loads old sheets into the swap history and touches nothing el
     one; these sheets are weeks old and the live one is today's. The only safe
     way to say that is a path with no access to the Down Sheet at all. */
  const written=[];
- applyBackfill({setItem(key,value){written.push(key)}},plan);
+ applyBackfill({setItem(key){written.push(key)}},plan);
  assert.deepEqual(written,[SHEET_LEDGER_KEY]);
  /* Comments stripped first. The module's own prose names the key it must never
     touch, and matching that is how a test passes for the wrong reason - or in
@@ -14870,4 +14870,40 @@ test("the Fleet Status Report has a way out you can see",async()=>{
  /* 44px on a phone, because this is the control somebody reaches for with a
     thumb while holding the report open in one hand. */
  assert.ok(rules.some(rule=>/min-height:44px/.test(rule)),"and it is a 44px target on a phone");
+});
+
+test("the downed forecast measures the same population it projects",async()=>{
+ const {buildFleetForecast,INSPECTION_CATEGORY}=await import("../app/fleet-forecast.ts");
+
+ /* AN INSPECTION IS NOT A DOWNED BUS. The ledger records the whole sheet; the
+    number this forecast projects is DOWNED buses, the line Curtis drew himself
+    - "the downed number normally does not count inspections". Measuring
+    arrivals over the whole sheet and charging them to a downed-only base is
+    measuring one population and billing another.
+
+    MEASURED against the real nine-sheet baseline: leaving inspections in runs
+    the arrival rate 49% hot (0.330/h against 0.222/h). */
+ const at=index=>new Date(Date.parse("2026-09-01T06:00:00.000Z")+index*24*3600000).toISOString();
+ const row=(b,c)=>({b,c});
+ /* Four repairs sit still across every swap. The only thing that MOVES is a
+    stream of inspections coming and going, so a rate that counts them reports
+    churn where the downed population never changed at all. */
+ const stayers=[row("17510","Engine"),row("17520","Brakes"),row("17530","Engine"),row("17540","Brakes")];
+ const ledger=[0,1,2,3].map(index=>({
+  id:"swap-"+index,at:at(index),shift:"1st",
+  rows:[...stayers,row("9000"+index,INSPECTION_CATEGORY),row("9100"+index,INSPECTION_CATEGORY)],
+  off:index?["9000"+(index-1),"9100"+(index-1)]:[],
+ }));
+ const forecast=buildFleetForecast([],[],{now:at(4),ledger,downed:4,span:"pullout"});
+ assert.equal(forecast.downed.enough,true,"four swaps is past the gate");
+ assert.deepEqual(forecast.downed.inRange,{low:0,high:0},"no DOWNED bus arrived, so none is forecast");
+ assert.deepEqual(forecast.downed.outRange,{low:0,high:0},"and none cleared");
+ assert.deepEqual(forecast.downed.range,{low:4,high:4},"the projection holds at the four that never moved");
+
+ /* And the same ledger WITH the inspections counted as downed work reports a
+    fleet churning twice a day. This is the mutation the strip exists to stop. */
+ const naive=ledger.map(snapshot=>({...snapshot,
+  rows:snapshot.rows.map(item=>item.c===INSPECTION_CATEGORY?{...item,c:"Engine"}:item)}));
+ const wrong=buildFleetForecast([],[],{now:at(4),ledger:naive,downed:4,span:"pullout"});
+ assert.ok(wrong.downed.inRange.high>0,"the fixture really does move once inspections count");
 });

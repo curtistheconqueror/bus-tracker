@@ -38,7 +38,7 @@
 
 import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
 import {normalizeRoadCalls} from "./road-calls.ts";
-import {ledgerTempo} from "./sheet-ledger.ts";
+import {ledgerTempo,normalizeSheetLedger} from "./sheet-ledger.ts";
 import {DEFAULT_SHIFT_SETTINGS,clockMinutes,minuteOfDay,nextPullout,shiftAt,windowHours,type ShiftKey,type ShiftSettings} from "./shift-clock.ts";
 
 /* How far back the rate is estimated from. Three weeks rather than the road
@@ -112,6 +112,10 @@ export type FleetForecast={
 };
 
 export type ForecastSpan="shift"|"two-shifts"|"pullout";
+
+/* The catalog category an inspection row carries. Named rather than inlined:
+   it is the same string `fleet-status-report.ts` fences DOWNED off with. */
+export const INSPECTION_CATEGORY="Inspection";
 
 const HOUR=3600000;
 
@@ -248,8 +252,46 @@ export function categoryDwell(fleet:ForecastBus[],now=new Date().toISOString()){
    ends of the arithmetic. No category weighting yet — that is Stage 2 of the
    roadmap and it needs more swaps than the shop has recorded — so this is the
    flat rate, and it says so by refusing until there are swaps to average. */
+/* AN INSPECTION IS NOT A DOWNED BUS, AND THE RATE HAS TO AGREE WITH THE BASE.
+
+   The ledger records the whole sheet, inspections included. The number this
+   forecast projects is DOWNED buses — the Status Report has drawn that line
+   since Curtis drew it first: "the downed number normally does not count
+   inspections." Measuring arrivals over the whole sheet and charging them to a
+   downed-only base is measuring one population and billing another, and against
+   the real baseline it runs the arrival rate 49% hot.
+
+   The category is on the row for exactly this reason, so the strip is free. */
+function downedRows(ledger:unknown){
+ return normalizeSheetLedger(ledger).map(snapshot=>({
+  ...snapshot,rows:snapshot.rows.filter(row=>row.c!==INSPECTION_CATEGORY),
+ }));
+}
+
+/* ARRIVALS MINUS CLEARANCES, both from the ledger's own measurements.
+
+   A ROAD CALL STANDING RIGHT NOW IS NOT IN HERE, and it belongs. This rate is
+   an average over past windows, so it carries the TYPICAL road-call conversion
+   and nothing about the queue standing on the yard tonight. Curtis, correcting
+   an earlier reading of mine: "if a roll call comes in, just the fact that a
+   bus is a roll call, it should add to the probability of more down buses,
+   depending on the conversion from roll call to down sheet... if we have 10
+   roll calls and only two of them are converted to the down sheet, then that's
+   a 20% chance."
+
+   A road call already ON the sheet is a downed bus and needs no predicting —
+   that is why the reconciler takes it out of the pending count. The one worth
+   forecasting is the one nobody has written up yet.
+
+   NOT BUILT HERE YET. The conversion rate cannot come off the sheets at all: a
+   road call that never converted never appears on one, so it is invisible to
+   the paper and has to be read from the board's own roadCalls history. The
+   pending pool is already computed next door as the Status Report's ROADCALLS
+   PENDING. When it lands it overlaps this rate by the typical conversion —
+   four of the fifty-four arrivals across the baseline were road-call rows — so
+   it will read about 7% hot on the arrival side until that is scaled out. */
 function downedForecast(ledger:unknown,downedNow:number,hours:number){
- const tempo=ledgerTempo(ledger).filter(row=>row.sinceHours!==null&&row.sinceHours>0);
+ const tempo=ledgerTempo(downedRows(ledger)).filter(row=>row.sinceHours!==null&&row.sinceHours>0);
  if(tempo.length<FORECAST_MIN_SWAPS-1)
   return {now:downedNow,range:{low:downedNow,high:downedNow},inRange:{low:0,high:0},outRange:{low:0,high:0},
    enough:false,need:(FORECAST_MIN_SWAPS-1)-tempo.length};

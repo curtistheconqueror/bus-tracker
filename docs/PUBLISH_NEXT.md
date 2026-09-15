@@ -152,9 +152,36 @@ with `delete`, the spelling `setBusHold` uses.
 **No storage key is added.** The backfill writes the ledger key that shipped in
 176.
 
+## Also in 177: the downed forecast measures the population it projects
+
+The ledger records the whole sheet, inspections included. The number the
+forecast projects is DOWNED buses — the line Curtis drew himself: *"the downed
+number normally does not count inspections."* Measuring arrivals over the whole
+sheet and charging them to a downed-only base is measuring one population and
+billing another.
+
+**Measured against the real nine-sheet baseline: leaving inspections in runs the
+arrival rate 49% hot** — 0.330/hour against 0.222/hour. The ledger stores the
+catalog category per row for exactly this kind of question, so the strip costs
+nothing.
+
+**Still to come: the road-call queue.** Curtis: *"if a roll call comes in, just
+the fact that a bus is a roll call, it should add to the probability of more
+down buses, depending on the conversion from roll call to down sheet... if we
+have 10 roll calls and only two of them are converted to the down sheet, then
+that's a 20% chance."*
+
+A road call already on the sheet is a downed bus and needs no predicting. The
+one worth forecasting is the one standing on the yard that nobody has written up
+yet — and the ledger's arrival rate, being an average over past windows, knows
+nothing about tonight's queue. The pending pool is already computed next door as
+the Status Report's ROADCALLS PENDING; the conversion rate has to come off the
+board's own `roadCalls` history, because a road call that never converted never
+appears on a sheet and is invisible to the paper. Noted in the module, not built.
+
 ## Gates
 
-`npm test` — **322 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **323 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
 **Three mutations, three caught**, each aimed at a decision that would have been
