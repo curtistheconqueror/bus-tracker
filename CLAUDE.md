@@ -93,6 +93,13 @@ machine, because these sessions run in containers that are thrown away.
   bring it back, and a test asserts there is one.
 - **Never commit** API keys, credentials, fleet backups, photographs, or
   employee-sensitive information.
+- **Say before you change the UI or a flow, not after.** Curtis: *"if you make a
+  UI change i need to know that explicitly... any flow functions that change,
+  like how something works from a user experience perspective or UI please let
+  me know before implementation."* Architecture and refactoring do not need
+  announcing — but then they have to BE that, proved with a before/after render
+  rather than asserted. A change that moves a control, renames a label, reorders
+  a list or changes what a tap does is his call first.
 - **Catalog renames are read-time, never rewrites.** A record saved under an old
   wording must keep reading correctly through the rename maps in
   `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,

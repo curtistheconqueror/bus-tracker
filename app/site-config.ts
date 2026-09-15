@@ -147,7 +147,18 @@ export const SITE_SECTIONS:SiteSection[]=[
  /* ONE SECTION, THREE DESTINATIONS. The section is named 1-12 because that is
     the grid the map draws; the destination is named 1-10 because that is what
     a foreman means by "the main garage". Both strings are load-bearing and
-    neither can be dropped. */
+    neither can be dropped.
+
+    AND THE TWO TROUBLE BAYS ARE NOT THE SAME KIND OF PLACE. Curtis: "Bay 11
+    keep in mind is also a back up bay that is used because things get out of
+    hand a lot." So 11 is overflow capacity as much as it is a trouble bay -
+    where buses go when the garage is full, not only when something is wrong
+    with them.
+
+    That is why they are two destinations rather than one "TROUBLE BAYS" pair,
+    and it is worth knowing before anyone decides the two could be merged to
+    simplify the move editor. A bus in 11 and a bus in 12 may be there for
+    completely different reasons. */
  {name:"MAIN GARAGE (BAYS 1-12)",plan:{kind:"range",prefix:"garage",count:GARAGE_CAPACITY},
   theme:{key:"garage",label:"Main Garage",order:12},
   areas:[
@@ -161,14 +172,45 @@ export const SITE_SECTIONS:SiteSection[]=[
  {name:"CNG WEST LOT",plan:{kind:"range",prefix:"west",count:WEST_CAPACITY},
   theme:{key:"west",label:"CNG West",order:13},
   areas:[{name:"CNG WEST LOT",label:"CNG West",aliases:["cng west lot","cng west","west lot"],aliasOrder:8}]},
- /* OFF PROPERTY has no theme key and no spoken alias. Both are absences in the
-    app as it stands, not oversights in this file. */
+ /* OFF PROPERTY: two rows of the waiting area, given over to buses that are
+    away at a vendor — Bus & Truck and the like. They are not on this property
+    at all, so they are not "waiting" for anything here, and counting them in
+    the holding area made the yard look fuller than it was.
+
+    Twenty-eight because that is two full rows on the shop computer. A fixed
+    count rather than "two rows" on purpose: the waiting grid is 14 across on a
+    computer, 10 on an iPad and 3 on a phone, so "two rows" would have meant 28,
+    20 or 6 spaces depending on what somebody happened to be holding.
+
+    It also has no theme key and no spoken alias. Both are absences in the app
+    as it stands, not oversights in this file. */
  {name:"OFF PROPERTY",plan:{kind:"range",prefix:"offsite",count:28},theme:null,
   areas:[{name:"OFF PROPERTY",label:"Off Property",aliases:[],aliasOrder:99}]},
  {name:"WAITING AREA",plan:{kind:"range",prefix:"waiting",count:70},
   theme:{key:"waiting",label:"Waiting Area",order:14},
   areas:[{name:"WAITING AREA",label:"Waiting Area",aliases:["waiting area","waiting","unsorted","holding area","hold area","void zone"],aliasOrder:0}]},
 ];
+
+/* How many spaces a section has. The counts live here now, so the capacity
+   constants elsewhere are derived from this rather than stated twice. */
+export function siteSectionCount(name:string){
+ const section=SITE_SECTIONS.find(item=>item.name===name);
+ if(!section)throw new Error("site-config: no section named "+name);
+ return planSlots(section.plan).length;
+}
+
+/* ONE CONSUMER IS DELIBERATELY NOT SWITCHED: `map-settings.ts`.
+
+   `SECTION_THEME_KEYS` there is written `as const`, and `SectionThemeKey` is
+   the literal union derived from it — which is what types `Visuals.sections`
+   and every theme in the app. Reading the array from `siteThemeKeys()` at
+   runtime gives byte-identical VALUES and a type of plain `string`, so a
+   misspelt section key would start type-checking. Measured, not assumed.
+
+   Trading compile-time safety for tidiness in the file that types the whole
+   theming system is the wrong way round, so the literal stays where it is. It
+   cannot drift: the equivalence test requires it to equal `siteThemeKeys()` in
+   content AND order, and that test is the guard this file relies on for it. */
 
 /* The derived views, in the shapes the existing tables already have. */
 export function siteSectionSlots():Record<string,string[]>{

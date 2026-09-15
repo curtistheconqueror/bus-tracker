@@ -23,7 +23,7 @@ import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forge
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
 import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
-import { moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../app/facility-areas.ts";
+import { EAST_SLOTS, moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../app/facility-areas.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
@@ -893,7 +893,7 @@ test("removes prospective customer branding from visible app titles", async () =
 });
 
 test("includes full theme, manual color, highlight, and locate controls", async () => {
-  const [page, css, backup, areas] = await Promise.all([
+  const [page, css, backup] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/fleet-backup.ts", import.meta.url), "utf8"),
@@ -934,7 +934,10 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
   assert.match(page, /BAY_LAYOUT:\(number\|null\)\[\]=\[null,8,6,4,2,9,7,5,3,1\]/);
-  assert.match(areas, /"SHOP BAYS \(DIAGONAL\)":facilitySlots\("bay",9,1\)/);
+  /* Asserted against the table rather than against the text that builds it:
+     the spelling moved to site-config.ts in Phase 1 and the shop bays did not. */
+  assert.deepEqual(SECTION_SLOTS["SHOP BAYS (DIAGONAL)"],
+    ["bay-1","bay-2","bay-3","bay-4","bay-5","bay-6","bay-7","bay-8","bay-9"]);
   assert.match(page, /roadcallSolid:boolean;roadcallLocation:string/);
   assert.match(page, /SOLID ORANGE BUS \(NO FLASHING DOT\)/);
   assert.match(page, /ROADCALL LOCATION/);
@@ -1021,13 +1024,19 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.app\.highlight-status-out/);
   assert.equal(ROAD_CAPACITY, 75);
   assert.equal(WEST_CAPACITY, 40);
-  assert.match(areas, /"PIT":facilitySlots\("pit",2\)/);
-  assert.match(areas, /"BRAKE TEST":facilitySlots\("brake",3\)/);
-  assert.match(areas, /"TOW \/ STAGING":facilitySlots\("tow",4\)/);
-  assert.match(areas, /"FOREMAN OFFICE":facilitySlots\("office",3\)/);
+  /* The sections and their sizes, read off the table itself. */
+  assert.deepEqual(SECTION_SLOTS["PIT"],["pit-0","pit-1"]);
+  assert.deepEqual(SECTION_SLOTS["BRAKE TEST"],["brake-0","brake-1","brake-2"]);
+  assert.deepEqual(SECTION_SLOTS["TOW / STAGING"],["tow-0","tow-1","tow-2","tow-3"]);
+  assert.deepEqual(SECTION_SLOTS["FOREMAN OFFICE"],["office-0","office-1","office-2"]);
   assert.match(page, /EAST_SLOTS\.find\(slot=>!occupiedEast\.has\(slot\)\)/);
   assert.match(css, /\.eastgrid\{grid-template-columns:repeat\(2/);
-  assert.ok(areas.includes('export const EAST_SLOTS=Array.from({length:9},(_,row)=>[1,2].map(column=>"east-"+(row*4+column))).flat();'));
+  /* The east lot is two painted columns numbered on a stride of four, so its
+     ids skip. Asserted as the ids themselves rather than as the expression that
+     builds them, which moved to site-config.ts in Phase 1. */
+  assert.equal(EAST_SLOTS.length, 18);
+  assert.deepEqual(EAST_SLOTS.slice(0, 6), ["east-1","east-2","east-5","east-6","east-9","east-10"]);
+  assert.equal(EAST_SLOTS.at(-1), "east-34");
   assert.match(css, /\.roadgrid\{grid-template-columns:repeat\(5/);
   assert.match(css, /\.roadgrid\{[^}]*grid-template-rows:repeat\(15/);
   assert.match(css, /\.westgrid\{[^}]*grid-template-rows:repeat\(5/);
@@ -1082,9 +1091,17 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /checked=\{addToDownSheet\}[\s\S]*?DOWN SHEET/);
   assert.match(page, /Choose Defect Log, Down Sheet, or both/);
   assert.match(page, /CLEAR MAP-ONLY DEFECTS/);
-  assert.match(areas, /\["MAIN GARAGE \(BAYS 1-10\)",GARAGE_STANDARD_SLOTS\]/);
-  assert.match(areas, /\["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS\]/);
-  assert.match(areas, /\["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS\]/);
+  /* The garage is one section drawn as one grid and THREE move destinations.
+     Asserted against the destinations themselves rather than the expression
+     that splits them, which moved to site-config.ts in Phase 1 — and this way
+     it also checks the split is right, not merely that it is spelled. */
+  assert.equal(RELOCATION_AREAS["MAIN GARAGE (BAYS 1-10)"].length, 70);
+  assert.deepEqual(RELOCATION_AREAS["TROUBLE BAY 11"],
+    ["garage-10","garage-22","garage-34","garage-46","garage-58","garage-70","garage-82"]);
+  assert.deepEqual(RELOCATION_AREAS["TROUBLE BAY 12"],
+    ["garage-11","garage-23","garage-35","garage-47","garage-59","garage-71","garage-83"]);
+  assert.equal(RELOCATION_AREAS["MAIN GARAGE (BAYS 1-12)"], undefined,
+    "the section is not itself a destination — the three above are");
   assert.match(css, /\.multi-bulk-actions\{/);
   assert.match(css, /\.bulk-defect-panel\{/);
   assert.match(page, /NOT ENOUGH SPACE/);
@@ -1886,16 +1903,15 @@ test("confirmation prompts are per-device settings that default to on", async ()
 test("every facility section can collapse independently while global controls remain", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const areas = await readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8");
   assert.match(page, /aria-expanded=\{!collapsed\}/);
   assert.match(page, /setCollapsedSections\(new Set\(Object\.keys\(SECTION_SLOTS\)\)\)/);
   assert.match(page, /sectionClass\("IN SERVICE \/ ON ROAD","road"\)/);
   assert.match(page, /sectionClass\("MAIN GARAGE \(BAYS 1-12\)","garage panel"\)/);
   assert.match(css, /\.section-collapsed>:not\(\.title\)\{display:none!important\}/);
   assert.match(css, /\.title-actions \.toggle-section/);
-  assert.match(areas, /"BRAKE TEST":facilitySlots\("brake",3\)/);
-  assert.match(areas, /"TOW \/ STAGING":facilitySlots\("tow",4\)/);
-  assert.match(areas, /"FOREMAN OFFICE":facilitySlots\("office",3\)/);
+  assert.equal(SECTION_SLOTS["BRAKE TEST"].length,3);
+  assert.equal(SECTION_SLOTS["TOW / STAGING"].length,4);
+  assert.equal(SECTION_SLOTS["FOREMAN OFFICE"].length,3);
   assert.match(page, /\["BRAKE TEST","brake",3\]/);
   assert.match(page, /\["TOW \/ STAGING","tow",4\]/);
   assert.match(css, /\.foreman-office\{grid-column:1\/-1/);
@@ -4576,8 +4592,11 @@ test("the road panel stops covering the service detail area once the map stacks"
  // the section itself is still defined, so nothing about this is a phone-only
  // rendering decision — it is one section that was being painted over
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- const areas=await readFile(new URL("../app/facility-areas.ts",import.meta.url),"utf8");
- assert.match(areas,/"SERVICE DETAIL AREA \(SINGLE FILE\)":facilitySlots\("service",SINGLE_FILE_CAPACITY\)/);
+ /* Both single-file rows are the same length, which is what SINGLE_FILE_CAPACITY
+    meant when it was one constant shared by the two. */
+ assert.equal(SECTION_SLOTS["SERVICE DETAIL AREA (SINGLE FILE)"].length,8);
+ assert.equal(SECTION_SLOTS["SHOP WALL (SINGLE FILE)"].length,
+  SECTION_SLOTS["SERVICE DETAIL AREA (SINGLE FILE)"].length);
  assert.match(map,/IN SERVICE \/ ON ROAD/);
 });
 
@@ -15202,8 +15221,16 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
   "the garage capacity must be derived from the grid");
  /* The numbers themselves live in exactly one file. */
  assert.match(code(layout),/export const GARAGE_COLUMNS=12;/);
- for(const [name,source] of [["facility-areas",areas],["mystery-buses",mystery],["page",page]])
+ /* mystery-buses and the map read the grid straight from facility-layout.
+    facility-areas reaches it through site-config, which is where the garage's
+    column arithmetic moved in Phase 1 — so the chain is asserted rather than a
+    direct import that is no longer there. What matters is that no file works
+    the width out for itself, which the literal checks above already require. */
+ for(const [name,source] of [["mystery-buses",mystery],["page",page]])
   assert.match(code(source),/from "\.\/facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
+ assert.match(code(areas),/from "\.\/site-config(\.ts)?"/,"facility-areas must read the site config");
+ const config=await readFile(new URL("../app/site-config.ts",import.meta.url),"utf8");
+ assert.match(code(config),/from "\.\/facility-layout(\.ts)?"/,"site-config must read the grid from facility-layout");
 });
 
 test("site-config describes this building exactly as the five tables already do",async()=>{
@@ -15249,6 +15276,12 @@ test("site-config describes this building exactly as the five tables already do"
     swatches and ninth among the sections - and the swatch order is what a
     person scrolls in Settings. Sorting the config by section order silently
     reorders somebody's colour picker. */
+ /* AND THIS ASSERTION IS THE GUARD FOR THE ONE CONSUMER NOT SWITCHED.
+    `map-settings.ts` keeps its literal `as const` array, because
+    `SectionThemeKey` is the union derived from it and reading the array at
+    runtime would degrade that to plain `string` — a misspelt section key would
+    start type-checking in the file that types all theming. So the two lists
+    genuinely coexist, and this is what stops them drifting. */
  assert.deepEqual(siteThemeKeys(),SECTION_THEME_KEYS.map(([key,label])=>[key,label]),
   "the theme swatches must match in content AND order");
  assert.equal(siteThemeKeys().length,SECTION_THEME_KEYS.length);
@@ -15273,23 +15306,42 @@ test("site-config describes this building exactly as the five tables already do"
     whose aliases appears in the command - but walking the CONFIG's order, and
     require the two to land on the same area. Now a config ordered any other way
     disagrees with the app and fails here. */
- const normalize=value=>value.toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
- const resolveThroughConfig=command=>{
-  const haystack=normalize(command);
-  for(const [name,aliases] of siteAliases())
-   if(aliases.some(alias=>haystack.includes(normalize(alias))))return name;
-  return "";
- };
- /* TROUBLE BAY 11 owns "bay 11" and SHOP BAYS owns "service bay", and both sit
-    inside this phrase. The trouble bays are listed first, so it resolves the
-    way somebody standing in the shop means it. */
- for(const phrase of ["service bay 11","service bay 12","shop bays","the pit","move it to main garage","bay 11 please"])
-  assert.equal(resolveThroughConfig(phrase),findOperatorArea(phrase,areas)?.name??"",
-   'the config\'s alias order must resolve "'+phrase+'" the same way the app does');
+ /* PINNED TO THE ANSWER, NOT TO AGREEMENT BETWEEN TWO LISTS.
+
+    This assertion used to resolve the phrase through the config's own list and
+    require `findOperatorArea` to agree. That bit while the two were separate -
+    and stopped the moment `fleet-intelligence.ts` began reading the config,
+    because then both sides walked the same array and moved together. The
+    mutation that removes the config's alias sort passed. Caught by re-running
+    it after the swap, which is the only reason it is written this way now.
+
+    So the expected area is spelled out. TROUBLE BAY 11 owns "bay 11" and SHOP
+    BAYS owns "service bay", and both sit inside "service bay 11": the trouble
+    bays are listed ahead of the shop bays, so it resolves the way somebody
+    standing in the shop means it. Re-sort the list and these fail. */
+ for(const [phrase,expected] of [
+  ["service bay 11","TROUBLE BAY 11"],
+  ["service bay 12","TROUBLE BAY 12"],
+  ["put it in shop bays","SHOP BAYS (DIAGONAL)"],
+  ["the pit","PIT"],
+  ["move it to main garage","MAIN GARAGE (BAYS 1-10)"],
+  ["waiting","WAITING AREA"],
+ ])assert.equal(findOperatorArea(phrase,areas)?.name,expected,
+  '"'+phrase+'" must resolve to '+expected+' - the alias order decides it');
 
  /* 5. THE PREFIX FALLBACK, for a location no destination lists - an overflow
-    slot, or an east id outside the painted columns. */
+    slot, or an east id outside the painted columns.
+
+    ORDER-INDEPENDENT, AND THAT IS ASSERTED RATHER THAN ASSUMED. The lookup is
+    first-match-wins, and the config lists the prefixes in a different order
+    than the hand-written table did, so the reorder is only safe while no prefix
+    is itself a prefix of another. It is a near miss: "offsite-" and "office-"
+    share three characters, and so do "wall-", "waiting-" and "wash-". If a
+    future section is ever added whose prefix contains an existing one, this
+    fails here rather than silently mislabelling a bus. */
  const prefixes=sitePrefixLabels();
+ for(const [a] of prefixes)for(const [b] of prefixes)
+  if(a!==b)assert.equal(b.startsWith(a),false,'"'+a+'" is a prefix of "'+b+'" - the fallback order would start to matter');
  for(const slot of ["west-overflow-2","bay-overflow-0","service-overflow-1","east-3"])
   assert.equal(prefixes.find(([prefix])=>slot.startsWith(prefix))?.[1],locationLabel(slot),
    slot+" must fall back to the same label the app gives it");

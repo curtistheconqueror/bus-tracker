@@ -1,4 +1,5 @@
 import {RELOCATION_AREAS} from "./facility-areas.ts";
+import {siteAreaLabels,sitePrefixLabels} from "./site-config.ts";
 
 /* WHERE A BUS IS, in the words a person uses out loud. One copy, because there
    were five — and they had already drifted: the Fixed Repairs copy had no
@@ -26,26 +27,12 @@ import {RELOCATION_AREAS} from "./facility-areas.ts";
    source, and a future section cannot be added to one without appearing in the
    other. */
 
-const AREA_LABELS:Record<string,string>={
- "MAIN GARAGE (BAYS 1-10)":"Main Garage",
- "TROUBLE BAY 11":"Trouble Bay 11",
- "TROUBLE BAY 12":"Trouble Bay 12",
- "IN SERVICE / ON ROAD":"On Road",
- "CNG WEST LOT":"CNG West",
- "CNG EAST LOT":"CNG East",
- "SHOP BAYS (DIAGONAL)":"Shop Bay",
- "SERVICE DETAIL AREA (SINGLE FILE)":"Service Detail",
- "SHOP WALL (SINGLE FILE)":"Shop Wall",
- "WAITING AREA":"Waiting Area",
- "OFF PROPERTY":"Off Property",
- "FOREMAN OFFICE":"Foreman Office",
- "PIT":"Pit",
- "BRAKE TEST":"Brake Test",
- "TOW / STAGING":"Tow / Staging",
- "BODY SHOP":"Body Shop",
- "PAINT BOOTH":"Paint Booth",
- "WASH RACK":"Wash Rack",
-};
+/* The words, read from `site-config.ts` rather than kept as a second list.
+   Issue #21, Phase 1 step 2. This file's own comment already says why one copy
+   matters - there were five of these and they had drifted - so holding the
+   labels here while the config also held them would have been the same mistake
+   one level up. */
+const AREA_LABELS:Record<string,string>=siteAreaLabels();
 
 const SLOT_LABELS=new Map<string,string>();
 for(const [area,slots] of Object.entries(RELOCATION_AREAS)){
@@ -63,12 +50,7 @@ for(const [area,slots] of Object.entries(RELOCATION_AREAS)){
    It is deliberately consulted SECOND. Reversing the two would put the bug
    straight back: "garage-11" starts with "garage-" and would answer Main
    Garage before anything looked at which bay it is. */
-const PREFIX_LABELS:[string,string][]=[
- ["garage-","Main Garage"],["road-","On Road"],["offsite-","Off Property"],["west-","CNG West"],
- ["east-","CNG East"],["bay-","Shop Bay"],["service-","Service Detail"],["wall-","Shop Wall"],
- ["waiting-","Waiting Area"],["office-","Foreman Office"],["pit-","Pit"],["brake-","Brake Test"],
- ["tow-","Tow / Staging"],["body-","Body Shop"],["paint-","Paint Booth"],["wash-","Wash Rack"],
-];
+const PREFIX_LABELS:[string,string][]=sitePrefixLabels();
 
 /* The label, or "" when this build cannot name the place. Callers that print a
    location into a report use this and leave the line out rather than printing
