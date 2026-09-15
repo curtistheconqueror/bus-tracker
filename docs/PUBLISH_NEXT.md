@@ -1,14 +1,16 @@
 # Publish next
 
-**STATUS: 178 PENDING — the CLOSE button on the Fleet Status Report, and main is
-red without it.**
+**STATUS: 178 PENDING — the CLOSE button on the Fleet Status Report, the home
+screen asking one question at a time, and main is red without the first of
+these.**
 
 Sites Version 177 was published from `c18f635eef6a44b35ee76c240475d11eeb13ea64`
 on 2026-09-14. The rollback tag is `sites-v177` at that exact source commit. The
 prior production rollback point is Version 176 from `5e6fd58`.
 
-**Two commits**, on top of the 177 release record (`bc76850`). One is a bug
-Curtis hit on his phone; the other is why `main` is currently failing CI.
+**Three changes**, on top of the 177 release record (`bc76850`): a bug Curtis hit
+on his phone, the reason `main` is currently failing CI, and the home screen
+asking its two questions in order.
 Derive the range rather than trusting a count: `git log --oneline bc76850..HEAD`.
 
 ## 178 first, because main is red
@@ -92,13 +94,58 @@ in the viewport but painted under something else is still untappable.
 is pre-existing. It belongs to the deferred iPad touch-target pass (issue #11)
 rather than to this fix, and was left alone.
 
+## Also in 178: MY ROLE is asked after FULL or LITE, not beside it
+
+Curtis: *"On the Home Screen I want the question of MY ROLE to come up next
+AFTER u pick Full or Lite version. Not at same time."*
+
+**This reverses where the role picker was put when it was built.** It was folded
+up under the mode buttons on purpose — the note in the file said stacking a
+second question in front of the first "would turn a gate into a form." Curtis's
+sequencing serves that same worry better than hiding one of them did: the screen
+still asks one thing at a time, and the optional question is no longer competing
+for attention with the one that gates the app.
+
+The welcome gate is now two steps:
+
+1. **Mode** — the name, the kicker, FULL and LITE. Nothing else.
+2. **Role** — its own heading (ONE MORE THING), the department → union → job
+   walk already built, opened rather than folded, plus **BACK** and
+   **SKIP FOR NOW** (which reads DONE once a role is set).
+
+**The ordering is structural, not a check.** The role panel renders only on the
+role step, and the only route onto that step is `choose`, which writes the mode
+first. So there is no state in which a job title can be picked before the mode
+is answered — `chooseRole` needs no guard, and a test asserts the panel's
+`step==="role"` gate rather than trusting one.
+
+Re-opening from Settings always starts at the mode step, so the same tap shows
+the same screen every time. **The cost:** somebody who wants to change only
+their role now re-picks their mode on the way through — two taps, and it writes
+the value it already had.
+
+Driven in Chromium at 390 and 820 on a genuinely empty device: role absent from
+step 1, the gate staying open on picking a mode, the mode stored *before* step 2
+renders, the picker already open, SKIP and BACK both 44px and in view, no
+horizontal scroll, the job list for Maintenance / Non-Union reading Foreman /
+Asst Supt / Supt, picking Foreman storing the role and closing, BACK keeping the
+mode already written, and SKIP closing with no role stored.
+
+**Two mutations, two caught.** Putting the panel back on the mode step, and
+closing on mode choice as before — both fail the suite; the first also fails the
+browser walk.
+
 ## Storage
 
-**Nothing.** No key added, renamed or migrated. 178 is one CSS rule block and one
-test constant.
+**Nothing.** No key added, renamed or migrated. `pace-app-mode-v1` and
+`pace-role-v1` keep the shapes they already had; only the order they are asked
+in changed.
 
 ## What to check once it is live
 
+0. In Settings, press **SHOW THE WELCOME AGAIN**. Pick FULL or LITE — **MY ROLE
+   should appear next, on its own screen**, not alongside the two buttons. SKIP
+   FOR NOW should close it without setting anything.
 1. Open the **STATUS REPORT** on a phone with a full sheet. Tick everything so
    the report is long.
 2. Scroll to the very bottom of the report. **CLOSE must still be sitting at the

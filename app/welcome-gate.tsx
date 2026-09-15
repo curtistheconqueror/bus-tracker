@@ -39,6 +39,21 @@ export default function WelcomeGate(){
     So the close exists only when the question is already answered. On a genuine
     first run there is no way past it, which is the whole point of a gate. */
  const [dismissable,setDismissable]=useState(false);
+ /* TWO STEPS, NOT ONE SCREEN WITH TWO QUESTIONS ON IT.
+
+    Curtis: "On the Home Screen I want the question of MY ROLE to come up next
+    AFTER u pick Full or Lite version. Not at same time."
+
+    That reverses where the role picker was put when it was built - folded up
+    under the mode buttons, specifically so a first run would not meet two
+    questions at once. Sequencing them answers that same worry better than
+    hiding one of them did: the screen still asks one thing at a time, and the
+    optional question is no longer competing for attention with the one that
+    gates the app.
+
+    "mode" is always the entry step, including when somebody re-opens this from
+    Settings, so the order is the same every time it is seen. */
+ const [step,setStep]=useState<"mode"|"role">("mode");
  /* Read on mount for the same reason `open` is: the answer lives in
     localStorage, so a server render knows nothing about it. */
  const [role,setRole]=useState<RoleChoice|null>(null);
@@ -48,7 +63,9 @@ export default function WelcomeGate(){
  useEffect(()=>{try{setRole(readRole(localStorage.getItem(ROLE_STORAGE_KEY)))}catch{}},[]);
  useEffect(()=>{
   if(isFirstRun(localStorage))setOpen(true);
-  const onRequest=()=>{setDismissable(!isFirstRun(localStorage));setOpen(true)};
+  /* Re-opening always starts at the mode step. A gate that resumed wherever it
+     was last closed would show a different screen to the same tap. */
+  const onRequest=()=>{setDismissable(!isFirstRun(localStorage));setStep("mode");setOpen(true)};
   window.addEventListener(WELCOME_REQUEST_EVENT,onRequest);
   return ()=>window.removeEventListener(WELCOME_REQUEST_EVENT,onRequest);
  },[]);
@@ -73,7 +90,16 @@ export default function WelcomeGate(){
      refusing to close the panel over it would be a bigger problem than the one
      being reported. */
   try{localStorage.setItem(ROLE_STORAGE_KEY,serializeRole(next))}catch{}
-  setRole(next);setRoleOpen(false);setDepartment(null);setUnit(null);
+  setRole(next);setDepartment(null);setUnit(null);
+  /* Picking your job ends the walk. It can only ever run on the role step -
+     the panel does not render anywhere else - and the only route onto that step
+     is through `choose`, which stores the mode first. So there is no state in
+     which this closes a gate whose mode question is still unanswered, and it is
+     the structure that guarantees that rather than a check here.
+
+     Making somebody tap DONE after naming their job would be a tap that only
+     confirms what they just said. */
+  setOpen(false);
  };
  const clearRole=()=>{
   try{localStorage.removeItem(ROLE_STORAGE_KEY)}catch{}
@@ -84,9 +110,14 @@ export default function WelcomeGate(){
   catch{/* A device that cannot store the answer still gets the app it chose for
            this visit, and is asked again next time. Refusing to continue over a
            preference would be worse than asking twice. */}
-  setOpen(false);
-  /* Whatever is already on screen re-reads the mode without a reload. */
+  /* Whatever is already on screen re-reads the mode without a reload. The
+     event fires here rather than on the way out, so the app behind the gate is
+     already the one that was chosen by the time the role step is showing. */
   window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
+  /* AND THEN THE ROLE QUESTION, rather than closing. Open, because on this step
+     the panel IS the question - a collapsed one would be asking somebody to tap
+     twice to answer something optional. */
+  setRoleOpen(true);setDepartment(null);setUnit(null);setStep("role");
  };
  return <div className={"welcome-gate"+(shown?" shown":"")} role="dialog" aria-modal="true" aria-label={"Welcome to "+APP_NAME}>
   {dismissable&&<button type="button" className="welcome-close" aria-label="Close" onClick={()=>setOpen(false)}>×</button>}
@@ -115,14 +146,22 @@ export default function WelcomeGate(){
        other "Pace South" in the app is a download FILENAME in
        section-transfer-controls.tsx, which is a different thing and untouched. */}
    <p className="welcome-kicker">Transit Maintenance Work Solutions</p>
-   <div className="welcome-choices">
+   {step==="mode"&&<div className="welcome-choices">
     <button type="button" className="welcome-choice welcome-full" onClick={()=>choose("full")}>
      <b>FULL</b><small>Every surface and every control. What the shop runs on.</small>
     </button>
     <button type="button" className="welcome-choice welcome-lite" onClick={()=>choose("lite")}>
      <b>LITE</b><small>The same app drawing less of itself, to learn the workflow on. Turn it off in Settings whenever you want.</small>
     </button>
-   </div>
+   </div>}
+
+   {/* STEP TWO'S OWN HEADING. The mode step has the app's name doing this job;
+       once that is answered the screen needs to say what it is now asking, or
+       the role panel is a lone control floating under a logo. */}
+   {step==="role"&&<div className="welcome-step-head">
+    <b>ONE MORE THING</b>
+    <small>What do you do here? This is a label only — it changes nothing about what you can see or do, and you can skip it.</small>
+   </div>}
    {/* THE ROLE PICKER, under the two mode choices and above the footnote.
 
        Placed there rather than above them because the screen already asks one
@@ -141,7 +180,7 @@ export default function WelcomeGate(){
        picking a role closes the whole panel with the answer showing on the
        summary line. Nothing else in the app changes — see roles.ts, which says
        at some length why nothing else may. */}
-   <div className={"welcome-role"+(roleOpen?" open":"")}>
+   {step==="role"&&<div className={"welcome-role"+(roleOpen?" open":"")}>
     <button type="button" className="welcome-role-toggle" aria-expanded={roleOpen}
      onClick={()=>{setRoleOpen(!roleOpen);setDepartment(null);setUnit(null)}}>
      <span><b>MY ROLE</b><small><span>{role?roleLabel(role):"Not set — optional"}</span>{role&&<i className={"welcome-role-unit "+role.unit}>{unitLabel(role.unit).toUpperCase()}</i>}</small></span>
@@ -173,8 +212,20 @@ export default function WelcomeGate(){
      {(!department||!unit)&&<small className="welcome-role-hint">{department?"Union or non-union — it decides which jobs are listed next.":"Pick a department, then union or non-union, then your job."}{role?" Yours is set to "+roleLabel(role)+" ("+unitLabel(role.unit)+").":""}</small>}
      {role&&<button type="button" className="welcome-role-clear" onClick={clearRole}>CLEAR MY ROLE</button>}
     </div>}
-   </div>
-   <p className="welcome-foot">Nothing here changes what is saved. Both keep the same records and the same Shop Cloud.{dismissable&&" Close this and nothing changes at all."}</p>
+   </div>}
+   {/* SKIP AND BACK, on the role step only. The role is optional and has been
+       since it was built - "Not set" is a real answer - so a step that asks for
+       it has to have a door that is not "pick something". BACK exists because
+       the step before it is a decision somebody may want to change once they
+       see they are past it. */}
+   {step==="role"&&<div className="welcome-step-actions">
+    <button type="button" className="welcome-step-back" onClick={()=>{setStep("mode");setRoleOpen(false);setDepartment(null);setUnit(null)}}>BACK</button>
+    <button type="button" className="welcome-step-skip" onClick={()=>setOpen(false)}>{role?"DONE":"SKIP FOR NOW"}</button>
+   </div>}
+
+   <p className="welcome-foot">{step==="role"
+    ?"Your role is stored on this device only. It never syncs and nothing else in the app reads it yet."
+    :"Nothing here changes what is saved. Both keep the same records and the same Shop Cloud."}{dismissable&&step==="mode"&&" Close this and nothing changes at all."}</p>
   </div>
  </div>;
 }

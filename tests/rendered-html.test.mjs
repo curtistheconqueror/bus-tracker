@@ -13231,15 +13231,44 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     should survive a squeeze. */
  assert.match(css,/\.welcome-role-toggle small\{display:flex[^}]*\}/);
  assert.match(css,/\.welcome-role-toggle small>span\{min-width:0;overflow:hidden;text-overflow:ellipsis/);
- /* UNDER the two mode choices and ABOVE the footnote: the screen already asks
-    one question a first run must answer, and stacking a second in front of it
-    would turn a gate into a form. */
- assert.ok(gate.indexOf('className="welcome-choices"')<gate.indexOf('className={"welcome-role"'));
- assert.ok(gate.indexOf('className={"welcome-role"')<gate.indexOf('className="welcome-foot"'));
- /* Choosing a role must not answer the mode question for somebody. */
+ /* AFTER THE MODE, ON ITS OWN STEP - not beside it. Curtis: "On the Home
+    Screen I want the question of MY ROLE to come up next AFTER u pick Full or
+    Lite version. Not at same time."
+
+    It was built folded up under the mode buttons precisely so a first run would
+    not meet two questions at once; sequencing serves that better than hiding
+    one did. The two mode buttons only exist on the mode step, so the role step
+    cannot be reached without the mode already being written. */
+ assert.match(gate,/const \[step,setStep\]=useState<"mode"\|"role">\("mode"\)/);
+ assert.match(gate,/\{step==="mode"&&<div className="welcome-choices">/,
+  "the mode buttons belong to the mode step only");
+ assert.match(gate,/\{step==="role"&&<div className="welcome-step-head">/);
+ /* Re-opening from Settings starts at the mode step too, so the same tap always
+    shows the same screen. */
+ assert.match(gate,/setDismissable\(!isFirstRun\(localStorage\)\);setStep\("mode"\);setOpen\(true\)/);
+
+ /* THE ORDER IS ENFORCED BY `choose`, WHICH IS THE ONLY ROUTE ONTO THE ROLE
+    STEP. Storing the mode comes first in that handler, so there is no state in
+    which the role step is showing and the mode is unanswered. */
+ const chose=gate.slice(gate.indexOf("const choose=(mode:AppMode)"),gate.indexOf("\n };",gate.indexOf("const choose=(mode:AppMode)")));
+ assert.ok(chose.indexOf("APP_MODE_STORAGE_KEY")<chose.indexOf('setStep("role")'),
+  "the mode must be stored before the role step is shown");
+ assert.equal(chose.includes("setOpen(false)"),false,"choosing a mode now advances to the role step instead of closing");
+ assert.equal((gate.match(/setStep\("role"\)/g)||[]).length,1,"the role step has exactly one entrance");
+
+ /* The role is optional and always has been, so the step that asks for it needs
+    a door that is not "pick something". */
+ assert.match(gate,/className="welcome-step-skip"[\s\S]*?\{role\?"DONE":"SKIP FOR NOW"\}/);
+ assert.match(gate,/className="welcome-step-back"/);
+
+ /* THE PANEL RENDERS ON THE ROLE STEP AND NOWHERE ELSE. This is what makes
+    "not at same time" structural rather than a check somebody can delete: with
+    no panel on the mode step, there is no state in which a job title could be
+    picked before the mode is answered. */
+ assert.match(gate,/\{step==="role"&&<div className=\{"welcome-role"/);
+ /* Choosing a role must still never answer the mode question for somebody. */
  const body=gate.slice(gate.indexOf("const chooseRole="),gate.indexOf("\n };",gate.indexOf("const chooseRole=")));
- assert.equal(body.includes("setOpen"),false,"picking a role must not close a gate that has not been answered");
- assert.equal(body.includes(  "APP_MODE_STORAGE_KEY"),false,"and must not touch the mode");
+ assert.equal(body.includes("APP_MODE_STORAGE_KEY"),false,"picking a role must not touch the mode");
 
  /* globals.css line 2 gives every bare <button> height:28px. Every control here
     is a bare button, so each one states its own height — measured at 44px in
@@ -13247,8 +13276,15 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  assert.match(css,/\.welcome-role-body button\{min-height:44px/);
  assert.match(css,/\.welcome-role-toggle\{width:100%;min-height:52px/);
  /* And it joins the reduced-motion opt-out rather than being the one panel that
-    still flies in for somebody who asked the OS for none of that. */
- assert.match(css,/\.welcome-name span,\.welcome-kicker,\.welcome-choices,\.welcome-role,\.welcome-foot\{opacity:1/);
+    still flies in for somebody who asked the OS for none of that - the role
+    STEP's own heading and buttons included, since they animate in too. Asserted
+    per class rather than as one exact selector list, so adding a sibling later
+    cannot silently leave it out of the opt-out. */
+ const reduced=css.slice(css.indexOf("@media(prefers-reduced-motion:reduce){\n .welcome-name span"));
+ for(const cls of [".welcome-name span",".welcome-kicker",".welcome-choices",".welcome-role",".welcome-step-head",".welcome-step-actions",".welcome-foot"]){
+  assert.ok(new RegExp(cls.replace(/[.]/g,"\\.")+"[,{]").test(reduced.split("}")[0]),cls+" is missing from the reduced-motion opt-out");
+  assert.ok(reduced.includes(".welcome-gate.shown "+cls.split(" ")[0]),cls+" still animates for reduced motion");
+ }
 });
 
 test("a bus that keeps coming back is counted, with every date kept",async()=>{
