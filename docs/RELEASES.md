@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 178 / release 178 | Live | 531c3f8 | Keeps the Fleet Status Report CLOSE action reachable in its iOS modal, makes first-run role selection follow Full/Lite selection, and fixes the cross-timezone forecast fixture so CI passes consistently. |
+| 179 / release 179 | Live | fe467c0 | Adds optional HOLD UNTIL and EXTEND controls for deferred Defect Log repairs without resetting their original 90-minute alarm or deferred history; the facility-config extraction is internal and renders identically. |
+| 178 / release 178 | Previous live | 531c3f8 | Keeps the Fleet Status Report CLOSE action reachable in its iOS modal, makes first-run role selection follow Full/Lite selection, and fixes the cross-timezone forecast fixture so CI passes consistently. |
 | 177 / release 177 | Previous live | c18f635 | Turns the Fleet Status Report into a per-device checkbox list, adds its first Fleet Forecast, counts Farebox, Ventra and CUBIC-screen buses independently, safely backfills old Down Sheets into history, and uses fleet numbers for that ledger across devices. |
 | 176 / release 176 | Previous live | 5e6fd58 | Restores the garage's actual shift hours, gives the incoming shift ownership at 30-minute handovers, and corrects two-shift timing; starts an append-only, capped Down Sheet swap ledger that merges across transfers and master imports; and makes the Fleet Status Report close control obvious and touch-sized. |
 | 175 / release 175 | Previous live | 9bac8ed | Corrects road-call status when a bus is formally placed on the Down Sheet while preserving road-call history; renames and shortens the Fleet Status Report; repairs Fixed Repairs contrast across all themes; and adds editable device-local shift and pullout hours. |

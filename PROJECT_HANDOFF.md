@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 178 (repository release 178)
-Live feature checkpoint: commit 531c3f8
+Live release: Sites Version 179 (repository release 179)
+Live feature checkpoint: commit fe467c0
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 178 is live as Sites Version 178 from commit 531c3f8. It keeps the Fleet Status Report close action reachable on iOS, makes first-run role selection follow Full/Lite selection, and makes the cross-timezone forecast fixture pass consistently. It adds no storage key, payload migration, or operational behavior change. The normal rollback target is Version 177 from commit c18f635.
+Repository release 179 is live as Sites Version 179 from commit fe467c0. It adds optional HOLD UNTIL and EXTEND controls for deferred repairs without resetting the deferred alarm or history. The facility-config extraction is internal and renders identically. It adds no storage key, payload migration, or operational behavior change; deferredUntil was already an existing optional field. The normal rollback target is Version 178 from commit 531c3f8.
 
 The Version 171 baseline details below remain useful historical context:
 
