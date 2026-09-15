@@ -39,6 +39,7 @@ import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFin
 import {copyText,shareOrDownloadFile} from "../share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
+import {clockValue,nextOccurrenceISO} from "../deferral-clock";
 import {useAppMode} from "../welcome-gate";
 import {hiddenInLite} from "../lite-mode";
 import {exportFleetBoardBackup} from "../fleet-backup";
@@ -253,11 +254,39 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     prior one. */
  const deferred=value.defect.state==="deferred";
  const hasHistory=hasDeferredHistory(value.defect,value.onDownSheet);
+ /* HOLD UNTIL, asked at the moment the bus is held rather than at 20:30.
+
+    Curtis: "when I hit deferred, I need an option in that pop-up to extend the
+    time of the deferment."
+
+    Until now a deferment got a START and no END. The only place an end time
+    could be set was the evening review prompt, which fires from 20:30, only for
+    buses already held over an hour, one bus at a time, and can be switched off
+    in settings — so a bus deferred at 09:00 had an open-ended hold for eleven
+    hours, and if the prompt was off it never got one at all.
+
+    OPTIONAL, deliberately. A deferment with no end time is a valid thing and
+    always has been: "not fixed yet, not ready to escalate either" sometimes
+    genuinely has no hour attached. Making this required would turn a one-tick
+    decision into a form. */
+ const deferUntilLabel=value.defect.deferredUntil?timeLabel(value.defect.deferredUntil):"";
+ /* The stored value is an instant; the control speaks hh:mm. Converted here so
+    a hold time set earlier shows in the field when the editor is reopened
+    rather than reading as empty and inviting somebody to set it again. */
+ const deferUntilTime=clockValue(value.defect.deferredUntil);
+ const setDeferUntil=(hhmm:string)=>{
+  /* Cleared back to no end time rather than to a bad one: an empty field means
+     "held, no hour decided", which is where this started. */
+  const iso=hhmm?nextOccurrenceISO(hhmm,new Date()):"";
+  setValue(current=>({...current,defect:{...current.defect,deferredUntil:iso||undefined}}));
+ };
  const toggleDeferred=(on:boolean)=>{
   setValue(current=>({...current,onDownSheet:on?false:current.onDownSheet,defect:{
    ...current.defect,
    state:on?"deferred":(current.defect.state==="deferred"?"open":current.defect.state),
    deferredAt:on?new Date().toISOString():undefined,
+   /* Kept across a re-tick so a hold time already chosen is not silently
+      dropped, and cleared on the way out with everything else. */
    deferredUntil:on?current.defect.deferredUntil:undefined,
    /* Turning DEFERRED off without going to the Down Sheet is exactly the
       "returned to service, still open" moment this stamps. Turning it back
@@ -544,6 +573,16 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         shows the truth — the record really does say deferred — it just says
         where that came from and what to do about it. */}
     {!hiddenInLite(editorMode,"deferred")&&<label className="wide downsheet-check deferred-check"><input type="checkbox" checked={deferred} disabled={value.defect.state==="completed"||value.onDownSheet} onChange={event=>toggleDeferred(event.target.checked)}/><span><b>DEFERRED</b><small>{value.onDownSheet?(deferred?"On the sheet, and the sheet has it deferred.":"Not available while it is on the Down Sheet."):deferred?"Held back since "+timeLabel(value.defect.deferredAt||new Date().toISOString())+".":hasHistory?"Check again to hold it back, or fix it now.":"Hold the bus back from service."}</small></span></label>}
+    {/* Revealed by the tick rather than always drawn, the same way the evening
+        review reveals its own time field once KEEP is chosen. Drawing it while
+        the bus is not deferred would be asking for an hour on a decision
+        nobody has made. */}
+    {deferred&&!hiddenInLite(editorMode,"deferred")&&<label className="wide deferred-until-field">
+     <b>HOLD UNTIL</b>
+     <input type="time" value={deferUntilTime} onChange={event=>setDeferUntil(event.target.value)}
+      aria-label="Hold this repair deferred until"/>
+     <small>{deferUntilLabel?"Held until "+deferUntilLabel+". The evening review will skip it until then.":"Optional. Left empty it stays held with no end time, and the evening review will ask."}</small>
+    </label>}
     {hasHistory&&!hiddenInLite(editorMode,"deferred")&&<p className="deferred-history-note" role="note"><b>WAS DEFERRED</b>Returned to service {timeLabel(value.defect.deferredReturnedAt||"")}. Still open.</p>}
     <label className="wide downsheet-check condition-not-duplicated-check"><input type="checkbox" checked={Boolean(value.defect.conditionNotDuplicated)} onChange={event=>updateDefect("conditionNotDuplicated",event.target.checked)}/><span><b>DEFECT / CONDITION NOT DUPLICATED</b><small>Could not reproduce the reported condition.</small></span></label>
 
@@ -634,6 +673,12 @@ export default function DefectLog(){
  const [holdBoardOpen,setHoldBoardOpen]=useState(false);
  const [saveProblem,setSaveProblem]=useState<FleetWriteReason|"">("");
  const [undoSnapshot,setUndoSnapshot]=useState<LogUndoSnapshot|null>(null);
+ /* Which held row has its EXTEND field open, by defect id, and what is typed in
+    it. One at a time: the field is revealed in place of the row's buttons, so
+    two open at once would be two rows mid-edit with no way to tell which
+    CONFIRM belongs to which. */
+ const [extending,setExtending]=useState("");
+ const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
  const [batchesOpen,setBatchesOpen]=useState(false);
  /* The last removed scan sweep, read from the device rather than held only in
@@ -833,6 +878,30 @@ export default function DefectLog(){
  };
  const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
+/* EXTEND, from the held row itself.
+
+    The only way to move a deferment's clock was the evening review prompt, and
+    that fires from 20:30, only for buses already held over an hour, one at a
+    time, and can be switched off in settings. A foreman who decides at 10am
+    that a bus is held until the afternoon had nowhere to say so.
+
+    It is an EDIT to an existing deferral, so it changes the end time and
+    nothing else. `deferredAt` is untouched — that stamp measures THIS stay and
+    is what the 90-minute badge counts from, so restamping it here would reset
+    the alarm every time somebody pushed the clock, which is the one thing a
+    safety net must not let you do. The state stays "deferred" and
+    `deferredReturnedAt` stays clear, so `wasDeferred` history is unaffected. */
+ const extendDeferral=(record:DefectLogRecord,hhmm:string)=>{
+  const iso=nextOccurrenceISO(hhmm,new Date());
+  if(!iso){alert("Choose a time to hold this bus until.");return}
+  const now=new Date().toISOString();
+  const result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,deferredUntil:iso},false,now);
+  if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}
+  /* A way back, the same as every other row action here leaves. */
+  setUndoSnapshot({fleet,downEntries,label:"Extended the hold on Bus "+record.bus.n});
+  persist(result.fleet,result.downEntries);
+  setExtending("");setExtendUntil("");
+ };
  const undoDeferred=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"open",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:now},false,now);if(result.error){alert("That deferred repair is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Undid Deferred status for Bus "+record.bus.n});persist(result.fleet,result.downEntries)};
  /* END DEFERRAL from the drawer itself.
 
@@ -1233,7 +1302,16 @@ export default function DefectLog(){
      {record.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET</b><span>{downSheetEntryLabel(record.downSheetEntry)}</span></p>}
      <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
-     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
+     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
+      ?<span className="extend-deferral-field"><input type="time" value={extendUntil} autoFocus
+         onChange={event=>setExtendUntil(event.target.value)}
+         aria-label={"Hold bus "+record.bus.n+" until"}/>
+        <button className="extend-confirm" type="button" onClick={()=>extendDeferral(record,extendUntil)}>HOLD</button>
+        <button className="extend-cancel" type="button" onClick={()=>{setExtending("");setExtendUntil("")}} aria-label="Cancel extending the hold">×</button></span>
+      :<button className="extend-deferral" type="button" onClick={()=>{setExtending(record.defect.id);setExtendUntil("")}}
+         aria-label={"Extend the hold on bus "+record.bus.n+" defect "+(index+1)}
+         title={record.defect.deferredUntil?"Held until "+timeLabel(record.defect.deferredUntil):"No end time set"}>
+        <span aria-hidden="true">⏱</span><b>{record.defect.deferredUntil?"EXTEND":"HOLD UNTIL"}</b></button>)}{record.defect.state!=="completed"&&record.bus.s!=="defect"&&record.bus.s!=="decommissioned"&&<button className="back-service" onClick={()=>backInService(record)} aria-label={"Return bus "+record.bus.n+" to service with defect "+(index+1)+" still active"}><span aria-hidden="true">&#8593;</span><b>BACK IN SERVICE</b></button>}<button className="remove-log" onClick={()=>removeFromLog(record)} aria-label={"Remove bus "+record.bus.n+" defect "+(index+1)+" from Defect Log only"}><span aria-hidden="true">×</span><b>REMOVE</b></button></div>
     </section>)}
     </div>}
      {/* THE CLOSING LINE, off unless asked for. Curtis wanted this one kept as

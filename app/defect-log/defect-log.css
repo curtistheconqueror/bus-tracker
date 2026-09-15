@@ -129,6 +129,23 @@ button,input,select,textarea{font:inherit}
 .undo-deferred{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;background:#e8f5f8;color:#0b6679}.undo-deferred span{font-size:14px;font-weight:900;line-height:1}.undo-deferred b{font-size:6.5px}.undo-deferred:hover,.undo-deferred:focus-visible{background:#d7f0f7;outline:none}
 @media(max-width:760px){.feed-title{gap:9px;align-items:stretch;flex-direction:column}.feed-title>span{align-items:flex-start;text-align:left}.feed-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}.feed-title .feed-operator,.feed-title button{width:100%;height:52px;min-height:52px;padding:0 7px;font-size:11px;line-height:1.15;letter-spacing:.15px;touch-action:manipulation}.back-service{flex-direction:row;gap:4px;border-top:0!important}}
 @media(max-width:760px){.undo-deferred{flex-direction:row;gap:4px;border-top:0!important}}
+/* EXTEND / HOLD UNTIL, beside UNDO DEFERRED and matching it: same wash, same
+   stacked glyph-over-label, so the two read as one pair of things you can do to
+   a held bus. Both sit in `.log-actions`, whose own rules already give these
+   buttons their size and border. */
+.extend-deferral{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;background:#eef6e9;color:#3f6b25}
+.extend-deferral span{font-size:14px;font-weight:900;line-height:1}
+.extend-deferral b{font-size:6.5px}
+.extend-deferral:hover,.extend-deferral:focus-visible{background:#e2f0d9;outline:none}
+/* The field that replaces the button while a time is being chosen. 44px on the
+   input and both buttons: this one is pressed on a phone standing next to a
+   bus, and `.log-form input`'s 38px is the debt issue #11 exists for rather
+   than a target to copy. */
+.extend-deferral-field{display:flex;align-items:center;gap:4px;padding:4px;background:#eef6e9;border-top:1px solid var(--log-border)}
+.extend-deferral-field input{min-width:0;width:100%;min-height:44px;border:1px solid #9db98a;border-radius:5px;padding:0 6px;font-family:inherit;font-size:12px}
+.extend-deferral-field button{min-height:44px;border:1px solid #9db98a;border-radius:5px;background:#3f6b25;color:#fff;padding:0 9px;font-family:inherit;font-size:9px;font-weight:900;letter-spacing:.06em;cursor:pointer}
+.extend-deferral-field .extend-cancel{min-width:44px;background:#fff;color:#3f6b25;font-size:15px;letter-spacing:0}
+@media(max-width:760px){.extend-deferral{flex-direction:row;gap:4px;border-top:0!important}}
 /* Responsive grouped Defect Log */
 /* The Defect Log's own emphasis on the typed box. Scoped to .log-form, so it
    stays here while the shared picker rules live in bus-selector.css. */
@@ -409,6 +426,17 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .deferred-history-note b{font-size:8px;font-weight:900;letter-spacing:.4px}
 .downsheet-recommend-check b{color:#8a4c00}
 .deferred-check{border-color:#a9d3dc;background:#eaf7fa}.deferred-check b{color:#0b6b80}
+/* HOLD UNTIL, revealed under the DEFERRED tick. Same wash as the tick above it
+   so the two read as one decision rather than as an unrelated field that
+   appeared. Its own min-height because `.log-form input` gives every field in
+   this form 38px, which is under a thumb target — the existing fields are issue
+   #11's to fix in an iPad-scoped pass, and a new control should not join them.
+   Same specificity as that rule, so it wins on source order alone; it sits
+   after it deliberately. */
+.deferred-until-field{border:1px solid #a9d3dc;border-radius:7px;background:#eaf7fa;padding:9px 11px;margin-top:-4px}
+.deferred-until-field b{color:#0b6b80}
+.deferred-until-field input{min-height:44px;max-width:180px}
+.deferred-until-field small{color:#4a6076;font-size:9px;font-weight:700;line-height:1.5}
 /* Pass and fail read as opposites at a glance, because on a brake test that
    is the entire point of the control. Unpicked they are outlines; picked, the
    chosen one fills solid and the other stays quiet. */
