@@ -15315,8 +15315,18 @@ test("site-config describes this building exactly as the five tables already do"
    'the config\'s alias order must resolve "'+phrase+'" the same way the app does');
 
  /* 5. THE PREFIX FALLBACK, for a location no destination lists - an overflow
-    slot, or an east id outside the painted columns. */
+    slot, or an east id outside the painted columns.
+
+    ORDER-INDEPENDENT, AND THAT IS ASSERTED RATHER THAN ASSUMED. The lookup is
+    first-match-wins, and the config lists the prefixes in a different order
+    than the hand-written table did, so the reorder is only safe while no prefix
+    is itself a prefix of another. It is a near miss: "offsite-" and "office-"
+    share three characters, and so do "wall-", "waiting-" and "wash-". If a
+    future section is ever added whose prefix contains an existing one, this
+    fails here rather than silently mislabelling a bus. */
  const prefixes=sitePrefixLabels();
+ for(const [a] of prefixes)for(const [b] of prefixes)
+  if(a!==b)assert.equal(b.startsWith(a),false,'"'+a+'" is a prefix of "'+b+'" - the fallback order would start to matter');
  for(const slot of ["west-overflow-2","bay-overflow-0","service-overflow-1","east-3"])
   assert.equal(prefixes.find(([prefix])=>slot.startsWith(prefix))?.[1],locationLabel(slot),
    slot+" must fall back to the same label the app gives it");
