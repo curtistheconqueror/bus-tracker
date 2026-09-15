@@ -10773,10 +10773,23 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
   await import("../app/fleet-forecast.ts");
  const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
 
- const now="2026-09-14T10:00:00.000-05:00";
+ /* BUILT FROM LOCAL COMPONENTS, NOT PINNED TO AN INSTANT, and that is the
+    whole point of the spelling.
+
+    `shiftAt` resolves a shift through `minuteOfDay`, which reads `getHours()` -
+    LOCAL time. So any absolute instant lands in a different shift depending on
+    where the runner happens to be, and the test asserts a different window with
+    no code having changed. Both earlier spellings had that bug pointing in
+    opposite directions: `...Z` is 10:00 only in UTC, so it passed on CI and
+    failed on a Central machine; `...-05:00` is 10:00 only in Central, so it
+    passed locally and turned CI red.
+
+    `new Date(y,m,d,h,...)` constructs from local time, so this is 10:00
+    wherever it runs - which is exactly what the assertion means. 10:00 is 1st
+    shift under the shop's hours and the next pullout is 13:00, so the window is
+    three hours of 1st shift, in every timezone. */
+ const now=new Date(2026,8,14,10,0,0,0).toISOString();
  const hoursAgo=h=>new Date(Date.parse(now)-h*3600000).toISOString();
- /* 10:00 Central is 1st shift under the shop's hours, and the next pullout is
-    13:00, so the window is three hours of 1st shift. */
  const onShift=count=>Array.from({length:count},(unused,index)=>
   ({id:"r"+index,n:String(17600+index),roadCalls:[{id:"e"+index,at:hoursAgo(1+index*24)}],defects:[]}));
 
