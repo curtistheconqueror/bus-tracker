@@ -252,7 +252,15 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
- "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","ABS warning","Brake mod light","Parking brake","Other brake repair"],
+ /* A sticking brake had no wording at all, so the only way to log one was to
+    name a part. R-12 and R-14 already exist under Pneumatic System, either can
+    hold a rear brake on, and the two are linked — a fault on the parking-brake
+    valve can keep pressure on the service side through the anti-compound line.
+    Picking one of them here would store a guess where an inspection reads a
+    fact. The two "will not release" wordings are the split a mechanic can
+    actually make standing at the bus, and they narrow the valve without
+    asserting it. A test holds that no wording in here names either valve. */
+ "Brakes":["Brake inspection","Front brake pads","Brake rotors","Rear shoes and drums","Pads / shoes","Rotor / drum","Air brake fault","Brakes sticking / dragging","Brakes will not release - service (after pedal)","Brakes will not release - parking brake","Brake chamber leaking","ABS warning","Brake mod light","Parking brake","Other brake repair"],
  "Tires and Wheels":["Flat / air leak","Tire replacement","Wheel / rim","Wheel-end repair","Tire wear","Other tire repair"],
  "Battery, Starting and Charging":["Jump / boost bus","Battery replacement","Battery drain","Voltage regulator","Alternator failure","No crank","Crank no start","Intermittent no start","Front start INOP","Rear start INOP","Starter","Solid battery light","Flashing battery light","Starting / charging diagnosis","Cables / terminals","Other starting or charging repair"],
  "Electrical / Multiplex":["MOD light","Multiplex fault","Communication fault","Wiring repair","Fuse / relay","Module replacement","Intermittent electrical","Other electrical repair"],
