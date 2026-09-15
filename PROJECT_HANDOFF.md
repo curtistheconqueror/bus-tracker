@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 177 (repository release 177)
-Live feature checkpoint: commit c18f635
+Live release: Sites Version 178 (repository release 178)
+Live feature checkpoint: commit 531c3f8
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 177 is live as Sites Version 177 from commit c18f635. It turns the Fleet Status Report into a per-device checkbox list, adds its first Fleet Forecast, and independently counts Farebox, Ventra, and CUBIC-screen buses. It supports safe old-sheet backfill into the Down Sheet history ledger and corrects that ledger to use fleet numbers across devices. The new optional `pace-status-report-picks-v1` preference saves report inclusions only; no fleet, Down Sheet, or cloud record is migrated. The normal rollback target is Version 176 from commit 5e6fd58.
+Repository release 178 is live as Sites Version 178 from commit 531c3f8. It keeps the Fleet Status Report close action reachable on iOS, makes first-run role selection follow Full/Lite selection, and makes the cross-timezone forecast fixture pass consistently. It adds no storage key, payload migration, or operational behavior change. The normal rollback target is Version 177 from commit c18f635.
 
 The Version 171 baseline details below remain useful historical context:
 
