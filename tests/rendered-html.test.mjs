@@ -1715,6 +1715,19 @@ test("repair catalog exposes robust category and issue choices", () => {
   assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - C/S"));
   assert.ok(REPAIR_OPTIONS["Suspension and Steering"].includes("Bus leaning - R/S"));
   assert.ok(REPAIR_OPTIONS.Brakes.includes("Brake mod light"));
+  /* A sticking brake is a SYMPTOM and the two valves that can cause one are
+     PARTS, listed under Pneumatic System. The catalog kept the symptom out
+     altogether until now, which left naming a valve as the only way to log it.
+     These four say what the bus is doing; the last two assertions are the ones
+     that bite, because the tempting "fix" is to name R-12 or R-14 right here
+     and store a guess where an inspection reads a fact. */
+  assert.ok(REPAIR_OPTIONS.Brakes.includes("Brakes sticking / dragging"));
+  assert.ok(REPAIR_OPTIONS.Brakes.includes("Brakes will not release - service (after pedal)"));
+  assert.ok(REPAIR_OPTIONS.Brakes.includes("Brakes will not release - parking brake"));
+  assert.ok(REPAIR_OPTIONS.Brakes.includes("Brake chamber leaking"));
+  assert.ok(REPAIR_OPTIONS.Brakes.every(issue => !/R-1[24]/.test(issue)));
+  assert.ok(REPAIR_OPTIONS["Pneumatic System"].includes("R-12 service valve (C/S rear)"));
+  assert.ok(REPAIR_OPTIONS["Pneumatic System"].includes("R-14 parking brake valve (R/S rear)"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("Farebox - Unlocked / won't lock"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - BUS ER"));
   assert.ok(REPAIR_OPTIONS["Tech Services"].includes("CUBIC Screen - MV ER"));
