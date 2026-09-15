@@ -41,6 +41,8 @@ import {SETTINGS_KEY as LOG_SETTINGS_KEY} from "./defect-log/defect-log-settings
 
 const REVIEW_MINUTES=60;
 const REVIEW_HOUR=20,REVIEW_MINUTE=30;
+import {nextOccurrenceISO} from "./deferral-clock";
+
 const DISMISS_KEY="pace-deferred-review-dismissed-v1";
 
 function readFleet():DefectLogFleetBus[]{
@@ -74,14 +76,6 @@ function reviewPromptEnabled(){
 }
 
 function isReviewWindowOpen(now:Date){return now.getHours()>REVIEW_HOUR||(now.getHours()===REVIEW_HOUR&&now.getMinutes()>=REVIEW_MINUTE)}
-function nextOccurrenceISO(hhmm:string,from:Date){
- const [hours,minutes]=hhmm.split(":").map(Number);
- if(!Number.isFinite(hours)||!Number.isFinite(minutes))return "";
- const at=new Date(from);
- at.setHours(hours,minutes,0,0);
- if(at.getTime()<=from.getTime())at.setDate(at.getDate()+1);
- return at.toISOString();
-}
 function durationLabel(minutes:number){
  const whole=Math.round(minutes);
  return whole>=60?Math.floor(whole/60)+"h "+(whole%60)+"m":whole+"m";

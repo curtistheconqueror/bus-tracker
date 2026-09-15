@@ -15352,3 +15352,68 @@ test("site-config describes this building exactly as the five tables already do"
  assert.equal(SITE_SECTIONS.length,Object.keys(SECTION_SLOTS).length);
  assert.equal(SITE_SECTIONS.flatMap(section=>section.areas).length,Object.keys(RELOCATION_AREAS).length);
 });
+
+test("a deferment can be given an end time when it is made, and extended later without resetting its alarm",async()=>{
+ /* Curtis: "when I hit deferred, I need an option in that pop-up to extend the
+    time of the deferment."
+
+    Until now a deferment got a START and no END. The only place an end time
+    could be set was the evening review prompt, which fires from 20:30, only for
+    buses already held over an hour, one at a time, and can be switched off in
+    settings — so a bus deferred at 09:00 had an open-ended hold for eleven
+    hours, and with the prompt off it never got one at all.
+
+    Two controls, because he asked for both: HOLD UNTIL on the DEFERRED tick in
+    the editor, and EXTEND on the held row itself. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const watch=await readFile(new URL("../app/deferred-watch.tsx",import.meta.url),"utf8");
+
+ /* ONE COPY OF THE CLOCK ARITHMETIC. "Hold until 06:00" asked at 21:00 means
+    tomorrow morning, and three places now ask it — the evening review, the
+    editor tick, and the held row. */
+ const {nextOccurrenceISO,clockValue}=await import("../app/deferral-clock.ts");
+ assert.match(watch,/from "\.\/deferral-clock"/,"the evening review reads the shared clock");
+ assert.match(page,/from "\.\.\/deferral-clock"/,"and so does the Defect Log");
+ assert.equal(/function nextOccurrenceISO/.test(watch),false,"no second copy of the arithmetic");
+ const at21=new Date(2026,8,15,21,0,0);
+ const rolled=new Date(nextOccurrenceISO("06:00",at21));
+ assert.equal(rolled.getHours(),6);
+ assert.equal(rolled.getDate(),16,"an hour already past today means tomorrow");
+ const later=new Date(nextOccurrenceISO("23:30",at21));
+ assert.equal(later.getDate(),15,"an hour still to come today stays today");
+ assert.equal(nextOccurrenceISO("",at21),"","an empty time is not a time");
+ assert.equal(nextOccurrenceISO("nonsense",at21),"","and neither is a non-time");
+ /* Choosing the hour it already is means the NEXT one, not a hold that expires
+    the instant it is set. */
+ const same=new Date(nextOccurrenceISO("21:00",at21));
+ assert.equal(same.getDate(),16,"the current hour rolls to tomorrow rather than expiring at once");
+ /* And the field shows a hold already set, rather than reading empty and
+    inviting somebody to set it twice. */
+ assert.equal(clockValue(new Date(2026,8,15,16,30).toISOString()),"16:30");
+ assert.equal(clockValue(undefined),"");
+ assert.equal(clockValue("not a date"),"");
+
+ /* THE CONTROLS EXIST, and the editor's one is revealed by the tick rather than
+    always drawn — asking for an hour on a decision nobody has made. */
+ assert.match(page,/\{deferred&&!hiddenInLite\(editorMode,"deferred"\)&&<label className="wide deferred-until-field">/);
+ assert.match(page,/className="extend-deferral"/);
+ assert.match(page,/className="extend-deferral-field"/);
+
+ /* OPTIONAL, deliberately: a hold with no end time is valid and always has
+    been. Clearing the field returns it to that rather than to a bad value. */
+ assert.match(page,/const iso=hhmm\?nextOccurrenceISO\(hhmm,new Date\(\)\):"";/);
+ assert.match(page,/deferredUntil:iso\|\|undefined/);
+
+ /* THE INVARIANT THAT MATTERS. Extending changes the END time and nothing else.
+    `deferredAt` is what the 90-minute badge counts from, so restamping it here
+    would reset the alarm every time somebody pushed the clock — the one thing a
+    safety net must not let you do. `wasDeferred` history is untouched too. */
+ const extend=page.slice(page.indexOf("const extendDeferral="),page.indexOf("\n };",page.indexOf("const extendDeferral=")));
+ assert.match(extend,/\{\.\.\.record\.defect,deferredUntil:iso\}/,
+  "extending must set the end time and spread the rest of the defect unchanged");
+ assert.equal(/deferredAt:/.test(extend),false,"extending must not touch deferredAt - it is what the 90-minute alarm counts from");
+ assert.equal(/deferredReturnedAt:/.test(extend),false,"nor deferredReturnedAt, which is what wasDeferred reads");
+ assert.equal(/state:/.test(extend),false,"nor the state - the bus stays deferred");
+ /* And it leaves a way back, like every other row action here. */
+ assert.match(extend,/setUndoSnapshot\(/);
+});
