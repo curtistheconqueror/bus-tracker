@@ -1,4 +1,5 @@
 import {operationalAgeMs} from "./operational-time.ts";
+import {siteAliases} from "./site-config.ts";
 
 export type FleetInsightBus={
  id:string;
@@ -21,25 +22,19 @@ export type FleetInsightArea={name:string;slots:string[]};
 export type FleetInsight={response:string;busIds:string[];busNumbers:string[];selectionLabel:string};
 
 const STATUS_LABELS:Record<string,string>={service:"In Service / On Road",defect:"In Service with Defects",shop:"Work in Progress",out:"Out of Service",decommissioned:"Decommissioned",unknown:"Unknown / Mystery"};
-const AREA_ALIASES:[string,string[]][]=[
- ["WAITING AREA",["waiting area","waiting","unsorted","holding area","hold area","void zone"]],
- ["TROUBLE BAY 11",["trouble bay 11","bay 11"]],
- ["TROUBLE BAY 12",["trouble bay 12","bay 12"]],
- ["IN SERVICE / ON ROAD",["in service on road","on the road","on road","road section","road area"]],
- ["SERVICE DETAIL AREA (SINGLE FILE)",["service detail area","service detail"]],
- ["SHOP BAYS (DIAGONAL)",["shop bays","service bays","service bay"]],
- ["MAIN GARAGE (BAYS 1-10)",["main garage","garage"]],
- ["CNG EAST LOT",["cng east lot","cng east","east lot"]],
- ["CNG WEST LOT",["cng west lot","cng west","west lot"]],
- ["SHOP WALL (SINGLE FILE)",["shop wall"]],
- ["PAINT BOOTH",["paint booth"]],
- ["WASH RACK",["wash rack"]],
- ["BODY SHOP",["body shop"]],
- ["BRAKE TEST",["brake test"]],
- ["TOW / STAGING",["tow staging","tow area","tow / staging"]],
- ["FOREMAN OFFICE",["foreman office","office"]],
- ["PIT",["the pit","pit"]],
-];
+/* THE PHRASES A PERSON MIGHT SAY, read from `site-config.ts`.
+
+   Issue #21, Phase 1 step 2, the last consumer.
+
+   THE ORDER IS BEHAVIOUR, NOT PRESENTATION, which is why it travels with the
+   config rather than being re-sorted here. `findOperatorArea` below walks this
+   list and returns the FIRST area one of whose aliases appears in what was
+   typed, so two areas with overlapping aliases are decided by which comes
+   first. TROUBLE BAY 11 owns "bay 11" and SHOP BAYS owns "service bay", and
+   both sit inside "service bay 11" - the trouble bays are listed ahead of the
+   shop bays, so it resolves the way somebody standing in the shop means it.
+   Sorted any other way it quietly starts answering SHOP BAYS. */
+const AREA_ALIASES:[string,string[]][]=siteAliases();
 
 function normalized(value:string){return value.toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ")}
 function ordered(buses:FleetInsightBus[]){return [...buses].sort((a,b)=>a.n.localeCompare(b.n,undefined,{numeric:true})||a.id.localeCompare(b.id))}

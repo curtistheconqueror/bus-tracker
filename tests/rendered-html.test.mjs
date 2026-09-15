@@ -15306,19 +15306,28 @@ test("site-config describes this building exactly as the five tables already do"
     whose aliases appears in the command - but walking the CONFIG's order, and
     require the two to land on the same area. Now a config ordered any other way
     disagrees with the app and fails here. */
- const normalize=value=>value.toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
- const resolveThroughConfig=command=>{
-  const haystack=normalize(command);
-  for(const [name,aliases] of siteAliases())
-   if(aliases.some(alias=>haystack.includes(normalize(alias))))return name;
-  return "";
- };
- /* TROUBLE BAY 11 owns "bay 11" and SHOP BAYS owns "service bay", and both sit
-    inside this phrase. The trouble bays are listed first, so it resolves the
-    way somebody standing in the shop means it. */
- for(const phrase of ["service bay 11","service bay 12","shop bays","the pit","move it to main garage","bay 11 please"])
-  assert.equal(resolveThroughConfig(phrase),findOperatorArea(phrase,areas)?.name??"",
-   'the config\'s alias order must resolve "'+phrase+'" the same way the app does');
+ /* PINNED TO THE ANSWER, NOT TO AGREEMENT BETWEEN TWO LISTS.
+
+    This assertion used to resolve the phrase through the config's own list and
+    require `findOperatorArea` to agree. That bit while the two were separate -
+    and stopped the moment `fleet-intelligence.ts` began reading the config,
+    because then both sides walked the same array and moved together. The
+    mutation that removes the config's alias sort passed. Caught by re-running
+    it after the swap, which is the only reason it is written this way now.
+
+    So the expected area is spelled out. TROUBLE BAY 11 owns "bay 11" and SHOP
+    BAYS owns "service bay", and both sit inside "service bay 11": the trouble
+    bays are listed ahead of the shop bays, so it resolves the way somebody
+    standing in the shop means it. Re-sort the list and these fail. */
+ for(const [phrase,expected] of [
+  ["service bay 11","TROUBLE BAY 11"],
+  ["service bay 12","TROUBLE BAY 12"],
+  ["put it in shop bays","SHOP BAYS (DIAGONAL)"],
+  ["the pit","PIT"],
+  ["move it to main garage","MAIN GARAGE (BAYS 1-10)"],
+  ["waiting","WAITING AREA"],
+ ])assert.equal(findOperatorArea(phrase,areas)?.name,expected,
+  '"'+phrase+'" must resolve to '+expected+' - the alias order decides it');
 
  /* 5. THE PREFIX FALLBACK, for a location no destination lists - an overflow
     slot, or an east id outside the painted columns.
