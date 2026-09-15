@@ -15205,3 +15205,98 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
  for(const [name,source] of [["facility-areas",areas],["mystery-buses",mystery],["page",page]])
   assert.match(code(source),/from "\.\/facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
 });
+
+test("site-config describes this building exactly as the five tables already do",async()=>{
+ /* PHASE 1 OF PULLING THE SITE OUT OF THE CODE (issue #21).
+
+    `site-config.ts` is the single description of the yard. The five tables are
+    NOT derived from it yet — that swap happens one consumer at a time, with the
+    rendered map diffed at each step. This test is what makes that swap a
+    refactor rather than a rewrite: it requires the config to reproduce every
+    existing table exactly, so a consumer can be pointed at it without anything
+    moving.
+
+    It found two things a reading would not have. Both are ORDER, and in this
+    app order is not decoration. */
+ const {siteSectionSlots,siteRelocationAreas,siteAreaLabels,siteThemeKeys,siteAliases,sitePrefixLabels}=
+  await import("../app/site-config.ts");
+ const {SECTION_SLOTS,RELOCATION_AREAS}=await import("../app/facility-areas.ts");
+ const {SECTION_THEME_KEYS}=await import("../app/map-settings.ts");
+ const {findOperatorArea}=await import("../app/fleet-intelligence.ts");
+ const {locationLabel}=await import("../app/location-label.ts");
+
+ /* 1. WHAT EXISTS. Every slot id, in order, including the CNG East lot's gaps -
+    two painted columns inside a four-wide numbering, so its ids skip. */
+ assert.deepEqual(siteSectionSlots(),SECTION_SLOTS,"the sections and their slots must match exactly");
+ assert.deepEqual(siteRelocationAreas(),RELOCATION_AREAS,"the move destinations must match exactly");
+ /* Checked as exact ids, not as text: "east-3" is a substring of "east-30",
+    which the lot really does have, so a string search matches for the wrong
+    reason and would pass whatever the config said. */
+ const east=new Set(siteSectionSlots()["CNG EAST LOT"]);
+ assert.equal(east.size,18,"eighteen painted spaces");
+ for(const id of ["east-1","east-2","east-33","east-34"])assert.ok(east.has(id),id+" is a real space");
+ for(const id of ["east-0","east-3","east-4","east-7"])assert.equal(east.has(id),false,
+  id+" is a gap in the numbering and must not be generated");
+
+ /* 2. WHAT A PERSON IS TOLD, checked THROUGH the live label function on a real
+    slot of every destination rather than against the label table's text. */
+ const labels=siteAreaLabels();
+ for(const [name,slots] of Object.entries(siteRelocationAreas()))
+  assert.equal(locationLabel(slots[0]),labels[name],name+" is labelled differently by the app");
+
+ /* 3. THE SWATCH LIST, IN ITS OWN ORDER. The theme list and the section list
+    are ordered differently in this app - FOREMAN OFFICE is sixth among the
+    swatches and ninth among the sections - and the swatch order is what a
+    person scrolls in Settings. Sorting the config by section order silently
+    reorders somebody's colour picker. */
+ assert.deepEqual(siteThemeKeys(),SECTION_THEME_KEYS.map(([key,label])=>[key,label]),
+  "the theme swatches must match in content AND order");
+ assert.equal(siteThemeKeys().length,SECTION_THEME_KEYS.length);
+ assert.equal(siteThemeKeys().some(([key])=>key==="offsite"),false,
+  "OFF PROPERTY has no theme entry in this app; inventing one is a visible change");
+
+ /* 4. THE ALIAS LIST, AND ITS ORDER IS BEHAVIOUR. `findOperatorArea` walks the
+    list and returns the FIRST area one of whose aliases appears in the command,
+    so two areas with overlapping aliases are decided by which comes first. */
+ const areas=Object.keys(siteRelocationAreas()).map(name=>({name}));
+ for(const [area,aliases] of siteAliases())for(const alias of aliases)
+  assert.equal(findOperatorArea(alias,areas)?.name,area,'"'+alias+'" must resolve to '+area);
+ /* THE ORDER ITSELF, RESOLVED THROUGH THE CONFIG'S OWN LIST.
+
+    Feeding each alias in on its own proves nothing about order - every alias
+    matches its own area whatever the sequence. And `findOperatorArea` walks
+    fleet-intelligence's private table, so asking IT about an overlapping phrase
+    says nothing about this file either. A first draft did both of those and a
+    mutation that removed the config's sort survived them.
+
+    So: resolve the phrase the way the app does - first area in the list one of
+    whose aliases appears in the command - but walking the CONFIG's order, and
+    require the two to land on the same area. Now a config ordered any other way
+    disagrees with the app and fails here. */
+ const normalize=value=>value.toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+ const resolveThroughConfig=command=>{
+  const haystack=normalize(command);
+  for(const [name,aliases] of siteAliases())
+   if(aliases.some(alias=>haystack.includes(normalize(alias))))return name;
+  return "";
+ };
+ /* TROUBLE BAY 11 owns "bay 11" and SHOP BAYS owns "service bay", and both sit
+    inside this phrase. The trouble bays are listed first, so it resolves the
+    way somebody standing in the shop means it. */
+ for(const phrase of ["service bay 11","service bay 12","shop bays","the pit","move it to main garage","bay 11 please"])
+  assert.equal(resolveThroughConfig(phrase),findOperatorArea(phrase,areas)?.name??"",
+   'the config\'s alias order must resolve "'+phrase+'" the same way the app does');
+
+ /* 5. THE PREFIX FALLBACK, for a location no destination lists - an overflow
+    slot, or an east id outside the painted columns. */
+ const prefixes=sitePrefixLabels();
+ for(const slot of ["west-overflow-2","bay-overflow-0","service-overflow-1","east-3"])
+  assert.equal(prefixes.find(([prefix])=>slot.startsWith(prefix))?.[1],locationLabel(slot),
+   slot+" must fall back to the same label the app gives it");
+
+ /* And the config covers the whole building, so pointing a consumer at it
+    cannot drop a section on the way. */
+ const {SITE_SECTIONS}=await import("../app/site-config.ts");
+ assert.equal(SITE_SECTIONS.length,Object.keys(SECTION_SLOTS).length);
+ assert.equal(SITE_SECTIONS.flatMap(section=>section.areas).length,Object.keys(RELOCATION_AREAS).length);
+});
