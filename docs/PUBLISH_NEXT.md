@@ -8,7 +8,8 @@ Sites Version 176 was published from
 `sites-v176` at that exact source commit. The prior production rollback point is
 Version 175 from `9bac8ed`.
 
-**Six commits**, on top of the 176 release record (`07114e5`), oldest first:
+**Eight commits**, on top of the 176 release record (`07114e5`), oldest first.
+Six carry app changes; the last two only correct this file:
 
 - `c4ea1a0` Let the report be picked rather than coded, every time
 - `deae2a3` Let the old sheets in, and fix the key they join on
@@ -16,6 +17,12 @@ Version 175 from `9bac8ed`.
 - `3f1cdeb` Write down the two queues, and the forms the drivers fill in
 - `964275a` Make the forecast one number, and build the second spelling now
 - `91025bf` Count the queue standing in the yard, not just the average
+- `15d2bd3` Name every commit 177 is carrying, not just the first — *docs only*
+- `7fa2d71` Say the mutation list is a list, not a tally — *docs only*
+
+Verify before publishing rather than trusting this list: `git log --oneline
+07114e5..HEAD`. It has already gone stale twice, both times because a commit
+was added after the list was written.
 
 ## What 177 is
 
