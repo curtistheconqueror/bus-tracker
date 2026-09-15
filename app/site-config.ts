@@ -161,14 +161,32 @@ export const SITE_SECTIONS:SiteSection[]=[
  {name:"CNG WEST LOT",plan:{kind:"range",prefix:"west",count:WEST_CAPACITY},
   theme:{key:"west",label:"CNG West",order:13},
   areas:[{name:"CNG WEST LOT",label:"CNG West",aliases:["cng west lot","cng west","west lot"],aliasOrder:8}]},
- /* OFF PROPERTY has no theme key and no spoken alias. Both are absences in the
-    app as it stands, not oversights in this file. */
+ /* OFF PROPERTY: two rows of the waiting area, given over to buses that are
+    away at a vendor — Bus & Truck and the like. They are not on this property
+    at all, so they are not "waiting" for anything here, and counting them in
+    the holding area made the yard look fuller than it was.
+
+    Twenty-eight because that is two full rows on the shop computer. A fixed
+    count rather than "two rows" on purpose: the waiting grid is 14 across on a
+    computer, 10 on an iPad and 3 on a phone, so "two rows" would have meant 28,
+    20 or 6 spaces depending on what somebody happened to be holding.
+
+    It also has no theme key and no spoken alias. Both are absences in the app
+    as it stands, not oversights in this file. */
  {name:"OFF PROPERTY",plan:{kind:"range",prefix:"offsite",count:28},theme:null,
   areas:[{name:"OFF PROPERTY",label:"Off Property",aliases:[],aliasOrder:99}]},
  {name:"WAITING AREA",plan:{kind:"range",prefix:"waiting",count:70},
   theme:{key:"waiting",label:"Waiting Area",order:14},
   areas:[{name:"WAITING AREA",label:"Waiting Area",aliases:["waiting area","waiting","unsorted","holding area","hold area","void zone"],aliasOrder:0}]},
 ];
+
+/* How many spaces a section has. The counts live here now, so the capacity
+   constants elsewhere are derived from this rather than stated twice. */
+export function siteSectionCount(name:string){
+ const section=SITE_SECTIONS.find(item=>item.name===name);
+ if(!section)throw new Error("site-config: no section named "+name);
+ return planSlots(section.plan).length;
+}
 
 /* The derived views, in the shapes the existing tables already have. */
 export function siteSectionSlots():Record<string,string[]>{
