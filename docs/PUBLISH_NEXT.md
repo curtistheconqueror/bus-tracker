@@ -281,8 +281,9 @@ figure would have said.
 `npm test` — **325 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-**Seven mutations, seven caught**, each aimed at a decision that would have been
-invisible from outside:
+**Seven mutations named here, seven caught** — the ones aimed at a decision that
+would have been invisible from outside, not a count of every mutation run across
+the six commits. The last four were run this round, against the queue terms:
 
 - the forecast gate reading the fleet total instead of the shifts the window
   actually covers — the confident-zero bug, caught by its own test;
