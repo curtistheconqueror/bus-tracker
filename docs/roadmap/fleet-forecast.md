@@ -204,7 +204,40 @@ and the per-category dwell from Stage 1 is exactly the weight. That is the
 mechanism behind *"AC repairs and Check engine lights tend to stay on the
 longest... producing a higher rate of downsheet stick."*
 
-### The confidence gate
+#### The two queues the average cannot see
+
+Curtis, 2026-09-15, correcting an earlier reading: *"if a roll call comes in,
+just the fact that a bus is a roll call, it should add to the probability of
+more down buses, depending on the conversion from roll call to down sheet... if
+we have 10 roll calls and only two of them are converted to the down sheet, then
+that's a 20% chance."* And on inspections: *"we need inspection also counted in
+that rate if half of them are counted as down buses or become downed buses with
+PM defects. That is a factor we cannot ignore."*
+
+Both are right, and both are the same shape: **a pool you can see today,
+converting at a rate you can measure, that an average over past windows knows
+nothing about.**
+
+| pool | conversion | already in the rate | missing |
+| --- | --- | --- | --- |
+| Road calls standing, not on the sheet | RC to sheet | partly — 4 of 54 arrivals | tonight's queue |
+| Inspections sitting on the sheet | inspection to downed | yes — 13 of 63 arrivals (21%) | tonight's queue |
+
+**Stripping inspection rows from the rate does NOT discard their conversions**,
+which was the worry. It counts them at the moment they become down buses:
+17524 reads `INSP` on 9/7 and `down` on 9/8, so in the stripped ledger it is
+absent then present — an arrival, on the sheet where it actually converted.
+Measured, not assumed.
+
+What is missing is the queue depth. The HOLD block went **3 to 8 overnight**
+between 9/13 and 9/14; at the measured 44% conversion that is three or four
+downed buses coming, and it is knowable today. Neither term is built.
+
+**The road-call conversion cannot be computed from the sheets at all.** A road
+call that never converted never appears on one, so it is invisible to the paper
+and has to be read from the board's own `roadCalls` history.
+
+## The confidence gate
 
 Below a threshold of observations the forecast **refuses to give a number** and
 says what it is waiting for: *"Not enough history yet — 3 more sheet swaps."*
