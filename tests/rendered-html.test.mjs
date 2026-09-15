@@ -14921,13 +14921,22 @@ test("the forecast is one number, and the single-number spelling is already ther
 
  /* Curtis: "Most important number is Forecasted Total Down buses by pullout
     times... So far, I only want this one number for the forecast." */
- const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*24*3600000).toISOString();
+ /* Twelve hours between swaps, not twenty-four. The window to the next pullout
+    can be as little as four hours, and at one net bus a day the projection moves
+    less than half a bus across it - which rounds away to nothing and makes a
+    real rate look like no rate at all. */
+ const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
  /* Four swaps, two buses arriving each day and one clearing, so the rates are
-    real and the projection has to move. */
+    real and the projection has to rise.
+
+    A STABLE ROSTER THAT SLIDES. The first draft of this fixture minted new bus
+    numbers on every snapshot, so every bus read as an arrival AND a clearance
+    and the projection rose for a reason that had nothing to do with the rates.
+    A fixture that passes for the wrong reason is worse than one that fails. */
  const ledger=[0,1,2,3].map(index=>({
   id:"s"+index,at:at(index),shift:"1st",
-  rows:Array.from({length:4+index},(unused,n)=>({b:"170"+n+index,c:"Engine"})),
-  off:index?["170"+index+(index-1)]:[],
+  rows:Array.from({length:4+3*index},(unused,n)=>({b:String(17500+index+n),c:"Engine"})),
+  off:index?[String(17500+index-1)]:[],
  }));
  const forecast=buildFleetForecast([],[],{now:at(4),ledger,downed:20,span:"pullout"});
  assert.equal(forecast.downed.enough,true);
@@ -14975,4 +14984,96 @@ test("the forecast is one number, and the single-number spelling is already ther
  for(const text of [ranged,single])
   for(const line of text.split("\n"))
    assert.ok(line.length<=STATUS_REPORT_WIDTH,"too wide ("+line.length+"): "+line);
+});
+
+test("the forecast adds the two queues it can see, and counts neither twice",async()=>{
+ const {buildFleetForecast,INSPECTION_CATEGORY,FORECAST_MIN_INSPECTIONS,FORECAST_MIN_CONVERSIONS,
+  FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS}=await import("../app/fleet-forecast.ts");
+ const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+
+ const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
+ const down=(...buses)=>buses.map(b=>({b,c:"Engine"}));
+ const insp=(...buses)=>buses.map(b=>({b,c:INSPECTION_CATEGORY}));
+
+ /* THE INSPECTION QUEUE. Four swaps; on each one a pair of inspections that sat
+    on the previous sheet comes back as a downed bus. Curtis: "we need inspection
+    also counted in that rate if half of them are counted as down buses or become
+    downed buses with PM defects. That is a factor we cannot ignore." */
+ const ledger=[0,1,2,3].map(index=>({
+  id:"s"+index,at:at(index),shift:"1st",off:[],
+  rows:[...down("17500","17501"),
+   /* last swap's inspections, now written up */
+   ...(index?down(String(17600+index-1),String(17700+index-1)):[]),
+   ...insp(String(17600+index),String(17700+index))],
+ }));
+ const quiet=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:0,roadCallsPending:0});
+ const queued=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:8,roadCallsPending:0});
+ assert.equal(queued.downed.fromInspections.enough,true,"four swaps of inspections is past the floor");
+ assert.equal(queued.downed.fromInspections.pool,8,"and it carries the queue standing right now");
+ assert.ok(queued.downed.fromInspections.expected>0,"eight waiting inspections contribute");
+ assert.ok(queued.downed.expected>quiet.downed.expected,
+  "the same shop with eight inspections queued forecasts MORE than one with none");
+ /* THE QUEUE IS WHY, not the base rate: an empty yard and a full one share a
+    ledger, so anything that moved between them came from the pool. */
+ assert.equal(quiet.downed.fromInspections.expected,0);
+
+ /* A HANDFUL OF INSPECTIONS IS NOT A RATE. Below the floor it says what it is
+    waiting for and contributes nothing, rather than quoting a conversion off
+    two observations. */
+ const thin=buildFleetForecast([],[],{now:at(2),inspections:8,roadCallsPending:0,
+  ledger:[{id:"a",at:at(0),shift:"1st",off:[],rows:[...down("17500"),...insp("17600")]},
+          {id:"b",at:at(1),shift:"1st",off:[],rows:down("17500","17600")}]});
+ assert.equal(thin.downed.fromInspections.enough,false);
+ assert.equal(thin.downed.fromInspections.expected,0,"and contributes nothing while it is thin");
+ assert.equal(thin.downed.fromInspections.need,FORECAST_MIN_INSPECTIONS-1);
+
+ /* THE ROAD-CALL QUEUE, which the sheets alone cannot measure - a road call
+    that never converted never appears on one. The denominator comes off the
+    board's own events and the numerator off the ledger.
+
+    Eight buses road-call; six of them show up on the next sheet. Curtis: "if we
+    have 10 roll calls and only two of them are converted to the down sheet,
+    then that's a 20% chance." */
+ const called=[];
+ const rcLedger=[{id:"r0",at:at(0),shift:"1st",off:[],rows:down("17500")}];
+ for(let index=0;index<8;index++){
+  const number=String(17800+index);
+  called.push({id:"rc"+index,n:number,roadCalls:[{id:"e"+index,at:at(0)}]});
+  if(index<6)rcLedger.push({id:"r"+(index+1),at:at(1),shift:"1st",off:[],rows:down(number)});
+ }
+ /* One snapshot per converted bus would double the swap count, so they share a
+    stamp - the conversion check asks whether ANY snapshot inside the window saw
+    the bus, not how many did. */
+ /* TWO EVENTS NO SNAPSHOT EVER LOOKED AT. They fell in a hole in the ledger,
+    which is a failure to OBSERVE and not a failure to convert - counting them as
+    the latter quietly drags the rate toward zero every time the shop goes a few
+    days without scanning. They must not appear in the denominator at all. */
+ called.push({id:"rcOld",n:"17899",roadCalls:[{id:"eOld",at:new Date(Date.parse(at(0))-30*24*3600000).toISOString()}]});
+ called.push({id:"rcOld2",n:"17898",roadCalls:[{id:"eOld2",at:new Date(Date.parse(at(0))-20*24*3600000).toISOString()}]});
+ const rc=buildFleetForecast(called,[],{now:at(2),ledger:rcLedger,downed:10,inspections:0,roadCallsPending:5});
+ assert.equal(Math.round(rc.downed.fromRoadCalls.rate*100),75,
+  "six of the EIGHT judged converted; the two nobody looked at are not in the denominator");
+ assert.equal(rc.downed.fromRoadCalls.enough,true,"eight judged events is past the floor");
+ assert.equal(rc.downed.fromRoadCalls.pool,5);
+ assert.ok(rc.downed.fromRoadCalls.rate>0.5&&rc.downed.fromRoadCalls.rate<1,
+  "six of eight converted, so the rate sits between a half and certainty: "+rc.downed.fromRoadCalls.rate);
+ assert.equal(Math.round(rc.downed.fromRoadCalls.expected),Math.round(5*rc.downed.fromRoadCalls.rate),
+  "five standing at that rate is what the queue contributes");
+ assert.equal(FORECAST_MIN_CONVERSIONS,6);
+ assert.ok(FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS>0);
+
+ /* AND NEITHER IS COUNTED TWICE. The base rate is an average over past windows,
+    so it already carries the TYPICAL conversion of both queues; adding the queue
+    terms on top of the RAW rate would count those arrivals once in the average
+    and again in the queue. An arrival that was an inspection on the previous
+    sheet is taken out of the base, so a ledger made entirely of such arrivals
+    has a base rate of nothing at all. */
+ const allFromInspections=buildFleetForecast([],[],{now:at(4),ledger,downed:10,inspections:0,roadCallsPending:0});
+ assert.deepEqual(allFromInspections.downed.inRange,{low:0,high:0},
+  "every arrival in this ledger converted from an inspection, so the base carries none of them");
+
+ /* The pools are handed over by the report rather than worked out twice. */
+ const modalCode=modal.replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.match(modalCode,/inspections:board\.inspections/);
+ assert.match(modalCode,/roadCallsPending:board\.roadCallsPending\.length/);
 });

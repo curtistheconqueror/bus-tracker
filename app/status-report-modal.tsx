@@ -109,9 +109,15 @@ export default function StatusReportModal({fleet,entries,title,close}:{
   try{
    return buildFleetForecast(fleet as never,entries as never,{
     now:at,settings:readShiftSettings(localStorage),ledger:readSheetLedger(localStorage),downed:board.downed,
+    /* The two queues standing right now, handed over rather than recomputed.
+       The report already works both out and is tested on them, and a second
+       answer to "is this bus on the sheet" is the drift the location-label
+       rule exists to stop. */
+    inspections:board.inspections,
+    roadCallsPending:board.roadCallsPending.length,
    });
   }catch{return null}
- },[fleet,entries,at,board.downed]);
+ },[fleet,entries,at,board.downed,board.inspections,board.roadCallsPending]);
  const forecastLines=useMemo(()=>forecastTextLines(forecast,STATUS_REPORT_WIDTH),[forecast]);
  const text=useMemo(()=>statusReportText(board,{pick,title,forecast:forecastLines}),[board,pick,title,forecastLines]);
 

@@ -165,19 +165,66 @@ arrival rate 49% hot** — 0.330/hour against 0.222/hour. The ledger stores the
 catalog category per row for exactly this kind of question, so the strip costs
 nothing.
 
-**Still to come: the road-call queue.** Curtis: *"if a roll call comes in, just
-the fact that a bus is a roll call, it should add to the probability of more
-down buses, depending on the conversion from roll call to down sheet... if we
-have 10 roll calls and only two of them are converted to the down sheet, then
-that's a 20% chance."*
+## Also in 177: the two queues the average cannot see
 
-A road call already on the sheet is a downed bus and needs no predicting. The
-one worth forecasting is the one standing on the yard that nobody has written up
-yet — and the ledger's arrival rate, being an average over past windows, knows
-nothing about tonight's queue. The pending pool is already computed next door as
-the Status Report's ROADCALLS PENDING; the conversion rate has to come off the
-board's own `roadCalls` history, because a road call that never converted never
-appears on a sheet and is invisible to the paper. Noted in the module, not built.
+The arrival rate is measured over past windows, so it carries the TYPICAL
+conversion of a road call and of an inspection, and knows nothing about what is
+standing on the yard tonight. Both queues are now read at forecast time.
+
+**Road calls.** Curtis: *"if a roll call comes in, just the fact that a bus is a
+roll call, it should add to the probability of more down buses, depending on the
+conversion from roll call to down sheet... if we have 10 roll calls and only two
+of them are converted to the down sheet, then that's a 20% chance."*
+
+A road call already on the sheet is a downed bus and needs no predicting; the one
+worth forecasting is the one nobody has written up yet, which is exactly the
+Status Report's ROADCALLS PENDING. **The conversion rate cannot come off the
+sheets at all** — a road call that never converted never appears on one — so the
+denominator comes from the board's own `roadCalls` events and the numerator from
+the ledger. A **flat probability per bus**, matching how Curtis put it: a
+standing road call is a pending decision a foreman resolves inside a shift, not
+a slow burn. Forty-eight hours is the window in which a write-up still counts as
+that road call's doing; beyond it the bus went back in service and came down
+again for something else.
+
+**Only events a snapshot actually looked at are judged.** A road call that fell
+in a hole in the ledger is a failure to OBSERVE, not a failure to convert, and
+counting it as the latter quietly drags the rate toward zero. That distinction is
+its own mutation below.
+
+**Inspections.** Curtis: *"we need inspection also counted in that rate if half
+of them are counted as down buses or become downed buses with PM defects. That is
+a factor we cannot ignore."*
+
+Measured entirely off the ledger — an inspection row on one snapshot appearing as
+a downed row on the next is a conversion — and expressed as a **per-hour hazard**
+rather than a flat fraction. An inspection sits on the sheet for days; applying a
+whole conversion fraction across a four-hour window to the pullout would claim
+half the B-18s in the yard turn into brake jobs before lunch. Conversions over
+inspection-hours-at-risk is the unit that scales to the window honestly. `gap`
+pairs are skipped, as everywhere else.
+
+**Neither queue is counted twice.** An arrival that was an inspection on the
+previous sheet, or that followed a road call inside the conversion window, is
+taken OUT of the base arrival rate: the average carries what neither queue
+explains, and each queue carries its own.
+
+**The pools are handed over, not recomputed.** `board.inspections` and
+`board.roadCallsPending.length` come straight from the Status Report, which
+already works both out and is tested on them. A second implementation of "is this
+bus on the sheet" is the drift the `location-label.ts` rule exists to stop.
+
+**Both refuse below a floor** — four inspections observed, six judged road calls
+— and say what they are waiting for rather than quoting a conversion. The floors
+are low on purpose: these are corrections on a number that already reads, so the
+cost of a thin one is smaller than the cost of ignoring a queue plainly sitting
+in the yard.
+
+**The queues move the number without widening the band.** The interval is the
+sampling error in the RATE; a counted pool and a floor-passing conversion are not
+a rate. Stretching the band by them would say the forecast got less certain the
+moment it learned something new.
+
 
 ## Also in 177: the forecast is one number
 
@@ -224,10 +271,10 @@ figure would have said.
 
 ## Gates
 
-`npm test` — **324 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
+`npm test` — **325 pass, 0 fail** · `npm run lint` — clean · `npm run build` —
 clean.
 
-**Three mutations, three caught**, each aimed at a decision that would have been
+**Seven mutations, seven caught**, each aimed at a decision that would have been
 invisible from outside:
 
 - the forecast gate reading the fleet total instead of the shifts the window
@@ -235,7 +282,18 @@ invisible from outside:
 - the dwell counting completed repairs only, which reports A/C as the fastest
   category in the shop;
 - the Ventra flag counting a bus that already has a CUBIC screen written up,
-  which would inflate both numbers at once.
+  which would inflate both numbers at once;
+- the two queue terms dropped from the projection entirely, which is the whole
+  correction and must not pass silently;
+- the queues added on top of an UNSTRIPPED base rate, counting every converted
+  arrival once in the average and again in the queue;
+- the floor removed from the projection, letting a busy clearance rate print a
+  negative number of buses;
+- an unobservable road call counted as a failure to convert. **This one survived
+  the first round** — the fixture had no such case, because every road call in it
+  happened to sit inside the ledger's span. Two events 20–30 days before the
+  ledger starts were added and it is caught now. A mutation that survives because
+  the fixture cannot express it is the failure mode this gate exists to find.
 
 Measured in Chromium at **390, 820 and 1180** on a seeded board: modal 390 / 760
 / 760 wide, one column at 390 and two above it, no horizontal scroll at any width
@@ -246,6 +304,21 @@ With the forecast and the repairs both ticked, the longest line of the generated
 message measures **37** against the 38-character lock-screen budget. The first
 draft ran to **44**, with `BEFORE THE 06:00 PULLOUT` set in a labelled row, and
 the width test is what caught it rather than reading it.
+
+**The queues were measured in Chromium, not reasoned about.** Same fleet, same
+ledger, same window, run twice with only the two pools changed — eight swaps 24
+hours apart, twenty buses stuck throughout, four inspections per swap of which
+two convert, and ten judged road calls of which five do:
+
+```
+queues empty      DOWNED BUSES / BEFORE THE 06:00 PULLOUT /  18-21  (now 20)
+queues standing   DOWNED BUSES / BEFORE THE 06:00 PULLOUT /  23-26  (now 20)
+```
+
+Ten inspections and six pending road calls standing, and the figure moves by
+five: 6 x 0.50 = 3.0 from the road calls, 10 x 0.0208/hour x 9.5 hours = 2.0 from
+the inspections. The arithmetic the module claims is the arithmetic the screen
+shows. No horizontal scroll at 390 in either run.
 
 The PDF was rendered in Chromium as well: every ticked section present and every
 unticked one absent, the forecast set as a definition list rather than a pasted
@@ -277,6 +350,11 @@ shut.
 6. Tick **Fleet forecast**. On a device with no recorded swaps it should say what
    it is waiting for. It must never show a 0% chance.
 7. Close the report and reopen it: the boxes are as you left them.
+8. With the forecast ticked, note the number, then check it against ROADCALLS
+   PENDING and INSPECTIONS on the same report. A yard with a queue standing
+   should forecast **above** the current downed count even on a quiet ledger;
+   that gap IS the two queues. On a device with too little history either queue
+   silently contributes nothing, which is the intended shape rather than a fault.
 
 ## The way back
 

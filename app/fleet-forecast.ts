@@ -38,7 +38,7 @@
 
 import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
 import {normalizeRoadCalls} from "./road-calls.ts";
-import {ledgerTempo,normalizeSheetLedger} from "./sheet-ledger.ts";
+import {normalizeSheetLedger} from "./sheet-ledger.ts";
 import {DEFAULT_SHIFT_SETTINGS,clockMinutes,minuteOfDay,nextPullout,shiftAt,windowHours,type ShiftKey,type ShiftSettings} from "./shift-clock.ts";
 
 /* How far back the rate is estimated from. Three weeks rather than the road
@@ -63,8 +63,16 @@ export const FORECAST_MIN_DWELL=3;
 
 export const FORECAST_HEDGE="not guaranteed - based on work flow and probability logistics";
 
-export type ForecastBus={id:string;roadCalls?:unknown;defects?:Partial<StructuredDefect>[]};
-export type ForecastEntry={busId?:string;workflow?:string;category?:string};
+export type ForecastBus={
+ id:string;
+ /* The fleet number. The ledger keys on it, so measuring whether a road-called
+    bus later reached the sheet means joining on this and not on the id. */
+ n?:string;
+ roadcall?:boolean;
+ roadCalls?:unknown;
+ defects?:Partial<StructuredDefect>[];
+};
+export type ForecastEntry={busId?:string;busNumber?:string;workflow?:string;category?:string};
 
 export type ForecastRange={low:number;high:number};
 
@@ -89,9 +97,42 @@ export type RoadCallForecast={
  need:number;
 };
 
+/* ONE QUEUE YOU CAN SEE, CONVERTING AT A RATE YOU CAN MEASURE.
+
+   Curtis, on road calls: "if a roll call comes in, just the fact that a bus is
+   a roll call, it should add to the probability of more down buses, depending
+   on the conversion from roll call to down sheet... if we have 10 roll calls
+   and only two of them are converted to the down sheet, then that's a 20%
+   chance." And on inspections: "we need inspection also counted in that rate if
+   half of them are counted as down buses or become downed buses with PM
+   defects. That is a factor we cannot ignore."
+
+   Both are the same shape and neither is visible to an average. The arrival
+   rate is measured over past windows, so it carries the TYPICAL conversion of
+   both and knows nothing about what is standing on the yard tonight — and the
+   queue moves hard: the HOLD block went from three to eight overnight between
+   the 13th and the 14th. */
+export type QueueTerm={
+ /* How many are standing right now. */
+ pool:number;
+ /* The measured conversion. Per POOL-HOUR for inspections, which sit for days
+    and must be scaled to the window; per BUS for road calls, which are a
+    pending decision a foreman resolves within a shift rather than a slow burn.
+    The units differ because the two things differ, and `expected` is the only
+    number a caller should read. */
+ rate:number;
+ /* What the pool contributes to this window. */
+ expected:number;
+ enough:boolean;
+ need:number;
+};
+
 export type DownedForecast={
  now:number;
  range:ForecastRange;
+ /* The two queues, kept apart so the number can be taken to pieces. */
+ fromInspections:QueueTerm;
+ fromRoadCalls:QueueTerm;
  /* THE SINGLE NUMBER, always computed and not shown by default.
 
     Curtis asked for one number; a range is what seven swaps can honestly
@@ -271,50 +312,175 @@ export function categoryDwell(fleet:ForecastBus[],now=new Date().toISOString()){
    since Curtis drew it first: "the downed number normally does not count
    inspections." Measuring arrivals over the whole sheet and charging them to a
    downed-only base is measuring one population and billing another, and against
-   the real baseline it runs the arrival rate 49% hot.
-
-   The category is on the row for exactly this reason, so the strip is free. */
-function downedRows(ledger:unknown){
- return normalizeSheetLedger(ledger).map(snapshot=>({
-  ...snapshot,rows:snapshot.rows.filter(row=>row.c!==INSPECTION_CATEGORY),
- }));
+   the real baseline it runs the arrival rate 49% hot. */
+function snapshots(ledger:unknown){return normalizeSheetLedger(ledger)}
+function downedSet(snapshot:{rows:{b:string;c:string}[]}){
+ return new Set(snapshot.rows.filter(row=>row.c!==INSPECTION_CATEGORY).map(row=>row.b));
+}
+function inspectionSet(snapshot:{rows:{b:string;c:string}[]}){
+ return new Set(snapshot.rows.filter(row=>row.c===INSPECTION_CATEGORY).map(row=>row.b));
 }
 
-/* ARRIVALS MINUS CLEARANCES, both from the ledger's own measurements.
+/* How long after a road call a write-up still counts as that road call's doing.
+   Beyond this the bus went back in service and came down again for something
+   else, which is a different event and must not be credited here. */
+export const FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS=48;
 
-   A ROAD CALL STANDING RIGHT NOW IS NOT IN HERE, and it belongs. This rate is
-   an average over past windows, so it carries the TYPICAL road-call conversion
-   and nothing about the queue standing on the yard tonight. Curtis, correcting
-   an earlier reading of mine: "if a roll call comes in, just the fact that a
-   bus is a roll call, it should add to the probability of more down buses,
-   depending on the conversion from roll call to down sheet... if we have 10
-   roll calls and only two of them are converted to the down sheet, then that's
-   a 20% chance."
+/* Floors below which each queue term says what it is waiting for rather than
+   quoting a conversion. Four inspections and six road calls is not much, and
+   that is deliberate: these are corrections on a number that already reads, not
+   the number itself, so the cost of a thin one is smaller than the cost of
+   ignoring a queue that is plainly sitting there. */
+export const FORECAST_MIN_INSPECTIONS=4;
+export const FORECAST_MIN_CONVERSIONS=6;
 
-   A road call already ON the sheet is a downed bus and needs no predicting —
-   that is why the reconciler takes it out of the pending count. The one worth
-   forecasting is the one nobody has written up yet.
+function noQueue(pool:number,need:number):QueueTerm{
+ return {pool,rate:0,expected:0,enough:false,need};
+}
 
-   NOT BUILT HERE YET. The conversion rate cannot come off the sheets at all: a
-   road call that never converted never appears on one, so it is invisible to
-   the paper and has to be read from the board's own roadCalls history. The
-   pending pool is already computed next door as the Status Report's ROADCALLS
-   PENDING. When it lands it overlaps this rate by the typical conversion —
-   four of the fifty-four arrivals across the baseline were road-call rows — so
-   it will read about 7% hot on the arrival side until that is scaled out. */
-function downedForecast(ledger:unknown,downedNow:number,hours:number){
- const tempo=ledgerTempo(downedRows(ledger)).filter(row=>row.sinceHours!==null&&row.sinceHours>0);
- if(tempo.length<FORECAST_MIN_SWAPS-1)
+/* THE INSPECTION QUEUE, measured off the ledger alone.
+
+   A PER-HOUR HAZARD, not a flat probability. An inspection sits on the sheet
+   for days; applying a whole conversion fraction across a four-hour window to
+   the next pullout would claim half the B-18s in the yard turn into brake jobs
+   before lunch. Conversions over inspection-hours-at-risk is the unit that
+   scales to the window honestly. */
+function inspectionQueue(snaps:ReturnType<typeof snapshots>,poolNow:number,hours:number):QueueTerm{
+ let converted=0,atRisk=0,seen=0;
+ for(let index=1;index<snaps.length;index++){
+  const previous=snaps[index-1],current=snaps[index];
+  if(current.gap||!(Date.parse(current.at)>Date.parse(previous.at)))continue;
+  const span=(Date.parse(current.at)-Date.parse(previous.at))/HOUR;
+  const waiting=inspectionSet(previous);
+  if(!waiting.size)continue;
+  seen+=waiting.size;
+  atRisk+=waiting.size*span;
+  const nowDown=downedSet(current);
+  for(const bus of waiting)if(nowDown.has(bus))converted++;
+ }
+ if(seen<FORECAST_MIN_INSPECTIONS||atRisk<=0)return noQueue(poolNow,Math.max(0,FORECAST_MIN_INSPECTIONS-seen));
+ const rate=converted/atRisk;
+ return {pool:poolNow,rate,expected:poolNow*rate*hours,enough:true,need:0};
+}
+
+/* THE ROAD-CALL QUEUE, which the sheets alone cannot measure.
+
+   A road call that never converted never appears on any down sheet, so it is
+   invisible to the paper — the denominator has to come from the board's own
+   roadCalls events and the numerator from the ledger. That asymmetry is the
+   whole reason this cannot be done off the photographs.
+
+   A FLAT PROBABILITY PER BUS, unlike the inspections. A standing road call is a
+   pending decision rather than a slow burn: a foreman walks the yard and writes
+   it up or does not, inside a shift. Curtis put it as "if we have 10 roll calls
+   and only two of them are converted to the down sheet, then that's a 20%
+   chance", which is a probability per bus and not a rate per hour. */
+function roadCallQueue(
+ fleet:ForecastBus[],
+ snaps:ReturnType<typeof snapshots>,
+ now:string,
+ lookbackDays:number,
+ poolNow:number,
+):QueueTerm{
+ const end=when(now)??Date.now();
+ const start=end-lookbackDays*24*HOUR;
+ const window=FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS*HOUR;
+ let converted=0,judged=0;
+ for(const bus of fleet){
+  const number=String(bus.n??"").trim();
+  if(!number)continue;
+  for(const event of normalizeRoadCalls(bus.roadCalls)){
+   const at=when(event.at);
+   if(at===null||at<start||at>end)continue;
+   /* Only events a snapshot actually looked at afterwards can be judged. One
+      that fell in a hole in the ledger is not a failure to convert, it is a
+      failure to observe, and counting it as the former quietly drags the rate
+      toward zero. */
+   const looked=snaps.filter(snapshot=>{
+    const stamp=Date.parse(snapshot.at);
+    return stamp>at&&stamp<=at+window;
+   });
+   if(!looked.length)continue;
+   judged++;
+   if(looked.some(snapshot=>downedSet(snapshot).has(number)))converted++;
+  }
+ }
+ if(judged<FORECAST_MIN_CONVERSIONS)return noQueue(poolNow,FORECAST_MIN_CONVERSIONS-judged);
+ const rate=converted/judged;
+ return {pool:poolNow,rate,expected:poolNow*rate,enough:true,need:0};
+}
+
+/* ARRIVALS MINUS CLEARANCES, with the two queues taken out of the base so
+   nothing is counted twice.
+
+   The base rate is an average over past windows, so it already contains the
+   TYPICAL conversion of both queues. Adding the queue terms on top of the raw
+   rate would count those arrivals once in the average and again in the queue.
+   So an arrival that was an inspection on the previous sheet, or that followed
+   a road call inside the conversion window, is removed from the base: the
+   average carries what neither queue explains, and each queue carries its own. */
+function downedForecast(
+ ledger:unknown,
+ downedNow:number,
+ hours:number,
+ fleet:ForecastBus[],
+ now:string,
+ lookbackDays:number,
+ inspectionsNow:number,
+ roadCallsPendingNow:number,
+){
+ const snaps=snapshots(ledger);
+ const fromInspections=inspectionQueue(snaps,inspectionsNow,hours);
+ const fromRoadCalls=roadCallQueue(fleet,snaps,now,lookbackDays,roadCallsPendingNow);
+
+ /* When a road call landed, by fleet number, so an arrival that followed one
+    can be told apart from an arrival that did not. */
+ const roadCallStamps=new Map<string,number[]>();
+ for(const bus of fleet){
+  const number=String(bus.n??"").trim();
+  if(!number)continue;
+  const stamps=normalizeRoadCalls(bus.roadCalls).map(event=>when(event.at)).filter((value):value is number=>value!==null);
+  if(stamps.length)roadCallStamps.set(number,stamps);
+ }
+ const followedRoadCall=(bus:string,at:number)=>
+  (roadCallStamps.get(bus)||[]).some(stamp=>stamp<=at&&at-stamp<=FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS*HOUR);
+
+ /* Counted in the same pass that measures them, rather than by a second
+    filter spelling the same skip rule. Two places that must agree about which
+    pairs are measurable are two places that will eventually disagree, and the
+    one that decides `need` is the one a person reads. */
+ let added=0,cleared=0,totalHours=0,pairs=0;
+ for(let index=1;index<snaps.length;index++){
+  const previous=snaps[index-1],current=snaps[index];
+  if(current.gap)continue;
+  const span=(Date.parse(current.at)-Date.parse(previous.at))/HOUR;
+  if(!(span>0))continue;
+  pairs++;
+  totalHours+=span;
+  const before=downedSet(previous),after=downedSet(current);
+  const waiting=inspectionSet(previous);
+  const stamp=Date.parse(current.at);
+  for(const bus of after)
+   if(!before.has(bus)&&!waiting.has(bus)&&!followedRoadCall(bus,stamp))added++;
+  for(const bus of before)if(!after.has(bus))cleared++;
+ }
+ if(pairs<FORECAST_MIN_SWAPS-1||totalHours<=0)
   return {now:downedNow,range:{low:downedNow,high:downedNow},expected:downedNow,
-   inRange:{low:0,high:0},outRange:{low:0,high:0},
-   enough:false,need:(FORECAST_MIN_SWAPS-1)-tempo.length};
- const totalHours=tempo.reduce((sum,row)=>sum+(row.sinceHours as number),0);
- const added=tempo.reduce((sum,row)=>sum+row.added,0);
- const cleared=tempo.reduce((sum,row)=>sum+row.cleared,0);
- const addedRate=totalHours>0?added/totalHours:0;
- const clearedRate=totalHours>0?cleared/totalHours:0;
+   fromInspections,fromRoadCalls,inRange:{low:0,high:0},outRange:{low:0,high:0},
+   enough:false,need:Math.max(0,(FORECAST_MIN_SWAPS-1)-pairs)};
+
+ const addedRate=added/totalHours,clearedRate=cleared/totalHours;
+ const queue=fromInspections.expected+fromRoadCalls.expected;
+ /* THE QUEUES MOVE THE NUMBER WITHOUT WIDENING THE BAND. The interval on the
+    arrival side is the sampling error in the RATE, and the queues are not a
+    rate — they are a pool that has been counted and a conversion that has
+    passed its own floor. Stretching the band by them would say the forecast got
+    less certain the moment it learned something it did not know before, which
+    is backwards. It does mean the band understates the error a little, since
+    the conversions carry sampling error of their own; that is the side to be
+    wrong on here, and the floors above are what keep it small. */
  const inBand=rateInterval(added),outBand=rateInterval(cleared);
- const inRange={low:Math.floor(addedRate*hours*inBand.low),high:Math.ceil(addedRate*hours*inBand.high)};
+ const inRange={low:Math.floor(addedRate*hours*inBand.low+queue),high:Math.ceil(addedRate*hours*inBand.high+queue)};
  const outRange={low:Math.floor(clearedRate*hours*outBand.low),high:Math.ceil(clearedRate*hours*outBand.high)};
  return {
   now:downedNow,
@@ -323,10 +489,10 @@ function downedForecast(ledger:unknown,downedNow:number,hours:number){
      down, and a range whose floor is negative reads as a bug to the one person
      whose job it is to notice. */
   range:{low:Math.max(0,downedNow+inRange.low-outRange.high),high:Math.max(0,downedNow+inRange.high-outRange.low)},
-  /* The point estimate is the rates straight through, rounded — buses are
-     whole. Never below zero, for the reason the range's floor is not. */
-  expected:Math.max(0,Math.round(downedNow+addedRate*hours-clearedRate*hours)),
-  inRange,outRange,enough:true,need:0,
+  /* The point estimate is the rates and the queues straight through, rounded —
+     buses are whole. Never below zero, for the reason the range's floor is not. */
+  expected:Math.max(0,Math.round(downedNow+addedRate*hours+queue-clearedRate*hours)),
+  fromInspections,fromRoadCalls,inRange,outRange,enough:true,need:0,
  };
 }
 
@@ -339,6 +505,12 @@ export function buildFleetForecast(
   ledger?:unknown;
   span?:ForecastSpan;
   downed?:number;
+  /* The two queues standing right now. Passed in rather than recomputed: the
+     Status Report already works both out and is tested on them, and a second
+     implementation of "is this bus on the sheet" is the kind of drift the
+     location-label rule exists to stop. */
+  inspections?:number;
+  roadCallsPending?:number;
  }={}
 ):FleetForecast|null{
  const now=options.now||new Date().toISOString();
@@ -378,7 +550,9 @@ export function buildFleetForecast(
   shift:shiftAt(now,settings),
   window:{label:spanLabel(span,now,settings),hours:Math.round(hours*10)/10},
   roadCalls,
-  downed:downedForecast(options.ledger,downedNow,hours),
+  downed:downedForecast(options.ledger,downedNow,hours,fleet,now,FORECAST_LOOKBACK_DAYS,
+   typeof options.inspections==="number"?options.inspections:0,
+   typeof options.roadCallsPending==="number"?options.roadCallsPending:0),
   /* Only what is actually on the sheet right now. The slowest categories in the
      whole fleet's history is a different report; what a foreman is being told
      here is which of the work IN FRONT OF HIM is the work that sticks. */
