@@ -74,11 +74,42 @@ carry the ambiguity into a file that claims to describe the building.
 
 ## The plan
 
-**Phase 0 — resolve the landmines. No config yet.**
-Make the garage width a named constant that `mystery-buses.ts` reads, and settle
-`bay-12`. Pure refactor, no behaviour change, tests unedited. This is the
-session that de-risks the rest, and it has standalone value even if Phase 1
-never happens.
+**Phase 0 — resolve the landmines. No config yet. DONE.**
+
+The garage's shape is now four constants in `facility-layout.ts` —
+`GARAGE_ROWS`, `GARAGE_COLUMNS`, `GARAGE_TROUBLE_BAY_FIRST_COLUMN`,
+`GARAGE_READY_BAY_DIVIDER_COLUMN` — with `GARAGE_CAPACITY` derived rather than
+typed, and one shared predicate `isGarageTroubleBayIndex`. All four readers
+(`facility-areas.ts`, `mystery-buses.ts`, `page.tsx`, and the capacity) go
+through them; no file spells the width itself any more.
+
+The net that makes a width change SAFE rather than merely centralised is a test
+that drives the two independent definitions of "trouble bay" — the awareness
+predicate and the move destinations the editor offers — over **every** slot in
+the garage and requires them to agree, plus that the three destinations
+partition the grid exactly. Mutating `GARAGE_COLUMNS` to 14 fails it on the
+partition; leaving `mystery-buses.ts` on its own literal while the width moves
+fails it with *"garage-8 (column 8): the awareness test and the move
+destinations disagree"*.
+
+Proved a pure refactor by rendering the same seeded board at 1180 before and
+after: 84 spots, trouble bays at columns 10–11 of every row, divider on 07,
+awareness only on the trouble bays — and the grid's innerHTML identical to the
+character (23,329).
+
+**`bay-12` is NOT dead code, and the near-miss is the finding.** It reads like a
+leftover: SHOP BAYS is `bay-1`…`bay-9`, there is no `bay-12`, and the move
+editor cannot put a bus there. But `migrateFacilitySlots` — which rewrites any
+bus found at `bay-10/11/12` — is local to `page.tsx`, is not exported, and only
+feeds React state. **It never writes the corrected board back to
+`pace-board-v1`.** The Defect Log reads that key raw and calls
+`stampOperationalChange` through `defect-log-sync.ts`, so a legacy bus stored at
+`bay-12` reaches the check without ever passing the migration. It stays, with
+the reasoning written in `operational-time.ts`.
+
+Deleting it is safe only once the bay migration is **persisted** rather than
+held in one page's state — a change to how the board is written, so it belongs
+to Phase 1.
 
 **Phase 1 — one `site-config.ts`, values byte-identical to today.**
 The five TS tables above become one exported object; each current module reads

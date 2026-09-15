@@ -1,4 +1,4 @@
-import {ROAD_CAPACITY,WEST_CAPACITY} from "./facility-layout.ts";
+import {GARAGE_CAPACITY,GARAGE_COLUMNS,GARAGE_ROWS,GARAGE_TROUBLE_BAY_FIRST_COLUMN,ROAD_CAPACITY,WEST_CAPACITY} from "./facility-layout.ts";
 import {moveOrSwapBuses,type MovableRepairBus} from "./smart-status.ts";
 
 export const SINGLE_FILE_CAPACITY=8;
@@ -28,15 +28,21 @@ export const SECTION_SLOTS:Record<string,string[]>={
  "CNG EAST LOT":EAST_SLOTS,
  "IN SERVICE / ON ROAD":facilitySlots("road",ROAD_CAPACITY),
  "SHOP WALL (SINGLE FILE)":facilitySlots("wall",SINGLE_FILE_CAPACITY),
- "MAIN GARAGE (BAYS 1-12)":facilitySlots("garage",84),
+ "MAIN GARAGE (BAYS 1-12)":facilitySlots("garage",GARAGE_CAPACITY),
  "CNG WEST LOT":facilitySlots("west",WEST_CAPACITY),
  "OFF PROPERTY":facilitySlots("offsite",OFF_PROPERTY_CAPACITY),
  "WAITING AREA":facilitySlots("waiting",WAITING_CAPACITY),
 };
 
-const GARAGE_STANDARD_SLOTS=Array.from({length:7},(_,row)=>Array.from({length:10},(_,column)=>"garage-"+(row*12+column))).flat();
-const TROUBLE_BAY_11_SLOTS=Array.from({length:7},(_,row)=>"garage-"+(row*12+10));
-const TROUBLE_BAY_12_SLOTS=Array.from({length:7},(_,row)=>"garage-"+(row*12+11));
+/* The three garage destinations, all derived from the grid rather than from a
+   literal 12 repeated three times. The standard slots are everything LEFT of
+   the trouble bays, so the boundary is stated once and the two sides cannot
+   disagree about it. */
+const garageSlot=(row:number,column:number)=>"garage-"+(row*GARAGE_COLUMNS+column);
+const GARAGE_STANDARD_SLOTS=Array.from({length:GARAGE_ROWS},(_,row)=>
+ Array.from({length:GARAGE_TROUBLE_BAY_FIRST_COLUMN},(_,column)=>garageSlot(row,column))).flat();
+const TROUBLE_BAY_11_SLOTS=Array.from({length:GARAGE_ROWS},(_,row)=>garageSlot(row,GARAGE_TROUBLE_BAY_FIRST_COLUMN));
+const TROUBLE_BAY_12_SLOTS=Array.from({length:GARAGE_ROWS},(_,row)=>garageSlot(row,GARAGE_TROUBLE_BAY_FIRST_COLUMN+1));
 export const RELOCATION_AREAS:Record<string,string[]>=Object.fromEntries(Object.entries(SECTION_SLOTS).flatMap(([name,sectionSlots]):[string,string[]][]=>name==="MAIN GARAGE (BAYS 1-12)"?[["MAIN GARAGE (BAYS 1-10)",GARAGE_STANDARD_SLOTS],["TROUBLE BAY 11",TROUBLE_BAY_11_SLOTS],["TROUBLE BAY 12",TROUBLE_BAY_12_SLOTS]]:[[name,sectionSlots]]));
 
 export function sectionForLocation(location:string){return Object.entries(RELOCATION_AREAS).find(([,sectionSlots])=>sectionSlots.includes(location))?.[0]||""}

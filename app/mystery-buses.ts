@@ -1,3 +1,5 @@
+import {isGarageTroubleBayIndex} from "./facility-layout.ts";
+
 export type MysteryFleetBus={id:string;l:string;s?:string;bay12Watch?:boolean;defects?:{state?:string}[]};
 
 const ONSITE_WORK_PREFIXES=["east-","west-","bay-","bay-overflow-","wall-","wall-overflow-","service-","service-overflow-","paint-","wash-","body-","office-","pit-","brake-","tow-","waiting-"] as const;
@@ -9,8 +11,13 @@ export function isMysteryArea(location:string){
 export function isBay12AwarenessArea(location:string){
  if(isMysteryArea(location))return true;
  if(!location.startsWith("garage-"))return false;
+ /* The trouble bays are the last two columns of the garage grid, and WHICH
+    columns those are is a property of the grid rather than of this module. It
+    read `slot%12>=10` here, with the 12 written out - so a garage of any other
+    width would have gone on returning a confident boolean about the wrong
+    buses. `facility-layout.ts` owns the shape; this asks it. */
  const slot=Number(location.slice("garage-".length));
- return Number.isInteger(slot)&&slot>=0&&slot%12>=10;
+ return isGarageTroubleBayIndex(slot);
 }
 
 export function hasActiveDefects(bus:MysteryFleetBus){
