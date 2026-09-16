@@ -1,10 +1,11 @@
 # Publish next
 
-**STATUS: 181 PENDING — a bus already on the Down Sheet can still raise a
-recommendation for a different repair.**
+**STATUS: 181 PENDING — two Defect Log fixes: a bus already on the Down Sheet
+can still raise a recommendation for a different repair, and a stale bus search
+no longer hides the defect you just wrote.**
 
-Publish from `e283c26` (`A bus already on the sheet can still raise a
-recommendation`), the commit directly below this handoff. Derive the range with:
+Publish from `3b1e0ca` (`A stale bus search ends itself on the Defect Log`), the
+commit directly below this handoff. Derive the range with:
 
 ```
 git log --oneline 6a98878..HEAD
@@ -15,9 +16,17 @@ point; its tag is `sites-v180`. The one before it is 179 from `fe467c0`.
 
 ## What a person will see
 
-**RECOMMENDED FOR DOWN SHEET** — the third board on the Down Sheet, and the
+Two things, both on the Defect Log side of the app.
+
+**1 — RECOMMENDED FOR DOWN SHEET** — the third board on the Down Sheet, and the
 `DS Rec` quick filter on the Defect Log — now lists a bus that is already on the
 sheet, when the repair being recommended is **not** the one the sheet carries.
+
+**2 — THE SEARCH BOX ON THE DEFECT LOG** now empties itself when it no longer
+describes what somebody is doing: search a bus, press LOG DEFECT, pick a
+different bus and save, and the board comes back whole with the new record on
+it. Before, the board stayed filtered to the number that had been typed and the
+record was invisible behind it.
 
 Nothing else moves. No screen changes, no control is renamed, no wording
 changes, nothing is added to or removed from any other list.
@@ -103,8 +112,64 @@ switched off.
 4. Tick DS REC on a second repair on a bus already on the sheet. It should
    appear within the same card rather than as a second bus.
 
+## The second fix: a stale search
+
+Measured before changing anything — searched `17544`, logged a defect on
+`17520`, saved:
+
+```
+SEARCH box still holds -> "17544"
+counter                -> 0 BUSES SHOWN · 1 HIDDEN BY THIS SEARCH
+bus just written to visible? -> false
+saved on disk?               -> yes, correctly
+```
+
+The record was never at risk. It was invisible, and the only sign was a counter
+line.
+
+> Curtis: "my attention drifted elsewhere and the bus I typed in and hit SEARCH
+> on may not even be the bus I'm after... the system should just clear that
+> search and default back to the entire list with the most recent thing I did."
+
+This does NOT undo "a search ends when somebody says it ends", which is about
+TAPPING a bus and still holds. That rule protects a search somebody is still
+using; choosing another bus says they are not.
+
+**Two moments, judged on what each one knows.** Picking the bus happens before
+any repair is chosen, so only a BUS-NUMBER search is judged there. The first
+draft tested the whole record that early and cleared a `brake` search the
+instant a bus was picked, before the brake defect it would have matched existed
+— found by driving it in a browser, not by reading it. A text search is now left
+alone until the save.
+
+Driven in Chromium on a seeded board:
+
+| Case | Search after |
+| --- | --- |
+| search 20001, log on 20002, save | cleared, and 20002 is visible |
+| pick another bus, then CANCEL | cleared |
+| pick the very bus being searched | **survives** |
+| text `brake`, log a brake defect | **survives** |
+| no search at all | nothing breaks |
+
+The last three are the half that proves this narrows the rule rather than
+switching the search off.
+
+Two mutations fail the new guards: dropping the save-time clear, and collapsing
+the two moments into one.
+
+## Post-publish checks for the search
+
+6. Defect Log → SEARCH a bus → **+ LOG DEFECT** → pick a **different** bus →
+   save. The list should come back whole with your new defect at the top.
+7. Same, but pick the **same** bus you searched. The search must **stay** —
+   otherwise the rule is switched off rather than narrowed.
+8. Type a word rather than a number (`brake`), log a brake defect on any bus.
+   The search must stay, because it still describes what you just wrote.
+
 ## Rollback
 
-Roll back to `sites-v180` (`b6e0cba`). Nothing is written differently, so a
-rollback only restores the old hiding rule — recommendations made in the
-meantime keep their stamps and reappear on the next publish.
+Roll back to `sites-v180` (`b6e0cba`). Neither change writes anything
+differently, so a rollback only restores the old hiding rule and the old search
+behaviour. Recommendations made in the meantime keep their stamps and reappear
+on the next publish, and no defect logged under 181 is lost or altered.
