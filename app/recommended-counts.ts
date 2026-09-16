@@ -1,4 +1,5 @@
-import {isDownSheetRecommended,isUnresolved,recommendedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {isDownSheetRecommended,isUnresolved,normalizeDefects,recommendedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {downSheetDefectIds} from "./down-sheet/down-sheet-sync.ts";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync.ts";
 
 /* The buses somebody has PUT FORWARD for the Down Sheet, and nobody has ruled
@@ -17,20 +18,53 @@ import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log
    runner can drive against a fleet directly, where a .tsx file would need its
    JSX stripped first.
 
-   ALREADY ON THE SHEET IS NOT LISTED. All three boards on the Down Sheet answer
-   one question — what is this sheet not covering — and a bus the sheet already
-   carries is covered. It is the same rule isHeldDeferred applies one board up,
-   at the same grain (the bus, not the repair), so the two boards cannot
-   disagree about what "on the sheet" means.
+   COVERED IS PER REPAIR, NOT PER BUS, and that is a correction.
 
-   Putting a bus on the sheet DOES NOT clear its recommendation, and this is
-   why it does not have to: the row leaves the board because the bus is now on
-   the sheet, and the stamp stays on the record saying who asked for it and
-   when. Clearing it would erase that, which repair-catalog.ts already refuses
-   to do where the two fields are defined. */
+   This board answers what the sheet is not covering, and it used to answer it
+   at the grain of the BUS: any bus with an active entry was dropped whole. The
+   sheet carries one row per bus, so a bus already on it for one thing could
+   never raise a second. Curtis found it on 17555 — on the sheet for an air-tank
+   row, a ramp that would not lock recommended underneath it, and the board
+   silently empty. His reasoning is the rule: "Doesn't mean the guy that's doing
+   the inspection is gonna come across the defect."
 
-export function activeDownSheetBusIds(downEntries:DefectLogDownEntry[]){
- return new Set(downEntries.filter(entry=>entry.workflow!=="Completed").map(entry=>entry.busId));
+   He put it in terms of inspections. It is not only inspections — 17555's own
+   row reads as a FAULT to downSheetScheduledOnly, because real complaints are
+   written in it — and a rule about inspections would have left that exact bus
+   broken. What is true of the inspector is true of whoever has the bus for any
+   other reason: the row they are working is not this repair.
+
+   So a recommendation is dropped only when the sheet is writing to THAT
+   repair. The stamp still stays on the record either way — putting a repair on
+   the sheet does not clear its recommendation, and repair-catalog.ts refuses to
+   erase who asked for it and when.
+
+   This is now a finer grain than isHeldDeferred uses one board up, which still
+   asks per bus. That is deliberate and it is the one thing to be careful of
+   here: the two boards no longer mean the same thing by "on the sheet". A
+   deferral is a fact about the BUS — it is held back or it is not — while a
+   recommendation is a fact about one REPAIR, so each is asked at the grain of
+   the thing it describes. */
+
+/* The repairs the sheet is ALREADY writing to, across every active entry.
+
+   Asked through downSheetDefectIds, the sheet's own answer and the same one the
+   Defect Log's badge uses, rather than a second rule beside it. An entry names
+   its repairs four ways — a stated defectId, the ids it mints per repair card,
+   and the record a card adopts — and reading only the stated id would call a
+   repair uncovered while the sheet is writing to it. Hand-typed entries state
+   no defectId at all. */
+export function downSheetCoveredDefectIds(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
+ const covered=new Set<string>();
+ for(const entry of downEntries){
+  if(entry.workflow==="Completed")continue;
+  const bus=fleet.find(item=>item.id===entry.busId);
+  if(!bus)continue;
+  /* Normalized because that is the contract downSheetDefectIds is written
+     against, and the ids it returns have to be the ids the records carry. */
+  for(const id of downSheetDefectIds(entry,normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)))covered.add(id);
+ }
+ return covered;
 }
 
 /* One row per RECOMMENDED DEFECT paired with its bus, so a bus carrying two
@@ -38,15 +72,14 @@ export function activeDownSheetBusIds(downEntries:DefectLogDownEntry[]){
    the same trap the deferred badge fell into, where one bus held on two repairs
    counted as two. */
 export function recommendedRows(fleet:DefectLogFleetBus[],downEntries:DefectLogDownEntry[]){
- const onSheet=activeDownSheetBusIds(downEntries);
+ const covered=downSheetCoveredDefectIds(fleet,downEntries);
  const rows:{bus:DefectLogFleetBus;defect:StructuredDefect}[]=[];
  for(const bus of fleet){
-  if(onSheet.has(bus.id))continue;
   for(const defect of bus.defects||[])
    /* isUnresolved is what keeps the count honest. Curtis: the number "needs to
       be in sync" — fix the repair the recommendation was made about, or delete
       the record, and this list is one shorter without anybody tidying it. */
-   if(isUnresolved(defect)&&isDownSheetRecommended(defect))rows.push({bus,defect});
+   if(isUnresolved(defect)&&isDownSheetRecommended(defect)&&!covered.has(defect.id))rows.push({bus,defect});
  }
  return rows;
 }
