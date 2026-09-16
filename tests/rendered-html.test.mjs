@@ -2572,6 +2572,28 @@ test("a search ends when somebody ends it, and never says so silently", async ()
  assert.match(css, /\.log-search-filtered\{/);
  assert.match(css, /\.show-all-buses\{min-height:44px/, "a real tap target on a phone");
 
+ /* ...but a search that no longer describes what somebody is doing ends itself.
+    Search a bus, press LOG DEFECT at the top, pick a DIFFERENT bus and save:
+    the record landed correctly and was invisible behind the old search, with
+    only "1 HIDDEN BY THIS SEARCH" in the counter to say so. Curtis: "my
+    attention drifted elsewhere and the bus I typed in and hit SEARCH on may not
+    even be the bus I'm after... the system should just clear that search."
+
+    This does NOT contradict the rule above, which is about TAPPING a bus and
+    protects a search somebody is still using. Choosing another bus says they
+    are not. */
+ assert.match(page, /onBusPicked=\{clearSearchIfBusIsOutside\}/, "picking another bus ends a stale bus-number search");
+ assert.match(page, /clearSearchIfItHides\(draft\.busId,draft\.defect\);closeEditor\(\)/, "and so does saving onto a bus the search hides");
+ /* THE TWO MOMENTS KNOW DIFFERENT THINGS, and collapsing them breaks a working
+    case. At bus-pick time no repair has been chosen, so only a BUS-NUMBER
+    search can be judged; testing a TEXT search there cleared "brake" the moment
+    a bus was picked, before the brake defect it would have matched existed.
+    Measured in a browser, not reasoned about. */
+ assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
+  "the pick-time check judges bus-number searches only");
+ assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
+  "the save-time check takes the whole record, so a text search it still matches survives");
+
  // It counts what the SEARCH is hiding, not what the state filter is hiding —
  // different questions, and the banner only answers the first.
  assert.match(page, /const unsearched=records\.filter\(matchesStateFilter\)/);
