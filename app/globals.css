@@ -1271,3 +1271,8 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
  .sweep-banner span{flex:1 1 100%;order:3}
  .sweep-banner>button{min-height:38px}
 }
+/* The scan-started sweep's extra line. Its own row under the walking time
+   rather than beside it: the banner is already three items wide on a phone and
+   a fourth would push END & REPORT off the edge. display:block is what makes
+   the <em> take a line of its own inside the span that holds both. */
+.sweep-banner span em{display:block;margin-top:3px;font-style:normal;font-weight:700;color:#ffd7a8}

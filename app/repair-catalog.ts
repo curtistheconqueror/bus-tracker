@@ -282,7 +282,17 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
  /* A-3 and A-21 are on the sheet and were not on this list, so a scan of a real
     morning had to pick the nearest thing: A3 became A-6 and A21 became A-15, and
     the bus was recorded as having had a service it never had. */
- "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
+ /* IDOT PREP IS THE STATE INSPECTION COMING DUE, and it is not a fault. Curtis:
+    "even on the days that they go to IDOT, a lot of times they're used in the
+    morning. And when they come back, they go right into service, unless they go
+    down from after the state inspection, which is different."
+
+    Named for what the shop writes on the sheet rather than spelled out, and
+    that is load-bearing rather than cosmetic: down-sheet-availability.ts reads
+    "IDOT Prep" as a row that is ONLY the inspection and keeps the bus out of the
+    down count, while "IDOT State Inspection Due" would leave the words "state
+    inspection due" behind and read as a complaint about the bus. */
+ "Inspection":["A-3","A-6","A-15","A-21","B-12","B-18","C-24","Hub / Trans / Diff Refill (Three-Piece)","IDOT Prep","Spark Plug Refresh","Valve Adjustment","Valve Adjustment and Spark Plug Refresh"],
  "Preventive Maintenance":["Add engine oil","Add coolant (glycol)","Add transmission fluid","Oil and filter service","Lubrication","Bike rack - arms / pivot adjustment","Fluid service","Scheduled campaign","Seasonal preparation","Other preventive maintenance"],
  /* HAZMAT on the sheet means a biohazard on board — blood, vomit or faeces. It
     had nowhere to go and landed as "Unknown diagnosis", which is the one thing

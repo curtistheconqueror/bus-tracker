@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 179 (repository release 179)
-Live feature checkpoint: commit fe467c0
+Live release: Sites Version 180 (repository release 180)
+Live feature checkpoint: commit b6e0cba
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 179 is live as Sites Version 179 from commit fe467c0. It adds optional HOLD UNTIL and EXTEND controls for deferred repairs without resetting the deferred alarm or history. The facility-config extraction is internal and renders identically. It adds no storage key, payload migration, or operational behavior change; deferredUntil was already an existing optional field. The normal rollback target is Version 178 from commit 531c3f8.
+Repository release 180 is live as Sites Version 180 from commit b6e0cba. It adds four Brakes symptom choices: Brakes sticking / dragging, brakes will not release after the service pedal, brakes will not release at the parking brake, and Brake chamber leaking. It adds no storage key, migration, rename, or retirement. The normal rollback target is Version 179 from commit fe467c0.
 
 The Version 171 baseline details below remain useful historical context:
 

@@ -755,3 +755,51 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
 /* The two switches now stack, so the second needs a gap above it, and the
    disabled one has to read as unavailable rather than as broken. */
+
+/* THE FULL SWEEP QUESTION AFTER A SCAN. Width capped so the two answers sit
+   side by side on a phone rather than wrapping into a column, where NO would
+   land under YES and be pressed by somebody aiming at the one above it.
+
+   height:auto on the header is not decoration: globals.css gives every bare
+   <header> a fixed height:38px, which min-height cannot undo, and the two lines
+   this one carries need more than that. The class it borrows is the scanner's,
+   so it already reads as the same kind of dialog. */
+.sweep-ask-modal{width:min(420px,100%);background:#f8faff;border-radius:12px;overflow:hidden;box-shadow:0 18px 70px #0009}
+.sweep-ask-body{padding:16px 18px 18px;display:grid;gap:10px}
+.sweep-ask-body p{margin:0;font-size:13px;line-height:1.45;color:#26375c}
+.sweep-ask-warn{padding:10px 12px;border-radius:8px;background:#fdf3d8;border:1px solid #d9a93a;color:#6a4b06}
+.sweep-ask-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.sweep-ask-actions:has(>button:only-child){grid-template-columns:1fr}
+/* 44px is the tap target, and height:auto releases any inherited fixed height
+   before min-height is asked to do anything. */
+.sweep-ask-actions button{height:auto;min-height:44px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer}
+.sweep-ask-no{border:1px solid #9aa7c2;background:#fff;color:#2b3c60}
+.sweep-ask-yes{border:1px solid #0a5fc0;background:#0a5fc0;color:#fff}
+
+/* SOFT beside the lead number rather than under it. The header is a button and
+   already carries the lead and the SHOW COUNTS chevron, so this sits between
+   them and shrinks first — the two numbers are the point, the word is not. */
+.down-counts-soft{display:flex;align-items:baseline;gap:5px;margin-left:12px;padding-left:12px;border-left:1px solid #b9c4da;min-width:0}
+.down-counts-soft strong{font-size:20px;font-weight:900;color:#8a5a06}
+.down-counts-soft span{font-size:9px;font-weight:900;letter-spacing:.08em;color:#8a5a06;overflow:hidden;text-overflow:ellipsis}
+.group-count.soft-down strong{color:#8a5a06}
+.group-count.down-total strong{color:#1f3566}
+.group-count.idot-due strong{color:#0a5fc0}
+@media(max-width:620px){.down-counts-soft{margin-left:8px;padding-left:8px}}
+
+/* The two new boards take the same shell as MYSTERY / DEFERRED / RECOMMENDED
+   and differ only by the colour on the header rule, which is how the three
+   above them already tell each other apart. Amber for soft, because it is a
+   caution rather than a stop; blue for IDOT, which is a date rather than a
+   fault. */
+.soft-down-board .mystery-head{border-left:4px solid #d9a93a}
+.idot-board .mystery-head{border-left:4px solid #0b64bd}
+.sheet-section-card .mystery-detail small{display:block;margin-top:2px;line-height:1.35}
+
+/* The switch on a SOFT row. Wide and worded rather than a tick, because the two
+   states say different things — one is an instruction, the other is a record of
+   a decision with initials on it. height:auto before min-height, so an inherited
+   fixed height cannot win. */
+.in-service-toggle{height:auto;min-height:38px;width:100%;border:1px solid #9aa7c2;border-radius:7px;background:#fff;color:#2b3c60;padding:6px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}
+.in-service-toggle.on{border-color:#0d7a3f;background:#e6f6ec;color:#0b5c31}
+.group-count.in-service strong{color:#0d7a3f}

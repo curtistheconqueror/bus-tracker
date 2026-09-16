@@ -2572,6 +2572,28 @@ test("a search ends when somebody ends it, and never says so silently", async ()
  assert.match(css, /\.log-search-filtered\{/);
  assert.match(css, /\.show-all-buses\{min-height:44px/, "a real tap target on a phone");
 
+ /* ...but a search that no longer describes what somebody is doing ends itself.
+    Search a bus, press LOG DEFECT at the top, pick a DIFFERENT bus and save:
+    the record landed correctly and was invisible behind the old search, with
+    only "1 HIDDEN BY THIS SEARCH" in the counter to say so. Curtis: "my
+    attention drifted elsewhere and the bus I typed in and hit SEARCH on may not
+    even be the bus I'm after... the system should just clear that search."
+
+    This does NOT contradict the rule above, which is about TAPPING a bus and
+    protects a search somebody is still using. Choosing another bus says they
+    are not. */
+ assert.match(page, /onBusPicked=\{clearSearchIfBusIsOutside\}/, "picking another bus ends a stale bus-number search");
+ assert.match(page, /clearSearchIfItHides\(draft\.busId,draft\.defect\);closeEditor\(\)/, "and so does saving onto a bus the search hides");
+ /* THE TWO MOMENTS KNOW DIFFERENT THINGS, and collapsing them breaks a working
+    case. At bus-pick time no repair has been chosen, so only a BUS-NUMBER
+    search can be judged; testing a TEXT search there cleared "brake" the moment
+    a bus was picked, before the brake defect it would have matched existed.
+    Measured in a browser, not reasoned about. */
+ assert.match(page, /const clearSearchIfBusIsOutside=\(busId:string\)=>\{\s*if\(!search\.trim\(\)\|\|busSearch\.kind!=="numbers"\)return;/,
+  "the pick-time check judges bus-number searches only");
+ assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
+  "the save-time check takes the whole record, so a text search it still matches survives");
+
  // It counts what the SEARCH is hiding, not what the state filter is hiding —
  // different questions, and the banner only answers the first.
  assert.match(page, /const unsearched=records\.filter\(matchesStateFilter\)/);
@@ -9968,9 +9990,86 @@ test("the tablet band does not scroll sideways: the nav wraps, and a map rule st
  assert.match(globals,/\.command-highlights>\*,\.command-bar \.quick-filter-trigger\{width:100%\}/,"scoped to the map's own command bar");
 });
 
+test("a bus only leaves the DOWN count when the sheet says it still runs",async()=>{
+ const {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly}=await import("../app/down-sheet/down-sheet-availability.ts");
+ /* Rows lifted from a real master export, reconciled against the paper sheet it
+    was scanned from. The app said 47 DOWN where the foreman counted 39. */
+ const row=(busNumber,repair,customReason,items=[])=>({busId:busNumber,busNumber,category:"",repair,customReason,
+  repairItems:items.map(([category,itemRepair,details])=>({category,repair:itemRepair,details}))});
+
+ /* THE PERMISSIONS. Somebody wrote that the bus still runs, so it is soft. */
+ assert.equal(downSheetAvailability(row("17559","Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )")),"soft");
+ assert.equal(downSheetAvailability(row("17527","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR")),"soft");
+
+ /* SILENCE IS DOWN, and this is the case Curtis named to settle it: "if it says
+    HIGH OIL CONSUMPTION with nothing else, then that is where the ambiguity
+    comes in and I would not expect the app to make that distinction... So if
+    it's on downsheet without any additional notes like hold or can use, then
+    add it to downed count." */
+ assert.equal(downSheetAvailability(row("99999","Other repair","HIGH OIL CONSUMPTION")),"down",
+  "no permission written means the bus is down");
+
+ /* THE THREE ROWS AN EARLIER, CLEVERER RULE GOT WRONG. It read "high oil" as a
+    limitation and let these stay available: a bus with a BURNING SMELL, one
+    with a FLAT TIRE AND A FAILED BRAKE TEST, and one whose front brakes are
+    written up. The words do not separate short-run from undriveable. */
+ assert.equal(downSheetAvailability(row("17517","Check transmission light","Trans Light / Bushing Smell / High Oil Usage")),"down");
+ assert.equal(downSheetAvailability(row("17545","Brake inspection","Won't Pass Brake Test / Rear Brakes / Flat Tire / High Oil Usage")),"down");
+ assert.equal(downSheetAvailability(row("17506","Other brake repair","PM Defects - Frt.Brakes / High Oil Consumption")),"down");
+
+ /* A REFUSAL BEATS A PERMISSION, and both of these carry the word HOLD. Only
+    one of them means the bus can turn a wheel. */
+ assert.equal(downSheetAvailability(row("18501","Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )")),"down",
+  "hold UNTIL REPAIRED is the opposite of a permission");
+ assert.equal(downSheetAvailability(row("15511","A-21","A21",[["Bodywork","Accident damage","Accident Hold for Saftey"]])),"down",
+  "an accident hold is a hold away from service, whatever words it shares with one that is not");
+
+ /* THE STATE INSPECTION IS NOT A REPAIR. A row that is only IDOT prep leaves
+    the count entirely; a row that is IDOT AND a fault is still a down bus, and
+    still shows in the section that keeps an eye on them. */
+ assert.equal(downSheetAvailability(row("17563","Manual entry","PREP FOR IDOT",[["Miscellaneous","Manual entry","17558 17563 PREP FOR IDOT"]])),"idot");
+ const idotAndFault=row("17558","Other brake repair","PM DEFECTS-REAR BRAKES / PREP FOR IDOT");
+ assert.equal(downSheetAvailability(idotAndFault),"down");
+ assert.equal(downSheetMentionsIdot(idotAndFault),true,"but it is still one to watch");
+ assert.equal(downSheetIdotOnly(idotAndFault),false);
+ /* The bus numbers on a multi-bus IDOT line are its subjects, not a complaint. */
+ assert.equal(downSheetIdotOnly(row("17515","Manual entry","17542 17522 17515-PREP FOR IDOT")),true);
+
+ /* Scheduled maintenance is answered one file over and still answers first. */
+ assert.equal(downSheetAvailability(row("17502","C-24","C24",[["Inspection","C-24","C24"]])),"inspection");
+});
+
 test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
  const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
  const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
+
+ /* THE CATALOG'S OWN NAME DEFEATED THE CATALOG'S OWN RULE, found on bus 17534
+    in a real export: every three-piece refill on the sheet counted as a DOWN
+    bus. The row says TRANS/HUB/DIFF, which the maintenance pattern matches, and
+    carries the catalog's name for that same service, which it does not -- the
+    words run in a different order and bring "Refill" and "Three-Piece" with
+    them. The name survived the strip and read as a complaint.
+
+    Wording the app filed UNDER Inspection is scheduled maintenance whatever it
+    says, so it comes out before the pattern is asked anything. */
+ const refill={busId:"b",busNumber:"17534",category:"Inspection",repair:"Hub / Trans / Diff Refill (Three-Piece)",
+  customReason:"TRANS/HUB/DIFF",repairItems:[{category:"Inspection",repair:"Hub / Trans / Diff Refill (Three-Piece)",details:"TRANS/HUB/DIFF"}]};
+ assert.equal(downSheetMentionsDefect(refill),false,"a three-piece refill is maintenance, not a down bus");
+
+ /* AND ONLY THE WORDING FILED AS AN INSPECTION COMES OUT. 17534's neighbour on
+    the same sheet, 15511, is an A-21 carrying a BODYWORK card that reads
+    "Accident Hold for Saftey". The A-21 goes, the accident stays, the bus stays
+    down -- which is more than its one-word paper line says. Curtis: "Keep 15511
+    down if it says accident."
+
+    This is the assertion that bites: strip by category without checking WHICH
+    category and an accident-damaged bus quietly leaves the down count. */
+ const a21={busId:"b",busNumber:"15511",category:"Inspection",repair:"A-21",customReason:"A21",
+  repairItems:[{category:"Bodywork",repair:"Accident damage",details:"Accident Hold for Saftey"}]};
+ assert.equal(downSheetMentionsDefect(a21),true,"an accident card keeps the bus down");
+ /* A plain inspection with no second card is still maintenance. */
+ assert.equal(downSheetMentionsDefect({busId:"b",busNumber:"17502",category:"Inspection",repair:"C-24",
+  customReason:"C24",repairItems:[{category:"Inspection",repair:"C-24",details:"C24"}]}),false);
 
  /* The PM half of the maintenance wording was missing, and the omission was
     invisible because `pm's` itself matched: the catalog words written beside it
@@ -10017,8 +10116,52 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
 
  // The tile, beside the total rather than under it, and the count behind it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/const downBusCount=useMemo\(\(\)=>shown\.filter\(downSheetMentionsDefect\)\.length,\[shown\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
- assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{downBusCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+ /* DOWN BUSES SPLIT IN TWO, and the old single number is now the sum. It asked
+    the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the
+    road, and it still does — it is just reported as the hard count, the soft
+    count and the total, because one number was answering two questions and a
+    foreman needs to know which of his down buses can still turn a wheel.
+
+    THE CONSERVATION LAW IS THE ASSERTION, not the spelling. Every row the old
+    count counted lands in exactly one of the three new buckets, so no bus can
+    go missing off this page by being reclassified — which is the failure that
+    would actually hurt: a bus nobody is counting is a bus nobody fixes. */
+ assert.match(page,/const hardDownCount=useMemo\(\(\)=>shown\.filter\(entry=>downSheetAvailability\(entry\)==="down"\)\.length,\[shown\]\)/);
+ /* SOFT DOWN is the soft buses NOBODY HAS PUT ON A RUN. A bus the yard has
+    decided to use is not part of the morning's shortage — that is what the
+    switch is for, and the number has to follow the decision. */
+ assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isSoftDownEntry\(entry\)&&!isEntryInService\(entry\)\)\.length,\[shown\]\)/);
+ {
+  const {downSheetAvailability}=await import("../app/down-sheet/down-sheet-availability.ts");
+  const sheet=[
+   row("Misfire","ENGINE LIGHT-MISFIRES"),
+   row("Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )"),
+   row("Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+   row("Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )"),
+   row("Manual entry","PREP FOR IDOT"),
+   row("A-6","A6"),
+  ];
+  const oldCount=sheet.filter(downSheetMentionsDefect).length;
+  const hard=sheet.filter(e=>downSheetAvailability(e)==="down").length;
+  const soft=sheet.filter(e=>downSheetAvailability(e)==="soft").length;
+  const idot=sheet.filter(e=>downSheetAvailability(e)==="idot").length;
+  assert.equal(hard+soft+idot,oldCount,"every bus the old number counted is still counted somewhere");
+  assert.deepEqual([hard,soft,idot],[2,2,1],"and they land where the sheet's own words put them");
+ }
+ assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{hardDownCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+ /* And the three pullout numbers run in the order Curtis asked for: the hard
+    count, the soft count, then the two added up. "Should be right under the
+    total down buses, and then it should just give a total of both of those
+    numbers together. But it should be easily distinguished from one another." */
+ assert.match(page,/group-count down-buses[\s\S]{0,600}?group-count soft-down[\s\S]{0,600}?group-count down-total/,
+  "DOWN, then SOFT DOWN, then the two added together");
+ /* SOFT, IN USE sits between them, and only when there is one — it is the
+    answer to "why is SOFT DOWN smaller than the board says", which is a
+    question nobody has on a morning when nothing has been switched on. */
+ assert.match(page,/\{inServiceCount>0&&<div className="group-count in-service">/);
+ /* SOFT also rides beside the lead number, so the press that opens these tiles
+    is not needed to learn that some of those buses can still work. */
+ assert.match(page,/down-counts-soft.{0,120}?\{softDownCount\}/s);
 
  /* The total used to take a whole row by itself on a phone. It is one of a pair
     now, so it takes half like every other tile. */
@@ -10529,11 +10672,149 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
 
  /* THE SCAN SIDE. Asked AFTER the import - the scan is what the person came to
     do - and only when not already sweeping, because a prompt that appears
-    mid-walk to ask whether you are walking is one people learn to dismiss. */
- assert.match(scanner,/onImport\(imports\);[\s\S]{0,900}?if\(!readSweep\(localStorage\)&&confirm\(/,
+    mid-walk to ask whether you are walking is one people learn to dismiss.
+
+    Asked by the PAGE rather than the scanner, and that is forced rather than
+    tidy: importing closes the scanner, so a dialog it owned would unmount
+    before anybody could answer. The confirm() this replaced only survived
+    because it blocks the thread. */
+ const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.doesNotMatch(scanner,/full sweep of the facility/,"the scanner no longer owns the question");
+ assert.doesNotMatch(scanner,/readSweep|startSweep/,"nor the sweep record");
+ assert.match(sheet,/setScannerOpen\(false\);[\s\S]{0,700}?if\(!readSweep\(localStorage\)\)setSweepAsk\("ask"\)/,
   "asked after the import, and only when not already mid-sweep");
- assert.match(scanner,/full sweep of the facility for bus count/);
- assert.match(scanner,/startSweep\(localStorage,"scan"\)/);
+ assert.match(sheet,/full sweep of the facility for bus count/);
+ assert.match(sheet,/startSweep\(localStorage,"scan"\)/);
+
+ /* A REAL NO. A confirm() offers OK and CANCEL and the browser owns both words.
+    Curtis: "There is not a 'no' for an answer if I am not doing a full sweep of
+    the yard." Cancel reads as backing out of the question rather than answering
+    it, and NO has something to say here. */
+ assert.match(sheet,/className="sweep-ask-no" onClick=\{\(\)=>setSweepAsk\("mismatch"\)\}>NO</,
+  "NO is an answer, and it leads somewhere");
+ assert.match(sheet,/className="sweep-ask-yes" onClick=\{\(\)=>\{startSweep\(localStorage,"scan"\);setSweepAsk\(""\)\}\}>YES</);
+
+ /* WHAT NO IS ANSWERED WITH. A scan REPLACES the sheet and the map does not move
+    with it, so the two can disagree until somebody walks the yard. Curtis: "if
+    they hit no, then another message to show up saying 'be aware of any
+    mismatches between buses on Fleet Map & new Downsheet' Full yard sweep
+    recommended." */
+ assert.match(sheet,/Be aware of any mismatches between buses on the Fleet Map and the new Down Sheet/);
+ assert.match(sheet,/A full yard sweep is recommended/);
+
+ /* THE PROMISE THAT IS GONE. It offered the Status Report as a reward for
+    ending a sweep, and the report was never gated on one. Curtis: "The summary
+    report is ALWAYS READY anyway. At anytime I can send it because it's real
+    time snap shot of the fleet's health." */
+ assert.doesNotMatch(sheet,/ending it offers the Status Report/);
+ assert.doesNotMatch(scanner,/ending it offers the Status Report/);
+
+ /* AND THE OTHER HALF OF THE SAME WARNING, on the sweep itself. The person who
+    answered YES is the one actually walking the yard looking for these, so the
+    banner carries it too. Curtis: "This may need to show up as a message with
+    the full sweep."
+
+    Only when the sweep began from a SCAN. A sweep started on the map has no new
+    sheet behind it and nothing to reconcile, so it stays quiet rather than
+    crying wolf every time. */
+ assert.match(map,/sweep\.startedFrom==="scan"&&<em>Watch for mismatches between this map and the new sheet/,
+  "a scan-started sweep says what the walk is for");
+ const sweepCss=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(sweepCss,/\.sweep-banner span em\{display:block/,
+  "on its own row, or it pushes END & REPORT off a phone");
+});
+
+test("a soft bus the yard puts on a run stops counting against pullout, on every device",async()=>{
+ const {setEntryInService,isEntryInService,entryInServiceStamp,countsAgainstPullout,isSoftDownEntry}=
+  await import("../app/down-sheet/down-sheet-availability.ts");
+ const soft={id:"e1",busId:"b",busNumber:"17527",category:"",repair:"Manual entry",
+  customReason:"HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"};
+ const hard={id:"e2",busId:"c",busNumber:"17510",category:"",repair:"Driver-reported defect",
+  customReason:"QUARANTINE DO NOT MOVE (PER SAFETY)"};
+ const at="2026-09-16T11:00:00.000Z";
+
+ assert.equal(countsAgainstPullout(soft),true,"a soft bus nobody has used is still short");
+ const using=setEntryInService(soft,true,at,"CJ");
+ assert.equal(isEntryInService(using),true);
+ assert.deepEqual(entryInServiceStamp(using),{at,by:"CJ"},"who decided, and when");
+ assert.equal(countsAgainstPullout(using),false,"once it is on a run it is not part of the shortage");
+ /* It is still a soft bus. Taking it off the board the moment it is switched on
+    would hide the control that switched it. */
+ assert.equal(isSoftDownEntry(using),true);
+
+ /* THE SWITCH CANNOT REACH A HARD DOWN BUS. Nothing in the UI offers it, but a
+    record hand-edited or arriving from another device could carry the flag, and
+    a quarantined bus must not leave the shortage because of a stray field. */
+ assert.equal(countsAgainstPullout(setEntryInService(hard,true,at,"CJ")),true,
+  "a bus that cannot run is short whatever the flag says");
+
+ /* DELETED, NOT SET TO undefined — the spelling setBusHold uses. A save merges
+    with {...existing,...incoming}, where a key written as undefined cannot
+    carry a removal, so a bus taken back out of service would come straight
+    back on the next read. */
+ const off=setEntryInService(using,false,at,"CJ");
+ assert.equal("inService" in off,false,"the key is gone, so the removal survives a merge");
+ assert.equal(countsAgainstPullout(off),true);
+
+ /* IT TRAVELS, which is the opposite of how a HOLD works and was Curtis's
+    explicit call: "1 travel for sure." A hold is one person's note about one
+    bus; pullout is the whole shop's number. It rides for free because
+    cloud-sync puts every field it has no column for into `detail`. */
+ const {downSheetRow}=await import("../app/cloud-sync.ts");
+ const config={project:"p",account:"a",initials:"CJ",device:"phone"};
+ const row=downSheetRow(using,config,at);
+ assert.ok(row,"the entry makes a row");
+ assert.deepEqual(row.detail.inService,{at,by:"CJ"},"and the flag rides in detail rather than being dropped");
+ /* The guard that matters: if inService were ever given a column of its own,
+    this would still pass while the round trip silently lost it. */
+ assert.equal(Object.prototype.hasOwnProperty.call(row,"inService"),false,
+  "it is not a column, so nothing has to change in the database for it to travel");
+});
+
+test("the STATUS REPORT separates what cannot run from what can",async()=>{
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const at="2026-09-16T04:00:00.000Z";
+ const bus=(id,n)=>({id,n,l:"bay-1",s:"out",defects:[]});
+ const entry=(id,busId,busNumber,repair,customReason)=>({id,busId,busNumber,category:"",repair,customReason,
+  section:"Pending",workflow:"Scheduled",operationalStatus:"out",assignedTo:"",assignmentType:"Mechanic"});
+ const fleet=[bus("a","17510"),bus("b","17527"),bus("c","17559"),bus("d","18501")];
+ const sheet=[
+  entry("e1","a","17510","Driver-reported defect","QUARANTINE DO NOT MOVE (PER SAFETY)"),
+  entry("e2","b","17527","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+  entry("e3","c","17559","Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )"),
+  entry("e4","d","18501","Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )"),
+ ];
+ const report=buildFleetStatusReport(fleet,sheet,[],at);
+ /* Curtis: "they're on the down sheet, but they can be used... so that way, if
+    they're not making pull out, they know what they can possibly run." */
+ assert.equal(report.downed,2,"quarantined and held-until-repaired cannot run");
+ assert.equal(report.softDowned,2,"South Holland and short-run can");
+ assert.equal(report.downedTotal,4,"and the shortage is still four buses");
+
+ const text=statusReportText(report,{...DEFAULT_STATUS_REPORT_PICK});
+ /* The order Curtis asked for: hard, soft, then the two added up. */
+ assert.ok(text.indexOf("DOWNED BUSES")<text.indexOf("SOFT DOWN"));
+ assert.ok(text.indexOf("SOFT DOWN")<text.indexOf("TOTAL DOWN + SOFT"));
+ assert.match(text,/SOFT DOWN\s+2/);
+ assert.match(text,/TOTAL DOWN \+ SOFT\s+4/);
+
+ /* COUNTED BY BUS ON BOTH SIDES, and the hard row wins. A bus written up twice
+    -- once held for another garage, once for a no-start -- does not move, and
+    counting it as soft would put it back in service on paper. */
+ const twice=buildFleetStatusReport([bus("a","17510")],[
+  entry("x1","a","17510","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+  entry("x2","a","17510","No crank","No Start"),
+ ],[],at);
+ assert.equal(twice.downed,1);
+ assert.equal(twice.softDowned,0,"the hard row wins, and the bus is counted once");
+ assert.equal(twice.downedTotal,1);
+
+ /* AN ORDINARY MORNING READS AS IT ALWAYS DID. Nothing soft on the sheet means
+    no SOFT line and no total repeating the number above it. */
+ const plain=buildFleetStatusReport([bus("a","17510")],[entry("y1","a","17510","No crank","No Start")],[],at);
+ const plainText=statusReportText(plain,{...DEFAULT_STATUS_REPORT_PICK});
+ assert.doesNotMatch(plainText,/SOFT DOWN/);
+ assert.doesNotMatch(plainText,/TOTAL DOWN/);
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
@@ -12069,7 +12350,13 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
- assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the status report is grouped from the whole sheet, in the reader's band order");
+ /* Grouped from the whole sheet in the reader's band order, minus the rows that
+    are ONLY a state inspection: those are not down and Curtis does not want them
+    read as though they were. They are not dropped — the IDOT board lists them —
+    and a row that is IDOT AND a fault stays in its band, because the fault is
+    why it is there. */
+ assert.match(page,/const bandEntries=useMemo\(\(\)=>shown\.filter\(entry=>!downSheetIdotOnly\(entry\)\),\[shown\]\)/);
+ assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(bandEntries,"number-asc",locations\),sectionOrder\)/,"the status report is grouped from the sheet, in the reader's band order");
  /* ONLY THE TABLE FOLLOWS THE FILTERS, and there are two of them now — the
     road tallies and the quick filter share one pipeline. The shape is asserted
     rather than the exact old expression, because what has to hold is the
@@ -12974,20 +13261,40 @@ test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses 
   /* Off property, waiting days. It belongs on the list — the board is about
      what is waiting on a decision, not about what is parked outside. */
   {id:"c",n:"6303",l:"offsite-2",defects:[{id:"d4",category:"Engine",issue:"Oil leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-06T00:00:00.000Z")}]},
-  /* Recommended and ALREADY ON THE SHEET: covered, so not waiting on anybody. */
+  /* Recommended and ALREADY ON THE SHEET FOR THAT REPAIR: covered, so not
+     waiting on anybody. The entry has to NAME the defect for that to be true —
+     a bare entry against the bus is not the sheet writing to this record. */
   {id:"d",n:"6304",l:"bay-3",defects:[{id:"d5",category:"Engine",issue:"No start",details:"",state:"open",operability:"down",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* BUS 17555, the case that prompted the per-repair grain. On the sheet for an
+     air-tank row, with a ramp that will not lock recommended underneath it. The
+     old bus-grain rule dropped this bus whole and the board sat empty while a
+     foreman had asked for something. Curtis: "Doesn't mean the guy that's doing
+     the inspection is gonna come across the defect." */
+  {id:"g",n:"17555",l:"bay-6",defects:[
+   {id:"g1",category:"Pneumatic System",issue:"Air tank / valve",details:"IDOT Prep",state:"open",operability:"down"},
+   {id:"g2",category:"Bus Accessories",issue:"Ramp, Lift and Kneeler - Ramp will not lock",details:"cam damaged",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:45:00.000Z")}]},
   /* Recommended and FIXED. This is the "in sync" half: close the repair the
      recommendation was about and the number drops with no tidying up. */
   {id:"e",n:"6305",l:"bay-4",defects:[{id:"d6",category:"Engine",issue:"Done",details:"",state:"completed",operability:"service",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
   /* Not recommended at all. */
   {id:"f",n:"6306",l:"bay-5",defects:[{id:"d7",category:"Engine",issue:"Plain",details:"",state:"open",operability:"service"}]},
  ];
- const onSheet=[{id:"e1",busId:"d",busNumber:"6304",workflow:"Scheduled"}];
- assert.equal(recommendedBusCount(fleet,onSheet),3,"buses, deduplicated — never rows");
- assert.equal(recommendedRows(fleet,onSheet).length,4,"and four rows behind those three buses");
+ const onSheet=[
+  {id:"e1",busId:"d",busNumber:"6304",defectId:"d5",category:"Engine",repair:"No start",customReason:"",workflow:"Scheduled"},
+  /* 17555's row: the sheet is writing to the AIR TANK record, not the ramp. */
+  {id:"e2",busId:"g",busNumber:"17555",defectId:"g1",category:"Pneumatic System",repair:"Air tank / valve",customReason:"IDOT Prep",workflow:"Scheduled"}];
+ assert.equal(recommendedBusCount(fleet,onSheet),4,"buses, deduplicated — never rows");
+ assert.equal(recommendedRows(fleet,onSheet).length,5,"and five rows behind those four buses");
+ /* THE REGRESSION GUARD. 17555 is on the sheet and still owes somebody an
+    answer about its ramp, so it is listed; 6304's recommendation IS the row the
+    sheet carries, so it is not. Flip the rule back to the bus and the first of
+    these two disappears. */
+ const listed=recommendedBuses(fleet,onSheet).map(row=>row.bus.n);
+ assert.ok(listed.includes("17555"),"on the sheet for one repair, still waiting on another");
+ assert.equal(listed.includes("6304"),false,"the sheet is writing to that very record");
  /* LONGEST WAITING FIRST. The only question this board answers is what has been
     waiting on you, and alphabetical order answers nothing. */
- assert.deepEqual(recommendedBuses(fleet,onSheet).map(row=>row.bus.n),["6303","6301","6302"]);
+ assert.deepEqual(listed,["6303","6301","6302","17555"]);
  /* Inside a bus too, so the card's lead repair is the one waiting longest. */
  assert.deepEqual(recommendedBuses(fleet,onSheet).find(row=>row.bus.n==="6302").defects.map(d=>d.issue),["Air leak","Misfire"]);
 

@@ -1,100 +1,144 @@
 # Publish next
 
-**STATUS: 180 PENDING — a sticking brake can be logged as a symptom instead of
-a guessed valve.**
+**STATUS: 181 PENDING — the Down Sheet stops calling every bus down, plus four
+smaller fixes.**
 
-Publish from `b6e0cba` (`Brakes: a sticking brake gets its own wording`), the
-commit directly below this handoff. Derive the range with:
+Publish from `148a45e` (`USING THIS ONE: a soft bus put on a run stops counting
+against pullout`). Derive the range with:
 
 ```
-git log --oneline 546684d..HEAD
+git log --oneline 6a98878..HEAD
 ```
 
-Version 179 was published from `fe467c0` on 2026-09-15 and is the rollback
-point; its tag is `sites-v179`. The one before it is 178 from `531c3f8`.
+Version 180 was published from `b6e0cba` on 2026-09-15 and is the rollback
+point; its tag is `sites-v180`. The one before it is 179 from `fe467c0`.
 
 ## What a person will see
 
-Four new options in the **Brakes** category of the Defect Log's DEFECT picker,
-and nowhere else:
+### 1 — The Down Sheet tells the truth about the pullout number
+
+One number became four. On the shop's real sheet of 52 rows:
 
 ```
-Brakes sticking / dragging
-Brakes will not release - service (after pedal)
-Brakes will not release - parking brake
-Brake chamber leaking
+DOWN BUSES     41     cannot run
+SOFT DOWN       4     on the sheet, and the sheet says they still run
+DOWN + SOFT    45     the shortage
+IDOT DUE        5     a date, not a fault — counted nowhere
 ```
 
-Nothing else in the app changes. No screen moves, no control is renamed, no
-existing option is reworded or removed.
+`SOFT` also rides beside the lead number in the collapsed header, so the press
+that opens the tiles is not needed to learn that some of those buses can work.
 
-## Why the wording is a symptom and not a part
+**Two new boards**, beside MYSTERY / DEFERRED / RECOMMENDED and collapsed by
+default: **SOFT DOWN — CAN STILL BE USED** and **IDOT — STATE INSPECTION DUE**.
 
-The catalog had no way to say a brake is sticking — `sticking`, `dragging` and
-`chamber` appeared nowhere in the app at all. R-12 and R-14 already exist under
-**Pneumatic System**, worded as parts, and either can hold a rear brake on. The
-two are linked, so a fault on the parking-brake valve can keep pressure on the
-service side. Logging the symptom therefore meant naming a valve nobody had
-confirmed.
+**A switch on each soft row** — `USING THIS ONE` — takes that bus out of the
+shortage and stamps who decided. It **travels between devices**.
 
-Curtis: *"I don't want to mix up actual parts (due to inspection) from symptoms
-that is being experienced from whatever the situation is."*
+**IDOT-only rows leave the sheet body.** A bus whose whole entry is PREP FOR
+IDOT no longer has a row; it is on the IDOT board instead. A row that is IDOT
+*and* a fault keeps its row.
 
-The two "will not release" entries are the split a mechanic can make standing
-at the bus, and they narrow the valve without asserting it. A test holds that
-no wording in the Brakes category names either valve.
+**`IDOT Prep` is now in the Inspection catalog**, so a bus can be put on that
+board by hand rather than only by a scan.
 
-## Storage impact: none
+**The Status Report** gains, only when something is soft:
 
-Additive only. No rename, no retirement, no storage key touched, no migration.
-Every record already on a device reads back exactly as logged. `REPAIR_OPTIONS`
-still holds 21 categories; the Brakes array goes from 11 entries to 15.
+```
+DOWNED BUSES        41
+SOFT DOWN            4
+  (on the sheet, still usable)
+TOTAL DOWN + SOFT   45
+```
 
-All four open on **May Stay In Service**, the same default as every other
-Brakes entry. Whether a stuck brake should instead open on Remove From Service
-is an open question for Curtis and is deliberately NOT decided in this release.
+### 2 — Four smaller fixes
+
+- A bus already on the sheet can raise a recommendation for a **different**
+  repair. Found on 17555.
+- A **stale bus search** on the Defect Log ends itself, so a defect logged onto
+  another bus is not invisible behind it.
+- The **full sweep question** after a scan has a real **NO**, no longer promises
+  the Status Report, and warns about map/sheet mismatches — on the NO path and
+  on the sweep banner itself.
+- A **three-piece refill** counted as a down bus. The catalog's own name for that
+  inspection defeated the catalog's own maintenance rule.
+
+## The rule behind the split
+
+**Nothing runs unless the paper says it runs.** Permissions are `short run`,
+`hold for`, `can be used`, `ok to run`, `light duty`. Refusals beat permissions:
+`accident`, `until repaired`, `do not move/run/release/use`, `quarantine`,
+`don't let go`. **Silence is DOWN.**
+
+> Curtis: "if it says HIGH OIL CONSUMPTION with nothing else, then that is where
+> the ambiguity comes in and I would not expect the app to make that
+> distinction... So if it's on downsheet without any additional notes like hold
+> or can use, then add it to downed count."
+
+A first version inferred the other way and put a bus with a **burning smell** and
+one with a **flat tire and a failed brake test** into the running column, because
+both rows also mentioned oil. Caught by running the classifier over 52 real rows
+before any screen was built on it.
+
+## Storage impact
+
+**No key renamed, no migration, nothing rewritten.** Two new per-device keys,
+both documented in CLAUDE.md:
+
+```
+pace-down-sheet-soft-collapsed-v1
+pace-down-sheet-idot-collapsed-v1
+```
+
+The `inService` flag lives on the sheet entry. It travels for free —
+`cloud-sync.ts` puts every field it has no column for into `detail` and spreads
+`detail` back on the way in — so **the Supabase schema does not change.**
 
 ## Validation completed
 
-- **328 tests pass** in UTC and in `America/Chicago`
+- **331 tests pass** in UTC and `America/Chicago`
 - `npm run lint` clean, `npm run build` clean
-- CI green on the pre-rebase commit (`Lint, build and test`, 2026-09-15)
-- Two mutations confirm the new assertions bite: dropping one of the four
-  wordings fails the suite, and naming R-14 inside Brakes fails it
+- **Eleven mutations** fail the new guards across the release. The ones that
+  matter: checking permissions before refusals; treating high oil as a
+  permission; defaulting to soft rather than down; letting a soft row win over a
+  hard one on the same bus; letting the in-service flag excuse a hard down bus;
+  stripping every repair card rather than only the ones filed as inspections
+  (which takes an accident-damaged bus out of the count).
 
-Measured in Chromium at 390px against the real seeded board (62 buses), not
-read off the CSS:
+Driven in Chromium at 390px against a board seeded from the shop's real export:
 
 | Check | Result |
 | --- | --- |
-| Type `sticking` cold, no category chosen | Returns the new entry; picking it fills Brakes in behind you |
-| Browse the Brakes list | 15 rows, all four present, none naming R-12 or R-14 |
-| Longest new row | 364px wide inside a 377px list — unclipped, untruncated |
-| Save round trip | Saved on bus 17500; lands in `pace-board-v1` under category `Brakes` with the exact wording; reload reads it back in the feed |
-
-Three fixture errors were hit and fixed on the way, none of them the app: bus
-records use `s`/`l` rather than `status`/`loc`; the welcome gate blocks until
-`pace-app-mode-v1` is answered; and the Defect Log never seeds `pace-board-v1`
-— the Facility Map does, so a probe has to land there first.
+| Header | `41 DOWN BUSES` with `4 SOFT` beside it |
+| Tiles | DOWN, SOFT DOWN, DOWN + SOFT, IDOT DUE, in that order |
+| Boards | both start collapsed |
+| SOFT lists | 15512, 17516, 17527, 17559 |
+| IDOT lists | 17538, 17542, 17555, 17558, 17563 |
+| Rows on the sheet | 51 of 52 entries — the missing one is 17563, only IDOT prep |
+| Flip 17527 | SOFT 4 → 3, DOWN stays 41, stamp written |
+| Reload | SOFT still 3, button still reads IN SERVICE |
+| Flip back | SOFT 4 again, and the key is gone from the record |
+| Header at 390px | 364px in a 377px box, nothing cut |
 
 ## Post-publish checks
 
-1. Defect Log → **+ LOG DEFECT** → type `sticking` in the DEFECT field with no
-   category chosen. `Brakes sticking / dragging` should appear, tagged 🛑 Brakes.
-2. Pick it. The CATEGORY field should fill in with Brakes on its own.
-3. Clear the DEFECT field and browse. The Brakes list should show **15** rows
-   with all four new wordings in it.
-4. Type `will not release`. You should get **both** new brake entries AND the
-   parking brake knob from Operator/Driver Controls, each labelled with its own
-   category. That contrast is the point of the change — the knob and the brake
-   are different repairs.
-5. Save one against a real bus, close the app, reopen it. The repair must read
-   back with the same wording, not blank and not a different entry.
+1. Down Sheet header should read **41 DOWN BUSES** with **4 SOFT** beside it, on
+   the current sheet.
+2. Open the counts. DOWN, SOFT DOWN, DOWN + SOFT, IDOT DUE.
+3. **SOFT DOWN — CAN STILL BE USED** should list the three South Holland holds
+   and 17559 (`Short Run Only`). If it lists buses with real faults and no
+   permission written on them, the rule has been loosened and that is the one
+   to report.
+4. Press **USING THIS ONE** on one of them. SOFT drops by one, DOWN does not
+   move. Close the app, reopen it — it should still be on.
+5. **17563** should have no row on the sheet; **17555** and **17558** should.
+6. Send a Status Report. SOFT DOWN sits under DOWNED BUSES, then the total.
+7. Scan a sheet and press **NO** on the sweep question — mismatch warning. Press
+   **YES** — the map banner should say what the walk is for.
 
 ## Rollback
 
-Roll back to `sites-v179` (`fe467c0`). A record saved under one of the four new
-wordings is simply not offered by 179's picker, but it still READS correctly —
-the editor offers an unknown stored wording back as its own choice rather than
-blanking the field, so nothing logged on 180 is lost or corrupted by a
-rollback to 179.
+Roll back to `sites-v180` (`b6e0cba`). Nothing is stored differently except the
+`inService` flag, which 180 does not read — a bus switched to in-service under
+181 simply counts as down again, which is the safe direction. No defect, entry
+or recommendation logged under 181 is lost or altered.

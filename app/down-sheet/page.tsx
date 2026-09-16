@@ -11,6 +11,7 @@ import RefreshButton from "../refresh-button";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetScanner from "./down-sheet-scanner";
+import {readSweep,startSweep} from "../facility-sweep";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {matchingUnresolvedDefectId} from "../duplicate-defects";
 import {learnFinding,readFindingsMemory,writeFindingsMemory} from "../findings-memory";
@@ -24,7 +25,8 @@ import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
 import {recordSheetSwap} from "../sheet-ledger";
 import {readShiftSettings} from "../shift-clock";
-import {downSheetMentionsDefect,downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
+import {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly,isSoftDownEntry,isEntryInService,entryInServiceStamp,setEntryInService} from "./down-sheet-availability";
+import {downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -35,6 +37,11 @@ import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";
+import SheetSectionBoard from "./sheet-section-board";
+/* Per device and collapsed by default, the same as the three boards above
+   them. Both are NEW names, so nothing already stored is renamed. */
+const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
+const IDOT_BOARD_COLLAPSED_KEY="pace-down-sheet-idot-collapsed-v1";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {answerDeferredBus} from "../deferred-actions";
 import {answerRecommendedBus} from "../recommended-actions";
@@ -212,6 +219,8 @@ export default function DownSheet(){
  const [countsOpen,setCountsOpen]=useState(false);
  const [deferredCollapsed,setDeferredCollapsed]=useState(true);
  const [recommendedCollapsed,setRecommendedCollapsed]=useState(true);
+ const [softCollapsed,setSoftCollapsed]=useState(true);
+ const [idotCollapsed,setIdotCollapsed]=useState(true);
  const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
@@ -228,6 +237,27 @@ export default function DownSheet(){
     wanting details." The person being sent it is asking which buses are waiting
     on parts, not for all forty rows, and a list is worth sending only when it
     is that list. */
+/* THE FULL SWEEP QUESTION AFTER A SCAN, and why it is no longer a confirm().
+
+   A confirm() offers OK and CANCEL, and the browser owns both words. Curtis:
+   "There is not a 'no' for an answer if I am not doing a full sweep of the
+   yard." Cancel reads as backing out of the question rather than answering it,
+   and the two are not the same thing here — NO has something to say.
+
+   The old second line promised the Status Report as a reward for ending a
+   sweep. It is gone: "The summary report is ALWAYS READY anyway. At anytime I
+   can send it because it's real time snap shot of the fleet's health."
+
+   WHAT THE QUESTION IS ACTUALLY FOR, which is the part worth keeping. A scan
+   REPLACES the sheet and the Facility Map does not move with it, so right after
+   an import the map can disagree with the paper — a bus in the wrong place, one
+   reading as a mystery bus, one carrying a number that has since been written
+   against a different bus. Curtis: "if a person uploads sheets, then they may
+   see mystery buses, or things like that that are switched around or buses that
+   are labeled incorrectly due to the new down sheet because the facility map did
+   not change with the down sheet's upload." A walk is what reconciles them, so
+   NO is answered with that warning rather than with silence. */
+ const [sweepAsk,setSweepAsk]=useState<""|"ask"|"mismatch">("");
  const [quickFilter,setQuickFilter]=useState<DownSheetFilterKey|null>(null);
  /* Two failure states rather than one. The first version of this bar reported a
     failed COPY LIST as "COULD NOT SHARE — TRY COPY LIST", which sends somebody
@@ -260,6 +290,10 @@ export default function DownSheet(){
     who never opened it should not be scrolling past it to reach the sheet. */
  useEffect(()=>{setRecommendedCollapsed(localStorage.getItem(RECOMMENDED_BOARD_COLLAPSED_KEY)!=="0")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,RECOMMENDED_BOARD_COLLAPSED_KEY,recommendedCollapsed?"1":"0")},[recommendedCollapsed,hydrated]);
+ useEffect(()=>{setSoftCollapsed(localStorage.getItem(SOFT_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,SOFT_BOARD_COLLAPSED_KEY,softCollapsed?"1":"0")},[softCollapsed,hydrated]);
+ useEffect(()=>{setIdotCollapsed(localStorage.getItem(IDOT_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,IDOT_BOARD_COLLAPSED_KEY,idotCollapsed?"1":"0")},[idotCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
@@ -303,7 +337,18 @@ export default function DownSheet(){
 
     The sort helper keeps its parameter — the Defect Log's own views still pass
     other orders through it. */
- const sheetGroups=useMemo(()=>orderDownSheetGroups(groupDownSheetEntries(shown,"number-asc",locations),sectionOrder),[shown,locations,sectionOrder]);
+ /* IDOT-ONLY ROWS DO NOT GO IN THE BANDS. A bus whose whole entry is PREP FOR
+    IDOT is not down and must not be read as though it were. Curtis: "those
+    three buses, no, they're not on the down sheet, but we do need a separate
+    section on the down sheet for IDOT buses... they're still being used. It's
+    just that we have to be aware that the time to send them to IDOT for state
+    inspection is coming up. It doesn't mean the bus can't run."
+
+    They are not dropped — the IDOT board below lists them, and their entry is
+    untouched, so nothing a scan wrote is lost. A row that is IDOT AND a fault
+    stays in its band, because the fault is why it is there. */
+ const bandEntries=useMemo(()=>shown.filter(entry=>!downSheetIdotOnly(entry)),[shown]);
+ const sheetGroups=useMemo(()=>orderDownSheetGroups(groupDownSheetEntries(bandEntries,"number-asc",locations),sectionOrder),[bandEntries,locations,sectionOrder]);
  /* The band tiles used to render straight off sheetGroups, so their order on
     the board was whatever DOWN_SHEET_GROUPS happened to be in. They are placed
     by name now, because the order Curtis set interleaves them with tiles that
@@ -337,7 +382,40 @@ export default function DownSheet(){
     Same question the DOWNED BUSES ON ROAD tally already asks, asked of the
     whole sheet instead of only the buses out on the road, so the two numbers
     are defined the same way and the smaller can never exceed the larger. */
- const downBusCount=useMemo(()=>shown.filter(downSheetMentionsDefect).length,[shown]);
+ /* DOWN SPLIT IN TWO, because one number was answering two questions.
+
+    A foreman opens this page to find out how many buses he is short at pullout,
+    and buses held for another garage's technicians or written up SHORT RUN ONLY
+    were being counted as though they could not turn a wheel. Reconciled against
+    a real paper sheet the app said 47 where the shop counted 39.
+
+    hardDownCount is what DOWN BUSES now means. softDownCount is the buses the
+    sheet has explicitly said still run. Together they are every bus the sheet is
+    carrying for a fault, which is what the old single number counted — so
+    hardDownCount + softDownCount + the IDOT-only rows equals the old total, and
+    no bus has gone missing from the page by being reclassified. */
+ const hardDownCount=useMemo(()=>shown.filter(entry=>downSheetAvailability(entry)==="down").length,[shown]);
+ /* The soft buses nobody has put on a run. A bus the yard has decided to use
+    is not part of the morning's shortage, which is the whole point of the
+    switch, so the number follows the decision. */
+ const softDownCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&!isEntryInService(entry)).length,[shown]);
+ const inServiceCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&isEntryInService(entry)).length,[shown]);
+ /* Every row that MENTIONS the state inspection, down or not: the section
+    exists to keep an eye on what is coming due, and a bus can be both. */
+ const idotEntries=useMemo(()=>shown.filter(downSheetMentionsIdot),[shown]);
+ /* The board lists EVERY soft bus, in service or not — taking one off the list
+    the moment it is switched on would hide the control that switched it. */
+ const softEntries=useMemo(()=>shown.filter(isSoftDownEntry),[shown]);
+ /* Flipping writes to the entry and saves the sheet, so it reaches the other
+    devices the way every other entry change does. */
+ const toggleInService=(entryId:string,on:boolean)=>{
+  const now=new Date().toISOString();
+  const next=entries.map(entry=>entry.id===entryId?setEntryInService(entry,on,now,defaultInitials):entry);
+  const written=writeDownSheetStorage(localStorage,next);
+  setSaveProblem(written.reason||"");
+  if(written.reason)return;
+  setEntries(next);
+ };
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  /* Opened after the round, which is when somebody is about to be asked. */
@@ -508,6 +586,11 @@ export default function DownSheet(){
   setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");
   setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);
   alert(`${imported.length} bus${imported.length===1?"":"es"} imported as the current Down Sheet. ${removed.length} prior bus${removed.length===1?"":"es"} came off. Locations and saved defects were preserved.`);
+  /* Asked AFTER the import — the scan is what the person came to do — and only
+     when NOT already sweeping, because a prompt that appears mid-walk to ask
+     whether you are walking is the kind of dialog people learn to dismiss.
+     startSweep does not reset a walk already under way. */
+  if(!readSweep(localStorage))setSweepAsk("ask");
  };
  const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();
   /* The undo is itself a removal in one direction and a restore in the other:
@@ -748,13 +831,27 @@ export default function DownSheet(){
   <section className="down-counts-board" aria-label="Down sheet section counts">
    <div className="down-counts-head">
     <button type="button" className="down-counts-toggle" aria-expanded={countsOpen} aria-controls="down-counts-tiles" onClick={()=>setCountsOpen(value=>!value)}>
-     <span className="down-counts-lead"><strong>{downBusCount}</strong><span>DOWN BUSES</span></span>
+     {/* THE LEAD IS THE HARD NUMBER, and SOFT rides beside it rather than
+         under it, so the one press it takes to open the tiles is not needed to
+         learn that four of these buses can still work. Curtis: "a person can
+         easily tell if they're not making pull out that hey, we got buses that
+         are down that are not contributing to our pullout numbers." Shown only
+         when there are any, so an ordinary morning still reads as one number. */}
+     <span className="down-counts-lead"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></span>
+     {softDownCount>0&&<span className="down-counts-soft"><strong>{softDownCount}</strong><span>SOFT</span></span>}
      <span className="down-counts-more">{countsOpen?"HIDE COUNTS":"SHOW COUNTS"}<i aria-hidden="true">{countsOpen?"\u25B2":"\u25BC"}</i></span>
     </button>
    </div>
    {countsOpen&&<div className="down-group-counts" id="down-counts-tiles">
     <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
-    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
+    <div className="group-count down-buses"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></div>
+    {/* The three that answer the pullout question together, in the order Curtis
+        asked for them: the hard number, the soft number, then the two added up,
+        "easily distinguished from one another". */}
+    <div className="group-count soft-down"><strong>{softDownCount}</strong><span>SOFT DOWN</span></div>
+    {inServiceCount>0&&<div className="group-count in-service"><strong>{inServiceCount}</strong><span>SOFT, IN USE</span></div>}
+    <div className="group-count down-total"><strong>{hardDownCount+softDownCount}</strong><span>DOWN + SOFT</span></div>
+    {idotEntries.length>0&&<div className="group-count idot-due"><strong>{idotEntries.length}</strong><span>IDOT DUE</span></div>}
     {tileFor("scheduled")}
     {/* Still a button, because it filters. Same press-to-narrow behaviour the
         two road tallies have, so it belongs with them rather than looking like
@@ -825,6 +922,24 @@ export default function DownSheet(){
       available in Lite — hiding only the board would be the odd half. */}
   <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
    collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
+  {/* THE TWO THE SHEET COULD NOT SAY BEFORE. SOFT is the buses the paper has
+      explicitly said still run; IDOT is what is coming due for the state
+      inspection, which is not a repair and never a reason a bus is down. */}
+  <SheetSectionBoard className="soft-down-board" title="SOFT DOWN — CAN STILL BE USED"
+   hint="ON THE SHEET, AND THE SHEET SAYS THEY STILL RUN" entries={softEntries} locations={locations}
+   collapsed={softCollapsed} onCollapsedChange={setSoftCollapsed}
+   action={entry=>{
+    const stamp=entryInServiceStamp(entry);
+    return <button type="button" className={"in-service-toggle"+(stamp?" on":"")}
+     onClick={()=>toggleInService(String(entry.id||""),!stamp)}
+     aria-pressed={Boolean(stamp)}
+     aria-label={(stamp?"Take bus ":"Put bus ")+entry.busNumber+(stamp?" back out of service":" into service today")}>
+     {stamp?"IN SERVICE"+(stamp.by?" — "+stamp.by:"")+" · TAKE OFF":"USING THIS ONE"}
+    </button>;
+   }}/>
+  <SheetSectionBoard className="idot-board" title="IDOT — STATE INSPECTION DUE"
+   hint="KEEP AN EYE ON THESE. NOT COUNTED AS DOWN" entries={idotEntries} locations={locations}
+   collapsed={idotCollapsed} onCollapsedChange={setIdotCollapsed}/>
   {/* Its own class rather than the road note's, deliberately: that rule gives
       every button inside it width:100% below 760px, which reads correctly for
       one SHOW THE WHOLE SHEET button and would stack these four down the
@@ -912,5 +1027,26 @@ export default function DownSheet(){
   {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {sweepAsk&&<div className="down-shade" role="dialog" aria-modal="true" aria-labelledby="sweep-ask-title">
+   <section className="sweep-ask-modal">
+    <header className="repair-editor-head"><div><span>AFTER THE SCAN</span><h2 id="sweep-ask-title">{sweepAsk==="ask"?"FULL SWEEP?":"CHECK THE MAP"}</h2></div></header>
+    {sweepAsk==="ask"
+     ?<div className="sweep-ask-body">
+       <p>Are you doing a full sweep of the facility for bus count?</p>
+       <div className="sweep-ask-actions">
+        <button type="button" className="sweep-ask-no" onClick={()=>setSweepAsk("mismatch")}>NO</button>
+        <button type="button" className="sweep-ask-yes" onClick={()=>{startSweep(localStorage,"scan");setSweepAsk("")}}>YES</button>
+       </div>
+      </div>
+     :<div className="sweep-ask-body">
+       <p className="sweep-ask-warn"><b>Be aware of any mismatches between buses on the Fleet Map and the new Down Sheet.</b></p>
+       <p>The sheet has just been replaced and the map has not moved with it, so a bus can sit in the wrong place, read as a mystery bus, or carry a number now written against another bus.</p>
+       <p><b>A full yard sweep is recommended.</b></p>
+       <div className="sweep-ask-actions">
+        <button type="button" className="sweep-ask-yes" onClick={()=>setSweepAsk("")}>GOT IT</button>
+       </div>
+      </div>}
+   </section>
+  </div>}
  </main>;
 }
