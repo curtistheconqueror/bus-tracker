@@ -9990,6 +9990,55 @@ test("the tablet band does not scroll sideways: the nav wraps, and a map rule st
  assert.match(globals,/\.command-highlights>\*,\.command-bar \.quick-filter-trigger\{width:100%\}/,"scoped to the map's own command bar");
 });
 
+test("a bus only leaves the DOWN count when the sheet says it still runs",async()=>{
+ const {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly}=await import("../app/down-sheet/down-sheet-availability.ts");
+ /* Rows lifted from a real master export, reconciled against the paper sheet it
+    was scanned from. The app said 47 DOWN where the foreman counted 39. */
+ const row=(busNumber,repair,customReason,items=[])=>({busId:busNumber,busNumber,category:"",repair,customReason,
+  repairItems:items.map(([category,itemRepair,details])=>({category,repair:itemRepair,details}))});
+
+ /* THE PERMISSIONS. Somebody wrote that the bus still runs, so it is soft. */
+ assert.equal(downSheetAvailability(row("17559","Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )")),"soft");
+ assert.equal(downSheetAvailability(row("17527","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR")),"soft");
+
+ /* SILENCE IS DOWN, and this is the case Curtis named to settle it: "if it says
+    HIGH OIL CONSUMPTION with nothing else, then that is where the ambiguity
+    comes in and I would not expect the app to make that distinction... So if
+    it's on downsheet without any additional notes like hold or can use, then
+    add it to downed count." */
+ assert.equal(downSheetAvailability(row("99999","Other repair","HIGH OIL CONSUMPTION")),"down",
+  "no permission written means the bus is down");
+
+ /* THE THREE ROWS AN EARLIER, CLEVERER RULE GOT WRONG. It read "high oil" as a
+    limitation and let these stay available: a bus with a BURNING SMELL, one
+    with a FLAT TIRE AND A FAILED BRAKE TEST, and one whose front brakes are
+    written up. The words do not separate short-run from undriveable. */
+ assert.equal(downSheetAvailability(row("17517","Check transmission light","Trans Light / Bushing Smell / High Oil Usage")),"down");
+ assert.equal(downSheetAvailability(row("17545","Brake inspection","Won't Pass Brake Test / Rear Brakes / Flat Tire / High Oil Usage")),"down");
+ assert.equal(downSheetAvailability(row("17506","Other brake repair","PM Defects - Frt.Brakes / High Oil Consumption")),"down");
+
+ /* A REFUSAL BEATS A PERMISSION, and both of these carry the word HOLD. Only
+    one of them means the bus can turn a wheel. */
+ assert.equal(downSheetAvailability(row("18501","Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )")),"down",
+  "hold UNTIL REPAIRED is the opposite of a permission");
+ assert.equal(downSheetAvailability(row("15511","A-21","A21",[["Bodywork","Accident damage","Accident Hold for Saftey"]])),"down",
+  "an accident hold is a hold away from service, whatever words it shares with one that is not");
+
+ /* THE STATE INSPECTION IS NOT A REPAIR. A row that is only IDOT prep leaves
+    the count entirely; a row that is IDOT AND a fault is still a down bus, and
+    still shows in the section that keeps an eye on them. */
+ assert.equal(downSheetAvailability(row("17563","Manual entry","PREP FOR IDOT",[["Miscellaneous","Manual entry","17558 17563 PREP FOR IDOT"]])),"idot");
+ const idotAndFault=row("17558","Other brake repair","PM DEFECTS-REAR BRAKES / PREP FOR IDOT");
+ assert.equal(downSheetAvailability(idotAndFault),"down");
+ assert.equal(downSheetMentionsIdot(idotAndFault),true,"but it is still one to watch");
+ assert.equal(downSheetIdotOnly(idotAndFault),false);
+ /* The bus numbers on a multi-bus IDOT line are its subjects, not a complaint. */
+ assert.equal(downSheetIdotOnly(row("17515","Manual entry","17542 17522 17515-PREP FOR IDOT")),true);
+
+ /* Scheduled maintenance is answered one file over and still answers first. */
+ assert.equal(downSheetAvailability(row("17502","C-24","C24",[["Inspection","C-24","C24"]])),"inspection");
+});
+
 test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
  const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
  const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
