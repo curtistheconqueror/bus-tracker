@@ -129,6 +129,35 @@ function reasonText(entry:DownSheetViewEntry){
 }
 const INSPECTION_STRIPPER=new RegExp(DOWN_SHEET_INSPECTION_PATTERN.source,"gi");
 
+/* Wording the APP ITSELF filed under Inspection, which is scheduled maintenance
+   whatever it happens to say.
+
+   The pattern above reads the words a PERSON wrote on the paper. This reads what
+   the catalog picked, and only the second can answer for the catalog's own
+   names. Found on 17534: the row reads TRANS/HUB/DIFF, which the pattern
+   matches, and carries the catalog's name for that very service — "Hub / Trans /
+   Diff Refill (Three-Piece)" — which it does NOT, because the words run in a
+   different order and carry "Refill" and "Three-Piece" besides. The catalog name
+   survived the strip, read as a complaint, and put a bus on a three-piece refill
+   into the DOWN count. Every three-piece refill on the sheet counted as down.
+
+   Only the wording filed AS an inspection is taken out. 15511 is the case that
+   proves it matters: an A-21 entry carrying a Bodywork card reading "Accident
+   Hold for Saftey". The A-21 goes, the accident stays, and the bus stays down —
+   which is right, and is more than the paper line for it says. */
+function inspectionCatalogText(entry:DownSheetViewEntry){
+ const parts:string[]=[];
+ if(String(entry.category||"").trim()==="Inspection")parts.push(String(entry.repair||""));
+ for(const item of entry.repairItems||[])
+  if(String(item.category||"").trim()==="Inspection")parts.push(String(item.repair||""),String(item.details||""));
+ return parts.map(value=>value.trim().toLowerCase()).filter(value=>value&&!REASON_PLACEHOLDERS.test(value));
+}
+/* Escaped because catalog names carry "/" and brackets — "Hub / Trans / Diff
+   Refill (Three-Piece)" is not a regex anybody meant to write. */
+function stripLiteral(text:string,phrase:string){
+ return text.split(phrase).join(" ");
+}
+
 /* Is scheduled maintenance ALL this row carries?
 
    A bus can be on the sheet twice — once for a fault and once because a PM came
@@ -149,7 +178,11 @@ export function downSheetScheduledOnly(entry:DownSheetViewEntry){
  const written=reasonText(entry);
  if(!written)return entry.section==="Inspection";
  if(!DOWN_SHEET_INSPECTION_PATTERN.test(written))return false;
- const remainder=written.replace(INSPECTION_STRIPPER," ").replace(/[^a-z0-9]+/g," ");
+ /* The catalog's own inspection wording comes out FIRST, before the pattern
+    runs, so a name the pattern cannot match is gone before it is asked to. */
+ let rest=written;
+ for(const phrase of inspectionCatalogText(entry))rest=stripLiteral(rest,phrase);
+ const remainder=rest.replace(INSPECTION_STRIPPER," ").replace(/[^a-z0-9]+/g," ");
  return !/[a-z]{3}/.test(remainder);
 }
 

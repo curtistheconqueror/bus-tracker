@@ -9994,6 +9994,34 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
  const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
  const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
 
+ /* THE CATALOG'S OWN NAME DEFEATED THE CATALOG'S OWN RULE, found on bus 17534
+    in a real export: every three-piece refill on the sheet counted as a DOWN
+    bus. The row says TRANS/HUB/DIFF, which the maintenance pattern matches, and
+    carries the catalog's name for that same service, which it does not -- the
+    words run in a different order and bring "Refill" and "Three-Piece" with
+    them. The name survived the strip and read as a complaint.
+
+    Wording the app filed UNDER Inspection is scheduled maintenance whatever it
+    says, so it comes out before the pattern is asked anything. */
+ const refill={busId:"b",busNumber:"17534",category:"Inspection",repair:"Hub / Trans / Diff Refill (Three-Piece)",
+  customReason:"TRANS/HUB/DIFF",repairItems:[{category:"Inspection",repair:"Hub / Trans / Diff Refill (Three-Piece)",details:"TRANS/HUB/DIFF"}]};
+ assert.equal(downSheetMentionsDefect(refill),false,"a three-piece refill is maintenance, not a down bus");
+
+ /* AND ONLY THE WORDING FILED AS AN INSPECTION COMES OUT. 17534's neighbour on
+    the same sheet, 15511, is an A-21 carrying a BODYWORK card that reads
+    "Accident Hold for Saftey". The A-21 goes, the accident stays, the bus stays
+    down -- which is more than its one-word paper line says. Curtis: "Keep 15511
+    down if it says accident."
+
+    This is the assertion that bites: strip by category without checking WHICH
+    category and an accident-damaged bus quietly leaves the down count. */
+ const a21={busId:"b",busNumber:"15511",category:"Inspection",repair:"A-21",customReason:"A21",
+  repairItems:[{category:"Bodywork",repair:"Accident damage",details:"Accident Hold for Saftey"}]};
+ assert.equal(downSheetMentionsDefect(a21),true,"an accident card keeps the bus down");
+ /* A plain inspection with no second card is still maintenance. */
+ assert.equal(downSheetMentionsDefect({busId:"b",busNumber:"17502",category:"Inspection",repair:"C-24",
+  customReason:"C24",repairItems:[{category:"Inspection",repair:"C-24",details:"C24"}]}),false);
+
  /* The PM half of the maintenance wording was missing, and the omission was
     invisible because `pm's` itself matched: the catalog words written beside it
     did not, so "Other preventive maintenance - PM'S" had `pm's` struck out and
