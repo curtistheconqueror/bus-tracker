@@ -10551,11 +10551,42 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
 
  /* THE SCAN SIDE. Asked AFTER the import - the scan is what the person came to
     do - and only when not already sweeping, because a prompt that appears
-    mid-walk to ask whether you are walking is one people learn to dismiss. */
- assert.match(scanner,/onImport\(imports\);[\s\S]{0,900}?if\(!readSweep\(localStorage\)&&confirm\(/,
+    mid-walk to ask whether you are walking is one people learn to dismiss.
+
+    Asked by the PAGE rather than the scanner, and that is forced rather than
+    tidy: importing closes the scanner, so a dialog it owned would unmount
+    before anybody could answer. The confirm() this replaced only survived
+    because it blocks the thread. */
+ const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.doesNotMatch(scanner,/full sweep of the facility/,"the scanner no longer owns the question");
+ assert.doesNotMatch(scanner,/readSweep|startSweep/,"nor the sweep record");
+ assert.match(sheet,/setScannerOpen\(false\);[\s\S]{0,700}?if\(!readSweep\(localStorage\)\)setSweepAsk\("ask"\)/,
   "asked after the import, and only when not already mid-sweep");
- assert.match(scanner,/full sweep of the facility for bus count/);
- assert.match(scanner,/startSweep\(localStorage,"scan"\)/);
+ assert.match(sheet,/full sweep of the facility for bus count/);
+ assert.match(sheet,/startSweep\(localStorage,"scan"\)/);
+
+ /* A REAL NO. A confirm() offers OK and CANCEL and the browser owns both words.
+    Curtis: "There is not a 'no' for an answer if I am not doing a full sweep of
+    the yard." Cancel reads as backing out of the question rather than answering
+    it, and NO has something to say here. */
+ assert.match(sheet,/className="sweep-ask-no" onClick=\{\(\)=>setSweepAsk\("mismatch"\)\}>NO</,
+  "NO is an answer, and it leads somewhere");
+ assert.match(sheet,/className="sweep-ask-yes" onClick=\{\(\)=>\{startSweep\(localStorage,"scan"\);setSweepAsk\(""\)\}\}>YES</);
+
+ /* WHAT NO IS ANSWERED WITH. A scan REPLACES the sheet and the map does not move
+    with it, so the two can disagree until somebody walks the yard. Curtis: "if
+    they hit no, then another message to show up saying 'be aware of any
+    mismatches between buses on Fleet Map & new Downsheet' Full yard sweep
+    recommended." */
+ assert.match(sheet,/Be aware of any mismatches between buses on the Fleet Map and the new Down Sheet/);
+ assert.match(sheet,/A full yard sweep is recommended/);
+
+ /* THE PROMISE THAT IS GONE. It offered the Status Report as a reward for
+    ending a sweep, and the report was never gated on one. Curtis: "The summary
+    report is ALWAYS READY anyway. At anytime I can send it because it's real
+    time snap shot of the fleet's health." */
+ assert.doesNotMatch(sheet,/ending it offers the Status Report/);
+ assert.doesNotMatch(scanner,/ending it offers the Status Report/);
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{

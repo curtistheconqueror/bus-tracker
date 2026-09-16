@@ -11,6 +11,7 @@ import RefreshButton from "../refresh-button";
 import "./down-sheet.css";
 import DownSheetEditor from "./down-sheet-editor";
 import DownSheetScanner from "./down-sheet-scanner";
+import {readSweep,startSweep} from "../facility-sweep";
 import {applyDownEntryToFleet} from "./down-sheet-sync";
 import {matchingUnresolvedDefectId} from "../duplicate-defects";
 import {learnFinding,readFindingsMemory,writeFindingsMemory} from "../findings-memory";
@@ -228,6 +229,27 @@ export default function DownSheet(){
     wanting details." The person being sent it is asking which buses are waiting
     on parts, not for all forty rows, and a list is worth sending only when it
     is that list. */
+/* THE FULL SWEEP QUESTION AFTER A SCAN, and why it is no longer a confirm().
+
+   A confirm() offers OK and CANCEL, and the browser owns both words. Curtis:
+   "There is not a 'no' for an answer if I am not doing a full sweep of the
+   yard." Cancel reads as backing out of the question rather than answering it,
+   and the two are not the same thing here — NO has something to say.
+
+   The old second line promised the Status Report as a reward for ending a
+   sweep. It is gone: "The summary report is ALWAYS READY anyway. At anytime I
+   can send it because it's real time snap shot of the fleet's health."
+
+   WHAT THE QUESTION IS ACTUALLY FOR, which is the part worth keeping. A scan
+   REPLACES the sheet and the Facility Map does not move with it, so right after
+   an import the map can disagree with the paper — a bus in the wrong place, one
+   reading as a mystery bus, one carrying a number that has since been written
+   against a different bus. Curtis: "if a person uploads sheets, then they may
+   see mystery buses, or things like that that are switched around or buses that
+   are labeled incorrectly due to the new down sheet because the facility map did
+   not change with the down sheet's upload." A walk is what reconciles them, so
+   NO is answered with that warning rather than with silence. */
+ const [sweepAsk,setSweepAsk]=useState<""|"ask"|"mismatch">("");
  const [quickFilter,setQuickFilter]=useState<DownSheetFilterKey|null>(null);
  /* Two failure states rather than one. The first version of this bar reported a
     failed COPY LIST as "COULD NOT SHARE — TRY COPY LIST", which sends somebody
@@ -508,6 +530,11 @@ export default function DownSheet(){
   setSaveProblem(writeFleetStorageResult(localStorage,nextFleet).reason||"");
   setEntries(nextEntries);setFleet(nextFleet);setUndoScanAvailable(true);setScannerOpen(false);
   alert(`${imported.length} bus${imported.length===1?"":"es"} imported as the current Down Sheet. ${removed.length} prior bus${removed.length===1?"":"es"} came off. Locations and saved defects were preserved.`);
+  /* Asked AFTER the import — the scan is what the person came to do — and only
+     when NOT already sweeping, because a prompt that appears mid-walk to ask
+     whether you are walking is the kind of dialog people learn to dismiss.
+     startSweep does not reset a walk already under way. */
+  if(!readSweep(localStorage))setSweepAsk("ask");
  };
  const undoScan=()=>{try{const snapshot=JSON.parse(localStorage.getItem(SCAN_UNDO_KEY)||"null");if(!snapshot||!Array.isArray(snapshot.entries)||!Array.isArray(snapshot.fleet))throw new Error();
   /* The undo is itself a removal in one direction and a restore in the other:
@@ -912,5 +939,26 @@ export default function DownSheet(){
   {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
   {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {sweepAsk&&<div className="down-shade" role="dialog" aria-modal="true" aria-labelledby="sweep-ask-title">
+   <section className="sweep-ask-modal">
+    <header className="repair-editor-head"><div><span>AFTER THE SCAN</span><h2 id="sweep-ask-title">{sweepAsk==="ask"?"FULL SWEEP?":"CHECK THE MAP"}</h2></div></header>
+    {sweepAsk==="ask"
+     ?<div className="sweep-ask-body">
+       <p>Are you doing a full sweep of the facility for bus count?</p>
+       <div className="sweep-ask-actions">
+        <button type="button" className="sweep-ask-no" onClick={()=>setSweepAsk("mismatch")}>NO</button>
+        <button type="button" className="sweep-ask-yes" onClick={()=>{startSweep(localStorage,"scan");setSweepAsk("")}}>YES</button>
+       </div>
+      </div>
+     :<div className="sweep-ask-body">
+       <p className="sweep-ask-warn"><b>Be aware of any mismatches between buses on the Fleet Map and the new Down Sheet.</b></p>
+       <p>The sheet has just been replaced and the map has not moved with it, so a bus can sit in the wrong place, read as a mystery bus, or carry a number now written against another bus.</p>
+       <p><b>A full yard sweep is recommended.</b></p>
+       <div className="sweep-ask-actions">
+        <button type="button" className="sweep-ask-yes" onClick={()=>setSweepAsk("")}>GOT IT</button>
+       </div>
+      </div>}
+   </section>
+  </div>}
  </main>;
 }

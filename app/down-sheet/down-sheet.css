@@ -755,3 +755,23 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
 /* The two switches now stack, so the second needs a gap above it, and the
    disabled one has to read as unavailable rather than as broken. */
+
+/* THE FULL SWEEP QUESTION AFTER A SCAN. Width capped so the two answers sit
+   side by side on a phone rather than wrapping into a column, where NO would
+   land under YES and be pressed by somebody aiming at the one above it.
+
+   height:auto on the header is not decoration: globals.css gives every bare
+   <header> a fixed height:38px, which min-height cannot undo, and the two lines
+   this one carries need more than that. The class it borrows is the scanner's,
+   so it already reads as the same kind of dialog. */
+.sweep-ask-modal{width:min(420px,100%);background:#f8faff;border-radius:12px;overflow:hidden;box-shadow:0 18px 70px #0009}
+.sweep-ask-body{padding:16px 18px 18px;display:grid;gap:10px}
+.sweep-ask-body p{margin:0;font-size:13px;line-height:1.45;color:#26375c}
+.sweep-ask-warn{padding:10px 12px;border-radius:8px;background:#fdf3d8;border:1px solid #d9a93a;color:#6a4b06}
+.sweep-ask-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+.sweep-ask-actions:has(>button:only-child){grid-template-columns:1fr}
+/* 44px is the tap target, and height:auto releases any inherited fixed height
+   before min-height is asked to do anything. */
+.sweep-ask-actions button{height:auto;min-height:44px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer}
+.sweep-ask-no{border:1px solid #9aa7c2;background:#fff;color:#2b3c60}
+.sweep-ask-yes{border:1px solid #0a5fc0;background:#0a5fc0;color:#fff}
