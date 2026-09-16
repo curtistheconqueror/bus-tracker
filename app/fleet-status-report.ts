@@ -11,6 +11,7 @@
    and the sheet and returns the numbers. The Down Sheet renders them, the share
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
+import {downSheetAvailability,isSoftDownEntry} from "./down-sheet/down-sheet-availability.ts";
 import {mysteryBusIds} from "./mystery-buses.ts";
 import {standingRoadCalls} from "./road-calls.ts";
 import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
@@ -65,6 +66,17 @@ export type FleetStatusReport={
  /* Buses with an active sheet entry, minus the ones only there for an
     inspection. The headline number and the reason this page exists. */
  downed:number;
+ /* THE BUSES THE SHEET HAS SAID STILL RUN, kept apart from `downed` rather than
+    folded into it. Curtis: "they're on the down sheet, but they can be used...
+    so that way, if they're not making pull out, they know what they can
+    possibly run." Held for another garage's technicians, or written up SHORT
+    RUN ONLY — counted against pullout, but a reader has to be able to see which
+    of the shortage is still drivable. */
+ softDowned:number;
+ /* downed + softDowned, printed rather than left to be added in somebody's
+    head: "it should just give a total of both of those numbers together. But it
+    should be easily distinguished from one another." */
+ downedTotal:number;
  /* Kept beside it because the two disagree the moment an inspection lands, and
     a reader who knows the sheet has 32 rows needs to see why the answer is 30
     rather than wonder whether the app is wrong. */
@@ -130,7 +142,17 @@ export function buildFleetStatusReport(
  /* Counted by BUS, not by row. A bus written up three times is one bus the
     superintendent cannot put on the road, and reporting 3 would overstate the
     shortage — the one direction a maintenance number must never be wrong in. */
- const downedIds=new Set(active.filter(entry=>!isInspection(entry)).map(entry=>clean(entry.busId)).filter(Boolean));
+ /* SPLIT IN TWO, and by BUS on both sides so a bus written up twice cannot
+    appear in each. A bus is soft only if NOTHING on the sheet has it down:
+    two rows, one saying HOLD FOR SOUTH HOLLAND and one saying no start, is a
+    bus that does not move, and the hard row has to win. */
+ const hardIds=new Set(active.filter(entry=>downSheetAvailability(entry)==="down").map(entry=>clean(entry.busId)).filter(Boolean));
+ const softIds=new Set(
+  active.filter(isSoftDownEntry).map(entry=>clean(entry.busId)).filter(id=>id&&!hardIds.has(id))
+ );
+ /* Every bus the old single number counted, so the report cannot quietly stop
+    counting a bus that has merely been reclassified. */
+ const downedIds=new Set([...hardIds,...softIds]);
  const inspectionOnlyIds=new Set(
   active.filter(isInspection).map(entry=>clean(entry.busId)).filter(id=>id&&!downedIds.has(id))
  );
@@ -189,7 +211,9 @@ export function buildFleetStatusReport(
 
  return {
   at:now,
-  downed:downedIds.size,
+  downed:hardIds.size,
+ softDowned:softIds.size,
+ downedTotal:hardIds.size+softIds.size,
   onSheet:activeBusIds.size,
   inspections:inspectionOnlyIds.size,
   mystery,
@@ -338,6 +362,19 @@ export function statusReportText(
     not — that this number is NOT inside the one above — and so it stays, and it
     leaves with the line it is about rather than hanging under nothing. */
  lines.push(countLine("DOWNED BUSES",board.downed));
+ /* SOFT DOWN DIRECTLY UNDER IT, then the two added up, which is the order
+    Curtis asked for and the order somebody reads them in: what cannot run, what
+    can run with limits, what the shortage adds up to.
+
+    Printed only when there are any. A morning with nothing soft on the sheet
+    should read as one number and a total that repeats it, which is noise — so
+    on those mornings DOWNED BUSES stands alone exactly as it always did, and
+    nobody has to learn a new report to read an ordinary one. */
+ if(board.softDowned>0){
+  lines.push(countLine("SOFT DOWN",board.softDowned));
+  lines.push("  (on the sheet, still usable)");
+  lines.push(countLine("TOTAL DOWN + SOFT",board.downedTotal));
+ }
  if(pick.inspections){
   lines.push(countLine("INSPECTIONS",board.inspections));
   lines.push("  (not counted above)");

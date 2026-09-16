@@ -775,3 +775,23 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .sweep-ask-actions button{height:auto;min-height:44px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer}
 .sweep-ask-no{border:1px solid #9aa7c2;background:#fff;color:#2b3c60}
 .sweep-ask-yes{border:1px solid #0a5fc0;background:#0a5fc0;color:#fff}
+
+/* SOFT beside the lead number rather than under it. The header is a button and
+   already carries the lead and the SHOW COUNTS chevron, so this sits between
+   them and shrinks first — the two numbers are the point, the word is not. */
+.down-counts-soft{display:flex;align-items:baseline;gap:5px;margin-left:12px;padding-left:12px;border-left:1px solid #b9c4da;min-width:0}
+.down-counts-soft strong{font-size:20px;font-weight:900;color:#8a5a06}
+.down-counts-soft span{font-size:9px;font-weight:900;letter-spacing:.08em;color:#8a5a06;overflow:hidden;text-overflow:ellipsis}
+.group-count.soft-down strong{color:#8a5a06}
+.group-count.down-total strong{color:#1f3566}
+.group-count.idot-due strong{color:#0a5fc0}
+@media(max-width:620px){.down-counts-soft{margin-left:8px;padding-left:8px}}
+
+/* The two new boards take the same shell as MYSTERY / DEFERRED / RECOMMENDED
+   and differ only by the colour on the header rule, which is how the three
+   above them already tell each other apart. Amber for soft, because it is a
+   caution rather than a stop; blue for IDOT, which is a date rather than a
+   fault. */
+.soft-down-board .mystery-head{border-left:4px solid #d9a93a}
+.idot-board .mystery-head{border-left:4px solid #0b64bd}
+.sheet-section-card .mystery-detail small{display:block;margin-top:2px;line-height:1.35}

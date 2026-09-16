@@ -25,7 +25,8 @@ import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
 import {recordSheetSwap} from "../sheet-ledger";
 import {readShiftSettings} from "../shift-clock";
-import {downSheetMentionsDefect,downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
+import {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly,isSoftDownEntry} from "./down-sheet-availability";
+import {downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
 import SaveAlert from "../save-alert";
@@ -36,6 +37,11 @@ import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";
+import SheetSectionBoard from "./sheet-section-board";
+/* Per device and collapsed by default, the same as the three boards above
+   them. Both are NEW names, so nothing already stored is renamed. */
+const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
+const IDOT_BOARD_COLLAPSED_KEY="pace-down-sheet-idot-collapsed-v1";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {answerDeferredBus} from "../deferred-actions";
 import {answerRecommendedBus} from "../recommended-actions";
@@ -213,6 +219,8 @@ export default function DownSheet(){
  const [countsOpen,setCountsOpen]=useState(false);
  const [deferredCollapsed,setDeferredCollapsed]=useState(true);
  const [recommendedCollapsed,setRecommendedCollapsed]=useState(true);
+ const [softCollapsed,setSoftCollapsed]=useState(true);
+ const [idotCollapsed,setIdotCollapsed]=useState(true);
  const appMode=useAppMode();
  const [displaySettings,setDisplaySettings]=useState<DownSheetDisplaySettings>(DEFAULT_DOWN_SHEET_DISPLAY);
  const [quickNotes,setQuickNotes]=useState("");
@@ -282,6 +290,10 @@ export default function DownSheet(){
     who never opened it should not be scrolling past it to reach the sheet. */
  useEffect(()=>{setRecommendedCollapsed(localStorage.getItem(RECOMMENDED_BOARD_COLLAPSED_KEY)!=="0")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,RECOMMENDED_BOARD_COLLAPSED_KEY,recommendedCollapsed?"1":"0")},[recommendedCollapsed,hydrated]);
+ useEffect(()=>{setSoftCollapsed(localStorage.getItem(SOFT_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,SOFT_BOARD_COLLAPSED_KEY,softCollapsed?"1":"0")},[softCollapsed,hydrated]);
+ useEffect(()=>{setIdotCollapsed(localStorage.getItem(IDOT_BOARD_COLLAPSED_KEY)!=="0")},[]);
+ useEffect(()=>{if(hydrated)writeSetting(localStorage,IDOT_BOARD_COLLAPSED_KEY,idotCollapsed?"1":"0")},[idotCollapsed,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,COUNTS_OPEN_KEY,countsOpen?"1":"0")},[countsOpen,hydrated]);
 
  // Restore the existing device-local fleet and down sheet once after hydration.
@@ -325,7 +337,18 @@ export default function DownSheet(){
 
     The sort helper keeps its parameter — the Defect Log's own views still pass
     other orders through it. */
- const sheetGroups=useMemo(()=>orderDownSheetGroups(groupDownSheetEntries(shown,"number-asc",locations),sectionOrder),[shown,locations,sectionOrder]);
+ /* IDOT-ONLY ROWS DO NOT GO IN THE BANDS. A bus whose whole entry is PREP FOR
+    IDOT is not down and must not be read as though it were. Curtis: "those
+    three buses, no, they're not on the down sheet, but we do need a separate
+    section on the down sheet for IDOT buses... they're still being used. It's
+    just that we have to be aware that the time to send them to IDOT for state
+    inspection is coming up. It doesn't mean the bus can't run."
+
+    They are not dropped — the IDOT board below lists them, and their entry is
+    untouched, so nothing a scan wrote is lost. A row that is IDOT AND a fault
+    stays in its band, because the fault is why it is there. */
+ const bandEntries=useMemo(()=>shown.filter(entry=>!downSheetIdotOnly(entry)),[shown]);
+ const sheetGroups=useMemo(()=>orderDownSheetGroups(groupDownSheetEntries(bandEntries,"number-asc",locations),sectionOrder),[bandEntries,locations,sectionOrder]);
  /* The band tiles used to render straight off sheetGroups, so their order on
     the board was whatever DOWN_SHEET_GROUPS happened to be in. They are placed
     by name now, because the order Curtis set interleaves them with tiles that
@@ -359,7 +382,24 @@ export default function DownSheet(){
     Same question the DOWNED BUSES ON ROAD tally already asks, asked of the
     whole sheet instead of only the buses out on the road, so the two numbers
     are defined the same way and the smaller can never exceed the larger. */
- const downBusCount=useMemo(()=>shown.filter(downSheetMentionsDefect).length,[shown]);
+ /* DOWN SPLIT IN TWO, because one number was answering two questions.
+
+    A foreman opens this page to find out how many buses he is short at pullout,
+    and buses held for another garage's technicians or written up SHORT RUN ONLY
+    were being counted as though they could not turn a wheel. Reconciled against
+    a real paper sheet the app said 47 where the shop counted 39.
+
+    hardDownCount is what DOWN BUSES now means. softDownCount is the buses the
+    sheet has explicitly said still run. Together they are every bus the sheet is
+    carrying for a fault, which is what the old single number counted — so
+    hardDownCount + softDownCount + the IDOT-only rows equals the old total, and
+    no bus has gone missing from the page by being reclassified. */
+ const hardDownCount=useMemo(()=>shown.filter(entry=>downSheetAvailability(entry)==="down").length,[shown]);
+ const softDownCount=useMemo(()=>shown.filter(isSoftDownEntry).length,[shown]);
+ /* Every row that MENTIONS the state inspection, down or not: the section
+    exists to keep an eye on what is coming due, and a bus can be both. */
+ const idotEntries=useMemo(()=>shown.filter(downSheetMentionsIdot),[shown]);
+ const softEntries=useMemo(()=>shown.filter(isSoftDownEntry),[shown]);
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  /* Opened after the round, which is when somebody is about to be asked. */
@@ -775,13 +815,26 @@ export default function DownSheet(){
   <section className="down-counts-board" aria-label="Down sheet section counts">
    <div className="down-counts-head">
     <button type="button" className="down-counts-toggle" aria-expanded={countsOpen} aria-controls="down-counts-tiles" onClick={()=>setCountsOpen(value=>!value)}>
-     <span className="down-counts-lead"><strong>{downBusCount}</strong><span>DOWN BUSES</span></span>
+     {/* THE LEAD IS THE HARD NUMBER, and SOFT rides beside it rather than
+         under it, so the one press it takes to open the tiles is not needed to
+         learn that four of these buses can still work. Curtis: "a person can
+         easily tell if they're not making pull out that hey, we got buses that
+         are down that are not contributing to our pullout numbers." Shown only
+         when there are any, so an ordinary morning still reads as one number. */}
+     <span className="down-counts-lead"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></span>
+     {softDownCount>0&&<span className="down-counts-soft"><strong>{softDownCount}</strong><span>SOFT</span></span>}
      <span className="down-counts-more">{countsOpen?"HIDE COUNTS":"SHOW COUNTS"}<i aria-hidden="true">{countsOpen?"\u25B2":"\u25BC"}</i></span>
     </button>
    </div>
    {countsOpen&&<div className="down-group-counts" id="down-counts-tiles">
     <div className="group-count total"><strong>{shown.length}</strong><span>TOTAL ON SHEET</span></div>
-    <div className="group-count down-buses"><strong>{downBusCount}</strong><span>DOWN BUSES</span></div>
+    <div className="group-count down-buses"><strong>{hardDownCount}</strong><span>DOWN BUSES</span></div>
+    {/* The three that answer the pullout question together, in the order Curtis
+        asked for them: the hard number, the soft number, then the two added up,
+        "easily distinguished from one another". */}
+    <div className="group-count soft-down"><strong>{softDownCount}</strong><span>SOFT DOWN</span></div>
+    <div className="group-count down-total"><strong>{hardDownCount+softDownCount}</strong><span>DOWN + SOFT</span></div>
+    {idotEntries.length>0&&<div className="group-count idot-due"><strong>{idotEntries.length}</strong><span>IDOT DUE</span></div>}
     {tileFor("scheduled")}
     {/* Still a button, because it filters. Same press-to-narrow behaviour the
         two road tallies have, so it belongs with them rather than looking like
@@ -852,6 +905,15 @@ export default function DownSheet(){
       available in Lite — hiding only the board would be the odd half. */}
   <RecommendedBoard fleet={fleet as DefectLogFleetBus[]} downEntries={entries as DefectLogDownEntry[]}
    collapsed={recommendedCollapsed} onCollapsedChange={setRecommendedCollapsed} onAnswer={answerRecommended}/>
+  {/* THE TWO THE SHEET COULD NOT SAY BEFORE. SOFT is the buses the paper has
+      explicitly said still run; IDOT is what is coming due for the state
+      inspection, which is not a repair and never a reason a bus is down. */}
+  <SheetSectionBoard className="soft-down-board" title="SOFT DOWN — CAN STILL BE USED"
+   hint="ON THE SHEET, AND THE SHEET SAYS THEY STILL RUN" entries={softEntries} locations={locations}
+   collapsed={softCollapsed} onCollapsedChange={setSoftCollapsed}/>
+  <SheetSectionBoard className="idot-board" title="IDOT — STATE INSPECTION DUE"
+   hint="KEEP AN EYE ON THESE. NOT COUNTED AS DOWN" entries={idotEntries} locations={locations}
+   collapsed={idotCollapsed} onCollapsedChange={setIdotCollapsed}/>
   {/* Its own class rather than the road note's, deliberately: that rule gives
       every button inside it width:100% below 760px, which reads correctly for
       one SHOW THE WHOLE SHEET button and would stack these four down the

@@ -10116,8 +10116,45 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
 
  // The tile, beside the total rather than under it, and the count behind it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/const downBusCount=useMemo\(\(\)=>shown\.filter\(downSheetMentionsDefect\)\.length,\[shown\]\)/,"DOWN BUSES asks the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the road");
- assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{downBusCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+ /* DOWN BUSES SPLIT IN TWO, and the old single number is now the sum. It asked
+    the same question of the whole sheet that DOWNED BUSES ON ROAD asks of the
+    road, and it still does — it is just reported as the hard count, the soft
+    count and the total, because one number was answering two questions and a
+    foreman needs to know which of his down buses can still turn a wheel.
+
+    THE CONSERVATION LAW IS THE ASSERTION, not the spelling. Every row the old
+    count counted lands in exactly one of the three new buckets, so no bus can
+    go missing off this page by being reclassified — which is the failure that
+    would actually hurt: a bus nobody is counting is a bus nobody fixes. */
+ assert.match(page,/const hardDownCount=useMemo\(\(\)=>shown\.filter\(entry=>downSheetAvailability\(entry\)==="down"\)\.length,\[shown\]\)/);
+ assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(isSoftDownEntry\)\.length,\[shown\]\)/);
+ {
+  const {downSheetAvailability}=await import("../app/down-sheet/down-sheet-availability.ts");
+  const sheet=[
+   row("Misfire","ENGINE LIGHT-MISFIRES"),
+   row("Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )"),
+   row("Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+   row("Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )"),
+   row("Manual entry","PREP FOR IDOT"),
+   row("A-6","A6"),
+  ];
+  const oldCount=sheet.filter(downSheetMentionsDefect).length;
+  const hard=sheet.filter(e=>downSheetAvailability(e)==="down").length;
+  const soft=sheet.filter(e=>downSheetAvailability(e)==="soft").length;
+  const idot=sheet.filter(e=>downSheetAvailability(e)==="idot").length;
+  assert.equal(hard+soft+idot,oldCount,"every bus the old number counted is still counted somewhere");
+  assert.deepEqual([hard,soft,idot],[2,2,1],"and they land where the sheet's own words put them");
+ }
+ assert.match(page,/<div className="group-count total">[\s\S]{0,400}?<div className="group-count down-buses"><strong>\{hardDownCount\}<\/strong><span>DOWN BUSES<\/span><\/div>/,"DOWN BUSES sits immediately after TOTAL ON SHEET");
+ /* And the three pullout numbers run in the order Curtis asked for: the hard
+    count, the soft count, then the two added up. "Should be right under the
+    total down buses, and then it should just give a total of both of those
+    numbers together. But it should be easily distinguished from one another." */
+ assert.match(page,/group-count down-buses[\s\S]{0,600}?group-count soft-down[\s\S]{0,200}?group-count down-total/,
+  "DOWN, then SOFT DOWN, then the two added together");
+ /* SOFT also rides beside the lead number, so the press that opens these tiles
+    is not needed to learn that some of those buses can still work. */
+ assert.match(page,/down-counts-soft.{0,120}?\{softDownCount\}/s);
 
  /* The total used to take a whole row by itself on a phone. It is one of a pair
     now, so it takes half like every other tile. */
@@ -10678,6 +10715,52 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
  const sweepCss=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  assert.match(sweepCss,/\.sweep-banner span em\{display:block/,
   "on its own row, or it pushes END & REPORT off a phone");
+});
+
+test("the STATUS REPORT separates what cannot run from what can",async()=>{
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const at="2026-09-16T04:00:00.000Z";
+ const bus=(id,n)=>({id,n,l:"bay-1",s:"out",defects:[]});
+ const entry=(id,busId,busNumber,repair,customReason)=>({id,busId,busNumber,category:"",repair,customReason,
+  section:"Pending",workflow:"Scheduled",operationalStatus:"out",assignedTo:"",assignmentType:"Mechanic"});
+ const fleet=[bus("a","17510"),bus("b","17527"),bus("c","17559"),bus("d","18501")];
+ const sheet=[
+  entry("e1","a","17510","Driver-reported defect","QUARANTINE DO NOT MOVE (PER SAFETY)"),
+  entry("e2","b","17527","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+  entry("e3","c","17559","Other brake repair","Short Run Only (Needs Frt. & Rear Brake Job ASAP )"),
+  entry("e4","d","18501","Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )"),
+ ];
+ const report=buildFleetStatusReport(fleet,sheet,[],at);
+ /* Curtis: "they're on the down sheet, but they can be used... so that way, if
+    they're not making pull out, they know what they can possibly run." */
+ assert.equal(report.downed,2,"quarantined and held-until-repaired cannot run");
+ assert.equal(report.softDowned,2,"South Holland and short-run can");
+ assert.equal(report.downedTotal,4,"and the shortage is still four buses");
+
+ const text=statusReportText(report,{...DEFAULT_STATUS_REPORT_PICK});
+ /* The order Curtis asked for: hard, soft, then the two added up. */
+ assert.ok(text.indexOf("DOWNED BUSES")<text.indexOf("SOFT DOWN"));
+ assert.ok(text.indexOf("SOFT DOWN")<text.indexOf("TOTAL DOWN + SOFT"));
+ assert.match(text,/SOFT DOWN\s+2/);
+ assert.match(text,/TOTAL DOWN \+ SOFT\s+4/);
+
+ /* COUNTED BY BUS ON BOTH SIDES, and the hard row wins. A bus written up twice
+    -- once held for another garage, once for a no-start -- does not move, and
+    counting it as soft would put it back in service on paper. */
+ const twice=buildFleetStatusReport([bus("a","17510")],[
+  entry("x1","a","17510","Manual entry","HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"),
+  entry("x2","a","17510","No crank","No Start"),
+ ],[],at);
+ assert.equal(twice.downed,1);
+ assert.equal(twice.softDowned,0,"the hard row wins, and the bus is counted once");
+ assert.equal(twice.downedTotal,1);
+
+ /* AN ORDINARY MORNING READS AS IT ALWAYS DID. Nothing soft on the sheet means
+    no SOFT line and no total repeating the number above it. */
+ const plain=buildFleetStatusReport([bus("a","17510")],[entry("y1","a","17510","No crank","No Start")],[],at);
+ const plainText=statusReportText(plain,{...DEFAULT_STATUS_REPORT_PICK});
+ assert.doesNotMatch(plainText,/SOFT DOWN/);
+ assert.doesNotMatch(plainText,/TOTAL DOWN/);
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
@@ -12213,7 +12296,13 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  /* THE COUNTS ARE TAKEN BEFORE THE FILTER. Pressing one tally must not empty
     the other out from under the person reading it. */
  assert.match(page,/const roadCounts=useMemo\(\(\)=>downSheetRoadCounts\(shown,locations\)/);
- assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(shown,"number-asc",locations\),sectionOrder\)/,"the status report is grouped from the whole sheet, in the reader's band order");
+ /* Grouped from the whole sheet in the reader's band order, minus the rows that
+    are ONLY a state inspection: those are not down and Curtis does not want them
+    read as though they were. They are not dropped — the IDOT board lists them —
+    and a row that is IDOT AND a fault stays in its band, because the fault is
+    why it is there. */
+ assert.match(page,/const bandEntries=useMemo\(\(\)=>shown\.filter\(entry=>!downSheetIdotOnly\(entry\)\),\[shown\]\)/);
+ assert.match(page,/const sheetGroups=useMemo\(\(\)=>orderDownSheetGroups\(groupDownSheetEntries\(bandEntries,"number-asc",locations\),sectionOrder\)/,"the status report is grouped from the sheet, in the reader's band order");
  /* ONLY THE TABLE FOLLOWS THE FILTERS, and there are two of them now — the
     road tallies and the quick filter share one pipeline. The shape is asserted
     rather than the exact old expression, because what has to hold is the
