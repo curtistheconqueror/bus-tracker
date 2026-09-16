@@ -10127,7 +10127,10 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
     go missing off this page by being reclassified — which is the failure that
     would actually hurt: a bus nobody is counting is a bus nobody fixes. */
  assert.match(page,/const hardDownCount=useMemo\(\(\)=>shown\.filter\(entry=>downSheetAvailability\(entry\)==="down"\)\.length,\[shown\]\)/);
- assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(isSoftDownEntry\)\.length,\[shown\]\)/);
+ /* SOFT DOWN is the soft buses NOBODY HAS PUT ON A RUN. A bus the yard has
+    decided to use is not part of the morning's shortage — that is what the
+    switch is for, and the number has to follow the decision. */
+ assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isSoftDownEntry\(entry\)&&!isEntryInService\(entry\)\)\.length,\[shown\]\)/);
  {
   const {downSheetAvailability}=await import("../app/down-sheet/down-sheet-availability.ts");
   const sheet=[
@@ -10150,8 +10153,12 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
     count, the soft count, then the two added up. "Should be right under the
     total down buses, and then it should just give a total of both of those
     numbers together. But it should be easily distinguished from one another." */
- assert.match(page,/group-count down-buses[\s\S]{0,600}?group-count soft-down[\s\S]{0,200}?group-count down-total/,
+ assert.match(page,/group-count down-buses[\s\S]{0,600}?group-count soft-down[\s\S]{0,600}?group-count down-total/,
   "DOWN, then SOFT DOWN, then the two added together");
+ /* SOFT, IN USE sits between them, and only when there is one — it is the
+    answer to "why is SOFT DOWN smaller than the board says", which is a
+    question nobody has on a morning when nothing has been switched on. */
+ assert.match(page,/\{inServiceCount>0&&<div className="group-count in-service">/);
  /* SOFT also rides beside the lead number, so the press that opens these tiles
     is not needed to learn that some of those buses can still work. */
  assert.match(page,/down-counts-soft.{0,120}?\{softDownCount\}/s);
@@ -10715,6 +10722,53 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
  const sweepCss=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  assert.match(sweepCss,/\.sweep-banner span em\{display:block/,
   "on its own row, or it pushes END & REPORT off a phone");
+});
+
+test("a soft bus the yard puts on a run stops counting against pullout, on every device",async()=>{
+ const {setEntryInService,isEntryInService,entryInServiceStamp,countsAgainstPullout,isSoftDownEntry}=
+  await import("../app/down-sheet/down-sheet-availability.ts");
+ const soft={id:"e1",busId:"b",busNumber:"17527",category:"",repair:"Manual entry",
+  customReason:"HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"};
+ const hard={id:"e2",busId:"c",busNumber:"17510",category:"",repair:"Driver-reported defect",
+  customReason:"QUARANTINE DO NOT MOVE (PER SAFETY)"};
+ const at="2026-09-16T11:00:00.000Z";
+
+ assert.equal(countsAgainstPullout(soft),true,"a soft bus nobody has used is still short");
+ const using=setEntryInService(soft,true,at,"CJ");
+ assert.equal(isEntryInService(using),true);
+ assert.deepEqual(entryInServiceStamp(using),{at,by:"CJ"},"who decided, and when");
+ assert.equal(countsAgainstPullout(using),false,"once it is on a run it is not part of the shortage");
+ /* It is still a soft bus. Taking it off the board the moment it is switched on
+    would hide the control that switched it. */
+ assert.equal(isSoftDownEntry(using),true);
+
+ /* THE SWITCH CANNOT REACH A HARD DOWN BUS. Nothing in the UI offers it, but a
+    record hand-edited or arriving from another device could carry the flag, and
+    a quarantined bus must not leave the shortage because of a stray field. */
+ assert.equal(countsAgainstPullout(setEntryInService(hard,true,at,"CJ")),true,
+  "a bus that cannot run is short whatever the flag says");
+
+ /* DELETED, NOT SET TO undefined — the spelling setBusHold uses. A save merges
+    with {...existing,...incoming}, where a key written as undefined cannot
+    carry a removal, so a bus taken back out of service would come straight
+    back on the next read. */
+ const off=setEntryInService(using,false,at,"CJ");
+ assert.equal("inService" in off,false,"the key is gone, so the removal survives a merge");
+ assert.equal(countsAgainstPullout(off),true);
+
+ /* IT TRAVELS, which is the opposite of how a HOLD works and was Curtis's
+    explicit call: "1 travel for sure." A hold is one person's note about one
+    bus; pullout is the whole shop's number. It rides for free because
+    cloud-sync puts every field it has no column for into `detail`. */
+ const {downSheetRow}=await import("../app/cloud-sync.ts");
+ const config={project:"p",account:"a",initials:"CJ",device:"phone"};
+ const row=downSheetRow(using,config,at);
+ assert.ok(row,"the entry makes a row");
+ assert.deepEqual(row.detail.inService,{at,by:"CJ"},"and the flag rides in detail rather than being dropped");
+ /* The guard that matters: if inService were ever given a column of its own,
+    this would still pass while the round trip silently lost it. */
+ assert.equal(Object.prototype.hasOwnProperty.call(row,"inService"),false,
+  "it is not a column, so nothing has to change in the database for it to travel");
 });
 
 test("the STATUS REPORT separates what cannot run from what can",async()=>{

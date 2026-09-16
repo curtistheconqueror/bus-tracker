@@ -94,3 +94,53 @@ export function downSheetAvailability(entry:DownSheetViewEntry):DownSheetAvailab
 }
 export function isSoftDownEntry(entry:DownSheetViewEntry){return downSheetAvailability(entry)==="soft"}
 export function isHardDownEntry(entry:DownSheetViewEntry){return downSheetAvailability(entry)==="down"}
+
+/* WE ARE USING THIS ONE TODAY.
+
+   A soft bus counts against pullout, because it is on the sheet and nobody has
+   put it on a run. But the foreman who decides to use one needs the number to
+   follow that decision. Curtis: "yeah they count against pull out but it's a
+   switch that should be able to be easily flipped to satisfy pullout as much as
+   possible."
+
+   IT TRAVELS, and that is the opposite of how a HOLD works. A hold is one
+   person's note to themselves about one bus — "It doesn't need to show up on
+   everybody's screen" — while pullout is the whole shop's number, and a bus the
+   yard has put into service is in service for everybody looking at the sheet.
+   Curtis: "1 travel for sure." It rides for free: cloud-sync.ts puts every field
+   it does not name a column for into `detail`, and spreads `detail` back on the
+   way in, so this needs no schema change and no migration.
+
+   NO AUTOMATIC EXPIRY, and that is a decision rather than an oversight. The
+   obvious rule — clear it at midnight — cuts the night shift in half, since that
+   crew works 22:00 to 06:30. Expiring it at the next pullout would need this
+   module to know the shift clock, and a flag that disappears on its own is worse
+   than one somebody can see: the stamp is printed on the row, so a decision made
+   yesterday reads as yesterday's rather than quietly counting today. */
+export type SheetEntryInService={at:string;by?:string};
+export type InServiceEntry=DownSheetViewEntry&{inService?:SheetEntryInService};
+
+export function entryInServiceStamp(entry:InServiceEntry){
+ const at=String(entry.inService?.at||"").trim();
+ return at?{at,by:String(entry.inService?.by||"").trim()||undefined}:undefined;
+}
+export function isEntryInService(entry:InServiceEntry){return Boolean(entryInServiceStamp(entry))}
+
+/* DELETED, never set to undefined, the spelling setBusHold uses and for the same
+   reason: `{...existing,...incoming}` cannot carry a removal written as
+   undefined, so a bus taken back out of service would come straight back on the
+   next read. */
+export function setEntryInService<T extends InServiceEntry>(entry:T,on:boolean,at:string,by=""):T{
+ const next={...entry} as T&{inService?:SheetEntryInService};
+ if(!on){delete next.inService;return next}
+ next.inService={at,...(by.trim()?{by:by.trim()}:{})};
+ return next;
+}
+
+/* What the shortage actually is: everything hard down, plus the soft buses
+   nobody has put on a run. */
+export function countsAgainstPullout(entry:InServiceEntry){
+ const availability=downSheetAvailability(entry);
+ if(availability==="down")return true;
+ return availability==="soft"&&!isEntryInService(entry);
+}

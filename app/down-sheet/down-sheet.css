@@ -795,3 +795,11 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .soft-down-board .mystery-head{border-left:4px solid #d9a93a}
 .idot-board .mystery-head{border-left:4px solid #0b64bd}
 .sheet-section-card .mystery-detail small{display:block;margin-top:2px;line-height:1.35}
+
+/* The switch on a SOFT row. Wide and worded rather than a tick, because the two
+   states say different things — one is an instruction, the other is a record of
+   a decision with initials on it. height:auto before min-height, so an inherited
+   fixed height cannot win. */
+.in-service-toggle{height:auto;min-height:38px;width:100%;border:1px solid #9aa7c2;border-radius:7px;background:#fff;color:#2b3c60;padding:6px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}
+.in-service-toggle.on{border-color:#0d7a3f;background:#e6f6ec;color:#0b5c31}
+.group-count.in-service strong{color:#0d7a3f}

@@ -25,7 +25,7 @@ import type {ScanImportRecord} from "./down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "./down-sheet-replace";
 import {recordSheetSwap} from "../sheet-ledger";
 import {readShiftSettings} from "../shift-clock";
-import {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly,isSoftDownEntry} from "./down-sheet-availability";
+import {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly,isSoftDownEntry,isEntryInService,entryInServiceStamp,setEntryInService} from "./down-sheet-availability";
 import {downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "./down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorage,writeDownSheetStorageResult,writeFleetStorage,writeFleetStorageResult,writeSetting,type FleetWriteReason} from "../storage";
@@ -395,11 +395,27 @@ export default function DownSheet(){
     hardDownCount + softDownCount + the IDOT-only rows equals the old total, and
     no bus has gone missing from the page by being reclassified. */
  const hardDownCount=useMemo(()=>shown.filter(entry=>downSheetAvailability(entry)==="down").length,[shown]);
- const softDownCount=useMemo(()=>shown.filter(isSoftDownEntry).length,[shown]);
+ /* The soft buses nobody has put on a run. A bus the yard has decided to use
+    is not part of the morning's shortage, which is the whole point of the
+    switch, so the number follows the decision. */
+ const softDownCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&!isEntryInService(entry)).length,[shown]);
+ const inServiceCount=useMemo(()=>shown.filter(entry=>isSoftDownEntry(entry)&&isEntryInService(entry)).length,[shown]);
  /* Every row that MENTIONS the state inspection, down or not: the section
     exists to keep an eye on what is coming due, and a bus can be both. */
  const idotEntries=useMemo(()=>shown.filter(downSheetMentionsIdot),[shown]);
+ /* The board lists EVERY soft bus, in service or not — taking one off the list
+    the moment it is switched on would hide the control that switched it. */
  const softEntries=useMemo(()=>shown.filter(isSoftDownEntry),[shown]);
+ /* Flipping writes to the entry and saves the sheet, so it reaches the other
+    devices the way every other entry change does. */
+ const toggleInService=(entryId:string,on:boolean)=>{
+  const now=new Date().toISOString();
+  const next=entries.map(entry=>entry.id===entryId?setEntryInService(entry,on,now,defaultInitials):entry);
+  const written=writeDownSheetStorage(localStorage,next);
+  setSaveProblem(written.reason||"");
+  if(written.reason)return;
+  setEntries(next);
+ };
  const visibleMinutes=visible.reduce((total,entry)=>total+entryEstimateMinutes(entry),0);
  const counters={active:active.length,first:active.filter(entry=>entry.shift==="1st").length,second:active.filter(entry=>entry.shift==="2nd").length,third:active.filter(entry=>entry.shift==="3rd").length,pending:active.filter(entry=>entry.section==="Pending").length,accident:active.filter(entry=>entry.section==="Accident").length,waiting:active.filter(entry=>entry.workflow==="Waiting for Parts").length,completedToday:entries.filter(entry=>entry.workflow==="Completed"&&isToday(entry.completedAt)).length,activeMinutes:active.reduce((total,entry)=>total+entryEstimateMinutes(entry),0)};
  /* Opened after the round, which is when somebody is about to be asked. */
@@ -833,6 +849,7 @@ export default function DownSheet(){
         asked for them: the hard number, the soft number, then the two added up,
         "easily distinguished from one another". */}
     <div className="group-count soft-down"><strong>{softDownCount}</strong><span>SOFT DOWN</span></div>
+    {inServiceCount>0&&<div className="group-count in-service"><strong>{inServiceCount}</strong><span>SOFT, IN USE</span></div>}
     <div className="group-count down-total"><strong>{hardDownCount+softDownCount}</strong><span>DOWN + SOFT</span></div>
     {idotEntries.length>0&&<div className="group-count idot-due"><strong>{idotEntries.length}</strong><span>IDOT DUE</span></div>}
     {tileFor("scheduled")}
@@ -910,7 +927,16 @@ export default function DownSheet(){
       inspection, which is not a repair and never a reason a bus is down. */}
   <SheetSectionBoard className="soft-down-board" title="SOFT DOWN — CAN STILL BE USED"
    hint="ON THE SHEET, AND THE SHEET SAYS THEY STILL RUN" entries={softEntries} locations={locations}
-   collapsed={softCollapsed} onCollapsedChange={setSoftCollapsed}/>
+   collapsed={softCollapsed} onCollapsedChange={setSoftCollapsed}
+   action={entry=>{
+    const stamp=entryInServiceStamp(entry);
+    return <button type="button" className={"in-service-toggle"+(stamp?" on":"")}
+     onClick={()=>toggleInService(String(entry.id||""),!stamp)}
+     aria-pressed={Boolean(stamp)}
+     aria-label={(stamp?"Take bus ":"Put bus ")+entry.busNumber+(stamp?" back out of service":" into service today")}>
+     {stamp?"IN SERVICE"+(stamp.by?" — "+stamp.by:"")+" · TAKE OFF":"USING THIS ONE"}
+    </button>;
+   }}/>
   <SheetSectionBoard className="idot-board" title="IDOT — STATE INSPECTION DUE"
    hint="KEEP AN EYE ON THESE. NOT COUNTED AS DOWN" entries={idotEntries} locations={locations}
    collapsed={idotCollapsed} onCollapsedChange={setIdotCollapsed}/>

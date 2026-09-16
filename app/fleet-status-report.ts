@@ -11,7 +11,7 @@
    and the sheet and returns the numbers. The Down Sheet renders them, the share
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
-import {downSheetAvailability,isSoftDownEntry} from "./down-sheet/down-sheet-availability.ts";
+import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "./down-sheet/down-sheet-availability.ts";
 import {mysteryBusIds} from "./mystery-buses.ts";
 import {standingRoadCalls} from "./road-calls.ts";
 import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
@@ -147,8 +147,13 @@ export function buildFleetStatusReport(
     two rows, one saying HOLD FOR SOUTH HOLLAND and one saying no start, is a
     bus that does not move, and the hard row has to win. */
  const hardIds=new Set(active.filter(entry=>downSheetAvailability(entry)==="down").map(entry=>clean(entry.busId)).filter(Boolean));
+ /* A soft bus the yard has PUT ON A RUN is not part of the shortage, which is
+    the whole point of the switch: "they count against pull out but it's a
+    switch that should be able to be easily flipped to satisfy pullout as much
+    as possible." The report has to follow that decision or the superintendent
+    is reading a number the shop has already acted against. */
  const softIds=new Set(
-  active.filter(isSoftDownEntry).map(entry=>clean(entry.busId)).filter(id=>id&&!hardIds.has(id))
+  active.filter(entry=>isSoftDownEntry(entry)&&!isEntryInService(entry)).map(entry=>clean(entry.busId)).filter(id=>id&&!hardIds.has(id))
  );
  /* Every bus the old single number counted, so the report cannot quietly stop
     counting a bus that has merely been reclassified. */
