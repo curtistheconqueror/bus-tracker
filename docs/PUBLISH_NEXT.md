@@ -1,11 +1,12 @@
 # Publish next
 
-**STATUS: 181 PENDING — two Defect Log fixes: a bus already on the Down Sheet
-can still raise a recommendation for a different repair, and a stale bus search
-no longer hides the defect you just wrote.**
+**STATUS: 181 PENDING — three fixes: a bus already on the Down Sheet can still
+raise a recommendation for a different repair, a stale bus search no longer
+hides the defect you just wrote, and the full-sweep question after a scan has a
+real NO.**
 
-Publish from `3b1e0ca` (`A stale bus search ends itself on the Defect Log`), the
-commit directly below this handoff. Derive the range with:
+Publish from `ef513c3` (`The full sweep question gets a real NO, and says why it
+matters`), the commit directly below this handoff. Derive the range with:
 
 ```
 git log --oneline 6a98878..HEAD
@@ -16,7 +17,7 @@ point; its tag is `sites-v180`. The one before it is 179 from `fe467c0`.
 
 ## What a person will see
 
-Two things, both on the Defect Log side of the app.
+Three things.
 
 **1 — RECOMMENDED FOR DOWN SHEET** — the third board on the Down Sheet, and the
 `DS Rec` quick filter on the Defect Log — now lists a bus that is already on the
@@ -28,8 +29,16 @@ different bus and save, and the board comes back whole with the new record on
 it. Before, the board stayed filtered to the number that had been typed and the
 record was invisible behind it.
 
-Nothing else moves. No screen changes, no control is renamed, no wording
-changes, nothing is added to or removed from any other list.
+**3 — THE FULL SWEEP QUESTION AFTER A SHEET SCAN** is no longer a browser
+confirm() with OK and CANCEL. It is an in-app dialog with **NO** and **YES**.
+Answering NO now shows a second message — *"Be aware of any mismatches between
+buses on the Fleet Map and the new Down Sheet"* and *"A full yard sweep is
+recommended"* — because a scan replaces the sheet while the map stays where it
+was. The old second line promising the Status Report is gone; the report was
+never gated on a sweep.
+
+Nothing else moves. No screen changes, no other control is renamed, no other
+wording changes, nothing is added to or removed from any other list.
 
 ## The bug
 
@@ -167,9 +176,63 @@ the two moments into one.
 8. Type a word rather than a number (`brake`), log a brake defect on any bus.
    The search must stay, because it still describes what you just wrote.
 
+## The third fix: the full sweep question
+
+> Curtis: "There is not a 'no' for an answer if I am not doing a full sweep of
+> the yard."
+
+A `confirm()` offers OK and CANCEL and the browser owns both words. Cancel reads
+as backing out of the question rather than answering it, and here the two differ
+— NO has something to say.
+
+> "The summary report is ALWAYS READY anyway. At anytime I can send it because
+> it's real time snap shot of the fleet's health."
+
+So the line promising the Status Report for ending a sweep is gone.
+
+**What the question is actually for.** A scan REPLACES the sheet and the
+Facility Map does not move with it, so right after an import the two can
+disagree — a bus in the wrong place, one reading as a mystery bus, one carrying
+a number since written against another bus. NO is answered with that warning
+rather than with silence.
+
+**Asked by the page, not the scanner**, and that is forced rather than tidy:
+importing calls `setScannerOpen(false)`, so a dialog the scanner owned would
+unmount before anybody could answer. The `confirm()` it replaces only survived
+because it blocks the thread. The question still lands after the import, and
+still only when not already mid-sweep.
+
+Driven in Chromium at 390px with the scan endpoint answered locally, so no photo
+and no model are involved:
+
+| Step | Result |
+| --- | --- |
+| after a scan | `FULL SWEEP?` with buttons `["NO","YES"]`, no Status Report line |
+| press NO | the mismatch warning + "A full yard sweep is recommended"; `pace-sweep-v1` still unset |
+| press YES | `pace-sweep-v1` written with `startedFrom:"scan"` |
+
+Both answers measure 44px tall and share a top of 434px, so they sit side by
+side on a phone rather than stacking, where NO would land under a thumb aiming
+for YES.
+
+Two mutations fail the new guards: making NO a plain dismiss, and putting the
+Status Report promise back.
+
+## Post-publish checks for the sweep question
+
+9. Scan a sheet and import it. The question must offer **NO** and **YES**, not
+   OK and Cancel, and must not mention the Status Report.
+10. Press **NO**. You should get the mismatch warning and the sweep
+    recommendation, and the Facility Map must **not** go into sweep mode.
+11. Scan again and press **YES**. The Facility Map should show mid-sweep.
+12. Start a sweep on the map first, then scan. The question must **not** appear
+    at all — it only asks when you are not already walking.
+
 ## Rollback
 
-Roll back to `sites-v180` (`b6e0cba`). Neither change writes anything
-differently, so a rollback only restores the old hiding rule and the old search
-behaviour. Recommendations made in the meantime keep their stamps and reappear
-on the next publish, and no defect logged under 181 is lost or altered.
+Roll back to `sites-v180` (`b6e0cba`). None of the three changes writes anything
+differently, so a rollback only restores the old hiding rule, the old search
+behaviour and the old confirm(). Recommendations made in the meantime keep their
+stamps and reappear on the next publish, no defect logged under 181 is lost or
+altered, and a sweep started from the new dialog is an ordinary `pace-sweep-v1`
+record that 180 reads exactly as it always did.
