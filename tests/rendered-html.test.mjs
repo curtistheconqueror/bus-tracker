@@ -10587,6 +10587,20 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
     time snap shot of the fleet's health." */
  assert.doesNotMatch(sheet,/ending it offers the Status Report/);
  assert.doesNotMatch(scanner,/ending it offers the Status Report/);
+
+ /* AND THE OTHER HALF OF THE SAME WARNING, on the sweep itself. The person who
+    answered YES is the one actually walking the yard looking for these, so the
+    banner carries it too. Curtis: "This may need to show up as a message with
+    the full sweep."
+
+    Only when the sweep began from a SCAN. A sweep started on the map has no new
+    sheet behind it and nothing to reconcile, so it stays quiet rather than
+    crying wolf every time. */
+ assert.match(map,/sweep\.startedFrom==="scan"&&<em>Watch for mismatches between this map and the new sheet/,
+  "a scan-started sweep says what the walk is for");
+ const sweepCss=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
+ assert.match(sweepCss,/\.sweep-banner span em\{display:block/,
+  "on its own row, or it pushes END & REPORT off a phone");
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
