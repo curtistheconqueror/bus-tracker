@@ -12974,20 +12974,40 @@ test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses 
   /* Off property, waiting days. It belongs on the list — the board is about
      what is waiting on a decision, not about what is parked outside. */
   {id:"c",n:"6303",l:"offsite-2",defects:[{id:"d4",category:"Engine",issue:"Oil leak",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-06T00:00:00.000Z")}]},
-  /* Recommended and ALREADY ON THE SHEET: covered, so not waiting on anybody. */
+  /* Recommended and ALREADY ON THE SHEET FOR THAT REPAIR: covered, so not
+     waiting on anybody. The entry has to NAME the defect for that to be true —
+     a bare entry against the bus is not the sheet writing to this record. */
   {id:"d",n:"6304",l:"bay-3",defects:[{id:"d5",category:"Engine",issue:"No start",details:"",state:"open",operability:"down",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
+  /* BUS 17555, the case that prompted the per-repair grain. On the sheet for an
+     air-tank row, with a ramp that will not lock recommended underneath it. The
+     old bus-grain rule dropped this bus whole and the board sat empty while a
+     foreman had asked for something. Curtis: "Doesn't mean the guy that's doing
+     the inspection is gonna come across the defect." */
+  {id:"g",n:"17555",l:"bay-6",defects:[
+   {id:"g1",category:"Pneumatic System",issue:"Air tank / valve",details:"IDOT Prep",state:"open",operability:"down"},
+   {id:"g2",category:"Bus Accessories",issue:"Ramp, Lift and Kneeler - Ramp will not lock",details:"cam damaged",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:45:00.000Z")}]},
   /* Recommended and FIXED. This is the "in sync" half: close the repair the
      recommendation was about and the number drops with no tidying up. */
   {id:"e",n:"6305",l:"bay-4",defects:[{id:"d6",category:"Engine",issue:"Done",details:"",state:"completed",operability:"service",downSheetRecommendation:rec("2026-09-09T22:00:00.000Z")}]},
   /* Not recommended at all. */
   {id:"f",n:"6306",l:"bay-5",defects:[{id:"d7",category:"Engine",issue:"Plain",details:"",state:"open",operability:"service"}]},
  ];
- const onSheet=[{id:"e1",busId:"d",busNumber:"6304",workflow:"Scheduled"}];
- assert.equal(recommendedBusCount(fleet,onSheet),3,"buses, deduplicated — never rows");
- assert.equal(recommendedRows(fleet,onSheet).length,4,"and four rows behind those three buses");
+ const onSheet=[
+  {id:"e1",busId:"d",busNumber:"6304",defectId:"d5",category:"Engine",repair:"No start",customReason:"",workflow:"Scheduled"},
+  /* 17555's row: the sheet is writing to the AIR TANK record, not the ramp. */
+  {id:"e2",busId:"g",busNumber:"17555",defectId:"g1",category:"Pneumatic System",repair:"Air tank / valve",customReason:"IDOT Prep",workflow:"Scheduled"}];
+ assert.equal(recommendedBusCount(fleet,onSheet),4,"buses, deduplicated — never rows");
+ assert.equal(recommendedRows(fleet,onSheet).length,5,"and five rows behind those four buses");
+ /* THE REGRESSION GUARD. 17555 is on the sheet and still owes somebody an
+    answer about its ramp, so it is listed; 6304's recommendation IS the row the
+    sheet carries, so it is not. Flip the rule back to the bus and the first of
+    these two disappears. */
+ const listed=recommendedBuses(fleet,onSheet).map(row=>row.bus.n);
+ assert.ok(listed.includes("17555"),"on the sheet for one repair, still waiting on another");
+ assert.equal(listed.includes("6304"),false,"the sheet is writing to that very record");
  /* LONGEST WAITING FIRST. The only question this board answers is what has been
     waiting on you, and alphabetical order answers nothing. */
- assert.deepEqual(recommendedBuses(fleet,onSheet).map(row=>row.bus.n),["6303","6301","6302"]);
+ assert.deepEqual(listed,["6303","6301","6302","17555"]);
  /* Inside a bus too, so the card's lead repair is the one waiting longest. */
  assert.deepEqual(recommendedBuses(fleet,onSheet).find(row=>row.bus.n==="6302").defects.map(d=>d.issue),["Air leak","Misfire"]);
 
