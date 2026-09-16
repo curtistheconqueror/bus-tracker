@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 180 / release 180 | Live | b6e0cba | Adds four Brakes symptom choices: Brakes sticking / dragging, brakes will not release after the service pedal, brakes will not release at the parking brake, and Brake chamber leaking. |
+| 181 / release 181 | Live | 148a45e | Distinguishes hard Down Sheet buses from Soft Down and IDOT preparation with collapsed boards and an optional in-service override; adds IDOT Prep, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. |
+| 180 / release 180 | Previous live | b6e0cba | Adds four Brakes symptom choices: Brakes sticking / dragging, brakes will not release after the service pedal, brakes will not release at the parking brake, and Brake chamber leaking. |
 | 179 / release 179 | Previous live | fe467c0 | Adds optional HOLD UNTIL and EXTEND controls for deferred Defect Log repairs without resetting their original 90-minute alarm or deferred history; the facility-config extraction is internal and renders identically. |
 | 178 / release 178 | Previous live | 531c3f8 | Keeps the Fleet Status Report CLOSE action reachable in its iOS modal, makes first-run role selection follow Full/Lite selection, and fixes the cross-timezone forecast fixture so CI passes consistently. |
 | 177 / release 177 | Previous live | c18f635 | Turns the Fleet Status Report into a per-device checkbox list, adds its first Fleet Forecast, counts Farebox, Ventra and CUBIC-screen buses independently, safely backfills old Down Sheets into history, and uses fleet numbers for that ledger across devices. |
