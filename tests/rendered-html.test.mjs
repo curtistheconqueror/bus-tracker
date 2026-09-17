@@ -2832,9 +2832,21 @@ test("phone layouts expose large primary controls and category-only defect entry
   /* QUICK SELECT (OPTIONAL) became DEFECT, and became a typing field. The label
      changed because the field did: it is no longer an optional shortcut behind a
      category, it is the way you name the defect — by typing it or by tapping it
-     open, whichever is faster with the bus in front of you. */
-  assert.match(defectPage, /<ComboField label="DEFECT"/);
-  assert.match(defectPage, /<ComboField label="CATEGORY"/);
+     open, whichever is faster with the bus in front of you.
+
+     DEFECT then became SPECIFIC DEFECT OR SYMPTOM and CATEGORY became DEFECT
+     CATEGORY, for a reader who has never seen the form. Curtis: "So this is
+     easy to see and understand for new comers." Both are still pinned here
+     exactly, because that is what caught the rename below. */
+  assert.match(defectPage, /<ComboField label="SPECIFIC DEFECT OR SYMPTOM"/);
+  assert.match(defectPage, /<ComboField label="DEFECT CATEGORY"/);
+  /* The two labels are the only ones in this form drawn larger than the rest,
+     and the rule has to say BOTH halves of that. Renaming them was half the
+     change; the other half is that they stop reading as muted 8px chrome. The
+     size is 8px x 1.3 and the colour is the theme's own text rather than #000,
+     which would go invisible the moment somebody picks a dark Defect Log. */
+  assert.match(defectCss, /\.log-form label\.combo-field\{[^}]*color:var\(--log-text\)[^}]*font-size:10\.4px/);
+  assert.doesNotMatch(defectCss, /\.log-form label\.combo-field\{[^}]*#000/);
   assert.doesNotMatch(defectPage, /disabled=\{!value\.defect\.category\}/,
     "the defect field must not be gated on a category - removing that gate is the point of the change");
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
@@ -5402,8 +5414,8 @@ test("the Amerex panel is two systems, and the states that down a bus say so",as
  assert.ok(notePage.indexOf("defect-note")<notePage.indexOf("advanced-defect-details"));
  /* Anchored to a string that still exists: 'QUICK SELECT' was renamed and this
     kept passing on indexOf(-1), which is a test that had stopped testing. */
- assert.ok(notePage.includes('<ComboField label="DEFECT"'));
- assert.ok(notePage.indexOf('<ComboField label="DEFECT"')<notePage.indexOf("defect-note"));
+ assert.ok(notePage.includes('<ComboField label="SPECIFIC DEFECT OR SYMPTOM"'));
+ assert.ok(notePage.indexOf('<ComboField label="SPECIFIC DEFECT OR SYMPTOM"')<notePage.indexOf("defect-note"));
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{

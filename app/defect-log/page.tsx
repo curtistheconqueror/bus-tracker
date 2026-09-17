@@ -348,7 +348,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="CATEGORY" className="wide"
+    <ComboField label="DEFECT CATEGORY" className="wide"
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
      placeholder="Type or tap to choose a category"
@@ -360,7 +360,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="DEFECT" className="wide"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide"
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
      placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
