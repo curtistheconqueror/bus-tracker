@@ -55,3 +55,10 @@ dev-server.*.log
 # is that nothing can commit one by accident later either.
 .dev.vars
 .dev.vars.*
+
+# The dev server's own output. `.claude/skills/browser-verification` tells every
+# session to start `npm run dev` into devserver.log and read the port back out
+# of it, because the server takes a different port when 5173 is busy -- so this
+# file appears in the working tree every time anybody measures a UI change, and
+# it is a log of one container that is about to be thrown away.
+devserver.log
