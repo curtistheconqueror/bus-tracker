@@ -36,13 +36,13 @@ import "../defect-log/defect-log.css";
 import "../down-sheet/down-sheet.css";
 import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
-import MapSettingsPanel from "../map-settings-panel";
-import CloudSyncControl from "../cloud-sync-control";
+import MapSettingsPanel from "./_components/map-settings-panel";
+import CloudSyncControl from "./_components/cloud-sync-control";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
-import DownSheetSettings from "../down-sheet/down-sheet-settings";
+import DownSheetSettings from "./_components/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
-import LogSettingsModal from "../defect-log/defect-log-settings-modal";
+import LogSettingsModal from "./_components/defect-log-settings-modal";
 import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "@/src/lib/defects/defect-log-settings";
 import {FixedAppearanceModal,type FixedAppearanceSettings} from "@/src/components/settings/fixed-repairs-settings";
 import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
@@ -56,7 +56,7 @@ import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSh
 import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import SaveAlert from "@/src/components/shared/save-alert";
-import FleetRecoveryControl from "../fleet-recovery-control";
+import FleetRecoveryControl from "./_components/fleet-recovery-control";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "@/src/lib/storage/storage";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import AppName from "@/src/components/shared/app-name";
@@ -64,8 +64,8 @@ import WelcomeGate,{WELCOME_REQUEST_EVENT} from "@/src/components/shared/welcome
 import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "@/src/lib/settings/app-mode";
 import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
 import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
-import ShiftSettingsPanel from "./shift-settings";
-import SheetBackfillPanel from "./sheet-backfill";
+import ShiftSettingsPanel from "./_components/shift-settings";
+import SheetBackfillPanel from "./_components/sheet-backfill";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */
