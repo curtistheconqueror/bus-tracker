@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "../scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "../scan-notes";
-import {writeSetting} from "../storage";
+import {writeSetting} from "@/src/lib/storage/storage";
 import {normalizeSweepDocument,normalizeSweepRow,sweepFindings,sweepOkAgainstBoard,sweepPageVerdict,SWEEP_COLUMN_LABEL,SWEEP_ISSUE_CHOICES,type ScannedSweepRow,type SweepFinding,type SweepFleetBus,type SweepOkBus,type SweepPageVerdict} from "./sweep-scan-import";
 
 /* The farebox / Ventra sweep scanner.

@@ -1,8 +1,8 @@
 import {BOARD_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,markFleetBackupExported} from "./storage.ts";
-import {PARTS_MEMORY_STORAGE_KEY} from "./parts-memory.ts";
-import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY} from "./bus-lists.ts";
-import {FINDINGS_MEMORY_STORAGE_KEY} from "./findings-memory.ts";
-import {shareOrDownloadFile} from "./share-file.ts";
+import {PARTS_MEMORY_STORAGE_KEY} from "../../../app/parts-memory.ts";
+import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY} from "../../../app/bus-lists.ts";
+import {FINDINGS_MEMORY_STORAGE_KEY} from "../../../app/findings-memory.ts";
+import {shareOrDownloadFile} from "../../../app/share-file.ts";
 
 /* Three buttons in this app write a file that CANNOT be read back in, and one
    writes the file that can. They used to be named the same way — EXPORT LOG
@@ -13,7 +13,7 @@ import {shareOrDownloadFile} from "./share-file.ts";
    The word REPORT in every one of those three labels is what carries that, and
    this hint is the long version behind them. It lives beside the backup itself
    so the two can never be described inconsistently. */
-import {SHEET_LEDGER_KEY} from "./sheet-ledger.ts";
+import {SHEET_LEDGER_KEY} from "../../../app/sheet-ledger.ts";
 
 export const REPORT_EXPORT_HINT="Report only — a snapshot to read or send to somebody. This file cannot be imported back into the app. To move this section to another device use the transfer above it; to back the whole app up use MASTER EXPORT in Settings.";
 
