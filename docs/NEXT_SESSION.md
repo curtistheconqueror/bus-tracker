@@ -208,7 +208,7 @@ strike the item the day it lands.
 ## How to check your work
 
 ```
-npm test          # builds first, then tests/rendered-html.test.mjs
+npm test          # builds first, then every file in tests/
 npm run lint
 npm run build
 ```

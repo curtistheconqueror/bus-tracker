@@ -479,7 +479,7 @@ step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
 ## Checking your work
 
 ```
-npm test          # builds, then runs tests/rendered-html.test.mjs
+npm test          # builds, then runs every file in tests/
 npm run lint
 npm run build
 ```

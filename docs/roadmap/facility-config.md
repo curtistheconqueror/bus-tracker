@@ -63,7 +63,7 @@ anything else moves.
 
 - `operational-time.ts` lines 23 and 37 test `bus.l==="bay-12"` to set
   `bay12Watch`;
-- `tests/rendered-html.test.mjs:244` and `:633` assert on `l:"bay-12"`;
+- the fleet suite (now `tests/fleet.test.mjs`) asserts on `l:"bay-12"`;
 - the seed board in `page.tsx:61` parks buses at `bay-10`, `bay-11`, `bay-12`.
 
 Meanwhile the *canonical* trouble bay test is the garage modulo above. So
@@ -193,7 +193,7 @@ mentions — it is already the regression net for exactly this, so any change th
 needs a test edited is a change that moved behaviour.
 
 ```
-grep -coE '"(garage|road|west|east|bay|...)-' tests/rendered-html.test.mjs   # 431
+grep -rcoE '"(garage|road|west|east|bay|...)-' tests/   # 431
 npm test | grep '^# tests'                                                    # must read 325
 ```
 

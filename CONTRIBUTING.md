@@ -15,7 +15,7 @@ Claude Code contributions use the persistent `claude-contributions` branch and m
 
 1. Inspect git status and the relevant feature files.
 2. Update domain helpers before duplicating rules inside UI components.
-3. Add or extend regression coverage in tests/rendered-html.test.mjs.
+3. Add or extend regression coverage in the tests/ file for that area (tests/down-sheet.test.mjs, tests/defects.test.mjs, and so on).
 4. Run npm test.
 5. Run npm run lint.
 6. Run git diff --check.
