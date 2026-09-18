@@ -10,9 +10,9 @@
    news is then fetched and merged down the same path GET THE SHOP'S COPY uses.
    Nothing here decides what a merge means. */
 
-import {mergeDefectLog,mergeDownSheet,mergeFleetMap} from "../src/lib/storage/section-transfer.ts";
-import {reconcileDownSheetMembership} from "./down-sheet-counter.ts";
-import {readDownSheetStorage,readFleetStorage,writeDownSheetStorage,writeFleetStorage,DOWN_SHEET_STORAGE_KEY,FLEET_STORAGE_KEY} from "../src/lib/storage/storage.ts";
+import {mergeDefectLog,mergeDownSheet,mergeFleetMap} from "../storage/section-transfer.ts";
+import {reconcileDownSheetMembership} from "../../../app/down-sheet-counter.ts";
+import {readDownSheetStorage,readFleetStorage,writeDownSheetStorage,writeFleetStorage,DOWN_SHEET_STORAGE_KEY,FLEET_STORAGE_KEY} from "../storage/storage.ts";
 
 export const LIVE_TABLES=["buses","bus_defects","down_sheet_entries"] as const;
 

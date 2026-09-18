@@ -48,9 +48,9 @@ import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repair
 import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {normalizeDefects} from "../repair-catalog";
 import {mergeDuplicateDefects} from "../duplicate-defects";
-import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "../cloud-sync";
+import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "@/src/lib/cloud/cloud-sync";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
-import {dropTombstonedDefects,dropTombstonedEntries} from "../cloud-live";
+import {dropTombstonedDefects,dropTombstonedEntries} from "@/src/lib/cloud/cloud-live";
 import SectionTransferControls from "../section-transfer-controls";
 import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "@/src/lib/storage/section-transfer";
 import {shareOrDownloadFile} from "../share-file";

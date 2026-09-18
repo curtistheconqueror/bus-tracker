@@ -14,7 +14,7 @@ import SweepScanner from "./sweep-scanner";
 import {sweepDefect,type SweepFinding} from "./sweep-scan-import";
 import ScanBatchesPanel from "./scan-batches-panel";
 import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,type ScanBatch,type ScanBatchUndo} from "./scan-batches";
-import {readMergedAway,writeMergedAway} from "../cloud-sync";
+import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "../quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "../quick-filters";
