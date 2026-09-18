@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../app/defect-log/sweep-scan-import.ts";
 import test from "node:test";
-import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../app/cloud-sync.ts";
+import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../src/lib/cloud/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
@@ -1682,7 +1682,7 @@ test("Mystery Buses can change facility location without changing defects or Dow
   assert.match(board,/MOVE \/ LOCATION/);
   assert.match(board,/defects and Down Sheet membership are not changed/);
   assert.match(page,/MOVE \/ LOCATION/,"the deferred drawer still offers it");
-  assert.match(page,/import \{MysteryMoveModal\} from "\.\.\/mystery-board"/,"and opens the shared one");
+  assert.match(page,/import \{MysteryMoveModal\} from "(?:[^"]*\/)mystery-board"/,"and opens the shared one");
   /* MOVE / LOCATION is shared: the Down Sheet's board and the Defect Log's
      deferred drawer both open it, so its styles sit in globals.css. */
   assert.match(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"),/\.mystery-move\{[^}]*min-height:44px/);
@@ -2064,7 +2064,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
      photos are capped at 700 KB before they leave the phone. */
   const scanPhoto = await readFile(new URL("../app/scan-photo.ts", import.meta.url), "utf8");
   assert.ok(scanPhoto.includes("700*1024"));
-  assert.match(scanner, /import \{scanReadyPhoto\} from "\.\.\/scan-photo"/);
+  assert.match(scanner, /import \{scanReadyPhoto\} from "(?:[^"]*\/)scan-photo"/);
   assert.ok(route.includes("OPENROUTER_API_KEY"));
   assert.ok(route.includes('import("cloudflare:workers")'));
   assert.ok(route.includes('"google/gemini-2.5-flash"'));
@@ -4187,7 +4187,7 @@ test("every storage function a page calls is one it imports, so IMPORT ALL DATA 
     now checks it where it lives - still guarded, still lifting the bulk-loss
     stop that a deliberate whole-device replace has to lift. */
  const restore=await readFile(new URL("../src/lib/storage/fleet-restore.ts",import.meta.url),"utf8");
- assert.match(restore,/import \{[^}]*\bwriteFleetStorageResult\b[^}]*\} from "\.\/storage\.ts"/);
+ assert.match(restore,/import \{[^}]*\bwriteFleetStorageResult\b[^}]*\} from "(?:[^"]*\/)?storage\.ts"/);
  assert.match(restore,/const written=writeFleetStorageResult\(storage,backup\.buses,\{allowBulkDefectLoss:true\}\);/);
  assert.match(restore,/if\(!written\.ok\)return \{ok:false,restored:\[\],reason:written\.reason\}/,
   "a refused board write leaves nothing half-restored");
@@ -6897,7 +6897,7 @@ test("the shop cloud reports what happened and never offers a switch",async()=>{
  // check must be that it is never CALLED, not that the words never appear.
  const code=text=>text.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1");
  const [source,control]=await Promise.all([
-  readFile(new URL("../app/cloud-sync.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/cloud/cloud-sync.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
  ]);
  // It only says the wifi is associated. Shop wifi that is up but with no route
@@ -6968,7 +6968,7 @@ test("the shop cloud never becomes a condition of using the board",async()=>{
  /* A pull merges; it never replaces. The three merges moved into cloud-live.ts
     when live sync arrived, so the button and the background use one copy and
     cannot drift — the control delegates to it rather than keeping its own. */
- const liveMerge=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ const liveMerge=await readFile(new URL("../src/lib/cloud/cloud-live.ts",import.meta.url),"utf8");
  assert.match(liveMerge,/mergeFleetMap\(/);
  assert.match(liveMerge,/mergeDefectLog\(/);
  assert.match(liveMerge,/mergeDownSheet\(/);
@@ -7039,7 +7039,7 @@ test("a bus that arrives from the cloud is a usable record, and its author survi
 });
 
 test("a pull reads past one page and signing out is local to the device",async()=>{
- const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ const client=await readFile(new URL("../src/lib/cloud/cloud-client.ts",import.meta.url),"utf8");
  // PostgREST caps rows per request and the cap is silent — the response looks
  // complete. This fleet plus its defects can reach it in ordinary use.
  assert.match(client,/\.range\(/);
@@ -7559,7 +7559,7 @@ test("a repair already on the bus is not recorded twice by the down sheet",async
 
 test("a merge survives the shop cloud instead of being undone by it",async()=>{
  const { mergedAwayRows, withoutMergedAway, readMergedAway, writeMergedAway,
-         defectLogPayload, changedRows } = await import("../app/cloud-sync.ts");
+         defectLogPayload, changedRows } = await import("../src/lib/cloud/cloud-sync.ts");
 
  // A push only ever sends what a bus still carries, so a record folded into
  // another is not deleted anywhere by merging alone. It stays live on the
@@ -8261,7 +8261,7 @@ test("LITE changes what is drawn and can never reach a record", async () => {
     files rather than trusted to a comment: the day somebody reaches for
     hiddenInLite inside a save path to "keep Lite simple", this fails. */
  const dataModules = [
-  "../src/lib/storage/storage.ts", "../app/cloud-sync.ts", "../app/cloud-live.ts", "../app/cloud-client.ts",
+  "../src/lib/storage/storage.ts", "../src/lib/cloud/cloud-sync.ts", "../src/lib/cloud/cloud-live.ts", "../src/lib/cloud/cloud-client.ts",
   "../app/repair-catalog.ts", "../src/lib/storage/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
   "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
   "../src/lib/storage/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
@@ -8275,7 +8275,7 @@ test("LITE changes what is drawn and can never reach a record", async () => {
  // And lite-mode.ts itself imports only a type — it cannot read or write storage.
  const rules = await readFile(new URL("../app/lite-mode.ts", import.meta.url), "utf8");
  assert.doesNotMatch(rules, /localStorage|setItem|getItem/, "the rules never touch storage");
- assert.match(rules, /^import type \{AppMode\} from "\.\/app-mode\.ts";$/m, "a type, not the store");
+ assert.match(rules, /^import type \{AppMode\} from "(?:[^"]*\/)?app-mode\.ts";$/m, "a type, not the store");
 });
 
 test("LITE stands the right things down on every surface", async () => {
@@ -9072,8 +9072,8 @@ test("the sweep scanner is its own door on the Defect Log and never touches the 
  assert.match(logPage,/const written=persist\(nextFleet,nextDown\);\s*if\(!written\.ok\)return;/);
  /* The scanner posts to its own route and shares the photo prep. */
  assert.match(scanner,/fetch\("\/api\/sweep-scan"/);
- assert.match(scanner,/import \{scanReadyPhoto\} from "\.\.\/scan-photo"/);
- assert.match(downScanner,/import \{scanReadyPhoto\} from "\.\.\/scan-photo"/,"the Down Sheet scanner shares the same photo prep");
+ assert.match(scanner,/import \{scanReadyPhoto\} from "(?:[^"]*\/)scan-photo"/);
+ assert.match(downScanner,/import \{scanReadyPhoto\} from "(?:[^"]*\/)scan-photo"/,"the Down Sheet scanner shares the same photo prep");
  assert.doesNotMatch(scanner,/down-sheet|DownSheet|writeDownSheetStorage/,"the sweep scanner must not know the Down Sheet exists");
  /* The route's description of the sheet carries the rule that matters most. */
  assert.match(route,/Blank means nobody checked it\. It NEVER means working\./);
@@ -9379,8 +9379,8 @@ test("the DEFERRED badge counts the same buses its filter lists", () => {
 });
 
 test("a merged-away tombstone goes up as an UPDATE by id, never inside an upsert missing its fleet number",async()=>{
- const {defectRow,mergedAwayRows,normalizeCloudConfig}=await import("../app/cloud-sync.ts");
- const {pushPlan,executePushPlan}=await import("../app/cloud-client.ts");
+ const {defectRow,mergedAwayRows,normalizeCloudConfig}=await import("../src/lib/cloud/cloud-sync.ts");
+ const {pushPlan,executePushPlan}=await import("../src/lib/cloud/cloud-client.ts");
  const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Phone"});
  const now="2026-09-06T22:23:15.000Z";
  const live=defectRow({id:"d-live",category:"Brakes",issue:"Air leak",details:"",state:"open",operability:"down"},"17510",config,now);
@@ -9416,7 +9416,7 @@ test("a merged-away tombstone goes up as an UPDATE by id, never inside an upsert
  assert.match(old.message,/null value in column "fleet_number"/);
 
  // cloudPush must actually use the planner, or the partition is decoration.
- const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ const client=await readFile(new URL("../src/lib/cloud/cloud-client.ts",import.meta.url),"utf8");
  assert.match(client,/executePushPlan\(supabase,pushPlan\(busChange\.changed,defectChange\.changed,entryChange\.changed\)\)/);
  assert.doesNotMatch(client,/const writes:\[string,CloudRow\[\],string\]\[\]/,"the old upsert-everything loop must be gone");
 });
@@ -9531,7 +9531,7 @@ test("the shop cloud runs on every page, not only while Settings is open",async(
 });
 
 test("live sync is a doorbell, not a delivery",async()=>{
- const {shouldSyncForChange,announceStoredChange,LIVE_TABLES,LIVE_DEBOUNCE_MS}=await import("../app/cloud-live.ts");
+ const {shouldSyncForChange,announceStoredChange,LIVE_TABLES,LIVE_DEBOUNCE_MS}=await import("../src/lib/cloud/cloud-live.ts");
  assert.deepEqual([...LIVE_TABLES],["buses","bus_defects","down_sheet_entries"]);
 
  // Another device's write wakes this one; its own echo does not.
@@ -9552,13 +9552,13 @@ test("live sync is a doorbell, not a delivery",async()=>{
     the browser fires it only for OTHER tabs — so a merge done in this tab would
     leave the board right on disk and stale on screen. Dispatching it ourselves
     is why live sync needed no change to any page's own code. */
- const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ const client=await readFile(new URL("../src/lib/cloud/cloud-client.ts",import.meta.url),"utf8");
  assert.match(client,/postgres_changes/);
  assert.match(client,/subscribeToShopCloud/);
  // A notification's row is never written to the board; it only triggers a pull.
  assert.equal(/payload\?\.new\?\.(?!device_label)/.test(client),false,"a realtime payload must not become board data");
 
- const liveSource=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ const liveSource=await readFile(new URL("../src/lib/cloud/cloud-live.ts",import.meta.url),"utf8");
  assert.match(liveSource,/new StorageEvent\("storage"/);
  // A merge is never a reason to accept a write the bulk-loss guard refuses,
  // and live sync runs with nobody watching. The one thing that lifts it is a
@@ -9755,8 +9755,8 @@ test("the operator reads 'remove the last scan sweep' as the batch it is",async(
 });
 
 test("a scan sweep removed on one device reaches the others, and so does putting it back",async()=>{
- const {dropTombstonedDefects,applyCloudPull}=await import("../app/cloud-live.ts");
- const {readTombstones}=await import("../app/cloud-client.ts");
+ const {dropTombstonedDefects,applyCloudPull}=await import("../src/lib/cloud/cloud-live.ts");
+ const {readTombstones}=await import("../src/lib/cloud/cloud-client.ts");
  const {serializeFleetPayload,FLEET_STORAGE_KEY}=await import("../src/lib/storage/storage.ts");
  const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Ipad"});
 
@@ -9801,7 +9801,7 @@ test("a scan sweep removed on one device reaches the others, and so does putting
  assert.ok(storage.value("pace-board-recovery-v1"),"the recovery snapshot was taken first — RESTORE LAST GOOD COPY stands behind this");
  assert.ok(announced.some(([key])=>key===FLEET_STORAGE_KEY),"the page in front of the user hears about it");
  // With nothing tombstoned, the guard is exactly as it was: still on.
- const live=await readFile(new URL("../app/cloud-live.ts",import.meta.url),"utf8");
+ const live=await readFile(new URL("../src/lib/cloud/cloud-live.ts",import.meta.url),"utf8");
  assert.match(live,/allowBulkDefectLoss:afterTombstones\.dropped\.length>0/);
 
  /* The tombstones are read as two columns, paged like everything else, and
@@ -9811,7 +9811,7 @@ test("a scan sweep removed on one device reaches the others, and so does putting
  const read=await readTombstones(fake,"bus_defects","defect_id");
  assert.deepEqual(read.deleted,{"sweep-1":"2026-09-07T01:00:00.000Z"});
  assert.deepEqual(calls,[["bus_defects","defect_id,deleted_at","deleted_at","is",null]]);
- const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ const client=await readFile(new URL("../src/lib/cloud/cloud-client.ts",import.meta.url),"utf8");
  assert.match(client,/readTombstones\(supabase,"bus_defects","defect_id"\)/);
  assert.match(client,/deleted:deletedRes\.deleted/);
  // Both callers hand the tombstones on; a pull that read them and dropped them would change nothing.
@@ -9821,9 +9821,9 @@ test("a scan sweep removed on one device reaches the others, and so does putting
 
 test("a Down Sheet cleared on one device stays cleared, instead of arriving back as nine days of sheets",async()=>{
  const {downSheetRow,removedEntryRows,withoutRemovedEntries,readRemovedEntries,rememberRemovedEntries,forgetRemovedEntries,
-        REMOVED_ENTRY_LEDGER_LIMIT,CLOUD_REMOVED_ENTRIES_KEY}=await import("../app/cloud-sync.ts");
- const {pushPlan,executePushPlan,cloudPush,readTombstones}=await import("../app/cloud-client.ts");
- const {dropTombstonedEntries,applyCloudPull}=await import("../app/cloud-live.ts");
+        REMOVED_ENTRY_LEDGER_LIMIT,CLOUD_REMOVED_ENTRIES_KEY}=await import("../src/lib/cloud/cloud-sync.ts");
+ const {pushPlan,executePushPlan,cloudPush,readTombstones}=await import("../src/lib/cloud/cloud-client.ts");
+ const {dropTombstonedEntries,applyCloudPull}=await import("../src/lib/cloud/cloud-live.ts");
  const {serializeFleetPayload,serializeDownSheetPayload,FLEET_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY}=await import("../src/lib/storage/storage.ts");
  const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Phone"});
  const NOW="2026-09-07T04:00:00.000Z",REMOVED="2026-09-07T03:30:00.000Z";
@@ -9934,7 +9934,7 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  const read=await readTombstones(fake,"down_sheet_entries","entry_id");
  assert.deepEqual(read.deleted,{"e-stale":REMOVED});
  assert.deepEqual(reads,[["down_sheet_entries","entry_id,deleted_at","deleted_at","is",null]]);
- const client=await readFile(new URL("../app/cloud-client.ts",import.meta.url),"utf8");
+ const client=await readFile(new URL("../src/lib/cloud/cloud-client.ts",import.meta.url),"utf8");
  assert.match(client,/readTombstones\(supabase,"down_sheet_entries","entry_id"\)/);
  assert.match(client,/removedEntries:removedRes\.deleted/);
  assert.match(client,/sheet:withoutRemovedEntries\(downSheetPayload\(entryRes\.rows,now\),removedEntries\)/);
@@ -10231,7 +10231,7 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
 
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- assert.match(page,/import \{forgetRemovedEntries,rememberRemovedEntries\} from "\.\.\/cloud-sync"/);
+ assert.match(page,/import \{forgetRemovedEntries,rememberRemovedEntries\} from "(?:[^"]*\/)cloud-sync"/);
 
  // CLEAR DOWNSHEET, and the whole sheet with it.
  assert.match(page,/const result=clearDownSheetState\(entries,fleet\);[\s\S]{0,600}?rememberRemovedEntries\(localStorage,entries\.map\(entry=>entry\.id\),new Date\(\)\.toISOString\(\)\)/);
@@ -10300,7 +10300,7 @@ test("the Down Sheet writes a removal down wherever one happens, and takes it ba
     through a different door, so it writes the same ledger — a clear that reaches
     only this device is not a clear. */
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- assert.match(map,/import \{forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway\} from "\.\/cloud-sync"/);
+ assert.match(map,/import \{forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway\} from "(?:[^"]*\/)?cloud-sync"/);
  assert.match(map,/plan\.kind==="clearDownSheet"[\s\S]{0,1400}?rememberRemovedEntries\(localStorage,\(entries as \{id:string\}\[\]\)\.map\(entry=>entry\.id\),new Date\(\)\.toISOString\(\)\)/);
  assert.match(map,/plan\.kind==="undoDownSheetClear"[\s\S]{0,1400}?forgetRemovedEntries\(localStorage,snapshot\.entries\.map\(entry=>entry\.id\)\)/);
 });
@@ -10760,7 +10760,7 @@ test("a soft bus the yard puts on a run stops counting against pullout, on every
     explicit call: "1 travel for sure." A hold is one person's note about one
     bus; pullout is the whole shop's number. It rides for free because
     cloud-sync puts every field it has no column for into `detail`. */
- const {downSheetRow}=await import("../app/cloud-sync.ts");
+ const {downSheetRow}=await import("../src/lib/cloud/cloud-sync.ts");
  const config={project:"p",account:"a",initials:"CJ",device:"phone"};
  const row=downSheetRow(using,config,at);
  assert.ok(row,"the entry makes a row");
@@ -11935,8 +11935,8 @@ test("a MYSTERY BUS card opens, because it already looked like it would",async()
 
 test("a transfer file carries removals, so an import can make the other device MATCH rather than only grow",async()=>{
  const {exportDownSheetPayload,exportDefectLogPayload,mergeDownSheet,mergeDefectLog,mergeSummary,TRANSFER_KINDS}=await import("../src/lib/storage/section-transfer.ts");
- const {dropTombstonedEntries,dropTombstonedDefects}=await import("../app/cloud-live.ts");
- const {adoptTombstones,trimTombstoneLedger,REMOVED_ENTRY_LEDGER_LIMIT}=await import("../app/cloud-sync.ts");
+ const {dropTombstonedEntries,dropTombstonedDefects}=await import("../src/lib/cloud/cloud-live.ts");
+ const {adoptTombstones,trimTombstoneLedger,REMOVED_ENTRY_LEDGER_LIMIT}=await import("../src/lib/cloud/cloud-sync.ts");
 
  /* THE CASE FROM THE FLOOR. The phone's sheet has 2 entries; the iPad's has
     those 2 plus a third the phone took off this morning. Curtis expected the
@@ -12024,7 +12024,7 @@ test("REFRESH is on every page, because a home-screen app has no address bar to 
     to look for an update. The map had this button in its command bar; the other
     five pages had nothing. */
  for(const [name,source] of [["down-sheet",pages[0]],["defect-log",pages[1]],["fixed-repairs",pages[2]],["lists",pages[3]],["settings",pages[4]]]){
-  assert.match(source,/import RefreshButton from "\.\.\/refresh-button"/,name+" must import the shared button");
+  assert.match(source,/import RefreshButton from "(?:[^"]*\/)refresh-button"/,name+" must import the shared button");
   /* Straight after the nav in the header. The Defect Log stacks ADVANCED
      ACTIONS under it in a column of its own, so a wrapper is allowed between
      the two - what must not drift is REFRESH ending up somewhere other than
@@ -12045,7 +12045,7 @@ test("REFRESH is on every page, because a home-screen app has no address bar to 
  assert.doesNotMatch(map,/registration\?\.update\(\)/);
  assert.equal((map.match(/serviceWorker/g)||[]).length,2,"only the registration effect mentions it now");
  // Its phone menu offers the same thing, and goes through the same function rather than keeping a second copy.
- assert.match(map,/import RefreshButton,\{refreshTrackerApp\} from "\.\/refresh-button"/);
+ assert.match(map,/import RefreshButton,\{refreshTrackerApp\} from "(?:[^"]*\/)?refresh-button"/);
  assert.match(map,/const refreshApp=async\(\)=>\{if\(refreshing\)return;setRefreshing\(true\);if\(!await refreshTrackerApp\(\)\)setRefreshing\(false\)\}/);
 
  /* Ask the service worker for a new version FIRST, then reload. A bare reload
@@ -12263,7 +12263,7 @@ test("Fixed Repairs takes a typed bus number, not only a dropdown",async()=>{
 
  /* The same resolver the rest of the app uses, so two ending digits work here
     exactly as they do on the map and in the Defect Log. */
- assert.match(page,/import \{candidateBusNumbers,resolveBusNumber\} from "\.\.\/bus-number-resolver"/);
+ assert.match(page,/import \{candidateBusNumbers,resolveBusNumber\} from "(?:[^"]*\/)bus-number-resolver"/);
  assert.match(page,/const resolution=resolveBusNumber\(fleet,value\);\s*if\(resolution\.kind!=="exact"&&resolution\.kind!=="suffix"\)return;/);
 
  /* A number that resolves to nothing must not clear a bus already chosen —
@@ -12678,7 +12678,7 @@ test("the location under a bus number is the control that moves it on the map", 
 
 test("a device that realtime cannot reach goes back to asking, instead of sitting deaf", async () => {
   const live = await readFile(new URL("../app/shop-cloud-live.tsx", import.meta.url), "utf8");
-  const client = await readFile(new URL("../app/cloud-client.ts", import.meta.url), "utf8");
+  const client = await readFile(new URL("../src/lib/cloud/cloud-client.ts", import.meta.url), "utf8");
 
   /* THE FAULT: subscribe() was called and its answer thrown away, so a channel
      that never joined handed back a stop-function exactly like one that did.
@@ -13547,12 +13547,12 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     string in LocalStorage that anybody holding the phone can change from the
     screen that set it. The moment something gates on it, that string is
     standing between a person and a control. */
- const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../src/lib/storage/storage.ts","../app/cloud-sync.ts"]
+ const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../src/lib/storage/storage.ts","../src/lib/cloud/cloud-sync.ts"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
  for(const source of files)assert.equal(source.includes(ROLE_STORAGE_KEY)||source.includes("readRole"),false,
   "nothing outside the picker may read the role — it is a label, not a permission");
  /* And it is never synced: it is a per-device label, like the app mode. */
- const sync=await readFile(new URL("../app/cloud-sync.ts",import.meta.url),"utf8");
+ const sync=await readFile(new URL("../src/lib/cloud/cloud-sync.ts",import.meta.url),"utf8");
  assert.equal(sync.includes("pace-role-v1"),false);
 
  const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
@@ -13820,7 +13820,7 @@ test("one location table, not five",async()=>{
  for(const file of files){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
-  assert.match(source,/from "\.\.?\/location-label/,file+" reads the shared one");
+  assert.match(source,/from "(?:[^"]*\/)location-label/,file+" reads the shared one");
  }
  const shared=await readFile(new URL("../app/location-label.ts",import.meta.url),"utf8");
  /* And in the one copy, the areas are consulted BEFORE the prefixes. Reverse
@@ -14322,7 +14322,7 @@ test("a hold stays on the phone that was told, and costs the cloud nothing",asyn
     whose map_fields were byte-identical to the last one but stamped newer:
     traffic that says "newer" while carrying nothing new, which is exactly the
     out-of-order ammunition updated_at exists to deny. */
- const {busUpdatedAt,busRow,rowFingerprint}=await import("../app/cloud-sync.ts");
+ const {busUpdatedAt,busRow,rowFingerprint}=await import("../src/lib/cloud/cloud-sync.ts");
  const older="2026-09-10T18:00:00.000Z",newer="2026-09-10T21:30:00.000Z",now="2026-09-10T22:00:00.000Z";
  const config={initials:"CT",deviceLabel:"shop"};
  const plain={id:"b1",n:"18505",l:"road-1",s:"service",parkedAt:older,lastLocationChangeAt:older,lastStatusChangeAt:older};
@@ -14638,7 +14638,7 @@ test("a hold rides MASTER EXPORT but never a share",async()=>{
  /* The two shares drop it. */
  const {exportFleetMapPayload}=await import("../src/lib/storage/section-transfer.ts");
  assert.equal("hold" in exportFleetMapPayload([bus],now).buses[0],false,"a section transfer is a share");
- const {busRow}=await import("../app/cloud-sync.ts");
+ const {busRow}=await import("../src/lib/cloud/cloud-sync.ts");
  assert.equal("hold" in busRow(bus,{initials:"CT",deviceLabel:"shop"},now).map_fields,false,"the Shop Cloud is a share");
 
  /* The clone keeps it — asserted on the payload builder, which passes `buses`
@@ -15052,7 +15052,7 @@ test("the garage's hours are editable on the device, and nothing re-implements t
     and the forecast do rather than parsing "HH:MM" itself — this repo has paid
     for five copies of one table and two road-call records that drifted, and a
     second opinion about when 2nd shift starts would be the next one. */
- assert.match(code,/from "\.\.\/shift-clock"/);
+ assert.match(code,/from "(?:[^"]*\/)shift-clock"/);
  assert.equal(/\d+\s*\*\s*60\s*\+/.test(code),false,"the panel never converts a clock time itself");
  assert.equal(/getHours\(\)/.test(code),false,"nor reads the wall clock behind the module's back");
 
@@ -15547,10 +15547,10 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
     direct import that is no longer there. What matters is that no file works
     the width out for itself, which the literal checks above already require. */
  for(const [name,source] of [["mystery-buses",mystery],["page",page]])
-  assert.match(code(source),/from "\.\/facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
- assert.match(code(areas),/from "\.\/site-config(\.ts)?"/,"facility-areas must read the site config");
+  assert.match(code(source),/from "(?:[^"]*\/)?facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
+ assert.match(code(areas),/from "(?:[^"]*\/)?site-config(\.ts)?"/,"facility-areas must read the site config");
  const config=await readFile(new URL("../app/site-config.ts",import.meta.url),"utf8");
- assert.match(code(config),/from "\.\/facility-layout(\.ts)?"/,"site-config must read the grid from facility-layout");
+ assert.match(code(config),/from "(?:[^"]*\/)?facility-layout(\.ts)?"/,"site-config must read the grid from facility-layout");
 });
 
 test("site-config describes this building exactly as the five tables already do",async()=>{
@@ -15692,8 +15692,8 @@ test("a deferment can be given an end time when it is made, and extended later w
     tomorrow morning, and three places now ask it — the evening review, the
     editor tick, and the held row. */
  const {nextOccurrenceISO,clockValue}=await import("../app/deferral-clock.ts");
- assert.match(watch,/from "\.\/deferral-clock"/,"the evening review reads the shared clock");
- assert.match(page,/from "\.\.\/deferral-clock"/,"and so does the Defect Log");
+ assert.match(watch,/from "(?:[^"]*\/)?deferral-clock"/,"the evening review reads the shared clock");
+ assert.match(page,/from "(?:[^"]*\/)deferral-clock"/,"and so does the Defect Log");
  assert.equal(/function nextOccurrenceISO/.test(watch),false,"no second copy of the arithmetic");
  const at21=new Date(2026,8,15,21,0,0);
  const rolled=new Date(nextOccurrenceISO("06:00",at21));

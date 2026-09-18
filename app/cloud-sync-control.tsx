@@ -16,7 +16,7 @@
    session on the device that is restored with no network call at all. */
 
 import {useCallback,useEffect,useRef,useState} from "react";
-import {cloudPull,cloudPush,cloudSignIn,cloudSignOut,cloudSignedIn} from "./cloud-client";
+import {cloudPull,cloudPush,cloudSignIn,cloudSignOut,cloudSignedIn} from "@/src/lib/cloud/cloud-client";
 import {
  cloudConfigProblem,
  cloudStatusLabel,
@@ -31,8 +31,8 @@ import {
  writeSentFingerprints,
  type CloudConfig,
  type CloudState,
-} from "./cloud-sync";
-import {applyCloudPull} from "./cloud-live";
+} from "@/src/lib/cloud/cloud-sync";
+import {applyCloudPull} from "@/src/lib/cloud/cloud-live";
 import {readDownSheetStorage,readFleetStorage} from "@/src/lib/storage/storage";
 
 export default function CloudSyncControl(){

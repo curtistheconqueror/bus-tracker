@@ -259,7 +259,7 @@ the conflict.** Both `bus_defects` and `down_sheet_entries` have
 `fleet_number text not null`. A tombstone row carries no fleet number by design,
 so it can never ride in an upsert — it takes the whole 200-row chunk down with
 it. Tombstones go as `UPDATE ... WHERE <key> = ...`. `pushPlan` in
-`app/cloud-client.ts` does this partitioning; do not undo it. This bug kept the
+`src/lib/cloud/cloud-client.ts` does this partitioning; do not undo it. This bug kept the
 shop cloud failing on every 45-second sweep for a week.
 
 **The merges are additive on purpose.** `mergeDefectLog` and `mergeDownSheet`

@@ -25,7 +25,7 @@
    does today. */
 
 import {useEffect,useRef} from "react";
-import {cloudPull,cloudPush,subscribeToShopCloud} from "./cloud-client";
+import {cloudPull,cloudPush,subscribeToShopCloud} from "@/src/lib/cloud/cloud-client";
 import {
  cloudConfigProblem,
  readCloudConfig,
@@ -35,8 +35,8 @@ import {
  readSentFingerprints,
  writeCloudState,
  writeSentFingerprints,
-} from "./cloud-sync";
-import {applyCloudPull,LIVE_DEBOUNCE_MS,shouldSyncForChange} from "./cloud-live";
+} from "@/src/lib/cloud/cloud-sync";
+import {applyCloudPull,LIVE_DEBOUNCE_MS,shouldSyncForChange} from "@/src/lib/cloud/cloud-live";
 import {readDownSheetStorage,readFleetStorage} from "@/src/lib/storage/storage";
 
 /* How often a connected device looks for its own unsent work. Long enough that

@@ -49,7 +49,7 @@ import SaveAlert from "./save-alert";
 import ShopCloudLive from "./shop-cloud-live";
 import RefreshButton,{refreshTrackerApp} from "./refresh-button";
 import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot} from "./defect-log/scan-batches";
-import {forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway} from "./cloud-sync";
+import {forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import AppName from "./app-name";
 import WelcomeGate from "./welcome-gate";
 type LegacyS=S|"route"|"tow"; type B={id:string;hold?:BusHold;n:string;s:S;l:string;mechanic:string;foreman:string;shift:string;priority:string;safe:boolean;down:boolean;notes:string;pendingRepair:string;roadcall:boolean;roadcallSolid:boolean;roadcallLocation:string;roadCalls?:RoadCallEvent[];towInProgress:boolean;checkEngine:boolean;checkTransmission:boolean;noHorn:boolean;badRampKneeler:boolean;farebox:boolean;ibsVentra:boolean;parkedAt:string;lastLocationChangeAt:string;lastStatusChangeAt:string;lastMovedFrom?:string;outReason:""|"Scheduled"|"Unscheduled";defects:StructuredDefect[];odometerReadings?:OdometerReading[];engineHourReadings?:EngineHourReading[];maintenanceEvents?:MaintenanceEvent[];mileageEstimate?:MileageEstimateCheckpoint;bay12Watch?:boolean;acIssue?:boolean;onDownSheet?:boolean;downSheetReady?:boolean;mystery?:boolean;awareness?:boolean;multiLocated?:boolean;located?:boolean;deferredHeld?:boolean;wasDeferred?:boolean};
