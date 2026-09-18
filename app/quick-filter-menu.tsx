@@ -2,7 +2,7 @@
 
 import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {QUICK_FILTERS,type QuickFilterKey} from "./quick-filters";
+import {QUICK_FILTERS,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 
 /* ONE MENU, TWO SETS OF FILTERS.
 

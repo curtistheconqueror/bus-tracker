@@ -1,8 +1,8 @@
-import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../repair-catalog.ts";
+import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../../src/lib/defects/repair-catalog.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 import {hasRequiredInteriorCleaning,hasUnresolvedDefects} from "../../src/lib/fleet/smart-status.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "../../src/lib/fleet/facility-areas.ts";
-import {adoptableDefect} from "../defect-identity.ts";
+import {adoptableDefect} from "../../src/lib/defects/defect-identity.ts";
 
 export type SyncFleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 

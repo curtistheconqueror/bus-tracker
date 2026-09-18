@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile, readdir, stat } from "node:fs/promises";
-import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../app/defect-log/sweep-scan-import.ts";
+import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../src/lib/defects/sweep-scan-import.ts";
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../src/lib/cloud/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../src/lib/fleet/fleet-validation.ts";
@@ -11,15 +11,15 @@ import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState 
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../src/lib/fleet/smart-status.ts";
 import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectClearSnapshot, restoreFacilityOnlyDefects, syncFacilityAlertDefects } from "../src/lib/fleet/facility-defect-clear.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../src/lib/fleet/bulk-relocation.ts";
-import { applyDefectToBuses } from "../app/bulk-defects.ts";
+import { applyDefectToBuses } from "../src/lib/defects/bulk-defects.ts";
 import { reassignBusPair } from "../src/lib/fleet/pair-reassignment.ts";
-import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, recommendedMinutesElapsed, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
-import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
+import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, recommendedMinutesElapsed, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../src/lib/defects/repair-catalog.ts";
+import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../src/lib/defects/defect-search.ts";
 import { sectionBusCount } from "../src/lib/fleet/section-count.ts";
 import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../src/lib/fleet/domain.ts";
 import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../src/lib/fleet/mileage-estimate.ts";
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../src/lib/fleet/maintenance-completion.ts";
-import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
+import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../src/lib/defects/parts-memory.ts";
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../src/lib/fleet/bus-lists.ts";
 import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../src/lib/fleet/service-intervals.ts";
@@ -35,19 +35,19 @@ import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-she
 import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
 import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch } from "../app/down-sheet/down-sheet-filters.ts";
 import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText } from "../app/down-sheet/down-sheet-share.ts";
-import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
+import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../src/lib/defects/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../src/lib/fleet/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../src/lib/storage/section-transfer.ts";
-import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
-import { deferredBadgeCounts, heldDeferredBuses } from "../app/deferred-counts.ts";
-import { readSettings } from "../app/defect-log/defect-log-settings.ts";
-import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../app/findings-memory.ts";
+import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../src/lib/defects/quick-filters.ts";
+import { deferredBadgeCounts, heldDeferredBuses } from "../src/lib/defects/deferred-counts.ts";
+import { readSettings } from "../src/lib/defects/defect-log-settings.ts";
+import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../src/lib/defects/findings-memory.ts";
 import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
 import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
-import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
-import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
+import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../src/lib/defects/defect-log-display-settings.ts";
+import { quickFilterShareText } from "../src/lib/defects/quick-filter-share.ts";
 import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../src/lib/storage/storage.ts";
 
 function memoryStorage(initial={}){
@@ -2062,7 +2062,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   /* The size cap moved to app/scan-photo.ts so the Down Sheet scan and the
      farebox / Ventra sweep scan share one limit. The invariant is the same:
      photos are capped at 700 KB before they leave the phone. */
-  const scanPhoto = await readFile(new URL("../app/scan-photo.ts", import.meta.url), "utf8");
+  const scanPhoto = await readFile(new URL("../src/lib/defects/scan-photo.ts", import.meta.url), "utf8");
   assert.ok(scanPhoto.includes("700*1024"));
   assert.match(scanner, /import \{scanReadyPhoto\} from "(?:[^"]*\/)scan-photo"/);
   assert.ok(route.includes("OPENROUTER_API_KEY"));
@@ -2377,7 +2377,7 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
   /* The log's settings live in their own modules now - the model, and the
      panel the Settings page renders - and the log reads the key they write. */
   const [model, panel] = await Promise.all([
-    readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/defects/defect-log-settings.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
   ]);
   assert.ok(model.includes("BACKGROUND"));
@@ -2467,7 +2467,7 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(page,/window\.requestAnimationFrame\(\(\)=>\{restore\(\);window\.requestAnimationFrame\(restore\)\}\)/);
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
-  const model=await readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8");
+  const model=await readFile(new URL("../src/lib/defects/defect-log-settings.ts",import.meta.url),"utf8");
   const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
   assert.match(model,/type LogGroupContrast="standard"\|"strong"/);
   assert.match(model,/groupContrast:"strong"/);
@@ -2797,7 +2797,7 @@ test("Version 85 stores Shop Notes and persists editable interface wording and s
     readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
-    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+    readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   ]);
   assert.match(downPage,/display:displaySettings/);
   assert.match(downSettings,/WORDING/);
@@ -2850,7 +2850,7 @@ test("phone layouts expose large primary controls and category-only defect entry
 
 test("Bus Controls and Cooling System expose field-ready defect choices", async () => {
   const [catalog,page]=await Promise.all([
-    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+    readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   ]);
   assert.match(catalog,/"Bus Controls"/);
@@ -2913,7 +2913,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
     readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
     readFile(new URL("../app/fixed-repairs/fixed-repairs-settings.tsx",import.meta.url),"utf8"),
     readFile(new URL("../public/sw.js",import.meta.url),"utf8"),
-    readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+    readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   ]);
   /* The link is written once, in the shared list; each page is asserted to draw
      that list rather than to carry its own copy of the link. */
@@ -3923,11 +3923,11 @@ test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one lo
 });
 
 test("a road call is a dated event on the bus that ages off the board on its own",async()=>{
- const {ALL_WORK_STATES,WORK_STATES,FIXED_REPAIR_WORK_STATES,WORK_STATE_KEYS,ROAD_CALL_KEY,PARTS_ON_ORDER_KEY,defectWorkStates,hasWorkState,normalizeWorkStates,setDefectWorkState}=await import("../app/repair-catalog.ts");
+ const {ALL_WORK_STATES,WORK_STATES,FIXED_REPAIR_WORK_STATES,WORK_STATE_KEYS,ROAD_CALL_KEY,PARTS_ON_ORDER_KEY,defectWorkStates,hasWorkState,normalizeWorkStates,setDefectWorkState}=await import("../src/lib/defects/repair-catalog.ts");
  const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,ROAD_CALL_UNDO_SECONDS,appendRoadCall,applyRoadCall,clearRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote,withdrawableRoadCall}=await import("../src/lib/fleet/road-calls.ts");
  const {moveOrSwapBuses:quickMove}=await import("../src/lib/fleet/smart-status.ts");
- const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
- const {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel}=await import("../app/quick-filters.ts");
+ const {saveDefectLogRecord}=await import("../src/lib/defects/defect-log-sync.ts");
+ const {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel}=await import("../src/lib/defects/quick-filters.ts");
 
  /* PARTS ON ORDER left the Defect Log's boxes for Fixed Repairs, and ROAD CALL
     stands where it stood. Six on the form, three across, so the bottom row is
@@ -4218,7 +4218,7 @@ test("ALL means everything, including whatever is in the search box",async()=>{
 });
 
 test("a technical service bulletin carries what the fleet knows, beside the note",async()=>{
- const { defectTsb, defectNote } = await import("../app/repair-catalog.ts");
+ const { defectTsb, defectNote } = await import("../src/lib/defects/repair-catalog.ts");
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
 
@@ -5243,7 +5243,7 @@ test("the Down Sheet editor holds the page still and fills a phone screen",async
 
 test("Air System is read as Pneumatic System, and the two rear valves by what they do",async()=>{
  const { REPAIR_OPTIONS, migrateRepairIdentity, normalizeDefects, defectCountField,
-         normalizeRepairCount, repairCategoryEmoji } = await import("../app/repair-catalog.ts");
+         normalizeRepairCount, repairCategoryEmoji } = await import("../src/lib/defects/repair-catalog.ts");
  const { recommendedRepairMinutes } = await import("../app/down-sheet/repair-time-estimates.ts");
 
  // The picker offers the new name only.
@@ -6213,7 +6213,7 @@ test("both repair workflows offer a remembered part without imposing or blocking
  const [log,fixed,catalog,logCss,fixedCss]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
  ]);
@@ -6632,7 +6632,7 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
     the search index built, so the mark now has to come through THERE or it
     silently stops appearing. Assert it at the source rather than deleting the
     check: this is exactly the kind of invariant that dies quietly in a rewrite. */
- const searchIndex=await readFile(new URL("../app/defect-search.ts",import.meta.url),"utf8");
+ const searchIndex=await readFile(new URL("../src/lib/defects/defect-search.ts",import.meta.url),"utf8");
  assert.match(searchIndex,/groupLabel=repairGroupDisplayLabel\(group\)/);
  assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue,group\)/);
  assert.match(searchIndex,/label:repairIssueDisplayLabel\(issue\)/);
@@ -7109,7 +7109,7 @@ test("the Defect Log can show the tracker's status colours, off by default",asyn
  ]);
  // Off by default: more colour on a long list should be a choice, not something
  // that happens to people.
- const model=await readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8");
+ const model=await readFile(new URL("../src/lib/defects/defect-log-settings.ts",import.meta.url),"utf8");
  assert.match(model,/statusColor:false/);
  assert.match(model,/statusColor=saved\.statusColor===true/);
  assert.match(page,/data-status-color=\{settings\.statusColor\?"on":"off"\}/);
@@ -7257,7 +7257,7 @@ test("bringing the shop's copy down sends this device's work first",async()=>{
 
 test("a shared filter list collapses repeats and can go as a page",async()=>{
  const { quickFilterShareText, quickFilterShareHtml, quickFilterShareFilename, shareAreaLabel } =
-  await import("../app/defect-log/quick-filter-share.ts");
+  await import("../src/lib/defects/quick-filter-share.ts");
  const defect=(id,category,issue,details)=>({id,category,issue,details,operability:"service",state:"open",source:"defect-log"});
 
  // Bus 17543 as it actually is on the shop's board: the same overheat
@@ -7309,7 +7309,7 @@ test("a shared filter list collapses repeats and can go as a page",async()=>{
 
 test("duplicate defects merge into one record without losing anything",async()=>{
  const { mergeDuplicateDefects, matchingUnresolvedDefectId, defectFingerprint } =
-  await import("../app/duplicate-defects.ts");
+  await import("../src/lib/defects/duplicate-defects.ts");
  const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
 
  const defect=(id,extra={})=>({id,category:"Cooling System",issue:"Overheating",
@@ -7447,7 +7447,7 @@ test("duplicate defects merge into one record without losing anything",async()=>
 
 test("a repair already on the bus is not recorded twice by the down sheet",async()=>{
  const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
- const { defectSupportingDetails, normalizeDefects } = await import("../app/repair-catalog.ts");
+ const { defectSupportingDetails, normalizeDefects } = await import("../src/lib/defects/repair-catalog.ts");
  const { blankRepairItem } = await import("../app/down-sheet/down-sheet-repair-items.ts");
 
  // A bus carrying a check engine light typed into the Defect Log, exactly as
@@ -7924,7 +7924,7 @@ test("the bus group outline is darker than every other border, and can be recolo
  // so leaving it alone keeps the theme-aware default.
  assert.match(logPage,/\.\.\.\(settings\.groupBorder\?\{"--log-card-border":settings\.groupBorder\}:\{\}\)/);
  const [model,panel]=await Promise.all([
-  readFile(new URL("../app/defect-log/defect-log-settings.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/defect-log-settings.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
  ]);
  assert.match(model,/groupBorder:safeBorderColor\(saved\.groupBorder\)/);
@@ -7935,7 +7935,7 @@ test("a stored outline colour cannot inject anything into the style attribute",a
  // The value lands in an inline style, and a settings blob is a file somebody
  // can hand-edit and a sync can carry between devices, so it is validated
  // rather than trusted.
- const {safeBorderColor}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const {safeBorderColor}=await import("../src/lib/defects/defect-log-display-settings.ts");
  for(const good of ["#9ea6b4","#B3261E","#000000"]) assert.equal(safeBorderColor(good),good);
  for(const bad of ["red","red;background:url(x)","#fff","","javascript:alert(1)",null,undefined,42,{}])
   assert.equal(safeBorderColor(bad),"","must reject "+String(bad));
@@ -8127,7 +8127,7 @@ test("the deferred nav badge only pulses past 90 minutes, and the evening prompt
  const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
  // The 90-minute line and the counting moved to deferred-counts.ts, a plain
  // module, so the numbers can be tested against a fleet instead of grepped for.
- const counts = await readFile(new URL("../app/deferred-counts.ts", import.meta.url), "utf8");
+ const counts = await readFile(new URL("../src/lib/defects/deferred-counts.ts", import.meta.url), "utf8");
  assert.match(counts, /const DEFERRED_OVERDUE_MINUTES=90/);
  assert.match(counts, /minutes>=DEFERRED_OVERDUE_MINUTES/);
  assert.match(watch, /const REVIEW_MINUTES=60/);
@@ -8262,8 +8262,8 @@ test("LITE changes what is drawn and can never reach a record", async () => {
     hiddenInLite inside a save path to "keep Lite simple", this fails. */
  const dataModules = [
   "../src/lib/storage/storage.ts", "../src/lib/cloud/cloud-sync.ts", "../src/lib/cloud/cloud-live.ts", "../src/lib/cloud/cloud-client.ts",
-  "../app/repair-catalog.ts", "../src/lib/storage/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
-  "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
+  "../src/lib/defects/repair-catalog.ts", "../src/lib/storage/section-transfer.ts", "../src/lib/defects/defect-log-sync.ts",
+  "../app/down-sheet/down-sheet-sync.ts", "../src/lib/defects/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
   "../src/lib/storage/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
  ];
  for (const file of dataModules) {
@@ -8410,7 +8410,7 @@ test("DEFERRED sits under MYSTERY BUSES on the Down Sheet, and both answers writ
  assert.match(board, /onAnswer:\(busId:string,defects:StructuredDefect\[\],action:"downsheet"\|"return"\)=>void/);
  assert.match(page, /const wroteFleet=writeFleetStorageResult\(localStorage,applied\.fleet as FleetBus\[\]\)/);
 
- const { answerDeferredBus } = await import("../app/deferred-actions.ts");
+ const { answerDeferredBus } = await import("../src/lib/defects/deferred-actions.ts");
  const at = "2026-09-08T14:00:00.000Z", now = "2026-09-08T18:00:00.000Z";
  const d = (id, c, i, when) => ({ id, category: c, issue: i, details: "", operability: "service", state: "deferred", deferredAt: when || at, createdAt: at, updatedAt: at, source: "defect-log", reportedBy: "CJ" });
  const fleet = [{ id: "b1", n: "17801", s: "shop", l: "bay-3", defects: [
@@ -8429,13 +8429,13 @@ test("DEFERRED sits under MYSTERY BUSES on the Down Sheet, and both answers writ
  assert.equal(escalated.downEntries.length, 1, "one entry, not one per repair");
  // The longest-held repair leads, so "one of them" is never arbitrary.
  assert.equal(escalated.downEntries[0].defectId, "x2");
- const { heldDeferredBuses: heldAfter } = await import("../app/deferred-counts.ts");
+ const { heldDeferredBuses: heldAfter } = await import("../src/lib/defects/deferred-counts.ts");
  assert.equal(heldAfter(escalated.fleet, escalated.downEntries).length, 0, "the bus stops being held once it is on the sheet");
 });
 
 test("the evening deferred prompt has an off switch, and turning it off leaves the alert badge alone", async () => {
  const [model, panel, watch] = await Promise.all([
-  readFile(new URL("../app/defect-log/defect-log-settings.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/defects/defect-log-settings.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8"),
  ]);
@@ -8525,7 +8525,7 @@ test("DEFERRED cannot be ticked on a repair the Down Sheet already has, and a wr
  assert.match(logPage, /return elapsed===null\?null:Math\.max\(0,elapsed\)/);
  // The floor is display-only: the alert and the review still read the signed
  // value, so a stay that has not started yet is ignored rather than counted.
- const catalog = await readFile(new URL("../app/repair-catalog.ts", import.meta.url), "utf8");
+ const catalog = await readFile(new URL("../src/lib/defects/repair-catalog.ts", import.meta.url), "utf8");
  assert.doesNotMatch(catalog, /Math\.max\(0,\(now\.getTime\(\)-started\)\/60000\)/);
  const future = { id: "d1", category: "Engine", issue: "Check engine light", details: "", operability: "service", state: "deferred", deferredAt: "2099-01-01T00:00:00.000Z" };
  assert.ok(deferredMinutesElapsed(future, new Date("2026-09-01T00:00:00.000Z")) < 0, "the raw helper still reports a future stamp as negative");
@@ -8978,7 +8978,7 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
 
 test("the Defect Log names WHICH defect has the bus on the down sheet",async()=>{
  const { defectLogRecords, downSheetEntryLabel, unexplainedDownSheetEntries } =
-  await import("../app/defect-log/defect-log-sync.ts");
+  await import("../src/lib/defects/defect-log-sync.ts");
 
  const D=(id,category,issue,details)=>({id,source:"defect-log",category,issue,details,
   operability:"service",state:"open",createdAt:"2026-09-01T21:01:00.000Z",updatedAt:"2026-09-01T21:57:00.000Z"});
@@ -9453,7 +9453,7 @@ test("a numbered sheet says which lines the photo never returned",async()=>{
 });
 
 test("the catalog carries the service codes and the hazmat condition the sheet actually uses",async()=>{
- const {REPAIR_OPTIONS,defaultDefectOperability}=await import("../app/repair-catalog.ts");
+ const {REPAIR_OPTIONS,defaultDefectOperability}=await import("../src/lib/defects/repair-catalog.ts");
  /* A3 and A21 are on the 09/5 sheet. Without them a scan had to pick the
     nearest thing — A3 became A-6, A21 became A-15 — recording a service the
     bus never had. */
@@ -9631,7 +9631,7 @@ test("the scan corrects what the camera misread, and never touches what it must 
 });
 
 test("a scan sweep filed in one press can be found by its stamp and taken back out",async()=>{
- const {scanBatches,removeScanBatch,restoreScanBatch,touchedScanRecord,scanBatchUndoSnapshot,readScanBatchUndo,describeScanBatch,SCAN_BATCH_ID_PREFIX}=await import("../app/defect-log/scan-batches.ts");
+ const {scanBatches,removeScanBatch,restoreScanBatch,touchedScanRecord,scanBatchUndoSnapshot,readScanBatchUndo,describeScanBatch,SCAN_BATCH_ID_PREFIX}=await import("../src/lib/defects/scan-batches.ts");
 
  /* Sep 6, 23:30 UTC: a Down Sheet photo went through SCAN SWEEP and 24 Tech
     Services records landed on 23 buses in one press. fileSweep takes the clock
@@ -10356,7 +10356,7 @@ test("SCAN BATCHES on the Defect Log, and the operator on the map, remove a swee
 });
 
 test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
- const {sweepPageVerdict,normalizeSweepDocument,normalizeSweepRow}=await import("../app/defect-log/sweep-scan-import.ts");
+ const {sweepPageVerdict,normalizeSweepDocument,normalizeSweepRow}=await import("../src/lib/defects/sweep-scan-import.ts");
  const row=(sheet)=>normalizeSweepRow({pageNumber:1,sheet,busNumber:"17510",dt:"blank",mv:"blank",power:"fault",bills:"blank",coin:"blank",initial:"",note:"",confidence:.9,reviewNote:""});
  assert.equal(normalizeSweepDocument("farebox"),"farebox");
  assert.equal(normalizeSweepDocument(" OTHER "),"other");
@@ -10395,7 +10395,7 @@ test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
 });
 
 test("a scan can carry the shop's own notes about what the camera will get wrong",async()=>{
- const {cleanScanNotes,scanNotesPrompt,readScanNotes,rememberScanNotes,SCAN_NOTES_LIMIT,SCAN_NOTES_KEY}=await import("../app/scan-notes.ts");
+ const {cleanScanNotes,scanNotesPrompt,readScanNotes,rememberScanNotes,SCAN_NOTES_LIMIT,SCAN_NOTES_KEY}=await import("../src/lib/defects/scan-notes.ts");
  assert.equal(SCAN_NOTES_LIMIT,500);
  assert.equal(SCAN_NOTES_KEY,"pace-scan-notes-v1");
 
@@ -11016,7 +11016,7 @@ test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is t
 test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{
  const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
  const {techServicesGroup}=await import("../src/lib/fleet/tech-services.ts");
- const {quickFilterMatch}=await import("../app/quick-filters.ts");
+ const {quickFilterMatch}=await import("../src/lib/defects/quick-filters.ts");
 
  /* Curtis: "now the Ventura and the fare boxes have been moved up to critical
     levels, period. So they need a count of that as well... Fairbox and Venture
@@ -11073,7 +11073,7 @@ test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",as
  /* ONE TABLE. The quick filter that offers them TOGETHER now reads the same
     module rather than a regex of its own — two tables that must agree about
     what a Ventra is are two tables that will eventually disagree. */
- const filters=await readFile(new URL("../app/quick-filters.ts",import.meta.url),"utf8");
+ const filters=await readFile(new URL("../src/lib/defects/quick-filters.ts",import.meta.url),"utf8");
  const filterCode=filters.replace(/\/\*[\s\S]*?\*\//g,"");
  assert.match(filterCode,/if\(key==="farebox"\)return isFarebox\(text\)/);
  assert.match(filterCode,/if\(key==="ibs-ventra"\)return isIbsVentra\(text\)/);
@@ -12164,7 +12164,7 @@ test("every bus on one printed line carries that line's wording, so a PM line is
 test("the words written on a scanned row outrank the catalog repair the scan guessed at",async()=>{
  const {reconcileScannedRepair,catalogPickFromWords,repairNamedInWords}=await import("../app/down-sheet/scan-catalog-match.ts");
  const {reviewScannedRows,mergeReviewedRows}=await import("../app/down-sheet/down-sheet-scan-import.ts");
- const {REPAIR_OPTIONS,migrateRepairIdentity}=await import("../app/repair-catalog.ts");
+ const {REPAIR_OPTIONS,migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
 
  /* BUS 15508, LINE 25 of the 09/6 sheet. Written on the paper: MISFIRE CYL # 5
     / MDT SCREEN. Filed by the scan as Engine / Stabilizer link — a suspension
@@ -12905,7 +12905,7 @@ test("the app's name is drawn top-left on every page, from one place", async () 
 });
 
 test("the farebox knows the fault that stops it being probed", async () => {
-  const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS} = await import("../app/repair-catalog.ts");
+  const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS} = await import("../src/lib/defects/repair-catalog.ts");
 
   /* Reported off the floor: a farebox that will not probe and open. Probing is
      how the vault is emptied and its fare data pulled, so a box that refuses is
@@ -13190,7 +13190,7 @@ test("one visit that took several fluids is one record",async()=>{
 
  const [form,filters]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/quick-filters.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/quick-filters.ts",import.meta.url),"utf8"),
  ]);
  /* THE QUANTITY BOX BELONGS TO ALL THREE. It was gated on the one string
     "Add engine oil" while the catalog had already been told all three carry an
@@ -13226,7 +13226,7 @@ test("a deferred bus does not have to be on property",async()=>{
     DOWN SHEET", which is the worse half of the two to get wrong: a wrong
     number gets questioned, a wrong label invites the next person to change the
     code until it agrees. This test exists so that cannot happen. */
- const {heldDeferredBuses,deferredBadgeCounts}=await import("../app/deferred-counts.ts");
+ const {heldDeferredBuses,deferredBadgeCounts}=await import("../src/lib/defects/deferred-counts.ts");
  const held=at=>({id:"x",category:"Brakes",issue:"Grinding",details:"",state:"deferred",operability:"service",deferredAt:at});
  const at="2026-09-10T00:00:00.000Z";
  const fleet=[
@@ -13249,7 +13249,7 @@ test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses 
     down sheet as mystery buses and deferred buses. I want this to go right
     under both of them, same color and everything, same functionality, with the
     same number count — that number count needs to be in sync." */
- const {recommendedBuses,recommendedBusCount,recommendedRows}=await import("../app/recommended-counts.ts");
+ const {recommendedBuses,recommendedBusCount,recommendedRows}=await import("../src/lib/defects/recommended-counts.ts");
  const rec=at=>({at,by:"CJ"});
  const fleet=[
   {id:"a",n:"6301",l:"bay-1",defects:[{id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T21:00:00.000Z")}]},
@@ -13343,13 +13343,13 @@ test("unticking RECOMMEND FOR DOWN SHEET actually sticks",async()=>{
     the same way. Two fields are; now both are rescued. */
  assert.equal("downSheetRecommendation" in setDownSheetRecommendation({id:"d"},false,"2026-09-10T00:00:00.000Z"),false,
   "the key is deleted, not set to undefined — which is why the spread cannot carry the removal");
- const sync=await readFile(new URL("../app/defect-log/defect-log-sync.ts",import.meta.url),"utf8");
+ const sync=await readFile(new URL("../src/lib/defects/defect-log-sync.ts",import.meta.url),"utf8");
  assert.match(sync,/\{\.\.\.existing,\.\.\.incoming,workStates:incoming\.workStates,downSheetRecommendation:incoming\.downSheetRecommendation,/);
 
  /* THE GUARD THAT GENERALISES IT. Every field repair-catalog.ts deletes has to
     be named in that merge; a third one added later and forgotten is the same
     bug a third time. */
- const catalog=await readFile(new URL("../app/repair-catalog.ts",import.meta.url),"utf8");
+ const catalog=await readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8");
  const deleted=[...catalog.matchAll(/delete next\.(\w+)/g)].map(match=>match[1]);
  assert.deepEqual([...new Set(deleted)].sort(),["downSheetRecommendation","workStates"]);
  for(const field of deleted)assert.ok(sync.includes(field+":incoming."+field),
@@ -13361,7 +13361,7 @@ test("unticking RECOMMEND FOR DOWN SHEET actually sticks",async()=>{
     the stored one, or mints a brand-new defect where there is nothing to
     inherit — both paths are exercised here, because the risk of this fix is
     the mirror image of the bug it fixes. */
- const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const {saveDefectLogRecord}=await import("../src/lib/defects/defect-log-sync.ts");
  const stamp={at:"2026-09-09T21:00:00.000Z",by:"CJ"};
  const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
   {id:"d1",category:"Brakes",issue:"Brake job",details:"",state:"open",operability:"service",downSheetRecommendation:stamp}]}];
@@ -13384,7 +13384,7 @@ test("the recommended list can be answered from the board and from the quick fil
     sheet, so I need that functionality when that list is brought up in quick
     filters." The Down Sheet's row actions are a tick that closes the entry out
     and a cross that takes the row off the sheet without touching the bus. */
- const {answerRecommendedBus}=await import("../app/recommended-actions.ts");
+ const {answerRecommendedBus}=await import("../src/lib/defects/recommended-actions.ts");
  const rec=at=>({at,by:"CJ"});
  const fleet=[{id:"b",n:"6302",l:"bay-2",s:"defect",defects:[
   {id:"d2",category:"Engine",issue:"Misfire",details:"",state:"open",operability:"service",downSheetRecommendation:rec("2026-09-09T23:30:00.000Z")},
@@ -13637,7 +13637,7 @@ test("a bus that keeps coming back is counted, with every date kept",async()=>{
     The app already REFUSED the repeat — recentDefectDuplicate blocks a matching
     unresolved defect for five days and disables the save buttons — and counted
     nothing. The bus came back and there was nowhere for that to land. */
- const {normalizeReportAttempts,recordReportAttempt,reportAttemptCount,mergeReportAttempts,REPORT_ATTEMPT_DEBOUNCE_MS}=await import("../app/repair-catalog.ts");
+ const {normalizeReportAttempts,recordReportAttempt,reportAttemptCount,mergeReportAttempts,REPORT_ATTEMPT_DEBOUNCE_MS}=await import("../src/lib/defects/repair-catalog.ts");
  const base={id:"d1",category:"Brakes",issue:"Front brake pads",details:"",state:"open",operability:"service"};
 
  /* THE TALLY IS THE LIST, not a number. Four returns in one week and four
@@ -13676,7 +13676,7 @@ test("a bus that keeps coming back is counted, with every date kept",async()=>{
   ["2026-09-08T10:00:00.000Z","2026-09-09T10:00:00.000Z"]);
  assert.deepEqual(mergeReportAttempts([{at:"2026-09-08T10:00:00.000Z"}],[]).map(a=>a.at),["2026-09-08T10:00:00.000Z"],"an empty incoming list cannot erase a stored one");
 
- const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
+ const {saveDefectLogRecord}=await import("../src/lib/defects/defect-log-sync.ts");
  const fleet=[{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[{...base,reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}]}]}];
  const stale=saveDefectLogRecord(fleet,[],"b",{...base,details:"edited"},false,"2026-09-10T00:00:00.000Z");
  assert.equal(reportAttemptCount(stale.fleet[0].defects[0]),1,
@@ -13695,7 +13695,7 @@ test("a bus that keeps coming back is counted, with every date kept",async()=>{
     back together have to keep every return between them — the tally can only
     ever grow, and a merge that quietly halved it would make the number evidence
     of nothing. Same union symptoms and fluids already get. */
- const {mergeDuplicateDefects}=await import("../app/duplicate-defects.ts");
+ const {mergeDuplicateDefects}=await import("../src/lib/defects/duplicate-defects.ts");
  const dupes=mergeDuplicateDefects([{id:"b",n:"6301",l:"bay-1",s:"defect",defects:[
   {...base,id:"d1",details:"same",reportAttempts:[{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
   {...base,id:"d2",details:"same",reportAttempts:[{at:"2026-09-09T10:00:00.000Z",by:"RM"},{at:"2026-09-08T10:00:00.000Z",by:"CJ"}],createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z"},
@@ -13816,7 +13816,7 @@ test("one location table, not five",async()=>{
     rather than labels: movedFromLabel in app/page.tsx and areaLabel in
     app/operator-engine.ts. Both were read and both name the trouble bays
     correctly. The claim here is the narrow one the assertions actually make. */
- const files=["../app/defect-log/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../app/defect-log/quick-filter-share.ts"];
+ const files=["../src/lib/defects/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../src/lib/defects/quick-filter-share.ts"];
  for(const file of files){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
@@ -13925,7 +13925,7 @@ test("one undated deferral cannot make a six-day-old bus disappear",async()=>{
     of every narrowed window. A bus held six days vanished under 7D and was
     counted as "1 HIDDEN". The wrong direction for a list of buses nobody has
     ruled on. */
- const {busDeferredMinutes}=await import("../app/deferred-counts.ts");
+ const {busDeferredMinutes}=await import("../src/lib/defects/deferred-counts.ts");
  const {withinTimeWindow}=await import("../app/time-window.ts");
  const now=new Date("2026-09-10T12:00:00.000Z");
  const at=hours=>new Date(now.getTime()-hours*3600000).toISOString();
@@ -13992,7 +13992,7 @@ test("the three view options default to off and survive a bad settings blob",asy
  /* Curtis: "I might not like it, but I just wanna make sure we can roll back at
     any point." Off by default is what makes that true — a device that updates
     looks exactly as it did. */
- const {DEFAULT_SETTINGS,readSettings,normalizeViewScope,VIEW_SCOPES}=await import("../app/defect-log/defect-log-settings.ts");
+ const {DEFAULT_SETTINGS,readSettings,normalizeViewScope,VIEW_SCOPES}=await import("../src/lib/defects/defect-log-settings.ts");
  for(const key of ["busRail","busBlueOnly","busEndMarker"]){
   assert.equal(DEFAULT_SETTINGS[key],"off",key+" ships off");
   assert.equal(readSettings(null)[key],"off");
@@ -14100,7 +14100,7 @@ test("a chosen Repair Title color still wins when blue is locked to the bus",asy
     and once displayStyleVars omitted every unchosen colour, the plain variable
     did the job and the extra one was retired. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../src/lib/defects/defect-log-display-settings.ts");
  assert.equal(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"dark")["--log-repair-category-color"],undefined,"unchosen: the quiet fallback answers");
  assert.equal(displayStyleVars(normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}}),"dark")["--log-repair-category-color"],"#c3262f","chosen: their colour wins");
  assert.equal(/"--log-repair-category-chosen"/.test(page),false,"the workaround variable is no longer emitted");
@@ -14169,7 +14169,7 @@ test("a text colour nobody picked follows the theme, so the dark themes are read
       category      4.92   2.24   2.21      1.52
 
     1.05:1 is the background. The defect text was invisible on three themes. */
- const {displayStyleVars,followsTheme,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const {displayStyleVars,followsTheme,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay}=await import("../src/lib/defects/defect-log-display-settings.ts");
  const untouched=DEFAULT_DEFECT_LOG_DISPLAY;
  for(const theme of ["dark","midnight","tactical","custom"]){
   const vars=displayStyleVars(untouched,theme);
@@ -14197,7 +14197,7 @@ test("the emitted variable names are the ones the stylesheets actually read",asy
  /* Derived from the CSS rather than listed here: this is a loop building
     property names out of camelCase keys, and a key renamed on one side only
     would silently stop styling anything. */
- const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY}=await import("../app/defect-log/defect-log-display-settings.ts");
+ const {displayStyleVars,DEFAULT_DEFECT_LOG_DISPLAY}=await import("../src/lib/defects/defect-log-display-settings.ts");
  const emitted=Object.keys(displayStyleVars(DEFAULT_DEFECT_LOG_DISPLAY,"light"));
  const css=(await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"))
   +(await readFile(new URL("../app/globals.css",import.meta.url),"utf8"));
@@ -15691,7 +15691,7 @@ test("a deferment can be given an end time when it is made, and extended later w
  /* ONE COPY OF THE CLOCK ARITHMETIC. "Hold until 06:00" asked at 21:00 means
     tomorrow morning, and three places now ask it — the evening review, the
     editor tick, and the held row. */
- const {nextOccurrenceISO,clockValue}=await import("../app/deferral-clock.ts");
+ const {nextOccurrenceISO,clockValue}=await import("../src/lib/defects/deferral-clock.ts");
  assert.match(watch,/from "(?:[^"]*\/)?deferral-clock"/,"the evening review reads the shared clock");
  assert.match(page,/from "(?:[^"]*\/)deferral-clock"/,"and so does the Defect Log");
  assert.equal(/function nextOccurrenceISO/.test(watch),false,"no second copy of the arithmetic");

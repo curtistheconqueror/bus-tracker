@@ -102,7 +102,7 @@ machine, because these sessions run in containers that are thrown away.
   a list or changes what a tap does is his call first.
 - **Catalog renames are read-time, never rewrites.** A record saved under an old
   wording must keep reading correctly through the rename maps in
-  `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
+  `src/lib/defects/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
   `LEGACY_ISSUE_RENAMES`, `RETIRED_ISSUES`). Nothing on disk is ever rewritten.
 - **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
   `src/lib/fleet/bus-hold.ts` stores it as an optional `hold` field on the bus record —
@@ -503,7 +503,7 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ```
 src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
-app/repair-catalog.ts      the defect catalog, rename maps, count fields
+src/lib/defects/repair-catalog.ts      the defect catalog, rename maps, count fields
 src/lib/storage/section-transfer.ts    per-section device transfers and their merge rules
 src/lib/storage/storage.ts             storage keys, envelopes, recovery snapshots
 app/globals.css            the whole facility map, all breakpoints

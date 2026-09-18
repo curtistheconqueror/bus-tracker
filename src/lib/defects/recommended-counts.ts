@@ -1,6 +1,6 @@
 import {isDownSheetRecommended,isUnresolved,normalizeDefects,recommendedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
-import {downSheetDefectIds} from "./down-sheet/down-sheet-sync.ts";
-import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync.ts";
+import {downSheetDefectIds} from "../../../app/down-sheet/down-sheet-sync.ts";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log-sync.ts";
 
 /* The buses somebody has PUT FORWARD for the Down Sheet, and nobody has ruled
    on yet.

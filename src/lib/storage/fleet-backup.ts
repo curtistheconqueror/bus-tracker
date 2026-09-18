@@ -1,7 +1,7 @@
 import {BOARD_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,markFleetBackupExported} from "./storage.ts";
-import {PARTS_MEMORY_STORAGE_KEY} from "../../../app/parts-memory.ts";
+import {PARTS_MEMORY_STORAGE_KEY} from "../defects/parts-memory.ts";
 import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY} from "../fleet/bus-lists.ts";
-import {FINDINGS_MEMORY_STORAGE_KEY} from "../../../app/findings-memory.ts";
+import {FINDINGS_MEMORY_STORAGE_KEY} from "../defects/findings-memory.ts";
 import {shareOrDownloadFile} from "../../../app/share-file.ts";
 
 /* Three buttons in this app write a file that CANNOT be read back in, and one

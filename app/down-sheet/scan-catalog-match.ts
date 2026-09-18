@@ -38,7 +38,7 @@
      them it wins the tie; otherwise the first is taken, and both readings of
      those four are the same repair by a different route. */
 
-import {migrateRepairIdentity,REPAIR_OPTIONS} from "../repair-catalog.ts";
+import {migrateRepairIdentity,REPAIR_OPTIONS} from "../../src/lib/defects/repair-catalog.ts";
 
 export type CatalogPick={category:string;repair:string};
 

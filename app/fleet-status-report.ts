@@ -14,7 +14,7 @@
 import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "./down-sheet/down-sheet-availability.ts";
 import {mysteryBusIds} from "../src/lib/fleet/mystery-buses.ts";
 import {standingRoadCalls} from "../src/lib/fleet/road-calls.ts";
-import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
+import {defectLabel,type StructuredDefect} from "../src/lib/defects/repair-catalog.ts";
 import {locationLabel} from "../src/lib/fleet/location-label.ts";
 import {techServicesGroup,type TechServicesGroup} from "../src/lib/fleet/tech-services.ts";
 

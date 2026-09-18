@@ -5,14 +5,14 @@ import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
 import "./fixed-repairs.css";
 import {useFixedAppearance} from "./fixed-repairs-settings";
-import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,hasWorkState,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,PARTS_ON_ORDER_KEY,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "../repair-catalog";
+import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,hasWorkState,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,PARTS_ON_ORDER_KEY,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "@/src/lib/defects/repair-catalog";
 
 /* Drawn from the catalog rather than typed here, so the label on this page and
    the label a record was stamped with can never drift apart. */
 const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES[0].label;
-import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "../parts-memory";
-import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "../findings-memory";
-import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
+import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
+import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
+import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {shareOrDownloadFile} from "../share-file";

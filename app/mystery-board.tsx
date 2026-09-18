@@ -15,7 +15,7 @@
    stylesheet both pages load. */
 
 import {useEffect,useMemo,useState,type FormEvent} from "react";
-import {defectLabel,type StructuredDefect} from "./repair-catalog";
+import {defectLabel,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "@/src/lib/fleet/facility-areas";
 import {lockPageScroll} from "./scroll-lock";
 import {bay12AwarenessBusIds,mysteryBusIds} from "@/src/lib/fleet/mystery-buses";

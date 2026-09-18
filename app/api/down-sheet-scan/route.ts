@@ -1,5 +1,5 @@
-import {REPAIR_OPTIONS} from "../../repair-catalog";
-import {cleanScanNotes,scanNotesPrompt} from "../../scan-notes";
+import {REPAIR_OPTIONS} from "@/src/lib/defects/repair-catalog";
+import {cleanScanNotes,scanNotesPrompt} from "@/src/lib/defects/scan-notes";
 
 export const runtime="edge";
 

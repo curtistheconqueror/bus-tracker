@@ -1,4 +1,4 @@
-import {normalizeDefects,type StructuredDefect} from "../repair-catalog.ts";
+import {normalizeDefects,type StructuredDefect} from "../../src/lib/defects/repair-catalog.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 import {roadServiceStatus} from "../../src/lib/fleet/smart-status.ts";
 

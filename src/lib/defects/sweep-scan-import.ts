@@ -1,4 +1,4 @@
-import {isUnresolved,migrateRepairIdentity,normalizeDefects,REPAIR_OPTIONS,type StructuredDefect} from "../repair-catalog.ts";
+import {isUnresolved,migrateRepairIdentity,normalizeDefects,REPAIR_OPTIONS,type StructuredDefect} from "./repair-catalog.ts";
 
 /* The farebox / Ventra sweep sheets, read from a photo.
 

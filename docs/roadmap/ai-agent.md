@@ -102,7 +102,7 @@ already exists and is already tested. The agent chooses; it never computes.
 | name a location | `locationLabel` | `src/lib/fleet/location-label.ts` |
 | the four counts | `buildFleetStatusReport` | `app/fleet-status-report.ts` |
 | mystery buses | `mysteryBusIds` | `src/lib/fleet/mystery-buses.ts` |
-| deferred buses | `heldDeferredBuses` | `app/deferred-counts.ts` |
+| deferred buses | `heldDeferredBuses` | `src/lib/defects/deferred-counts.ts` |
 
 A tool the agent can call that does its own arithmetic is a second
 implementation of a rule, and this project has already paid for that twice —

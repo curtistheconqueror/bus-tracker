@@ -13,7 +13,7 @@
    Storage is passed in rather than reached for, the same as storage.ts, because
    the tests have no DOM. */
 
-import {type StructuredDefect} from "../../../app/repair-catalog.ts";
+import {type StructuredDefect} from "../defects/repair-catalog.ts";
 
 type StorageReader=Pick<Storage,"getItem">;
 type StorageWriter=Pick<Storage,"getItem"|"setItem">;

@@ -1,4 +1,4 @@
-import {cleanScanNotes,scanNotesPrompt} from "../../scan-notes";
+import {cleanScanNotes,scanNotesPrompt} from "@/src/lib/defects/scan-notes";
 
 export const runtime="edge";
 

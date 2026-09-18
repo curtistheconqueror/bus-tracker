@@ -43,11 +43,11 @@ import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/
 import DownSheetSettings from "../down-sheet/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "../down-sheet/down-sheet-settings-store";
 import LogSettingsModal from "../defect-log/defect-log-settings-modal";
-import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "../defect-log/defect-log-settings";
+import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "@/src/lib/defects/defect-log-settings";
 import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repairs/fixed-repairs-settings";
-import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "../defect-log/defect-log-sync";
-import {normalizeDefects} from "../repair-catalog";
-import {mergeDuplicateDefects} from "../duplicate-defects";
+import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
+import {normalizeDefects} from "@/src/lib/defects/repair-catalog";
+import {mergeDuplicateDefects} from "@/src/lib/defects/duplicate-defects";
 import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "@/src/lib/cloud/cloud-sync";
 import {reconcileDownSheetMembership} from "../down-sheet-counter";
 import {dropTombstonedDefects,dropTombstonedEntries} from "@/src/lib/cloud/cloud-live";
