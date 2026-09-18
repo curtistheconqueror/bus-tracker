@@ -38,7 +38,7 @@ import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, down
 import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
-import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../app/section-transfer.ts";
+import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../src/lib/storage/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
 import { deferredBadgeCounts, heldDeferredBuses } from "../app/deferred-counts.ts";
 import { readSettings } from "../app/defect-log/defect-log-settings.ts";
@@ -48,7 +48,7 @@ import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupR
 import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../app/defect-log/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../app/defect-log/quick-filter-share.ts";
-import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../app/storage.ts";
+import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../src/lib/storage/storage.ts";
 
 function memoryStorage(initial={}){
  const values=new Map(Object.entries(initial));
@@ -146,10 +146,10 @@ test("phone safety controls expose full-board export reminders and recovery",asy
   readFile(new URL("../app/fleet-recovery-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/save-alert.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/storage.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/storage.ts",import.meta.url),"utf8"),
  ]);
  /* RESTORE LAST GOOD COPY moved off the map to sit beside MASTER IMPORT: both
     answer "this device is wrong, put it right", and splitting them left the
@@ -896,7 +896,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   const [page, css, backup] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-    readFile(new URL("../app/fleet-backup.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/storage/fleet-backup.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8"),
   ]);
 
@@ -3798,7 +3798,7 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  /* And the flag is load-bearing rather than decorative: the same write is
     refused without it and accepted with it. */
  {
-  const {writeFleetStorageResult,FLEET_STORAGE_KEY}=await import("../app/storage.ts");
+  const {writeFleetStorageResult,FLEET_STORAGE_KEY}=await import("../src/lib/storage/storage.ts");
   const withDefects=count=>[{id:"b1",n:"17549",defects:Array.from({length:count},(unused,index)=>({id:"d"+index}))}];
   const store=new Map();
   const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))}};
@@ -3831,8 +3831,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
 });
 
 test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one look",async()=>{
- const {readFleetBackup,restoreFleetBackup,FLEET_BACKUP_ERRORS}=await import("../app/fleet-restore.ts");
- const {FLEET_STORAGE_KEY,BOARD_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,readFleetPayload}=await import("../app/storage.ts");
+ const {readFleetBackup,restoreFleetBackup,FLEET_BACKUP_ERRORS}=await import("../src/lib/storage/fleet-restore.ts");
+ const {FLEET_STORAGE_KEY,BOARD_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,readFleetPayload}=await import("../src/lib/storage/storage.ts");
  const {BUS_LISTS_STORAGE_KEY}=await import("../app/bus-lists.ts");
 
  /* Every refusal the Facility Map used to make, kept, because this replaces a
@@ -3879,7 +3879,7 @@ test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one lo
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/settings.css",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
  ]);
  assert.ok(page.indexOf('<section id="master"')<page.indexOf('<section id="facility-map"'),"MASTER is the first section");
  assert.match(page,/>MASTER EXPORT</);
@@ -4161,22 +4161,22 @@ test("every storage function a page calls is one it imports, so IMPORT ALL DATA 
     moment somebody tried to restore a phone from a backup. Nothing in the gate
     asked the type checker. This asks the one question that matters: does every
     file that calls a storage function import it. */
- const storage=await readFile(new URL("../app/storage.ts",import.meta.url),"utf8");
+ const storage=await readFile(new URL("../src/lib/storage/storage.ts",import.meta.url),"utf8");
  const exported=[...storage.matchAll(/^export (?:async )?function ([A-Za-z]+)/gm)].map(match=>match[1]);
  assert.ok(exported.includes("writeFleetStorage")&&exported.length>10,"the storage module's functions are read off its source, not listed here");
  const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(entry=>
   entry.isDirectory()?walk(new URL(entry.name+"/",dir)):/\.(ts|tsx)$/.test(entry.name)?[new URL(entry.name,dir)]:[]))).flat();
- const files=await walk(new URL("../app/",import.meta.url));
+ const files=(await Promise.all(["../app/","../src/"].map(root=>walk(new URL(root,import.meta.url))))).flat();
  let checked=0;
  for(const file of files){
   const source=await readFile(file,"utf8");
-  const imports=[...source.matchAll(/import \{([^}]*)\} from "(?:\.\.\/|\.\/)+storage"/g)];
+  const imports=[...source.matchAll(/import \{([^}]*)\} from "(?:(?:\.\.\/|\.\/)+|@\/src\/lib\/storage\/)storage(?:\.ts)?"/g)];
   if(!imports.length)continue;
   const locals=new Set(imports.flatMap(match=>match[1].split(",").map(item=>item.trim().replace(/^type /,"")).filter(Boolean).map(item=>item.split(/\s+as\s+/).pop())));
   for(const name of exported){
    if(!new RegExp("(^|[^.\\w])"+name+"\\(").test(source))continue;
    checked++;
-   assert.ok(locals.has(name),file.pathname.split("/app/")[1]+" calls "+name+"() without importing it - a ReferenceError waiting for the first press");
+   assert.ok(locals.has(name),file.pathname.split(/\/(?:app|src)\//)[1]+" calls "+name+"() without importing it - a ReferenceError waiting for the first press");
   }
  }
  assert.ok(checked>=20,"expected to check many call sites, checked "+checked);
@@ -4186,7 +4186,7 @@ test("every storage function a page calls is one it imports, so IMPORT ALL DATA 
  /* The whole-app restore moved out of the map into fleet-restore.ts, so this
     now checks it where it lives - still guarded, still lifting the bulk-loss
     stop that a deliberate whole-device replace has to lift. */
- const restore=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ const restore=await readFile(new URL("../src/lib/storage/fleet-restore.ts",import.meta.url),"utf8");
  assert.match(restore,/import \{[^}]*\bwriteFleetStorageResult\b[^}]*\} from "\.\/storage\.ts"/);
  assert.match(restore,/const written=writeFleetStorageResult\(storage,backup\.buses,\{allowBulkDefectLoss:true\}\);/);
  assert.match(restore,/if\(!written\.ok\)return \{ok:false,restored:\[\],reason:written\.reason\}/,
@@ -4559,7 +4559,7 @@ test("no export hands the phone a link instead of a file",async()=>{
   ["Defect Log report","../app/defect-log/page.tsx"],
   ["Fixed Repairs report","../app/fixed-repairs/page.tsx"],
   ["Fleet Campaigns report","../app/lists/page.tsx"],
-  ["full backup","../app/fleet-backup.ts"],
+  ["full backup","../src/lib/storage/fleet-backup.ts"],
   ["section transfers","../app/section-transfer-controls.tsx"],
  ].map(async([label,path])=>[label,await readFile(new URL(path,import.meta.url),"utf8")]));
  for(const [label,source] of sources){
@@ -4789,7 +4789,7 @@ test("only the button that writes a restorable file is called a backup",async()=
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
  ]);
 
  // Each report says REPORT on its face, and none of them says BACKUP.
@@ -6655,7 +6655,7 @@ test("the chair mark flags ADA equipment without touching what gets stored",asyn
 test("release safety keeps interval units and learned parts attached to the right identity",async()=>{
  const [page,backup,log,fixed,logCss,fixedCss]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
@@ -6682,7 +6682,7 @@ test("release safety keeps interval units and learned parts attached to the righ
  assert.match(backup,/findingsMemory:readSavedValue\(storage,FINDINGS_MEMORY_STORAGE_KEY\)/);
  /* The learned parts and findings ride the whole-app restore, which lives in
     fleet-restore.ts now rather than inside the map's own import handler. */
- const restoreModule=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ const restoreModule=await readFile(new URL("../src/lib/storage/fleet-restore.ts",import.meta.url),"utf8");
  assert.match(restoreModule,/put\(FINDINGS_MEMORY_STORAGE_KEY,backup\.findingsMemory,"remembered findings",normalizeFindingsMemory\)/);
  assert.match(restoreModule,/put\(PARTS_MEMORY_STORAGE_KEY,backup\.partsMemory,"remembered parts",normalizePartsMemory\)/);
  // and a restore brings them back, through the same normalizers the page uses
@@ -7822,7 +7822,7 @@ test("saving fixed with a part asks for the number and flags it when left for la
 
 test("a board that did not save says so instead of failing silently",async()=>{
  const {writeFleetStorageResult,writeDownSheetStorageResult,writeSetting,writeFleetStorage}=
-  await import("../app/storage.ts");
+  await import("../src/lib/storage/storage.ts");
  const [mapPage,downPage,logPage,alert]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
@@ -8261,10 +8261,10 @@ test("LITE changes what is drawn and can never reach a record", async () => {
     files rather than trusted to a comment: the day somebody reaches for
     hiddenInLite inside a save path to "keep Lite simple", this fails. */
  const dataModules = [
-  "../app/storage.ts", "../app/cloud-sync.ts", "../app/cloud-live.ts", "../app/cloud-client.ts",
-  "../app/repair-catalog.ts", "../app/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
-  "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../app/fleet-backup.ts",
-  "../app/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
+  "../src/lib/storage/storage.ts", "../app/cloud-sync.ts", "../app/cloud-live.ts", "../app/cloud-client.ts",
+  "../app/repair-catalog.ts", "../src/lib/storage/section-transfer.ts", "../app/defect-log/defect-log-sync.ts",
+  "../app/down-sheet/down-sheet-sync.ts", "../app/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
+  "../src/lib/storage/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
  ];
  for (const file of dataModules) {
   const source = await readFile(new URL(file, import.meta.url), "utf8");
@@ -9757,7 +9757,7 @@ test("the operator reads 'remove the last scan sweep' as the batch it is",async(
 test("a scan sweep removed on one device reaches the others, and so does putting it back",async()=>{
  const {dropTombstonedDefects,applyCloudPull}=await import("../app/cloud-live.ts");
  const {readTombstones}=await import("../app/cloud-client.ts");
- const {serializeFleetPayload,FLEET_STORAGE_KEY}=await import("../app/storage.ts");
+ const {serializeFleetPayload,FLEET_STORAGE_KEY}=await import("../src/lib/storage/storage.ts");
  const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Ipad"});
 
  /* The row a live record sends now says deleted_at:null out loud. Before, a
@@ -9824,7 +9824,7 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
         REMOVED_ENTRY_LEDGER_LIMIT,CLOUD_REMOVED_ENTRIES_KEY}=await import("../app/cloud-sync.ts");
  const {pushPlan,executePushPlan,cloudPush,readTombstones}=await import("../app/cloud-client.ts");
  const {dropTombstonedEntries,applyCloudPull}=await import("../app/cloud-live.ts");
- const {serializeFleetPayload,serializeDownSheetPayload,FLEET_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY}=await import("../app/storage.ts");
+ const {serializeFleetPayload,serializeDownSheetPayload,FLEET_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY}=await import("../src/lib/storage/storage.ts");
  const config=normalizeCloudConfig({url:"https://demo.supabase.co",anonKey:"k".repeat(50),email:"shop@pacesouth.local",initials:"CM",deviceLabel:"Phone"});
  const NOW="2026-09-07T04:00:00.000Z",REMOVED="2026-09-07T03:30:00.000Z";
 
@@ -10521,7 +10521,7 @@ test("the handoff files stay true: every storage key is documented, and the entr
     share the "pace-" prefix and are not storage. */
  const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(entry=>
   entry.isDirectory()?walk(new URL(entry.name+"/",dir)):/\.(ts|tsx)$/.test(entry.name)?[new URL(entry.name,dir)]:[]))).flat();
- const sources=await Promise.all((await walk(new URL("../app/",import.meta.url))).map(file=>readFile(file,"utf8")));
+ const sources=await Promise.all(((await Promise.all(["../app/","../src/"].map(root=>walk(new URL(root,import.meta.url))))).flat()).map(file=>readFile(file,"utf8")));
  const inCode=new Set();
  for(const source of sources)
   for(const found of source.matchAll(/"(pace-[a-z0-9-]*-v\d+)"/g))inCode.add(found[1]);
@@ -11934,7 +11934,7 @@ test("a MYSTERY BUS card opens, because it already looked like it would",async()
 });
 
 test("a transfer file carries removals, so an import can make the other device MATCH rather than only grow",async()=>{
- const {exportDownSheetPayload,exportDefectLogPayload,mergeDownSheet,mergeDefectLog,mergeSummary,TRANSFER_KINDS}=await import("../app/section-transfer.ts");
+ const {exportDownSheetPayload,exportDefectLogPayload,mergeDownSheet,mergeDefectLog,mergeSummary,TRANSFER_KINDS}=await import("../src/lib/storage/section-transfer.ts");
  const {dropTombstonedEntries,dropTombstonedDefects}=await import("../app/cloud-live.ts");
  const {adoptTombstones,trimTombstoneLedger,REMOVED_ENTRY_LEDGER_LIMIT}=await import("../app/cloud-sync.ts");
 
@@ -12495,7 +12495,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
 });
 
 test("a deferred bus can be released from the drawer that lists it, and the badge moves without a reload", async () => {
-  const storage = await readFile(new URL("../app/storage.ts", import.meta.url), "utf8");
+  const storage = await readFile(new URL("../src/lib/storage/storage.ts", import.meta.url), "utf8");
   /* THE `storage` EVENT DOES NOT FIRE IN THE TAB THAT WROTE. That is the whole
      bug: defer a bus or end a deferral and the DEFERRED badge sat stale until
      its own sixty-second tick or a reload. Measured on the old code - the
@@ -13547,7 +13547,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     string in LocalStorage that anybody holding the phone can change from the
     screen that set it. The moment something gates on it, that string is
     standing between a person and a control. */
- const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../app/storage.ts","../app/cloud-sync.ts"]
+ const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../src/lib/storage/storage.ts","../app/cloud-sync.ts"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
  for(const source of files)assert.equal(source.includes(ROLE_STORAGE_KEY)||source.includes("readRole"),false,
   "nothing outside the picker may read the role — it is a label, not a permission");
@@ -14348,7 +14348,7 @@ test("a device transfer does not carry one person's holds onto everybody's board
     cloud change was made to prevent. The receiver's OWN hold has to survive the
     import too: being told to hold a bus is not undone by somebody sending you
     their board. */
- const {exportFleetMapPayload,mergeFleetMap}=await import("../app/section-transfer.ts");
+ const {exportFleetMapPayload,mergeFleetMap}=await import("../src/lib/storage/section-transfer.ts");
  const now="2026-09-11T12:00:00.000Z";
  const senderHold={at:"2026-09-11T09:00:00.000Z",by:"RM"};
  const theirs=[{id:"a1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold:senderHold}];
@@ -14636,14 +14636,14 @@ test("a hold rides MASTER EXPORT but never a share",async()=>{
  const bus={id:"b1",n:"18505",l:"garage-3",s:"service",defects:[],pendingRepair:"",hold};
 
  /* The two shares drop it. */
- const {exportFleetMapPayload}=await import("../app/section-transfer.ts");
+ const {exportFleetMapPayload}=await import("../src/lib/storage/section-transfer.ts");
  assert.equal("hold" in exportFleetMapPayload([bus],now).buses[0],false,"a section transfer is a share");
  const {busRow}=await import("../app/cloud-sync.ts");
  assert.equal("hold" in busRow(bus,{initials:"CT",deviceLabel:"shop"},now).map_fields,false,"the Shop Cloud is a share");
 
  /* The clone keeps it — asserted on the payload builder, which passes `buses`
     through verbatim, and on the absence of any filter being added later. */
- const source=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ const source=await readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8");
  assert.match(source,/payload=\{kind:"pace-south-fleet-board-backup",version:5,exportedAt:exportedAt\.toISOString\(\),buses,/,
   "MASTER EXPORT passes the buses through unfiltered, holds included");
  /* Checked against the CODE, not the comments: the comment below deliberately
@@ -15193,20 +15193,20 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
  /* MASTER IMPORT MERGES THIS ONE KEY. Everything else in a whole-app restore is
     STATE and is meant to be overwritten; the ledger is HISTORY, and restoring a
     phone onto the iPad must not throw away the swaps the iPad recorded itself. */
- const restore=await readFile(new URL("../app/fleet-restore.ts",import.meta.url),"utf8");
+ const restore=await readFile(new URL("../src/lib/storage/fleet-restore.ts",import.meta.url),"utf8");
  const restoreCode=restore.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
  assert.match(restoreCode,/mergeSheetLedgers\(readSheetLedger\(storage\),backup\.sheetLedger\)/,
   "the swap history is merged into what this device already holds");
  assert.equal(/put\(SHEET_LEDGER_KEY/.test(restoreCode),false,
   "and never goes through the plain replace every other key uses");
- const backup=await readFile(new URL("../app/fleet-backup.ts",import.meta.url),"utf8");
+ const backup=await readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8");
  assert.match(backup,/sheetLedger:readSavedValue\(storage,SHEET_LEDGER_KEY\)/,"and a master export carries it");
 
  /* THE FILE FORMAT ROUND-TRIP, which is the part that actually has to hold: a
     field that survives in memory and is dropped by the envelope or the reader
     would lose the history silently, on the one path built to move it between
     devices. Written, serialised, and read back through the app's own reader. */
- const {exportDownSheetPayload,readTransferPayload}=await import("../app/section-transfer.ts");
+ const {exportDownSheetPayload,readTransferPayload}=await import("../src/lib/storage/section-transfer.ts");
  const written=exportDownSheetPayload([{id:"e1",busId:"b1"}],day(5),{},mine);
  const reread=readTransferPayload(JSON.stringify(written),"down-sheet");
  assert.equal(reread.ok,true,"a Down Sheet transfer carrying a ledger still reads as one");

@@ -6,7 +6,7 @@
    font and appearance, so the shape here is the shape both pages agree on. */
 
 import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay,type DefectLogDisplaySettings} from "./defect-log-display-settings.ts";
-import {FLEET_BACKUP_INTERVAL,normalizeFleetBackupInterval} from "../storage.ts";
+import {FLEET_BACKUP_INTERVAL,normalizeFleetBackupInterval} from "../../src/lib/storage/storage.ts";
 
 export type Filter="all"|"open"|"in-progress"|"fixed"|"downsheet";
 export type LogTheme="light"|"dark"|"midnight"|"tactical"|"custom";

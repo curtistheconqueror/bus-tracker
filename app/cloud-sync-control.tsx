@@ -33,7 +33,7 @@ import {
  type CloudState,
 } from "./cloud-sync";
 import {applyCloudPull} from "./cloud-live";
-import {readDownSheetStorage,readFleetStorage} from "./storage";
+import {readDownSheetStorage,readFleetStorage} from "@/src/lib/storage/storage";
 
 export default function CloudSyncControl(){
  const [config,setConfig]=useState<CloudConfig>(EMPTY_CLOUD_CONFIG);

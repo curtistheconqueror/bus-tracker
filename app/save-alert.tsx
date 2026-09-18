@@ -24,7 +24,7 @@
    "today is on your phone in a file". */
 
 import {useState} from "react";
-import type {FleetWriteReason} from "./storage";
+import type {FleetWriteReason} from "@/src/lib/storage/storage";
 
 const ADVICE:Record<FleetWriteReason,{title:string;detail:string}>={
  "storage-full":{

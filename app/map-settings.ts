@@ -4,7 +4,7 @@
 
 import {confirmationPreference} from "./confirmation-preferences.ts";
 import {SERVICE_INTERVALS_UNIT,readSavedServiceIntervals,type ServiceIntervals} from "./service-intervals.ts";
-import {writeSetting} from "./storage.ts";
+import {writeSetting} from "../src/lib/storage/storage.ts";
 
 export type S="shop"|"service"|"defect"|"out"|"decommissioned"|"unknown";
 export type BusDisplayMode="icon"|"number";

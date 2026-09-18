@@ -24,7 +24,7 @@
 
 import {SHEET_LEDGER_KEY,SHEET_LEDGER_LIMIT,mergeSheetLedgers,normalizeSheetLedger,readSheetLedger,
  type SheetLedger,type SheetSnapshot} from "./sheet-ledger.ts";
-import {writeSetting} from "./storage.ts";
+import {writeSetting} from "../src/lib/storage/storage.ts";
 
 export const BACKFILL_KIND="pace-south-sheet-ledger-backfill";
 
