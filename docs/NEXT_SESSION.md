@@ -155,7 +155,7 @@ In the order Curtis asked for it. Each has enough here to start without asking.
 > the deferment."
 
 The deferral fields and the DEFERRED badge already exist — see
-`app/deferred-watch.tsx` and the `deferredAt` / `deferredUntil` fields. Release
+`src/components/shared/deferred-watch.tsx` and the `deferredAt` / `deferredUntil` fields. Release
 158 (Codex) added a persistent **UNDO DEFERRED** action, which is a different
 thing: undo returns the repair to Open, this extends the clock without changing
 the state.
@@ -208,7 +208,7 @@ strike the item the day it lands.
 ## How to check your work
 
 ```
-npm test          # builds first, then tests/rendered-html.test.mjs
+npm test          # builds first, then every file in tests/
 npm run lint
 npm run build
 ```
@@ -259,7 +259,7 @@ the conflict.** Both `bus_defects` and `down_sheet_entries` have
 `fleet_number text not null`. A tombstone row carries no fleet number by design,
 so it can never ride in an upsert — it takes the whole 200-row chunk down with
 it. Tombstones go as `UPDATE ... WHERE <key> = ...`. `pushPlan` in
-`app/cloud-client.ts` does this partitioning; do not undo it. This bug kept the
+`src/lib/cloud/cloud-client.ts` does this partitioning; do not undo it. This bug kept the
 shop cloud failing on every 45-second sweep for a week.
 
 **The merges are additive on purpose.** `mergeDefectLog` and `mergeDownSheet`

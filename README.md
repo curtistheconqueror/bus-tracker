@@ -32,13 +32,12 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 
 ## Project structure
 
-- app/ — application routes, UI, and domain logic
-- app/down-sheet/ — Down Sheet UI, synchronization, scanning, estimates, and settings
-- app/defect-log/ — mobile Defect Log UI, grouping, filters, and display settings
-- app/fixed-repairs/ — completed repair history and fix-detail editor
-- app/lists/ and app/bus-lists.ts — Fleet Campaigns, reusable formats, and text exports
+- app/ — Next routes only: one page.tsx per surface, the root layout, the stylesheets, and each route's own components under _components/
 - app/api/ — server-side API routes
-- tests/ — release-gate regression tests
+- src/lib/<area>/ — the domain, as plain TypeScript with no JSX: storage, cloud, fleet, defects, down-sheet, operator, reports, settings, shared
+- src/components/<area>/ — React components more than one route draws
+- tests/ — release-gate regression tests, one file per area, with shared setup in tests/helpers/
+- docs/ARCHITECTURE.md — the layout above and the rule for what goes where
 - public/ — manifest, service worker, icons, and static assets
 - db/, drizzle/ — backend scaffolding reserved for the shared-data phase
 - docs/ — architecture, release notes, roadmaps, and archived handoffs

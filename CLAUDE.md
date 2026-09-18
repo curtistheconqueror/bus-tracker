@@ -86,7 +86,7 @@ machine, because these sessions run in containers that are thrown away.
   silently orphans a mechanic's board.
 - **Never delete or merge repair records to simplify the UI.** History is the
   point of the app.
-- **A location is named through `app/location-label.ts`, never by a prefix.**
+- **A location is named through `src/lib/fleet/location-label.ts`, never by a prefix.**
   Matching `garage-` gets you "Main Garage" for all 84 spaces, including
   TROUBLE BAY 11 and 12, which the move editor treats as separate destinations.
   Five copies of that table existed and all five had the bug; a sixth would
@@ -102,10 +102,10 @@ machine, because these sessions run in containers that are thrown away.
   a list or changes what a tap does is his call first.
 - **Catalog renames are read-time, never rewrites.** A record saved under an old
   wording must keep reading correctly through the rename maps in
-  `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
+  `src/lib/defects/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
   `LEGACY_ISSUE_RENAMES`, `RETIRED_ISSUES`). Nothing on disk is ever rewritten.
 - **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
-  `app/bus-hold.ts` stores it as an optional `hold` field on the bus record —
+  `src/lib/fleet/bus-hold.ts` stores it as an optional `hold` field on the bus record —
   `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
   sets it to `undefined`. That rule was written when holds synced, and its
   original reason has since inverted — see below — but it stays: `delete` is
@@ -129,7 +129,7 @@ machine, because these sessions run in containers that are thrown away.
 - **The Down Sheet owns the DS badge.** Entries get there off photographed
   sheets or typed by hand, and the map *reads that membership back* rather than
   deciding it. No import, transfer or sync may assert it — see
-  `app/section-transfer.ts`, which deliberately refuses to carry `down`,
+  `src/lib/storage/section-transfer.ts`, which deliberately refuses to carry `down`,
   `onDownSheet` and `downSheetReady` on a Fleet Map transfer.
 
 ## Storage keys
@@ -219,7 +219,7 @@ than of the software, and a contract changes on a schedule nobody here controls.
 
 The app already had `Shift` as a LABEL on a Down Sheet entry — "1st", "2nd",
 "3rd", typed or defaulted by hand — and nothing anywhere that mapped a CLOCK
-TIME onto one. Pullout times appeared nowhere at all. `app/shift-clock.ts` is
+TIME onto one. Pullout times appeared nowhere at all. `src/lib/settings/shift-clock.ts` is
 that missing half and is the only place that knows: every window the Fleet
 Forecast quotes — "next shift", "the next two", "before the 06:00 pullout" —
 resolves through it, so hours change once.
@@ -322,7 +322,7 @@ nine-day hole reads as one swap that added fourteen buses and cleared thirty.
 Normalised with `delete` rather than `undefined`, the spelling `setBusHold`
 uses, so a hand-edited `gap:"no"` cannot spread through and read as truthy.
 
-**OLD SHEETS COME IN THROUGH `app/sheet-ledger-backfill.ts`**, behind LOAD OLD
+**OLD SHEETS COME IN THROUGH `src/lib/down-sheet/sheet-ledger-backfill.ts`**, behind LOAD OLD
 DOWN SHEETS in Settings. It writes `pace-sheet-ledger-v1` and nothing else —
 **a scanned sheet REPLACES the live one and a backfill must not**, because the
 sheets being loaded are weeks old and the live sheet is today's. The only
@@ -360,7 +360,7 @@ that, not the only input.
 each time. A render error unmounts the whole tree, and saved to a home screen
 there is no address bar, no reload button and no pull-to-refresh — so the app
 does not misbehave, it VANISHES, and the person holding the phone has no
-console to check and no way back in. `app/crash-guard.tsx` catches it, shows a
+console to check and no way back in. `app/_components/crash-guard.tsx` catches it, shows a
 screen carrying the one control standalone mode cannot otherwise offer, and
 writes the fault here so the next session can read it rather than guess from
 "it went white".
@@ -383,7 +383,7 @@ the mechanic ladder — inferred from the shape of the rest of the list, then
 confirmed by Curtis. The title is a top classification at some transit
 properties and a management job at others, so it was worth asking. A combination not in that table cannot
 be chosen and does not read back, so if the contract changes, it changes in
-`app/roles.ts` and any device holding the old pairing reads as "not set" until
+`src/lib/settings/roles.ts` and any device holding the old pairing reads as "not set" until
 its owner picks again. *Bargaining* is the union side, so it can never be the
 non-union label; Union / Non-Union is what the floor says.
 
@@ -398,7 +398,7 @@ they see and have access to," plus a questionnaire that does not exist yet. The
 access rules ride on **that login**. This key is an unauthenticated string in
 LocalStorage that anybody holding the phone can change from the screen that set
 it, so it can be the label a login confirms and never the thing that decides.
-Until the login exists, nothing outside `app/roles.ts` may read it, and a test
+Until the login exists, nothing outside `src/lib/settings/roles.ts` may read it, and a test
 holds that line.
 
 *Asst Supt* and *Supt* are abbreviated because both exist and both departments
@@ -436,7 +436,7 @@ ticking. It is the ONE thing the report writes — `status-report-modal.tsx`
 touches no record, and a test names the single permitted key.
 
 **Farebox, Ventra and the CUBIC screens are counted APART, through
-`app/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
+`src/lib/fleet/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
 moved up to critical levels, period. So they need a count of that as well...
 Fairbox and Venture separate. and cubic screen EV or... I'm sorry. MV, bus MV or
 MREV error. Whatever those errors say, I forgot."*
@@ -470,7 +470,7 @@ and are not — they are CustomEvent names.
 design — they keep every record the receiver alone holds — so a removal can
 never travel as an absence. It has to be recorded in one of these and pushed as
 a tombstone, or the record comes straight back on the next pull. See
-`app/cloud-sync.ts`.
+`src/lib/cloud/cloud-sync.ts`.
 
 Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
@@ -479,7 +479,7 @@ step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
 ## Checking your work
 
 ```
-npm test          # builds, then runs tests/rendered-html.test.mjs
+npm test          # builds, then runs every file in tests/
 npm run lint
 npm run build
 ```
@@ -501,22 +501,39 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
-app/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
-app/location-label.ts      slot id -> the words a person says, trouble bays included
-app/repair-catalog.ts      the defect catalog, rename maps, count fields
-app/section-transfer.ts    per-section device transfers and their merge rules
-app/storage.ts             storage keys, envelopes, recovery snapshots
-app/globals.css            the whole facility map, all breakpoints
-app/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
-app/cloud-client.ts        the Supabase calls, and how a push is planned
-app/cloud-live.ts          the one set of merge rules a pull is applied through
-docs/NEXT_SESSION.md       start here: state, queue, Codex workflow, traps
-docs/PUBLISH_NEXT.md       the standing Codex handoff
-docs/roadmap/              work that is designed but not built
-supabase/                  the cloud schema — APPLIED, and the shop is using it
-supabase/run-tests.sh      applies the migrations to a throwaway Postgres
-PROJECT_HANDOFF.md         domain ownership and surface-by-surface detail
+app/                                 what Next routes, and nothing else:
+                                     six page.tsx, layout.tsx, api/, the
+                                     stylesheets, and _components/ per route
+src/lib/<area>/                      the domain: .ts, no JSX, storage passed in
+src/components/<area>/               React drawn by more than one route
+app/<route>/_components/             React drawn by exactly one route
+
+src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
+src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
+src/lib/defects/repair-catalog.ts    the defect catalog, rename maps, count fields
+src/lib/storage/section-transfer.ts  per-section device transfers and their merge rules
+src/lib/storage/storage.ts           storage keys, envelopes, recovery snapshots
+app/globals.css                      the whole facility map, all breakpoints
+src/lib/cloud/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
+src/lib/cloud/cloud-client.ts        the Supabase calls, and how a push is planned
+src/lib/cloud/cloud-live.ts          the one set of merge rules a pull is applied through
+docs/ARCHITECTURE.md                 the layout above, and the rule for what goes where
+docs/NEXT_SESSION.md                 start here: state, queue, Codex workflow, traps
+docs/PUBLISH_NEXT.md                 the standing Codex handoff
+docs/roadmap/                        work that is designed but not built
+supabase/                            the cloud schema — APPLIED, and the shop is using it
+supabase/run-tests.sh                applies the migrations to a throwaway Postgres
+PROJECT_HANDOFF.md                   domain ownership and surface-by-surface detail
 ```
+
+**Where a new file goes.** A `.ts` module with no JSX is domain and belongs in
+`src/lib/<area>/`. A component two or more pages draw belongs in
+`src/components/<area>/`. A component exactly one page draws belongs in that
+page's `_components/` — the underscore is what stops Next routing it. `app/`
+takes routing files only. Cross-area imports go through the `@/*` alias
+(`@/src/lib/fleet/smart-status`); inside `src/lib` they stay relative, because
+the Node test runner resolves neither tsconfig paths nor the alias. See
+`docs/ARCHITECTURE.md`.
 
 The Supabase project is live and holds the shop's real records. Reading it to
 diagnose something is fine and has been useful. **Writing to it is Curtis's

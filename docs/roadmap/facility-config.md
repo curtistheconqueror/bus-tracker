@@ -10,11 +10,11 @@ the same building that must agree, plus a fifth in CSS:
 
 | Where | What it holds | Size |
 |---|---|---|
-| `app/facility-areas.ts` | `SECTION_SLOTS` — 16 sections to slot lists; `RELOCATION_AREAS` splits the garage into 3 move destinations | 18 areas |
-| `app/facility-layout.ts` | `ROAD_CAPACITY` 75, `WEST_CAPACITY` 40, plus two one-off capacity migrations | 34 lines |
-| `app/location-label.ts` | slot prefix to the words a person says | 16 prefixes |
-| `app/map-settings.ts` | `SECTION_THEME_KEYS` — which sections can be re-coloured | 15 sections |
-| `app/fleet-intelligence.ts` | spoken aliases ("cng east", "east lot") for the move parser | 16 sections |
+| `src/lib/fleet/facility-areas.ts` | `SECTION_SLOTS` — 16 sections to slot lists; `RELOCATION_AREAS` splits the garage into 3 move destinations | 18 areas |
+| `src/lib/fleet/facility-layout.ts` | `ROAD_CAPACITY` 75, `WEST_CAPACITY` 40, plus two one-off capacity migrations | 34 lines |
+| `src/lib/fleet/location-label.ts` | slot prefix to the words a person says | 16 prefixes |
+| `src/lib/settings/map-settings.ts` | `SECTION_THEME_KEYS` — which sections can be re-coloured | 15 sections |
+| `src/lib/fleet/fleet-intelligence.ts` | spoken aliases ("cng east", "east lot") for the move parser | 16 sections |
 | `app/globals.css` | the drawn geometry | 115 section selectors, 106 `grid-template-columns` |
 
 Slot-prefix literals outside those files, by count:
@@ -43,7 +43,7 @@ Not all are equal. Most are labels. These carry BEHAVIOUR:
 **1. The trouble-bay test hard-codes the garage's WIDTH.**
 
 ```ts
-// app/mystery-buses.ts
+// src/lib/fleet/mystery-buses.ts
 const slot=Number(location.slice("garage-".length));
 return Number.isInteger(slot)&&slot>=0&&slot%12>=10;
 ```
@@ -63,7 +63,7 @@ anything else moves.
 
 - `operational-time.ts` lines 23 and 37 test `bus.l==="bay-12"` to set
   `bay12Watch`;
-- `tests/rendered-html.test.mjs:244` and `:633` assert on `l:"bay-12"`;
+- the fleet suite (now `tests/fleet.test.mjs`) asserts on `l:"bay-12"`;
 - the seed board in `page.tsx:61` parks buses at `bay-10`, `bay-11`, `bay-12`.
 
 Meanwhile the *canonical* trouble bay test is the garage modulo above. So
@@ -117,7 +117,7 @@ Split in two on purpose. **Step 1 writes the config and proves it, changing no
 consumer** — a pure addition, so nothing in the running app can move. **Step 2**
 points the five tables at it one at a time, with the rendered map diffed at each.
 
-Step 1 is in: `app/site-config.ts` holds one record per section — the slot plan,
+Step 1 is in: `src/lib/fleet/site-config.ts` holds one record per section — the slot plan,
 the theme entry, and the move destinations with their labels and spoken aliases
 — and a test requires it to reproduce `SECTION_SLOTS`, `RELOCATION_AREAS`, the
 label table, `SECTION_THEME_KEYS` and the alias table **exactly**. That
@@ -193,7 +193,7 @@ mentions — it is already the regression net for exactly this, so any change th
 needs a test edited is a change that moved behaviour.
 
 ```
-grep -coE '"(garage|road|west|east|bay|...)-' tests/rendered-html.test.mjs   # 431
+grep -rcoE '"(garage|road|west|east|bay|...)-' tests/   # 431
 npm test | grep '^# tests'                                                    # must read 325
 ```
 

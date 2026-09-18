@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import CrashGuard from "./crash-guard";
+import CrashGuard from "./_components/crash-guard";
 export const metadata: Metadata = {
  title:"FLEETSTEP — Fleet Maintenance",
  description:"Interactive facility-wide fleet location and maintenance tracking board.",
