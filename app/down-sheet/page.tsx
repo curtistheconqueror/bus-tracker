@@ -33,7 +33,7 @@ import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import ShopCloudLive from "../shop-cloud-live";
-import {forgetRemovedEntries,rememberRemovedEntries} from "../cloud-sync";
+import {forgetRemovedEntries,rememberRemovedEntries} from "@/src/lib/cloud/cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "../mystery-board";
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";

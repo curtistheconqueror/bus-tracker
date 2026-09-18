@@ -129,7 +129,7 @@ machine, because these sessions run in containers that are thrown away.
 - **The Down Sheet owns the DS badge.** Entries get there off photographed
   sheets or typed by hand, and the map *reads that membership back* rather than
   deciding it. No import, transfer or sync may assert it — see
-  `app/section-transfer.ts`, which deliberately refuses to carry `down`,
+  `src/lib/storage/section-transfer.ts`, which deliberately refuses to carry `down`,
   `onDownSheet` and `downSheetReady` on a Fleet Map transfer.
 
 ## Storage keys
@@ -470,7 +470,7 @@ and are not — they are CustomEvent names.
 design — they keep every record the receiver alone holds — so a removal can
 never travel as an absence. It has to be recorded in one of these and pushed as
 a tombstone, or the record comes straight back on the next pull. See
-`app/cloud-sync.ts`.
+`src/lib/cloud/cloud-sync.ts`.
 
 Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
@@ -504,12 +504,12 @@ Tailwind's own `.fixed` and broke a tile at every width.
 app/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 app/location-label.ts      slot id -> the words a person says, trouble bays included
 app/repair-catalog.ts      the defect catalog, rename maps, count fields
-app/section-transfer.ts    per-section device transfers and their merge rules
-app/storage.ts             storage keys, envelopes, recovery snapshots
+src/lib/storage/section-transfer.ts    per-section device transfers and their merge rules
+src/lib/storage/storage.ts             storage keys, envelopes, recovery snapshots
 app/globals.css            the whole facility map, all breakpoints
-app/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
-app/cloud-client.ts        the Supabase calls, and how a push is planned
-app/cloud-live.ts          the one set of merge rules a pull is applied through
+src/lib/cloud/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
+src/lib/cloud/cloud-client.ts        the Supabase calls, and how a push is planned
+src/lib/cloud/cloud-live.ts          the one set of merge rules a pull is applied through
 docs/NEXT_SESSION.md       start here: state, queue, Codex workflow, traps
 docs/PUBLISH_NEXT.md       the standing Codex handoff
 docs/roadmap/              work that is designed but not built
