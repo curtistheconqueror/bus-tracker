@@ -16,9 +16,9 @@
 
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {defectLabel,type StructuredDefect} from "./repair-catalog";
-import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "./facility-areas";
+import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "@/src/lib/fleet/facility-areas";
 import {lockPageScroll} from "./scroll-lock";
-import {bay12AwarenessBusIds,mysteryBusIds} from "./mystery-buses";
+import {bay12AwarenessBusIds,mysteryBusIds} from "@/src/lib/fleet/mystery-buses";
 
 /* The board's collapsed state kept its Defect Log name on purpose. The key is
    what a device already has written down, and renaming one silently orphans
@@ -42,7 +42,7 @@ export type MysteryBoardBus={
 /* The boards' own name for the same function, kept so the three boards that
    import it do not all have to change; the label itself comes from the one
    copy that resolves a slot through the areas the move editor writes with. */
-import {locationLabel as mysteryLocationLabel} from "./location-label";
+import {locationLabel as mysteryLocationLabel} from "@/src/lib/fleet/location-label";
 export {mysteryLocationLabel};
 
 export function MysteryMoveModal<T extends {id:string;n:string;l:string}>({bus,fleet,move,close}:{bus:T;fleet:T[];move:(area:string)=>boolean;close:()=>void}){

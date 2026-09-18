@@ -18,7 +18,7 @@ import {
   type DownSheetRepairItem,
 } from "./down-sheet-repair-items";
 import {formatRepairTime, repairTimeTotal, resetCoreRepairEstimate, type RepairTimeEstimate} from "./repair-time-estimates";
-import {RELOCATION_AREAS, sectionForLocation} from "../facility-areas";
+import {RELOCATION_AREAS, sectionForLocation} from "@/src/lib/fleet/facility-areas";
 
 type FleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 type Shift="1st"|"2nd"|"3rd";

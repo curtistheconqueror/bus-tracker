@@ -36,7 +36,7 @@ The facility map owns physical location. The Down Sheet owns scheduled maintenan
 - app/down-sheet/ — Down Sheet UI, synchronization, scanning, estimates, and settings
 - app/defect-log/ — mobile Defect Log UI, grouping, filters, and display settings
 - app/fixed-repairs/ — completed repair history and fix-detail editor
-- app/lists/ and app/bus-lists.ts — Fleet Campaigns, reusable formats, and text exports
+- app/lists/ and src/lib/fleet/bus-lists.ts — Fleet Campaigns, reusable formats, and text exports
 - app/api/ — server-side API routes
 - tests/ — release-gate regression tests
 - public/ — manifest, service worker, icons, and static assets

@@ -3,7 +3,7 @@
    Settings page read and write the same thing. Data only - no JSX. */
 
 import {confirmationPreference} from "./confirmation-preferences.ts";
-import {SERVICE_INTERVALS_UNIT,readSavedServiceIntervals,type ServiceIntervals} from "./service-intervals.ts";
+import {SERVICE_INTERVALS_UNIT,readSavedServiceIntervals,type ServiceIntervals} from "../src/lib/fleet/service-intervals.ts";
 import {writeSetting} from "../src/lib/storage/storage.ts";
 
 export type S="shop"|"service"|"defect"|"out"|"decommissioned"|"unknown";

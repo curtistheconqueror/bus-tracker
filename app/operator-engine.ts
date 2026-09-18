@@ -1,7 +1,7 @@
-import {candidateBusNumbers,resolveBusNumber} from "./bus-number-resolver.ts";
+import {candidateBusNumbers,resolveBusNumber} from "../src/lib/fleet/bus-number-resolver.ts";
 import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "./repair-catalog.ts";
-import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "./fleet-intelligence.ts";
-import type {FleetStatus} from "./smart-status.ts";
+import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "../src/lib/fleet/fleet-intelligence.ts";
+import type {FleetStatus} from "../src/lib/fleet/smart-status.ts";
 import {describeScanBatch,scanBatches,type ScanBatch} from "./defect-log/scan-batches.ts";
 
 export type OperatorBus=FleetInsightBus;

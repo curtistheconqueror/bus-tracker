@@ -1,6 +1,6 @@
 "use client";
 
-import {MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR,SERVICE_KINDS,fleetDutyCycle,normalizeServiceIntervals,type ServiceIntervals} from "./service-intervals";
+import {MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR,SERVICE_KINDS,fleetDutyCycle,normalizeServiceIntervals,type ServiceIntervals} from "@/src/lib/fleet/service-intervals";
 import {type BusDisplayMode,type S,SECTION_THEME_KEYS,ST,type SectionThemeKey,THEMES,type Visuals,type BoardSettings} from "./map-settings";
 import Icon from "./status-icon";
 import {SettingsDrawer,SettingsDrawers} from "./settings/settings-drawer";

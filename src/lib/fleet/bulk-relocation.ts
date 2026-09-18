@@ -1,5 +1,5 @@
 import {statusForLocation,type FleetStatus,type RepairAwareBus} from "./smart-status.ts";
-import {stampOperationalChange} from "./operational-time.ts";
+import {stampOperationalChange} from "../../../app/operational-time.ts";
 
 export type BulkRelocationBus=RepairAwareBus&{
  id:string;
