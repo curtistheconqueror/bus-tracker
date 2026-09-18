@@ -4,10 +4,10 @@ import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgain
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../src/lib/cloud/cloud-sync.ts";
 import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../src/lib/fleet/fleet-validation.ts";
-import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
-import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
-import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
-import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
+import { applyDownEntryToFleet } from "../src/lib/down-sheet/down-sheet-sync.ts";
+import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../src/lib/down-sheet/down-sheet-counter.ts";
+import { syncTrackerDownSheetSelection } from "../src/lib/down-sheet/tracker-membership-sync.ts";
+import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../src/lib/down-sheet/down-sheet-clear.ts";
 import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../src/lib/fleet/smart-status.ts";
 import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectClearSnapshot, restoreFacilityOnlyDefects, syncFacilityAlertDefects } from "../src/lib/fleet/facility-defect-clear.ts";
 import { bulkAreaAvailability, bulkRelocateBuses } from "../src/lib/fleet/bulk-relocation.ts";
@@ -29,23 +29,23 @@ import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
-import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../app/down-sheet/repair-time-estimates.ts";
-import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../app/down-sheet/down-sheet-repair-items.ts";
-import { mergeReviewedRows, reviewScannedRows } from "../app/down-sheet/down-sheet-scan-import.ts";
-import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/down-sheet/down-sheet-replace.ts";
-import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch } from "../app/down-sheet/down-sheet-filters.ts";
-import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText } from "../app/down-sheet/down-sheet-share.ts";
+import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../src/lib/down-sheet/repair-time-estimates.ts";
+import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../src/lib/down-sheet/down-sheet-repair-items.ts";
+import { mergeReviewedRows, reviewScannedRows } from "../src/lib/down-sheet/down-sheet-scan-import.ts";
+import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../src/lib/down-sheet/down-sheet-replace.ts";
+import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch } from "../src/lib/down-sheet/down-sheet-filters.ts";
+import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText } from "../src/lib/down-sheet/down-sheet-share.ts";
 import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../src/lib/defects/defect-log-sync.ts";
 import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../src/lib/fleet/mystery-buses.ts";
-import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
+import { reconcileDownSheetMembership as reconcileDS } from "../src/lib/down-sheet/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../src/lib/storage/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../src/lib/defects/quick-filters.ts";
 import { deferredBadgeCounts, heldDeferredBuses } from "../src/lib/defects/deferred-counts.ts";
 import { readSettings } from "../src/lib/defects/defect-log-settings.ts";
 import { EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings } from "../src/lib/defects/findings-memory.ts";
-import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../app/down-sheet-badge-view.ts";
-import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../app/down-sheet/down-sheet-view.ts";
-import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../app/down-sheet/down-sheet-display-settings.ts";
+import { downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation } from "../src/lib/down-sheet/down-sheet-badge-view.ts";
+import { DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries } from "../src/lib/down-sheet/down-sheet-view.ts";
+import { DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay } from "../src/lib/down-sheet/down-sheet-display-settings.ts";
 import { DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay } from "../src/lib/defects/defect-log-display-settings.ts";
 import { quickFilterShareText } from "../src/lib/defects/quick-filter-share.ts";
 import { DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage } from "../src/lib/storage/storage.ts";
@@ -3690,7 +3690,7 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  /* Writes merge over what each key already holds. Checked on the data
     modules, which are what the page calls. */
  const {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings}=await import("../app/map-settings.ts");
- const {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings}=await import("../app/down-sheet/down-sheet-settings-store.ts");
+ const {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings}=await import("../src/lib/down-sheet/down-sheet-settings-store.ts");
  const store=new Map();
  const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))}};
  storage.setItem(BOARD_SETTINGS_KEY,JSON.stringify({theme:"midnight",downSheetBadgeView:"off-road",futureField:"keep"}));
@@ -5244,7 +5244,7 @@ test("the Down Sheet editor holds the page still and fills a phone screen",async
 test("Air System is read as Pneumatic System, and the two rear valves by what they do",async()=>{
  const { REPAIR_OPTIONS, migrateRepairIdentity, normalizeDefects, defectCountField,
          normalizeRepairCount, repairCategoryEmoji } = await import("../src/lib/defects/repair-catalog.ts");
- const { recommendedRepairMinutes } = await import("../app/down-sheet/repair-time-estimates.ts");
+ const { recommendedRepairMinutes } = await import("../src/lib/down-sheet/repair-time-estimates.ts");
 
  // The picker offers the new name only.
  assert.ok(REPAIR_OPTIONS["Pneumatic System"],"the category is listed under its new name");
@@ -7052,7 +7052,7 @@ test("a pull reads past one page and signing out is local to the device",async()
 });
 
 test("the Down Sheet can move a bus, which is what makes a status change stick",async()=>{
- const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+ const { applyDownEntryToFleet } = await import("../src/lib/down-sheet/down-sheet-sync.ts");
  const { RELOCATION_AREAS } = await import("../src/lib/fleet/facility-areas.ts");
  const now="2026-08-30T12:00:00.000Z";
  const fleet=[{id:"b1",n:"17554",l:"west-3",s:"out",defects:[],pendingRepair:"",down:true}];
@@ -7310,7 +7310,7 @@ test("a shared filter list collapses repeats and can go as a page",async()=>{
 test("duplicate defects merge into one record without losing anything",async()=>{
  const { mergeDuplicateDefects, matchingUnresolvedDefectId, defectFingerprint } =
   await import("../src/lib/defects/duplicate-defects.ts");
- const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+ const { applyDownEntryToFleet } = await import("../src/lib/down-sheet/down-sheet-sync.ts");
 
  const defect=(id,extra={})=>({id,category:"Cooling System",issue:"Overheating",
   details:"R/C Overheats/ Farebox Won't Lock/ Rear End Shifted",
@@ -7446,9 +7446,9 @@ test("duplicate defects merge into one record without losing anything",async()=>
 });
 
 test("a repair already on the bus is not recorded twice by the down sheet",async()=>{
- const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
+ const { applyDownEntryToFleet } = await import("../src/lib/down-sheet/down-sheet-sync.ts");
  const { defectSupportingDetails, normalizeDefects } = await import("../src/lib/defects/repair-catalog.ts");
- const { blankRepairItem } = await import("../app/down-sheet/down-sheet-repair-items.ts");
+ const { blankRepairItem } = await import("../src/lib/down-sheet/down-sheet-repair-items.ts");
 
  // A bus carrying a check engine light typed into the Defect Log, exactly as
  // that page stores it.
@@ -8263,8 +8263,8 @@ test("LITE changes what is drawn and can never reach a record", async () => {
  const dataModules = [
   "../src/lib/storage/storage.ts", "../src/lib/cloud/cloud-sync.ts", "../src/lib/cloud/cloud-live.ts", "../src/lib/cloud/cloud-client.ts",
   "../src/lib/defects/repair-catalog.ts", "../src/lib/storage/section-transfer.ts", "../src/lib/defects/defect-log-sync.ts",
-  "../app/down-sheet/down-sheet-sync.ts", "../src/lib/defects/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
-  "../src/lib/storage/fleet-restore.ts", "../app/down-sheet/down-sheet-clear.ts",
+  "../src/lib/down-sheet/down-sheet-sync.ts", "../src/lib/defects/deferred-actions.ts", "../src/lib/storage/fleet-backup.ts",
+  "../src/lib/storage/fleet-restore.ts", "../src/lib/down-sheet/down-sheet-clear.ts",
  ];
  for (const file of dataModules) {
   const source = await readFile(new URL(file, import.meta.url), "utf8");
@@ -8367,8 +8367,8 @@ test("the welcome is on every page, re-openable from Settings, and does not rend
 });
 
 test("the Down Sheet's bands are read in the order the shop chose, and the ORDER control is gone", async () => {
- const { normalizeDownSheetSectionOrder, orderDownSheetGroups, DOWN_SHEET_GROUPS } = await import("../app/down-sheet/down-sheet-view.ts");
- const { readDownSheetSettings } = await import("../app/down-sheet/down-sheet-settings-store.ts");
+ const { normalizeDownSheetSectionOrder, orderDownSheetGroups, DOWN_SHEET_GROUPS } = await import("../src/lib/down-sheet/down-sheet-view.ts");
+ const { readDownSheetSettings } = await import("../src/lib/down-sheet/down-sheet-settings-store.ts");
  const groups = DOWN_SHEET_GROUPS.map(group => ({ key: group.key }));
 
  // Absent means the default order, so no device changes on upgrade.
@@ -9422,7 +9422,7 @@ test("a merged-away tombstone goes up as an UPDATE by id, never inside an upsert
 });
 
 test("a numbered sheet says which lines the photo never returned",async()=>{
- const {scannedLineGaps,describeLineGaps}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const {scannedLineGaps,describeLineGaps}=await import("../src/lib/down-sheet/down-sheet-scan-import.ts");
  const row=(line,bus)=>({pageNumber:line<=28?1:2,lineNumber:String(line).padStart(2,"0"),busNumber:bus,reason:"",assignedTo:"",category:"",repair:"",section:"",shift:"1st",operationalStatus:"out",confidence:1,reviewNote:""});
 
  /* The 09/5 4:24pm sheet. Two buses vanished from the scan without a word —
@@ -9570,8 +9570,8 @@ test("live sync is a doorbell, not a delivery",async()=>{
 });
 
 test("the scan corrects what the camera misread, and never touches what it must not",async()=>{
- const {correctScannedText,knownMechanicNames}=await import("../app/down-sheet/scan-spelling.ts");
- const {isMarginRow,reviewScannedRows}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const {correctScannedText,knownMechanicNames}=await import("../src/lib/down-sheet/scan-spelling.ts");
+ const {isMarginRow,reviewScannedRows}=await import("../src/lib/down-sheet/down-sheet-scan-import.ts");
 
  /* The shop's own mechanics, learned from entries the device already holds. A
     fixed word list turns TIROS into TIRES; only the shop's history turns CAROS
@@ -9991,7 +9991,7 @@ test("the tablet band does not scroll sideways: the nav wraps, and a map rule st
 });
 
 test("a bus only leaves the DOWN count when the sheet says it still runs",async()=>{
- const {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly}=await import("../app/down-sheet/down-sheet-availability.ts");
+ const {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly}=await import("../src/lib/down-sheet/down-sheet-availability.ts");
  /* Rows lifted from a real master export, reconciled against the paper sheet it
     was scanned from. The app said 47 DOWN where the foreman counted 39. */
  const row=(busNumber,repair,customReason,items=[])=>({busId:busNumber,busNumber,category:"",repair,customReason,
@@ -10040,7 +10040,7 @@ test("a bus only leaves the DOWN count when the sheet says it still runs",async(
 });
 
 test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maintenance",async()=>{
- const {downSheetMentionsDefect,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+ const {downSheetMentionsDefect,downSheetGroup}=await import("../src/lib/down-sheet/down-sheet-view.ts");
  const row=(repair,customReason,section="Pending")=>({busId:"b",category:"",repair,customReason,section});
 
  /* THE CATALOG'S OWN NAME DEFEATED THE CATALOG'S OWN RULE, found on bus 17534
@@ -10132,7 +10132,7 @@ test("DOWN BUSES counts the sheet minus its maintenance, and PM wording is maint
     switch is for, and the number has to follow the decision. */
  assert.match(page,/const softDownCount=useMemo\(\(\)=>shown\.filter\(entry=>isSoftDownEntry\(entry\)&&!isEntryInService\(entry\)\)\.length,\[shown\]\)/);
  {
-  const {downSheetAvailability}=await import("../app/down-sheet/down-sheet-availability.ts");
+  const {downSheetAvailability}=await import("../src/lib/down-sheet/down-sheet-availability.ts");
   const sheet=[
    row("Misfire","ENGINE LIGHT-MISFIRES"),
    row("Rear main seal","High Oil Usage Hold until Repaired (Rear Main Seal )"),
@@ -10726,7 +10726,7 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
 
 test("a soft bus the yard puts on a run stops counting against pullout, on every device",async()=>{
  const {setEntryInService,isEntryInService,entryInServiceStamp,countsAgainstPullout,isSoftDownEntry}=
-  await import("../app/down-sheet/down-sheet-availability.ts");
+  await import("../src/lib/down-sheet/down-sheet-availability.ts");
  const soft={id:"e1",busId:"b",busNumber:"17527",category:"",repair:"Manual entry",
   customReason:"HOLD FOR SOUTH HOLLAND, THEY ARE COMING WEDS 7AM TO REPAIR"};
  const hard={id:"e2",busId:"c",busNumber:"17510",category:"",repair:"Driver-reported defect",
@@ -11208,7 +11208,7 @@ test("the FLEET FORECAST refuses before it can count, and counts open repairs at
 });
 
 test("the swap ledger keys on the fleet number, because bus ids are one device's own",async()=>{
- const {snapshotFromEntries,ledgerTempo,mergeSheetLedgers,normalizeSheetLedger}=await import("../app/sheet-ledger.ts");
+ const {snapshotFromEntries,ledgerTempo,mergeSheetLedgers,normalizeSheetLedger}=await import("../src/lib/down-sheet/sheet-ledger.ts");
 
  /* MEASURED, NOT REASONED ABOUT. The ledger keyed rows on the Down Sheet
     entry's `busId` for two releases, and that was wrong the moment it started
@@ -11252,10 +11252,10 @@ test("the swap ledger keys on the fleet number, because bus ids are one device's
 });
 
 test("the backfill loads old sheets into the swap history and touches nothing else",async()=>{
- const {planBackfill,applyBackfill,BACKFILL_KIND}=await import("../app/sheet-ledger-backfill.ts");
- const {SHEET_LEDGER_KEY}=await import("../app/sheet-ledger.ts");
+ const {planBackfill,applyBackfill,BACKFILL_KIND}=await import("../src/lib/down-sheet/sheet-ledger-backfill.ts");
+ const {SHEET_LEDGER_KEY}=await import("../src/lib/down-sheet/sheet-ledger.ts");
  const panel=await readFile(new URL("../app/settings/sheet-backfill.tsx",import.meta.url),"utf8");
- const module_=await readFile(new URL("../app/sheet-ledger-backfill.ts",import.meta.url),"utf8");
+ const module_=await readFile(new URL("../src/lib/down-sheet/sheet-ledger-backfill.ts",import.meta.url),"utf8");
 
  const snap=(id,at,rows,extra={})=>({id,at,shift:"1st",rows:rows.map(b=>({b,c:"Engine"})),off:[],...extra});
  const file=JSON.stringify({kind:BACKFILL_KIND,version:1,snapshots:[
@@ -12063,8 +12063,8 @@ test("REFRESH is on every page, because a home-screen app has no address bar to 
 });
 
 test("every bus on one printed line carries that line's wording, so a PM line is not seven down buses",async()=>{
- const {reviewScannedRows,mergeReviewedRows,fillPrintedLineSiblings,sectionForScannedRow}=await import("../app/down-sheet/down-sheet-scan-import.ts");
- const {downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+ const {reviewScannedRows,mergeReviewedRows,fillPrintedLineSiblings,sectionForScannedRow}=await import("../src/lib/down-sheet/down-sheet-scan-import.ts");
+ const {downSheetGroup}=await import("../src/lib/down-sheet/down-sheet-view.ts");
 
  const row=(over={})=>({pageNumber:2,lineNumber:"53",busNumber:"",reason:"",assignedTo:"",category:"",repair:"",section:"Pending",shift:"1st",operationalStatus:"out",confidence:.9,reviewNote:"",...over});
  const band=record=>downSheetGroup({...record,customReason:record.reason,assignmentType:"Mechanic"});
@@ -12162,8 +12162,8 @@ test("every bus on one printed line carries that line's wording, so a PM line is
 });
 
 test("the words written on a scanned row outrank the catalog repair the scan guessed at",async()=>{
- const {reconcileScannedRepair,catalogPickFromWords,repairNamedInWords}=await import("../app/down-sheet/scan-catalog-match.ts");
- const {reviewScannedRows,mergeReviewedRows}=await import("../app/down-sheet/down-sheet-scan-import.ts");
+ const {reconcileScannedRepair,catalogPickFromWords,repairNamedInWords}=await import("../src/lib/down-sheet/scan-catalog-match.ts");
+ const {reviewScannedRows,mergeReviewedRows}=await import("../src/lib/down-sheet/down-sheet-scan-import.ts");
  const {REPAIR_OPTIONS,migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
 
  /* BUS 15508, LINE 25 of the 09/6 sheet. Written on the paper: MISFIRE CYL # 5
@@ -12286,7 +12286,7 @@ test("Fixed Repairs takes a typed bus number, not only a dropdown",async()=>{
 });
 
 test("the Down Sheet says which of its buses are out on the road, the inverse of the map's badges",async()=>{
- const {downSheetRoadCounts,downSheetRoadEntries,downSheetMentionsInspection,downSheetMentionsDefect,isDownSheetRoadLocation,downSheetGroup}=await import("../app/down-sheet/down-sheet-view.ts");
+ const {downSheetRoadCounts,downSheetRoadEntries,downSheetMentionsInspection,downSheetMentionsDefect,isDownSheetRoadLocation,downSheetGroup}=await import("../src/lib/down-sheet/down-sheet-view.ts");
 
  /* The map's down-sheet badges answer "is this bus on the sheet?" while you
     look at the yard. These answer the inverse — "is this one out working?" —
@@ -12405,7 +12405,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     key, the label is `completed` - and the tile rendered a number over a blank
     line. It looked fine in the source and only showed up when the box was
     measured in a browser. */
- const {DEFAULT_DOWN_SHEET_DISPLAY:DOWN_LABELS}=await import("../app/down-sheet/down-sheet-display-settings.ts");
+ const {DEFAULT_DOWN_SHEET_DISPLAY:DOWN_LABELS}=await import("../src/lib/down-sheet/down-sheet-display-settings.ts");
  for(const key of [...page.matchAll(/displaySettings\.labels\.([A-Za-z]+)/g)].map(match=>match[1]))
   assert.ok(key in DOWN_LABELS.labels, "displaySettings.labels."+key+" is not a label that exists, so it would draw blank");
  const board=page.slice(page.indexOf('<div className="down-group-counts" id="down-counts-tiles">'),page.indexOf("</div>}\n  </section>"));
@@ -15066,7 +15066,7 @@ test("the garage's hours are editable on the device, and nothing re-implements t
 
 test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
  const {SHEET_LEDGER_KEY,SHEET_LEDGER_LIMIT,appendSnapshot,ledgerTempo,normalizeSheetLedger,
-  recordSheetSwap,snapshotFromEntries}=await import("../app/sheet-ledger.ts");
+  recordSheetSwap,snapshotFromEntries}=await import("../src/lib/down-sheet/sheet-ledger.ts");
 
  /* THE PROBLEM THIS EXISTS FOR: a scanned sheet REPLACES the live one and
     nothing retained the sheet before that, so sheet-to-sheet tempo had never
@@ -15171,7 +15171,7 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
     same swap — one scans the paper, the other receives the resulting sheet
     through the cloud and performs none. So there is nothing to reconcile and
     the union IS the history. Same shape as the road-call events. */
- const {mergeSheetLedgers}=await import("../app/sheet-ledger.ts");
+ const {mergeSheetLedgers}=await import("../src/lib/down-sheet/sheet-ledger.ts");
  const mine=[snapshotFromEntries([entry("b1","Brakes")],[],day(1),undefined,"a1"),
              snapshotFromEntries([entry("b2","Engine")],[],day(3),undefined,"a2")];
  const theirs=[snapshotFromEntries([entry("b3","A/C and HVAC")],[],day(2),undefined,"b1"),

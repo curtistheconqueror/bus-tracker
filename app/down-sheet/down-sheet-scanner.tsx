@@ -3,10 +3,10 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {lockPageScroll} from "../scroll-lock";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
-import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "./down-sheet-scan-import";
-import {knownMechanicNames} from "./scan-spelling";
-import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
-import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
+import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "@/src/lib/down-sheet/down-sheet-scan-import";
+import {knownMechanicNames} from "@/src/lib/down-sheet/scan-spelling";
+import {downSheetGroup,downSheetGroupLabel} from "@/src/lib/down-sheet/down-sheet-view";
+import {scannedSheetRemovals,type ReplaceDownEntry} from "@/src/lib/down-sheet/down-sheet-replace";
 import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
 import {writeSetting} from "@/src/lib/storage/storage";

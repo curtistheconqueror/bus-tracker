@@ -11,7 +11,7 @@
    Nothing here decides what a merge means. */
 
 import {mergeDefectLog,mergeDownSheet,mergeFleetMap} from "../storage/section-transfer.ts";
-import {reconcileDownSheetMembership} from "../../../app/down-sheet-counter.ts";
+import {reconcileDownSheetMembership} from "../down-sheet/down-sheet-counter.ts";
 import {readDownSheetStorage,readFleetStorage,writeDownSheetStorage,writeFleetStorage,DOWN_SHEET_STORAGE_KEY,FLEET_STORAGE_KEY} from "../storage/storage.ts";
 
 export const LIVE_TABLES=["buses","bus_defects","down_sheet_entries"] as const;

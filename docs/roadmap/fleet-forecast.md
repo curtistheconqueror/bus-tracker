@@ -19,7 +19,7 @@ no data behind it yet.**
 
 | | Built | Where |
 | --- | --- | --- |
-| 1a. The sheet ledger | ✅ | `app/sheet-ledger.ts`, and it travels |
+| 1a. The sheet ledger | ✅ | `src/lib/down-sheet/sheet-ledger.ts`, and it travels |
 | 1b. Shifts and pullout times | ✅ | `app/shift-clock.ts`, editable in Settings |
 | 1c. Road-call rate, censored dwell | ✅ | `app/fleet-forecast.ts` |
 | 1d. A descriptive panel to check it against | ❌ | not started |
@@ -104,7 +104,7 @@ in `writeFleetStorageResult` exists because that has nearly happened before.
 it:** *"I will be scanning from multiple devices, period."* Left device-local,
 each phone would hold only the swaps IT performed. Merging is safe because a
 swap is an EVENT that happened once on one device, so the union IS the history —
-see `CLAUDE.md` and `app/sheet-ledger.ts`.
+see `CLAUDE.md` and `src/lib/down-sheet/sheet-ledger.ts`.
 
 ### 1b. Shifts and pullout times — `pace-shift-settings-v1`
 

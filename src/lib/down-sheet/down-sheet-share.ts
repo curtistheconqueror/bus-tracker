@@ -3,7 +3,7 @@ import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view.ts";
 /* The same words the app says, from the same table. A shared list that invents
    its own name for Trouble Bay 12 is a list that sends somebody to the wrong
    bay, and five copies of that table have already existed in this repo. */
-import {knownLocationLabel} from "../../src/lib/fleet/location-label.ts";
+import {knownLocationLabel} from "../fleet/location-label.ts";
 
 export type DownSheetShareEntry=DownSheetFilterEntry&{busNumber:string};
 

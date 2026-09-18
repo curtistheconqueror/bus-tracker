@@ -13,7 +13,7 @@ import {shareOrDownloadFile} from "../../../app/share-file.ts";
    The word REPORT in every one of those three labels is what carries that, and
    this hint is the long version behind them. It lives beside the backup itself
    so the two can never be described inconsistently. */
-import {SHEET_LEDGER_KEY} from "../../../app/sheet-ledger.ts";
+import {SHEET_LEDGER_KEY} from "../down-sheet/sheet-ledger.ts";
 
 export const REPORT_EXPORT_HINT="Report only — a snapshot to read or send to somebody. This file cannot be imported back into the app. To move this section to another device use the transfer above it; to back the whole app up use MASTER EXPORT in Settings.";
 

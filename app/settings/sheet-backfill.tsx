@@ -15,8 +15,8 @@
    report: you read it, then it happens. */
 
 import {useMemo,useState} from "react";
-import {applyBackfill,planBackfill,type BackfillPlan} from "../sheet-ledger-backfill";
-import {readSheetLedger} from "../sheet-ledger";
+import {applyBackfill,planBackfill,type BackfillPlan} from "@/src/lib/down-sheet/sheet-ledger-backfill";
+import {readSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 
 export default function SheetBackfillPanel(){
  const [text,setText]=useState("");

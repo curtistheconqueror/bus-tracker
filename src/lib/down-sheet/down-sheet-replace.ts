@@ -1,6 +1,6 @@
-import {normalizeDefects,type StructuredDefect} from "../../src/lib/defects/repair-catalog.ts";
-import {stampOperationalChange} from "../operational-time.ts";
-import {roadServiceStatus} from "../../src/lib/fleet/smart-status.ts";
+import {normalizeDefects,type StructuredDefect} from "../defects/repair-catalog.ts";
+import {stampOperationalChange} from "../../../app/operational-time.ts";
+import {roadServiceStatus} from "../fleet/smart-status.ts";
 
 export type ReplaceDownEntry={id?:string;defectId?:string;busId:string;busNumber:string;section:string;workflow:string};
 export type ReplaceFleetBus={
