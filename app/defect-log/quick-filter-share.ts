@@ -8,7 +8,7 @@ import {quickFilterDefects,quickFilterFallbackLabel,type QuickFilterBus,type Qui
    Unknown slots stay blank here rather than printing the raw id: this text
    gets pasted into a message to somebody who may not have the app open at
    all, and "offsite-3" reads as a typo to them. */
-import {knownLocationLabel as shareAreaLabel} from "../location-label.ts";
+import {knownLocationLabel as shareAreaLabel} from "../../src/lib/fleet/location-label.ts";
 export {shareAreaLabel};
 
 export type QuickFilterShareBus=QuickFilterBus&{n:string;l?:string};

@@ -16,11 +16,11 @@ import type {DefectLogFleetBus} from "../defect-log/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {shareOrDownloadFile} from "../share-file";
-import {locationLabel as sharedLocationLabel} from "../location-label";
+import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "@/src/lib/storage/storage";
 import SaveAlert from "../save-alert";
 import ShopCloudLive from "../shop-cloud-live";
-import {candidateBusNumbers,resolveBusNumber} from "../bus-number-resolver";
+import {candidateBusNumbers,resolveBusNumber} from "@/src/lib/fleet/bus-number-resolver";
 import AppName from "../app-name";
 import WelcomeGate from "../welcome-gate";
 

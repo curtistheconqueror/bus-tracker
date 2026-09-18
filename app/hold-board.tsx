@@ -21,9 +21,9 @@
    business in a list of things the sheet is not covering. */
 
 import {useEffect} from "react";
-import {heldBuses,holdDetailLabel,holdUntilLabel,heldMinutes,type HoldableBus} from "./bus-hold";
+import {heldBuses,holdDetailLabel,holdUntilLabel,heldMinutes,type HoldableBus} from "@/src/lib/fleet/bus-hold";
 import {elapsedLong} from "./elapsed-label";
-import {locationLabel} from "./location-label";
+import {locationLabel} from "@/src/lib/fleet/location-label";
 import {lockPageScroll} from "./scroll-lock";
 
 export function HoldBadge({count,onOpen}:{count:number;onOpen:()=>void}){

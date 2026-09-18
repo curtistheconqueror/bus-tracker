@@ -1,4 +1,4 @@
-import {defectSummary,isUnresolved,migrateRepairIdentity,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
+import {defectSummary,isUnresolved,migrateRepairIdentity,normalizeDefects,type StructuredDefect} from "../../../app/repair-catalog.ts";
 import {statusForLocation,type FleetStatus} from "./smart-status.ts";
 
 export const FACILITY_DEFECT_CLEAR_UNDO_KEY="pace-facility-defect-clear-undo-v1";

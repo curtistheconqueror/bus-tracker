@@ -86,7 +86,7 @@ machine, because these sessions run in containers that are thrown away.
   silently orphans a mechanic's board.
 - **Never delete or merge repair records to simplify the UI.** History is the
   point of the app.
-- **A location is named through `app/location-label.ts`, never by a prefix.**
+- **A location is named through `src/lib/fleet/location-label.ts`, never by a prefix.**
   Matching `garage-` gets you "Main Garage" for all 84 spaces, including
   TROUBLE BAY 11 and 12, which the move editor treats as separate destinations.
   Five copies of that table existed and all five had the bug; a sixth would
@@ -105,7 +105,7 @@ machine, because these sessions run in containers that are thrown away.
   `app/repair-catalog.ts` (`LEGACY_CATEGORY_RENAMES`, `CATEGORY_ISSUE_RENAMES`,
   `LEGACY_ISSUE_RENAMES`, `RETIRED_ISSUES`). Nothing on disk is ever rewritten.
 - **A HOLD is a fact about the BUS and nothing lifts it but time or a person.**
-  `app/bus-hold.ts` stores it as an optional `hold` field on the bus record —
+  `src/lib/fleet/bus-hold.ts` stores it as an optional `hold` field on the bus record —
   `{at, by?, until?}` — and `setBusHold` **deletes the key** when clearing, never
   sets it to `undefined`. That rule was written when holds synced, and its
   original reason has since inverted — see below — but it stays: `delete` is
@@ -436,7 +436,7 @@ ticking. It is the ONE thing the report writes — `status-report-modal.tsx`
 touches no record, and a test names the single permitted key.
 
 **Farebox, Ventra and the CUBIC screens are counted APART, through
-`app/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
+`src/lib/fleet/tech-services.ts`.** Curtis: *"now the Ventura and the fare boxes have been
 moved up to critical levels, period. So they need a count of that as well...
 Fairbox and Venture separate. and cubic screen EV or... I'm sorry. MV, bus MV or
 MREV error. Whatever those errors say, I forgot."*
@@ -501,8 +501,8 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
-app/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
-app/location-label.ts      slot id -> the words a person says, trouble bays included
+src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
+src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
 app/repair-catalog.ts      the defect catalog, rename maps, count fields
 src/lib/storage/section-transfer.ts    per-section device transfers and their merge rules
 src/lib/storage/storage.ts             storage keys, envelopes, recovery snapshots

@@ -19,7 +19,7 @@
 
 import {useEffect,useState} from "react";
 
-import {locationLabel} from "./location-label";
+import {locationLabel} from "@/src/lib/fleet/location-label";
 import "./bus-selector.css";
 
 /* Structurally typed rather than importing either page's bus: the picker needs

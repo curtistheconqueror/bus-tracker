@@ -1,4 +1,4 @@
-import {normalizeBusListHours,type BusList,type BusListEntry} from "./bus-lists.ts";
+import {normalizeBusListHours,type BusList,type BusListEntry} from "../src/lib/fleet/bus-lists.ts";
 import {normalizeDefects,normalizeRepairHours} from "./repair-catalog.ts";
 
 /* Accrued work time, totalled per person per day.

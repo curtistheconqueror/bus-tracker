@@ -1,4 +1,4 @@
-import {operationalAgeMs} from "./operational-time.ts";
+import {operationalAgeMs} from "../../../app/operational-time.ts";
 import {siteAliases} from "./site-config.ts";
 
 export type FleetInsightBus={

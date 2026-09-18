@@ -1,6 +1,6 @@
 "use client";
 
-import {locationLabel} from "../location-label";
+import {locationLabel} from "@/src/lib/fleet/location-label";
 import {downSheetReasonWords} from "./down-sheet-availability";
 import type {DownSheetViewEntry} from "./down-sheet-view";
 

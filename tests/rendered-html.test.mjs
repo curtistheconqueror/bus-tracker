@@ -3,29 +3,29 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgainstBoard } from "../app/defect-log/sweep-scan-import.ts";
 import test from "node:test";
 import { busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig } from "../src/lib/cloud/cloud-sync.ts";
-import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../app/fleet-validation.ts";
+import { hasBusNumberConflict, hasLocationConflict, validateBusUpdate } from "../src/lib/fleet/fleet-validation.ts";
 import { applyDownEntryToFleet } from "../app/down-sheet/down-sheet-sync.ts";
 import { downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds } from "../app/down-sheet-counter.ts";
 import { syncTrackerDownSheetSelection } from "../app/down-sheet/tracker-membership-sync.ts";
 import { clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState } from "../app/down-sheet/down-sheet-clear.ts";
-import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../app/smart-status.ts";
-import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectClearSnapshot, restoreFacilityOnlyDefects, syncFacilityAlertDefects } from "../app/facility-defect-clear.ts";
-import { bulkAreaAvailability, bulkRelocateBuses } from "../app/bulk-relocation.ts";
+import { moveOrSwapBuses, roadServiceStatus, statusForLocation } from "../src/lib/fleet/smart-status.ts";
+import { clearFacilityOnlyDefects, facilityOnlyDefectCount, readFacilityDefectClearSnapshot, restoreFacilityOnlyDefects, syncFacilityAlertDefects } from "../src/lib/fleet/facility-defect-clear.ts";
+import { bulkAreaAvailability, bulkRelocateBuses } from "../src/lib/fleet/bulk-relocation.ts";
 import { applyDefectToBuses } from "../app/bulk-defects.ts";
-import { reassignBusPair } from "../app/pair-reassignment.ts";
+import { reassignBusPair } from "../src/lib/fleet/pair-reassignment.ts";
 import { CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, WORK_STATES, FLUID_TOP_UPS, recommendedMinutesElapsed, isFluidTopUp, normalizeFluids, fluidsLabel, isCheckEngineIssue, isDownSheetRecommended, migrateRepairIdentity, normalizeWorkStateStamp, setDownSheetRecommendation, REPAIR_CATEGORY_EMOJI, REPAIR_OPTION_GROUPS, REPAIR_OPTIONS, RETIRED_ISSUES, MINIMUM_DIAGNOSTIC_HOURS, defaultDefectOperability, defectCountField, defectFromDraft, defectNote, normalizeDiagnosticHours, normalizeRepairCount, defectLabel, defectSupportingDetails, defectSummary, defectWorkStates, hasWorkState, normalizeDefects, normalizeFinding, normalizeWorkStates, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairIssueDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssuePlaceholder, repairIssueStepLabel, setDefectWorkState, workStateStampLabel , partNumberMissing, hasDiagLightField, normalizeDiagLight, normalizeAlarmCode, diagLightLabel, deferredMinutesElapsed, isHeldDeferred, isUnresolved, hasDeferredHistory, brakeTestResult, brakeTestFailed, BRAKE_TEST_KEY} from "../app/repair-catalog.ts";
 import { CATALOG_OPTIONS, searchCatalog, searchCategories, searchCatalogForCategory, searchTerms } from "../app/defect-search.ts";
-import { sectionBusCount } from "../app/section-count.ts";
-import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../app/domain.ts";
-import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../app/mileage-estimate.ts";
-import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../app/maintenance-completion.ts";
+import { sectionBusCount } from "../src/lib/fleet/section-count.ts";
+import { appendMaintenanceEvent, appendOdometerReading, latestMaintenanceEvent, latestOdometerReading, maintenanceEventsOfKind, normalizeMaintenanceEvents, normalizeOdometerReadings } from "../src/lib/fleet/domain.ts";
+import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_MILE_INTERVAL, estimatedMileage, inspectionDueStatus } from "../src/lib/fleet/mileage-estimate.ts";
+import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../src/lib/fleet/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../app/parts-memory.ts";
-import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../app/bus-lists.ts";
+import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../src/lib/fleet/bus-lists.ts";
 import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
-import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../app/service-intervals.ts";
-import { EAST_SLOTS, moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../app/facility-areas.ts";
-import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../app/facility-layout.ts";
-import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../app/bus-number-resolver.ts";
+import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../src/lib/fleet/service-intervals.ts";
+import { EAST_SLOTS, moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../src/lib/fleet/facility-areas.ts";
+import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../src/lib/fleet/facility-layout.ts";
+import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../src/lib/fleet/bus-number-resolver.ts";
 import { planOperatorCommand } from "../app/operator-engine.ts";
 import { applyOperatorBatch } from "../app/operator-batch.ts";
 import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
@@ -36,7 +36,7 @@ import { prepareFleetForScannedReplacement, scannedSheetRemovals } from "../app/
 import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch } from "../app/down-sheet/down-sheet-filters.ts";
 import { downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText } from "../app/down-sheet/down-sheet-share.ts";
 import { RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord } from "../app/defect-log/defect-log-sync.ts";
-import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../app/mystery-buses.ts";
+import { bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds } from "../src/lib/fleet/mystery-buses.ts";
 import { reconcileDownSheetMembership as reconcileDS } from "../app/down-sheet-counter.ts";
 import { exportDefectLogPayload, exportDownSheetPayload, exportFleetMapPayload, mergeDefectLog, mergeDownSheet, mergeFleetMap, readTransferPayload, transferFilename, TRANSFER_KINDS } from "../src/lib/storage/section-transfer.ts";
 import { QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch } from "../app/quick-filters.ts";
@@ -897,7 +897,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/storage/fleet-backup.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/facility-areas.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/fleet/facility-areas.ts", import.meta.url), "utf8"),
   ]);
 
   /* The presets and the colour controls moved with the settings to the shared
@@ -3833,7 +3833,7 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
 test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one look",async()=>{
  const {readFleetBackup,restoreFleetBackup,FLEET_BACKUP_ERRORS}=await import("../src/lib/storage/fleet-restore.ts");
  const {FLEET_STORAGE_KEY,BOARD_SETTINGS_STORAGE_KEY,DOWN_SHEET_STORAGE_KEY,DOWN_SHEET_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,readFleetPayload}=await import("../src/lib/storage/storage.ts");
- const {BUS_LISTS_STORAGE_KEY}=await import("../app/bus-lists.ts");
+ const {BUS_LISTS_STORAGE_KEY}=await import("../src/lib/fleet/bus-lists.ts");
 
  /* Every refusal the Facility Map used to make, kept, because this replaces a
     whole device and a bad file must change nothing at all. */
@@ -3924,8 +3924,8 @@ test("MASTER EXPORT and MASTER IMPORT move the whole app, and MASTER sets one lo
 
 test("a road call is a dated event on the bus that ages off the board on its own",async()=>{
  const {ALL_WORK_STATES,WORK_STATES,FIXED_REPAIR_WORK_STATES,WORK_STATE_KEYS,ROAD_CALL_KEY,PARTS_ON_ORDER_KEY,defectWorkStates,hasWorkState,normalizeWorkStates,setDefectWorkState}=await import("../app/repair-catalog.ts");
- const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,ROAD_CALL_UNDO_SECONDS,appendRoadCall,applyRoadCall,clearRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote,withdrawableRoadCall}=await import("../app/road-calls.ts");
- const {moveOrSwapBuses:quickMove}=await import("../app/smart-status.ts");
+ const {ROAD_CALL_WINDOW_DAYS,ROAD_CALL_AREA,ROAD_CALL_UNDO_SECONDS,appendRoadCall,applyRoadCall,clearRoadCall,hasRecentRoadCall,latestRoadCall,normalizeRoadCalls,recentRoadCalls,roadCallBacklog,roadCallCount,roadCallNote,withdrawableRoadCall}=await import("../src/lib/fleet/road-calls.ts");
+ const {moveOrSwapBuses:quickMove}=await import("../src/lib/fleet/smart-status.ts");
  const {saveDefectLogRecord}=await import("../app/defect-log/defect-log-sync.ts");
  const {QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel}=await import("../app/quick-filters.ts");
 
@@ -6018,7 +6018,7 @@ test("Fleet Tracker records every maintenance type and never invents a mileage s
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
-  readFile(new URL("../app/service-intervals.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/service-intervals.ts",import.meta.url),"utf8"),
  ]);
  assert.match(page,/MAINTENANCE TYPE/);
  // The intervals themselves are set on the shared Settings page, in the map's panel.
@@ -7053,7 +7053,7 @@ test("a pull reads past one page and signing out is local to the device",async()
 
 test("the Down Sheet can move a bus, which is what makes a status change stick",async()=>{
  const { applyDownEntryToFleet } = await import("../app/down-sheet/down-sheet-sync.ts");
- const { RELOCATION_AREAS } = await import("../app/facility-areas.ts");
+ const { RELOCATION_AREAS } = await import("../src/lib/fleet/facility-areas.ts");
  const now="2026-08-30T12:00:00.000Z";
  const fleet=[{id:"b1",n:"17554",l:"west-3",s:"out",defects:[],pendingRepair:"",down:true}];
  const entry={id:"e1",busId:"b1",category:"Tech Services",repair:"Ventra",customReason:"",
@@ -7075,7 +7075,7 @@ test("the Down Sheet can move a bus, which is what makes a status change stick",
  // Location still governs MOVEMENT: a bus parked into a CNG lot still goes out
  // of service on its own. The rule was never removed, only stopped from
  // overruling a person who said otherwise on the sheet.
- const { moveOrSwapBuses } = await import("../app/smart-status.ts");
+ const { moveOrSwapBuses } = await import("../src/lib/fleet/smart-status.ts");
  const dragged=moveOrSwapBuses([{id:"b9",n:"20505",l:"garage-1",s:"service",defects:[],pendingRepair:""}],"b9","west-5",now);
  assert.equal(dragged[0].s,"out");
 
@@ -7192,9 +7192,9 @@ test("a fixed repair says which surface it came off",async()=>{
 });
 
 test("OFF PROPERTY holds buses away at a vendor and nobody is stranded by it",async()=>{
- const { OFF_PROPERTY_CAPACITY, WAITING_CAPACITY, SECTION_SLOTS, RELOCATION_AREAS, sectionForLocation } = await import("../app/facility-areas.ts");
- const { statusForLocation } = await import("../app/smart-status.ts");
- const { migrateReducedCapacity } = await import("../app/facility-layout.ts");
+ const { OFF_PROPERTY_CAPACITY, WAITING_CAPACITY, SECTION_SLOTS, RELOCATION_AREAS, sectionForLocation } = await import("../src/lib/fleet/facility-areas.ts");
+ const { statusForLocation } = await import("../src/lib/fleet/smart-status.ts");
+ const { migrateReducedCapacity } = await import("../src/lib/fleet/facility-layout.ts");
 
  // A fixed count, not "two rows". The waiting grid is 14 across on a computer,
  // 10 on an iPad and 3 on a phone, so "two rows" would have meant 28, 20 or 6
@@ -10567,7 +10567,7 @@ test("the handoff files stay true: every storage key is documented, and the entr
 
 test("FULL SWEEP is a state either surface can start, and ending it offers the report",async()=>{
  const {readSweep,startSweep,endSweep,touchSweep,sweepLabel,sweepMinutes,SWEEP_IDLE_MINUTES,SWEEP_STORAGE_KEY}=
-  await import("../app/facility-sweep.ts");
+  await import("../src/lib/fleet/facility-sweep.ts");
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
  const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
 
@@ -11015,7 +11015,7 @@ test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is t
 
 test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{
  const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
- const {techServicesGroup}=await import("../app/tech-services.ts");
+ const {techServicesGroup}=await import("../src/lib/fleet/tech-services.ts");
  const {quickFilterMatch}=await import("../app/quick-filters.ts");
 
  /* Curtis: "now the Ventura and the fare boxes have been moved up to critical
@@ -11586,7 +11586,7 @@ test("a render error shows a screen with a way out, not a white one",async()=>{
 });
 
 test("a road call logged on the sheet reaches the bus, whichever source saw it first",async()=>{
- const {reconcileRoadCallsFromSheet,standingRoadCalls,SHEET_ROAD_CALL_PREFIX}=await import("../app/road-calls.ts");
+ const {reconcileRoadCallsFromSheet,standingRoadCalls,SHEET_ROAD_CALL_PREFIX}=await import("../src/lib/fleet/road-calls.ts");
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
 
  /* MEASURED ON THE SHOP'S OWN CLOUD before this was written: 109 buses, zero
@@ -13777,8 +13777,8 @@ test("a trouble bay is not the main garage",async()=>{
     in the main garage, but there is a distinction there."
 
     There is, and everything except the label already knew it. */
- const {locationLabel,knownLocationLabel}=await import("../app/location-label.ts");
- const {RELOCATION_AREAS}=await import("../app/facility-areas.ts");
+ const {locationLabel,knownLocationLabel}=await import("../src/lib/fleet/location-label.ts");
+ const {RELOCATION_AREAS}=await import("../src/lib/fleet/facility-areas.ts");
  /* Read off the areas the MOVE editor writes with rather than hard-coded slot
     ids, so this test cannot pass against a garage the move editor has since
     renumbered. */
@@ -13822,7 +13822,7 @@ test("one location table, not five",async()=>{
   assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
   assert.match(source,/from "(?:[^"]*\/)location-label/,file+" reads the shared one");
  }
- const shared=await readFile(new URL("../app/location-label.ts",import.meta.url),"utf8");
+ const shared=await readFile(new URL("../src/lib/fleet/location-label.ts",import.meta.url),"utf8");
  /* And in the one copy, the areas are consulted BEFORE the prefixes. Reverse
     those two and "garage-11" answers Main Garage again. */
  assert.ok(shared.indexOf("SLOT_LABELS.get(at)")<shared.indexOf("PREFIX_LABELS.find"));
@@ -14261,7 +14261,7 @@ test("the closing line spans the card and an opened bus ends further from the ne
 test("a hold is a fact about the bus, and only time or a person lifts it",async()=>{
  /* Curtis: "somebody just asked me about two buses that are gonna probably come
     in to B12, and if they do, they want me to hold those buses." */
- const {setBusHold,isHeld,heldBuses,heldBusCount,normalizeHold,holdExpired,holdUntilLabel,heldMinutes}=await import("../app/bus-hold.ts");
+ const {setBusHold,isHeld,heldBuses,heldBusCount,normalizeHold,holdExpired,holdUntilLabel,heldMinutes}=await import("../src/lib/fleet/bus-hold.ts");
  const now=new Date("2026-09-10T22:00:00.000Z");
  const at=hours=>new Date(now.getTime()+hours*3600000).toISOString();
  const bus={id:"b1",n:"18505",l:"road-1"};
@@ -14291,7 +14291,7 @@ test("a hold is a fact about the bus, and only time or a person lifts it",async(
     move should lift it, then chose otherwise when asked — his own buses were
     ARRIVING, and arriving is a move, so that rule would have dropped the hold
     at the moment it started to matter. */
- const source=await readFile(new URL("../app/bus-hold.ts",import.meta.url),"utf8");
+ const source=await readFile(new URL("../src/lib/fleet/bus-hold.ts",import.meta.url),"utf8");
  assert.equal(/\bl\b\s*[=!]==|location|lastLocationChangeAt/.test(source.replace(/\/\*[\s\S]*?\*\//g,"")),false,"no code here reads where the bus is");
  assert.equal(isHeld(setBusHold({...held,l:"garage-0"},true,{at:at(-2)}),now),true,"moved, still held");
  /* A hold with no readable stamp is not a hold: every screen that draws one
@@ -15487,9 +15487,9 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
     the awareness predicate, and the move destinations the editor offers - over
     EVERY slot in the garage and requires them to agree. */
  const {GARAGE_CAPACITY,GARAGE_COLUMNS,GARAGE_ROWS,GARAGE_TROUBLE_BAY_FIRST_COLUMN,isGarageTroubleBayIndex}=
-  await import("../app/facility-layout.ts");
- const {RELOCATION_AREAS,SECTION_SLOTS}=await import("../app/facility-areas.ts");
- const {isBay12AwarenessArea}=await import("../app/mystery-buses.ts");
+  await import("../src/lib/fleet/facility-layout.ts");
+ const {RELOCATION_AREAS,SECTION_SLOTS}=await import("../src/lib/fleet/facility-areas.ts");
+ const {isBay12AwarenessArea}=await import("../src/lib/fleet/mystery-buses.ts");
 
  /* Derived, never typed: 84 is 7x12 and must stay that way by construction. */
  assert.equal(GARAGE_CAPACITY,GARAGE_ROWS*GARAGE_COLUMNS);
@@ -15528,9 +15528,9 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
  /* And the literals are gone from the four files that used to carry them, so a
     future width change has exactly one place to happen. */
  const [layout,areas,mystery,page]=await Promise.all([
-  readFile(new URL("../app/facility-layout.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/facility-areas.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/mystery-buses.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/facility-layout.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/facility-areas.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/mystery-buses.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
  ]);
  const code=source=>source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
@@ -15549,7 +15549,7 @@ test("the garage's shape is one set of numbers, and everything that reads the gr
  for(const [name,source] of [["mystery-buses",mystery],["page",page]])
   assert.match(code(source),/from "(?:[^"]*\/)?facility-layout(\.ts)?"/,name+" must read the grid from facility-layout");
  assert.match(code(areas),/from "(?:[^"]*\/)?site-config(\.ts)?"/,"facility-areas must read the site config");
- const config=await readFile(new URL("../app/site-config.ts",import.meta.url),"utf8");
+ const config=await readFile(new URL("../src/lib/fleet/site-config.ts",import.meta.url),"utf8");
  assert.match(code(config),/from "(?:[^"]*\/)?facility-layout(\.ts)?"/,"site-config must read the grid from facility-layout");
 });
 
@@ -15566,11 +15566,11 @@ test("site-config describes this building exactly as the five tables already do"
     It found two things a reading would not have. Both are ORDER, and in this
     app order is not decoration. */
  const {siteSectionSlots,siteRelocationAreas,siteAreaLabels,siteThemeKeys,siteAliases,sitePrefixLabels}=
-  await import("../app/site-config.ts");
- const {SECTION_SLOTS,RELOCATION_AREAS}=await import("../app/facility-areas.ts");
+  await import("../src/lib/fleet/site-config.ts");
+ const {SECTION_SLOTS,RELOCATION_AREAS}=await import("../src/lib/fleet/facility-areas.ts");
  const {SECTION_THEME_KEYS}=await import("../app/map-settings.ts");
- const {findOperatorArea}=await import("../app/fleet-intelligence.ts");
- const {locationLabel}=await import("../app/location-label.ts");
+ const {findOperatorArea}=await import("../src/lib/fleet/fleet-intelligence.ts");
+ const {locationLabel}=await import("../src/lib/fleet/location-label.ts");
 
  /* 1. WHAT EXISTS. Every slot id, in order, including the CNG East lot's gaps -
     two painted columns inside a four-wide numbering, so its ids skip. */
@@ -15668,7 +15668,7 @@ test("site-config describes this building exactly as the five tables already do"
 
  /* And the config covers the whole building, so pointing a consumer at it
     cannot drop a section on the way. */
- const {SITE_SECTIONS}=await import("../app/site-config.ts");
+ const {SITE_SECTIONS}=await import("../src/lib/fleet/site-config.ts");
  assert.equal(SITE_SECTIONS.length,Object.keys(SECTION_SLOTS).length);
  assert.equal(SITE_SECTIONS.flatMap(section=>section.areas).length,Object.keys(RELOCATION_AREAS).length);
 });

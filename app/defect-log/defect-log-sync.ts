@@ -1,15 +1,15 @@
 import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,mergeReportAttempts,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "../repair-catalog.ts";
-import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../road-calls.ts";
+import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../../src/lib/fleet/road-calls.ts";
 import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
 import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
-import {roadServiceStatus,statusForLocation,type FleetStatus} from "../smart-status.ts";
+import {roadServiceStatus,statusForLocation,type FleetStatus} from "../../src/lib/fleet/smart-status.ts";
 import {stampOperationalChange} from "../operational-time.ts";
 /* The plain name of a parking space, for reports that leave the app. Lived on
    the Defect Log page, then here; now re-exported from location-label.ts,
    which is the one copy that knows a trouble bay from the rest of the garage.
    Kept exported from here because every caller already imports it from this
    module. */
-import {locationLabel} from "../location-label.ts";
+import {locationLabel} from "../../src/lib/fleet/location-label.ts";
 export {locationLabel};
 
 export type DefectLogFleetBus={

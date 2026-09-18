@@ -1,5 +1,5 @@
 import {stampOperationalChange} from "./operational-time.ts";
-import {statusForLocation,type FleetStatus,type MovableRepairBus} from "./smart-status.ts";
+import {statusForLocation,type FleetStatus,type MovableRepairBus} from "../src/lib/fleet/smart-status.ts";
 
 export type OperatorBatchArea={name:string;slots:string[]};
 export type OperatorBatchInstruction={busId:string;areaName?:string;status?:FleetStatus};

@@ -1,5 +1,5 @@
 import {defectSummary,isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
-import {statusForLocation,type FleetStatus} from "./smart-status.ts";
+import {statusForLocation,type FleetStatus} from "../src/lib/fleet/smart-status.ts";
 import {stampOperationalChange} from "./operational-time.ts";
 
 export type BulkDefectBus={

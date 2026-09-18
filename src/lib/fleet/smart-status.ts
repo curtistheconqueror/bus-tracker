@@ -1,6 +1,6 @@
-import type {StructuredDefect} from "./repair-catalog.ts";
-import {isUnresolved} from "./repair-catalog.ts";
-import {stampOperationalChange} from "./operational-time.ts";
+import type {StructuredDefect} from "../../../app/repair-catalog.ts";
+import {isUnresolved} from "../../../app/repair-catalog.ts";
+import {stampOperationalChange} from "../../../app/operational-time.ts";
 
 export type FleetStatus="shop"|"service"|"defect"|"out"|"decommissioned"|"unknown";
 export type RepairAwareBus={defects?:StructuredDefect[];pendingRepair?:string};
