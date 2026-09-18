@@ -11,7 +11,7 @@
    and the sheet and returns the numbers. The Down Sheet renders them, the share
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
-import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "./down-sheet/down-sheet-availability.ts";
+import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "../src/lib/down-sheet/down-sheet-availability.ts";
 import {mysteryBusIds} from "../src/lib/fleet/mystery-buses.ts";
 import {standingRoadCalls} from "../src/lib/fleet/road-calls.ts";
 import {defectLabel,type StructuredDefect} from "../src/lib/defects/repair-catalog.ts";

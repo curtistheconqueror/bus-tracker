@@ -1,8 +1,8 @@
 "use client";
 
-import {DEFAULT_DOWN_SHEET_DISPLAY,DOWN_SHEET_LABEL_NAMES,DOWN_SHEET_STYLE_LABELS,normalizeDownSheetDisplay,type DownSheetDisplaySettings,type DownSheetLabels,type DownSheetStyleKey} from "./down-sheet-display-settings";
+import {DEFAULT_DOWN_SHEET_DISPLAY,DOWN_SHEET_LABEL_NAMES,DOWN_SHEET_STYLE_LABELS,normalizeDownSheetDisplay,type DownSheetDisplaySettings,type DownSheetLabels,type DownSheetStyleKey} from "@/src/lib/down-sheet/down-sheet-display-settings";
 
-import {DOWN_SHEET_GROUPS,OPTIONAL_DOWN_TILES,type DownSheetGroupKey,type OptionalDownTile,type Shift} from "./down-sheet-settings-store";
+import {DOWN_SHEET_GROUPS,OPTIONAL_DOWN_TILES,type DownSheetGroupKey,type OptionalDownTile,type Shift} from "@/src/lib/down-sheet/down-sheet-settings-store";
 import {SettingsDrawer,SettingsDrawers} from "../settings/settings-drawer";
 export type {Shift};
 type Props={transfer:React.ReactNode;defaultInitials:string;setDefaultInitials:(value:string)=>void;defaultShift:Shift;setDefaultShift:(value:Shift)=>void;showCompleted:boolean;setShowCompleted:(value:boolean)=>void;extraTiles:OptionalDownTile[];setExtraTiles:(value:OptionalDownTile[])=>void;sectionOrder:DownSheetGroupKey[];setSectionOrder:(value:DownSheetGroupKey[])=>void;showQuickNotes:boolean;setShowQuickNotes:(value:boolean)=>void;display:DownSheetDisplaySettings;setDisplay:(value:DownSheetDisplaySettings)=>void;onClose:()=>void;/* Rendered on the shared Settings page without the shade or the close and DONE buttons; every change there saves as it is made. */inline?:boolean};
