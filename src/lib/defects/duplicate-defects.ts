@@ -32,7 +32,7 @@
       ever know which one. */
 
 import {defectLabel,isUnresolved,mergeReportAttempts,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
-import {downSheetDefectIdCandidates,type SyncDownEntry} from "./down-sheet/down-sheet-sync.ts";
+import {downSheetDefectIdCandidates,type SyncDownEntry} from "../../../app/down-sheet/down-sheet-sync.ts";
 /* The identity rule lives on its own so the Down Sheet can ask the same
    question before it writes without these two files importing each other. */
 import {comparableFingerprint,defectFingerprint,type DuplicateBus} from "./defect-identity.ts";

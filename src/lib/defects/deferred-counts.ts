@@ -1,5 +1,5 @@
 import {isHeldDeferred,isUnresolved,deferredMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
-import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync.ts";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log-sync.ts";
 
 /* The buses DEFERRED is holding back, and the two numbers the nav badge needs.
 

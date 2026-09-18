@@ -26,16 +26,16 @@
    recommended-counts.ts beside the code that applies them. */
 
 import {useMemo,useState} from "react";
-import {recommendedBuses,busRecommendedMinutes} from "./recommended-counts";
+import {recommendedBuses,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import TimeWindowChips from "./time-window-chips";
 import {withinTimeWindow,type TimeWindowKey} from "./time-window";
 import {elapsedLong} from "./elapsed-label";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice, the same trap the DEFERRED board hit. */
-import {defectLabel,workStateStampLabel} from "./repair-catalog";
+import {defectLabel,workStateStampLabel} from "@/src/lib/defects/repair-catalog";
 import {mysteryLocationLabel} from "./mystery-board";
-import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync";
-import type {StructuredDefect} from "./repair-catalog";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
+import type {StructuredDefect} from "@/src/lib/defects/repair-catalog";
 
 export const RECOMMENDED_BOARD_COLLAPSED_KEY="pace-down-sheet-recommended-collapsed-v1";
 

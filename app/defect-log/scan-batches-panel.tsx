@@ -1,6 +1,6 @@
 "use client";
 
-import {type ScanBatch,type ScanBatchUndo} from "./scan-batches";
+import {type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
 
 /* Every scan sweep filed on this device, one press per row, and the way to take
    one back out.

@@ -31,7 +31,7 @@
       return are stamped as new work so the shop cloud accepts them back over
       the tombstones the removal sent. */
 
-import {defectSummary,normalizeDefects,type StructuredDefect} from "../repair-catalog.ts";
+import {defectSummary,normalizeDefects,type StructuredDefect} from "./repair-catalog.ts";
 
 export type ScanBatchBus={id:string;n:string;defects?:unknown;pendingRepair?:string};
 
