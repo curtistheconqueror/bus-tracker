@@ -1,7 +1,7 @@
 "use client";
 
 import {useMemo,useState} from "react";
-import type {BusList} from "./bus-lists";
+import type {BusList} from "@/src/lib/fleet/bus-lists";
 import {formatWorkHours,workDayLabel,workTimePeople,workTimeSummary,type WorkTimeBus} from "./work-time";
 
 /* Accrued work time, day by day, for one person.

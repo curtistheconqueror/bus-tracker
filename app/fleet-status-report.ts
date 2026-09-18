@@ -12,11 +12,11 @@
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
 import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "./down-sheet/down-sheet-availability.ts";
-import {mysteryBusIds} from "./mystery-buses.ts";
-import {standingRoadCalls} from "./road-calls.ts";
+import {mysteryBusIds} from "../src/lib/fleet/mystery-buses.ts";
+import {standingRoadCalls} from "../src/lib/fleet/road-calls.ts";
 import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
-import {locationLabel} from "./location-label.ts";
-import {techServicesGroup,type TechServicesGroup} from "./tech-services.ts";
+import {locationLabel} from "../src/lib/fleet/location-label.ts";
+import {techServicesGroup,type TechServicesGroup} from "../src/lib/fleet/tech-services.ts";
 
 /* 48 hours, expressed in the unit roadCallsWithin takes. Curtis: "all road
    calls in last 48 hours only". Named rather than inlined as 2 because the
