@@ -17,7 +17,7 @@ Two greps, before writing the rule:
 
 ```
 grep -n "^header{\|^nav{\|[^-]header{" app/globals.css     # bare-element rules
-grep -n "\.the-class-i-am-about-to-use" app/*.css app/**/*.css
+grep -rn "\.the-class-i-am-about-to-use" app/ src/
 ```
 
 ## The three ways it goes wrong here
