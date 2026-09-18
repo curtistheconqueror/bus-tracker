@@ -42,12 +42,12 @@
 
 import {useMemo,useState} from "react";
 import {busDeferredMinutes,heldDeferredBuses} from "@/src/lib/defects/deferred-counts";
-import TimeWindowChips from "./time-window-chips";
+import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice ("Lighting — Lighting — Headlight out"). */
 import {deferredMinutesElapsed,defectLabel} from "@/src/lib/defects/repair-catalog";
-import {mysteryLocationLabel} from "./mystery-board";
+import {mysteryLocationLabel} from "@/src/components/down-sheet/mystery-board";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import type {StructuredDefect} from "@/src/lib/defects/repair-catalog";
 

@@ -1,9 +1,9 @@
 "use client";
 
 import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search";
-import ComboField from "../combo-field";
-import BusSelector from "../bus-selector";
-import HoursField from "../hours-field";
+import ComboField from "@/src/components/shared/combo-field";
+import BusSelector from "@/src/components/shared/bus-selector";
+import HoursField from "@/src/components/shared/hours-field";
 import {useEffect, useMemo, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defects/findings-memory";

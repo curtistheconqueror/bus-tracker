@@ -2,8 +2,8 @@
 
 import {MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR,SERVICE_KINDS,fleetDutyCycle,normalizeServiceIntervals,type ServiceIntervals} from "@/src/lib/fleet/service-intervals";
 import {type BusDisplayMode,type S,SECTION_THEME_KEYS,ST,type SectionThemeKey,THEMES,type Visuals,type BoardSettings} from "@/src/lib/settings/map-settings";
-import Icon from "./status-icon";
-import {SettingsDrawer,SettingsDrawers} from "./settings/settings-drawer";
+import Icon from "@/src/components/fleet/status-icon";
+import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
 
 function ColorField({label,value,onChange}:{label:string;value:string;onChange:(value:string)=>void}){return <label className="color-field"><span>{label}</span><input type="color" value={value} onChange={event=>onChange(event.target.value)}/><code>{value.toUpperCase()}</code></label>}
 
