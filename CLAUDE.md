@@ -501,22 +501,39 @@ Tailwind's own `.fixed` and broke a tile at every width.
 ## Where things are
 
 ```
+app/                                 what Next routes, and nothing else:
+                                     six page.tsx, layout.tsx, api/, the
+                                     stylesheets, and _components/ per route
+src/lib/<area>/                      the domain: .ts, no JSX, storage passed in
+src/components/<area>/               React drawn by more than one route
+app/<route>/_components/             React drawn by exactly one route
+
 src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
-src/lib/defects/repair-catalog.ts      the defect catalog, rename maps, count fields
-src/lib/storage/section-transfer.ts    per-section device transfers and their merge rules
-src/lib/storage/storage.ts             storage keys, envelopes, recovery snapshots
-app/globals.css            the whole facility map, all breakpoints
+src/lib/defects/repair-catalog.ts    the defect catalog, rename maps, count fields
+src/lib/storage/section-transfer.ts  per-section device transfers and their merge rules
+src/lib/storage/storage.ts           storage keys, envelopes, recovery snapshots
+app/globals.css                      the whole facility map, all breakpoints
 src/lib/cloud/cloud-sync.ts          row shapes, fingerprints, the tombstone ledgers
 src/lib/cloud/cloud-client.ts        the Supabase calls, and how a push is planned
 src/lib/cloud/cloud-live.ts          the one set of merge rules a pull is applied through
-docs/NEXT_SESSION.md       start here: state, queue, Codex workflow, traps
-docs/PUBLISH_NEXT.md       the standing Codex handoff
-docs/roadmap/              work that is designed but not built
-supabase/                  the cloud schema — APPLIED, and the shop is using it
-supabase/run-tests.sh      applies the migrations to a throwaway Postgres
-PROJECT_HANDOFF.md         domain ownership and surface-by-surface detail
+docs/ARCHITECTURE.md                 the layout above, and the rule for what goes where
+docs/NEXT_SESSION.md                 start here: state, queue, Codex workflow, traps
+docs/PUBLISH_NEXT.md                 the standing Codex handoff
+docs/roadmap/                        work that is designed but not built
+supabase/                            the cloud schema — APPLIED, and the shop is using it
+supabase/run-tests.sh                applies the migrations to a throwaway Postgres
+PROJECT_HANDOFF.md                   domain ownership and surface-by-surface detail
 ```
+
+**Where a new file goes.** A `.ts` module with no JSX is domain and belongs in
+`src/lib/<area>/`. A component two or more pages draw belongs in
+`src/components/<area>/`. A component exactly one page draws belongs in that
+page's `_components/` — the underscore is what stops Next routing it. `app/`
+takes routing files only. Cross-area imports go through the `@/*` alias
+(`@/src/lib/fleet/smart-status`); inside `src/lib` they stay relative, because
+the Node test runner resolves neither tsconfig paths nor the alias. See
+`docs/ARCHITECTURE.md`.
 
 The Supabase project is live and holds the shop's real records. Reading it to
 diagnose something is fine and has been useful. **Writing to it is Curtis's
