@@ -1,4 +1,4 @@
-import {normalizeFinding, normalizeRepairCount, normalizeRepairHours} from "../repair-catalog.ts";
+import {normalizeFinding, normalizeRepairCount, normalizeRepairHours} from "../../src/lib/defects/repair-catalog.ts";
 import {
   normalizeRepairTimeEstimate,
   repairTimeTotal,

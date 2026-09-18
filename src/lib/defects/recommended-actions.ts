@@ -8,7 +8,7 @@
 
    Data only, no JSX, so the test runner can drive it against a fleet. */
 
-import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log/defect-log-sync.ts";
+import {saveDefectLogRecord,type DefectLogDownEntry,type DefectLogFleetBus} from "./defect-log-sync.ts";
 import {setDownSheetRecommendation,type StructuredDefect} from "./repair-catalog.ts";
 import {recommendedRank} from "./recommended-counts.ts";
 

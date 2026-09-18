@@ -30,18 +30,18 @@
 
 import {useEffect,useMemo,useState} from "react";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,RECORDS_WRITTEN_EVENT,readDownSheetStorage,readFleetStorage,writeDownSheetStorageResult,writeFleetStorageResult} from "@/src/lib/storage/storage";
-import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "./repair-catalog";
-import type {DefectLogDownEntry,DefectLogFleetBus} from "./defect-log/defect-log-sync";
+import {defectLabel,deferredMinutesElapsed,normalizeDefects,repairCategoryLabel,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
+import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "@/src/lib/fleet/facility-areas";
 import {locationLabel} from "@/src/lib/fleet/location-label";
-import {QUICK_FILTER_EVENT,quickFilterHref} from "./quick-filters";
-import {deferredBadgeCounts,heldDeferredBuses} from "./deferred-counts";
-import {answerDeferredBus} from "./deferred-actions";
-import {SETTINGS_KEY as LOG_SETTINGS_KEY} from "./defect-log/defect-log-settings";
+import {QUICK_FILTER_EVENT,quickFilterHref} from "@/src/lib/defects/quick-filters";
+import {deferredBadgeCounts,heldDeferredBuses} from "@/src/lib/defects/deferred-counts";
+import {answerDeferredBus} from "@/src/lib/defects/deferred-actions";
+import {SETTINGS_KEY as LOG_SETTINGS_KEY} from "@/src/lib/defects/defect-log-settings";
 
 const REVIEW_MINUTES=60;
 const REVIEW_HOUR=20,REVIEW_MINUTE=30;
-import {nextOccurrenceISO} from "./deferral-clock";
+import {nextOccurrenceISO} from "@/src/lib/defects/deferral-clock";
 
 const DISMISS_KEY="pace-deferred-review-dismissed-v1";
 

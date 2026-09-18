@@ -125,7 +125,7 @@ polarity, unlike the trip card.
 
 **COMMENTS:** four ruled lines.
 
-Every row here maps onto `Tech Services` in `app/repair-catalog.ts` — the CUBIC
+Every row here maps onto `Tech Services` in `src/lib/defects/repair-catalog.ts` — the CUBIC
 Screen, IBS Screen and Ventra groups. A scanned IBS report is a structured
 Tech Services defect with no wording to guess at, which makes it the **easier of
 the two forms to build first**.
