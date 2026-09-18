@@ -1,7 +1,7 @@
 import {defectSupportingDetails,defectSummary,hasWorkState,isUnresolved,mergeReportAttempts,normalizeDefects,ROAD_CALL_KEY,type DefectState,type StructuredDefect} from "./repair-catalog.ts";
 import {applyRoadCall,clearRoadCall,type RoadCallEvent} from "../fleet/road-calls.ts";
-import {normalizeRepairTimeEstimate} from "../../../app/down-sheet/repair-time-estimates.ts";
-import {downSheetDefectIds} from "../../../app/down-sheet/down-sheet-sync.ts";
+import {normalizeRepairTimeEstimate} from "../down-sheet/repair-time-estimates.ts";
+import {downSheetDefectIds} from "../down-sheet/down-sheet-sync.ts";
 import {roadServiceStatus,statusForLocation,type FleetStatus} from "../fleet/smart-status.ts";
 import {stampOperationalChange} from "../../../app/operational-time.ts";
 /* The plain name of a parking space, for reports that leave the app. Lived on

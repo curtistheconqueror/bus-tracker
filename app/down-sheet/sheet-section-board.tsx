@@ -1,8 +1,8 @@
 "use client";
 
 import {locationLabel} from "@/src/lib/fleet/location-label";
-import {downSheetReasonWords} from "./down-sheet-availability";
-import type {DownSheetViewEntry} from "./down-sheet-view";
+import {downSheetReasonWords} from "@/src/lib/down-sheet/down-sheet-availability";
+import type {DownSheetViewEntry} from "@/src/lib/down-sheet/down-sheet-view";
 
 /* A SECTION OF THE DOWN SHEET THAT IS NOT A BAND.
 

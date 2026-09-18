@@ -41,7 +41,7 @@ import CloudSyncControl from "../cloud-sync-control";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "../map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
 import DownSheetSettings from "../down-sheet/down-sheet-settings";
-import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "../down-sheet/down-sheet-settings-store";
+import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
 import LogSettingsModal from "../defect-log/defect-log-settings-modal";
 import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "@/src/lib/defects/defect-log-settings";
 import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repairs/fixed-repairs-settings";
@@ -49,7 +49,7 @@ import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFle
 import {normalizeDefects} from "@/src/lib/defects/repair-catalog";
 import {mergeDuplicateDefects} from "@/src/lib/defects/duplicate-defects";
 import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "@/src/lib/cloud/cloud-sync";
-import {reconcileDownSheetMembership} from "../down-sheet-counter";
+import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
 import {dropTombstonedDefects,dropTombstonedEntries} from "@/src/lib/cloud/cloud-live";
 import SectionTransferControls from "../section-transfer-controls";
 import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "@/src/lib/storage/section-transfer";
@@ -63,7 +63,7 @@ import AppName from "../app-name";
 import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
 import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
-import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "../sheet-ledger";
+import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 import ShiftSettingsPanel from "./shift-settings";
 import SheetBackfillPanel from "./sheet-backfill";
 

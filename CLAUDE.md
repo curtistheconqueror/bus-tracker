@@ -322,7 +322,7 @@ nine-day hole reads as one swap that added fourteen buses and cleared thirty.
 Normalised with `delete` rather than `undefined`, the spelling `setBusHold`
 uses, so a hand-edited `gap:"no"` cannot spread through and read as truthy.
 
-**OLD SHEETS COME IN THROUGH `app/sheet-ledger-backfill.ts`**, behind LOAD OLD
+**OLD SHEETS COME IN THROUGH `src/lib/down-sheet/sheet-ledger-backfill.ts`**, behind LOAD OLD
 DOWN SHEETS in Settings. It writes `pace-sheet-ledger-v1` and nothing else —
 **a scanned sheet REPLACES the live one and a backfill must not**, because the
 sheets being loaded are weeks old and the live sheet is today's. The only

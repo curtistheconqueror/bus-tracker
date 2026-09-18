@@ -29,7 +29,7 @@ import {buildFleetStatusReport,normalizeStatusReportPick,statusReportText,DEFAUL
 import {statusReportPrintHtml} from "./fleet-status-report-print";
 import {buildFleetForecast,forecastTextLines,FORECAST_HEDGE} from "./fleet-forecast";
 import {readShiftSettings} from "./shift-clock";
-import {readSheetLedger} from "./sheet-ledger";
+import {readSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 
 /* The selection is remembered, because the whole point of the include list is
    that the same person sends roughly the same report every morning. Making him

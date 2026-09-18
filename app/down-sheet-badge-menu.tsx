@@ -2,7 +2,7 @@
 
 import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
-import {DOWN_SHEET_BADGE_VIEWS,type DownSheetBadgeView} from "./down-sheet-badge-view";
+import {DOWN_SHEET_BADGE_VIEWS,type DownSheetBadgeView} from "@/src/lib/down-sheet/down-sheet-badge-view";
 
 export default function DownSheetBadgeMenu({view,counts,enabled,onSelect}:{view:DownSheetBadgeView;counts:Record<DownSheetBadgeView,number>;enabled:boolean;onSelect:(view:DownSheetBadgeView)=>void}){
  const [open,setOpen]=useState(false),[position,setPosition]=useState({left:8,bottom:0});

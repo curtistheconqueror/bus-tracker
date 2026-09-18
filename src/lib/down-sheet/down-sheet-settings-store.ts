@@ -10,7 +10,7 @@
    shift on the Settings page must not blank a note somebody typed on the
    sheet. */
 
-import {DOWN_SHEET_SETTINGS_STORAGE_KEY,writeSetting} from "../../src/lib/storage/storage.ts";
+import {DOWN_SHEET_SETTINGS_STORAGE_KEY,writeSetting} from "../storage/storage.ts";
 import {normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "./down-sheet-display-settings.ts";
 import {DOWN_SHEET_GROUPS,normalizeDownSheetSectionOrder,type DownSheetGroupKey} from "./down-sheet-view.ts";
 export {DOWN_SHEET_GROUPS};
