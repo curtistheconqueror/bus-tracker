@@ -143,9 +143,9 @@ test("successful ordinary writes snapshot the previous board and backup reminder
 test("phone safety controls expose full-board export reminders and recovery",async()=>{
  const [tracker,recovery,defect,reminder,backup,settings,alert,storage]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/fleet-recovery-control.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/fleet-recovery-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/offline-backup-reminder.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/components/shared/save-alert.tsx",import.meta.url),"utf8"),
@@ -255,7 +255,7 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{otherPages\(/);
   /* The badge's own settings render on the shared Settings page now, from the
      map's panel module; the map still draws what they say. */
-  const panel = await readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8");
+  const panel = await readFile(new URL("../app/settings/_components/map-settings-panel.tsx", import.meta.url), "utf8");
   assert.match(panel, /<h3>DS BADGE<\/h3>/);
   assert.match(panel, /<b>SHOW BADGE<\/b>/);
   assert.match(panel, /visuals\.downSheetBadgeText/);
@@ -282,7 +282,7 @@ test("DS badge view filters display without changing Down Sheet membership", asy
   assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "ready-road"), ["road", "garage"]);
   assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "off-road"), ["shop", "cng"]);
   assert.deepEqual(downSheetBadgeViewCounts(fleet, active), {all:4,"ready-road":2,"off-road":2});
-  const menu = await readFile(new URL("../app/down-sheet-badge-menu.tsx", import.meta.url), "utf8");
+  const menu = await readFile(new URL("../app/_components/down-sheet-badge-menu.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(menu, /DS BADGES/);
   assert.match(menu, /Badge view never changes Down Sheet membership/);
@@ -477,7 +477,7 @@ test("The Down Sheet photo import reads the four section headings the sheet is o
 
   // The reviewer is told which band each scanned row lands in BEFORE importing,
   // read from the same two functions the sheet uses so the two cannot drift.
-  const scanner = await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8");
+  const scanner = await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx", import.meta.url), "utf8");
   assert.match(scanner, /downSheetGroup,downSheetGroupLabel/);
   assert.match(scanner, />GOES TO </);
   const scanCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
@@ -863,7 +863,7 @@ test("removes prospective customer branding from visible app titles", async () =
   const [layout, manifestText, operator, downSheet, tracker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
-    readFile(new URL("../app/operator-modal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_components/operator-modal.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
@@ -905,7 +905,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      its panel. The map still applies every one of them. */
   const [model, panel] = await Promise.all([
     readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/settings/_components/map-settings-panel.tsx", import.meta.url), "utf8"),
   ]);
   for (const theme of ["Default", "Terminal", "Black / Dark", "Midnight", "Tactical"]) {
     assert.match(model, new RegExp(`label:\"${theme.replace("/", "\\/")}\"`));
@@ -1851,7 +1851,7 @@ test("bus marker display toggles between icons and large number tiles per device
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const [model, panel] = await Promise.all([
     readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/settings/_components/map-settings-panel.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(panel, /BUS MARKER DISPLAY/);
   assert.match(panel, /SHOW LARGE NUMBER TILES INSTEAD OF BUS ICONS/);
@@ -1883,7 +1883,7 @@ test("confirmation prompts are per-device settings that default to on", async ()
 
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  const panel = await readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8");
+  const panel = await readFile(new URL("../app/settings/_components/map-settings-panel.tsx", import.meta.url), "utf8");
   const settingsPage = await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
   // The Settings page exposes independent move and group-defect toggles.
   assert.match(panel, /CONFIRMATION PROMPTS/);
@@ -1978,7 +1978,7 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.equal(formatRepairTime(repairTimeTotal(realistic)), "8h");
 
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
-  const editor = await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx", import.meta.url), "utf8");
+  const editor = await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
   assert.ok(page.includes("EST. ACTIVE LABOR"));
   assert.ok(page.includes("EST. CURRENT VIEW"));
@@ -2044,7 +2044,7 @@ test("photo scan review validates fleet numbers and safely merges repeated rows"
   assert.equal(safetyReleased[0].defects.find(defect => defect.id === "brake-1").source, "defect-log");
 
   const page = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
-  const scanner = await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8");
+  const scanner = await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx", import.meta.url), "utf8");
   const route = await readFile(new URL("../app/api/down-sheet-scan/route.ts", import.meta.url), "utf8");
   assert.ok(page.includes("SCAN SHEET"));
   assert.ok(page.includes("UNDO IMPORT"));
@@ -2378,7 +2378,7 @@ test("real-time defect log keeps one linked repair across tracker and down sheet
      panel the Settings page renders - and the log reads the key they write. */
   const [model, panel] = await Promise.all([
     readFile(new URL("../src/lib/defects/defect-log-settings.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
   ]);
   assert.ok(model.includes("BACKGROUND"));
   assert.ok(model.includes("PRIMARY TEXT"));
@@ -2468,7 +2468,7 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   assert.match(css,/@media\(max-width:760px\)\{\.shop-notes-column\{display:none\}/);
   assert.match(css,/\.grouped-defect-row/);
   const model=await readFile(new URL("../src/lib/defects/defect-log-settings.ts",import.meta.url),"utf8");
-  const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+  const panel=await readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8");
   assert.match(model,/type LogGroupContrast="standard"\|"strong"/);
   assert.match(model,/groupContrast:"strong"/);
   assert.match(model,/saved\.groupContrast==="standard"\?"standard":"strong"/);
@@ -2793,7 +2793,7 @@ test("Version 85 stores Shop Notes and persists editable interface wording and s
 
   const [downPage,downSettings,downCss,logPage,logCss,catalog]=await Promise.all([
     readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
-    readFile(new URL("../app/down-sheet/down-sheet-settings.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../app/settings/_components/down-sheet-settings.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
@@ -4368,7 +4368,7 @@ test("a repair records how far it got, and what was found travels with it",async
  // The initials setting covers both saving a repair fixed and ticking a state,
  // so there is one switch rather than two that can disagree.
  assert.match(page,/before ticking a work state/);
- const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ const panel=await readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8");
  assert.match(panel,/REQUIRE INITIALS ON RECORDED WORK/);
 });
 
@@ -4451,7 +4451,7 @@ test("the backup reminder is one card the shop sets the cadence of",async()=>{
     of the sentence it belongs under. The reset is load-bearing, not tidiness. */
  const [css,tsx]=await Promise.all([
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/offline-backup-reminder.tsx",import.meta.url),"utf8"),
  ]);
  const card=css.match(/\.offline-backup-reminder\{[^}]*\}/)[0];
  for(const reset of ["position:static","width:auto","top:auto","right:auto"])assert.ok(card.includes(reset),"the card must undo the global aside rule: "+reset);
@@ -4471,7 +4471,7 @@ test("the command bar carries the other pages behind one trigger",async()=>{
     width from an iPad to a 1440px desktop, and onto four rows — 208px — on an
     iPad held upright. A bar you have to scroll has stopped being a bar. */
  const page=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- const menu=await readFile(new URL("../app/page-menu.tsx",import.meta.url),"utf8");
+ const menu=await readFile(new URL("../app/_components/page-menu.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
 
  // the four buttons are gone from the bar and live in the menu instead
@@ -4516,8 +4516,8 @@ test("no class name collides with a Tailwind positioning utility",async()=>{
     winning, and the next person to add one would not know to look. */
  const files=["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx",
   "../app/fixed-repairs/page.tsx","../app/lists/page.tsx","../src/components/settings/section-transfer-controls.tsx",
-  "../app/defect-log/offline-backup-reminder.tsx","../app/down-sheet/down-sheet-editor.tsx",
-  "../app/down-sheet/down-sheet-settings.tsx","../app/down-sheet/down-sheet-scanner.tsx"];
+  "../app/defect-log/_components/offline-backup-reminder.tsx","../app/down-sheet/_components/down-sheet-editor.tsx",
+  "../app/settings/_components/down-sheet-settings.tsx","../app/down-sheet/_components/down-sheet-scanner.tsx"];
  const utilities=new Set(["fixed","static","absolute","relative","sticky","block","inline","flex","grid",
   "hidden","table","container","visible","invisible","border","italic","underline","truncate","isolate","contents"]);
  for(const file of files){
@@ -4785,7 +4785,7 @@ test("only the button that writes a restorable file is called a backup",async()=
     Settings page renders now; the page itself no longer carries it. */
  const [logPage,log,fixed,lists,map,backup]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
@@ -4973,7 +4973,7 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  // A retired repair still reads back on the record that carries it, in every
  // picker. The Down Sheet card was the one with no such option, so a retired
  // entry would have rendered there as an empty select.
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  /* The card is a ComboField now rather than a <select>, so the guarantee moved
     from an injected "(as logged)" <option> to the `display` prop — and it is
     the same guarantee, stated once instead of per-option: a wording the catalog
@@ -5110,7 +5110,7 @@ test("one repair on the sheet is one defect on the bus",async()=>{
  assert.equal(normalizeDiagnosticHours(""),undefined,"blank still means no time recorded");
  assert.equal(normalizeDefects([{id:"d",category:"Brakes",issue:"x",details:"",state:"completed",diagnosticHours:0.5}])[0].diagnosticHours,0.5);
 
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  // The Defect Log has a straight path to Fixed Repairs through SAVE AS FIXED.
  // This is that path from here, on each repair, and only while closing out.
  // The fix fields follow the repair that was finished, not the whole entry.
@@ -5180,7 +5180,7 @@ test("a repair on the Down Sheet finishes on its own day",async()=>{
  // blank cards are not counted as repairs waiting to be done
  assert.equal(repairItemsProgress([item("a","Brakes","x",{done:true}),item("b","","")]).complete,true);
 
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  // The entry's workflow and its cards have to agree, and it is the cards that
  // know: ticking the last one closes the entry, unticking one reopens it.
  assert.match(editor,/progress\.complete\?"Completed":current\.workflow==="Completed"\?"In Progress":current\.workflow/);
@@ -5197,7 +5197,7 @@ test("a repair on the Down Sheet finishes on its own day",async()=>{
 test("the Down Sheet editor holds the page still and fills a phone screen",async()=>{
  const [css,editor,logCss,lock]=await Promise.all([
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
-  readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/shared/scroll-lock.ts",import.meta.url),"utf8"),
  ]);
@@ -5585,7 +5585,7 @@ test("a day's work time covers Defect Log repairs as well as campaign sweeps",()
 
 test("the work time panel is written to be moved somewhere else later",async()=>{
  const [panel,logic,listsPage]=await Promise.all([
-  readFile(new URL("../app/work-time-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/lists/_components/work-time-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/reports/work-time.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
  ]);
@@ -5606,7 +5606,7 @@ test("the work time panel is written to be moved somewhere else later",async()=>
  // inside one and a busy day read as an unbroken run of numbers.
  assert.match(panel,/className="work-time-job"/);
  assert.equal(/\.join\(/.test(panel),false,"jobs are elements, not a joined string");
- const styles=await readFile(new URL("../app/work-time.css",import.meta.url),"utf8");
+ const styles=await readFile(new URL("../app/lists/_components/work-time.css",import.meta.url),"utf8");
  assert.match(styles,/\.work-time-job\+\.work-time-job\{[^}]*border-left/,"with a rule between them");
  assert.match(styles,/\.work-time-detail\{[^}]*flex-wrap:wrap/,"wrapping rather than running off a phone");
 
@@ -6016,7 +6016,7 @@ test("Curtis's two real buses show why miles cannot decide these services",()=>{
 test("Fleet Tracker records every maintenance type and never invents a mileage service interval",async()=>{
  const [page,panel,css,intervals]=await Promise.all([
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/fleet/service-intervals.ts",import.meta.url),"utf8"),
  ]);
@@ -6448,7 +6448,7 @@ test("ADA securement and stop request have a home in Bus Accessories",()=>{
 test("no element in the Defect Log relies on the global bare header and footer styling",async()=>{
  const [logPage,logSettings,logCss,mysteryBoard,globalCss]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../src/components/down-sheet/mystery-board.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
@@ -6898,7 +6898,7 @@ test("the shop cloud reports what happened and never offers a switch",async()=>{
  const code=text=>text.replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/.*$/gm,"$1");
  const [source,control]=await Promise.all([
   readFile(new URL("../src/lib/cloud/cloud-sync.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/cloud-sync-control.tsx",import.meta.url),"utf8"),
  ]);
  // It only says the wifi is associated. Shop wifi that is up but with no route
  // to the internet reports true, and a sync built on it insists it is online
@@ -6932,9 +6932,9 @@ test("connection details are checked where the message can name the field",async
 
 test("the shop cloud never becomes a condition of using the board",async()=>{
  const [control,page,panel,css,settings]=await Promise.all([
-  readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/cloud-sync-control.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/map-settings-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/map-settings-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
  ]);
@@ -7097,7 +7097,7 @@ test("the Down Sheet can move a bus, which is what makes a status change stick",
  // somebody had since parked it.
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  assert.match(page,/next=\{\.\.\.next,location:undefined\}/);
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  assert.match(editor,/MOVE BUS TO/);
  assert.doesNotMatch(editor,/Status only; location stays unchanged/);
 });
@@ -7229,7 +7229,7 @@ test("OFF PROPERTY holds buses away at a vendor and nobody is stranded by it",as
 });
 
 test("bringing the shop's copy down sends this device's work first",async()=>{
- const control=await readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8");
+ const control=await readFile(new URL("../app/settings/_components/cloud-sync-control.tsx",import.meta.url),"utf8");
  const pull=control.slice(control.indexOf("const pull=async"),control.indexOf("const set=(key:keyof CloudConfig)"));
  assert.ok(pull,"the pull handler should be findable");
 
@@ -7925,7 +7925,7 @@ test("the bus group outline is darker than every other border, and can be recolo
  assert.match(logPage,/\.\.\.\(settings\.groupBorder\?\{"--log-card-border":settings\.groupBorder\}:\{\}\)/);
  const [model,panel]=await Promise.all([
   readFile(new URL("../src/lib/defects/defect-log-settings.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
  ]);
  assert.match(model,/groupBorder:safeBorderColor\(saved\.groupBorder\)/);
  assert.ok(panel.includes("USE THEME COLOR"),"there must be a way back to the theme colour");
@@ -8179,7 +8179,7 @@ test("the evening prompt asks once per BUS, and one answer covers every repair h
 test("a footer inside a dialog is not positioned against the viewport, and every lock actually locks", async () => {
  const [globals, scanner, lock, down] = await Promise.all([
   readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/lib/shared/scroll-lock.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8"),
  ]);
@@ -8225,8 +8225,8 @@ test("a footer inside a dialog is not positioned against the viewport, and every
  assert.match(globals, /\.mobile-mode-nav\{position:sticky;z-index:19;top:0/,
    "the rule this exists to make true");
  // Every caller is now covered by that one rule whatever name it passes.
- for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../src/components/down-sheet/mystery-board.tsx", "../src/components/shared/welcome-gate.tsx",
-                     "../app/down-sheet/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
+ for (const file of ["../app/down-sheet/_components/down-sheet-scanner.tsx", "../src/components/down-sheet/mystery-board.tsx", "../src/components/shared/welcome-gate.tsx",
+                     "../app/down-sheet/_components/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
   const source = await readFile(new URL(file, import.meta.url), "utf8");
   if (/lockPageScroll\(/.test(source)) assert.match(source, /lockPageScroll\("[a-z-]+"\)/, file + " passes a name");
  }
@@ -8390,7 +8390,7 @@ test("the Down Sheet's bands are read in the order the shop chose, and the ORDER
 
 test("DEFERRED sits under MYSTERY BUSES on the Down Sheet, and both answers write the whole bus", async () => {
  const [board, page, css] = await Promise.all([
-  readFile(new URL("../app/deferred-board.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/down-sheet/_components/deferred-board.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
  ]);
@@ -8436,7 +8436,7 @@ test("DEFERRED sits under MYSTERY BUSES on the Down Sheet, and both answers writ
 test("the evening deferred prompt has an off switch, and turning it off leaves the alert badge alone", async () => {
  const [model, panel, watch] = await Promise.all([
   readFile(new URL("../src/lib/defects/defect-log-settings.ts", import.meta.url), "utf8"),
-  readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/shared/deferred-watch.tsx", import.meta.url), "utf8"),
  ]);
  // Absent means on: every device already in the shop has a settings blob with
@@ -9058,9 +9058,9 @@ test("the Defect Log names WHICH defect has the bus on the down sheet",async()=>
 test("the sweep scanner is its own door on the Defect Log and never touches the Down Sheet", async () => {
  const [logPage,scanner,route,downScanner]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/sweep-scanner.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8"),
  ]);
  /* A separate button next to LOG DEFECT, not the Down Sheet's scan button. */
  assert.match(logPage,/className="sweep-scan-button"[^>]*onClick=\{\(\)=>setSweepOpen\(true\)\}[^>]*>📷 SCAN SWEEP</);
@@ -9205,7 +9205,7 @@ test("the Defect Log opens on what it is for, not on a status report", async () 
     working. Removing the button must not remove the behaviour. */
  assert.match(logPage,/if\(filter==="open"&&!\(record\.defect\.state==="open"\|\|record\.defect\.state==="deferred"\)\)return false/);
  assert.match(logPage,/if\(filter==="downsheet"&&!activeDownBusIdSet\.has\(record\.bus\.id\)\)return false/);
- const panel=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ const panel=await readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8");
  assert.match(panel,/<option value="open">Open<\/option>/,"and both remain choosable as a default view");
  assert.match(panel,/<option value="downsheet">/);
 
@@ -9446,7 +9446,7 @@ test("a numbered sheet says which lines the photo never returned",async()=>{
  // a part-filled sheet went, so absent trailing lines are not reported.
  assert.deepEqual(scannedLineGaps([row(1,"17510"),row(3,"17530")]),[2]);
 
- const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+ const scanner=await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8");
  assert.match(scanner,/LINES NOT READ: \{describeLineGaps\(lineGaps\)\}/);
  const css=await readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8");
  assert.match(css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,""),/\.scan-line-gaps\{/);
@@ -9479,7 +9479,7 @@ test("the catalog carries the service codes and the hazmat condition the sheet a
 });
 
 test("a scanned row the model had to guess at is flagged even when its bus number resolves",async()=>{
- const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+ const scanner=await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8");
  /* The flag used to mean one thing only: this bus number matches no bus in the
     fleet. But a misread digit usually lands on ANOTHER REAL BUS — 17565 came
     back as 17563, which exists — so the row resolved cleanly and looked as
@@ -9518,7 +9518,7 @@ test("the shop cloud runs on every page, not only while Settings is open",async(
   assert.match(source,/import ShopCloudLive from/,file+" is missing the import");
  }
  const live=await readFile(new URL("../src/components/shared/shop-cloud-live.tsx",import.meta.url),"utf8");
- const control=await readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8");
+ const control=await readFile(new URL("../app/settings/_components/cloud-sync-control.tsx",import.meta.url),"utf8");
  assert.match(live,/const SWEEP_MS=45000/);
  // Exactly one sweeper. Leaving it in the control too would race whenever
  // Settings was open, on the device most likely to be mid-edit.
@@ -9815,7 +9815,7 @@ test("a scan sweep removed on one device reaches the others, and so does putting
  assert.match(client,/readTombstones\(supabase,"bus_defects","defect_id"\)/);
  assert.match(client,/deleted:deletedRes\.deleted/);
  // Both callers hand the tombstones on; a pull that read them and dropped them would change nothing.
- for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"])
+ for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/settings/_components/cloud-sync-control.tsx"])
   assert.match(await readFile(new URL(file,import.meta.url),"utf8"),/applyCloudPull\(localStorage,\{[^}]*deleted:(?:got|result)\.deleted[,}]/,file);
 });
 
@@ -9938,7 +9938,7 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.match(client,/readTombstones\(supabase,"down_sheet_entries","entry_id"\)/);
  assert.match(client,/removedEntries:removedRes\.deleted/);
  assert.match(client,/sheet:withoutRemovedEntries\(downSheetPayload\(entryRes\.rows,now\),removedEntries\)/);
- for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"]){
+ for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/settings/_components/cloud-sync-control.tsx"]){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.match(source,/removedEntries:readRemovedEntries\(localStorage\)/,file+" must push its removals");
   assert.match(source,/cloudPull\([^;]{0,160}?readRemovedEntries\(localStorage\)\)/,file+" must send them on the pull too");
@@ -10309,7 +10309,7 @@ test("SCAN BATCHES on the Defect Log, and the operator on the map, remove a swee
  const [logPage,mapPage,panel,css]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/scan-batches-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/scan-batches-panel.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
  // The door is beside SCAN SWEEP, which is where the mistake was made.
@@ -10374,7 +10374,7 @@ test("the sweep scanner refuses a page that is not a sweep sheet",async()=>{
 
  const [route,scanner,css]=await Promise.all([
   readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/sweep-scanner.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
  // The route asks what the page IS before what is on it, and the answer is in the schema, not prose.
@@ -10432,8 +10432,8 @@ test("a scan can carry the shop's own notes about what the camera will get wrong
  const [downRoute,sweepRoute,downScanner,sweepScanner,downCss,logCss]=await Promise.all([
   readFile(new URL("../app/api/down-sheet-scan/route.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/api/sweep-scan/route.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/defect-log/sweep-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/sweep-scanner.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
  ]);
@@ -10569,7 +10569,7 @@ test("FULL SWEEP is a state either surface can start, and ending it offers the r
  const {readSweep,startSweep,endSweep,touchSweep,sweepLabel,sweepMinutes,SWEEP_IDLE_MINUTES,SWEEP_STORAGE_KEY}=
   await import("../src/lib/fleet/facility-sweep.ts");
  const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- const scanner=await readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx",import.meta.url),"utf8");
+ const scanner=await readFile(new URL("../app/down-sheet/_components/down-sheet-scanner.tsx",import.meta.url),"utf8");
 
  const store=new Map();
  const storage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>{store.set(k,String(v))},removeItem:k=>{store.delete(k)}};
@@ -11254,7 +11254,7 @@ test("the swap ledger keys on the fleet number, because bus ids are one device's
 test("the backfill loads old sheets into the swap history and touches nothing else",async()=>{
  const {planBackfill,applyBackfill,BACKFILL_KIND}=await import("../src/lib/down-sheet/sheet-ledger-backfill.ts");
  const {SHEET_LEDGER_KEY}=await import("../src/lib/down-sheet/sheet-ledger.ts");
- const panel=await readFile(new URL("../app/settings/sheet-backfill.tsx",import.meta.url),"utf8");
+ const panel=await readFile(new URL("../app/settings/_components/sheet-backfill.tsx",import.meta.url),"utf8");
  const module_=await readFile(new URL("../src/lib/down-sheet/sheet-ledger-backfill.ts",import.meta.url),"utf8");
 
  const snap=(id,at,rows,extra={})=>({id,at,shift:"1st",rows:rows.map(b=>({b,c:"Engine"})),off:[],...extra});
@@ -11317,7 +11317,7 @@ test("the backfill loads old sheets into the swap history and touches nothing el
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../src/lib/shared/hours-value.ts");
  const field=await readFile(new URL("../src/components/shared/hours-field.tsx",import.meta.url),"utf8");
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
 
  /* Curtis: "the hours entered field is janky and doesn't allow u to just
@@ -11386,7 +11386,7 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
 });
 
 test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already on the sheet",async()=>{
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
  const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
@@ -11442,7 +11442,7 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
 
 test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random one",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
+ const editor=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
 
  /* It used to seed fleet.find(item=>!active.some(...)) - the first bus that
     happened to have no entry, chosen by array order and nothing else - into
@@ -11552,7 +11552,7 @@ test("the AI operator keeps hold of the bus, and answers a question instead of o
 });
 
 test("a render error shows a screen with a way out, not a white one",async()=>{
- const guard=await readFile(new URL("../app/crash-guard.tsx",import.meta.url),"utf8");
+ const guard=await readFile(new URL("../app/_components/crash-guard.tsx",import.meta.url),"utf8");
  const layout=await readFile(new URL("../app/layout.tsx",import.meta.url),"utf8");
 
  /* Curtis, from the floor: "if I touch a bus and hold it down without letting
@@ -12747,7 +12747,7 @@ test("UNDO FIX returns a repair to where it came from, or does not offer itself"
 
   /* In Progress, not Scheduled: down-sheet-editor.tsx already does exactly
      this when the editor un-completes an entry, so the two agree. */
-  const editor = await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx", import.meta.url), "utf8");
+  const editor = await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx", import.meta.url), "utf8");
   assert.match(editor,/current\.workflow==="Completed"\?"In Progress"/,"the rule this follows");
   assert.match(page,/workflow:"In Progress",completedAt:"",completedBy:""/);
   assert.match(page,/action:"Reopened from Fixed Repairs"/,"the stamp says where the change came from, since it did not come from the sheet");
@@ -13239,7 +13239,7 @@ test("a deferred bus does not have to be on property",async()=>{
   "a bus on the road and a bus off property are both still deferred");
  assert.equal(deferredBadgeCounts(fleet,[]).listed,3);
  /* And the label has to say so, because it is what a foreman reads. */
- const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const board=await readFile(new URL("../app/down-sheet/_components/deferred-board.tsx",import.meta.url),"utf8");
  const rendered=board.replace(/\/\*[\s\S]*?\*\//g,"");
  assert.equal(/ON PROPERTY/i.test(rendered),false,"the board must not claim these buses are on property");
  assert.match(board,/<small>HELD BACK AND NOT ON THE DOWN SHEET — HERE OR ON THE ROAD<\/small>/);
@@ -13315,7 +13315,7 @@ test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses 
 
  /* NOTHING HERE IS OVERDUE, and that is a decision rather than an omission.
     Curtis: "that bus could be in that status for a while, which is fine." */
- const board=await readFile(new URL("../app/recommended-board.tsx",import.meta.url),"utf8");
+ const board=await readFile(new URL("../app/down-sheet/_components/recommended-board.tsx",import.meta.url),"utf8");
  assert.equal(/overdue/i.test(board.replace(/\/\*[\s\S]*?\*\//g,"")),false,"a recommendation is never late");
  /* Same board classes as the two above it — "same color and everything". */
  assert.match(board,/className=\{"mystery-board recommended-board"\+\(collapsed\?" collapsed":""\)\}/);
@@ -13884,7 +13884,7 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
 });
 
 test("both Down Sheet boards carry the window and say what it hides",async()=>{
- for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+ for(const file of ["../app/down-sheet/_components/deferred-board.tsx","../app/down-sheet/_components/recommended-board.tsx"]){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.match(source,/<TimeWindowChips value=\{windowKey\}/,file+" draws the chips");
   /* The count beside the chips is what the window is holding back — measured
@@ -13944,7 +13944,7 @@ test("one undated deferral cannot make a six-day-old bus disappear",async()=>{
  assert.equal(withinTimeWindow(busDeferredMinutes([undated],now),"all"),true);
  /* And the two surfaces that draw this list read it from here rather than
     each working it out — they disagreed before, which is the whole point. */
- const board=await readFile(new URL("../app/deferred-board.tsx",import.meta.url),"utf8");
+ const board=await readFile(new URL("../app/down-sheet/_components/deferred-board.tsx",import.meta.url),"utf8");
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  for(const [name,source] of [["the board",board],["the quick filter",page]]){
   assert.match(source,/busDeferredMinutes\(/,name+" reads the shared rule");
@@ -13957,7 +13957,7 @@ test("a collapsed board never shows a narrowed count with nothing saying so",asy
     count is not, so a board collapsed while narrowed read as a smaller list
     with no explanation on screen — and both boards are collapsed by DEFAULT,
     making that the resting state rather than an edge case. */
- for(const file of ["../app/deferred-board.tsx","../app/recommended-board.tsx"]){
+ for(const file of ["../app/down-sheet/_components/deferred-board.tsx","../app/down-sheet/_components/recommended-board.tsx"]){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   /* DERIVED through the collapse, not reset by an effect and not by a line in
      the toggle's onClick. An effect runs after the commit, which left one
@@ -14079,7 +14079,7 @@ test("the vertical rail runs beside the defect rows, never across them",async()=
  /* .log-focus-row is a DEAD selector — no .tsx renders it — and the first
     version of these rules carried two more copies of it. A rule for an element
     that does not exist reads as coverage and is not. */
- for(const file of ["../app/defect-log/page.tsx","../app/defect-log/defect-log-settings-modal.tsx"])
+ for(const file of ["../app/defect-log/page.tsx","../app/settings/_components/defect-log-settings-modal.tsx"])
   assert.equal((await readFile(new URL(file,import.meta.url),"utf8")).includes("log-focus-row"),false,file);
  assert.equal(/data-bus-rail[^{]*\.log-focus-row/.test(css),false,"the option adds no rule for an element nothing renders");
  /* grid-row:1/-1 is NOT how this is done: with rows auto-placed there is no
@@ -14216,7 +14216,7 @@ test("Settings says which colours are following the theme",async()=>{
  /* The swatch beside a following colour is showing a colour the screen is NOT
     using. Saying so is the difference between a sensible default and a control
     that lies — and the button pins it back the other way. */
- const modal=await readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ const modal=await readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8");
  assert.match(modal,/FOLLOWING THEME/);
  assert.match(modal,/followsTheme\(key,settings\.display\.styles\[key\]\.color\)/);
  /* FOLLOW THEME sets the colour back to the shipped default, which IS the
@@ -14450,8 +14450,8 @@ test("the settings page is five sections of closed drawers, and WORDING is one o
  const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
  const [drawer,css,settingsPage,mapPanel,downPanel,logPanel,fixedPanel]=await Promise.all([
   read("src/components/settings/settings-drawer.tsx"),read("app/settings/settings.css"),read("app/settings/page.tsx"),
-  read("app/map-settings-panel.tsx"),read("app/down-sheet/down-sheet-settings.tsx"),
-  read("app/defect-log/defect-log-settings-modal.tsx"),read("src/components/settings/fixed-repairs-settings.tsx"),
+  read("app/settings/_components/map-settings-panel.tsx"),read("app/settings/_components/down-sheet-settings.tsx"),
+  read("app/settings/_components/defect-log-settings-modal.tsx"),read("src/components/settings/fixed-repairs-settings.tsx"),
  ]);
 
  /* STILL EXACTLY FIVE at the top. The drawers are a second level, not a sixth
@@ -14518,8 +14518,8 @@ test("a page's settings panel does not draw a second Settings header inside its 
     hence !inline rather than deletion. */
  const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
  const [down,log,fixed]=await Promise.all([
-  read("app/down-sheet/down-sheet-settings.tsx"),
-  read("app/defect-log/defect-log-settings-modal.tsx"),
+  read("app/settings/_components/down-sheet-settings.tsx"),
+  read("app/settings/_components/defect-log-settings-modal.tsx"),
   read("src/components/settings/fixed-repairs-settings.tsx"),
  ]);
  assert.match(down,/\{!inline&&<div className="repair-editor-head">/,"the Down Sheet banner is modal-only");
@@ -14585,7 +14585,7 @@ test("an imported helper is never called as a method on a record",async()=>{
     imported function invoked as a property of something else. */
  const files=["app/page.tsx","app/defect-log/page.tsx","app/down-sheet/page.tsx",
   "app/fixed-repairs/page.tsx","app/lists/page.tsx","app/settings/page.tsx",
-  "app/deferred-board.tsx","app/recommended-board.tsx","src/components/down-sheet/mystery-board.tsx","src/components/fleet/hold-board.tsx"];
+  "app/down-sheet/_components/deferred-board.tsx","app/down-sheet/_components/recommended-board.tsx","src/components/down-sheet/mystery-board.tsx","src/components/fleet/hold-board.tsx"];
  for(const file of files){
   const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
   /* Every name brought in by a braced import, which is how this repo imports
@@ -15035,7 +15035,7 @@ test("the shift clock knows which shift it is and when the next pullout is",asyn
 
 test("the garage's hours are editable on the device, and nothing re-implements the clock",async()=>{
  const [panel,settings]=await Promise.all([
-  readFile(new URL("../app/settings/shift-settings.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/shift-settings.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
  ]);
  const code=panel.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");

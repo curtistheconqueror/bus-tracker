@@ -9,8 +9,8 @@ import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./down-sheet.css";
-import DownSheetEditor from "./down-sheet-editor";
-import DownSheetScanner from "./down-sheet-scanner";
+import DownSheetEditor from "./_components/down-sheet-editor";
+import DownSheetScanner from "./_components/down-sheet-scanner";
 import {readSweep,startSweep} from "@/src/lib/fleet/facility-sweep";
 import {applyDownEntryToFleet} from "@/src/lib/down-sheet/down-sheet-sync";
 import {matchingUnresolvedDefectId} from "@/src/lib/defects/duplicate-defects";
@@ -35,9 +35,9 @@ import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import {forgetRemovedEntries,rememberRemovedEntries} from "@/src/lib/cloud/cloud-sync";
 import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "@/src/components/down-sheet/mystery-board";
-import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "../deferred-board";
-import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "../recommended-board";
-import SheetSectionBoard from "./sheet-section-board";
+import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "./_components/deferred-board";
+import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "./_components/recommended-board";
+import SheetSectionBoard from "./_components/sheet-section-board";
 /* Per device and collapsed by default, the same as the three boards above
    them. Both are NEW names, so nothing already stored is renamed. */
 const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
