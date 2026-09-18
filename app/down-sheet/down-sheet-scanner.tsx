@@ -9,7 +9,7 @@ import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view";
 import {scannedSheetRemovals,type ReplaceDownEntry} from "./down-sheet-replace";
 import {scanReadyPhoto} from "../scan-photo";
 import {readScanNotes,rememberScanNotes,SCAN_NOTES_KEY,SCAN_NOTES_LIMIT} from "../scan-notes";
-import {writeSetting} from "../storage";
+import {writeSetting} from "@/src/lib/storage/storage";
 
 type SelectedPhoto={file:File;url:string;key:string};
 

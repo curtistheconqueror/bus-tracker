@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
-import {exportFleetBoardBackup} from "../fleet-backup";
-import {fleetBackupDue,FLEET_BACKUP_INTERVAL} from "../storage";
+import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
+import {fleetBackupDue,FLEET_BACKUP_INTERVAL} from "@/src/lib/storage/storage";
 
 type BackupStatus={due:boolean;newLogs:number;current:number;interval:number};
 

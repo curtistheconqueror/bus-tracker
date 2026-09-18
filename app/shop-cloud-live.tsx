@@ -37,7 +37,7 @@ import {
  writeSentFingerprints,
 } from "./cloud-sync";
 import {applyCloudPull,LIVE_DEBOUNCE_MS,shouldSyncForChange} from "./cloud-live";
-import {readDownSheetStorage,readFleetStorage} from "./storage";
+import {readDownSheetStorage,readFleetStorage} from "@/src/lib/storage/storage";
 
 /* How often a connected device looks for its own unsent work. Long enough that
    a phone on its owner's data plan is not paying for a chatty app, short enough
