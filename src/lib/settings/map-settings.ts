@@ -3,8 +3,8 @@
    Settings page read and write the same thing. Data only - no JSX. */
 
 import {confirmationPreference} from "./confirmation-preferences.ts";
-import {SERVICE_INTERVALS_UNIT,readSavedServiceIntervals,type ServiceIntervals} from "../src/lib/fleet/service-intervals.ts";
-import {writeSetting} from "../src/lib/storage/storage.ts";
+import {SERVICE_INTERVALS_UNIT,readSavedServiceIntervals,type ServiceIntervals} from "../fleet/service-intervals.ts";
+import {writeSetting} from "../storage/storage.ts";
 
 export type S="shop"|"service"|"defect"|"out"|"decommissioned"|"unknown";
 export type BusDisplayMode="icon"|"number";

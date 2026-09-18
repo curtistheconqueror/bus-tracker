@@ -1,6 +1,6 @@
 "use client";
 
-import {TIME_WINDOWS,type TimeWindowKey} from "./time-window";
+import {TIME_WINDOWS,type TimeWindowKey} from "@/src/lib/shared/time-window";
 
 /* The chip row itself, drawn identically on all four lists that carry it — the
    two boards on the Down Sheet and the two quick-filter drawers on the Defect

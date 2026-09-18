@@ -10,9 +10,9 @@
    stylesheet, so this component owns the LIST and the pages own the LOOK. A
    page that wants the shared list in a different shell passes a className. */
 
-import {TRACKER_PAGES} from "./tracker-pages";
+import {TRACKER_PAGES} from "@/src/lib/settings/tracker-pages";
 import {useAppMode} from "./welcome-gate";
-import {hiddenInLite} from "./lite-mode";
+import {hiddenInLite} from "@/src/lib/settings/lite-mode";
 
 export default function TrackerNav({active,className}:{active:string;className?:string}){
  /* One filter in one file, which is most of why hiding a page in Lite is

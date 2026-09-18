@@ -1,6 +1,6 @@
 import {defectSummary,isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
 import {statusForLocation,type FleetStatus} from "../fleet/smart-status.ts";
-import {stampOperationalChange} from "../../../app/operational-time.ts";
+import {stampOperationalChange} from "../shared/operational-time.ts";
 
 export type BulkDefectBus={
  id:string;

@@ -13,7 +13,7 @@ the same building that must agree, plus a fifth in CSS:
 | `src/lib/fleet/facility-areas.ts` | `SECTION_SLOTS` — 16 sections to slot lists; `RELOCATION_AREAS` splits the garage into 3 move destinations | 18 areas |
 | `src/lib/fleet/facility-layout.ts` | `ROAD_CAPACITY` 75, `WEST_CAPACITY` 40, plus two one-off capacity migrations | 34 lines |
 | `src/lib/fleet/location-label.ts` | slot prefix to the words a person says | 16 prefixes |
-| `app/map-settings.ts` | `SECTION_THEME_KEYS` — which sections can be re-coloured | 15 sections |
+| `src/lib/settings/map-settings.ts` | `SECTION_THEME_KEYS` — which sections can be re-coloured | 15 sections |
 | `src/lib/fleet/fleet-intelligence.ts` | spoken aliases ("cng east", "east lot") for the move parser | 16 sections |
 | `app/globals.css` | the drawn geometry | 115 section selectors, 106 `grid-template-columns` |
 
