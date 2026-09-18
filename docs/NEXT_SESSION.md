@@ -155,7 +155,7 @@ In the order Curtis asked for it. Each has enough here to start without asking.
 > the deferment."
 
 The deferral fields and the DEFERRED badge already exist — see
-`app/deferred-watch.tsx` and the `deferredAt` / `deferredUntil` fields. Release
+`src/components/shared/deferred-watch.tsx` and the `deferredAt` / `deferredUntil` fields. Release
 158 (Codex) added a persistent **UNDO DEFERRED** action, which is a different
 thing: undo returns the repair to Open, this extends the clock without changing
 the state.

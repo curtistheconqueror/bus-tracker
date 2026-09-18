@@ -1,12 +1,12 @@
 "use client";
 
-import BusSelector from "../bus-selector";
-import HoursField from "../hours-field";
+import BusSelector from "@/src/components/shared/bus-selector";
+import HoursField from "@/src/components/shared/hours-field";
 import {useEffect,useMemo,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
-import TrackerNav from "../tracker-nav";
-import RefreshButton from "../refresh-button";
+import TrackerNav from "@/src/components/shared/tracker-nav";
+import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
 import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,recordReportAttempt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
@@ -15,42 +15,42 @@ import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import
 import ScanBatchesPanel from "./scan-batches-panel";
 import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
-import QuickFilterMenu from "../quick-filter-menu";
+import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./offline-backup-reminder";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
-import HoldBoard,{HoldBadge} from "../hold-board";
+import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
-import TimeWindowChips from "../time-window-chips";
+import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 /* One copy of the location editor, shared with the Down Sheet's MYSTERY BUSES
    board. The board moved there; this page still opens the same editor from the
    deferred quick-filter drawer, and two copies of that form would drift. */
-import {MysteryMoveModal} from "../mystery-board";
+import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
-import SaveAlert from "../save-alert";
-import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
+import SaveAlert from "@/src/components/shared/save-alert";
+import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {clockValue,nextOccurrenceISO} from "@/src/lib/defects/deferral-clock";
-import {useAppMode} from "../welcome-gate";
+import {useAppMode} from "@/src/components/shared/welcome-gate";
 import {hiddenInLite} from "@/src/lib/settings/lite-mode";
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "@/src/lib/storage/storage";
 
 import {moveBusToArea} from "@/src/lib/fleet/facility-areas";
-import ShopCloudLive from "../shop-cloud-live";
-import AppName from "../app-name";
-import ComboField from "../combo-field";
+import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
+import AppName from "@/src/components/shared/app-name";
+import ComboField from "@/src/components/shared/combo-field";
 import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search.ts";
-import WelcomeGate from "../welcome-gate";
+import WelcomeGate from "@/src/components/shared/welcome-gate";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
    restore of the old fleet: the records have to come back stamped as new work,

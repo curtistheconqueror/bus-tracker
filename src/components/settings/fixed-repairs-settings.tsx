@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect,useState,type CSSProperties} from "react";
-import {SettingsDrawer,SettingsDrawers} from "../settings/settings-drawer";
+import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
 
 type FixedTheme="light"|"dark"|"midnight"|"tactical"|"custom";
 type FixedFontSize="standard"|"large"|"extra";

@@ -27,13 +27,13 @@
 
 import {useMemo,useState} from "react";
 import {recommendedBuses,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
-import TimeWindowChips from "./time-window-chips";
+import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice, the same trap the DEFERRED board hit. */
 import {defectLabel,workStateStampLabel} from "@/src/lib/defects/repair-catalog";
-import {mysteryLocationLabel} from "./mystery-board";
+import {mysteryLocationLabel} from "@/src/components/down-sheet/mystery-board";
 import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import type {StructuredDefect} from "@/src/lib/defects/repair-catalog";
 

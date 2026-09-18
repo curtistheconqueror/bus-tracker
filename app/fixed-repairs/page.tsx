@@ -1,10 +1,10 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
-import TrackerNav from "../tracker-nav";
-import RefreshButton from "../refresh-button";
+import TrackerNav from "@/src/components/shared/tracker-nav";
+import RefreshButton from "@/src/components/shared/refresh-button";
 import "./fixed-repairs.css";
-import {useFixedAppearance} from "./fixed-repairs-settings";
+import {useFixedAppearance} from "@/src/components/settings/fixed-repairs-settings";
 import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,hasWorkState,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeFinding,normalizeRepairHours,normalizeDefects,PARTS_ON_ORDER_KEY,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,workStateStampLabel,type DefectOperability,type StructuredDefect,partNumberMissing} from "@/src/lib/defects/repair-catalog";
 
 /* Drawn from the catalog rather than typed here, so the label on this page and
@@ -13,16 +13,16 @@ const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES[0].label;
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
-import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
+import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "@/src/lib/storage/storage";
-import SaveAlert from "../save-alert";
-import ShopCloudLive from "../shop-cloud-live";
+import SaveAlert from "@/src/components/shared/save-alert";
+import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import {candidateBusNumbers,resolveBusNumber} from "@/src/lib/fleet/bus-number-resolver";
-import AppName from "../app-name";
-import WelcomeGate from "../welcome-gate";
+import AppName from "@/src/components/shared/app-name";
+import WelcomeGate from "@/src/components/shared/welcome-gate";
 
 /* How many completed repairs render at once.
 

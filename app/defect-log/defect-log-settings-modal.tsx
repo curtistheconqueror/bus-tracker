@@ -5,7 +5,7 @@ import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT
 import {REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {FLEET_BACKUP_INTERVAL_CHOICES,normalizeFleetBackupInterval} from "@/src/lib/storage/storage";
 import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope} from "@/src/lib/defects/defect-log-settings";
-import {SettingsDrawer,SettingsDrawers} from "../settings/settings-drawer";
+import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
 
 /* The Defect Log's settings panel.
 

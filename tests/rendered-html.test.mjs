@@ -148,7 +148,7 @@ test("phone safety controls expose full-board export reminders and recovery",asy
   readFile(new URL("../app/defect-log/offline-backup-reminder.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/save-alert.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/save-alert.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/storage/storage.ts",import.meta.url),"utf8"),
  ]);
  /* RESTORE LAST GOOD COPY moved off the map to sit beside MASTER IMPORT: both
@@ -878,7 +878,7 @@ test("removes prospective customer branding from visible app titles", async () =
      rather than each page spelling it - five copies of the nav once drifted
      until the Facility Map called itself something the other pages did not, and
      a name is the last string that should be allowed to do that. */
-  const appName = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  const appName = await readFile(new URL("../src/components/shared/app-name.tsx", import.meta.url), "utf8");
   assert.match(appName, /export const APP_NAME="FLEETSTEP"/);
   assert.equal(manifest.short_name, "FLEETSTEP");
   assert.equal(manifest.name, "FLEETSTEP — Fleet Maintenance");
@@ -1179,7 +1179,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      module now that all six pages carry the button — the map delegates rather
      than keeping its own copy. */
   assert.match(page, /<RefreshButton className="refresh-command"\/>/);
-  const refreshModule = await readFile(new URL("../app/refresh-button.tsx", import.meta.url), "utf8");
+  const refreshModule = await readFile(new URL("../src/components/shared/refresh-button.tsx", import.meta.url), "utf8");
   assert.match(refreshModule, /registration\?\.update\(\)/);
   assert.match(refreshModule, /window\.location\.reload\(\)/);
   /* The whole-app pair moved to MASTER EXPORT / MASTER IMPORT in Settings, and
@@ -1678,7 +1678,7 @@ test("Mystery Buses can change facility location without changing defects or Dow
   /* The editor moved into the shared board module — the Down Sheet's MYSTERY
      BUSES opens it, and so does the Defect Log's deferred drawer, which is why
      there is one copy rather than two that drift. */
-  const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
+  const board=await readFile(new URL("../src/components/down-sheet/mystery-board.tsx",import.meta.url),"utf8");
   assert.match(board,/MOVE \/ LOCATION/);
   assert.match(board,/defects and Down Sheet membership are not changed/);
   assert.match(page,/MOVE \/ LOCATION/,"the deferred drawer still offers it");
@@ -2453,7 +2453,7 @@ test("Defect Log groups multiple repairs per bus and streamlines phone entry", a
   /* The picker is a SHARED component now — the Down Sheet had a bare <select>
      with no way to type a number at all, and copying this across would have
      made two of them. Asserted where it lives. */
-  const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
+  const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
   assert.match(picker,/className="bus-generations"/);
   assert.match(picker,/input autoFocus=\{autoFocus\} inputMode="numeric"/);
   assert.match(picker,/Choose generation first/);
@@ -2911,7 +2911,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
     readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
     readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
     readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
-    readFile(new URL("../app/fixed-repairs/fixed-repairs-settings.tsx",import.meta.url),"utf8"),
+    readFile(new URL("../src/components/settings/fixed-repairs-settings.tsx",import.meta.url),"utf8"),
     readFile(new URL("../public/sw.js",import.meta.url),"utf8"),
     readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   ]);
@@ -3583,7 +3583,7 @@ test("work time totals per person, day by day, and says what it is not counting"
 });
 
 test("every page draws the same six links from one list",async()=>{
- const nav=await readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8");
+ const nav=await readFile(new URL("../src/components/shared/tracker-nav.tsx",import.meta.url),"utf8");
  const {TRACKER_PAGES,otherPages}=await import("../src/lib/settings/tracker-pages.ts");
  const pagesSource=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
 
@@ -4515,7 +4515,7 @@ test("no class name collides with a Tailwind positioning utility",async()=>{
     Renamed rather than fought: a class the framework already owns will keep
     winning, and the next person to add one would not know to look. */
  const files=["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx",
-  "../app/fixed-repairs/page.tsx","../app/lists/page.tsx","../app/section-transfer-controls.tsx",
+  "../app/fixed-repairs/page.tsx","../app/lists/page.tsx","../src/components/settings/section-transfer-controls.tsx",
   "../app/defect-log/offline-backup-reminder.tsx","../app/down-sheet/down-sheet-editor.tsx",
   "../app/down-sheet/down-sheet-settings.tsx","../app/down-sheet/down-sheet-scanner.tsx"];
  const utilities=new Set(["fixed","static","absolute","relative","sticky","block","inline","flex","grid",
@@ -4560,7 +4560,7 @@ test("no export hands the phone a link instead of a file",async()=>{
   ["Fixed Repairs report","../app/fixed-repairs/page.tsx"],
   ["Fleet Campaigns report","../app/lists/page.tsx"],
   ["full backup","../src/lib/storage/fleet-backup.ts"],
-  ["section transfers","../app/section-transfer-controls.tsx"],
+  ["section transfers","../src/components/settings/section-transfer-controls.tsx"],
  ].map(async([label,path])=>[label,await readFile(new URL(path,import.meta.url),"utf8")]));
  for(const [label,source] of sources){
   assert.match(source,/shareOrDownloadFile/,label+" must deliver its file through the shared helper");
@@ -6450,7 +6450,7 @@ test("no element in the Defect Log relies on the global bare header and footer s
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
-  readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/down-sheet/mystery-board.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
  ]);
  // globals.css styles bare <header> as a 38px dark banner and bare <footer> as
@@ -7827,7 +7827,7 @@ test("a board that did not save says so instead of failing silently",async()=>{
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/save-alert.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/save-alert.tsx",import.meta.url),"utf8"),
  ]);
 
  const store=(seed={})=>{const map=new Map(Object.entries(seed));
@@ -8124,7 +8124,7 @@ test("Facility Map bus tokens carry a DEF badge only for genuinely held-back bus
 });
 
 test("the deferred nav badge only pulses past 90 minutes, and the evening prompt opens from 8:30pm for anything over 60", async () => {
- const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
+ const watch = await readFile(new URL("../src/components/shared/deferred-watch.tsx", import.meta.url), "utf8");
  // The 90-minute line and the counting moved to deferred-counts.ts, a plain
  // module, so the numbers can be tested against a fleet instead of grepped for.
  const counts = await readFile(new URL("../src/lib/defects/deferred-counts.ts", import.meta.url), "utf8");
@@ -8225,7 +8225,7 @@ test("a footer inside a dialog is not positioned against the viewport, and every
  assert.match(globals, /\.mobile-mode-nav\{position:sticky;z-index:19;top:0/,
    "the rule this exists to make true");
  // Every caller is now covered by that one rule whatever name it passes.
- for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../app/mystery-board.tsx", "../app/welcome-gate.tsx",
+ for (const file of ["../app/down-sheet/down-sheet-scanner.tsx", "../src/components/down-sheet/mystery-board.tsx", "../src/components/shared/welcome-gate.tsx",
                      "../app/down-sheet/down-sheet-editor.tsx", "../app/defect-log/page.tsx"]) {
   const source = await readFile(new URL(file, import.meta.url), "utf8");
   if (/lockPageScroll\(/.test(source)) assert.match(source, /lockPageScroll\("[a-z-]+"\)/, file + " passes a name");
@@ -8280,8 +8280,8 @@ test("LITE changes what is drawn and can never reach a record", async () => {
 
 test("LITE stands the right things down on every surface", async () => {
  const [nav, name, down, log, settings] = await Promise.all([
-  readFile(new URL("../app/tracker-nav.tsx", import.meta.url), "utf8"),
-  readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/shared/tracker-nav.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/shared/app-name.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
@@ -8342,7 +8342,7 @@ test("the welcome asks once, on a device that has never opened the app, and Full
 
 test("the welcome is on every page, re-openable from Settings, and does not render before mount", async () => {
  const [gate, css, settings] = await Promise.all([
-  readFile(new URL("../app/welcome-gate.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/shared/welcome-gate.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8"),
  ]);
@@ -8437,7 +8437,7 @@ test("the evening deferred prompt has an off switch, and turning it off leaves t
  const [model, panel, watch] = await Promise.all([
   readFile(new URL("../src/lib/defects/defect-log-settings.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/defect-log/defect-log-settings-modal.tsx", import.meta.url), "utf8"),
-  readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/shared/deferred-watch.tsx", import.meta.url), "utf8"),
  ]);
  // Absent means on: every device already in the shop has a settings blob with
  // no such field, and none of them should go quiet on upgrade.
@@ -8922,8 +8922,8 @@ test("the defect form asks for the bus the way a mechanic reaches for it",async(
     a bare <select>; the rest of this test is still about the Defect Log's own
     form, so both sources are read and each assertion uses the right one. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
- const css=await readFile(new URL("../app/bus-selector.css",import.meta.url),"utf8");
+ const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../src/components/shared/bus-selector.css",import.meta.url),"utf8");
  /* Every colour in the SHARED sheet carries a fallback. They read --log-*
     because that is where they came from and the Defect Log still sets them; the
     Down Sheet does not, and a var with no value and no fallback is an invalid
@@ -9306,7 +9306,7 @@ test("a record with a malformed details field renders instead of taking the page
 });
 
 test("the pulsing DEFERRED badge opens the Deferred filter instead of going nowhere", async () => {
-  const watch = await readFile(new URL("../app/deferred-watch.ts" + "x", import.meta.url), "utf8");
+  const watch = await readFile(new URL("../src/components/shared/deferred-watch.ts" + "x", import.meta.url), "utf8");
   const log = await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
 
   /* The badge renders on all six pages, the Defect Log included. It used to be
@@ -9517,7 +9517,7 @@ test("the shop cloud runs on every page, not only while Settings is open",async(
   assert.match(source,/<ShopCloudLive\/>/,file+" does not run the shop cloud");
   assert.match(source,/import ShopCloudLive from/,file+" is missing the import");
  }
- const live=await readFile(new URL("../app/shop-cloud-live.tsx",import.meta.url),"utf8");
+ const live=await readFile(new URL("../src/components/shared/shop-cloud-live.tsx",import.meta.url),"utf8");
  const control=await readFile(new URL("../app/cloud-sync-control.tsx",import.meta.url),"utf8");
  assert.match(live,/const SWEEP_MS=45000/);
  // Exactly one sweeper. Leaving it in the control too would race whenever
@@ -9815,7 +9815,7 @@ test("a scan sweep removed on one device reaches the others, and so does putting
  assert.match(client,/readTombstones\(supabase,"bus_defects","defect_id"\)/);
  assert.match(client,/deleted:deletedRes\.deleted/);
  // Both callers hand the tombstones on; a pull that read them and dropped them would change nothing.
- for(const file of ["../app/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"])
+ for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"])
   assert.match(await readFile(new URL(file,import.meta.url),"utf8"),/applyCloudPull\(localStorage,\{[^}]*deleted:(?:got|result)\.deleted[,}]/,file);
 });
 
@@ -9938,7 +9938,7 @@ test("a Down Sheet cleared on one device stays cleared, instead of arriving back
  assert.match(client,/readTombstones\(supabase,"down_sheet_entries","entry_id"\)/);
  assert.match(client,/removedEntries:removedRes\.deleted/);
  assert.match(client,/sheet:withoutRemovedEntries\(downSheetPayload\(entryRes\.rows,now\),removedEntries\)/);
- for(const file of ["../app/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"]){
+ for(const file of ["../src/components/shared/shop-cloud-live.tsx","../app/cloud-sync-control.tsx"]){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.match(source,/removedEntries:readRemovedEntries\(localStorage\)/,file+" must push its removals");
   assert.match(source,/cloudPull\([^;]{0,160}?readRemovedEntries\(localStorage\)\)/,file+" must send them on the pull too");
@@ -10821,7 +10821,7 @@ test("the STATUS REPORT sends either version, and both tell the same story",asyn
  const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../src/lib/reports/fleet-status-report.ts");
  const COUNTS={...DEFAULT_STATUS_REPORT_PICK,locations:false,defects:false};
  const {statusReportPrintHtml}=await import("../src/lib/reports/fleet-status-report-print.ts");
- const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+ const modal=await readFile(new URL("../src/components/reports/status-report-modal.tsx",import.meta.url),"utf8");
 
  const now="2026-09-13T18:00:00.000Z";
  const fleet=[
@@ -10937,7 +10937,7 @@ test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is t
  const {buildFleetStatusReport,statusReportText,normalizeStatusReportPick,DEFAULT_STATUS_REPORT_PICK}=
   await import("../src/lib/reports/fleet-status-report.ts");
  const {statusReportPrintHtml}=await import("../src/lib/reports/fleet-status-report-print.ts");
- const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+ const modal=await readFile(new URL("../src/components/reports/status-report-modal.tsx",import.meta.url),"utf8");
 
  const now="2026-09-13T18:00:00.000Z";
  const fleet=[
@@ -11316,7 +11316,7 @@ test("the backfill loads old sheets into the swap history and touches nothing el
 
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../src/lib/shared/hours-value.ts");
- const field=await readFile(new URL("../app/hours-field.tsx",import.meta.url),"utf8");
+ const field=await readFile(new URL("../src/components/shared/hours-field.tsx",import.meta.url),"utf8");
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
 
@@ -11388,7 +11388,7 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
 test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already on the sheet",async()=>{
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- const picker=await readFile(new URL("../app/bus-selector.tsx",import.meta.url),"utf8");
+ const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  /* Every "this must be gone" check reads the CODE. The comments here explain
     what was removed and why, and a naive search matches the explanation — which
@@ -11891,7 +11891,7 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
 });
 
 test("a MYSTERY BUS card opens, because it already looked like it would",async()=>{
- const board=await readFile(new URL("../app/mystery-board.tsx",import.meta.url),"utf8");
+ const board=await readFile(new URL("../src/components/down-sheet/mystery-board.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
 
  /* The card carried cursor:pointer, border:0 and text-align:left — every
@@ -12011,7 +12011,7 @@ test("a transfer file carries removals, so an import can make the other device M
 
 test("REFRESH is on every page, because a home-screen app has no address bar to reload from",async()=>{
  const [button,css,map,...pages]=await Promise.all([
-  readFile(new URL("../app/refresh-button.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/refresh-button.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
   readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
   ...["down-sheet","defect-log","fixed-repairs","lists","settings"].map(page=>
@@ -12513,7 +12513,7 @@ test("a deferred bus can be released from the drawer that lists it, and the badg
   /* And it must not throw on a server render, where there is no window. */
   assert.match(storage,/function announceWrite\(key:string\)\{\n if\(typeof window==="undefined"/);
 
-  const watch = await readFile(new URL("../app/deferred-watch.tsx", import.meta.url), "utf8");
+  const watch = await readFile(new URL("../src/components/shared/deferred-watch.tsx", import.meta.url), "utf8");
   assert.match(watch,/window\.addEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"the badge listens for it");
   assert.match(watch,/window\.removeEventListener\(RECORDS_WRITTEN_EVENT,recompute\)/,"and stops listening when it unmounts");
 
@@ -12677,7 +12677,7 @@ test("the location under a bus number is the control that moves it on the map", 
 });
 
 test("a device that realtime cannot reach goes back to asking, instead of sitting deaf", async () => {
-  const live = await readFile(new URL("../app/shop-cloud-live.tsx", import.meta.url), "utf8");
+  const live = await readFile(new URL("../src/components/shared/shop-cloud-live.tsx", import.meta.url), "utf8");
   const client = await readFile(new URL("../src/lib/cloud/cloud-client.ts", import.meta.url), "utf8");
 
   /* THE FAULT: subscribe() was called and its answer thrown away, so a channel
@@ -12798,16 +12798,17 @@ test("the app's name is drawn top-left on every page, from one place", async () 
   /* Curtis named it: FLEETSTEP. It goes in the top-left of every page header,
      above the kicker each one already carries, so the existing block moves
      down rather than making room sideways. */
-  const component = await readFile(new URL("../app/app-name.tsx", import.meta.url), "utf8");
+  const component = await readFile(new URL("../src/components/shared/app-name.tsx", import.meta.url), "utf8");
   assert.match(component,/export const APP_NAME="FLEETSTEP"/);
 
   /* ONE SHARED PIECE, not six copies. Five copies of the nav drifted until the
      Facility Map called itself something the other pages did not - that is why
      tracker-pages.ts exists - and a name is the last string that should be
      allowed to disagree with itself across six screens. */
-  for(const [file,importPath] of [["../app/page.tsx","./app-name"],["../app/down-sheet/page.tsx","../app-name"],
-      ["../app/defect-log/page.tsx","../app-name"],["../app/fixed-repairs/page.tsx","../app-name"],
-      ["../app/lists/page.tsx","../app-name"],["../app/settings/page.tsx","../app-name"]]){
+  const APP_NAME_IMPORT="@/src/components/shared/app-name";
+  for(const [file,importPath] of [["../app/page.tsx",APP_NAME_IMPORT],["../app/down-sheet/page.tsx",APP_NAME_IMPORT],
+      ["../app/defect-log/page.tsx",APP_NAME_IMPORT],["../app/fixed-repairs/page.tsx",APP_NAME_IMPORT],
+      ["../app/lists/page.tsx",APP_NAME_IMPORT],["../app/settings/page.tsx",APP_NAME_IMPORT]]){
     const src = await readFile(new URL(file, import.meta.url), "utf8");
     assert.match(src,new RegExp('import AppName from "'+importPath.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+'"'),file+" must import the shared name");
     assert.match(src,/<AppName\/>/,file+" must draw it");
@@ -13075,10 +13076,10 @@ test("Lite can always be turned back off from inside Lite",async()=>{
     permission — anyone holding the device can turn it off — so the way out has
     to survive being in Lite. This holds the three things that would break it. */
  const [nav,settings,lite,gate]=await Promise.all([
-  readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/tracker-nav.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/settings/lite-mode.ts",import.meta.url),"utf8"),
-  readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/welcome-gate.tsx",import.meta.url),"utf8"),
  ]);
 
  /* 1. SETTINGS MUST STAY IN THE NAV. The nav filters exactly one page in Lite,
@@ -13111,7 +13112,7 @@ test("the welcome screen names the app, not one garage",async()=>{
     Maintenance Work Solutions." The line under the name is what the app calls
     itself; the shop's own name does not belong on the screen that greets a
     device that has never opened it. */
- const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ const gate=await readFile(new URL("../src/components/shared/welcome-gate.tsx",import.meta.url),"utf8");
  assert.match(gate,/<p className="welcome-kicker">Transit Maintenance Work Solutions<\/p>/);
  /* Only inside the comment explaining the change, never in what renders. */
  const rendered=gate.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
@@ -13555,7 +13556,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  const sync=await readFile(new URL("../src/lib/cloud/cloud-sync.ts",import.meta.url),"utf8");
  assert.equal(sync.includes("pace-role-v1"),false);
 
- const gate=await readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8");
+ const gate=await readFile(new URL("../src/components/shared/welcome-gate.tsx",import.meta.url),"utf8");
  const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
  /* Collapsible, as asked. */
  assert.match(gate,/className="welcome-role-toggle" aria-expanded=\{roleOpen\}/);
@@ -13816,7 +13817,7 @@ test("one location table, not five",async()=>{
     rather than labels: movedFromLabel in app/page.tsx and areaLabel in
     app/operator-engine.ts. Both were read and both name the trouble bays
     correctly. The claim here is the narrow one the assertions actually make. */
- const files=["../src/lib/defects/defect-log-sync.ts","../app/mystery-board.tsx","../app/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../src/lib/defects/quick-filter-share.ts"];
+ const files=["../src/lib/defects/defect-log-sync.ts","../src/components/down-sheet/mystery-board.tsx","../src/components/shared/deferred-watch.tsx","../app/fixed-repairs/page.tsx","../src/lib/defects/quick-filter-share.ts"];
  for(const file of files){
   const source=await readFile(new URL(file,import.meta.url),"utf8");
   assert.equal(source.includes('["garage-","Main Garage"]'),false,file+" no longer carries its own prefix table");
@@ -13869,7 +13870,7 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
  /* Reset on open, and never written to storage — a window restored from
     yesterday would open the drawer already hiding buses. */
  assert.equal(page.split('setQuickFilterWindow("all")').length-1,2,"both entry points reset it");
- const chips=await readFile(new URL("../app/time-window-chips.tsx",import.meta.url),"utf8");
+ const chips=await readFile(new URL("../src/components/shared/time-window-chips.tsx",import.meta.url),"utf8");
  assert.equal(/localStorage|STORAGE_KEY/.test(chips),false,"the window is not persisted");
  /* The count of what is held back is on screen AND is the button that clears
     it — a narrowed list that looks like the whole list is the only failure
@@ -14368,7 +14369,7 @@ test("the HOLD badge is a button that opens every held bus, and never shows the 
     being held, and a time." And on the badge itself: "don't just show the time
     of the expected arrival by default, you have to press it to see that
     information." */
- const board=await readFile(new URL("../app/hold-board.tsx",import.meta.url),"utf8");
+ const board=await readFile(new URL("../src/components/fleet/hold-board.tsx",import.meta.url),"utf8");
  const badge=board.slice(board.indexOf("export function HoldBadge"),board.indexOf("export default function"));
  assert.match(badge,/<button type="button" className="work-state-badge bus-hold-badge"/,"the same look as the deferred badge, per Curtis");
  assert.equal(/holdUntilLabel|until/.test(badge),false,"no time on the badge");
@@ -14448,9 +14449,9 @@ test("the settings page is five sections of closed drawers, and WORDING is one o
     closed. */
  const read=file=>readFile(new URL("../"+file,import.meta.url),"utf8");
  const [drawer,css,settingsPage,mapPanel,downPanel,logPanel,fixedPanel]=await Promise.all([
-  read("app/settings/settings-drawer.tsx"),read("app/settings/settings.css"),read("app/settings/page.tsx"),
+  read("src/components/settings/settings-drawer.tsx"),read("app/settings/settings.css"),read("app/settings/page.tsx"),
   read("app/map-settings-panel.tsx"),read("app/down-sheet/down-sheet-settings.tsx"),
-  read("app/defect-log/defect-log-settings-modal.tsx"),read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+  read("app/defect-log/defect-log-settings-modal.tsx"),read("src/components/settings/fixed-repairs-settings.tsx"),
  ]);
 
  /* STILL EXACTLY FIVE at the top. The drawers are a second level, not a sixth
@@ -14519,7 +14520,7 @@ test("a page's settings panel does not draw a second Settings header inside its 
  const [down,log,fixed]=await Promise.all([
   read("app/down-sheet/down-sheet-settings.tsx"),
   read("app/defect-log/defect-log-settings-modal.tsx"),
-  read("app/fixed-repairs/fixed-repairs-settings.tsx"),
+  read("src/components/settings/fixed-repairs-settings.tsx"),
  ]);
  assert.match(down,/\{!inline&&<div className="repair-editor-head">/,"the Down Sheet banner is modal-only");
  assert.match(log,/\{!inline&&<header className="log-settings-head">/,"the Defect Log banner is modal-only");
@@ -14584,7 +14585,7 @@ test("an imported helper is never called as a method on a record",async()=>{
     imported function invoked as a property of something else. */
  const files=["app/page.tsx","app/defect-log/page.tsx","app/down-sheet/page.tsx",
   "app/fixed-repairs/page.tsx","app/lists/page.tsx","app/settings/page.tsx",
-  "app/deferred-board.tsx","app/recommended-board.tsx","app/mystery-board.tsx","app/hold-board.tsx"];
+  "app/deferred-board.tsx","app/recommended-board.tsx","src/components/down-sheet/mystery-board.tsx","src/components/fleet/hold-board.tsx"];
  for(const file of files){
   const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
   /* Every name brought in by a braced import, which is how this repo imports
@@ -15239,7 +15240,7 @@ test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
 
 test("the Fleet Status Report has a way out you can see",async()=>{
  const [modal,css]=await Promise.all([
-  readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/reports/status-report-modal.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
  ]);
  const code=modal.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
@@ -15380,7 +15381,7 @@ test("the forecast is one number, and the single-number spelling is already ther
 test("the forecast adds the two queues it can see, and counts neither twice",async()=>{
  const {buildFleetForecast,INSPECTION_CATEGORY,FORECAST_MIN_INSPECTIONS,FORECAST_MIN_CONVERSIONS,
   FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS}=await import("../src/lib/reports/fleet-forecast.ts");
- const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
+ const modal=await readFile(new URL("../src/components/reports/status-report-modal.tsx",import.meta.url),"utf8");
 
  const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
  const down=(...buses)=>buses.map(b=>({b,c:"Engine"}));
@@ -15686,7 +15687,7 @@ test("a deferment can be given an end time when it is made, and extended later w
     Two controls, because he asked for both: HOLD UNTIL on the DEFERRED tick in
     the editor, and EXTEND on the held row itself. */
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
- const watch=await readFile(new URL("../app/deferred-watch.tsx",import.meta.url),"utf8");
+ const watch=await readFile(new URL("../src/components/shared/deferred-watch.tsx",import.meta.url),"utf8");
 
  /* ONE COPY OF THE CLOCK ARITHMETIC. "Hold until 06:00" asked at 21:00 means
     tomorrow morning, and three places now ask it — the evening review, the
