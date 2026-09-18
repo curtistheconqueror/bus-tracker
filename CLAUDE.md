@@ -360,7 +360,7 @@ that, not the only input.
 each time. A render error unmounts the whole tree, and saved to a home screen
 there is no address bar, no reload button and no pull-to-refresh — so the app
 does not misbehave, it VANISHES, and the person holding the phone has no
-console to check and no way back in. `app/crash-guard.tsx` catches it, shows a
+console to check and no way back in. `app/_components/crash-guard.tsx` catches it, shows a
 screen carrying the one control standalone mode cannot otherwise offer, and
 writes the fault here so the next session can read it rather than guess from
 "it went white".
