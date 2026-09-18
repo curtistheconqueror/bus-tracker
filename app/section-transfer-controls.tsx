@@ -1,6 +1,6 @@
 "use client";
 import {useRef,useState} from "react";
-import {shareOrDownloadFile,shareOutcomeLabel} from "./share-file";
+import {shareOrDownloadFile,shareOutcomeLabel} from "@/src/lib/shared/share-file";
 import {readTransferPayload,transferFilename,TRANSFER_KINDS,type TransferKind,type TransferPayload} from "@/src/lib/storage/section-transfer";
 
 /* One pair of buttons, used by all three sections, so the Defect Log and the

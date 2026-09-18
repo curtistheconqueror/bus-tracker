@@ -43,7 +43,7 @@
 import {useMemo,useState} from "react";
 import {busDeferredMinutes,heldDeferredBuses} from "@/src/lib/defects/deferred-counts";
 import TimeWindowChips from "./time-window-chips";
-import {withinTimeWindow,type TimeWindowKey} from "./time-window";
+import {withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice ("Lighting — Lighting — Headlight out"). */
 import {deferredMinutesElapsed,defectLabel} from "@/src/lib/defects/repair-catalog";

@@ -18,7 +18,7 @@
    rows and it hands back a ledger. The forecast reads the ledger and nothing
    else, so what "tempo" means is defined once. */
 
-import {shiftAt,type ShiftKey,type ShiftSettings} from "../../../app/shift-clock.ts";
+import {shiftAt,type ShiftKey,type ShiftSettings} from "../settings/shift-clock.ts";
 
 export const SHEET_LEDGER_KEY="pace-sheet-ledger-v1";
 

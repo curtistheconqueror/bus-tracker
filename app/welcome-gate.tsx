@@ -15,9 +15,9 @@
 
 import {useEffect,useState} from "react";
 import {APP_NAME} from "./app-name";
-import {APP_MODE_STORAGE_KEY,isFirstRun,readAppMode,serializeAppMode,type AppMode} from "./app-mode";
-import {lockPageScroll} from "./scroll-lock";
-import {ROLE_DEPARTMENTS,ROLE_UNITS,ROLE_STORAGE_KEY,departmentRoles,readRole,roleLabel,serializeRole,unitLabel,type RoleChoice,type RoleDepartment,type RoleUnit} from "./roles";
+import {APP_MODE_STORAGE_KEY,isFirstRun,readAppMode,serializeAppMode,type AppMode} from "@/src/lib/settings/app-mode";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
+import {ROLE_DEPARTMENTS,ROLE_UNITS,ROLE_STORAGE_KEY,departmentRoles,readRole,roleLabel,serializeRole,unitLabel,type RoleChoice,type RoleDepartment,type RoleUnit} from "@/src/lib/settings/roles";
 
 export const WELCOME_REQUEST_EVENT="pace-show-welcome";
 

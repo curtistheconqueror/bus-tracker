@@ -21,13 +21,13 @@ import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,qu
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
-import {elapsedLong} from "../elapsed-label";
+import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 import HoldBoard,{HoldBadge} from "../hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "../time-window-chips";
-import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "../time-window";
+import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
-import {lockPageScroll} from "../scroll-lock";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 /* One copy of the location editor, shared with the Down Sheet's MYSTERY BUSES
    board. The board moved there; this page still opens the same editor from the
    deferred quick-filter drawer, and two copies of that form would drift. */
@@ -36,12 +36,12 @@ import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-numb
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
-import {copyText,shareOrDownloadFile} from "../share-file";
+import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import SaveAlert from "../save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {clockValue,nextOccurrenceISO} from "@/src/lib/defects/deferral-clock";
 import {useAppMode} from "../welcome-gate";
-import {hiddenInLite} from "../lite-mode";
+import {hiddenInLite} from "@/src/lib/settings/lite-mode";
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeFleetStorage,writeFleetStorageResult,writeDownSheetStorageResult,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult,writeSetting} from "@/src/lib/storage/storage";
 
