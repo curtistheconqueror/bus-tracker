@@ -25,10 +25,10 @@
    The report has more than one reader and they are owed different documents. */
 
 import {useEffect,useMemo,useState} from "react";
-import {buildFleetStatusReport,normalizeStatusReportPick,statusReportText,DEFAULT_STATUS_REPORT_PICK,STATUS_REPORT_WIDTH,type StatusReportBus,type StatusReportEntry,type StatusReportPick} from "./fleet-status-report";
-import {statusReportPrintHtml} from "./fleet-status-report-print";
-import {buildFleetForecast,forecastTextLines,FORECAST_HEDGE} from "./fleet-forecast";
-import {readShiftSettings} from "./shift-clock";
+import {buildFleetStatusReport,normalizeStatusReportPick,statusReportText,DEFAULT_STATUS_REPORT_PICK,STATUS_REPORT_WIDTH,type StatusReportBus,type StatusReportEntry,type StatusReportPick} from "@/src/lib/reports/fleet-status-report";
+import {statusReportPrintHtml} from "@/src/lib/reports/fleet-status-report-print";
+import {buildFleetForecast,forecastTextLines,FORECAST_HEDGE} from "@/src/lib/reports/fleet-forecast";
+import {readShiftSettings} from "@/src/lib/settings/shift-clock";
 import {readSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 
 /* The selection is remembered, because the whole point of the include list is

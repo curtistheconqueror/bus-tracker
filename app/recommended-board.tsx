@@ -28,8 +28,8 @@
 import {useMemo,useState} from "react";
 import {recommendedBuses,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import TimeWindowChips from "./time-window-chips";
-import {withinTimeWindow,type TimeWindowKey} from "./time-window";
-import {elapsedLong} from "./elapsed-label";
+import {withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
+import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 /* defectLabel already reads "Category — Issue"; prefixing repairCategoryLabel
    printed the category twice, the same trap the DEFERRED board hit. */
 import {defectLabel,workStateStampLabel} from "@/src/lib/defects/repair-catalog";

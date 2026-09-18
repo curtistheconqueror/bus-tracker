@@ -20,8 +20,8 @@ no data behind it yet.**
 | | Built | Where |
 | --- | --- | --- |
 | 1a. The sheet ledger | ✅ | `src/lib/down-sheet/sheet-ledger.ts`, and it travels |
-| 1b. Shifts and pullout times | ✅ | `app/shift-clock.ts`, editable in Settings |
-| 1c. Road-call rate, censored dwell | ✅ | `app/fleet-forecast.ts` |
+| 1b. Shifts and pullout times | ✅ | `src/lib/settings/shift-clock.ts`, editable in Settings |
+| 1c. Road-call rate, censored dwell | ✅ | `src/lib/reports/fleet-forecast.ts` |
 | 1d. A descriptive panel to check it against | ❌ | not started |
 | 2. Road calls per window, with a range | ✅ | in the report, behind the checkbox |
 | 2. Downed = arrivals − clearances | ✅ | refuses until 3 swaps are recorded |
@@ -125,12 +125,12 @@ Per device and never synced, for the same reason the sweep is: it is a setting
 about the building, and a device that syncs it would overwrite a garage that
 runs different hours.
 
-A pure `app/shift-clock.ts`: which shift a timestamp falls in, which pullout is
+A pure `src/lib/settings/shift-clock.ts`: which shift a timestamp falls in, which pullout is
 next, how long until it, how much of the current shift is left. Every forecast
 window in Stage 2 is expressed through it, so there is exactly one place that
 knows what "next shift" means.
 
-### 1c. The descriptive numbers — `app/fleet-forecast.ts`
+### 1c. The descriptive numbers — `src/lib/reports/fleet-forecast.ts`
 
 Pure functions, no storage, no rendering — the shape `fleet-status-report.ts`
 already uses.

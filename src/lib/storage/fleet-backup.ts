@@ -2,7 +2,7 @@ import {BOARD_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,DOWN_SHEET_SE
 import {PARTS_MEMORY_STORAGE_KEY} from "../defects/parts-memory.ts";
 import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY} from "../fleet/bus-lists.ts";
 import {FINDINGS_MEMORY_STORAGE_KEY} from "../defects/findings-memory.ts";
-import {shareOrDownloadFile} from "../../../app/share-file.ts";
+import {shareOrDownloadFile} from "../shared/share-file.ts";
 
 /* Three buttons in this app write a file that CANNOT be read back in, and one
    writes the file that can. They used to be named the same way — EXPORT LOG

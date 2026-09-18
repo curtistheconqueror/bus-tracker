@@ -36,10 +36,10 @@
    feature is dead the moment it costs somebody a bus. Refusing early is what
    makes the number worth anything later. */
 
-import {isUnresolved,type StructuredDefect} from "../src/lib/defects/repair-catalog.ts";
-import {normalizeRoadCalls} from "../src/lib/fleet/road-calls.ts";
-import {normalizeSheetLedger} from "../src/lib/down-sheet/sheet-ledger.ts";
-import {DEFAULT_SHIFT_SETTINGS,clockMinutes,minuteOfDay,nextPullout,shiftAt,windowHours,type ShiftKey,type ShiftSettings} from "./shift-clock.ts";
+import {isUnresolved,type StructuredDefect} from "../defects/repair-catalog.ts";
+import {normalizeRoadCalls} from "../fleet/road-calls.ts";
+import {normalizeSheetLedger} from "../down-sheet/sheet-ledger.ts";
+import {DEFAULT_SHIFT_SETTINGS,clockMinutes,minuteOfDay,nextPullout,shiftAt,windowHours,type ShiftKey,type ShiftSettings} from "../settings/shift-clock.ts";
 
 /* How far back the rate is estimated from. Three weeks rather than the road
    call module's own seven days: seven days of a quiet week is four events, and

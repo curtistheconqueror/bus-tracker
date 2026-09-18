@@ -21,14 +21,14 @@ import { ESTIMATED_MILES_PER_OPERATING_DAY, INSPECTION_DAY_INTERVAL, INSPECTION_
 import { COMPLETION_READING_NOTE, maintenanceCompletionError, recordMaintenanceCompletion } from "../src/lib/fleet/maintenance-completion.ts";
 import { EMPTY_PARTS_MEMORY, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, forgetPart, learnPart, normalizePartsMemory, partMemoryKey, partMemoryLabel, readPartsMemory, recallPart, writePartsMemory } from "../src/lib/defects/parts-memory.ts";
 import { BUS_LIST_COLUMN_LIMIT, BUS_LIST_MAX_HOURS, BUS_LIST_TEMPLATES, busListHours, normalizeBusListHours, setBusListEntryHours, busListTemplateOptions, deleteBusListTemplate, normalizeBusListTemplates, saveBusListTemplate, addBusListEntries, busListColumnCount, busListCounts, busListExportText, createBusList, normalizeBusListColumns, normalizeBusLists, parseBusListInput, setBusListColumns, setBusListEntryCell, setBusListEntryDone } from "../src/lib/fleet/bus-lists.ts";
-import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../app/work-time.ts";
+import { formatWorkHours, workDayKey, workTimePeople, workTimeRowsFromFleet, workTimeSummary } from "../src/lib/reports/work-time.ts";
 import { DEFAULT_SERVICE_INTERVALS, LEGACY_SERVICE_INTERVALS_UNIT, SERVICE_DUE_SOON_HOURS, SERVICE_INTERVALS_UNIT, readSavedServiceIntervals, SERVICE_KINDS, MAX_PLAUSIBLE_MILES_PER_ENGINE_HOUR, SERVICE_CRITICAL_FRACTION, SERVICE_OVERDUE_FRACTION, SERVICE_SEVERITY_LABELS, engineHourMeterReset, estimateEngineHoursAtMiles, fleetDutyCycle, milesPerEngineHour, monthsBetween, serviceSeverity, normalizeServiceIntervals, serviceIntervalHours, serviceIntervalStatus } from "../src/lib/fleet/service-intervals.ts";
 import { EAST_SLOTS, moveBusToArea, RELOCATION_AREAS, SECTION_SLOTS } from "../src/lib/fleet/facility-areas.ts";
 import { migrateBrakeTowCapacities, migrateReducedCapacity, ROAD_CAPACITY, WEST_CAPACITY } from "../src/lib/fleet/facility-layout.ts";
 import { candidateBusNumbers, resolveBusNumber, resolveBusNumberList } from "../src/lib/fleet/bus-number-resolver.ts";
-import { planOperatorCommand } from "../app/operator-engine.ts";
-import { applyOperatorBatch } from "../app/operator-batch.ts";
-import { operationalUpdateAt, stampOperationalChange } from "../app/operational-time.ts";
+import { planOperatorCommand } from "../src/lib/operator/operator-engine.ts";
+import { applyOperatorBatch } from "../src/lib/operator/operator-batch.ts";
+import { operationalUpdateAt, stampOperationalChange } from "../src/lib/shared/operational-time.ts";
 import { formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommendedRepairMinutes } from "../src/lib/down-sheet/repair-time-estimates.ts";
 import { aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal } from "../src/lib/down-sheet/down-sheet-repair-items.ts";
 import { mergeReviewedRows, reviewScannedRows } from "../src/lib/down-sheet/down-sheet-scan-import.ts";
@@ -904,7 +904,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      Settings page: the presets into the map's data module, the controls into
      its panel. The map still applies every one of them. */
   const [model, panel] = await Promise.all([
-    readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
   ]);
   for (const theme of ["Default", "Terminal", "Black / Dark", "Midnight", "Tactical"]) {
@@ -1850,7 +1850,7 @@ test("bus marker display toggles between icons and large number tiles per device
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   const [model, panel] = await Promise.all([
-    readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/map-settings-panel.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(panel, /BUS MARKER DISPLAY/);
@@ -1866,7 +1866,7 @@ test("bus marker display toggles between icons and large number tiles per device
   assert.match(css, /color-mix\(in srgb,var\(--marker-status\) 22%,#fff\)/);
 });
 test("confirmation prompts are per-device settings that default to on", async () => {
-  const { confirmationPreference, confirmAction } = await import("../app/confirmation-preferences.ts");
+  const { confirmationPreference, confirmAction } = await import("../src/lib/settings/confirmation-preferences.ts");
   // Missing, damaged, or legacy saved settings must restore the safer prompting default.
   assert.equal(confirmationPreference(undefined), true);
   assert.equal(confirmationPreference(null), true);
@@ -1902,7 +1902,7 @@ test("confirmation prompts are per-device settings that default to on", async ()
   assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
   /* A restored backup reaches the intervals through the board-settings reader
      now, rather than through a setter inside the map's own import handler. */
-  const boardModel = await readFile(new URL("../app/map-settings.ts", import.meta.url), "utf8");
+  const boardModel = await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
   assert.match(boardModel, /serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/);
   /* A restored backup reaches the prompts through the board-settings reader,
      which defaults an unset or damaged value back to asking. */
@@ -2917,7 +2917,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   ]);
   /* The link is written once, in the shared list; each page is asserted to draw
      that list rather than to carry its own copy of the link. */
-  const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+  const navPages=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
   assert.match(navPages,/\{href:"\/fixed-repairs",label:"FIXED REPAIRS"\}/);
   for(const page of [trackerPage,downPage,defectPage,fixedPage])assert.match(page,/<TrackerNav[^>]*\/>/);
   /* THE ORDER FLIPPED, deliberately. This asserted the nav rendered BEFORE the
@@ -3584,8 +3584,8 @@ test("work time totals per person, day by day, and says what it is not counting"
 
 test("every page draws the same six links from one list",async()=>{
  const nav=await readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8");
- const {TRACKER_PAGES,otherPages}=await import("../app/tracker-pages.ts");
- const pagesSource=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+ const {TRACKER_PAGES,otherPages}=await import("../src/lib/settings/tracker-pages.ts");
+ const pagesSource=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
 
  /* Five copies of this nav drifted: the Facility Map called itself FLEET
     TRACKER in its own nav while every other page called it FACILITY MAP. One
@@ -3689,7 +3689,7 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
 
  /* Writes merge over what each key already holds. Checked on the data
     modules, which are what the page calls. */
- const {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings}=await import("../app/map-settings.ts");
+ const {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings}=await import("../src/lib/settings/map-settings.ts");
  const {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings}=await import("../src/lib/down-sheet/down-sheet-settings-store.ts");
  const store=new Map();
  const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>{store.set(key,String(value))}};
@@ -4478,7 +4478,7 @@ test("the command bar carries the other pages behind one trigger",async()=>{
  for(const gone of ["downsheet-command","defectlog-command","fixed-repairs-command","lists-command"])
   assert.ok(!page.includes('className="'+gone+'"'),gone+" should be inside the PAGES menu now");
  assert.match(page,/<PageMenu pages=\{otherPages\(/);
-  const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+  const navPages=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
  for(const href of ["/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"])
   assert.ok(navPages.includes('href:"'+href+'"'),"the menu must still reach "+href);
  // the counts come along: the reason to glance at the bar is to see what is waiting
@@ -4542,7 +4542,7 @@ test("no export hands the phone a link instead of a file",async()=>{
     address bar, sharing it shares the URL rather than the file, and a blob URL
     is scoped to the session that made it, so on the other device it resolves to
     https://<site>/<uuid> and 404s. It could never have worked. */
- const helper=await readFile(new URL("../app/share-file.ts",import.meta.url),"utf8");
+ const helper=await readFile(new URL("../src/lib/shared/share-file.ts",import.meta.url),"utf8");
  // the share sheet first, guarded, because share() with files it will not take
  // is its own failure
  assert.match(helper,/navigator\.canShare\?\.\(\{files:\[file\]\}\)/);
@@ -5199,7 +5199,7 @@ test("the Down Sheet editor holds the page still and fills a phone screen",async
   readFile(new URL("../app/down-sheet/down-sheet.css",import.meta.url),"utf8"),
   readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
-  readFile(new URL("../app/scroll-lock.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/shared/scroll-lock.ts",import.meta.url),"utf8"),
  ]);
 
  // One lock, used by both editors. The Defect Log carried its own copy for
@@ -5586,7 +5586,7 @@ test("a day's work time covers Defect Log repairs as well as campaign sweeps",()
 test("the work time panel is written to be moved somewhere else later",async()=>{
  const [panel,logic,listsPage]=await Promise.all([
   readFile(new URL("../app/work-time-panel.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/work-time.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/reports/work-time.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/lists/page.tsx",import.meta.url),"utf8"),
  ]);
  // Curtis expects this to move. It takes its records as a prop and holds only
@@ -5696,7 +5696,7 @@ test("bus lists survive a round trip through storage",()=>{
 test("every page offers the Fleet Campaigns tab without changing the lists route",async()=>{
  const pages=await Promise.all(["../app/page.tsx","../app/down-sheet/page.tsx","../app/defect-log/page.tsx","../app/fixed-repairs/page.tsx","../app/lists/page.tsx"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
- const navPages=await readFile(new URL("../app/tracker-pages.ts",import.meta.url),"utf8");
+ const navPages=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
  assert.match(navPages,/\{href:"\/lists",label:"FLEET CAMPAIGNS"\}/);
  for(const page of pages)assert.match(page,/<TrackerNav[^>]*\/>/);
  // the lists page marks itself current and links back to the other four
@@ -6666,7 +6666,7 @@ test("release safety keeps interval units and learned parts attached to the righ
  // Both read paths go through the one migration, so an imported backup and a
  // device that has been running all along read a stored blob the same way.
  assert.match(page,/setServiceIntervals\(readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)\)/);
- const boardModelSource=await readFile(new URL("../app/map-settings.ts",import.meta.url),"utf8");
+ const boardModelSource=await readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8");
  assert.match(boardModelSource,/serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/,
   "a restored backup still reaches the intervals, through the board-settings reader");
  assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
@@ -8180,7 +8180,7 @@ test("a footer inside a dialog is not positioned against the viewport, and every
  const [globals, scanner, lock, down] = await Promise.all([
   readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   readFile(new URL("../app/down-sheet/down-sheet-scanner.tsx", import.meta.url), "utf8"),
-  readFile(new URL("../app/scroll-lock.ts", import.meta.url), "utf8"),
+  readFile(new URL("../src/lib/shared/scroll-lock.ts", import.meta.url), "utf8"),
   readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8"),
  ]);
 
@@ -8243,7 +8243,7 @@ test("a footer inside a dialog is not positioned against the viewport, and every
 });
 
 test("LITE changes what is drawn and can never reach a record", async () => {
- const { hiddenInLite, shownIn, LITE_HIDDEN } = await import("../app/lite-mode.ts");
+ const { hiddenInLite, shownIn, LITE_HIDDEN } = await import("../src/lib/settings/lite-mode.ts");
 
  // Full hides nothing, whatever is on the list.
  for (const feature of LITE_HIDDEN) {
@@ -8273,7 +8273,7 @@ test("LITE changes what is drawn and can never reach a record", async () => {
  }
 
  // And lite-mode.ts itself imports only a type — it cannot read or write storage.
- const rules = await readFile(new URL("../app/lite-mode.ts", import.meta.url), "utf8");
+ const rules = await readFile(new URL("../src/lib/settings/lite-mode.ts", import.meta.url), "utf8");
  assert.doesNotMatch(rules, /localStorage|setItem|getItem/, "the rules never touch storage");
  assert.match(rules, /^import type \{AppMode\} from "(?:[^"]*\/)?app-mode\.ts";$/m, "a type, not the store");
 });
@@ -8309,7 +8309,7 @@ test("LITE stands the right things down on every surface", async () => {
 });
 
 test("the welcome asks once, on a device that has never opened the app, and Full is the fallback", async () => {
- const { isFirstRun, readAppMode, serializeAppMode, APP_MODE_STORAGE_KEY, DEFAULT_APP_MODE } = await import("../app/app-mode.ts");
+ const { isFirstRun, readAppMode, serializeAppMode, APP_MODE_STORAGE_KEY, DEFAULT_APP_MODE } = await import("../src/lib/settings/app-mode.ts");
  const store = map => ({ getItem: key => (key in map ? map[key] : null) });
 
  // Nothing on the device at all: the one case that gets the welcome by itself.
@@ -10772,7 +10772,7 @@ test("a soft bus the yard puts on a run stops counting against pullout, on every
 });
 
 test("the STATUS REPORT separates what cannot run from what can",async()=>{
- const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../src/lib/reports/fleet-status-report.ts");
  const at="2026-09-16T04:00:00.000Z";
  const bus=(id,n)=>({id,n,l:"bay-1",s:"out",defects:[]});
  const entry=(id,busId,busNumber,repair,customReason)=>({id,busId,busNumber,category:"",repair,customReason,
@@ -10818,9 +10818,9 @@ test("the STATUS REPORT separates what cannot run from what can",async()=>{
 });
 
 test("the STATUS REPORT sends either version, and both tell the same story",async()=>{
- const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../src/lib/reports/fleet-status-report.ts");
  const COUNTS={...DEFAULT_STATUS_REPORT_PICK,locations:false,defects:false};
- const {statusReportPrintHtml}=await import("../app/fleet-status-report-print.ts");
+ const {statusReportPrintHtml}=await import("../src/lib/reports/fleet-status-report-print.ts");
  const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
 
  const now="2026-09-13T18:00:00.000Z";
@@ -10935,8 +10935,8 @@ test("the STATUS REPORT sends either version, and both tell the same story",asyn
 
 test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is ticked",async()=>{
  const {buildFleetStatusReport,statusReportText,normalizeStatusReportPick,DEFAULT_STATUS_REPORT_PICK}=
-  await import("../app/fleet-status-report.ts");
- const {statusReportPrintHtml}=await import("../app/fleet-status-report-print.ts");
+  await import("../src/lib/reports/fleet-status-report.ts");
+ const {statusReportPrintHtml}=await import("../src/lib/reports/fleet-status-report-print.ts");
  const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
 
  const now="2026-09-13T18:00:00.000Z";
@@ -11014,7 +11014,7 @@ test("the STATUS REPORT is a checkbox list now, and it auto-formats to what is t
 });
 
 test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",async()=>{
- const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../app/fleet-status-report.ts");
+ const {buildFleetStatusReport,statusReportText,DEFAULT_STATUS_REPORT_PICK}=await import("../src/lib/reports/fleet-status-report.ts");
  const {techServicesGroup}=await import("../src/lib/fleet/tech-services.ts");
  const {quickFilterMatch}=await import("../src/lib/defects/quick-filters.ts");
 
@@ -11086,8 +11086,8 @@ test("Farebox, Ventra and the CUBIC screens are counted apart, off one table",as
 
 test("the FLEET FORECAST refuses before it can count, and counts open repairs at their age",async()=>{
  const {buildFleetForecast,forecastTextLines,categoryDwell,roadCallRates,FORECAST_MIN_ROAD_CALLS,FORECAST_LOOKBACK_DAYS}=
-  await import("../app/fleet-forecast.ts");
- const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+  await import("../src/lib/reports/fleet-forecast.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../src/lib/reports/fleet-status-report.ts");
 
  /* BUILT FROM LOCAL COMPONENTS, NOT PINNED TO AN INSTANT, and that is the
     whole point of the spelling.
@@ -11315,7 +11315,7 @@ test("the backfill loads old sheets into the swap history and touches nothing el
 });
 
 test("an hours box can be typed in and emptied, on both surfaces",async()=>{
- const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../app/hours-value.ts");
+ const {parseHours,isTypeableHours,HOURS_TYPING}=await import("../src/lib/shared/hours-value.ts");
  const field=await readFile(new URL("../app/hours-field.tsx",import.meta.url),"utf8");
  const editor=await readFile(new URL("../app/down-sheet/down-sheet-editor.tsx",import.meta.url),"utf8");
  const log=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
@@ -11471,7 +11471,7 @@ test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random o
 });
 
 test("the AI operator keeps hold of the bus, and answers a question instead of offering to cause it",async()=>{
- const {planOperatorCommand,isQuestion}=await import("../app/operator-engine.ts");
+ const {planOperatorCommand,isQuestion}=await import("../src/lib/operator/operator-engine.ts");
  const areas=[{name:"CNG East",slots:["east-1","east-2"]},{name:"Main Garage",slots:["garage-1","garage-2"]}];
  const oil={id:"d1",category:"Engine",issue:"Oil leak",details:"",operability:"service",state:"open"};
  const fleet=[
@@ -11714,7 +11714,7 @@ test("a road call logged on the sheet reaches the bus, whichever source saw it f
 
 test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()=>{
  const {buildFleetStatusReport,statusReportText,mysteryLabel,DEFAULT_STATUS_REPORT_PICK,INSPECTION_SECTION,STATUS_REPORT_ROAD_CALL_HOURS}=
-  await import("../app/fleet-status-report.ts");
+  await import("../src/lib/reports/fleet-status-report.ts");
  /* The two fixed versions are gone; both are now points on the include list.
     Curtis: "I could just pick what I want sent, and it'll auto format to that."
     COUNTS is what the old counts-only version was — numbers, no locations — and
@@ -11839,7 +11839,7 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
  assert.match(full,/A\/C and HVAC/,"and the checkbox brings the repairs in");
 
  /* Every line has to survive a phone. */
- const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../src/lib/reports/fleet-status-report.ts");
  for(const line of statusReportText(board,{pick:WITH_REPAIRS,title:"PACE SOUTH"}).split("\n"))
   assert.ok(line.length<=STATUS_REPORT_WIDTH,"line too wide for a lock screen ("+line.length+"): "+line);
 
@@ -11859,7 +11859,7 @@ test("the FLEET STATUS REPORT counts downed buses the way the shop does",async()
     because Curtis asked for the numbers and a bare "+14 more" would defeat the
     list. */
  {
-  const {STATUS_REPORT_DETAIL_LIMIT,STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+  const {STATUS_REPORT_DETAIL_LIMIT,STATUS_REPORT_WIDTH}=await import("../src/lib/reports/fleet-status-report.ts");
   const many=Array.from({length:22},(unused,index)=>({id:"m"+index,n:String(17500+index),l:"east-1",s:"unknown",defects:[]}));
   const crowded=statusReportText(buildFleetStatusReport(many,[],now));
   assert.equal(crowded.split("\n").filter(line=>/^  \d{5}  /.test(line)).length,STATUS_REPORT_DETAIL_LIMIT,
@@ -13077,7 +13077,7 @@ test("Lite can always be turned back off from inside Lite",async()=>{
  const [nav,settings,lite,gate]=await Promise.all([
   readFile(new URL("../app/tracker-nav.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8"),
-  readFile(new URL("../app/lite-mode.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/settings/lite-mode.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/welcome-gate.tsx",import.meta.url),"utf8"),
  ]);
 
@@ -13307,7 +13307,7 @@ test("RECOMMENDED FOR DOWN SHEET is the third board, and its count is the buses 
     broken clock must not read as "just now". */
  assert.equal(recommendedMinutesElapsed({downSheetRecommendation:{by:"CJ"}},now),null);
  assert.equal(recommendedMinutesElapsed({},now),null);
- const {elapsedLong}=await import("../app/elapsed-label.ts");
+ const {elapsedLong}=await import("../src/lib/shared/elapsed-label.ts");
  assert.equal(elapsedLong(180),"3H 0M");
  assert.equal(elapsedLong(60*24*4),"4D");
  assert.equal(elapsedLong(-5),"0M","a clock ahead of this one must not print a negative");
@@ -13440,7 +13440,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
  /* Curtis: "a collapsible expandable section placed somewhere sensible on the
     screen where a person could select their role... this could be broken up
     into two categories, transportation and maintenance." */
- const {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,departmentRoles}=await import("../app/roles.ts");
+ const {ROLE_DEPARTMENTS,ROLE_STORAGE_KEY,readRole,roleLabel,serializeRole,departmentRoles}=await import("../src/lib/settings/roles.ts");
 
  /* HIS TWO LISTS, IN HIS ORDER — the shop's order, from the road or the floor
     upward, not alphabetical. "Transportation, it will give you the option
@@ -13483,7 +13483,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     simultaneously." Spelled out, "Assistant Superintendent" beside
     "Superintendent" is two long strings differing by one word at the front —
     the hardest pair of all to tell apart at a glance on a phone. */
- const {allDepartmentRoles}=await import("../app/roles.ts");
+ const {allDepartmentRoles}=await import("../src/lib/settings/roles.ts");
  for(const department of ["transportation","maintenance"]){
   assert.ok(allDepartmentRoles(department).includes("Asst Supt"),department+" has an assistant");
   assert.ok(allDepartmentRoles(department).includes("Supt"));
@@ -13519,7 +13519,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     asked whether non-union is called "bargain": it is the other way round. A
     BARGAINING UNIT is the group a union represents, so "bargaining" names the
     union side and cannot label the other one. */
- const {ROLE_UNITS,unitLabel}=await import("../app/roles.ts");
+ const {ROLE_UNITS,unitLabel}=await import("../src/lib/settings/roles.ts");
  assert.deepEqual(ROLE_UNITS.map(item=>item.key),["union","non-union"],"union first — most of the building is");
  assert.deepEqual(ROLE_UNITS.map(item=>item.label),["Union","Non-Union"]);
  for(const item of ROLE_UNITS)assert.equal(/bargain/i.test(item.label),false,
@@ -13547,7 +13547,7 @@ test("the home screen asks what you do, and nothing in the app acts on the answe
     string in LocalStorage that anybody holding the phone can change from the
     screen that set it. The moment something gates on it, that string is
     standing between a person and a control. */
- const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../app/lite-mode.ts","../src/lib/storage/storage.ts","../src/lib/cloud/cloud-sync.ts"]
+ const files=await Promise.all(["../app/page.tsx","../app/defect-log/page.tsx","../app/down-sheet/page.tsx","../app/settings/page.tsx","../src/lib/settings/lite-mode.ts","../src/lib/storage/storage.ts","../src/lib/cloud/cloud-sync.ts"]
   .map(path=>readFile(new URL(path,import.meta.url),"utf8")));
  for(const source of files)assert.equal(source.includes(ROLE_STORAGE_KEY)||source.includes("readRole"),false,
   "nothing outside the picker may read the role — it is a label, not a permission");
@@ -13829,7 +13829,7 @@ test("one location table, not five",async()=>{
 });
 
 test("the recency window keeps an undated row out of every narrowed list",async()=>{
- const {withinTimeWindow,timeWindowLabel,timeWindowMinutes,TIME_WINDOWS}=await import("../app/time-window.ts");
+ const {withinTimeWindow,timeWindowLabel,timeWindowMinutes,TIME_WINDOWS}=await import("../src/lib/shared/time-window.ts");
  /* ALL means all, including a row with no usable stamp. */
  assert.equal(withinTimeWindow(null,"all"),true);
  assert.equal(withinTimeWindow(99999,"all"),true);
@@ -13926,7 +13926,7 @@ test("one undated deferral cannot make a six-day-old bus disappear",async()=>{
     counted as "1 HIDDEN". The wrong direction for a list of buses nobody has
     ruled on. */
  const {busDeferredMinutes}=await import("../src/lib/defects/deferred-counts.ts");
- const {withinTimeWindow}=await import("../app/time-window.ts");
+ const {withinTimeWindow}=await import("../src/lib/shared/time-window.ts");
  const now=new Date("2026-09-10T12:00:00.000Z");
  const at=hours=>new Date(now.getTime()-hours*3600000).toISOString();
  const deferred=deferredAt=>({id:"d"+deferredAt,state:"deferred",deferredAt});
@@ -14922,7 +14922,7 @@ test("Fixed Repairs is themed all the way into the card, not just around it",asy
 test("the shift clock knows which shift it is and when the next pullout is",async()=>{
  const {DEFAULT_SHIFT_SETTINGS,SHIFT_SETTINGS_KEY,clockMinutes,formatClock,minutesUntilClock,
   nextPullout,normalizeShiftSettings,shiftAt,shiftLabel,shiftRemainingMinutes,untilLabel,
-  windowHours,withinWindow}=await import("../app/shift-clock.ts");
+  windowHours,withinWindow}=await import("../src/lib/settings/shift-clock.ts");
 
  /* The app already had `Shift` as a LABEL on a sheet entry and nothing that
     mapped a clock time onto one, and no pullout time anywhere. Curtis: "it must
@@ -15271,7 +15271,7 @@ test("the Fleet Status Report has a way out you can see",async()=>{
 });
 
 test("the downed forecast measures the same population it projects",async()=>{
- const {buildFleetForecast,INSPECTION_CATEGORY}=await import("../app/fleet-forecast.ts");
+ const {buildFleetForecast,INSPECTION_CATEGORY}=await import("../src/lib/reports/fleet-forecast.ts");
 
  /* AN INSPECTION IS NOT A DOWNED BUS. The ledger records the whole sheet; the
     number this forecast projects is DOWNED buses, the line Curtis drew himself
@@ -15307,8 +15307,8 @@ test("the downed forecast measures the same population it projects",async()=>{
 });
 
 test("the forecast is one number, and the single-number spelling is already there",async()=>{
- const {buildFleetForecast,forecastTextLines}=await import("../app/fleet-forecast.ts");
- const {STATUS_REPORT_WIDTH}=await import("../app/fleet-status-report.ts");
+ const {buildFleetForecast,forecastTextLines}=await import("../src/lib/reports/fleet-forecast.ts");
+ const {STATUS_REPORT_WIDTH}=await import("../src/lib/reports/fleet-status-report.ts");
 
  /* Curtis: "Most important number is Forecasted Total Down buses by pullout
     times... So far, I only want this one number for the forecast." */
@@ -15379,7 +15379,7 @@ test("the forecast is one number, and the single-number spelling is already ther
 
 test("the forecast adds the two queues it can see, and counts neither twice",async()=>{
  const {buildFleetForecast,INSPECTION_CATEGORY,FORECAST_MIN_INSPECTIONS,FORECAST_MIN_CONVERSIONS,
-  FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS}=await import("../app/fleet-forecast.ts");
+  FORECAST_ROAD_CALL_CONVERTS_WITHIN_HOURS}=await import("../src/lib/reports/fleet-forecast.ts");
  const modal=await readFile(new URL("../app/status-report-modal.tsx",import.meta.url),"utf8");
 
  const at=index=>new Date(Date.parse("2026-09-01T09:00:00.000Z")+index*12*3600000).toISOString();
@@ -15568,7 +15568,7 @@ test("site-config describes this building exactly as the five tables already do"
  const {siteSectionSlots,siteRelocationAreas,siteAreaLabels,siteThemeKeys,siteAliases,sitePrefixLabels}=
   await import("../src/lib/fleet/site-config.ts");
  const {SECTION_SLOTS,RELOCATION_AREAS}=await import("../src/lib/fleet/facility-areas.ts");
- const {SECTION_THEME_KEYS}=await import("../app/map-settings.ts");
+ const {SECTION_THEME_KEYS}=await import("../src/lib/settings/map-settings.ts");
  const {findOperatorArea}=await import("../src/lib/fleet/fleet-intelligence.ts");
  const {locationLabel}=await import("../src/lib/fleet/location-label.ts");
 

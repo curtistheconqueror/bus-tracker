@@ -35,7 +35,7 @@
 
 import {useState} from "react";
 /* The rules live in a .ts beside this so they can be tested on their own. */
-import {isTypeableHours,parseHours} from "./hours-value";
+import {isTypeableHours,parseHours} from "@/src/lib/shared/hours-value";
 
 export default function HoursField({value,onChange,id,placeholder=".5",max,className,ariaLabel}:{
  /* `undefined` means EMPTY and must stay distinguishable from zero — an

@@ -7,7 +7,7 @@ import HoursField from "../hours-field";
 import {useEffect, useMemo, useState} from "react";
 import {defectCountField,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {findingMatchKey,readFindingsMemory,recallFindings} from "@/src/lib/defects/findings-memory";
-import {lockPageScroll} from "../scroll-lock";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {
   aggregateRepairItemEstimates,
   blankRepairItem,

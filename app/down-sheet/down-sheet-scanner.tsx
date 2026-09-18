@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useRef,useState} from "react";
-import {lockPageScroll} from "../scroll-lock";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
 import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {knownMechanicNames} from "@/src/lib/down-sheet/scan-spelling";

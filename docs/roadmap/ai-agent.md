@@ -100,7 +100,7 @@ already exists and is already tested. The agent chooses; it never computes.
 | hold a bus | `setBusHold` | `src/lib/fleet/bus-hold.ts` |
 | add to the Down Sheet | the sheet's own write path | `app/down-sheet/` |
 | name a location | `locationLabel` | `src/lib/fleet/location-label.ts` |
-| the four counts | `buildFleetStatusReport` | `app/fleet-status-report.ts` |
+| the four counts | `buildFleetStatusReport` | `src/lib/reports/fleet-status-report.ts` |
 | mystery buses | `mysteryBusIds` | `src/lib/fleet/mystery-buses.ts` |
 | deferred buses | `heldDeferredBuses` | `src/lib/defects/deferred-counts.ts` |
 

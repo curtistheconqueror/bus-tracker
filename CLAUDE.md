@@ -219,7 +219,7 @@ than of the software, and a contract changes on a schedule nobody here controls.
 
 The app already had `Shift` as a LABEL on a Down Sheet entry — "1st", "2nd",
 "3rd", typed or defaulted by hand — and nothing anywhere that mapped a CLOCK
-TIME onto one. Pullout times appeared nowhere at all. `app/shift-clock.ts` is
+TIME onto one. Pullout times appeared nowhere at all. `src/lib/settings/shift-clock.ts` is
 that missing half and is the only place that knows: every window the Fleet
 Forecast quotes — "next shift", "the next two", "before the 06:00 pullout" —
 resolves through it, so hours change once.
@@ -383,7 +383,7 @@ the mechanic ladder — inferred from the shape of the rest of the list, then
 confirmed by Curtis. The title is a top classification at some transit
 properties and a management job at others, so it was worth asking. A combination not in that table cannot
 be chosen and does not read back, so if the contract changes, it changes in
-`app/roles.ts` and any device holding the old pairing reads as "not set" until
+`src/lib/settings/roles.ts` and any device holding the old pairing reads as "not set" until
 its owner picks again. *Bargaining* is the union side, so it can never be the
 non-union label; Union / Non-Union is what the floor says.
 
@@ -398,7 +398,7 @@ they see and have access to," plus a questionnaire that does not exist yet. The
 access rules ride on **that login**. This key is an unauthenticated string in
 LocalStorage that anybody holding the phone can change from the screen that set
 it, so it can be the label a login confirms and never the thing that decides.
-Until the login exists, nothing outside `app/roles.ts` may read it, and a test
+Until the login exists, nothing outside `src/lib/settings/roles.ts` may read it, and a test
 holds that line.
 
 *Asst Supt* and *Supt* are abbreviated because both exist and both departments

@@ -22,9 +22,9 @@
 
 import {useEffect} from "react";
 import {heldBuses,holdDetailLabel,holdUntilLabel,heldMinutes,type HoldableBus} from "@/src/lib/fleet/bus-hold";
-import {elapsedLong} from "./elapsed-label";
+import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 import {locationLabel} from "@/src/lib/fleet/location-label";
-import {lockPageScroll} from "./scroll-lock";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 
 export function HoldBadge({count,onOpen}:{count:number;onOpen:()=>void}){
  return <button type="button" className="work-state-badge bus-hold-badge"

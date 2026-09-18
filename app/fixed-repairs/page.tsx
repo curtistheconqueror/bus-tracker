@@ -15,7 +15,7 @@ import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFin
 import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "../deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
-import {shareOrDownloadFile} from "../share-file";
+import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "@/src/lib/storage/storage";
 import SaveAlert from "../save-alert";

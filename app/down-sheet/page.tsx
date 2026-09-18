@@ -4,7 +4,7 @@ import StatusReportModal from "../status-report-modal";
 import QuickFilterMenu from "../quick-filter-menu";
 import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
 import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
-import {copyText,shareOrDownloadFile} from "../share-file";
+import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "../tracker-nav";
 import RefreshButton from "../refresh-button";
@@ -24,7 +24,7 @@ import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgre
 import type {ScanImportRecord} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "@/src/lib/down-sheet/down-sheet-replace";
 import {recordSheetSwap} from "@/src/lib/down-sheet/sheet-ledger";
-import {readShiftSettings} from "../shift-clock";
+import {readShiftSettings} from "@/src/lib/settings/shift-clock";
 import {downSheetAvailability,downSheetMentionsIdot,downSheetIdotOnly,isSoftDownEntry,isEntryInService,entryInServiceStamp,setEntryInService} from "@/src/lib/down-sheet/down-sheet-availability";
 import {downSheetRoadCounts,downSheetRoadEntries,groupDownSheetEntries,normalizeDownSheetSectionOrder,orderDownSheetGroups,isDownSheetRoadLocation,matchesDownSheetSearch,type DownSheetGroupKey,type DownSheetRoadKind} from "@/src/lib/down-sheet/down-sheet-view";
 import {DEFAULT_DOWN_SHEET_DISPLAY,normalizeDownSheetDisplay,type DownSheetDisplaySettings} from "@/src/lib/down-sheet/down-sheet-display-settings";
@@ -46,7 +46,7 @@ import type {DefectLogDownEntry,DefectLogFleetBus} from "@/src/lib/defects/defec
 import {answerDeferredBus} from "@/src/lib/defects/deferred-actions";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {useAppMode} from "../welcome-gate";
-import {hiddenInLite} from "../lite-mode";
+import {hiddenInLite} from "@/src/lib/settings/lite-mode";
 import {DEFAULT_DEFECT_LOG_DISPLAY,normalizeDefectLogDisplay} from "@/src/lib/defects/defect-log-display-settings";
 import AppName from "../app-name";
 import WelcomeGate from "../welcome-gate";

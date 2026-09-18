@@ -1,12 +1,12 @@
 # Lite Mode
 
-**Built, first pass.** `app/lite-mode.ts` holds what Lite hides, and the nav,
+**Built, first pass.** `src/lib/settings/lite-mode.ts` holds what Lite hides, and the nav,
 both sheets, the defect form and the app name read it. Fixed Repairs and the
 Settings page still draw everything — those are the next pass, and the sections
 below describing them are still design rather than code.
 
 **The constraint, enforced rather than promised.** Lite changes what is DRAWN,
-never what is STORED, SYNCED or READ BACK. `app/lite-mode.ts` imports one TYPE
+never what is STORED, SYNCED or READ BACK. `src/lib/settings/lite-mode.ts` imports one TYPE
 and touches no storage, and a test asserts that no module deciding a record —
 storage, both syncs, the cloud trio, the catalog, section transfer, backup and
 restore — so much as mentions the mode. Measured: a full → Lite → full round
@@ -78,7 +78,7 @@ belongs in that later phase and not in this one.
 
 The groundwork is already there, which is most of why this is worth doing.
 
-- **The nav is one list.** `app/tracker-pages.ts` holds `TRACKER_PAGES` and
+- **The nav is one list.** `src/lib/settings/tracker-pages.ts` holds `TRACKER_PAGES` and
   every header draws from it. Hiding pages in Lite is one filter in one file,
   not six edits — the comment in that file records what the five drifting
   copies used to cost.

@@ -17,7 +17,7 @@
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {defectLabel,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {moveBusToArea,RELOCATION_AREAS,sectionForLocation} from "@/src/lib/fleet/facility-areas";
-import {lockPageScroll} from "./scroll-lock";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {bay12AwarenessBusIds,mysteryBusIds} from "@/src/lib/fleet/mystery-buses";
 
 /* The board's collapsed state kept its Defect Log name on purpose. The key is

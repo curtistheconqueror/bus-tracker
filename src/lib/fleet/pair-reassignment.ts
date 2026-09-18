@@ -1,5 +1,5 @@
 import {statusForLocation,type MovableRepairBus} from "./smart-status.ts";
-import {stampOperationalChange} from "../../../app/operational-time.ts";
+import {stampOperationalChange} from "../shared/operational-time.ts";
 
 export type PairReassignmentError="missing-bus"|"same-bus"|"insufficient-space"|null;
 

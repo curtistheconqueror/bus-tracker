@@ -14,7 +14,7 @@
 import {useEffect,useState} from "react";
 import {clockMinutes,DEFAULT_SHIFT_SETTINGS,formatClock,nextPullout,readShiftSettings,
  shiftAt,shiftLabel,shiftRemainingMinutes,SHIFT_SETTINGS_KEY,untilLabel,
- type ShiftSettings} from "../shift-clock";
+ type ShiftSettings} from "@/src/lib/settings/shift-clock";
 
 export default function ShiftSettingsPanel(){
  const [settings,setSettings]=useState<ShiftSettings>(DEFAULT_SHIFT_SETTINGS);

@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
-import type {OperatorPlan,OperatorPlanningResult,OperatorSelectionContext} from "./operator-engine";
+import type {OperatorPlan,OperatorPlanningResult,OperatorSelectionContext} from "@/src/lib/operator/operator-engine";
 
 type Message={id:number;role:"operator"|"assistant";text:string;success?:boolean};
 

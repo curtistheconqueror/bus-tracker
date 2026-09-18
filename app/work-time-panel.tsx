@@ -2,7 +2,7 @@
 
 import {useMemo,useState} from "react";
 import type {BusList} from "@/src/lib/fleet/bus-lists";
-import {formatWorkHours,workDayLabel,workTimePeople,workTimeSummary,type WorkTimeBus} from "./work-time";
+import {formatWorkHours,workDayLabel,workTimePeople,workTimeSummary,type WorkTimeBus} from "@/src/lib/reports/work-time";
 
 /* Accrued work time, day by day, for one person.
 

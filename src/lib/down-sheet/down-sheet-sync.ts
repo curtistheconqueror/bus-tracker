@@ -1,5 +1,5 @@
 import {defectCountField,defectSummary,normalizeDefects,normalizeFinding,normalizeRepairCount,normalizeRepairHours,type StructuredDefect} from "../defects/repair-catalog.ts";
-import {stampOperationalChange} from "../../../app/operational-time.ts";
+import {stampOperationalChange} from "../shared/operational-time.ts";
 import {hasRequiredInteriorCleaning,hasUnresolvedDefects} from "../fleet/smart-status.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "../fleet/facility-areas.ts";
 import {adoptableDefect} from "../defects/defect-identity.ts";

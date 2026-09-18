@@ -38,7 +38,7 @@ import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
 import MapSettingsPanel from "../map-settings-panel";
 import CloudSyncControl from "../cloud-sync-control";
-import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "../map-settings";
+import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
 import DownSheetSettings from "../down-sheet/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
@@ -53,7 +53,7 @@ import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-coun
 import {dropTombstonedDefects,dropTombstonedEntries} from "@/src/lib/cloud/cloud-live";
 import SectionTransferControls from "../section-transfer-controls";
 import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "@/src/lib/storage/section-transfer";
-import {shareOrDownloadFile} from "../share-file";
+import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
 import SaveAlert from "../save-alert";
 import FleetRecoveryControl from "../fleet-recovery-control";
@@ -61,7 +61,7 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import ShopCloudLive from "../shop-cloud-live";
 import AppName from "../app-name";
 import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
-import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
+import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "@/src/lib/settings/app-mode";
 import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
 import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
 import ShiftSettingsPanel from "./shift-settings";
