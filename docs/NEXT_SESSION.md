@@ -34,6 +34,66 @@ line on a printed sheet he is holding. Take the words literally and check them
 against the code; more than one bug in this project has been the app naming
 something the shop does not have.
 
+
+---
+
+## How to run this session without wasting Curtis's money
+
+A full day on this project in September 2026 cost roughly $320 of Opus 5 tokens
+for 28 commits. The bill was not the code. Output was 930K tokens and accounted
+for under 8% of the money. Input was **512 million** — 550 input tokens for
+every one written — because every tool result and every earlier turn is re-sent
+on every request. Three rules follow from that, and none of them asks you to
+think less hard about the work.
+
+**1. Never switch models mid-session.** Prompt caches are scoped to the model,
+and a model switch has no escape hatch — the entire conversation is rebuilt from
+scratch on the new model. At a 775K context that is one turn at roughly $7.75
+instead of $0.39. If a switch is wanted, do it straight after a `/clear`, when
+there is almost nothing to rebuild; the same switch then costs pennies. Changing
+the effort level is a softer version of the same hit: it invalidates the
+messages cache, so pin it per task rather than nudging it turn to turn.
+
+This rule costs nothing in quality. It exists to stop you downgrading in the
+middle of a job, which is the only way a switch here could hurt the work.
+
+**2. Hand mechanical work to a Sonnet subagent instead of doing it in the main
+thread.** A subagent gets its own context and its own model, so the main
+session's cache is never touched — this is the one way to do cheap work without
+paying the switch above. Its forty tool-call rounds never enter your context;
+only its answer does.
+
+**This is the rule that can cost quality, so it is bounded.** A subagent
+reports a *summary*, and a summary is exactly what `fresh-context-review` was
+written about — a commit that quoted a count instead of re-running it, a handler
+that reported success over a write that had been refused.
+
+- Delegate: bounded searches with a definite answer, running the gates and
+  returning output verbatim, a refactor with a named target, reading a long file
+  for one fact.
+- Do not delegate: anything touching an invariant in `CLAUDE.md`, designing a
+  rule or classifier, reconciling the app against paper Curtis is holding, or
+  the verification a "verified" claim will rest on. Those are the four places
+  this project has actually been bitten.
+- Require evidence, not conclusions. A subagent that says "tests pass" has told
+  you nothing; one that returns the output has. Never let a subagent be the
+  sole witness to anything you are about to write into a commit message or a
+  handoff.
+
+Ten at once is the hard cap, and it is in the never-OK list. In practice this
+means one or two.
+
+**3. `/clear` between unrelated tasks — never inside one.** On the day measured,
+the brake catalog work was still being re-sent five and a half hours later
+during the soft/IDOT build, which shared nothing with it. Clearing between jobs
+is free because the state already lives on disk: this file, `docs/PUBLISH_NEXT.md` and
+`PROJECT_HANDOFF.md` are the handoff, and they are current because you keep them
+current. Clearing *inside* a job throws away the reasoning that job is made of —
+do not.
+
+The order that matters: clearing between tasks saves more than switching models
+ever will, and it is the only one of the three with no downside at all.
+
 ---
 
 ## Where things stand

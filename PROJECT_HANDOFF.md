@@ -4,8 +4,8 @@ Updated: 2026-09-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 180 (repository release 180)
-Live feature checkpoint: commit b6e0cba
+Live release: Sites Version 181 (repository release 181)
+Live feature checkpoint: commit 148a45e
 
 ## Read this first
 
@@ -53,7 +53,7 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 180 is live as Sites Version 180 from commit b6e0cba. It adds four Brakes symptom choices: Brakes sticking / dragging, brakes will not release after the service pedal, brakes will not release at the parking brake, and Brake chamber leaking. It adds no storage key, migration, rename, or retirement. The normal rollback target is Version 179 from commit fe467c0.
+Repository release 181 is live as Sites Version 181 from commit 148a45e. It distinguishes hard Down Sheet buses from Soft Down and IDOT preparation through collapsed boards, and adds an optional per-entry inService flag for a Soft Down bus actually in use. It also adds IDOT Prep to Inspection, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. Two new per-device collapse keys and the entry detail field add no migration or Supabase schema change. The normal rollback target is Version 180 from commit b6e0cba.
 
 The Version 171 baseline details below remain useful historical context:
 

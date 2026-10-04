@@ -2832,9 +2832,21 @@ test("phone layouts expose large primary controls and category-only defect entry
   /* QUICK SELECT (OPTIONAL) became DEFECT, and became a typing field. The label
      changed because the field did: it is no longer an optional shortcut behind a
      category, it is the way you name the defect — by typing it or by tapping it
-     open, whichever is faster with the bus in front of you. */
-  assert.match(defectPage, /<ComboField label="DEFECT"/);
-  assert.match(defectPage, /<ComboField label="CATEGORY"/);
+     open, whichever is faster with the bus in front of you.
+
+     DEFECT then became SPECIFIC DEFECT OR SYMPTOM and CATEGORY became DEFECT
+     CATEGORY, for a reader who has never seen the form. Curtis: "So this is
+     easy to see and understand for new comers." Both are still pinned here
+     exactly, because that is what caught the rename below. */
+  assert.match(defectPage, /<ComboField label="SPECIFIC DEFECT OR SYMPTOM"/);
+  assert.match(defectPage, /<ComboField label="DEFECT CATEGORY"/);
+  /* The two labels are the only ones in this form drawn larger than the rest,
+     and the rule has to say BOTH halves of that. Renaming them was half the
+     change; the other half is that they stop reading as muted 8px chrome. The
+     size is 8px x 1.3 and the colour is the theme's own text rather than #000,
+     which would go invisible the moment somebody picks a dark Defect Log. */
+  assert.match(defectCss, /\.log-form label\.combo-field\{[^}]*color:var\(--log-text\)[^}]*font-size:10\.4px/);
+  assert.doesNotMatch(defectCss, /\.log-form label\.combo-field\{[^}]*#000/);
   assert.doesNotMatch(defectPage, /disabled=\{!value\.defect\.category\}/,
     "the defect field must not be gated on a category - removing that gate is the point of the change");
   assert.match(defectPage, /details\?"Manual entry":"Unspecified issue"/);
@@ -5402,8 +5414,8 @@ test("the Amerex panel is two systems, and the states that down a bus say so",as
  assert.ok(notePage.indexOf("defect-note")<notePage.indexOf("advanced-defect-details"));
  /* Anchored to a string that still exists: 'QUICK SELECT' was renamed and this
     kept passing on indexOf(-1), which is a test that had stopped testing. */
- assert.ok(notePage.includes('<ComboField label="DEFECT"'));
- assert.ok(notePage.indexOf('<ComboField label="DEFECT"')<notePage.indexOf("defect-note"));
+ assert.ok(notePage.includes('<ComboField label="SPECIFIC DEFECT OR SYMPTOM"'));
+ assert.ok(notePage.indexOf('<ComboField label="SPECIFIC DEFECT OR SYMPTOM"')<notePage.indexOf("defect-note"));
 });
 
 test("a diagnosed cause is learned under the symptom it was found beneath",async()=>{
@@ -15736,4 +15748,57 @@ test("a deferment can be given an end time when it is made, and extended later w
  assert.equal(/state:/.test(extend),false,"nor the state - the bus stays deferred");
  /* And it leaves a way back, like every other row action here. */
  assert.match(extend,/setUndoSnapshot\(/);
+});
+
+test("the picker's drop-down arrow is a real control, and the component carries its own styling",async()=>{
+ const [combo,css,logCss]=await Promise.all([
+  readFile(new URL("../app/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/combo-field.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+
+ /* It was `<span className="combo-caret">` with pointer-events:none — an
+    affordance that did nothing. That matters more than it looks: the list has a
+    single opener, the input's onFocus, and a tap on an already-focused input
+    fires no second focus event, so the arrow is the only way back once the
+    field is focused with the list shut. Curtis: "if I accidentally pressed the
+    field twice for input then it's hard to get the list to regenerate." */
+ assert.match(combo,/<button\s+type="button"\s+className="combo-caret"/);
+ assert.doesNotMatch(combo,/<span className="combo-caret"/);
+ assert.doesNotMatch(css,/\.combo-caret\{[^}]*pointer-events:\s*none/);
+ /* Toggles, so the arrow that asks for the list also puts it away. */
+ assert.match(combo,/if\(open\)\{setOpen\(false\);setQuery\(""\);return;\}/);
+ /* Out of the tab order on purpose: the input owns the keyboard, where
+    ArrowDown already opens the list. This adds a touch target, not a tab stop. */
+ assert.match(combo,/className="combo-caret"[\s\S]*?tabIndex=\{-1\}/);
+
+ /* THE DOWN SHEET IMPORTS THIS COMPONENT AND NOT defect-log.css. While the caret
+    was a bare span that only looked wrong; a <button> with no CSS draws as a
+    default grey box mid-row. The base rules travel with the component now, and
+    only the `.log-form`-scoped theming stayed behind. */
+ assert.match(combo,/import "\.\/combo-field\.css"/);
+ assert.match(css,/\.combo-box\{position:relative/);
+ assert.doesNotMatch(logCss,/^\.combo-box\{/m);
+ assert.doesNotMatch(logCss,/^\.combo-caret\{/m);
+ assert.match(logCss,/\.log-form \.combo-caret\{color:var\(--log-text/);
+
+ /* The caret and the clear button share the right-hand gutter, and the value
+    text has to stop before both. Written as the arithmetic rather than as three
+    remembered numbers, so moving any one of them fails here instead of putting
+    a tap meant for × onto ▾. */
+ const [wide,phone]=css.split("@media(max-width:760px){");
+ const num=(text,re,what)=>{const m=text.match(re);assert.ok(m,"missing "+what);return parseInt(m[1],10);};
+ for(const [name,text] of [["desktop",wide],["phone",phone]]){
+  const caretRight=num(text,/\.combo-caret\{[^}]*right:(\d+)px/,name+" caret right");
+  const caretWidth=num(text,/\.combo-caret\{[^}]*width:(\d+)px/,name+" caret width");
+  const clearRight=num(text,/\.combo-clear\{[^}]*right:(\d+)px/,name+" clear right");
+  const clearWidth=num(text,/\.combo-clear\{[^}]*width:(\d+)px/,name+" clear width");
+  const padding=num(text,/\.combo-input\{padding-right:(\d+)px/,name+" input padding");
+  assert.ok(clearRight>=caretRight+caretWidth,
+   name+": the clear button overlaps the caret ("+clearRight+" < "+caretRight+"+"+caretWidth+")");
+  assert.ok(padding>=clearRight+clearWidth,
+   name+": the value text runs under the buttons ("+padding+" < "+clearRight+"+"+clearWidth+")");
+ }
+ /* A gloved thumb on a phone. The form already gives its inputs 44px. */
+ assert.ok(num(phone,/\.combo-caret\{[^}]*width:(\d+)px/,"phone caret width")>=44);
 });

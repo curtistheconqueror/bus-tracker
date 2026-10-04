@@ -27,6 +27,7 @@
    defect log whose wording drifts is a defect log nobody can count. */
 
 import {Fragment,useEffect,useId,useRef,useState} from "react";
+import "./combo-field.css";
 
 export type ComboOption={
  value:string;
@@ -176,9 +177,38 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     onFocus={()=>{if(!disabled){setOpen(true);setQuery("");setActive(0);}}}
     onChange={event=>{setQuery(event.target.value);setActive(0);if(!open)setOpen(true);}}
     onKeyDown={keys}/>
-   {/* Not a submit button and never inside the tab order twice: the input owns
-       the interaction, this only says out loud that there is a list behind it. */}
-   <span className="combo-caret" aria-hidden="true">▾</span>
+   {/* A REAL BUTTON, because it was a span with pointer-events:none and it looked
+       exactly like a control. The list has one opener -- the input's onFocus --
+       and a tap on an already-focused input fires no second focus event, so any
+       state that leaves the field focused with the list shut is a dead end you
+       can only escape by tapping somewhere else first. Curtis: "if I accidentally
+       pressed the field twice for input then it's hard to get the list to
+       regenerate. So the small arrow will always provide a quick way to do it."
+
+       It toggles rather than only opening, so the same arrow that asks for the
+       list puts it away. Still out of the tab order -- the input owns the
+       keyboard, where ArrowDown already opens the list -- so this adds a touch
+       target without adding a tab stop. */}
+   <button
+    type="button"
+    className="combo-caret"
+    aria-label={(open?"Hide ":"Show ")+label+" choices"}
+    aria-expanded={open}
+    aria-controls={id+"-list"}
+    tabIndex={-1}
+    disabled={disabled}
+    /* mousedown with preventDefault, matching the options below: click lands
+       after the focus/blur dance, and holding focus still is what stops onFocus
+       from reopening the list this tap just closed. Opening focuses the input so
+       typing narrows straight away; when it is already focused that is a no-op
+       and fires no second onFocus. */
+    onMouseDown={event=>{
+     event.preventDefault();
+     if(disabled)return;
+     if(open){setOpen(false);setQuery("");return;}
+     setOpen(true);setQuery("");setActive(0);
+     inputRef.current?.focus();
+    }}>▾</button>
    {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label}
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
    {open&&<ul className="combo-list" id={id+"-list"} role="listbox" ref={listRef}>
