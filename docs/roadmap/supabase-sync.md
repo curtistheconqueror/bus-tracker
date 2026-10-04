@@ -11,7 +11,7 @@ purpose.
 | Files | `supabase/migrations/0001_cloud_backup.sql`, `supabase/migrations/0002_shared_records.sql`, `supabase/tests/schema.test.sql`, `supabase/run-tests.sh` |
 | Verify locally | `./supabase/run-tests.sh` — builds a throwaway cluster, applies every migration twice, runs 12 checks. No network, no Supabase account. |
 | How it was applied | Pasted into the Supabase **SQL Editor** in the browser. That needs no MCP connector and no database password, and it is the route to use again. Do not wait on the connector, which reported `connected: true` with `enabledInChat: false` and never exposed a single tool. |
-| Client | **Built.** `app/cloud-sync.ts` (pure logic), `app/cloud-client.ts` (the Supabase calls), `app/cloud-sync-control.tsx` (Settings → SHOP CLOUD). Syncs the map, the Defect Log and the Down Sheet. |
+| Client | **Built.** `src/lib/cloud/cloud-sync.ts` (pure logic), `src/lib/cloud/cloud-client.ts` (the Supabase calls), `app/settings/_components/cloud-sync-control.tsx` (Settings → SHOP CLOUD). Syncs the map, the Defect Log and the Down Sheet. |
 | Next | Each device is connected once by pasting its Project URL, anon key, sign-in email and the person's initials into Settings. Campaigns and the learned parts/findings have tables waiting but are not synced yet. |
 
 ### Verified in the live project on 2026-08-30

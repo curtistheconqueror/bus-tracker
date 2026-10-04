@@ -26,8 +26,8 @@
    board rather than describe it, and they stay on the map. */
 
 import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
-import TrackerNav from "../tracker-nav";
-import RefreshButton from "../refresh-button";
+import TrackerNav from "@/src/components/shared/tracker-nav";
+import RefreshButton from "@/src/components/shared/refresh-button";
 /* Every page's own stylesheet, so each panel here looks exactly as it did
    behind that page's gear. settings.css comes LAST: all three of these, and
    globals.css before them, style html, body, header and nav, and the last word
@@ -36,36 +36,36 @@ import "../defect-log/defect-log.css";
 import "../down-sheet/down-sheet.css";
 import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
-import MapSettingsPanel from "../map-settings-panel";
-import CloudSyncControl from "../cloud-sync-control";
-import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "../map-settings";
-import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "../fleet-restore";
-import DownSheetSettings from "../down-sheet/down-sheet-settings";
-import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "../down-sheet/down-sheet-settings-store";
-import LogSettingsModal from "../defect-log/defect-log-settings-modal";
-import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "../defect-log/defect-log-settings";
-import {FixedAppearanceModal,type FixedAppearanceSettings} from "../fixed-repairs/fixed-repairs-settings";
-import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "../defect-log/defect-log-sync";
-import {normalizeDefects} from "../repair-catalog";
-import {mergeDuplicateDefects} from "../duplicate-defects";
-import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "../cloud-sync";
-import {reconcileDownSheetMembership} from "../down-sheet-counter";
-import {dropTombstonedDefects,dropTombstonedEntries} from "../cloud-live";
-import SectionTransferControls from "../section-transfer-controls";
-import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "../section-transfer";
-import {shareOrDownloadFile} from "../share-file";
-import {exportFleetBoardBackup} from "../fleet-backup";
-import SaveAlert from "../save-alert";
-import FleetRecoveryControl from "../fleet-recovery-control";
-import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "../storage";
-import ShopCloudLive from "../shop-cloud-live";
-import AppName from "../app-name";
-import WelcomeGate,{WELCOME_REQUEST_EVENT} from "../welcome-gate";
-import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "../app-mode";
-import {SettingsDrawer,SettingsDrawers} from "./settings-drawer";
-import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "../sheet-ledger";
-import ShiftSettingsPanel from "./shift-settings";
-import SheetBackfillPanel from "./sheet-backfill";
+import MapSettingsPanel from "./_components/map-settings-panel";
+import CloudSyncControl from "./_components/cloud-sync-control";
+import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
+import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
+import DownSheetSettings from "./_components/down-sheet-settings";
+import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
+import LogSettingsModal from "./_components/defect-log-settings-modal";
+import {FONT_STACKS,LOG_THEMES,SETTINGS_KEY as LOG_SETTINGS_KEY,readSettings as readLogSettings,type LogSettings} from "@/src/lib/defects/defect-log-settings";
+import {FixedAppearanceModal,type FixedAppearanceSettings} from "@/src/components/settings/fixed-repairs-settings";
+import {defectLogRecords,locationLabel,type DefectLogDownEntry,type DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
+import {normalizeDefects} from "@/src/lib/defects/repair-catalog";
+import {mergeDuplicateDefects} from "@/src/lib/defects/duplicate-defects";
+import {adoptTombstones,readMergedAway,readRemovedEntries,writeMergedAway,writeRemovedEntries,type MergedAwayDefects} from "@/src/lib/cloud/cloud-sync";
+import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
+import {dropTombstonedDefects,dropTombstonedEntries} from "@/src/lib/cloud/cloud-live";
+import SectionTransferControls from "@/src/components/settings/section-transfer-controls";
+import {exportDefectLogPayload,exportDownSheetPayload,mergeDefectLog,mergeDownSheet,mergeSummary} from "@/src/lib/storage/section-transfer";
+import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
+import {exportFleetBoardBackup} from "@/src/lib/storage/fleet-backup";
+import SaveAlert from "@/src/components/shared/save-alert";
+import FleetRecoveryControl from "./_components/fleet-recovery-control";
+import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetPayload,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,writeSetting,type FleetWriteOptions,type FleetWriteReason,type StorageWriteResult} from "@/src/lib/storage/storage";
+import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
+import AppName from "@/src/components/shared/app-name";
+import WelcomeGate,{WELCOME_REQUEST_EVENT} from "@/src/components/shared/welcome-gate";
+import {APP_MODE_STORAGE_KEY,readAppMode,serializeAppMode,type AppMode} from "@/src/lib/settings/app-mode";
+import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
+import {mergeSheetLedgers,readSheetLedger,writeSheetLedger} from "@/src/lib/down-sheet/sheet-ledger";
+import ShiftSettingsPanel from "./_components/shift-settings";
+import SheetBackfillPanel from "./_components/sheet-backfill";
 
 /* The map's duty-cycle average reads two histories the Defect Log's bus type
    never needed to know about. */

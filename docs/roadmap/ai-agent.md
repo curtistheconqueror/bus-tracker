@@ -94,15 +94,15 @@ already exists and is already tested. The agent chooses; it never computes.
 
 | Tool | Existing function | File |
 | --- | --- | --- |
-| move a bus | `moveBusToArea` | `app/facility-areas.ts` |
-| record a road call | `applyRoadCall` | `app/road-calls.ts` |
-| clear a road call | `clearRoadCall` | `app/road-calls.ts` |
-| hold a bus | `setBusHold` | `app/bus-hold.ts` |
+| move a bus | `moveBusToArea` | `src/lib/fleet/facility-areas.ts` |
+| record a road call | `applyRoadCall` | `src/lib/fleet/road-calls.ts` |
+| clear a road call | `clearRoadCall` | `src/lib/fleet/road-calls.ts` |
+| hold a bus | `setBusHold` | `src/lib/fleet/bus-hold.ts` |
 | add to the Down Sheet | the sheet's own write path | `app/down-sheet/` |
-| name a location | `locationLabel` | `app/location-label.ts` |
-| the four counts | `buildFleetStatusReport` | `app/fleet-status-report.ts` |
-| mystery buses | `mysteryBusIds` | `app/mystery-buses.ts` |
-| deferred buses | `heldDeferredBuses` | `app/deferred-counts.ts` |
+| name a location | `locationLabel` | `src/lib/fleet/location-label.ts` |
+| the four counts | `buildFleetStatusReport` | `src/lib/reports/fleet-status-report.ts` |
+| mystery buses | `mysteryBusIds` | `src/lib/fleet/mystery-buses.ts` |
+| deferred buses | `heldDeferredBuses` | `src/lib/defects/deferred-counts.ts` |
 
 A tool the agent can call that does its own arithmetic is a second
 implementation of a rule, and this project has already paid for that twice —
