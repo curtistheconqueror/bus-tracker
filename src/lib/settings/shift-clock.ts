@@ -135,18 +135,38 @@ function minutesSinceStart(minute:number,start:number){return ((minute-start)%14
    crew who will work whatever arrives. So of the windows that match, the one
    that STARTED MOST RECENTLY wins, which is what "incoming" means in a sentence
    and needs no separate table of handover times to maintain. */
-export function shiftAt(at:string|Date,settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):ShiftKey|null{
+export type ActiveShift={key:ShiftKey;since:number;start:ClockTime};
+
+/* THE WINDOW THAT OWNS THIS MOMENT, with everything a caller can ask about it:
+   which crew, how long they have been on, and the clock time they came in at.
+
+   One function rather than three that each re-pick the window, because the
+   overlap rule above is the whole point and two copies of it would eventually
+   disagree about who owns 14:15 — which is exactly the half-hour it exists to
+   settle. `shiftAt` is this, narrowed to the key it always returned.
+
+   The start is formatted rather than passed through, so a garage that typed
+   `6:00` into Settings reads back `06:00` on a shared list. */
+function activeShiftAt(at:string|Date,settings:ShiftSettings):ActiveShift|null{
  const minute=minuteOfDay(at);
  if(minute===null)return null;
- let best:{key:ShiftKey;since:number}|null=null;
+ let best:ActiveShift|null=null;
  for(const shift of settings.shifts){
   const start=clockMinutes(shift.start),end=clockMinutes(shift.end);
   if(start===null||end===null)continue;
   if(!withinWindow(minute,start,end))continue;
   const since=minutesSinceStart(minute,start);
-  if(!best||since<best.since)best={key:shift.key,since};
+  if(!best||since<best.since)best={key:shift.key,since,start:formatClock(start)};
  }
- return best?best.key:null;
+ return best;
+}
+
+export function activeShift(at:string|Date,settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):ActiveShift|null{
+ return activeShiftAt(at,settings);
+}
+
+export function shiftAt(at:string|Date,settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS):ShiftKey|null{
+ return activeShiftAt(at,settings)?.key||null;
 }
 
 /* How many minutes from `at` forward to the next occurrence of a clock time.

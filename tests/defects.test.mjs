@@ -27,11 +27,15 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
     {id:"fixed",n:"7",defects:[{category:"Engine",issue:"Oil leak",details:"",state:"completed"}]},
     {id:"notDuplicated",n:"8",defects:[{category:"Electrical / Multiplex",issue:"Intermittent electrical",details:"Reported cutting out",state:"completed",conditionNotDuplicated:true}]},
   ];
-  assert.equal(QUICK_FILTERS.length,13);
-  /* Recommended for Down Sheet and Deferred stay last on purpose: the others
-     answer "what is broken" and these two answer "what needs a decision". */
-  assert.equal(QUICK_FILTERS.at(-2).key,"down-sheet-recommended");
-  assert.equal(QUICK_FILTERS.at(-1).key,"deferred");
+  assert.equal(QUICK_FILTERS.length,14);
+  /* The TAIL of the list answers "what needs a decision or a handover" and
+     everything above it answers "what is broken". Asserted as the tail rather
+     than by index so that moving any of the three up among the symptom filters
+     fails by name — which is the claim, not the arithmetic. LOGGED joined this
+     group rather than the one above it: it names a stretch of time, not a
+     fault. */
+  assert.deepEqual(QUICK_FILTERS.slice(-3).map(item=>item.key),["down-sheet-recommended","deferred","logged"]);
+  assert.equal(QUICK_FILTERS.at(-1).key,"logged");
   assert.equal(quickFilterMatch(buses[0],"ac"),true);
   assert.deepEqual(quickFilterBusIds(buses,"check-engine"),["engine"]);
   assert.deepEqual(quickFilterBusIds(buses,"bad-ramp"),["ramp"]);
@@ -132,12 +136,14 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   /* quickFilterShareLabel, not quickFilterLabel: the recency window is part of
      what a shared list claims, so it travels in the heading. Still built from
      quickFilterBuses, which is the narrowed list. */
-  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
+  assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions\)/);
   assert.match(page,/navigator\.share\(\{title:quickFilterShareLabel\+" bus list",text\}\)/);
   assert.doesNotMatch(page,/navigator\.share\(\{[^}]*url:/);
   assert.match(page,/aria-label="Copy filtered bus list"/);
   assert.match(page,/aria-label="Share filtered bus list as text"/);
-  assert.match(page,/quickFilterDefects\(bus,quickFilter\)/);
+  /* The drawer's own cards read the same window the share does, so what is on
+     screen and what gets pasted cannot disagree. */
+  assert.match(page,/quickFilterDefects\(bus,quickFilter,new Date\(\)\.toISOString\(\),quickFilterLineMaxAge\)/);
   assert.match(page,/current\.includes\(bus\.id\)\?\[\]:\[bus\.id\]/);
   assert.match(css,/\.quick-filter-defects\{/);
   assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
@@ -1731,7 +1737,7 @@ test("a repair can be put forward for the Down Sheet without being put on it",as
  // it is a real filter entry, so the drawer's COPY LIST and SHARE come with it
  const entry=QUICK_FILTERS.find(item=>item.key==="down-sheet-recommended");
  assert.equal(entry.label,"Recommended for Down Sheet");
- assert.equal(QUICK_FILTERS.at(-2).key,"down-sheet-recommended","second-to-last: it answers a different question from the rest");
+ assert.deepEqual(QUICK_FILTERS.slice(-3).map(item=>item.key),["down-sheet-recommended","deferred","logged"],"in the tail: it answers a different question from the symptom filters");
 
  // A recommendation must never quietly become membership, and membership must
  // never clear the recommendation. Separate fields, and adjacent rows in the
@@ -4472,15 +4478,16 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  /* Every share path builds from quickFilterBuses, which is the narrowed list,
     and none from quickFilterAllBuses. */
- assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter\)/);
- assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp\)/);
+ assert.match(page,/quickFilterShareText\(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions\)/);
+ assert.match(page,/quickFilterShareHtml\(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp,quickFilterShareOptions\)/);
  assert.equal(/quickFilterShareText\(\w+,quickFilterAllBuses/.test(page),false);
  /* And the heading says which window, so somebody who cannot see the screen it
     came off is not reading six buses as the total. */
- assert.match(page,/quickFilterShareLabel=quickFilterLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow\)/);
- /* Only the two lists that accumulate carry it. Curtis: "only as it relates to
-    these two fields." */
- assert.match(page,/quickFilterWindowed=quickFilter==="deferred"\|\|quickFilter==="down-sheet-recommended"/);
+ assert.match(page,/quickFilterShareLabel=quickFilterLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow,shiftWindowText\)/);
+ /* The three lists that carry a window. The first two accumulate decisions —
+    Curtis: "only as it relates to these two fields" — and LOGGED was added
+    beside them because its whole question is when. */
+ assert.match(page,/quickFilterWindowed=quickFilter==="deferred"\|\|quickFilter==="down-sheet-recommended"\|\|quickFilter==="logged"/);
  /* Reset on open, and never written to storage — a window restored from
     yesterday would open the drawer already hiding buses. */
  assert.equal(page.split('setQuickFilterWindow("all")').length-1,2,"both entry points reset it");
@@ -4666,4 +4673,122 @@ test("Settings says which colours are following the theme",async()=>{
     validation on read. */
  assert.match(modal,/className="log-style-follow" onClick=\{\(\)=>setDisplayStyle\(key,"color",DEFAULT_DEFECT_LOG_DISPLAY\.styles\[key\]\.color\)\}/);
  assert.match(modal,/\{!themed&&<button type="button" className="log-style-follow"/,"offered only where there is something to undo");
+});
+
+test("LOGGED is the third snapshot: open work written down inside the window",async()=>{
+ /* Curtis, back from vacation with two buses down and no way to send just
+    those: "if I pull those reports and I try to give a snapshot it's gonna give
+    me all the other buses from the other days that I don't want ... I just need
+    a snapshot of things that are deferred, recommended for the down sheet, or
+    any defects that I logged" — for the shift he is on. The first two lists
+    already had the window chips. This is the one that did not exist. */
+ const {QUICK_FILTERS,quickFilterDefects,quickFilterMatch,quickFilterBusIds,quickFilterFallbackLabel,busLoggedMinutes}=
+  await import("../src/lib/defects/quick-filters.ts");
+ const {loggedMinutesElapsed}=await import("../src/lib/defects/repair-catalog.ts");
+ const {quickFilterShareText}=await import("../src/lib/defects/quick-filter-share.ts");
+
+ const now="2026-09-14T18:00:00.000Z";
+ const ago=minutes=>new Date(Date.parse(now)-minutes*60000).toISOString();
+ const defect=(id,issue,createdAt,extra={})=>({id,category:"Brakes",issue,details:"",operability:"service",state:"open",createdAt,...extra});
+ /* 14:00 Chicago is 19:00Z in September, so "this shift" for a 2nd-shift
+    foreman reading this at 18:00Z is not a clean four hours — the window is
+    passed in as minutes precisely so this module never has to know that. */
+ const thisShift=defect("fresh","Brakes sticking / dragging",ago(40));
+ const earlierToday=defect("earlier","Brake chamber leaking",ago(600));
+ const fixedThisShift=defect("fixed","No horn",ago(20),{state:"completed",completedAt:ago(10)});
+ const undated=defect("undated","Air leak","");
+ const bus={id:"a",n:"17566",l:"garage-12",defects:[thisShift,earlierToday,fixedThisShift,undated]};
+
+ /* ONLY OPEN WORK. Curtis: "anything fixed, I don't need a record of that." A
+    defect logged and closed on the same shift is a thing that happened, not a
+    thing to hand over. */
+ assert.equal(quickFilterDefects(bus,"logged",now).some(item=>item.id==="fixed"),false,"a repair finished this shift is not a handover");
+ /* WITH NO WINDOW it is every open defect, newest first — which is why the
+    drawer opens it on SHIFT rather than ALL. */
+ assert.deepEqual(quickFilterDefects(bus,"logged",now).map(item=>item.id),["fresh","earlier","undated"],"newest first, undated last");
+ /* THE WINDOW REACHES THE LINES, not only the bus. A bus picked for something
+    logged 40 minutes ago that then printed this morning's defect underneath it
+    would put the exact rows he is trying not to send into the snapshot. */
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,120).map(item=>item.id),["fresh"]);
+ assert.equal(quickFilterDefects(bus,"logged",now,30).length,0,"nothing inside half an hour");
+ assert.equal(quickFilterDefects(bus,"logged",now,0).length,0,"zero minutes is a real limit, not 'no window'");
+
+ /* THE BUS'S OWN AGE IS THE NEWEST STAMP — the opposite reduction to the two
+    lists beside it, where the oldest unresolved thing is the complaint. A bus
+    logged 40 minutes ago must not be dropped because it also carries this
+    morning's work. */
+ assert.equal(Math.round(busLoggedMinutes(quickFilterDefects(bus,"logged",now),new Date(now))),40);
+ assert.equal(busLoggedMinutes([undated],new Date(now)),null,"nothing dated at all has no age");
+ /* createdAt ONLY, never falling back to updatedAt. An edit is not a landing: a
+    defect written last Monday and re-worded tonight must not walk into
+    tonight's list. The fallback has to be tested on a record with NO createdAt,
+    which is the only input that tells the two spellings apart — the first
+    version of this assertion used a dated defect and passed either way. */
+ assert.equal(loggedMinutesElapsed({...undated,updatedAt:ago(1)},new Date(now)),null,"a fresh edit on an undated defect is still no age");
+ assert.equal(loggedMinutesElapsed({...earlierToday,updatedAt:ago(1)},new Date(now)),600,"and an edit does not make a dated one recent");
+ /* Through the filter, not only the helper: such a bus stays out of a narrowed
+    window however recently it was touched. */
+ assert.equal(quickFilterDefects({id:"d",n:"17502",defects:[{...undated,updatedAt:ago(1)}]},"logged",now,120).length,0);
+
+ /* A bus with only finished work is not in the list at all. */
+ assert.equal(quickFilterMatch({id:"b",n:"17500",defects:[fixedThisShift]},"logged",now),false);
+ /* THE LEGACY FREE-TEXT REPAIR IS AN UNDATED OPEN DEFECT, and behaves like
+    every other undated row rather than getting a special case: it is in the
+    list that promises nothing and out of the ones that promise something.
+    Measured, not assumed — the first version of this assertion claimed the
+    string could never reach the filter at all, and it can. */
+ const legacy={id:"c",n:"17501",pendingRepair:"needs oil"};
+ assert.deepEqual(quickFilterBusIds([bus,legacy],"logged",now),["a","c"],"shown under ALL");
+ assert.equal(quickFilterDefects(legacy,"logged",now)[0].createdAt,undefined,"because it carries no date");
+ assert.equal(quickFilterDefects(legacy,"logged",now,120).length,0,"and is held back by any window");
+
+ /* THE SHARED TEXT CARRIES THE SAME WINDOW. Without the options the heading and
+    the body disagree, and the heading is the only part a reader can check. */
+ const shared=quickFilterShareText("Defects Logged (2ND SHIFT · SINCE 14:00)",[bus],"logged",{now,maxAgeMinutes:120});
+ assert.match(shared,/^Defects Logged \(2ND SHIFT · SINCE 14:00\) — 1 bus/,"the window names the boundary in the heading");
+ assert.match(shared,/Brakes sticking/);
+ assert.equal(/Brake chamber leaking/.test(shared),false,"this morning's defect is not in a this-shift snapshot");
+ assert.equal(/No horn/.test(shared),false,"and neither is the one that got fixed");
+
+ /* It is a real filter entry, so the drawer's COPY LIST, SHARE and SHARE PAGE
+    come with it for free. */
+ const entry=QUICK_FILTERS.find(item=>item.key==="logged");
+ /* "Defects Logged", not "Defects Logged (Still Open)": the window arrives in
+    the shared heading inside its own brackets, and the first wording made that
+    read "Defects Logged (Still Open) (2ND SHIFT · SINCE 14:00)". Measured by
+    copying a real list out of the drawer, not spotted in the source. */
+ assert.equal(entry.label,"Defects Logged");
+ assert.equal(/\(.*\(/.test(entry.label+" (2ND SHIFT · SINCE 14:00)"),false,"one set of brackets in a shared heading");
+ assert.equal(entry.shortLabel,"Logged");
+ assert.equal(quickFilterFallbackLabel("logged"),"Open defect logged in this window");
+});
+
+test("the drawer resolves the shift itself, and only offers the chip when it did",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The boundary comes from the one clock the Down Sheet and the forecast use,
+    so SHIFT means the same thing on all three — including the handover rule
+    that gives 14:00 onward to the incoming crew. */
+ assert.match(page,/const shiftNow=activeShift\(new Date\(\),shiftSettings\)/);
+ assert.match(page,/readShiftSettings\(localStorage\)/,"the device's own edited hours, not just the defaults");
+ assert.match(page,/shiftWindowText=shiftNow\?shiftLabel\(shiftNow\.key\)\+" · SINCE "\+shiftNow\.start/);
+ /* The chip is offered only where a shift resolved. Both halves asserted: the
+    opt-in list when it did, the plain row when it did not. */
+ assert.match(page,/quickFilterWindowChoices=shiftNow\?TIME_WINDOWS_WITH_SHIFT:TIME_WINDOWS/);
+ assert.match(page,/windows=\{quickFilterWindowChoices\}/);
+ /* The resolved limit reaches the filter, or SHIFT would read as ALL. */
+ assert.match(page,/withinTimeWindow\(quickFilterAgeMinutes\(bus\),quickFilterWindow,shiftWindowMinutes\)/);
+ /* LOGGED opens on this shift; on ALL it is every bus in the fleet with an open
+    defect, which is the opposite of a handover list. */
+ assert.match(page,/if\(quickFilter==="logged"&&shiftResolved\)setQuickFilterWindow\(current=>current==="all"\?"shift":current\)/);
+ /* And the line window is LOGGED's alone — the other filters answer "what is
+    true now", where the age of the record is not the question. */
+ assert.match(page,/quickFilterLineMaxAge=quickFilter!=="logged"\|\|quickFilterWindow==="all"\?null:quickFilterWindow==="shift"\?shiftWindowMinutes:timeWindowMinutes\(quickFilterWindow\)/);
+
+ /* The two Down Sheet boards cannot draw the shift chip: they pass no window
+    list, so they get the rolling spans they already had. */
+ for(const file of ["deferred-board","recommended-board"]){
+  const board=await readFile(new URL("../app/down-sheet/_components/"+file+".tsx",import.meta.url),"utf8");
+  assert.equal(/windows=\{/.test(board),false,file+" keeps the row it had");
+  assert.equal(/TIME_WINDOWS_WITH_SHIFT/.test(board),false,file+" cannot offer a shift it never resolved");
+ }
 });

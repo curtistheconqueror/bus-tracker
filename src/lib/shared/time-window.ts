@@ -21,7 +21,7 @@
    asked, and offering a window there would invite somebody to hide a bus that
    is down today because it went down on Monday. */
 
-export type TimeWindowKey="all"|"1h"|"4h"|"8h"|"24h"|"3d"|"7d";
+export type TimeWindowKey="all"|"shift"|"1h"|"4h"|"8h"|"24h"|"3d"|"7d";
 
 /* Short enough to sit in one row on a 360px phone, and spaced the way a shift
    is actually thought about: the last hour, half a shift, a shift, a day, then
@@ -35,6 +35,31 @@ export const TIME_WINDOWS:{key:TimeWindowKey;label:string;minutes:number}[]=[
  {key:"3d",label:"3D",minutes:3*24*60},
  {key:"7d",label:"7D",minutes:7*24*60},
 ];
+
+/* "JUST THIS SHIFT." A span the clock decides, not a number of hours.
+
+   Curtis: "at two o'clock, which is the shift I work, that's when it can start
+   ... because at two I'm officially coming in, so the expectation is for me to
+   take on work. The expectation for the other shift leaving, even though it's
+   overlapping, is to delegate or dismiss work."
+
+   So this is not 8H. At 14:05 it is five minutes and at 22:00 it is eight and a
+   half hours, and the boundary is the one `shift-clock.ts` already draws — the
+   INCOMING crew owns the handover. 8H asked at 14:05 would hand him the morning
+   crew's work, which is the whole thing he was trying not to send.
+
+   NOT IN `TIME_WINDOWS`, and that is deliberate. The chip row is drawn by four
+   lists — these two drawers and the two Down Sheet boards — and only a caller
+   that can resolve a shift may offer it. A chip that appears everywhere and
+   silently means ALL on two of those screens is the exact failure this file's
+   header warns about, so the shift chip travels in its own list and a screen
+   opts in by drawing that one. */
+export const SHIFT_TIME_WINDOW:{key:TimeWindowKey;label:string;minutes:number}={key:"shift",label:"SHIFT",minutes:0};
+
+/* ALL, then SHIFT, then the rolling spans. Second rather than first because ALL
+   is the way out of every window and has to stay where the thumb already
+   expects it. */
+export const TIME_WINDOWS_WITH_SHIFT=[TIME_WINDOWS[0],SHIFT_TIME_WINDOW,...TIME_WINDOWS.slice(1)];
 
 export function timeWindowMinutes(key:TimeWindowKey){
  return TIME_WINDOWS.find(item=>item.key===key)?.minutes||0;
@@ -53,7 +78,18 @@ export function timeWindowMinutes(key:TimeWindowKey){
    comes from a wrong clock, and such a row is newer than anything real rather
    than older. The boards floor the DISPLAYED number at zero, which is a
    separate decision about not printing "-4M" at somebody. */
-export function withinTimeWindow(minutes:number|null,key:TimeWindowKey){
+export function withinTimeWindow(minutes:number|null,key:TimeWindowKey,shiftMinutes:number|null=null){
+ /* SHIFT carries its limit in rather than looking one up, and zero is a real
+    limit here — standing at 14:00 exactly, the shift is zero minutes old and
+    only something logged this minute belongs in it. `if(!limit)` would read
+    that as "no window" and hand over the whole list, which is why the shift
+    branch is separate from the lookup below rather than folded into it.
+
+    A shift that cannot be resolved degrades to ALL, and `timeWindowLabel`
+    degrades to "" on the same input: the list keeps everything and claims no
+    window. The two have to move together — keeping everything under a heading
+    that says SHIFT is the one outcome worth writing code to prevent. */
+ if(key==="shift")return shiftMinutes===null?true:minutes!==null&&minutes<=shiftMinutes;
  const limit=timeWindowMinutes(key);
  if(!limit)return true;
  return minutes!==null&&minutes<=limit;
@@ -61,7 +97,16 @@ export function withinTimeWindow(minutes:number|null,key:TimeWindowKey){
 
 /* What the heading of a shared list says. "" for ALL, because a list with no
    window is just the list and saying so would be noise. */
-export function timeWindowLabel(key:TimeWindowKey){
+export function timeWindowLabel(key:TimeWindowKey,shiftText=""){
+ /* The caller supplies the shift's own words — "2ND SHIFT · SINCE 14:00" —
+    because a heading read by somebody who is not in the building has to name
+    the boundary, not just claim there was one. "THIS SHIFT" to a dispatcher
+    reading it at 23:00 means a different eight hours than it did to the person
+    who sent it at 15:00.
+
+    "" when there is no shift to name, in step with `withinTimeWindow` keeping
+    everything on the same input. */
+ if(key==="shift")return shiftText;
  const found=TIME_WINDOWS.find(item=>item.key===key);
  return !found||!found.minutes?"":"LAST "+found.label;
 }

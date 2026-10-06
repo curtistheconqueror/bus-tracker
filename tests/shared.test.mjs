@@ -767,3 +767,48 @@ test("the picker's drop-down arrow is a real control, and the component carries 
  /* A gloved thumb on a phone. The form already gives its inputs 44px. */
  assert.ok(num(phone,/\.combo-caret\{[^}]*width:(\d+)px/,"phone caret width")>=44);
 });
+
+test("THIS SHIFT is a window the clock decides, and it cannot claim a shift it could not resolve",async()=>{
+ const {withinTimeWindow,timeWindowLabel,TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,SHIFT_TIME_WINDOW}=
+  await import("../src/lib/shared/time-window.ts");
+
+ /* ZERO IS A REAL LIMIT. Standing at 14:00 exactly the shift is zero minutes
+    old and only something logged this minute belongs in it. The lookup path
+    below treats 0 as "no window" — which is right for ALL and would be a
+    disaster here, so the shift branch is separate. */
+ assert.equal(withinTimeWindow(0,"shift",0),true,"logged this minute, at the top of the shift");
+ assert.equal(withinTimeWindow(1,"shift",0),false,"one minute before the shift started is the last crew's");
+ assert.equal(withinTimeWindow(5,"shift",10),true);
+ assert.equal(withinTimeWindow(11,"shift",10),false);
+ assert.equal(withinTimeWindow(8*60,"shift",8*60+29),true,"late in a shift the window is most of a day");
+ /* An undated row is out of this window exactly as it is out of every other
+    narrowed one: it has no age, and a list claiming everything in it is from
+    this shift must not carry one. */
+ assert.equal(withinTimeWindow(null,"shift",120),false);
+ /* A stamp from the future is newer than anything real, not older — the same
+    reading the rolling windows take. */
+ assert.equal(withinTimeWindow(-30,"shift",10),true);
+
+ /* THE DEGRADE PATH, and the reason it is safe: with no shift to resolve the
+    filter keeps everything AND the heading claims nothing. Those two have to
+    move together — keeping the whole list under a heading that says SHIFT is
+    the one outcome worth writing code to prevent. */
+ assert.equal(withinTimeWindow(99999,"shift",null),true);
+ assert.equal(timeWindowLabel("shift"),"");
+ assert.equal(timeWindowLabel("shift",""),"");
+ /* The caller names the boundary, because "THIS SHIFT" read at 23:00 is not the
+    shift it was sent from. */
+ assert.equal(timeWindowLabel("shift","2ND SHIFT · SINCE 14:00"),"2ND SHIFT · SINCE 14:00");
+ /* And a shift text passed with any other key is ignored rather than printed. */
+ assert.equal(timeWindowLabel("24h","2ND SHIFT · SINCE 14:00"),"LAST 24H");
+
+ /* NOT IN TIME_WINDOWS. The chip row is drawn by four lists and only the two
+    that resolve a shift may offer it; a chip that appeared on the Down Sheet
+    boards and silently meant ALL there is the failure this file warns about. */
+ assert.equal(TIME_WINDOWS.some(item=>item.key==="shift"),false,"the default row cannot draw it");
+ assert.deepEqual(TIME_WINDOWS_WITH_SHIFT.map(item=>item.key),["all","shift","1h","4h","8h","24h","3d","7d"],"ALL stays first: it is the way out of every window");
+ assert.equal(SHIFT_TIME_WINDOW.label,"SHIFT");
+ /* The opt-in list is the default list plus one, in the same order, so the two
+    cannot drift as spans are added. */
+ assert.deepEqual(TIME_WINDOWS_WITH_SHIFT.filter(item=>item.key!=="shift"),TIME_WINDOWS);
+});

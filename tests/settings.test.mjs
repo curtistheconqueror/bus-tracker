@@ -956,3 +956,43 @@ test("the garage's hours are editable on the device, and nothing re-implements t
  assert.match(code,/if\(clockMinutes\(value\)!==null\)save\(next\)/,
   "a half-typed time is not committed");
 });
+
+test("the shift clock says how long the current shift has been running",async()=>{
+ /* Curtis asked to be able to send a snapshot of one shift's work rather than
+    "all the other buses from the other days", and named the boundary himself:
+    "at two o'clock, which is the shift I work, that's when it can start ...
+    because at two I'm officially coming in, so the expectation is for me to
+    take on work. The expectation for the other shift leaving, even though it's
+    overlapping, is to delegate or dismiss work."
+
+    So THIS SHIFT is a span the clock decides — five minutes at 14:05 and eight
+    and a half hours at 22:00 — and it hangs off the same handover rule shiftAt
+    already applies rather than a second table of times. */
+ const {activeShift,shiftAt,DEFAULT_SHIFT_SETTINGS}=await import("../src/lib/settings/shift-clock.ts");
+ const at=(h,m=0)=>{const d=new Date("2026-09-14T00:00:00");d.setHours(h,m,0,0);return d};
+
+ /* THE INCOMING CREW OWNS THE HANDOVER, and the span restarts at its start —
+    not at the end of the overlap. At 14:05 the window is five minutes old, so
+    the morning's work falls out, which is the entire point. */
+ assert.deepEqual(activeShift(at(14)),{key:"2nd",since:0,start:"14:00"});
+ assert.deepEqual(activeShift(at(14,5)),{key:"2nd",since:5,start:"14:00"});
+ assert.deepEqual(activeShift(at(13,59)),{key:"1st",since:7*60+59,start:"06:00"},"right up to the handover it is still the outgoing shift");
+ assert.deepEqual(activeShift(at(22,10)),{key:"3rd",since:10,start:"22:00"});
+ /* Past midnight on the shift that began last night: the span has to wrap, or
+    every hour after 00:00 reads as a fresh shift. */
+ assert.deepEqual(activeShift(at(2)),{key:"3rd",since:4*60,start:"22:00"});
+ assert.deepEqual(activeShift(at(6,15)),{key:"1st",since:15,start:"06:00"},"the 06:00 handover belongs to the day crew");
+
+ /* ONE FUNCTION PICKS THE WINDOW. shiftAt is this narrowed to its key, so the
+    two can never disagree about who owns 14:15 — the half-hour the overlap
+    rule exists to settle. */
+ for(const time of [at(0),at(6),at(6,15),at(13,59),at(14),at(14,29),at(18),at(22),at(22,30),at(23,59)])
+  assert.equal(shiftAt(time),activeShift(time).key,"shiftAt and activeShift agree at "+time.getHours()+":"+time.getMinutes());
+
+ /* The start is formatted, not echoed: a garage that typed `6:00` into Settings
+    still reads back 06:00 on a list somebody else opens. */
+ assert.equal(activeShift(at(7),{...DEFAULT_SHIFT_SETTINGS,shifts:[{key:"1st",start:"6:00",end:"14:30"}]}).start,"06:00");
+ /* No window matching means no shift to name, rather than a guess. */
+ assert.equal(activeShift(at(12),{shifts:[],pullouts:[]}),null);
+ assert.equal(activeShift("not a time"),null);
+});
