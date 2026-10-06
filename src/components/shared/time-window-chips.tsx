@@ -2,6 +2,11 @@
 
 import {TIME_WINDOWS,type TimeWindowKey} from "@/src/lib/shared/time-window";
 
+/* What one chip needs to draw. Taken as data rather than imported here, so a
+   screen that can resolve a shift can offer the SHIFT chip and one that cannot
+   is unable to draw it by accident. */
+export type TimeWindowChoice={key:TimeWindowKey;label:string;minutes:number};
+
 /* The chip row itself, drawn identically on all four lists that carry it — the
    two boards on the Down Sheet and the two quick-filter drawers on the Defect
    Log. One component rather than four copies for the reason elapsed-label.ts
@@ -21,23 +26,30 @@ import {TIME_WINDOWS,type TimeWindowKey} from "@/src/lib/shared/time-window";
    being wrong costs a scroll. These two lists are buses nobody has ruled on
    yet, and a window silently restored from yesterday would open the board
    already hiding them. It resets to ALL every time the page loads. */
-export default function TimeWindowChips({value,onChange,hidden,label}:{
+export default function TimeWindowChips({value,onChange,hidden,label,windows=TIME_WINDOWS}:{
  value:TimeWindowKey;
  onChange:(value:TimeWindowKey)=>void;
  /* How many rows the window is holding back right now. */
  hidden:number;
  /* Named for the screen reader, since two of these can be on one page. */
  label:string;
+ /* Which chips to draw. Defaults to the rolling spans, so the two Down Sheet
+    boards keep exactly the row they had; the Defect Log drawers pass the list
+    that includes SHIFT because they resolve one. */
+ windows?:readonly TimeWindowChoice[];
 }){
  return <div className="time-window-chips" role="group" aria-label={"Filter "+label+" by how recent"}>
   <small>SHOW</small>
   {/* `item`, not `window`: the two boards that draw this both carry a comment
       saying the global must not be shadowed, and a rule that holds in two
       files and not the third is not a rule. */}
-  <div className="time-window-row">{TIME_WINDOWS.map(item=>
+  <div className="time-window-row">{windows.map(item=>
    <button type="button" key={item.key} className={"time-window-chip"+(item.key===value?" on":"")}
     aria-pressed={item.key===value}
-    aria-label={item.key==="all"?"Show every "+label:"Show "+label+" from the last "+item.label}
+    /* "from this shift", never "from the last SHIFT" — the spoken label has to
+       read as the span it is, and this one is a boundary rather than a count of
+       hours. */
+    aria-label={item.key==="all"?"Show every "+label:item.key==="shift"?"Show "+label+" from this shift":"Show "+label+" from the last "+item.label}
     onClick={()=>onChange(item.key)}>{item.label}</button>)}
   </div>
   {/* "HIDDEN", not "OLDER HIDDEN" — measured in the browser and corrected

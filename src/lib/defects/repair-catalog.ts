@@ -668,6 +668,19 @@ export function recommendedMinutesElapsed(defect:StructuredDefect,now=new Date()
  const started=Date.parse(String(defect.downSheetRecommendation.at||""));
  return Number.isNaN(started)?null:(now.getTime()-started)/60000;
 }
+
+/* HOW LONG AGO THIS DEFECT WAS WRITTEN DOWN.
+
+   `createdAt` only, never falling back to `updatedAt`. The question this answers
+   is "did this land on my shift", and an edit is not a landing: a defect logged
+   on Monday and re-worded on Thursday would otherwise walk into Thursday's
+   list, which is the same leak the window exists to stop. A record thin enough
+   to carry no `createdAt` has no age, reads as null, and falls out of every
+   narrowed window exactly like an undated deferral. */
+export function loggedMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ const started=Date.parse(String(defect.createdAt||""));
+ return Number.isNaN(started)?null:(now.getTime()-started)/60000;
+}
 export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
  const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
  if(!stamp)delete next.downSheetRecommendation;
