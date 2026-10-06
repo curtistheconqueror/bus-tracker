@@ -109,6 +109,32 @@ function loggedWithin(defect:StructuredDefect,now:string,maxAgeMinutes:number|nu
  return elapsed!==null&&elapsed<=maxAgeMinutes;
 }
 
+/* WHOSE WORK THIS IS. Curtis: "key off initials so we don't have the multiple
+   day issues."
+
+   NO INITIALS MEANS NO FILTER, and that pairing is the whole safety of this.
+   `defaultInitials` ships EMPTY and `requireInitials` only ever gated FIXED BY,
+   so a device nobody has set up has none to match and a defect can carry a
+   blank `reportedBy` — a hard match there would hand back an empty list every
+   time, which reads as "nothing happened this shift" rather than "this is not
+   set up". The caller shows everyone AND says so, the same way the shift window
+   and its heading degrade together.
+
+   Compared case-folded: a hand-logged defect is upper-cased on save, but a
+   defect read off a photographed sheet carries whatever the paper said
+   (`sweep-scan-import.ts`), raw. */
+function loggedBy(defect:StructuredDefect,initials:string){
+ const want=initials.trim().toUpperCase();
+ if(!want)return true;
+ return String(defect.reportedBy||"").trim().toUpperCase()===want;
+}
+
+/* How a `logged` list is narrowed. An object rather than two more positional
+   arguments: these are both optional, both only mean anything for one filter,
+   and `quickFilterDefects(bus,key,now,null,"")` says nothing to anybody
+   reading it. */
+export type QuickFilterNarrow={maxAgeMinutes?:number|null;initials?:string};
+
 /* THE NEWEST FIRST, for `logged` only.
 
    The other lists are ordered longest-waiting-first, because there the age is
@@ -123,7 +149,7 @@ function loggedFirst(a:StructuredDefect,b:StructuredDefect,now:string){
  return left-right;
 }
 
-export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString(),maxAgeMinutes:number|null=null){
+export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString(),narrow:QuickFilterNarrow={}){
  const normalized=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id),matches=normalized.filter(defect=>
   /* Which repair the bus road-called on, so the list names the fault and not
      only the bus. Fixed ones count here: a bus that broke down on Tuesday and
@@ -147,7 +173,7 @@ export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new
      list headed 2ND SHIFT. The other filters ignore the window on purpose —
      they answer "what is true now", where the age of the record is not the
      question being asked. */
-  :key==="logged"?isUnresolved(defect)&&loggedWithin(defect,now,maxAgeMinutes)
+  :key==="logged"?isUnresolved(defect)&&loggedWithin(defect,now,narrow.maxAgeMinutes??null)&&loggedBy(defect,narrow.initials||"")
   :isUnresolved(defect)&&quickFilterTextMatch(defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
  if(key==="logged")matches.sort((a,b)=>loggedFirst(a,b,now));
  if(matches.length||normalized.length||!legacy||!quickFilterTextMatch(legacy,key))return matches;
@@ -204,11 +230,11 @@ export function busLoggedMinutes(defects:StructuredDefect[],now=new Date()){
  return minutes.length?Math.min(...minutes):null;
 }
 
-export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString()){
- return quickFilterFlagMatch(bus,key,now)||quickFilterDefects(bus,key,now).length>0;
+export function quickFilterMatch(bus:QuickFilterBus,key:QuickFilterKey,now=new Date().toISOString(),narrow:QuickFilterNarrow={}){
+ return quickFilterFlagMatch(bus,key,now)||quickFilterDefects(bus,key,now,narrow).length>0;
 }
 
-export function quickFilterBusIds<T extends QuickFilterBus>(fleet:T[],key:QuickFilterKey,now=new Date().toISOString()){return fleet.filter(bus=>quickFilterMatch(bus,key,now)).map(bus=>bus.id)}
+export function quickFilterBusIds<T extends QuickFilterBus>(fleet:T[],key:QuickFilterKey,now=new Date().toISOString(),narrow:QuickFilterNarrow={}){return fleet.filter(bus=>quickFilterMatch(bus,key,now,narrow)).map(bus=>bus.id)}
 
 /* How the pulsing DEFERRED badge asks the Defect Log to open a filter.
 

@@ -143,7 +143,7 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   assert.match(page,/aria-label="Share filtered bus list as text"/);
   /* The drawer's own cards read the same window the share does, so what is on
      screen and what gets pasted cannot disagree. */
-  assert.match(page,/quickFilterDefects\(bus,quickFilter,new Date\(\)\.toISOString\(\),quickFilterLineMaxAge\)/);
+  assert.match(page,/quickFilterDefects\(bus,quickFilter,new Date\(\)\.toISOString\(\),quickFilterShareOptions\)/);
   assert.match(page,/current\.includes\(bus\.id\)\?\[\]:\[bus\.id\]/);
   assert.match(css,/\.quick-filter-defects\{/);
   assert.match(css,/\.quick-filter-share-actions button\{min-height:36px/);
@@ -4483,7 +4483,7 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
  assert.equal(/quickFilterShareText\(\w+,quickFilterAllBuses/.test(page),false);
  /* And the heading says which window, so somebody who cannot see the screen it
     came off is not reading six buses as the total. */
- assert.match(page,/quickFilterShareLabel=quickFilterLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow,shiftWindowText\)/);
+ assert.match(page,/quickFilterShareLabel=quickFilterOwnedLabel\+\(quickFilterWindowed&&timeWindowLabel\(quickFilterWindow,shiftWindowText\)/);
  /* The three lists that carry a window. The first two accumulate decisions —
     Curtis: "only as it relates to these two fields" — and LOGGED was added
     beside them because its whole question is when. */
@@ -4709,9 +4709,9 @@ test("LOGGED is the third snapshot: open work written down inside the window",as
  /* THE WINDOW REACHES THE LINES, not only the bus. A bus picked for something
     logged 40 minutes ago that then printed this morning's defect underneath it
     would put the exact rows he is trying not to send into the snapshot. */
- assert.deepEqual(quickFilterDefects(bus,"logged",now,120).map(item=>item.id),["fresh"]);
- assert.equal(quickFilterDefects(bus,"logged",now,30).length,0,"nothing inside half an hour");
- assert.equal(quickFilterDefects(bus,"logged",now,0).length,0,"zero minutes is a real limit, not 'no window'");
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,{maxAgeMinutes:120}).map(item=>item.id),["fresh"]);
+ assert.equal(quickFilterDefects(bus,"logged",now,{maxAgeMinutes:30}).length,0,"nothing inside half an hour");
+ assert.equal(quickFilterDefects(bus,"logged",now,{maxAgeMinutes:0}).length,0,"zero minutes is a real limit, not 'no window'");
 
  /* THE BUS'S OWN AGE IS THE NEWEST STAMP — the opposite reduction to the two
     lists beside it, where the oldest unresolved thing is the complaint. A bus
@@ -4728,7 +4728,7 @@ test("LOGGED is the third snapshot: open work written down inside the window",as
  assert.equal(loggedMinutesElapsed({...earlierToday,updatedAt:ago(1)},new Date(now)),600,"and an edit does not make a dated one recent");
  /* Through the filter, not only the helper: such a bus stays out of a narrowed
     window however recently it was touched. */
- assert.equal(quickFilterDefects({id:"d",n:"17502",defects:[{...undated,updatedAt:ago(1)}]},"logged",now,120).length,0);
+ assert.equal(quickFilterDefects({id:"d",n:"17502",defects:[{...undated,updatedAt:ago(1)}]},"logged",now,{maxAgeMinutes:120}).length,0);
 
  /* A bus with only finished work is not in the list at all. */
  assert.equal(quickFilterMatch({id:"b",n:"17500",defects:[fixedThisShift]},"logged",now),false);
@@ -4740,7 +4740,7 @@ test("LOGGED is the third snapshot: open work written down inside the window",as
  const legacy={id:"c",n:"17501",pendingRepair:"needs oil"};
  assert.deepEqual(quickFilterBusIds([bus,legacy],"logged",now),["a","c"],"shown under ALL");
  assert.equal(quickFilterDefects(legacy,"logged",now)[0].createdAt,undefined,"because it carries no date");
- assert.equal(quickFilterDefects(legacy,"logged",now,120).length,0,"and is held back by any window");
+ assert.equal(quickFilterDefects(legacy,"logged",now,{maxAgeMinutes:120}).length,0,"and is held back by any window");
 
  /* THE SHARED TEXT CARRIES THE SAME WINDOW. Without the options the heading and
     the body disagree, and the heading is the only part a reader can check. */
@@ -4791,4 +4791,79 @@ test("the drawer resolves the shift itself, and only offers the chip when it did
   assert.equal(/windows=\{/.test(board),false,file+" keeps the row it had");
   assert.equal(/TIME_WINDOWS_WITH_SHIFT/.test(board),false,file+" cannot offer a shift it never resolved");
  }
+});
+
+test("LOGGED keys off the device's initials, and says so when it has none",async()=>{
+ /* Curtis: "key off initials so we don't have the multiple day issues." The
+    shift window answers WHEN; this answers WHOSE, and together they are the
+    sentence he actually said — "any defects that I logged". */
+ const {quickFilterDefects,quickFilterBusIds}=await import("../src/lib/defects/quick-filters.ts");
+ const {quickFilterShareText}=await import("../src/lib/defects/quick-filter-share.ts");
+ const now="2026-09-14T18:00:00.000Z";
+ const ago=minutes=>new Date(Date.parse(now)-minutes*60000).toISOString();
+ const defect=(id,issue,minutesAgo,reportedBy)=>({id,category:"Brakes",issue,details:"",
+  operability:"service",state:"open",createdAt:ago(minutesAgo),reportedBy});
+ const mine=defect("mine","Brakes sticking / dragging",20,"CJ");
+ const theirs=defect("theirs","Brake chamber leaking",25,"RM");
+ /* A hand-logged defect is upper-cased on save, but one read off a photographed
+    sheet carries whatever the paper said, raw — so the match has to case-fold.
+    sweep-scan-import.ts stores `finding.initial` without touching it. */
+ const mineLowercase=defect("mine-scan","Air leak",30,"cj");
+ const nobodys=defect("nobodys","No horn",35,"");
+ const bus={id:"a",n:"17566",l:"garage-12",defects:[mine,theirs,mineLowercase,nobodys]};
+
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,{initials:"CJ"}).map(item=>item.id),["mine","mine-scan"],"his own, however the initial was cased, newest first");
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,{initials:"RM"}).map(item=>item.id),["theirs"]);
+ /* A blank reportedBy is nobody's, so it is in no named person's list. */
+ assert.equal(quickFilterDefects(bus,"logged",now,{initials:"CJ"}).some(item=>item.id==="nobodys"),false);
+
+ /* NO INITIALS MEANS NO PERSON FILTER — not a match against "" that returns
+    nothing. `defaultInitials` ships EMPTY, so the hard-match version of this
+    would hand an un-set-up device an empty list on every shift, which reads as
+    "nothing happened" rather than "this is not configured". */
+ assert.equal(quickFilterDefects(bus,"logged",now,{initials:""}).length,4,"everyone, including the unattributed one");
+ assert.equal(quickFilterDefects(bus,"logged",now).length,4,"and the same with no narrow passed at all");
+
+ /* WHOSE AND WHEN COMPOSE. CJ's work in the last 22 minutes is one row, not
+    his two and not everybody's three. */
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,{initials:"CJ",maxAgeMinutes:22}).map(item=>item.id),["mine"]);
+ assert.deepEqual(quickFilterDefects(bus,"logged",now,{maxAgeMinutes:22}).map(item=>item.id),["mine"],"without initials the window still stands alone");
+
+ /* The bus list narrows too, so the count on the chip is the count of HIS work
+    rather than the fleet's. */
+ const hers={id:"b",n:"17570",defects:[theirs]};
+ assert.deepEqual(quickFilterBusIds([bus,hers],"logged",now,{initials:"CJ"}),["a"]);
+ assert.deepEqual(quickFilterBusIds([bus,hers],"logged",now,{initials:""}),["a","b"]);
+
+ /* THE SHARED LIST OBEYS IT. A list headed "Defects Logged by CJ" that prints
+    RM's report is wrong in the one direction a pasted list cannot afford —
+    somebody acts on it without being able to check. */
+ const shared=quickFilterShareText("Defects Logged by CJ (2ND SHIFT · SINCE 14:00)",[bus],"logged",{now,initials:"CJ",maxAgeMinutes:240});
+ assert.match(shared,/Brakes sticking/);
+ assert.match(shared,/Air leak/);
+ assert.equal(/Brake chamber leaking/.test(shared),false,"RM's report is not in CJ's snapshot");
+ assert.equal(/No horn/.test(shared),false,"and neither is the unattributed one");
+});
+
+test("the drawer names whose list it is, and admits when it is not filtering by person",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The device's own initials — the same value stamped onto anything logged
+    here, so the list and the stamp cannot mean different people. */
+ assert.match(page,/myInitials=\(settings\.defaultInitials\|\|""\)\.trim\(\)\.toUpperCase\(\)/);
+ assert.match(page,/loggedNarrow=\{initials:myInitials\}/);
+ /* It reaches the counts, the ages, the drawn list and the share. */
+ assert.match(page,/quickFilterBusIds\(fleet,key,new Date\(\)\.toISOString\(\),key==="logged"\?loggedNarrow:\{\}\)/);
+ assert.match(page,/quickFilterDefects\(bus,"logged",new Date\(\)\.toISOString\(\),loggedNarrow\)/);
+ assert.match(page,/initials:quickFilter==="logged"\?myInitials:""/);
+ /* THE HEADING NAMES THE PERSON, and drops the name when there is none —
+    never claim a narrowing that is not being applied. */
+ assert.match(page,/quickFilterOwnedLabel=quickFilter==="logged"&&myInitials\?quickFilterLabel\+" by "\+myInitials:quickFilterLabel/);
+ /* AND IT SAYS SO OUT LOUD. The alternative is a list that looks like "mine"
+    while showing everyone's, which is the failure mode the window chips
+    already carry a HIDDEN count to prevent. */
+ assert.match(page,/quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET/);
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* A bare <p> in a flex column arrives with the browser's own 1em margin and
+    nothing in this project resets it — measured, not read. */
+ assert.match(css,/\.quick-filter-drawer>\.quick-filter-initials-note\{flex:none;margin:0;/);
 });
