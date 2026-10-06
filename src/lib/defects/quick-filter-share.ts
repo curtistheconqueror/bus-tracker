@@ -27,11 +27,15 @@ export type QuickFilterShareBus=QuickFilterBus&{n:string;l?:string};
    underneath a bus that qualified on something logged at 14:20. The window
    already decided which buses are in the list; without this it would stop at
    the bus and the lines would contradict the heading above them — and the
-   heading is the only part of a pasted list a reader can check. */
-export type QuickFilterShareOptions={now?:string;maxAgeMinutes?:number|null};
+   heading is the only part of a pasted list a reader can check.
+
+   `initials` rides along for the same reason: a list headed "Defects Logged by
+   CJ" that prints somebody else's report is wrong in the one direction a
+   shared list cannot afford. */
+export type QuickFilterShareOptions={now?:string;maxAgeMinutes?:number|null;initials?:string};
 
 function defectLines(bus:QuickFilterShareBus,key:QuickFilterKey,options:QuickFilterShareOptions={}){
- const defects=quickFilterDefects(bus,key,options.now||new Date().toISOString(),options.maxAgeMinutes??null);
+ const defects=quickFilterDefects(bus,key,options.now||new Date().toISOString(),{maxAgeMinutes:options.maxAgeMinutes??null,initials:options.initials||""});
  if(!defects.length)return [quickFilterFallbackLabel(key)];
  const seen=new Set<string>(),lines:string[]=[];
  for(const defect of defects){
