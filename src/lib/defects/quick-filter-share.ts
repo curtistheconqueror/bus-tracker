@@ -20,8 +20,22 @@ export type QuickFilterShareBus=QuickFilterBus&{n:string;l?:string};
    two of them carry the same wording, the shared list printed the same sentence
    twice and the person reading it has to work out whether that means two
    problems or one. It means one. */
-function defectLines(bus:QuickFilterShareBus,key:QuickFilterKey){
- const defects=quickFilterDefects(bus,key);
+/* How much of the window the shared list has to respect.
+
+   `maxAgeMinutes` reaches `quickFilterDefects`, which is what keeps a snapshot
+   headed "2ND SHIFT · SINCE 14:00" from printing a defect logged on Monday
+   underneath a bus that qualified on something logged at 14:20. The window
+   already decided which buses are in the list; without this it would stop at
+   the bus and the lines would contradict the heading above them — and the
+   heading is the only part of a pasted list a reader can check.
+
+   `initials` rides along for the same reason: a list headed "Defects Logged by
+   CJ" that prints somebody else's report is wrong in the one direction a
+   shared list cannot afford. */
+export type QuickFilterShareOptions={now?:string;maxAgeMinutes?:number|null;initials?:string};
+
+function defectLines(bus:QuickFilterShareBus,key:QuickFilterKey,options:QuickFilterShareOptions={}){
+ const defects=quickFilterDefects(bus,key,options.now||new Date().toISOString(),{maxAgeMinutes:options.maxAgeMinutes??null,initials:options.initials||""});
  if(!defects.length)return [quickFilterFallbackLabel(key)];
  const seen=new Set<string>(),lines:string[]=[];
  for(const defect of defects){
@@ -39,12 +53,12 @@ function defectLines(bus:QuickFilterShareBus,key:QuickFilterKey){
    A blank line between buses, because this gets read on a phone as a wall of
    text and the eye needs somewhere to land. The location goes on its own line
    under the number for the same reason: it is the thing somebody acts on. */
-export function quickFilterShareText(label:string,buses:QuickFilterShareBus[],key:QuickFilterKey){
+export function quickFilterShareText(label:string,buses:QuickFilterShareBus[],key:QuickFilterKey,options:QuickFilterShareOptions={}){
  const heading=label+" — "+buses.length+" bus"+(buses.length===1?"":"es");
  if(!buses.length)return heading+"\n\nNo buses currently match this filter.";
  return [heading,...buses.map(bus=>{
   const area=shareAreaLabel(bus.l);
-  return ["Bus "+bus.n+(area?"  ·  "+area:""),...defectLines(bus,key).map(line=>"   "+line)].join("\n");
+  return ["Bus "+bus.n+(area?"  ·  "+area:""),...defectLines(bus,key,options).map(line=>"   "+line)].join("\n");
  })].join("\n\n");
 }
 
@@ -61,10 +75,10 @@ function escapeHtml(value:string){
    signal, and a page that needs to fetch something is a page that shows nothing.
    It is also why this is a file rather than a link: nobody has to be given an
    account, and it still reads a year from now. */
-export function quickFilterShareHtml(label:string,buses:QuickFilterShareBus[],key:QuickFilterKey,stamp:string){
+export function quickFilterShareHtml(label:string,buses:QuickFilterShareBus[],key:QuickFilterKey,stamp:string,options:QuickFilterShareOptions={}){
  const cards=buses.length?buses.map(bus=>{
   const area=shareAreaLabel(bus.l);
-  const lines=defectLines(bus,key).map(line=>"<li>"+escapeHtml(line)+"</li>").join("");
+  const lines=defectLines(bus,key,options).map(line=>"<li>"+escapeHtml(line)+"</li>").join("");
   return "<article><header><span class=\"n\">"+escapeHtml(bus.n)+"</span>"+
    (area?"<span class=\"a\">"+escapeHtml(area)+"</span>":"")+"</header><ul>"+lines+"</ul></article>";
  }).join(""):"<p class=\"empty\">No buses currently match this filter.</p>";

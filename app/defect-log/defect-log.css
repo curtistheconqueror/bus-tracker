@@ -936,6 +936,11 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    restate itself too. The chip row is a direct child, so it needs the same
    escape or it becomes a two-column grid with its own scrollbar. */
 .quick-filter-drawer>.time-window-chips{flex:none;display:flex;gap:8px;padding:7px;overflow:visible}
+/* The note that says the person filter is NOT being applied. `flex:none` and
+   `margin:0` are both load-bearing: the drawer is a flex column, and a bare
+   <p> arrives carrying the browser's own 1em margin — nothing in this project
+   resets it, so it would push the chips off the top of the drawer. */
+.quick-filter-drawer>.quick-filter-initials-note{flex:none;margin:0;padding:7px 12px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,#d97706 14%,var(--log-surface));color:var(--log-text);font-size:7.5px;font-weight:900;letter-spacing:.3px;line-height:1.4}
 
 /* ─── THREE WAYS OF TELLING ONE BUS FROM THE NEXT ────────────────────────────
    All three off unless the device asks for them, and each written twice: once

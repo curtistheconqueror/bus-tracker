@@ -17,7 +17,7 @@ import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,s
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
-import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
+import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,busLoggedMinutes,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
@@ -25,7 +25,8 @@ import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
-import {timeWindowLabel,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
+import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
+import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 /* One copy of the location editor, shared with the Down Sheet's MYSTERY BUSES
@@ -631,6 +632,12 @@ export default function DefectLog(){
     time-window-chips.tsx for why a remembered window is the wrong default on
     a list of buses nobody has ruled on yet. */
  const [quickFilterWindow,setQuickFilterWindow]=useState<TimeWindowKey>("all");
+ /* The garage's own hours, for the SHIFT window. The defaults ARE this shop's
+    real shifts, so the window is already correct on the first render and the
+    effect only matters on a device where somebody edited them in Settings —
+    which is the whole reason that key is editable. */
+ const [shiftSettings,setShiftSettings]=useState(DEFAULT_SHIFT_SETTINGS);
+ useEffect(()=>{setShiftSettings(readShiftSettings(localStorage))},[]);
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
@@ -759,7 +766,18 @@ export default function DefectLog(){
     switching between the two screens reads the same list in the same order. */
  const recommendedDefectsFor=(busId:string)=>recommendedRowsForFleet.filter(row=>row.bus.id===busId).map(row=>row.defect).sort((a,b)=>recommendedRank(a)-recommendedRank(b));
  const recommendedSince=(bus:DefectLogFleetBus)=>recommendedRank(recommendedDefectsFor(bus.id)[0]);
- const candidateIdsFor=(key:QuickFilterKey)=>key==="deferred"?deferredCandidateIds:key==="down-sheet-recommended"?recommendedCandidateIds:quickFilterBusIds(fleet,key);
+ /* WHOSE WORK THE LOGGED LIST IS. Curtis: "key off initials so we don't have
+    the multiple day issues." The device's own initials from Defect Log
+    settings — the same value that gets stamped onto anything logged here, so
+    the list and the stamp can never mean different people.
+
+    Empty is a real state and not an error: `defaultInitials` ships empty, and
+    on such a device the person filter is OFF rather than matching "" and
+    returning nothing. The drawer says so out loud; see the note below the
+    chips. */
+ const myInitials=(settings.defaultInitials||"").trim().toUpperCase();
+ const loggedNarrow={initials:myInitials};
+ const candidateIdsFor=(key:QuickFilterKey)=>key==="deferred"?deferredCandidateIds:key==="down-sheet-recommended"?recommendedCandidateIds:quickFilterBusIds(fleet,key,new Date().toISOString(),key==="logged"?loggedNarrow:{});
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,candidateIdsFor(item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(candidateIdsFor(quickFilter)):new Set<string>(),quickFilterAllBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):quickFilter==="down-sheet-recommended"?recommendedSince(a)-recommendedSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  /* HOW OLD THIS ROW IS, for the window chips, in the two filters that carry
     them. Read from exactly the records the row's own line prints its time
@@ -780,14 +798,69 @@ export default function DefectLog(){
    const defects=recommendedDefectsFor(bus.id);
    return defects.length?busRecommendedMinutes(defects):null;
   }
+  /* The NEWEST open defect on the bus, through busLoggedMinutes — the opposite
+     reduction to the two above, and deliberately so. A bus belongs in this
+     shift's list if ANYTHING was written on it this shift; taking the oldest
+     would drop a bus logged ten minutes ago because it also carries something
+     from last Tuesday. Asked with no window so the bus's age is its own fact,
+     not a function of the chip that is currently pressed. */
+  if(quickFilter==="logged"){
+   /* Narrowed by initials but NOT by the window: a bus's age is its own fact,
+      not a function of the chip currently pressed. Somebody else's report on
+      the same bus must not decide how recent HIS list thinks it is. */
+   const defects=quickFilterDefects(bus,"logged",new Date().toISOString(),loggedNarrow);
+   return defects.length?busLoggedMinutes(defects):null;
+  }
   return null;
  };
- const quickFilterWindowed=quickFilter==="deferred"||quickFilter==="down-sheet-recommended";
- const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow)):quickFilterAllBuses;
+ const quickFilterWindowed=quickFilter==="deferred"||quickFilter==="down-sheet-recommended"||quickFilter==="logged";
+ /* WHERE THIS SHIFT STARTED — resolved on every render, like every other age on
+    this screen, so the span grows as the shift runs.
+
+    `activeShift` applies the handover rule rather than restating it: of the
+    windows that match, the one that started most recently, so 14:00 onward
+    belongs to the incoming crew. Curtis: "at two o'clock, which is the shift I
+    work, that's when it can start ... because at two I'm officially coming in,
+    so the expectation is for me to take on work. The expectation for the other
+    shift leaving, even though it's overlapping, is to delegate or dismiss
+    work." SHIFT therefore means the same boundary here, on the Down Sheet and
+    in the forecast, because all three ask the one clock. */
+ const shiftNow=activeShift(new Date(),shiftSettings);
+ const shiftWindowMinutes=shiftNow?shiftNow.since:null;
+ /* What a shared heading says. "2ND SHIFT · SINCE 14:00" rather than "THIS
+    SHIFT", because the person reading it at 23:00 is not on the shift it was
+    sent from and cannot ask which one it was. */
+ const shiftWindowText=shiftNow?shiftLabel(shiftNow.key)+" · SINCE "+shiftNow.start:"";
+ /* Hoisted out of the dependency array below rather than inlined: a boolean is
+    what the effect actually depends on, and `shiftNow` is a fresh object every
+    render, which as a dependency would re-run this on every keystroke. */
+ const shiftResolved=Boolean(shiftNow);
+ /* Only a screen that actually resolved a shift may offer the chip — see
+    time-window.ts for why it is not in TIME_WINDOWS. */
+ const quickFilterWindowChoices=shiftNow?TIME_WINDOWS_WITH_SHIFT:TIME_WINDOWS;
+ /* LOGGED OPENS ON THIS SHIFT. It is the one filter whose question is WHEN, and
+    on ALL it is every bus in the fleet carrying an open defect — the opposite
+    of the handover list it exists to be. A window already chosen is left
+    alone, and the other two filters keep whatever was last picked, as they
+    always have. */
+ useEffect(()=>{if(quickFilter==="logged"&&shiftResolved)setQuickFilterWindow(current=>current==="all"?"shift":current)},[quickFilter,shiftResolved]);
+ const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow,shiftWindowMinutes)):quickFilterAllBuses;
+ /* HOW FAR BACK THE PRINTED LINES MAY REACH, for `logged` alone. The window
+    picked the buses; this stops a bus that qualified on a 14:20 defect from
+    printing Monday's underneath it in a list headed 2ND SHIFT. The other
+    filters pass null — their lines answer "what is true now", where the age of
+    the record is not the question. */
+ const quickFilterLineMaxAge=quickFilter!=="logged"||quickFilterWindow==="all"?null:quickFilterWindow==="shift"?shiftWindowMinutes:timeWindowMinutes(quickFilterWindow);
+ const quickFilterShareOptions={maxAgeMinutes:quickFilterLineMaxAge,initials:quickFilter==="logged"?myInitials:""};
  /* The window travels with the shared list. A heading that says only
     "Deferred — 6 buses" to somebody who cannot see the screen it came off is
     the failure this whole control could otherwise cause. */
- const quickFilterShareLabel=quickFilterLabel+(quickFilterWindowed&&timeWindowLabel(quickFilterWindow)?" ("+timeWindowLabel(quickFilterWindow)+")":"");
+ /* "Defects Logged by CJ", so a list pasted into a message says whose work it
+    is without the reader having to ask. Dropped when there are no initials to
+    name — the same rule as the window: never claim a narrowing that is not
+    being applied. */
+ const quickFilterOwnedLabel=quickFilter==="logged"&&myInitials?quickFilterLabel+" by "+myInitials:quickFilterLabel;
+ const quickFilterShareLabel=quickFilterOwnedLabel+(quickFilterWindowed&&timeWindowLabel(quickFilterWindow,shiftWindowText)?" ("+timeWindowLabel(quickFilterWindow,shiftWindowText)+")":"");
  const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
  /* Reports why nothing was kept instead of returning in silence. The state is
@@ -1084,7 +1157,7 @@ export default function DefectLog(){
  };
  const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
- const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
+ const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
 /* The same list as a page rather than a paragraph.
 
     Text is right for pasting into a group message. It is wrong for a list
@@ -1095,12 +1168,12 @@ export default function DefectLog(){
  const shareQuickFilterPage=async()=>{
   if(!quickFilter)return;
   const stamp=new Date().toLocaleString();
-  const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp);
+  const html=quickFilterShareHtml(quickFilterShareLabel,quickFilterBuses,quickFilter,stamp,quickFilterShareOptions);
   const blob=new Blob([html],{type:"text/html"});
   const outcome=await shareOrDownloadFile(blob,quickFilterShareFilename(quickFilterShareLabel),quickFilterShareLabel+" bus list");
   setQuickFilterShareStatus(outcome==="cancelled"?null:outcome==="shared"?"shared":"copied");
  };
- const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterShareLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
+ const shareQuickFilterList=async()=>{if(!quickFilter)return;const text=quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions);if(typeof navigator.share!=="function"){await copyQuickFilterList();return}try{await navigator.share({title:quickFilterShareLabel+" bus list",text});setQuickFilterShareStatus("shared")}catch(error){if((error as Error).name!=="AbortError")setQuickFilterShareStatus("error")}};
  
  /* Colours come from displayStyleVars, which OMITS any left at the shipped
     default so the theme-aware fallback behind it in defect-log.css can answer.
@@ -1212,7 +1285,7 @@ export default function DefectLog(){
     decoration, so it carries its name and is shaped like the buttons beside it. */}
    
   </section>
-  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={setQuickFilterWindow} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"}/>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{const defects=quickFilterDefects(bus,quickFilter),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
+  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={setQuickFilterWindow} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
       kind of number that makes somebody stop trusting every other number on
       the card. The comparisons that matter — the 90-minute alert and the
