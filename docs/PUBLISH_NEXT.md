@@ -1,13 +1,15 @@
 # Publish next
 
-**STATUS: 182 AND 183 PENDING — 182: the Defect Log's two pickers say what
-they are, and their drop-down arrow works. 183: the repository is laid out by
-what each file is; nothing on screen changes.**
+**STATUS: 182, 183 AND 184 PENDING — 182: the Defect Log's two pickers say
+what they are, and their drop-down arrow works. 183: the repository is laid out
+by what each file is; nothing on screen changes. 184: three Defect Log lists can
+be narrowed to the shift somebody is standing in, and shared that way.**
 
 | Version | Publish from | What | Section |
 | --- | --- | --- | --- |
 | 182 | `807357a` | Picker labels and a working drop-down arrow | [182](#182--publish-from-807357a) |
 | 183 | `6dc96fe` | Repository layout only, no UI or flow change | [183](#183--publish-from-6dc96fe) |
+| 184 | `c296486` | A THIS SHIFT window, and a new LOGGED list keyed off initials | [184](#184--publish-from-c296486) |
 
 **182** publishes from `807357a` (`The drop-down arrow is a button now, because it never
 was one`). Derive the range with:
@@ -19,10 +21,12 @@ git log --oneline 5d5a033..807357a
 Version 181 was published from `148a45e` on 2026-09-15 and is the rollback
 point; its tag is `sites-v181`. The one before it is 180 from `b6e0cba`.
 
-Two releases are pending. **Publish 182 first, then 183.** 183 is built on top
-of 182 (its range starts at `807357a`), so publishing 183 alone would also ship
-everything in 182. If Curtis wants only one Sites version, publishing 183 from
-`6dc96fe` carries both — but then walk both checklists below.
+Three releases are pending, and they STACK. **Publish in order: 182, then 183,
+then 184.** Each is built on the one before it — 183's range starts at
+`807357a` and 184's at `6dc96fe` — so publishing a later one alone also ships
+everything beneath it. If Curtis wants only one Sites version, publishing **184
+from `c296486` carries all three** — but then walk all three checklists below,
+because each one lists different things to look at on the phone.
 
 # 182 — publish from 807357a
 
@@ -453,3 +457,186 @@ holds only its `page.tsx`, its stylesheet and its `_components/`.
 
 Roll back to 182 (`807357a`) if it is live, otherwise `sites-v181` (`148a45e`).
 Nothing is stored differently, so nothing logged under 183 is lost or altered.
+# 184 — publish from c296486
+
+## Source
+
+```
+$ git log --oneline 0d0fd13..c296486
+c296486 LOGGED is whose work it is, not just when it happened
+0573f11 A snapshot of one shift, not of every day since
+
+$ git diff --name-only 0d0fd13..c296486
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+src/components/shared/time-window-chips.tsx
+src/lib/defects/quick-filter-share.ts
+src/lib/defects/quick-filters.ts
+src/lib/defects/repair-catalog.ts
+src/lib/settings/shift-clock.ts
+src/lib/shared/time-window.ts
+tests/defects.test.mjs
+tests/settings.test.mjs
+tests/shared.test.mjs
+
+$ git diff --shortstat 0d0fd13..c296486
+ 11 files changed, 612 insertions(+), 47 deletions(-)
+
+$ git diff --name-only 0d0fd13..c296486 -- supabase package.json package-lock.json .github public worker
+(nothing)
+```
+
+Merged from PR #30 as a rebase, so `main` stays linear and these are its own
+two commits rather than a merge commit.
+
+## Migrations
+
+**None.** No LocalStorage key added, renamed or read that was not read before.
+No Supabase schema change. The window a drawer is set to is per-drawer state and
+is still deliberately not persisted anywhere, so there is nothing on a device for
+this release to migrate.
+
+It does READ one key it did not read before — `pace-shift-settings-v1`, the
+garage's own hours — through `readShiftSettings`, the same way the Down Sheet and
+the Fleet Forecast already read it. A device that never opened Settings has no
+such record and gets the shop's real defaults.
+
+## What was wrong
+
+**A snapshot of a list was a snapshot of every day in it.** Curtis, back from
+vacation with two buses down:
+
+> "if I pull those reports and I try to give a snapshot it's gonna give me all
+> the other buses from the other days that I don't want ... I just need a
+> snapshot of things that are deferred, recommended for the down sheet, or any
+> defects that I logged" — for the shift he is on.
+
+The DEFERRED and RECOMMENDED FOR DOWN SHEET drawers already had a
+`SHOW: ALL 1H 4H 8H 24H 3D 7D` row, and it already narrowed the shared list
+rather than only the screen. But every one of those is a ROLLING count of hours,
+and a shift is not a number of hours — it is a boundary. **At 14:02, `8H` hands
+back the morning crew's work**, which is exactly the thing being avoided.
+
+There was also no list at all for "what did I write down this shift". The other
+quick filters each name a fault (A/C, leaks, horn); none of them answers *when*.
+
+## What changed
+
+**1. A `SHIFT` chip, first after ALL, in the Defect Log's quick-filter drawers.**
+It resolves against `pace-shift-settings-v1` — 1st 06:00, 2nd 14:00, 3rd 22:00 —
+so it is five minutes long at 14:05 and eight and a half hours long at 22:00.
+
+**The incoming crew owns the handover**, which was already the rule and is what
+Curtis confirmed rather than changed:
+
+> "at two o'clock, which is the shift I work, that's when it can start ...
+> because at two I'm officially coming in, so the expectation is for me to take
+> on work. The expectation for the other shift leaving, even though it's
+> overlapping, is to delegate or dismiss work."
+
+**2. A new `LOGGED` list** — open defects written down inside the window.
+**Open work only**: *"anything fixed, I don't need a record of that."* It opens
+on THIS SHIFT rather than ALL, because on ALL it is every bus in the fleet
+carrying an open defect.
+
+**3. `LOGGED` is keyed off initials as well as time.** Curtis: *"key off
+initials so we don't have the multiple day issues."* The drawer header reads
+**DEFECTS LOGGED BY CJ** and the shared heading carries both the person and the
+boundary:
+
+```
+Defects Logged by CJ (2ND SHIFT · SINCE 14:00) — 2 buses
+```
+
+**No initials set means no person filter, and the drawer says so** on a line
+under the chips: `NO INITIALS SET — SHOWING EVERYONE'S REPORTS`. The initials
+field ships empty and has never been required for a report, so a hard match
+would have handed an un-set-up device an empty list every shift — and an empty
+list reads as "nothing happened this shift" rather than "this is not set up".
+
+**4. The window reaches the printed LINES on the LOGGED list**, not only the bus,
+so a bus picked for a 14:20 defect does not print Monday's underneath it in a
+list headed 2ND SHIFT.
+
+**UI change, and Curtis approved it before the merge:** the chip row now holds
+eight chips instead of seven, so each is narrower — **34.3 → 29.5px wide at
+360px**, 38.6 → 33.3 at 390px. Height is unchanged at 38px, nothing clips or
+wraps, and the row stays on one line at every phone width. The two Down Sheet
+boards draw the same component and **keep the seven-chip row they had**: only a
+screen that resolves a shift may offer the chip.
+
+## Verified
+
+Gates re-run on `c296486` itself, after the merge, not carried over from the
+branch:
+
+- **338 tests pass**, 0 fail (332 before this release)
+- `npm run lint` clean
+- `npm run build` complete
+
+**Twelve mutations fail the new guards.** The ones that matter, each of which
+would make a shared list claim something untrue: treating a resolved shift as no
+window at all; giving the handover half-hour to the outgoing crew; letting the
+line-level window go so a this-shift snapshot prints last Monday's defect;
+reading a bus's age from its OLDEST stamp so a bus logged ten minutes ago drops
+out; letting finished work back into the list; treating an edit as a fresh
+report; **treating "no initials" as a match against the empty string, so the
+list comes back empty**; dropping the case-fold so a lowercase initial off a
+photographed sheet reads as somebody else's; and naming a person in the heading
+when there are no initials to name.
+
+Driven in Chromium at 360, 390 and 430px against a seeded board with the clock
+pinned:
+
+| Check | Result |
+| --- | --- |
+| Chip row | 8 chips on ONE row at all three widths, no text clipping, no horizontal overflow, each chip owning its own centre by `elementFromPoint` |
+| 14:40, mid-2nd-shift | SHIFT → 2 buses, `3 HIDDEN · SHOW ALL` beside the chips |
+| **14:02, two minutes in** | SHIFT → **1 bus** (logged 14:01) · the same moment on **8H** → **3 buses**, including the morning crew's 13:50 and 09:02 |
+| Initials `CJ` | `Defects Logged by CJ`, 2 buses — his own, including one whose initial was written lowercase on a scanned sheet; his own 04:40 defect stays out |
+| Initials `RM` | `Defects Logged by RM`, 1 bus |
+| Initials unset | `Defects Logged`, 4 buses, and the NO INITIALS SET line, whose box measured 0px top and bottom margin |
+| A defect logged AND fixed this shift | absent at every window |
+
+Two probe errors on the way, both the fixture rather than the app, recorded
+because this is where "it works" gets claimed: a handover case whose stamps were
+built from a different clock put "20 minutes ago" eighteen minutes into the
+future, where a future stamp correctly passes every window; and a Down Sheet
+check that reported "no chips" on a fixture whose boards had no rows to draw a
+chip row for. **That the Down Sheet boards do not offer the SHIFT chip is proved
+at the module and source level, not in the browser** — `TIME_WINDOWS` has no
+`shift` key and neither board passes a window list.
+
+## What to check once it is live
+
+1. Make sure your **initials are set** in the Defect Log's settings first. If
+   they are not, the LOGGED list shows everybody's reports and tells you so on
+   an orange line — that line is the thing to look for.
+2. Open the Defect Log and press the **LOGGED** quick filter. It should open
+   already set to **SHIFT**, and the header should read **DEFECTS LOGGED BY**
+   and your initials.
+3. The buses listed should be only the ones you logged since your shift started
+   — 06:00, 14:00 or 22:00, whichever you are on. Anything from yesterday should
+   be absent, and the count of what is being held back should appear beside the
+   chips as `N HIDDEN · SHOW ALL`.
+4. Press **COPY LIST**. The first line should name both you and the boundary:
+   `Defects Logged by CJ (2ND SHIFT · SINCE 14:00) — 2 buses`.
+5. Press **SHOW ALL**. Every bus you have an open defect on should come back,
+   and the heading should lose the shift.
+6. Open **DEFERRED** and **RECOMMENDED FOR DOWN SHEET**. Both should now have a
+   **SHIFT** chip at the front of their row; press it and the list should narrow
+   to decisions made this shift. These two are **not** filtered by initials.
+7. On the **Down Sheet**, open its DEFERRED and RECOMMENDED boards. Their chip
+   rows should be unchanged — **no SHIFT chip there**.
+8. Worth one look on the narrowest phone you have: the chip row is eight chips
+   wide now and each one is about 30px. If it is awkward under a glove, say so
+   and the row can wrap to two lines.
+
+## Rollback
+
+Roll back to 183 (`6dc96fe`) if it is live, else 182 (`807357a`), else
+`sites-v181` (`148a45e`). **Nothing is stored differently**, so no defect,
+entry, recommendation or deferral logged under 184 is lost or altered — the
+SHIFT chip and the LOGGED list simply are not offered, and `pace-shift-settings-v1`
+is left exactly as it is for the Down Sheet and the forecast, which read it
+on 181 as well.
