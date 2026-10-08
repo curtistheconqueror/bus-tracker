@@ -1818,8 +1818,11 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
  assert.match(css,/\.feed-title button\{height:36px;border:0;border-radius:6px;background:#08733f/);
 
- // larger reading type than the feed it replaces, and a real touch target
- assert.match(css,/\.log-focus-defect\{margin:0 0 11px;font-size:21px/);
+ // larger reading type than the feed it replaces, and a real touch target.
+ // `white-space:pre-wrap` joined this rule when typed line breaks stopped being
+ // collapsed on the way to the screen; the size claim is unchanged and still
+ // the point of this assertion.
+ assert.match(css,/\.log-focus-defect\{margin:0 0 11px;white-space:pre-wrap;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
  assert.match(css,/\.log-focus-record-actions\{display:flex;align-items:center;gap:8px\}/);
@@ -4866,4 +4869,350 @@ test("the drawer names whose list it is, and admits when it is not filtering by 
  /* A bare <p> in a flex column arrives with the browser's own 1em margin and
     nothing in this project resets it — measured, not read. */
  assert.match(css,/\.quick-filter-drawer>\.quick-filter-initials-note\{flex:none;margin:0;/);
+});
+
+test("the feed header says how long the work standing on it would take",async()=>{
+ /* Curtis, pointing at the LIVE REPAIR FEED line: "a little badge that shows
+    how many hours all of the ... defects that are currently on the bus add up
+    to". The Down Sheet has printed the same number since it was built; the
+    Defect Log never had it. */
+ const {defectEstimateMinutes,openDefectsEstimateMinutes}=await import("../src/lib/defects/defect-estimates.ts");
+ const {normalizeRepairTimeEstimate,repairTimeTotal,formatRepairTime,MINIMUM_REPAIR_MINUTES}=
+  await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const d=(id,category,issue,extra={})=>({id,category,issue,details:"",operability:"service",state:"open",...extra});
+
+ /* A MECHANIC'S OWN NUMBER WINS, both halves of it. Diagnostic time is time —
+    a fault nobody can find yet is still work somebody is doing. */
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{repairHours:2,diagnosticHours:0.5})),150);
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{diagnosticHours:1})),60,"diagnostic alone still counts");
+ /* AND IS NOT FLOORED. The shared table holds a 30-minute minimum because a
+    guess saying "ten minutes" is a guess nobody should plan around; a typed
+    .25 is somebody saying they did it in fifteen, and rounding that up would
+    quietly overstate the board. */
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{repairHours:0.25})),15);
+ assert.ok(15<MINIMUM_REPAIR_MINUTES,"which is deliberately under the table's floor");
+
+ /* UNTYPED READS THE DOWN SHEET'S OWN TABLE, not a second one. Asserted as
+    equality with what that module would produce rather than as a number, so
+    the two screens cannot drift apart as the table is tuned — the same reason
+    the Ventra filter was made to read tech-services.ts. */
+ for(const [category,issue] of [["A/C and HVAC","No cooling"],["Engine","Check engine light"],["Lights, Mirrors and Alarms","No horn"]])
+  assert.equal(defectEstimateMinutes(d("x",category,issue)),repairTimeTotal(normalizeRepairTimeEstimate(undefined,category,issue)),
+   category+" matches what the Down Sheet would print");
+ /* A record too thin to name a repair still gets the floor rather than zero. */
+ assert.equal(defectEstimateMinutes(d("x","","")),MINIMUM_REPAIR_MINUTES);
+
+ /* OUTSTANDING WORK ONLY. A completed repair is work already done; deferred
+    and in-progress are both still owed. */
+ const board=[
+  d("typed","Brakes","Brakes sticking / dragging",{repairHours:2,diagnosticHours:0.5}),
+  d("untyped","A/C and HVAC","No cooling"),
+  d("done","Engine","Check engine light",{state:"completed"}),
+  d("held","Lights, Mirrors and Alarms","No horn",{state:"deferred"}),
+ ];
+ assert.equal(openDefectsEstimateMinutes(board),390);
+ assert.equal(formatRepairTime(openDefectsEstimateMinutes(board)),"6h 30m","which is what the badge prints");
+ assert.equal(openDefectsEstimateMinutes(board.filter(item=>item.id!=="done")),390,"dropping the completed one changes nothing");
+ assert.equal(openDefectsEstimateMinutes(board.filter(item=>item.state==="completed")),0,"and completed work alone is zero");
+ assert.equal(openDefectsEstimateMinutes([{...board[3],state:"in-progress"}]),90,"in-progress is owed too");
+ assert.equal(openDefectsEstimateMinutes([]),0);
+});
+
+test("the estimate badge is scoped like the numbers beside it, and wins its own cascade fight",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* SAME SCOPE AS THE COUNTS. Built from `visible` — what the search and the
+    state filter left — so all three numbers on that line always describe the
+    same buses. From `active` it would quote the whole fleet's hours while
+    standing on one bus. */
+ assert.match(page,/visibleEstimateMinutes=openDefectsEstimateMinutes\(visible\.map\(record=>record\.defect\),repairHours\)/,"and asks the shop's own ledger before the catalog");
+ assert.equal(/openDefectsEstimateMinutes\(active/.test(page),false,"never the unsearched list");
+ /* Dropped rather than printed as "0m": the line already says 0 DEFECTS, and a
+    zero beside it reads as a broken counter. */
+ assert.match(page,/visibleEstimateMinutes>0&&<b className="feed-estimate">\{formatRepairTime\(visibleEstimateMinutes\)\} ESTIMATED<\/b>/);
+
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* THE SPECIFICITY FIGHT, pinned because losing it is silent. `.feed-title b`
+    carries the user's own LIVE REPAIR FEED size and colour at (0,1,1); a bare
+    `.feed-estimate` at (0,1,0) loses whatever the source order and the badge
+    renders at heading size in heading navy. Measured in the browser at 7px
+    against the title's 17px. A later tidy-up to `.feed-estimate` would break
+    it with no error, so the selector itself is the assertion. */
+ assert.match(css,/\.feed-title b\.feed-estimate\{/);
+ assert.equal(/^\.feed-estimate\{/m.test(css),false,"a class-only rule would lose to .feed-title b");
+ assert.equal(/\.feed-estimate[^{]*\{[^}]*!important/.test(css),false,"and !important is not how that fight is won");
+ /* One line: "14h 30m ESTIMATED" breaking in half reads as two numbers. */
+ assert.match(css,/\.feed-title b\.feed-estimate\{[^}]*white-space:nowrap/);
+
+ /* ONE TABLE. The badge imports the Down Sheet's estimate module rather than
+    the Defect Log growing its own. */
+ const estimates=await readFile(new URL("../src/lib/defects/defect-estimates.ts",import.meta.url),"utf8");
+ assert.match(estimates,/from "\.\.\/down-sheet\/repair-time-estimates\.ts"/);
+ assert.equal(/CATEGORY_REPAIR_MINUTES|repairMinutes:\s*\d/.test(estimates),false,"no second table of its own");
+});
+
+test("FIXED TODAY counts the fixes made on this device",async()=>{
+ /* Found while building the hours badge, measured not read: a board holding
+    two repairs completed today reported ONE. Pressing MARK FIXED completes a
+    repair and stamps defectLogHiddenAt in the same action, and the counter was
+    computed from the list defined as "everything without that stamp" — so
+    every fix made on this device fell out of its own tally, and the ones that
+    did count were the ones that arrived some other way. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/fixedToday:allRecords\.filter\(record=>record\.defect\.state==="completed"/,"the full record, hidden fixes included");
+ assert.equal(/fixedToday:records\.filter/.test(page),false,"never the list that drops hidden records");
+ /* The two lists are still different things, and the rest of the stats are
+    deliberately built from the narrower one: ACTIVE, BUSES and DOWNING describe
+    what is on the feed, and a hidden repair is not on the feed. Only the FIXED
+    count asks a question about history. */
+ assert.match(page,/const records=useMemo\(\(\)=>allRecords\.filter\(record=>!record\.defect\.defectLogHiddenAt\)/);
+ assert.match(page,/active=records\.filter\(record=>isUnresolved\(record\.defect\)\)/);
+
+ /* And MARK FIXED still hides, because that is what keeps the feed to
+    outstanding work — the counter was the bug, not the hiding. */
+ assert.match(page,/persist\(hideDefectLogRecords\(result\.fleet,\[\{busId:record\.bus\.id,defectId:record\.defect\.id\}\]/);
+});
+
+test("PATH TO REPAIR is written once per repair and survives a catalog rename",async()=>{
+ /* Curtis: "basically steps, general steps to point people in the right
+    direction of how to get it repaired" — refer to Cummins INSIGHT, check the
+    oil first, look for corrosion behind the AC filters. Asked what it should
+    attach to, he chose the REPAIR rather than the defect: a writeup keyed per
+    instance would be retyped on every bus and never become a library. */
+ const {PATH_TO_REPAIR_KEY,MAX_PATH_TO_REPAIR,pathToRepairKey,findPathToRepair,savePathToRepair,
+  normalizePathToRepairs,readPathToRepairs,writePathToRepairs}=await import("../src/lib/defects/path-to-repair.ts");
+
+ assert.equal(PATH_TO_REPAIR_KEY,"pace-ptr-v1");
+
+ /* ONE WRITEUP, EVERY BUS. The key is the repair, so a PTR saved while looking
+    at 17543 is the one 17566 reads. */
+ const after=savePathToRepair({entries:[]},{category:"A/C and HVAC",issue:"No cooling",
+  steps:"Check the thermostat screen first.\nThen look behind the AC filters for corrosion.",by:"cj"});
+ assert.equal(after.entries.length,1);
+ assert.equal(findPathToRepair(after,"A/C and HVAC","No cooling").steps.split("\n")[0],"Check the thermostat screen first.");
+ assert.equal(findPathToRepair(after,"A/C and HVAC","No cooling").updatedBy,"CJ","initials are folded up, as everywhere else");
+ assert.equal(findPathToRepair(after,"Engine","Check engine light"),null,"and it is not offered for a different repair");
+
+ /* IT SURVIVES A CATALOG RENAME, which is the half that fails silently. A PTR
+    keyed on raw wording would still be in storage after a category is renamed
+    and would simply never match again. Both sides resolve through
+    migrateRepairIdentity, the same function every stored defect is read
+    through, so the defect and its writeup move together. */
+ const {migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
+ const moved=migrateRepairIdentity("Air System","Leak");
+ assert.notEqual(moved.category,"Air System","the rename this test rides on still exists");
+ const legacy=savePathToRepair({entries:[]},{category:"Air System",issue:"Leak",steps:"Soap the fittings."});
+ assert.equal(findPathToRepair(legacy,moved.category,moved.issue).steps,"Soap the fittings.","found under today's wording");
+ assert.equal(findPathToRepair(legacy,"Air System","Leak").steps,"Soap the fittings.","and under yesterday's");
+ assert.equal(legacy.entries[0].category,moved.category,"stored in today's words");
+ assert.equal(pathToRepairKey("Air System","Leak"),pathToRepairKey(moved.category,moved.issue));
+ /* Case and spacing are wordings people type, not identifiers. */
+ assert.equal(pathToRepairKey("a/c and hvac","  No   cooling "),pathToRepairKey("A/C and HVAC","No cooling"));
+
+ /* SAVING EMPTY CLEARS IT — there is no separate delete. Guidance is not a
+    repair record; the rule that this app never deletes history is about
+    defects and the work done on them. */
+ const cleared=savePathToRepair(after,{category:"A/C and HVAC",issue:"No cooling",steps:"   "});
+ assert.equal(cleared.entries.length,0);
+ assert.equal(findPathToRepair(cleared,"A/C and HVAC","No cooling"),null);
+
+ /* Re-saving replaces rather than accumulating, and lands newest first. */
+ const twice=savePathToRepair(savePathToRepair(after,{category:"Engine",issue:"Check engine light",steps:"Pull the code."}),
+  {category:"A/C and HVAC",issue:"No cooling",steps:"Replaced."});
+ assert.equal(twice.entries.length,2);
+ assert.equal(findPathToRepair(twice,"A/C and HVAC","No cooling").steps,"Replaced.");
+ assert.equal(twice.entries[0].issue,"No cooling","the one just written is on top");
+
+ /* Capped, so one entry cannot fill a phone on its own. */
+ const long=savePathToRepair({entries:[]},{category:"Engine",issue:"Check engine light",steps:"x".repeat(MAX_PATH_TO_REPAIR+500)});
+ assert.equal(long.entries[0].steps.length,MAX_PATH_TO_REPAIR);
+
+ /* A ROUND TRIP THROUGH STORAGE, and a device that cannot take the write says
+    so instead of throwing into a render. */
+ const store=new Map();
+ const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>store.set(key,value)};
+ assert.equal(writePathToRepairs(storage,twice),true);
+ assert.equal(findPathToRepair(readPathToRepairs(storage),"Engine","Check engine light").steps,"Pull the code.");
+ assert.equal(writePathToRepairs({setItem:()=>{throw new Error("QuotaExceeded")}},twice),false);
+ assert.deepEqual(readPathToRepairs({getItem:()=>"not json"}),{entries:[]});
+ assert.deepEqual(normalizePathToRepairs(null),{entries:[]});
+ assert.deepEqual(normalizePathToRepairs({entries:[{category:"Engine",issue:"X",steps:"  "}]}),{entries:[]},"a blank entry is not a PTR");
+});
+
+test("the PTR button sits on the defect card and opens the repair's own writeup",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* ON THE DEFECT CARD, which is where Curtis put it after thinking aloud about
+    the FOCUS row: "somewhere on each of the defect cards so that way it's
+    specified to that defect". */
+ assert.match(page,/className="ptr-log-focus-defect"[\s\S]{0,220}onClick=\{\(\)=>openPathToRepair\(record\.defect\.category,record\.defect\.issue\)\}/);
+ /* Carrying the REPAIR, never the defect id — that is what makes one writeup
+    serve every bus with the fault. */
+ assert.equal(/openPathToRepair\(record\.defect\.id/.test(page),false);
+ /* The screen is titled the way he named it. */
+ assert.match(page,/<small>PATH TO REPAIR<\/small>/);
+ /* A repair with nothing written opens straight into the editor rather than
+    onto a blank page with an EDIT button on it. */
+ assert.match(page,/setPtrEditing\(!existing\)/);
+ /* The write is checked. A full device must not show text it did not store. */
+ assert.match(page,/if\(!writePathToRepairs\(localStorage,next\)\)\{setPtrProblem\(/);
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* IT STACKS ABOVE THE FOCUS VIEW, and the first version of this assertion had
+    the mechanism backwards - it checked that the panel came BEFORE the focus
+    shade in source and called that "so it paints above it". Later paints above,
+    not earlier, and both shades share one z-index through `.log-shade`. So the
+    focus shade sat on top of a panel that looked perfectly normal and ate every
+    tap on it. Caught by clicking SAVE in a browser; the source assertion had
+    passed. The z-index is the real mechanism, so the z-index is the assertion. */
+ assert.match(css,/\.ptr-shade\{z-index:2147483001\}/);
+ assert.match(css,/\.log-shade\{position:fixed;z-index:2147483000/,"one higher than the shade it opens over");
+ /* And it says, on the screen that writes it, who will see it. */
+ assert.match(page,/shows on every bus with that repair/);
+ assert.match(page,/does not travel to the Shop Cloud yet/);
+
+ /* The button takes only a background: `.log-focus-record-foot button` already
+    gives every button in that row its 44px target and face, and restating any
+    of it would be a second opinion waiting to drift. */
+ assert.match(css,/\.ptr-log-focus-defect\{background:#3f4a63\}/);
+ assert.equal(/\.ptr-log-focus-defect\{[^}]*min-height/.test(css),false,"the row already sets the touch target");
+ assert.match(css,/\.log-focus-record-foot button\{min-height:44px/,"which is the rule it is leaning on");
+ /* The line breaks somebody typed ARE the steps. */
+ assert.match(css,/\.ptr-steps\{[^}]*white-space:pre-wrap/);
+});
+
+test("the line breaks somebody types in a description survive to the screen",async()=>{
+ /* Curtis: "I even tried hitting the space button to put a space in between it,
+    and it did while I was in the text input space, but when I saved it, it just
+    put them all back together, both paragraphs."
+
+    Nothing was ever losing them. The save path trims the ENDS of the string and
+    the record keeps every newline; HTML collapses them on the way to the screen
+    unless the element says otherwise. So this is a rendering rule, and the
+    assertions below hold both halves of that: the data is untouched, and the
+    element that draws it keeps the breaks. */
+ const {normalizeDefects}=await import("../src/lib/defects/repair-catalog.ts");
+ const typed="The check engine light stays on.\n\n• Temperature sits at 205-210\n• Spikes to 220 under load";
+ const stored=normalizeDefects([{id:"d1",category:"Engine",issue:"Misfire",details:typed,state:"open"}],"","bus");
+ assert.equal(stored[0].details,typed,"the record keeps the breaks exactly as typed");
+ assert.equal(stored[0].details.split("\n").length,4);
+
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The save path trims the ends and nothing more — no collapsing of internal
+    whitespace, which is what would actually destroy them. */
+ assert.match(page,/details=defect\.details\.trim\(\)/);
+ assert.equal(/details\.replace\(\/\\s\+\/g/.test(page),false,"nothing flattens the inside of the string");
+
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* pre-wrap, not pre: the typed breaks are kept AND long lines still wrap to
+    the phone instead of scrolling sideways. */
+ assert.match(css,/\.log-focus-defect\{[^}]*white-space:pre-wrap/);
+ assert.equal(/\.log-focus-defect\{[^}]*white-space:pre;/.test(css),false,"pre alone would scroll a phone sideways");
+
+ /* BULLET needs no parser once breaks are kept: a line starting with a dot is a
+    line. It appends rather than inserting at the caret, because dictation
+    leaves the caret wherever the recogniser put it. */
+ assert.match(page,/className="insert-bullet"/);
+ assert.match(page,/needsBreak=Boolean\(current\.trim\(\)\)&&!current\.endsWith\("\\n"\)/,"a bullet never opens on a blank box, and never doubles a break");
+ assert.match(page,/updateDefect\("details",current\+\(needsBreak\?"\\n":""\)\+"• "\)/);
+ /* AND THE CARET FOLLOWS IT. Pressing the button blurs the box and React
+    re-renders it from the new value, leaving the caret at position 0 — so the
+    next words typed or dictated land at the TOP of the description. Caught in
+    a browser: the probe pressed BULLET, typed, and found its sentence welded
+    to the front of the paragraph. Restored on the NEXT frame, because setting
+    the selection in the same tick sets it on the pre-update value. */
+ assert.match(page,/requestAnimationFrame\(\(\)=>\{const box=detailsRef\.current;if\(!box\)return;box\.focus\(\);box\.setSelectionRange\(box\.value\.length,box\.value\.length\)\}\)/);
+ assert.match(page,/<textarea ref=\{detailsRef\}/,"the ref the caret fix needs is actually attached");
+});
+
+test("the shop's own repair time is a ledger somebody sets, not something that drifts",async()=>{
+ /* Curtis, offered a version that learns from completed work: "if that's some
+    type of like adaptive strategy, we can hold off on it as long as a person
+    can change the repair times then and then it updates ... that's not
+    necessarily an adaptive strategy, but that's more like a fixed ledger."
+
+    So nothing in here averages, decays, or moves on its own. A number is set by
+    a person and stands until a person changes it. */
+ const {REPAIR_HOURS_KEY,findRepairMinutes,saveRepairMinutes,hoursToMinutes,
+  normalizeRepairHoursLedger,readRepairHoursLedger,writeRepairHoursLedger}=
+  await import("../src/lib/defects/repair-hours-ledger.ts");
+ const {defectEstimateMinutes,openDefectsEstimateMinutes}=await import("../src/lib/defects/defect-estimates.ts");
+ const {normalizeRepairTimeEstimate,repairTimeTotal}=await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const {repairIdentityKey}=await import("../src/lib/defects/repair-catalog.ts");
+ const {pathToRepairKey}=await import("../src/lib/defects/path-to-repair.ts");
+
+ assert.equal(REPAIR_HOURS_KEY,"pace-repair-hours-v1");
+
+ /* HOURS IN, MINUTES STORED. A mechanic writes .5; everything that consumes an
+    estimate in this app is in minutes. */
+ assert.equal(hoursToMinutes("2.5"),150);
+ assert.equal(hoursToMinutes(".25"),15);
+ assert.equal(hoursToMinutes(""),null);
+ assert.equal(hoursToMinutes("0"),null,"zero is not a repair time");
+
+ const ledger=saveRepairMinutes({entries:[]},{category:"Brakes",issue:"Brakes sticking / dragging",hours:"2",by:"cj"});
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brakes sticking / dragging").minutes,120);
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brakes sticking / dragging").updatedBy,"CJ");
+ /* PER SPECIFIC REPAIR, not per category: a different Brakes repair is NOT
+    covered by it, which is the whole reason it is not keyed on the category. */
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brake chamber leaking"),null);
+
+ /* ONE KEY FUNCTION with PATH TO REPAIR, so a writeup and a time set on the
+    same screen cannot be filed under different names. */
+ assert.equal(pathToRepairKey("Brakes","Brakes sticking / dragging"),repairIdentityKey("Brakes","Brakes sticking / dragging"));
+ /* And it survives a catalog rename for the same reason PTR does. */
+ const {migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
+ const moved=migrateRepairIdentity("Air System","Leak");
+ const legacy=saveRepairMinutes({entries:[]},{category:"Air System",issue:"Leak",hours:"1"});
+ assert.equal(findRepairMinutes(legacy,moved.category,moved.issue).minutes,60,"found under today's wording");
+ assert.equal(legacy.entries[0].category,moved.category,"and filed in today's words");
+
+ /* THREE SOURCES, MOST SPECIFIC FIRST. */
+ const defect={id:"d",category:"Brakes",issue:"Brakes sticking / dragging",details:"",operability:"service",state:"open"};
+ const catalog=repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Brakes","Brakes sticking / dragging"));
+ assert.equal(defectEstimateMinutes(defect),catalog,"with no ledger it is the catalog's guess");
+ assert.equal(defectEstimateMinutes(defect,ledger),120,"the shop's number beats the catalog");
+ assert.equal(defectEstimateMinutes({...defect,repairHours:4},ledger),240,"and what was typed on THIS job beats the shop's");
+ assert.notEqual(catalog,120,"the test would prove nothing if they happened to match");
+
+ /* It reaches the badge's total too, not just one defect. */
+ assert.equal(openDefectsEstimateMinutes([defect],ledger),120);
+ assert.equal(openDefectsEstimateMinutes([{...defect,state:"completed"}],ledger),0,"and completed work still adds nothing");
+
+ /* AN EMPTY BOX REMOVES IT and the catalog estimate returns — withdrawing a
+    claim is the same gesture as never having made one. */
+ const cleared=saveRepairMinutes(ledger,{category:"Brakes",issue:"Brakes sticking / dragging",hours:""});
+ assert.equal(findRepairMinutes(cleared,"Brakes","Brakes sticking / dragging"),null);
+ assert.equal(defectEstimateMinutes(defect,cleared),catalog,"back to the catalog");
+
+ /* Re-setting replaces rather than accumulating. */
+ const twice=saveRepairMinutes(ledger,{category:"Brakes",issue:"Brakes sticking / dragging",hours:"1.5"});
+ assert.equal(twice.entries.length,1);
+ assert.equal(findRepairMinutes(twice,"Brakes","Brakes sticking / dragging").minutes,90);
+
+ /* A round trip, and a refused write reported rather than thrown. */
+ const store=new Map();
+ const storage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v)};
+ assert.equal(writeRepairHoursLedger(storage,twice),true);
+ assert.equal(findRepairMinutes(readRepairHoursLedger(storage),"Brakes","Brakes sticking / dragging").minutes,90);
+ assert.equal(writeRepairHoursLedger({setItem:()=>{throw new Error("QuotaExceeded")}},twice),false);
+ assert.deepEqual(readRepairHoursLedger({getItem:()=>"not json"}),{entries:[]});
+ /* A zero or negative stored time is a cleared or corrupt entry, not "instant". */
+ assert.deepEqual(normalizeRepairHoursLedger({entries:[{category:"Brakes",issue:"X",minutes:0}]}),{entries:[]});
+ assert.deepEqual(normalizeRepairHoursLedger({entries:[{category:"Brakes",issue:"X",minutes:-30}]}),{entries:[]});
+});
+
+test("SHOP TIME sits on the PATH TO REPAIR screen and feeds the hours badge",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* One screen per repair for what this garage knows about it: how to approach
+    it, and how long it takes here. */
+ assert.match(page,/SHOP TIME FOR THIS REPAIR<HoursField/);
+ /* Saved on its own, not folded into the steps — a time and a writeup are two
+    different claims and correcting one must not require re-saving the other. */
+ assert.match(page,/const saveShopHours=\(hours:string\)=>\{/);
+ assert.equal(/saveShopHours[\s\S]{0,200}savePathToRepair/.test(page),false,"the two saves are separate");
+ /* The write is checked, like every other write on this page. */
+ assert.match(page,/if\(!writeRepairHoursLedger\(localStorage,next\)\)\{setPtrProblem\(/);
+ /* It says what is in force when nothing is set, naming the catalog figure it
+    is about to be measured against rather than showing an empty box. */
+ assert.match(page,/NOT SET — ESTIMATING "\+formatRepairTime\(fallback\)\+" FROM THE CATALOG/);
+ /* And who set it when one is. */
+ assert.match(page,/"SET BY "\+\(shop\.updatedBy\|\|"SOMEONE"\)\+" · USED FOR EVERY BUS WITH THIS REPAIR"/);
 });

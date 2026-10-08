@@ -2,7 +2,7 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -22,6 +22,10 @@ import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/d
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
+import {MAX_PATH_TO_REPAIR,findPathToRepair,readPathToRepairs,savePathToRepair,writePathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
+import {findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,writeRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {defectEstimateMinutes,openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
+import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
@@ -128,6 +132,8 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
 
 function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>void;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
+ /* Held so BULLET can put the caret back after it appends — see its onClick. */
+ const detailsRef=useRef<HTMLTextAreaElement|null>(null);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
     that already had a diagnosis, an action, or a part recorded. React warned
     about it and the section simply never opened. Held in state instead, seeded
@@ -476,7 +482,24 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
-    <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
+    {/* BULLET starts a new line with a dot on it, which is the whole feature:
+        the breaks somebody types are kept now, so a dot at the start of a line
+        IS a bullet and nothing has to parse anything. It appends rather than
+        inserting at the cursor on purpose — dictating into a phone leaves the
+        caret wherever the recogniser last put it, and a bullet landing in the
+        middle of a sentence is worse than one landing at the end. */}
+    <label className="wide description-label"><span className="description-head">DESCRIPTION<button type="button" className="insert-bullet" aria-label="Start a new bulleted line in the description" onClick={()=>{
+     const current=value.defect.details,needsBreak=Boolean(current.trim())&&!current.endsWith("\n");
+     updateDefect("details",current+(needsBreak?"\n":"")+"• ");
+     /* THE CARET HAS TO FOLLOW THE BULLET. Pressing the button blurs the box
+        and React re-renders it from the new value, which leaves the caret at
+        position 0 — so the next words typed, or dictated, land at the TOP of
+        the description instead of after the dot. Measured in a browser: the
+        probe pressed BULLET, typed, and found its sentence welded to the front
+        of the paragraph. Restored on the next frame, after React has written
+        the new value in, or the selection is set on the old one. */
+     requestAnimationFrame(()=>{const box=detailsRef.current;if(!box)return;box.focus();box.setSelectionRange(box.value.length,box.value.length)});
+    }}>• BULLET</button></span><textarea ref={detailsRef} value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder={"What was reported, observed, or repaired?\n\nLine breaks are kept. Start a line with • for a bullet."}/></label>
     {/* Directly above WORK STATUS, and outside ADVANCED DETAILS on purpose:
         these are what gets ticked mid-job on a phone, by somebody standing at
         the bus, and burying them behind a disclosure is how they would go
@@ -668,6 +691,55 @@ export default function DefectLog(){
  const [focusedBusId,setFocusedBusId]=useState("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
+ /* PATH TO REPAIR: the shop's own notes on how to approach a repair, keyed to
+    the repair rather than to the bus. Read on mount like every other memory on
+    this page; `ptrFor` holds the repair whose screen is open, which is a
+    category and issue rather than a defect id precisely because the writeup
+    belongs to the repair and not to one bus's instance of it. */
+ const [pathToRepairs,setPathToRepairs]=useState<PathToRepairLibrary>({entries:[]});
+ useEffect(()=>setPathToRepairs(readPathToRepairs(localStorage)),[]);
+ /* THE SHOP'S OWN REPAIR TIMES, beside the writeups and on the same screen:
+    one place per repair for what this garage knows about it — how to approach
+    it, and how long it takes here. Curtis: "as long as a person can change the
+    repair times then and then it updates. That's all that matters really." */
+ const [repairHours,setRepairHours]=useState<RepairHoursLedger>({entries:[]});
+ useEffect(()=>setRepairHours(readRepairHoursLedger(localStorage)),[]);
+ const [ptrFor,setPtrFor]=useState<{category:string;issue:string}|null>(null);
+ const [ptrDraft,setPtrDraft]=useState("");
+ const [ptrEditing,setPtrEditing]=useState(false);
+ const [ptrProblem,setPtrProblem]=useState("");
+ const openPathToRepair=(category:string,issue:string)=>{
+  const existing=findPathToRepair(pathToRepairs,category,issue);
+  setPtrFor({category,issue});
+  setPtrDraft(existing?existing.steps:"");
+  /* A repair with nothing written opens straight into the editor: the empty
+     screen's only purpose is to be filled in, and making somebody press EDIT
+     to reach a blank page is a tap that teaches nothing. */
+  setPtrEditing(!existing);
+  setPtrProblem("");
+ };
+ const savePtr=()=>{
+  if(!ptrFor)return;
+  const next=savePathToRepair(pathToRepairs,{category:ptrFor.category,issue:ptrFor.issue,steps:ptrDraft,by:settings.defaultInitials});
+  /* The write is checked rather than assumed. A full device would otherwise
+     show the new text, having stored nothing, and the person would find out
+     when it was gone. */
+  if(!writePathToRepairs(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
+  setPathToRepairs(next);
+  setPtrEditing(false);
+  setPtrProblem("");
+ };
+ /* Saved on its own, not folded into the steps: a time and a writeup are two
+    different claims, and somebody correcting one must not have to re-save the
+    other. An empty box removes the shop's figure and the catalog estimate
+    comes back — withdrawing a claim is the same gesture as never making it. */
+ const saveShopHours=(hours:string)=>{
+  if(!ptrFor)return;
+  const next=saveRepairMinutes(repairHours,{category:ptrFor.category,issue:ptrFor.issue,hours,by:settings.defaultInitials});
+  if(!writeRepairHoursLedger(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
+  setRepairHours(next);
+  setPtrProblem("");
+ };
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
@@ -738,6 +810,15 @@ export default function DefectLog(){
  const unsearched=records.filter(matchesStateFilter);
  const visible=unsearched.filter(matchesSearch);
  const visibleGroups=groupDefectLogRecords(visible);
+ /* WHAT THE WORK ON SCREEN WOULD TAKE, in the same scope as the two counts it
+    sits beside: whatever the search and the state filter have left. All three
+    numbers on that line therefore always mean the same set of buses, which is
+    the only way none of them can be misread.
+
+    Built from `visible` rather than from `active` for exactly that reason —
+    `active` ignores the search, and a line reading "1 BUS · 2 DEFECTS · 31h"
+    while standing on one bus would be quoting the whole fleet's hours. */
+ const visibleEstimateMinutes=openDefectsEstimateMinutes(visible.map(record=>record.defect),repairHours);
  /* How many buses the search alone is holding back. Zero when nothing is typed,
     which is what keeps the banner off the page the rest of the time. */
  const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
@@ -861,7 +942,7 @@ export default function DefectLog(){
     being applied. */
  const quickFilterOwnedLabel=quickFilter==="logged"&&myInitials?quickFilterLabel+" by "+myInitials:quickFilterLabel;
  const quickFilterShareLabel=quickFilterOwnedLabel+(quickFilterWindowed&&timeWindowLabel(quickFilterWindow,shiftWindowText)?" ("+timeWindowLabel(quickFilterWindow,shiftWindowText)+")":"");
- const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,fixedToday:records.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
+ const stats={active:active.length,progress:active.filter(record=>record.defect.state==="in-progress").length,downing:active.filter(record=>record.defect.operability==="down").length,/* allRecords, NOT records, and this was a real undercount rather than a tidy-up. Pressing MARK FIXED completes a repair and stamps defectLogHiddenAt in the SAME action, and `records` is defined as everything without that stamp - so every fix made on this device fell straight out of its own counter. Measured: a board holding two repairs completed today, one hidden and one not, reported 1. The ones it did count were the ones that arrived some other way. Nothing was ever lost; the record keeps them all, and this is the list that can see them. */fixedToday:allRecords.filter(record=>record.defect.state==="completed"&&isToday(record.defect.completedAt||record.updatedAt)).length,buses:new Set(active.map(record=>record.bus.id)).size};
 
  /* Reports why nothing was kept instead of returning in silence. The state is
     not advanced on a refusal, on purpose — the screen keeps showing what is
@@ -1314,7 +1395,7 @@ export default function DefectLog(){
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}
   <section className="log-feed">
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
@@ -1438,6 +1519,53 @@ export default function DefectLog(){
      {expanded&&<p className="log-bus-end-marker" aria-hidden="true">END OF BUS {group.bus.n} · {group.records.length} DEFECT{group.records.length===1?"":"S"}</p>}
    </article>})}</div>:<div className="empty-log"><b>No repairs match this view.</b><span>Use Log Defect to record the next bus finding.</span></div>}
   </section>
+  {/* PATH TO REPAIR. Rendered AFTER the focus shade so it stacks above the
+      view it was opened from, and the focus view is deliberately left open
+      underneath: closing this returns somebody to the bus they were reading
+      rather than to the top of the feed. */}
+  {ptrFor&&<div className="log-shade ptr-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setPtrFor(null)}}>
+   <section className="ptr-panel" role="dialog" aria-modal="true" aria-label="Path to repair">
+    <div className="ptr-head"><span><small>PATH TO REPAIR</small><b>{repairCategoryLabel(ptrFor.category)}</b><i>{ptrFor.issue}</i></span><button className="ptr-close" type="button" onClick={()=>setPtrFor(null)} aria-label="Close path to repair">×</button></div>
+    {/* THE SHOP'S TIME, above the steps and always present. It is the one number
+        on this screen that the hours badge on the feed reads, so it is shown
+        whether or not anybody has written steps — a repair can have a time and
+        no writeup, or a writeup and no time. */}
+    {(()=>{
+     const shop=findRepairMinutes(repairHours,ptrFor.category,ptrFor.issue);
+     const fallback=defectEstimateMinutes({id:"ptr",category:ptrFor.category,issue:ptrFor.issue,details:"",operability:"service",state:"open"} as StructuredDefect);
+     return <div className="ptr-hours">
+      <label>SHOP TIME FOR THIS REPAIR<HoursField value={shop?Math.round(shop.minutes/60*100)/100:undefined} placeholder={String(Math.round(fallback/60*100)/100)} ariaLabel="Shop time for this repair, in hours" onChange={hours=>saveShopHours(hours===undefined?"":String(hours))}/></label>
+      <small>{shop
+       ?"SET BY "+(shop.updatedBy||"SOMEONE")+" · USED FOR EVERY BUS WITH THIS REPAIR"
+       :"NOT SET — ESTIMATING "+formatRepairTime(fallback)+" FROM THE CATALOG. TYPE A NUMBER TO REPLACE IT."}</small>
+     </div>;
+    })()}
+    {(()=>{
+     const saved=findPathToRepair(pathToRepairs,ptrFor.category,ptrFor.issue);
+     if(ptrEditing)return <div className="ptr-body">
+      <label className="ptr-edit">STEPS — GENERAL DIRECTION, NOT A PROCEDURE
+       <textarea value={ptrDraft} maxLength={MAX_PATH_TO_REPAIR} rows={9} autoFocus
+        placeholder={"Check the oil level first.\nRefer to Cummins INSIGHT for the fault code.\nLook for corrosion on the harness behind the AC filters."}
+        onChange={event=>setPtrDraft(event.target.value)}/></label>
+      <small className="ptr-count">{ptrDraft.trim().length} / {MAX_PATH_TO_REPAIR}</small>
+      {ptrProblem&&<p className="ptr-problem">{ptrProblem}</p>}
+      <div className="ptr-actions">
+       <button type="button" className="ptr-save" onClick={savePtr}>{ptrDraft.trim()?"SAVE":"CLEAR IT"}</button>
+       <button type="button" className="ptr-cancel" onClick={()=>{if(saved){setPtrDraft(saved.steps);setPtrEditing(false);setPtrProblem("")}else setPtrFor(null)}}>CANCEL</button>
+      </div>
+      {/* Said on the screen that writes it, because somebody filling this in is
+          entitled to know who will see it. */}
+      <p className="ptr-note">This is written once for <b>{repairCategoryLabel(ptrFor.category)} — {ptrFor.issue}</b> and shows on every bus with that repair. It stays on this device; it does not travel to the Shop Cloud yet.</p>
+     </div>;
+     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first steps somebody should take — a manual to check, a code to pull, a place to look.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
+     return <div className="ptr-body">
+      <p className="ptr-steps">{saved.steps}</p>
+      <div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>{setPtrDraft(saved.steps);setPtrEditing(true)}}>EDIT</button></div>
+      <p className="ptr-note">{saved.updatedBy?"Written by "+saved.updatedBy+", ":"Written "}{saved.updatedAt?timeLabel(saved.updatedAt):"earlier"} · shows on every bus with this repair</p>
+     </div>;
+    })()}
+   </section>
+  </div>}
   {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>
    <section className="log-focus" role="dialog" aria-modal="true" aria-label={"Bus "+focusedGroup.bus.n+" defects"}>
     <div className="log-focus-head"><span className="log-focus-bus"><small>BUS</small><strong>{focusedGroup.bus.n}</strong></span><span className="log-focus-where"><b>{locationLabel(focusedGroup.bus.l)}</b><small>{STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s}</small></span><button className="add-log-focus-defect" type="button" onClick={()=>{const busId=focusedGroup.bus.id;setFocusedBusId("");setEditing({...newDraft(),busId})}} aria-label={"Add a defect to bus "+focusedGroup.bus.n}>+ ADD DEFECT</button><button className="close-log-focus" type="button" onClick={()=>setFocusedBusId("")} aria-label="Close focus view">×</button></div>
@@ -1457,7 +1585,7 @@ export default function DefectLog(){
      {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
-     <div className="log-focus-record-foot"><time>LOGGED {timeLabel(record.createdAt)}</time><span className="log-focus-record-actions"><button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}{isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}</span></div>
+     <div className="log-focus-record-foot"><time>LOGGED {timeLabel(record.createdAt)}</time><span className="log-focus-record-actions">{/* PTR sits on the DEFECT CARD rather than beside FOCUS on the feed, which is where Curtis put it: "somewhere on each of the defect cards so that way it's specified to that defect". The writeup it opens belongs to the REPAIR, so the button carries that defect's category and issue rather than its id. */}<button className="ptr-log-focus-defect" type="button" onClick={()=>openPathToRepair(record.defect.category,record.defect.issue)} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button><button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}{isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}</span></div>
     </article>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,

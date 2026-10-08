@@ -1103,6 +1103,24 @@ export function migrateRepairIdentity(rawCategory:unknown,rawIssue:unknown){
  return {category,issue};
 }
 
+/* THE NAME A PER-REPAIR LIBRARY FILES SOMETHING UNDER.
+
+   Two of them now key off this — PATH TO REPAIR and the shop's own repair
+   times — and they have to agree about what "the same repair" means or a
+   writeup and a time written on the same screen end up under different names.
+   One function, for the same reason the Ventra filter reads tech-services.ts
+   instead of keeping its own regex.
+
+   It resolves through `migrateRepairIdentity` first, so a catalog rename moves
+   a defect and everything filed against it together; keyed on raw wording, an
+   entry written under "Air System - Leak" would sit in storage after the
+   rename to Pneumatic System and silently never match again. Case and spacing
+   are folded because these are wordings people type, not identifiers. */
+export function repairIdentityKey(category:unknown,issue:unknown){
+ const identity=migrateRepairIdentity(category,issue);
+ return (identity.category+" — "+identity.issue).toLowerCase().replace(/\s+/g," ").trim();
+}
+
 export function normalizeDefects(value:unknown,legacyText="",identity="bus"):StructuredDefect[]{
  if(Array.isArray(value))return value.filter(item=>item&&typeof item==="object").map((item,index)=>{
   const defect=item as Partial<StructuredDefect>;
