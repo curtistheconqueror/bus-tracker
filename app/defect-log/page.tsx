@@ -22,6 +22,8 @@ import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/d
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
+import {openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
+import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
@@ -738,6 +740,15 @@ export default function DefectLog(){
  const unsearched=records.filter(matchesStateFilter);
  const visible=unsearched.filter(matchesSearch);
  const visibleGroups=groupDefectLogRecords(visible);
+ /* WHAT THE WORK ON SCREEN WOULD TAKE, in the same scope as the two counts it
+    sits beside: whatever the search and the state filter have left. All three
+    numbers on that line therefore always mean the same set of buses, which is
+    the only way none of them can be misread.
+
+    Built from `visible` rather than from `active` for exactly that reason —
+    `active` ignores the search, and a line reading "1 BUS · 2 DEFECTS · 31h"
+    while standing on one bus would be quoting the whole fleet's hours. */
+ const visibleEstimateMinutes=openDefectsEstimateMinutes(visible.map(record=>record.defect));
  /* How many buses the search alone is holding back. Zero when nothing is typed,
     which is what keeps the banner off the page the rest of the time. */
  const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
@@ -1314,7 +1325,7 @@ export default function DefectLog(){
       MOVE / LOCATION editor stayed: the deferred drawer below still opens it. */}
   <section className="log-feed">
    <div className="feed-title">{/* LOG DEFECT moved to the top of the controls; it is not repeated here. */}
-   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
+   {/* CLEAN UP, SCAN SWEEP, SCAN BATCHES and AI OPERATOR moved into ADVANCED ACTIONS above, with the rest of the controls. */}<span><b>{settings.display.labels.feedTitle}</b><small>{visibleGroups.length} BUS{visibleGroups.length===1?"":"ES"} · {visible.length} DEFECT{visible.length===1?"":"S"}{/* Dropped entirely when nothing is outstanding rather than printed as "0m": the line already says 0 DEFECTS, and a zero beside it reads as a broken counter rather than as a clear board. */}{visibleEstimateMinutes>0&&<b className="feed-estimate">{formatRepairTime(visibleEstimateMinutes)} ESTIMATED</b>}</small></span><label className="feed-status-color"><input type="checkbox" checked={settings.statusColor} onChange={event=>setSettings({...settings,statusColor:event.target.checked})}/><span>SHOW STATUS COLOR</span></label></div>
    {visibleGroups.length?<div className="log-list">{visibleGroups.map(group=>{const primary=group.records[0],expanded=expandedBusIds.includes(group.bus.id),busOnDownSheet=activeDownBusIdSet.has(group.bus.id),groupState:DefectState=group.records.some(record=>record.defect.state==="in-progress")?"in-progress":group.records.some(record=>record.defect.state==="open")?"open":group.records.some(record=>record.defect.state==="deferred")?"deferred":"completed",groupDowning=group.records.some(record=>isUnresolved(record.defect)&&record.defect.operability==="down"),groupHasDeferredHistory=group.records.some(record=>hasDeferredHistory(record.defect,busOnDownSheet)),preview=group.records.slice(0,2).map(record=>defectLabel(record.defect)).join(" · "),roadCall=roadCallNote(group.bus.roadCalls,undefined,timeLabel);return <article className={"log-card log-card-group "+groupState+(groupDowning?" downing":"")+(group.bus.s==="out"?" out-of-service":"")+(expanded?" expanded":"")} key={group.bus.id}>
     <button className="log-focus-button" type="button" title={"Focus bus "+group.bus.n} aria-label={"Focus bus "+group.bus.n+" for easier reading"} onClick={event=>{event.stopPropagation();setFocusedBusId(group.bus.id)}}>FOCUS</button>
     {/* OUTSIDE the header button, which is why this column moved out of it at
