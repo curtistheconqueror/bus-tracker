@@ -1239,3 +1239,14 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  background:var(--log-surface);color:var(--log-accent);padding:0 10px;font-family:inherit;
  font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
 .insert-bullet:hover,.insert-bullet:focus-visible{border-color:var(--log-accent);outline:none}
+
+/* SHOP TIME, at the top of the PATH TO REPAIR screen. Boxed rather than loose
+   so it reads as a stored setting instead of another line of the writeup — it
+   is the one thing on that screen the feed's hours badge reads back. */
+.ptr-hours{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--log-border);
+ background:color-mix(in srgb,var(--log-accent,#0b64bd) 5%,var(--log-surface,#fff));padding:12px 15px}
+.ptr-hours label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.ptr-hours input{width:92px;min-height:44px;border:1px solid var(--log-border);border-radius:8px;
+ background:var(--log-surface);color:var(--log-text);padding:0 10px;font-size:16px;font-weight:900;text-align:center}
+.ptr-hours small{color:var(--log-muted);font-size:9px;font-weight:800;line-height:1.45}

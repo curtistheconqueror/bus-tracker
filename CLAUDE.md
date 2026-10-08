@@ -148,6 +148,7 @@ what the shop has taught it
   pace-findings-memory-v1          learned causes, per symptom
   pace-scan-notes-v1               notes for the next scan, 500 chars
   pace-ptr-v1                      PATH TO REPAIR: how to approach a repair, per repair
+  pace-repair-hours-v1             what this shop says a repair takes, per repair
 
 undo and recovery, never synced
   pace-board-recovery-v1           last known good board
@@ -385,6 +386,37 @@ The two memories beside it travel through `shop_memory`, which is constrained to
 `kind in ('part','finding')` — carrying PTR would need a schema migration, which
 is a write to the live database and therefore Curtis's call. The screen says so
 where it is written, rather than letting somebody assume the shop can see it.
+
+**`pace-repair-hours-v1` is a LEDGER, not a learner.** Curtis, after being
+offered a version that watches completed work and averages its way to a figure:
+*"if that's some type of like adaptive strategy, we can hold off on it as long
+as a person can change the repair times then and then it updates ... that's not
+necessarily an adaptive strategy, but that's more like a fixed ledger."*
+
+Somebody sets a number; that number is the estimate for that repair everywhere
+until somebody changes it, and it never moves on its own. Nothing averages,
+nothing decays, and when a figure looks wrong there is one place it came from
+and one person who put it there. The adaptive version stays parked by his
+decision, and this is the thing it would have to beat.
+
+**Three sources, most specific first**, in `src/lib/defects/defect-estimates.ts`:
+the hours typed on THIS defect, then this ledger, then the catalog's own
+estimate. The catalog is last because it is a guess made by somebody who has
+never stood in this garage.
+
+**Keyed per SPECIFIC REPAIR, not per category**, through the same
+`repairIdentityKey` PATH TO REPAIR uses — one function, so a writeup and a time
+set on the same screen cannot end up filed under different names. *All Brakes =
+2h* would price a chamber leak and a full reline the same, and the catalog it
+overrides already distinguishes them. A category-level default is a coarser
+thing that can sit on top of this later.
+
+**Stored as MINUTES, typed as HOURS.** Every estimate in this app is in minutes;
+a mechanic writes `.5`. Converting once, through the same `normalizeRepairHours`
+the defect editor uses, keeps one unit in the data and one in the hand.
+
+**An empty box REMOVES the entry** and the catalog estimate comes back.
+Withdrawing a claim is the same gesture as never having made one.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen

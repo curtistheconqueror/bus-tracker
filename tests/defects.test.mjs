@@ -4924,7 +4924,7 @@ test("the estimate badge is scoped like the numbers beside it, and wins its own 
     state filter left — so all three numbers on that line always describe the
     same buses. From `active` it would quote the whole fleet's hours while
     standing on one bus. */
- assert.match(page,/visibleEstimateMinutes=openDefectsEstimateMinutes\(visible\.map\(record=>record\.defect\)\)/);
+ assert.match(page,/visibleEstimateMinutes=openDefectsEstimateMinutes\(visible\.map\(record=>record\.defect\),repairHours\)/,"and asks the shop's own ledger before the catalog");
  assert.equal(/openDefectsEstimateMinutes\(active/.test(page),false,"never the unsearched list");
  /* Dropped rather than printed as "0m": the line already says 0 DEFECTS, and a
     zero beside it reads as a broken counter. */
@@ -5120,4 +5120,99 @@ test("the line breaks somebody types in a description survive to the screen",asy
     the selection in the same tick sets it on the pre-update value. */
  assert.match(page,/requestAnimationFrame\(\(\)=>\{const box=detailsRef\.current;if\(!box\)return;box\.focus\(\);box\.setSelectionRange\(box\.value\.length,box\.value\.length\)\}\)/);
  assert.match(page,/<textarea ref=\{detailsRef\}/,"the ref the caret fix needs is actually attached");
+});
+
+test("the shop's own repair time is a ledger somebody sets, not something that drifts",async()=>{
+ /* Curtis, offered a version that learns from completed work: "if that's some
+    type of like adaptive strategy, we can hold off on it as long as a person
+    can change the repair times then and then it updates ... that's not
+    necessarily an adaptive strategy, but that's more like a fixed ledger."
+
+    So nothing in here averages, decays, or moves on its own. A number is set by
+    a person and stands until a person changes it. */
+ const {REPAIR_HOURS_KEY,findRepairMinutes,saveRepairMinutes,hoursToMinutes,
+  normalizeRepairHoursLedger,readRepairHoursLedger,writeRepairHoursLedger}=
+  await import("../src/lib/defects/repair-hours-ledger.ts");
+ const {defectEstimateMinutes,openDefectsEstimateMinutes}=await import("../src/lib/defects/defect-estimates.ts");
+ const {normalizeRepairTimeEstimate,repairTimeTotal}=await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const {repairIdentityKey}=await import("../src/lib/defects/repair-catalog.ts");
+ const {pathToRepairKey}=await import("../src/lib/defects/path-to-repair.ts");
+
+ assert.equal(REPAIR_HOURS_KEY,"pace-repair-hours-v1");
+
+ /* HOURS IN, MINUTES STORED. A mechanic writes .5; everything that consumes an
+    estimate in this app is in minutes. */
+ assert.equal(hoursToMinutes("2.5"),150);
+ assert.equal(hoursToMinutes(".25"),15);
+ assert.equal(hoursToMinutes(""),null);
+ assert.equal(hoursToMinutes("0"),null,"zero is not a repair time");
+
+ const ledger=saveRepairMinutes({entries:[]},{category:"Brakes",issue:"Brakes sticking / dragging",hours:"2",by:"cj"});
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brakes sticking / dragging").minutes,120);
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brakes sticking / dragging").updatedBy,"CJ");
+ /* PER SPECIFIC REPAIR, not per category: a different Brakes repair is NOT
+    covered by it, which is the whole reason it is not keyed on the category. */
+ assert.equal(findRepairMinutes(ledger,"Brakes","Brake chamber leaking"),null);
+
+ /* ONE KEY FUNCTION with PATH TO REPAIR, so a writeup and a time set on the
+    same screen cannot be filed under different names. */
+ assert.equal(pathToRepairKey("Brakes","Brakes sticking / dragging"),repairIdentityKey("Brakes","Brakes sticking / dragging"));
+ /* And it survives a catalog rename for the same reason PTR does. */
+ const {migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
+ const moved=migrateRepairIdentity("Air System","Leak");
+ const legacy=saveRepairMinutes({entries:[]},{category:"Air System",issue:"Leak",hours:"1"});
+ assert.equal(findRepairMinutes(legacy,moved.category,moved.issue).minutes,60,"found under today's wording");
+ assert.equal(legacy.entries[0].category,moved.category,"and filed in today's words");
+
+ /* THREE SOURCES, MOST SPECIFIC FIRST. */
+ const defect={id:"d",category:"Brakes",issue:"Brakes sticking / dragging",details:"",operability:"service",state:"open"};
+ const catalog=repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Brakes","Brakes sticking / dragging"));
+ assert.equal(defectEstimateMinutes(defect),catalog,"with no ledger it is the catalog's guess");
+ assert.equal(defectEstimateMinutes(defect,ledger),120,"the shop's number beats the catalog");
+ assert.equal(defectEstimateMinutes({...defect,repairHours:4},ledger),240,"and what was typed on THIS job beats the shop's");
+ assert.notEqual(catalog,120,"the test would prove nothing if they happened to match");
+
+ /* It reaches the badge's total too, not just one defect. */
+ assert.equal(openDefectsEstimateMinutes([defect],ledger),120);
+ assert.equal(openDefectsEstimateMinutes([{...defect,state:"completed"}],ledger),0,"and completed work still adds nothing");
+
+ /* AN EMPTY BOX REMOVES IT and the catalog estimate returns — withdrawing a
+    claim is the same gesture as never having made one. */
+ const cleared=saveRepairMinutes(ledger,{category:"Brakes",issue:"Brakes sticking / dragging",hours:""});
+ assert.equal(findRepairMinutes(cleared,"Brakes","Brakes sticking / dragging"),null);
+ assert.equal(defectEstimateMinutes(defect,cleared),catalog,"back to the catalog");
+
+ /* Re-setting replaces rather than accumulating. */
+ const twice=saveRepairMinutes(ledger,{category:"Brakes",issue:"Brakes sticking / dragging",hours:"1.5"});
+ assert.equal(twice.entries.length,1);
+ assert.equal(findRepairMinutes(twice,"Brakes","Brakes sticking / dragging").minutes,90);
+
+ /* A round trip, and a refused write reported rather than thrown. */
+ const store=new Map();
+ const storage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v)};
+ assert.equal(writeRepairHoursLedger(storage,twice),true);
+ assert.equal(findRepairMinutes(readRepairHoursLedger(storage),"Brakes","Brakes sticking / dragging").minutes,90);
+ assert.equal(writeRepairHoursLedger({setItem:()=>{throw new Error("QuotaExceeded")}},twice),false);
+ assert.deepEqual(readRepairHoursLedger({getItem:()=>"not json"}),{entries:[]});
+ /* A zero or negative stored time is a cleared or corrupt entry, not "instant". */
+ assert.deepEqual(normalizeRepairHoursLedger({entries:[{category:"Brakes",issue:"X",minutes:0}]}),{entries:[]});
+ assert.deepEqual(normalizeRepairHoursLedger({entries:[{category:"Brakes",issue:"X",minutes:-30}]}),{entries:[]});
+});
+
+test("SHOP TIME sits on the PATH TO REPAIR screen and feeds the hours badge",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* One screen per repair for what this garage knows about it: how to approach
+    it, and how long it takes here. */
+ assert.match(page,/SHOP TIME FOR THIS REPAIR<HoursField/);
+ /* Saved on its own, not folded into the steps — a time and a writeup are two
+    different claims and correcting one must not require re-saving the other. */
+ assert.match(page,/const saveShopHours=\(hours:string\)=>\{/);
+ assert.equal(/saveShopHours[\s\S]{0,200}savePathToRepair/.test(page),false,"the two saves are separate");
+ /* The write is checked, like every other write on this page. */
+ assert.match(page,/if\(!writeRepairHoursLedger\(localStorage,next\)\)\{setPtrProblem\(/);
+ /* It says what is in force when nothing is set, naming the catalog figure it
+    is about to be measured against rather than showing an empty box. */
+ assert.match(page,/NOT SET — ESTIMATING "\+formatRepairTime\(fallback\)\+" FROM THE CATALOG/);
+ /* And who set it when one is. */
+ assert.match(page,/"SET BY "\+\(shop\.updatedBy\|\|"SOMEONE"\)\+" · USED FOR EVERY BUS WITH THIS REPAIR"/);
 });

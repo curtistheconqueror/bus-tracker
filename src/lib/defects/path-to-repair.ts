@@ -1,4 +1,4 @@
-import {migrateRepairIdentity} from "./repair-catalog.ts";
+import {migrateRepairIdentity,repairIdentityKey} from "./repair-catalog.ts";
 
 /* PATH TO REPAIR — what somebody should try first, written once per repair.
 
@@ -35,8 +35,7 @@ export type PathToRepairLibrary={entries:PathToRepair[]};
    Case and spacing folded because these are wordings people type and read, not
    identifiers. */
 export function pathToRepairKey(category:unknown,issue:unknown){
- const identity=migrateRepairIdentity(category,issue);
- return (identity.category+" — "+identity.issue).toLowerCase().replace(/\s+/g," ").trim();
+ return repairIdentityKey(category,issue);
 }
 
 function text(value:unknown,limit:number){
