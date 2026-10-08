@@ -366,7 +366,18 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-record-head b{font-size:14px;letter-spacing:.4px;color:var(--log-accent)}
 .log-focus-record-head i{border-radius:11px;background:#dce8f5;color:#1d4f84;padding:4px 10px;font-size:11px;font-style:normal;font-weight:900;white-space:nowrap}
 .log-focus-record-head i.in-progress{background:#ffedb3;color:#765500}.log-focus-record-head i.deferred{background:#d7f0f7;color:#0b6b80}.log-focus-record-head i.completed{background:#d9f2e3;color:#08663a}
-.log-focus-defect{margin:0 0 11px;font-size:21px;line-height:1.35;font-weight:700;color:var(--log-text)}
+/* THE LINE BREAKS SOMEBODY TYPED ARE PART OF WHAT THEY WROTE.
+   Curtis: "I even tried hitting the space button to put a space in between
+   it, and it did while I was in the text input space, but when I saved it, it
+   just put them all back together, both paragraphs."
+   Nothing was ever losing them - `details.trim()` only trims the ends and the
+   record keeps the newlines exactly as typed. HTML collapses them to a single
+   space unless told not to, so a seven-line description arrived on screen as
+   one wall of text. `pre-wrap` rather than `pre`: the breaks he typed are
+   kept, and long lines still wrap to the phone instead of scrolling sideways.
+   It also makes bullets work with nothing else added - a line starting with
+   a dot is a line. */
+.log-focus-defect{margin:0 0 11px;white-space:pre-wrap;font-size:21px;line-height:1.35;font-weight:700;color:var(--log-text)}
 .log-focus-record p{margin:0 0 9px;font-size:15px;line-height:1.45;color:var(--log-text);overflow-wrap:anywhere}
 .log-focus-record p b{display:block;margin-bottom:2px;font-size:10px;font-weight:900;letter-spacing:.8px;color:var(--log-muted)}
 .log-focus-record-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
@@ -1219,3 +1230,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .ptr-actions .ptr-cancel{background:var(--log-surface);border:1px solid var(--log-border);color:var(--log-text)}
 .ptr-note{margin:0;color:var(--log-muted);font-size:10px;font-weight:700;line-height:1.5}
 .ptr-note b{color:var(--log-text)}
+
+/* BULLET, beside the DESCRIPTION label. Small on purpose: it is a typing aid,
+   not an action, and it must never read as the thing that saves the defect. */
+.description-label{display:flex;flex-direction:column;gap:5px}
+.description-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.insert-bullet{min-height:32px;border:1px solid var(--log-border);border-radius:7px;
+ background:var(--log-surface);color:var(--log-accent);padding:0 10px;font-family:inherit;
+ font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
+.insert-bullet:hover,.insert-bullet:focus-visible{border-color:var(--log-accent);outline:none}
