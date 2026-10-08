@@ -209,20 +209,22 @@ those files.
 
 In the order Curtis asked for it. Each has enough here to start without asking.
 
-### 1. Extend a deferment from the Deferred popup
+### 1. Extend a deferment from the Deferred popup — BUILT, in `fe467c0`
 
 > "when I hit deferred, I need an option in that pop-up to extend the time of
 > the deferment."
 
-The deferral fields and the DEFERRED badge already exist — see
-`src/components/shared/deferred-watch.tsx` and the `deferredAt` / `deferredUntil` fields. Release
-158 (Codex) added a persistent **UNDO DEFERRED** action, which is a different
-thing: undo returns the repair to Open, this extends the clock without changing
-the state.
+**Shipped as release 179.** `fe467c0` added `src/lib/defects/deferral-clock.ts`
+and both controls Curtis asked for, in both readings of the sentence: **HOLD
+UNTIL** revealed in the Defect Log editor when DEFERRED is ticked, and **HOLD
+UNTIL / EXTEND** on the held row itself. `deferredAt` is deliberately not
+restamped, so pushing the clock never resets the 90-minute badge.
 
-Put the control in the popup that appears when Deferred is chosen. Extending is
-an edit to an existing deferral, so it belongs in the repair's history like any
-other edit, and it must not clear `wasDeferred`.
+**It is kept here, struck, for the same reason the DELETE button below it is.**
+This entry sat open for weeks after the work landed, and in one session it was
+offered back to Curtis twice from the title alone. A queue is a claim about the
+code, and only the code can settle it: check before you offer, and strike it
+here the moment you find it built.
 
 ### 2. A DELETE button per Down Sheet entry — BUILT, in `5dd3a99`
 
