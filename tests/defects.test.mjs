@@ -4968,3 +4968,109 @@ test("FIXED TODAY counts the fixes made on this device",async()=>{
     outstanding work — the counter was the bug, not the hiding. */
  assert.match(page,/persist\(hideDefectLogRecords\(result\.fleet,\[\{busId:record\.bus\.id,defectId:record\.defect\.id\}\]/);
 });
+
+test("PATH TO REPAIR is written once per repair and survives a catalog rename",async()=>{
+ /* Curtis: "basically steps, general steps to point people in the right
+    direction of how to get it repaired" — refer to Cummins INSIGHT, check the
+    oil first, look for corrosion behind the AC filters. Asked what it should
+    attach to, he chose the REPAIR rather than the defect: a writeup keyed per
+    instance would be retyped on every bus and never become a library. */
+ const {PATH_TO_REPAIR_KEY,MAX_PATH_TO_REPAIR,pathToRepairKey,findPathToRepair,savePathToRepair,
+  normalizePathToRepairs,readPathToRepairs,writePathToRepairs}=await import("../src/lib/defects/path-to-repair.ts");
+
+ assert.equal(PATH_TO_REPAIR_KEY,"pace-ptr-v1");
+
+ /* ONE WRITEUP, EVERY BUS. The key is the repair, so a PTR saved while looking
+    at 17543 is the one 17566 reads. */
+ const after=savePathToRepair({entries:[]},{category:"A/C and HVAC",issue:"No cooling",
+  steps:"Check the thermostat screen first.\nThen look behind the AC filters for corrosion.",by:"cj"});
+ assert.equal(after.entries.length,1);
+ assert.equal(findPathToRepair(after,"A/C and HVAC","No cooling").steps.split("\n")[0],"Check the thermostat screen first.");
+ assert.equal(findPathToRepair(after,"A/C and HVAC","No cooling").updatedBy,"CJ","initials are folded up, as everywhere else");
+ assert.equal(findPathToRepair(after,"Engine","Check engine light"),null,"and it is not offered for a different repair");
+
+ /* IT SURVIVES A CATALOG RENAME, which is the half that fails silently. A PTR
+    keyed on raw wording would still be in storage after a category is renamed
+    and would simply never match again. Both sides resolve through
+    migrateRepairIdentity, the same function every stored defect is read
+    through, so the defect and its writeup move together. */
+ const {migrateRepairIdentity}=await import("../src/lib/defects/repair-catalog.ts");
+ const moved=migrateRepairIdentity("Air System","Leak");
+ assert.notEqual(moved.category,"Air System","the rename this test rides on still exists");
+ const legacy=savePathToRepair({entries:[]},{category:"Air System",issue:"Leak",steps:"Soap the fittings."});
+ assert.equal(findPathToRepair(legacy,moved.category,moved.issue).steps,"Soap the fittings.","found under today's wording");
+ assert.equal(findPathToRepair(legacy,"Air System","Leak").steps,"Soap the fittings.","and under yesterday's");
+ assert.equal(legacy.entries[0].category,moved.category,"stored in today's words");
+ assert.equal(pathToRepairKey("Air System","Leak"),pathToRepairKey(moved.category,moved.issue));
+ /* Case and spacing are wordings people type, not identifiers. */
+ assert.equal(pathToRepairKey("a/c and hvac","  No   cooling "),pathToRepairKey("A/C and HVAC","No cooling"));
+
+ /* SAVING EMPTY CLEARS IT — there is no separate delete. Guidance is not a
+    repair record; the rule that this app never deletes history is about
+    defects and the work done on them. */
+ const cleared=savePathToRepair(after,{category:"A/C and HVAC",issue:"No cooling",steps:"   "});
+ assert.equal(cleared.entries.length,0);
+ assert.equal(findPathToRepair(cleared,"A/C and HVAC","No cooling"),null);
+
+ /* Re-saving replaces rather than accumulating, and lands newest first. */
+ const twice=savePathToRepair(savePathToRepair(after,{category:"Engine",issue:"Check engine light",steps:"Pull the code."}),
+  {category:"A/C and HVAC",issue:"No cooling",steps:"Replaced."});
+ assert.equal(twice.entries.length,2);
+ assert.equal(findPathToRepair(twice,"A/C and HVAC","No cooling").steps,"Replaced.");
+ assert.equal(twice.entries[0].issue,"No cooling","the one just written is on top");
+
+ /* Capped, so one entry cannot fill a phone on its own. */
+ const long=savePathToRepair({entries:[]},{category:"Engine",issue:"Check engine light",steps:"x".repeat(MAX_PATH_TO_REPAIR+500)});
+ assert.equal(long.entries[0].steps.length,MAX_PATH_TO_REPAIR);
+
+ /* A ROUND TRIP THROUGH STORAGE, and a device that cannot take the write says
+    so instead of throwing into a render. */
+ const store=new Map();
+ const storage={getItem:key=>store.has(key)?store.get(key):null,setItem:(key,value)=>store.set(key,value)};
+ assert.equal(writePathToRepairs(storage,twice),true);
+ assert.equal(findPathToRepair(readPathToRepairs(storage),"Engine","Check engine light").steps,"Pull the code.");
+ assert.equal(writePathToRepairs({setItem:()=>{throw new Error("QuotaExceeded")}},twice),false);
+ assert.deepEqual(readPathToRepairs({getItem:()=>"not json"}),{entries:[]});
+ assert.deepEqual(normalizePathToRepairs(null),{entries:[]});
+ assert.deepEqual(normalizePathToRepairs({entries:[{category:"Engine",issue:"X",steps:"  "}]}),{entries:[]},"a blank entry is not a PTR");
+});
+
+test("the PTR button sits on the defect card and opens the repair's own writeup",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* ON THE DEFECT CARD, which is where Curtis put it after thinking aloud about
+    the FOCUS row: "somewhere on each of the defect cards so that way it's
+    specified to that defect". */
+ assert.match(page,/className="ptr-log-focus-defect"[\s\S]{0,220}onClick=\{\(\)=>openPathToRepair\(record\.defect\.category,record\.defect\.issue\)\}/);
+ /* Carrying the REPAIR, never the defect id — that is what makes one writeup
+    serve every bus with the fault. */
+ assert.equal(/openPathToRepair\(record\.defect\.id/.test(page),false);
+ /* The screen is titled the way he named it. */
+ assert.match(page,/<small>PATH TO REPAIR<\/small>/);
+ /* A repair with nothing written opens straight into the editor rather than
+    onto a blank page with an EDIT button on it. */
+ assert.match(page,/setPtrEditing\(!existing\)/);
+ /* The write is checked. A full device must not show text it did not store. */
+ assert.match(page,/if\(!writePathToRepairs\(localStorage,next\)\)\{setPtrProblem\(/);
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* IT STACKS ABOVE THE FOCUS VIEW, and the first version of this assertion had
+    the mechanism backwards - it checked that the panel came BEFORE the focus
+    shade in source and called that "so it paints above it". Later paints above,
+    not earlier, and both shades share one z-index through `.log-shade`. So the
+    focus shade sat on top of a panel that looked perfectly normal and ate every
+    tap on it. Caught by clicking SAVE in a browser; the source assertion had
+    passed. The z-index is the real mechanism, so the z-index is the assertion. */
+ assert.match(css,/\.ptr-shade\{z-index:2147483001\}/);
+ assert.match(css,/\.log-shade\{position:fixed;z-index:2147483000/,"one higher than the shade it opens over");
+ /* And it says, on the screen that writes it, who will see it. */
+ assert.match(page,/shows on every bus with that repair/);
+ assert.match(page,/does not travel to the Shop Cloud yet/);
+
+ /* The button takes only a background: `.log-focus-record-foot button` already
+    gives every button in that row its 44px target and face, and restating any
+    of it would be a second opinion waiting to drift. */
+ assert.match(css,/\.ptr-log-focus-defect\{background:#3f4a63\}/);
+ assert.equal(/\.ptr-log-focus-defect\{[^}]*min-height/.test(css),false,"the row already sets the touch target");
+ assert.match(css,/\.log-focus-record-foot button\{min-height:44px/,"which is the rule it is leaning on");
+ /* The line breaks somebody typed ARE the steps. */
+ assert.match(css,/\.ptr-steps\{[^}]*white-space:pre-wrap/);
+});
