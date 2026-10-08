@@ -116,6 +116,16 @@ button,input,select,textarea{font:inherit}
 .log-header h1{color:var(--log-page-title-color,var(--log-header-text));font-size:var(--log-page-title-size,25px)}
 .log-summary span{color:var(--log-summary-color,var(--log-muted));font-size:var(--log-summary-size,7px)}
 .feed-title b{color:var(--log-feed-title-color,var(--log-accent));font-size:var(--log-feed-title-size,12px)}
+/* THE ESTIMATE BADGE, and why the selector names `b` as well as the class.
+   `.feed-title b` above is (0,1,1) and carries the user's own LIVE REPAIR FEED
+   size and colour, so a bare `.feed-estimate` at (0,1,0) loses on specificity
+   whatever the source order, and the badge renders at the title's size in the
+   title's navy — a silent fight, since nothing errors. `b.feed-estimate` is
+   (0,1,2) and wins without !important.
+   Sized off the counts line it sits in rather than the heading above it, and
+   kept on one line: "14h 30m ESTIMATED" breaking in half reads as two
+   numbers. */
+.feed-title b.feed-estimate{display:inline-block;margin-left:7px;padding:2px 6px;border-radius:9px;background:color-mix(in srgb,var(--log-accent,#0b64bd) 13%,var(--log-surface,#fff));color:var(--log-accent,#0b64bd);font-size:inherit;font-weight:900;letter-spacing:.3px;white-space:nowrap}
 .log-repair>b{color:var(--log-repair-category-color,var(--log-accent));font-size:var(--log-repair-category-size,9px)}
 .log-repair>strong{color:var(--log-repair-details-color,var(--log-text));font-size:var(--log-repair-details-size,11px)}
 .log-card-main{flex:1;width:auto;min-width:0}

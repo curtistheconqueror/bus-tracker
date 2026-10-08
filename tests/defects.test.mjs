@@ -4867,3 +4867,82 @@ test("the drawer names whose list it is, and admits when it is not filtering by 
     nothing in this project resets it — measured, not read. */
  assert.match(css,/\.quick-filter-drawer>\.quick-filter-initials-note\{flex:none;margin:0;/);
 });
+
+test("the feed header says how long the work standing on it would take",async()=>{
+ /* Curtis, pointing at the LIVE REPAIR FEED line: "a little badge that shows
+    how many hours all of the ... defects that are currently on the bus add up
+    to". The Down Sheet has printed the same number since it was built; the
+    Defect Log never had it. */
+ const {defectEstimateMinutes,openDefectsEstimateMinutes}=await import("../src/lib/defects/defect-estimates.ts");
+ const {normalizeRepairTimeEstimate,repairTimeTotal,formatRepairTime,MINIMUM_REPAIR_MINUTES}=
+  await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const d=(id,category,issue,extra={})=>({id,category,issue,details:"",operability:"service",state:"open",...extra});
+
+ /* A MECHANIC'S OWN NUMBER WINS, both halves of it. Diagnostic time is time —
+    a fault nobody can find yet is still work somebody is doing. */
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{repairHours:2,diagnosticHours:0.5})),150);
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{diagnosticHours:1})),60,"diagnostic alone still counts");
+ /* AND IS NOT FLOORED. The shared table holds a 30-minute minimum because a
+    guess saying "ten minutes" is a guess nobody should plan around; a typed
+    .25 is somebody saying they did it in fifteen, and rounding that up would
+    quietly overstate the board. */
+ assert.equal(defectEstimateMinutes(d("a","Brakes","Brakes sticking / dragging",{repairHours:0.25})),15);
+ assert.ok(15<MINIMUM_REPAIR_MINUTES,"which is deliberately under the table's floor");
+
+ /* UNTYPED READS THE DOWN SHEET'S OWN TABLE, not a second one. Asserted as
+    equality with what that module would produce rather than as a number, so
+    the two screens cannot drift apart as the table is tuned — the same reason
+    the Ventra filter was made to read tech-services.ts. */
+ for(const [category,issue] of [["A/C and HVAC","No cooling"],["Engine","Check engine light"],["Lights, Mirrors and Alarms","No horn"]])
+  assert.equal(defectEstimateMinutes(d("x",category,issue)),repairTimeTotal(normalizeRepairTimeEstimate(undefined,category,issue)),
+   category+" matches what the Down Sheet would print");
+ /* A record too thin to name a repair still gets the floor rather than zero. */
+ assert.equal(defectEstimateMinutes(d("x","","")),MINIMUM_REPAIR_MINUTES);
+
+ /* OUTSTANDING WORK ONLY. A completed repair is work already done; deferred
+    and in-progress are both still owed. */
+ const board=[
+  d("typed","Brakes","Brakes sticking / dragging",{repairHours:2,diagnosticHours:0.5}),
+  d("untyped","A/C and HVAC","No cooling"),
+  d("done","Engine","Check engine light",{state:"completed"}),
+  d("held","Lights, Mirrors and Alarms","No horn",{state:"deferred"}),
+ ];
+ assert.equal(openDefectsEstimateMinutes(board),390);
+ assert.equal(formatRepairTime(openDefectsEstimateMinutes(board)),"6h 30m","which is what the badge prints");
+ assert.equal(openDefectsEstimateMinutes(board.filter(item=>item.id!=="done")),390,"dropping the completed one changes nothing");
+ assert.equal(openDefectsEstimateMinutes(board.filter(item=>item.state==="completed")),0,"and completed work alone is zero");
+ assert.equal(openDefectsEstimateMinutes([{...board[3],state:"in-progress"}]),90,"in-progress is owed too");
+ assert.equal(openDefectsEstimateMinutes([]),0);
+});
+
+test("the estimate badge is scoped like the numbers beside it, and wins its own cascade fight",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* SAME SCOPE AS THE COUNTS. Built from `visible` — what the search and the
+    state filter left — so all three numbers on that line always describe the
+    same buses. From `active` it would quote the whole fleet's hours while
+    standing on one bus. */
+ assert.match(page,/visibleEstimateMinutes=openDefectsEstimateMinutes\(visible\.map\(record=>record\.defect\)\)/);
+ assert.equal(/openDefectsEstimateMinutes\(active/.test(page),false,"never the unsearched list");
+ /* Dropped rather than printed as "0m": the line already says 0 DEFECTS, and a
+    zero beside it reads as a broken counter. */
+ assert.match(page,/visibleEstimateMinutes>0&&<b className="feed-estimate">\{formatRepairTime\(visibleEstimateMinutes\)\} ESTIMATED<\/b>/);
+
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* THE SPECIFICITY FIGHT, pinned because losing it is silent. `.feed-title b`
+    carries the user's own LIVE REPAIR FEED size and colour at (0,1,1); a bare
+    `.feed-estimate` at (0,1,0) loses whatever the source order and the badge
+    renders at heading size in heading navy. Measured in the browser at 7px
+    against the title's 17px. A later tidy-up to `.feed-estimate` would break
+    it with no error, so the selector itself is the assertion. */
+ assert.match(css,/\.feed-title b\.feed-estimate\{/);
+ assert.equal(/^\.feed-estimate\{/m.test(css),false,"a class-only rule would lose to .feed-title b");
+ assert.equal(/\.feed-estimate[^{]*\{[^}]*!important/.test(css),false,"and !important is not how that fight is won");
+ /* One line: "14h 30m ESTIMATED" breaking in half reads as two numbers. */
+ assert.match(css,/\.feed-title b\.feed-estimate\{[^}]*white-space:nowrap/);
+
+ /* ONE TABLE. The badge imports the Down Sheet's estimate module rather than
+    the Defect Log growing its own. */
+ const estimates=await readFile(new URL("../src/lib/defects/defect-estimates.ts",import.meta.url),"utf8");
+ assert.match(estimates,/from "\.\.\/down-sheet\/repair-time-estimates\.ts"/);
+ assert.equal(/CATEGORY_REPAIR_MINUTES|repairMinutes:\s*\d/.test(estimates),false,"no second table of its own");
+});
