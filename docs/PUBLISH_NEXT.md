@@ -1,15 +1,19 @@
 # Publish next
 
-**STATUS: 182, 183 AND 184 PENDING — 182: the Defect Log's two pickers say
-what they are, and their drop-down arrow works. 183: the repository is laid out
-by what each file is; nothing on screen changes. 184: three Defect Log lists can
-be narrowed to the shift somebody is standing in, and shared that way.**
+**STATUS: 182, 183, 184 AND 185 PENDING. Curtis has asked for this to go live.**
+182: the Defect Log's two pickers say what they are, and their drop-down arrow
+works. 183: the repository is laid out by what each file is; nothing on screen
+changes. 184: three Defect Log lists can be narrowed to the shift somebody is
+standing in, and shared that way. 185: the Defect Log shows how many hours are
+standing on it, the shop can set its own repair times, PATH TO REPAIR arrives,
+and typed line breaks stop being flattened.
 
 | Version | Publish from | What | Section |
 | --- | --- | --- | --- |
 | 182 | `807357a` | Picker labels and a working drop-down arrow | [182](#182--publish-from-807357a) |
 | 183 | `6dc96fe` | Repository layout only, no UI or flow change | [183](#183--publish-from-6dc96fe) |
 | 184 | `c296486` | A THIS SHIFT window, and a new LOGGED list keyed off initials | [184](#184--publish-from-c296486) |
+| 185 | `b9c1e81` | Hours badge, shop repair times, PATH TO REPAIR, readable descriptions | [185](#185--publish-from-b9c1e81) |
 
 **182** publishes from `807357a` (`The drop-down arrow is a button now, because it never
 was one`). Derive the range with:
@@ -21,12 +25,15 @@ git log --oneline 5d5a033..807357a
 Version 181 was published from `148a45e` on 2026-09-15 and is the rollback
 point; its tag is `sites-v181`. The one before it is 180 from `b6e0cba`.
 
-Three releases are pending, and they STACK. **Publish in order: 182, then 183,
-then 184.** Each is built on the one before it — 183's range starts at
-`807357a` and 184's at `6dc96fe` — so publishing a later one alone also ships
-everything beneath it. If Curtis wants only one Sites version, publishing **184
-from `c296486` carries all three** — but then walk all three checklists below,
-because each one lists different things to look at on the phone.
+Four releases are pending, and they STACK. **Publish in order: 182, 183, 184,
+then 185.** Each is built on the one before it — 183's range starts at
+`807357a`, 184's at `6dc96fe`, 185's at `c296486` — so publishing a later one
+alone also ships everything beneath it.
+
+**If Curtis wants one Sites version rather than four, publish 185 from
+`b9c1e81`: it carries all four.** He asked for this to go live on 2026-10-08.
+Walk all four checklists below afterwards, because each lists different things
+to look at on the phone.
 
 # 182 — publish from 807357a
 
@@ -640,3 +647,158 @@ entry, recommendation or deferral logged under 184 is lost or altered — the
 SHIFT chip and the LOGGED list simply are not offered, and `pace-shift-settings-v1`
 is left exactly as it is for the Down Sheet and the forecast, which read it
 on 181 as well.
+\n
+
+# 185 — publish from b9c1e81
+
+## Source
+
+```
+$ git log --oneline ebfb89b..b9c1e81
+b9c1e81 The shop sets its own repair times, and the estimate obeys them
+d2c4456 Strike queue item 1: the deferment extend shipped in 179
+0545833 Typed line breaks reach the screen, and a BULLET button
+d7af396 PATH TO REPAIR: write it once, read it on every bus with that fault
+1119cdf FIXED TODAY was missing every fix made on this device
+f740f48 The Defect Log says how many hours are standing on it
+
+$ git diff --name-only ebfb89b..b9c1e81
+CLAUDE.md
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+docs/NEXT_SESSION.md
+src/lib/defects/defect-estimates.ts
+src/lib/defects/path-to-repair.ts
+src/lib/defects/repair-catalog.ts
+src/lib/defects/repair-hours-ledger.ts
+tests/defects.test.mjs
+tests/shared.test.mjs
+
+$ git diff --shortstat ebfb89b..b9c1e81
+ 10 files changed, 930 insertions(+), 19 deletions(-)
+
+$ git diff --name-only ebfb89b..b9c1e81 -- supabase package.json package-lock.json .github public worker
+(nothing)
+```
+
+Merged from PR #31 as a rebase, so `main` stays linear and these are its own
+six commits rather than a merge commit.
+
+## Migrations
+
+**None, and two new keys.** Adding a key is fine; nothing is renamed and nothing
+already on a device is read differently.
+
+```
+pace-ptr-v1            PATH TO REPAIR: how to approach a repair, per repair
+pace-repair-hours-v1   what this shop says a repair takes, per repair
+```
+
+Both are documented in `CLAUDE.md`, and a test fails if a key is not. Both are
+**device-local**: carrying them would need `shop_memory` to accept a third
+`kind`, which is a schema change on the live database and therefore Curtis's
+call. Not done, and the PATH TO REPAIR screen says so where somebody writes one.
+
+## What changed
+
+**1. The feed header says how long the work standing on it would take.**
+
+```
+LIVE REPAIR FEED
+81 BUSES · 275 DEFECTS   38h 30m ESTIMATED
+```
+
+Curtis asked for *"a little badge that shows how many hours all of the ...
+defects that are currently on the bus add up to"*. The Down Sheet has printed
+the same number since it was built; the Defect Log never had it. It reads the
+**Down Sheet's own estimate table** rather than growing a second one, so a
+repair cannot show two different numbers on two screens, and it follows the
+search — stand on one bus and it reads that bus's outstanding work.
+
+**2. The shop can set its own repair times.** A `SHOP TIME FOR THIS REPAIR` box
+on the PATH TO REPAIR screen. Type a number and it is the estimate for that
+repair on every bus until somebody changes it; empty the box and the catalog
+estimate returns.
+
+A **ledger, not a learner** — Curtis turned down the version that averages its
+way to a figure: *"that's not necessarily an adaptive strategy, but that's more
+like a fixed ledger."* Three sources, most specific first: hours typed on THIS
+defect, then this ledger, then the catalog.
+
+**3. PATH TO REPAIR.** A `PTR` button on each defect card in the focus view,
+opening a screen for general direction — *"refer to Cummins INSIGHT, check the
+oil first, look for corrosion behind the AC filters"*. Written once per repair
+and shown on every bus with that fault. Not a diagnosis and not a procedure.
+
+**4. Typed line breaks reach the screen**, plus a `• BULLET` button beside
+DESCRIPTION. Nothing was ever losing them — the record kept every newline and
+HTML was collapsing them on the way to the screen.
+
+**5. FIXED TODAY was missing every fix made on this device.** MARK FIXED
+completes a repair and hides it in the same action, and the counter was reading
+the list that excludes hidden records. A board holding two repairs completed
+today reported **one**. Nothing was ever lost.
+
+## Verified
+
+Gates re-run on `b9c1e81` itself, after the merge:
+
+- **346 tests pass**, 0 fail (338 before this release, counted at both revisions)
+- `npm run lint` clean
+- `npm run build` complete
+
+**Nineteen mutations fail the new guards across the release.** The ones that
+matter: the hours badge sourcing from the unsearched list so it quotes the whole
+fleet while standing on one bus; the shop's ledger being ignored so the catalog
+wins; a cleared time or writeup staying in force; `FIXED TODAY` going back to
+the list that cannot see this device's own fixes; a PTR key that stops resolving
+through the catalog's rename maps, which would orphan every writeup the first
+time a category is renamed; and the description's `pre-wrap` being dropped so
+line breaks collapse again.
+
+Driven in Chromium at 360 / 390 / 430 / 820 against seeded boards:
+
+| Check | Result |
+| --- | --- |
+| Hours badge | `6h 30m ESTIMATED`, and the module computes 390 minutes for the same board |
+| Shop time | two buses with the same repair read **7h**; setting 1.5h made it **3h**; clearing it returned **7h** |
+| The second bus | showed `1.5` without being touched — which is what "per repair" means |
+| PATH TO REPAIR | written on 17543, already present on 17566, survived a reload |
+| Description | two paragraphs and two bullets typed, saved, reopened — four lines on screen, stored string identical |
+| FIXED TODAY | the board that reported **1** now reports **2**, against 2 completed today in the record |
+
+Two bugs the browser caught that the tests had not: the PTR panel opened looking
+normal and was **completely dead**, because both shades share one z-index and
+the focus shade painted on top of it — and the test had asserted the inverse
+mechanism and passed. And the BULLET button left the caret at position 0, so the
+next words dictated landed welded to the front of the paragraph.
+
+## What to check once it is live
+
+1. Open the **Defect Log**. The line under LIVE REPAIR FEED should now end with
+   a small badge like `38h 30m ESTIMATED`. Search one bus — all three numbers on
+   that line should narrow together.
+2. Open **DAILY STATS** and press MARK FIXED on something. **FIXED TODAY should
+   go up by one.** Before this release it did not move.
+3. **FOCUS** a bus, then press **PTR** on one of its defects. The screen should
+   be titled PATH TO REPAIR and open straight into the editor if nothing is
+   written. Write a line and save it.
+4. Open a **different bus with the same repair** and press PTR. Your writeup
+   should already be there. That is the whole feature.
+5. On that same screen, type a number into **SHOP TIME FOR THIS REPAIR**. The
+   hours badge on the feed should move for **every** bus carrying that repair.
+   Clear the box and the catalog estimate comes back.
+6. **EDIT DEFECT** on anything, type a description with a blank line and press
+   **• BULLET** a couple of times. Save it, reopen the focus view: the breaks
+   should still be there. This is the one Curtis reported — *"when I saved it,
+   it just put them all back together, both paragraphs."*
+
+## Rollback
+
+Roll back to 184 (`c296486`) if it is live, else 183 (`6dc96fe`), else 182
+(`807357a`), else `sites-v181` (`148a45e`).
+
+**Nothing already stored is altered**, so no defect, entry, recommendation or
+deferral logged under 185 is lost. The two new keys are simply not read by an
+earlier version: a PTR writeup and a shop repair time stay on the device,
+untouched, and reappear when 185 is published again.
