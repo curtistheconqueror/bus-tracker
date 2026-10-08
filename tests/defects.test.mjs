@@ -1818,8 +1818,11 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(css,/\.add-log-focus-defect\+\.close-log-focus\{margin-left:0\}/);
  assert.match(css,/\.feed-title button\{height:36px;border:0;border-radius:6px;background:#08733f/);
 
- // larger reading type than the feed it replaces, and a real touch target
- assert.match(css,/\.log-focus-defect\{margin:0 0 11px;font-size:21px/);
+ // larger reading type than the feed it replaces, and a real touch target.
+ // `white-space:pre-wrap` joined this rule when typed line breaks stopped being
+ // collapsed on the way to the screen; the size claim is unchanged and still
+ // the point of this assertion.
+ assert.match(css,/\.log-focus-defect\{margin:0 0 11px;white-space:pre-wrap;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
  assert.match(css,/\.log-focus-record-actions\{display:flex;align-items:center;gap:8px\}/);
@@ -5073,4 +5076,48 @@ test("the PTR button sits on the defect card and opens the repair's own writeup"
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/,"which is the rule it is leaning on");
  /* The line breaks somebody typed ARE the steps. */
  assert.match(css,/\.ptr-steps\{[^}]*white-space:pre-wrap/);
+});
+
+test("the line breaks somebody types in a description survive to the screen",async()=>{
+ /* Curtis: "I even tried hitting the space button to put a space in between it,
+    and it did while I was in the text input space, but when I saved it, it just
+    put them all back together, both paragraphs."
+
+    Nothing was ever losing them. The save path trims the ENDS of the string and
+    the record keeps every newline; HTML collapses them on the way to the screen
+    unless the element says otherwise. So this is a rendering rule, and the
+    assertions below hold both halves of that: the data is untouched, and the
+    element that draws it keeps the breaks. */
+ const {normalizeDefects}=await import("../src/lib/defects/repair-catalog.ts");
+ const typed="The check engine light stays on.\n\n• Temperature sits at 205-210\n• Spikes to 220 under load";
+ const stored=normalizeDefects([{id:"d1",category:"Engine",issue:"Misfire",details:typed,state:"open"}],"","bus");
+ assert.equal(stored[0].details,typed,"the record keeps the breaks exactly as typed");
+ assert.equal(stored[0].details.split("\n").length,4);
+
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* The save path trims the ends and nothing more — no collapsing of internal
+    whitespace, which is what would actually destroy them. */
+ assert.match(page,/details=defect\.details\.trim\(\)/);
+ assert.equal(/details\.replace\(\/\\s\+\/g/.test(page),false,"nothing flattens the inside of the string");
+
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ /* pre-wrap, not pre: the typed breaks are kept AND long lines still wrap to
+    the phone instead of scrolling sideways. */
+ assert.match(css,/\.log-focus-defect\{[^}]*white-space:pre-wrap/);
+ assert.equal(/\.log-focus-defect\{[^}]*white-space:pre;/.test(css),false,"pre alone would scroll a phone sideways");
+
+ /* BULLET needs no parser once breaks are kept: a line starting with a dot is a
+    line. It appends rather than inserting at the caret, because dictation
+    leaves the caret wherever the recogniser put it. */
+ assert.match(page,/className="insert-bullet"/);
+ assert.match(page,/needsBreak=Boolean\(current\.trim\(\)\)&&!current\.endsWith\("\\n"\)/,"a bullet never opens on a blank box, and never doubles a break");
+ assert.match(page,/updateDefect\("details",current\+\(needsBreak\?"\\n":""\)\+"• "\)/);
+ /* AND THE CARET FOLLOWS IT. Pressing the button blurs the box and React
+    re-renders it from the new value, leaving the caret at position 0 — so the
+    next words typed or dictated land at the TOP of the description. Caught in
+    a browser: the probe pressed BULLET, typed, and found its sentence welded
+    to the front of the paragraph. Restored on the NEXT frame, because setting
+    the selection in the same tick sets it on the pre-update value. */
+ assert.match(page,/requestAnimationFrame\(\(\)=>\{const box=detailsRef\.current;if\(!box\)return;box\.focus\(\);box\.setSelectionRange\(box\.value\.length,box\.value\.length\)\}\)/);
+ assert.match(page,/<textarea ref=\{detailsRef\}/,"the ref the caret fix needs is actually attached");
 });

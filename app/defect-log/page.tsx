@@ -2,7 +2,7 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -131,6 +131,8 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
 
 function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>void;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
+ /* Held so BULLET can put the caret back after it appends — see its onClick. */
+ const detailsRef=useRef<HTMLTextAreaElement|null>(null);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
     that already had a diagnosis, an action, or a part recorded. React warned
     about it and the section simply never opened. Held in state instead, seeded
@@ -479,7 +481,24 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
     {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
-    <label className="wide">DESCRIPTION<textarea value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder="What was reported, observed, or repaired?"/></label>
+    {/* BULLET starts a new line with a dot on it, which is the whole feature:
+        the breaks somebody types are kept now, so a dot at the start of a line
+        IS a bullet and nothing has to parse anything. It appends rather than
+        inserting at the cursor on purpose — dictating into a phone leaves the
+        caret wherever the recogniser last put it, and a bullet landing in the
+        middle of a sentence is worse than one landing at the end. */}
+    <label className="wide description-label"><span className="description-head">DESCRIPTION<button type="button" className="insert-bullet" aria-label="Start a new bulleted line in the description" onClick={()=>{
+     const current=value.defect.details,needsBreak=Boolean(current.trim())&&!current.endsWith("\n");
+     updateDefect("details",current+(needsBreak?"\n":"")+"• ");
+     /* THE CARET HAS TO FOLLOW THE BULLET. Pressing the button blurs the box
+        and React re-renders it from the new value, which leaves the caret at
+        position 0 — so the next words typed, or dictated, land at the TOP of
+        the description instead of after the dot. Measured in a browser: the
+        probe pressed BULLET, typed, and found its sentence welded to the front
+        of the paragraph. Restored on the next frame, after React has written
+        the new value in, or the selection is set on the old one. */
+     requestAnimationFrame(()=>{const box=detailsRef.current;if(!box)return;box.focus();box.setSelectionRange(box.value.length,box.value.length)});
+    }}>• BULLET</button></span><textarea ref={detailsRef} value={value.defect.details} onChange={event=>updateDefect("details",event.target.value)} placeholder={"What was reported, observed, or repaired?\n\nLine breaks are kept. Start a line with • for a bullet."}/></label>
     {/* Directly above WORK STATUS, and outside ADVANCED DETAILS on purpose:
         these are what gets ticked mid-job on a phone, by somebody standing at
         the bus, and burying them behind a disclosure is how they would go
