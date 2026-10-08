@@ -4946,3 +4946,25 @@ test("the estimate badge is scoped like the numbers beside it, and wins its own 
  assert.match(estimates,/from "\.\.\/down-sheet\/repair-time-estimates\.ts"/);
  assert.equal(/CATEGORY_REPAIR_MINUTES|repairMinutes:\s*\d/.test(estimates),false,"no second table of its own");
 });
+
+test("FIXED TODAY counts the fixes made on this device",async()=>{
+ /* Found while building the hours badge, measured not read: a board holding
+    two repairs completed today reported ONE. Pressing MARK FIXED completes a
+    repair and stamps defectLogHiddenAt in the same action, and the counter was
+    computed from the list defined as "everything without that stamp" — so
+    every fix made on this device fell out of its own tally, and the ones that
+    did count were the ones that arrived some other way. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/fixedToday:allRecords\.filter\(record=>record\.defect\.state==="completed"/,"the full record, hidden fixes included");
+ assert.equal(/fixedToday:records\.filter/.test(page),false,"never the list that drops hidden records");
+ /* The two lists are still different things, and the rest of the stats are
+    deliberately built from the narrower one: ACTIVE, BUSES and DOWNING describe
+    what is on the feed, and a hidden repair is not on the feed. Only the FIXED
+    count asks a question about history. */
+ assert.match(page,/const records=useMemo\(\(\)=>allRecords\.filter\(record=>!record\.defect\.defectLogHiddenAt\)/);
+ assert.match(page,/active=records\.filter\(record=>isUnresolved\(record\.defect\)\)/);
+
+ /* And MARK FIXED still hides, because that is what keeps the feed to
+    outstanding work — the counter was the bug, not the hiding. */
+ assert.match(page,/persist\(hideDefectLogRecords\(result\.fleet,\[\{busId:record\.bus\.id,defectId:record\.defect\.id\}\]/);
+});
