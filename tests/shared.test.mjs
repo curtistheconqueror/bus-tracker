@@ -356,7 +356,7 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
     fixing the Down Sheet alone would have left the Defect Log turning 1.5 into
     15. */
  assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
- assert.equal((log.match(/<HoursField /g)||[]).length,2,"Defect Log: repair and diagnostic");
+ assert.equal((log.match(/<HoursField /g)||[]).length,3,"Defect Log: repair, diagnostic, and the shop's time for the repair on the PATH TO REPAIR screen");
  /* Scoped to HOURS. The Defect Log's quantity box is also type=number and is
     left alone on purpose: it counts quarts, not time, so a trailing decimal
     point is not the thing people type into it. (It has a smaller relative of

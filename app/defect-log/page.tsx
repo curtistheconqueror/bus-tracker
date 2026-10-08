@@ -23,7 +23,8 @@ import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 import {MAX_PATH_TO_REPAIR,findPathToRepair,readPathToRepairs,savePathToRepair,writePathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
-import {openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
+import {findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,writeRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {defectEstimateMinutes,openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
 import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
@@ -697,6 +698,12 @@ export default function DefectLog(){
     belongs to the repair and not to one bus's instance of it. */
  const [pathToRepairs,setPathToRepairs]=useState<PathToRepairLibrary>({entries:[]});
  useEffect(()=>setPathToRepairs(readPathToRepairs(localStorage)),[]);
+ /* THE SHOP'S OWN REPAIR TIMES, beside the writeups and on the same screen:
+    one place per repair for what this garage knows about it — how to approach
+    it, and how long it takes here. Curtis: "as long as a person can change the
+    repair times then and then it updates. That's all that matters really." */
+ const [repairHours,setRepairHours]=useState<RepairHoursLedger>({entries:[]});
+ useEffect(()=>setRepairHours(readRepairHoursLedger(localStorage)),[]);
  const [ptrFor,setPtrFor]=useState<{category:string;issue:string}|null>(null);
  const [ptrDraft,setPtrDraft]=useState("");
  const [ptrEditing,setPtrEditing]=useState(false);
@@ -720,6 +727,17 @@ export default function DefectLog(){
   if(!writePathToRepairs(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
   setPathToRepairs(next);
   setPtrEditing(false);
+  setPtrProblem("");
+ };
+ /* Saved on its own, not folded into the steps: a time and a writeup are two
+    different claims, and somebody correcting one must not have to re-save the
+    other. An empty box removes the shop's figure and the catalog estimate
+    comes back — withdrawing a claim is the same gesture as never making it. */
+ const saveShopHours=(hours:string)=>{
+  if(!ptrFor)return;
+  const next=saveRepairMinutes(repairHours,{category:ptrFor.category,issue:ptrFor.issue,hours,by:settings.defaultInitials});
+  if(!writeRepairHoursLedger(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
+  setRepairHours(next);
   setPtrProblem("");
  };
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
@@ -800,7 +818,7 @@ export default function DefectLog(){
     Built from `visible` rather than from `active` for exactly that reason —
     `active` ignores the search, and a line reading "1 BUS · 2 DEFECTS · 31h"
     while standing on one bus would be quoting the whole fleet's hours. */
- const visibleEstimateMinutes=openDefectsEstimateMinutes(visible.map(record=>record.defect));
+ const visibleEstimateMinutes=openDefectsEstimateMinutes(visible.map(record=>record.defect),repairHours);
  /* How many buses the search alone is holding back. Zero when nothing is typed,
     which is what keeps the banner off the page the rest of the time. */
  const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
@@ -1508,6 +1526,20 @@ export default function DefectLog(){
   {ptrFor&&<div className="log-shade ptr-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setPtrFor(null)}}>
    <section className="ptr-panel" role="dialog" aria-modal="true" aria-label="Path to repair">
     <div className="ptr-head"><span><small>PATH TO REPAIR</small><b>{repairCategoryLabel(ptrFor.category)}</b><i>{ptrFor.issue}</i></span><button className="ptr-close" type="button" onClick={()=>setPtrFor(null)} aria-label="Close path to repair">×</button></div>
+    {/* THE SHOP'S TIME, above the steps and always present. It is the one number
+        on this screen that the hours badge on the feed reads, so it is shown
+        whether or not anybody has written steps — a repair can have a time and
+        no writeup, or a writeup and no time. */}
+    {(()=>{
+     const shop=findRepairMinutes(repairHours,ptrFor.category,ptrFor.issue);
+     const fallback=defectEstimateMinutes({id:"ptr",category:ptrFor.category,issue:ptrFor.issue,details:"",operability:"service",state:"open"} as StructuredDefect);
+     return <div className="ptr-hours">
+      <label>SHOP TIME FOR THIS REPAIR<HoursField value={shop?Math.round(shop.minutes/60*100)/100:undefined} placeholder={String(Math.round(fallback/60*100)/100)} ariaLabel="Shop time for this repair, in hours" onChange={hours=>saveShopHours(hours===undefined?"":String(hours))}/></label>
+      <small>{shop
+       ?"SET BY "+(shop.updatedBy||"SOMEONE")+" · USED FOR EVERY BUS WITH THIS REPAIR"
+       :"NOT SET — ESTIMATING "+formatRepairTime(fallback)+" FROM THE CATALOG. TYPE A NUMBER TO REPLACE IT."}</small>
+     </div>;
+    })()}
     {(()=>{
      const saved=findPathToRepair(pathToRepairs,ptrFor.category,ptrFor.issue);
      if(ptrEditing)return <div className="ptr-body">

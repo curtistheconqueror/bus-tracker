@@ -1,4 +1,5 @@
 import {normalizeRepairTimeEstimate,repairTimeTotal} from "../down-sheet/repair-time-estimates.ts";
+import {findRepairMinutes,type RepairHoursLedger} from "./repair-hours-ledger.ts";
 import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
 
 /* HOW LONG THE WORK STANDING ON THE BOARD WOULD TAKE.
@@ -23,9 +24,21 @@ import {isUnresolved,type StructuredDefect} from "./repair-catalog.ts";
    did it in fifteen minutes, and rounding that up to half an hour would quietly
    overstate the board. Both halves of what the editor collects are counted,
    because diagnostic time is time: a fault nobody can find yet is work. */
-export function defectEstimateMinutes(defect:StructuredDefect){
+export function defectEstimateMinutes(defect:StructuredDefect,ledger?:RepairHoursLedger){
+ /* THREE SOURCES, MOST SPECIFIC FIRST, and the order is the whole design.
+
+    1. WHAT SOMEBODY WROTE ON THIS JOB. The hours typed on this defect describe
+       this bus on this day and beat any general figure.
+    2. WHAT THIS SHOP SAYS THE REPAIR TAKES — the ledger, set by hand. Curtis:
+       "as long as a person can change the repair times then and then it
+       updates. That's all that matters really." It is a fixed number somebody
+       stands behind, not something that drifts.
+    3. THE CATALOG'S ESTIMATE, which is a guess made by somebody who has never
+       stood in this garage, and is therefore last. */
  const typed=(defect.repairHours||0)+(defect.diagnosticHours||0);
  if(typed>0)return Math.round(typed*60);
+ const shop=ledger?findRepairMinutes(ledger,defect.category||"",defect.issue||""):null;
+ if(shop)return shop.minutes;
  return repairTimeTotal(normalizeRepairTimeEstimate(undefined,defect.category||"",defect.issue||""));
 }
 
@@ -41,6 +54,6 @@ export function defectEstimateMinutes(defect:StructuredDefect){
    them — so on a board built the way this shop builds one, summing only typed
    hours would report a fraction of the day's work and look authoritative doing
    it. */
-export function openDefectsEstimateMinutes(defects:StructuredDefect[]){
- return defects.reduce((total,defect)=>isUnresolved(defect)?total+defectEstimateMinutes(defect):total,0);
+export function openDefectsEstimateMinutes(defects:StructuredDefect[],ledger?:RepairHoursLedger){
+ return defects.reduce((total,defect)=>isUnresolved(defect)?total+defectEstimateMinutes(defect,ledger):total,0);
 }
