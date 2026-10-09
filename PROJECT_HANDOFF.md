@@ -55,7 +55,7 @@ Preserve these rules through refactors and backend migration:
 
 Repository release 185 is live as Sites Version 182 from commit b9c1e81, published on 2026-10-09. This one deployment includes repository releases 182–185: usable and labelled defect pickers; the app/src repository reorganization; shift-scoped Defect Log lists and initials-aware LOGGED reports; outstanding repair hours; a device-local shop repair-time ledger; PATH TO REPAIR; preserved description line breaks; and the FIXED TODAY count correction. No existing LocalStorage key was renamed and no Supabase schema changed. The additive pace-ptr-v1 and pace-repair-hours-v1 keys remain device-local. The normal rollback target is Sites Version 181 from commit 148a45e (`sites-v181`).
 
-Sites and repository numbering differ: `sites-v182` names the live source for repository release 185. Native deployment succeeded; fresh cloud build, lint and 346 tests passed. The original phone/offline and live-device editing checklists remain in docs/archive/PUBLISH_RELEASE_185.md and were not rerun during publishing. No real fleet records were changed.
+Sites and repository numbering differ: the prepared local `sites-v182` tag points to the live source for repository release 185. Its remote GitHub tag push is pending Git authentication; do not assume that tag exists on GitHub. Native deployment succeeded; fresh cloud build, lint and 346 tests passed. The original phone/offline and live-device editing checklists remain in docs/archive/PUBLISH_RELEASE_185.md and were not rerun during publishing. No real fleet records were changed.
 
 The Version 171 baseline details below remain useful historical context:
 

@@ -14,11 +14,13 @@ readable description line breaks and FIXED TODAY correction.
 - Live site: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site
 - Release evidence and rollback: [RELEASES.md](RELEASES.md)
 - Original handoff and phone checklists: [published 182–185 handoff](archive/PUBLISH_RELEASE_185.md)
-- Current source rollback tag: `sites-v182` (source `b9c1e81`)
+- Prepared local rollback tag: `sites-v182` (source `b9c1e81`); remote GitHub tag push pending Git authentication
 - Previous live rollback point: `sites-v181` (source `148a45e`)
 
 Fresh cloud production build, lint and all 346 tests passed. The native Sites
 production deployment succeeded. The phone/offline and live-device editing
 checklists remain unverified in this publish; no real fleet records were changed.
+
+Only the remote rollback-tag push remains pending; the application release is already live.
 
 Add the next unpublished release here after its source is committed and validated.

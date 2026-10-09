@@ -107,7 +107,7 @@ versions were created to align them.
 - Gates: fresh cloud production build, ESLint and 346 tests passed; `git diff --check` clean. Exact-source [GitHub CI](https://github.com/curtistheconqueror/bus-tracker/actions/runs/37851672242) also passed.
 - Validation boundary: publication confirmed by native deployment and saved-version results. Live-device phone, editing and offline checklists were not rerun; no real fleet records were changed.
 - Data: no schema migration or existing-key rename. `pace-ptr-v1` and `pace-repair-hours-v1` are additive, device-local keys.
-- Rollback tag for this source: `sites-v182`. Previous live target: `sites-v181` (`148a45e`). Rolling back leaves the two new keys untouched but unread until this release returns.
+- Prepared local rollback tag for this source: `sites-v182`, pointing to `b9c1e81`. Its remote GitHub push is pending Git authentication; the tag is not yet present on GitHub. Previous live target: `sites-v181` (`148a45e`). Rolling back leaves the two new keys untouched but unread until this release returns.
 - Historical handoff and all four phone checklists: [published releases 182–185](archive/PUBLISH_RELEASE_185.md).
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
