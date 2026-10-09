@@ -1825,8 +1825,8 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(css,/\.log-focus-defect\{margin:0 0 11px;white-space:pre-wrap;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
- assert.match(css,/\.log-focus-record-actions\{display:flex;align-items:center;gap:8px\}/);
- assert.match(css,/\.log-focus-record-foot button\{[^}]*padding:0 14px[^}]*font-size:11px/);
+ assert.match(css,/\.log-focus-record-actions\{display:grid;grid-auto-flow:column;grid-auto-columns:minmax\(0,1fr\);gap:8px;width:100%\}/);
+ assert.match(css,/\.log-focus-record-foot button\{[^}]*padding:0 6px[^}]*font-size:11px/);
  assert.match(css,/\.fix-log-focus-defect\{background:#08733f\}/);
  assert.match(css,/\.log-card-group>\.log-focus-button\{position:absolute;top:6px;right:6px/);
  // the card header reserves the corner so repair text cannot run under the control
@@ -5215,4 +5215,27 @@ test("SHOP TIME sits on the PATH TO REPAIR screen and feeds the hours badge",asy
  assert.match(page,/NOT SET — ESTIMATING "\+formatRepairTime\(fallback\)\+" FROM THE CATALOG/);
  /* And who set it when one is. */
  assert.match(page,/"SET BY "\+\(shop\.updatedBy\|\|"SOMEONE"\)\+" · USED FOR EVERY BUS WITH THIS REPAIR"/);
+});
+
+
+test("focus repair actions share one full-width row above the date, with PTR last",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ const foot=page.slice(page.indexOf('<div className="log-focus-record-foot">'),page.indexOf('    </article>)}',page.indexOf('<div className="log-focus-record-foot">')));
+ const actions=foot.slice(foot.indexOf('<div className="log-focus-record-actions">'),foot.indexOf('<div className="log-focus-record-meta">'));
+ assert.ok(actions.indexOf('className="edit-log-focus-defect"')<actions.indexOf('className="fix-log-focus-defect"'));
+ assert.ok(actions.indexOf('className="fix-log-focus-defect"')<actions.indexOf('className="ptr-log-focus-defect"'));
+ assert.equal((actions.match(/<button /g)||[]).length,3);
+ assert.equal(actions.includes('UNDO DEFERRED'),false,"the optional action must not squeeze the equal main row");
+ assert.match(foot,/<div className="log-focus-record-meta"><time>LOGGED/);
+ assert.match(foot,/className="undo-deferred"[^>]*onClick=\{\(\)=>undoDeferred\(record\)\}>UNDO DEFERRED/);
+ assert.match(css,/\.log-focus-record-foot\{display:flex;flex-direction:column;align-items:stretch/);
+ assert.match(css,/\.log-focus-record-actions>button\{width:100%;min-width:0\}/);
+ assert.equal(/\.log-focus-record-actions\{[^}]*flex-wrap/.test(css),false);
+ assert.match(page,/placeholder="Add the first checks and useful references to help someone start this repair\."/);
+ assert.equal(page.includes('Check the oil level first.'),false,"example instructions are not shown as repair advice");
+ assert.match(page,/<textarea value=\{ptrDraft\}/,"saved notes stay in the editor value, separate from help text");
+ assert.match(page,/<p className="ptr-steps">\{saved.steps\}<\/p>/,"reading still shows the user's saved writeup");
 });
