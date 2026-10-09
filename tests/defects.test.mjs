@@ -5232,7 +5232,7 @@ test("focus repair actions share one full-width row above the date, with PTR las
  assert.match(foot,/<div className="log-focus-record-meta"><time>LOGGED/);
  assert.match(foot,/className="undo-deferred"[^>]*onClick=\{\(\)=>undoDeferred\(record\)\}>UNDO DEFERRED/);
  assert.match(css,/\.log-focus-record-foot\{display:flex;flex-direction:column;align-items:stretch/);
- assert.match(css,/\.log-focus-record-actions>button\{width:100%;min-width:0\}/);
+ assert.match(css,/\.log-focus-record-actions>button\{[^}]*width:100%;min-width:0;align-self:stretch;padding:8px 6px;line-height:1\.2;text-align:center;white-space:normal;overflow-wrap:anywhere\}/);
  assert.equal(/\.log-focus-record-actions\{[^}]*flex-wrap/.test(css),false);
  assert.match(page,/placeholder="Add the first checks and useful references to help someone start this repair\."/);
  assert.equal(page.includes('Check the oil level first.'),false,"example instructions are not shown as repair advice");

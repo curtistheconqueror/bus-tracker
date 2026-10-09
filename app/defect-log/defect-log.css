@@ -383,9 +383,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-record-foot{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
 .log-focus-record-foot time{font-size:11px;font-weight:800;color:var(--log-muted)}
 .log-focus-record-actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;width:100%}
-.log-focus-record-actions>button{width:100%;min-width:0}
 .log-focus-record-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-header-text);padding:0 6px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+/* At 320px, body/card padding and borders leave 79.67px per action before
+   a possible scrollbar. Let labels wrap, rather than overflow or shrink, and
+   let one grid row stretch all three buttons to the same 44px-or-taller size. */
+.log-focus-record-actions>button{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;align-self:stretch;padding:8px 6px;line-height:1.2;text-align:center;white-space:normal;overflow-wrap:anywhere}
 .edit-log-focus-defect{background:var(--log-accent)}
 .fix-log-focus-defect{background:#08733f}
 .edit-log-focus-defect:hover,.edit-log-focus-defect:focus-visible{filter:brightness(1.1)}
