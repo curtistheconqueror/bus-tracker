@@ -1,6 +1,25 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M22 19.2727C22 20.779 20.779 22 19.2727 22H14.7273C13.221 22 12 20.779 12 19.2727V12H19.2727C20.779 12 22 13.221 22 14.7273V19.2727Z" fill="#68C4FF"/>
-<path d="M20 2C21.1046 2 22 2.89543 22 4V7C22 8.10457 21.1046 9 20 9H17C15.8954 9 15 8.10457 15 7V4C15 2.89543 15.8954 2 17 2H20Z" fill="#0C79D8"/>
-<path d="M7 15C8.10457 15 9 15.8954 9 17V20C9 21.1046 8.10457 22 7 22H4C2.89543 22 2 21.1046 2 20V17C2 15.8954 2.89543 15 4 15H7Z" fill="#0C79D8"/>
-<path d="M12 12H4.72727C3.22104 12 2 10.779 2 9.27273V4.72727C2 3.22104 3.22104 2 4.72727 2H9.27273C10.779 2 12 3.22104 12 4.72727V12Z" fill="#2E9EFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<title>FLEETSTEP</title>
+<!-- FS, split on the diagonal: navy above the line, white below it, and the two
+     colours swap across it. Full bleed and opaque on purpose — every platform
+     applies its own corner mask, and an icon with a transparent ground gets
+     filled in black by iOS. No rounded corners here for the same reason.
+
+     The letters are Archivo Black (SIL Open Font License), converted to
+     outlines so the icon never depends on a font being installed. Each sits at
+     the centre of its own half's inscribed circle, which is what keeps it off
+     the dividing line: measured off the rendered artwork, the nearest ink is
+     193 units clear on the F and 122 on the S, perpendicular to the diagonal.
+     Letters that fill more of each triangle would spill over it. Content stays
+     inside the iOS squircle;
+     for Android's circular crop see icon-maskable.svg, which is this artwork
+     with the letters drawn in closer. -->
+<rect width="1024" height="1024" fill="#06275C"/>
+<path d="M1024 0V1024H0Z" fill="#FFFFFF"/>
+<g transform="translate(169.06 137.98) scale(0.471 -0.471) translate(-74 -688)" fill="#FFFFFF">
+<path d="M74 688H630V523H295V405H583V247H295V0H74Z"/>
+</g>
+<g transform="translate(572.58 556.33) scale(0.471 -0.471) translate(-43 -700)" fill="#06275C">
+<path d="M667 488V476H460V480Q460 510 438.0 530.0Q416 550 371 550Q327 550 303.5 537.0Q280 524 280 505Q280 478 312.0 465.0Q344 452 415 438Q498 421 551.5 402.5Q605 384 645.0 342.0Q685 300 686 228Q686 106 603.5 47.0Q521 -12 383 -12Q222 -12 132.5 42.0Q43 96 43 233H252Q252 181 279.0 163.5Q306 146 363 146Q405 146 432.5 155.0Q460 164 460 192Q460 217 429.5 229.5Q399 242 330 256Q246 274 191.0 293.5Q136 313 95.0 358.0Q54 403 54 480Q54 593 141.5 646.5Q229 700 363 700Q495 700 580.0 646.5Q665 593 667 488Z"/>
+</g>
 </svg>

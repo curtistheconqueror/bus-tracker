@@ -160,8 +160,14 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.ok(served.length>1,"expected to find real page routes under app/");
   for(const route of served)assert.ok(precached.includes(route),route+" is a real page but sw.js does not pre-cache it, so it is blank offline");
   /* Changing CORE_PAGES without bumping the cache name leaves phones on the old
-     pre-cache: activate only purges caches whose name no longer matches. */
-  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v5"/);
+     pre-cache: activate only purges caches whose name no longer matches. The
+     same holds when a CORE_FILE's CONTENTS change under an unchanged name —
+     these files are served cache-first and, unlike the hashed chunks, keep
+     their names from one release to the next, so a phone that already holds
+     one never asks for it again. The new icon in Version 186 changed
+     favicon.svg and the manifest without renaming either, which is why that
+     release bumped this line too. */
+  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v6"/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
