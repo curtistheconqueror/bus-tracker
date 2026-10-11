@@ -1,11 +1,19 @@
-/* Bumped whenever CORE_PAGES changes. The activate handler deletes every cache
-   under the old name, which is the only thing that clears the dead hashed asset
-   files left behind by earlier releases — each build renames every chunk, so
-   without a bump the old ones sit on the phone forever, never requested and
-   never removed. The cost is one re-download of the shell, online, on first
-   launch after an update. */
-const CACHE_NAME = "pace-bus-tracker-shell-v5";
-const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg"];
+/* Bumped whenever CORE_PAGES changes, AND whenever the CONTENTS of a CORE_FILE
+   change. The activate handler deletes every cache under the old name, which is
+   the only thing that clears the dead hashed asset files left behind by earlier
+   releases — each build renames every chunk, so without a bump the old ones sit
+   on the phone forever, never requested and never removed. The cost is one
+   re-download of the shell, online, on first launch after an update.
+
+   The contents half of that rule is not theoretical: these files are served
+   cache-first and keep their NAMES across releases, unlike the hashed chunks.
+   A new icon or a changed manifest under an unbumped name is a file the phone
+   already holds and will never ask for again. */
+const CACHE_NAME = "pace-bus-tracker-shell-v6";
+/* The icons are here so a phone that first opens the app in a bay with no
+   signal still has them, and because the fetch handler below serves anything
+   in this list cache-first. */
+const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"];
 /* Every page the app has. Fleet Campaigns was missing until Version 137, so a
    phone that had never opened it while online got nothing when it lost signal
    in a bay — which is the one situation this whole file exists for. Settings

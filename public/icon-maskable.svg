@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<title>FLEETSTEP</title>
+<!-- The same artwork as favicon.svg, for Android's MASKABLE purpose.
+
+     A maskable icon is cropped to a shape the launcher chooses, and the only
+     region guaranteed to survive is the centre circle of 80% diameter — radius
+     410 of 1024. The ground still has to be full bleed, because the crop can
+     also be a square; it is only the LETTERS that have to come in. At their
+     favicon.svg placement the F's farthest ink sits 507 units from the centre
+     and the S's 478, so a circular crop takes a bite out of both.
+
+     So the two letters, and nothing else, are scaled to 0.76 about the centre.
+     Measured off the rendered artwork that puts the F at 385 and the S at 363,
+     a comfortable 25 units inside 410. 0.8 also fits, by four units, which is
+     no margin at all for a crop whose exact shape the launcher chooses; the
+     letters at 0.76 are 5% smaller and nobody can see the difference. Scaling
+     about the centre is also what keeps them off the
+     diagonal, which passes through that same point — each letter's clearance
+     shrinks in proportion rather than closing up. -->
+<rect width="1024" height="1024" fill="#06275C"/>
+<path d="M1024 0V1024H0Z" fill="#FFFFFF"/>
+<g transform="translate(512 512) scale(0.76) translate(-512 -512)">
+<g transform="translate(169.06 137.98) scale(0.471 -0.471) translate(-74 -688)" fill="#FFFFFF">
+<path d="M74 688H630V523H295V405H583V247H295V0H74Z"/>
+</g>
+<g transform="translate(572.58 556.33) scale(0.471 -0.471) translate(-43 -700)" fill="#06275C">
+<path d="M667 488V476H460V480Q460 510 438.0 530.0Q416 550 371 550Q327 550 303.5 537.0Q280 524 280 505Q280 478 312.0 465.0Q344 452 415 438Q498 421 551.5 402.5Q605 384 645.0 342.0Q685 300 686 228Q686 106 603.5 47.0Q521 -12 383 -12Q222 -12 132.5 42.0Q43 96 43 233H252Q252 181 279.0 163.5Q306 146 363 146Q405 146 432.5 155.0Q460 164 460 192Q460 217 429.5 229.5Q399 242 330 256Q246 274 191.0 293.5Q136 313 95.0 358.0Q54 403 54 480Q54 593 141.5 646.5Q229 700 363 700Q495 700 580.0 646.5Q665 593 667 488Z"/>
+</g>
+</g>
+</svg>

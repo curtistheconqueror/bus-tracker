@@ -110,6 +110,69 @@ test("installs and caches an offline app shell", async () => {
   assert.match(worker, /\/fixed-repairs/);
 });
 
+test("the home-screen icon is one a phone can actually use", async () => {
+  const [layout, favicon, maskable, manifestText] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../public/favicon.svg", import.meta.url), "utf8"),
+    readFile(new URL("../public/icon-maskable.svg", import.meta.url), "utf8"),
+    readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
+  ]);
+  const manifest = JSON.parse(manifestText);
+
+  /* THE ONE THAT WAS WRONG. iOS does not accept SVG for an apple-touch-icon;
+     given one it ignores it and puts a screenshot of the page on the home
+     screen instead. layout.tsx pointed `apple` at favicon.svg from the first
+     build, so the icon in this repository was never the icon anybody saw. */
+  const apple = layout.match(/apple:"([^"]+)"/);
+  assert.ok(apple, "layout.tsx must name an apple-touch-icon");
+  assert.match(apple[1], /\.png$/, "iOS ignores an SVG apple-touch-icon and shows a page screenshot instead");
+
+  /* A real PNG of the size iOS asks for, checked by its header rather than its
+     name: the magic bytes, then width and height out of the IHDR chunk. */
+  const png = await readFile(new URL("../public/" + apple[1].replace(/^\//, ""), import.meta.url));
+  assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "not a PNG");
+  assert.equal(png.readUInt32BE(16), 180, "apple-touch-icon must be 180x180");
+  assert.equal(png.readUInt32BE(20), 180, "apple-touch-icon must be 180x180");
+
+  /* Every src the manifest names has to be a file that is actually served,
+     and the sizes it claims have to be the sizes on disk — a manifest icon
+     whose dimensions are a guess gets rejected by Chrome at install time. */
+  for (const icon of manifest.icons) {
+    const file = await readFile(new URL("../public/" + icon.src.replace(/^\//, ""), import.meta.url));
+    assert.ok(file.length > 0, icon.src + " is named by the manifest but is empty");
+    if (icon.type !== "image/png") continue;
+    const [w, h] = icon.sizes.split("x").map(Number);
+    assert.equal(file.readUInt32BE(16), w, icon.src + " is not " + icon.sizes);
+    assert.equal(file.readUInt32BE(20), h, icon.src + " is not " + icon.sizes);
+  }
+
+  /* Android crops a maskable icon to a shape of its choosing and guarantees
+     only the centre circle of 80% diameter. The two purposes need different
+     artwork — the letters sit further in on the maskable one — so declaring
+     one file "any maskable", which is what this manifest used to do, is a
+     promise one drawing cannot keep. */
+  const purposes = manifest.icons.map(icon => icon.purpose);
+  assert.ok(purposes.includes("maskable"), "no maskable icon: Android pads and plates the any icon instead");
+  assert.ok(purposes.includes("any"), "no any icon");
+  assert.ok(!purposes.some(p => p.split(" ").length > 1), "one file cannot serve both purposes: the artwork differs");
+
+  /* An icon that names a font renders in whatever the device happens to have,
+     which for a logo means a different logo on every phone. Both files carry
+     the letters as outlines, so neither may mention one. */
+  for (const [name, svg] of [["favicon.svg", favicon], ["icon-maskable.svg", maskable]]) {
+    assert.doesNotMatch(svg, /font-family|<text/, name + " must carry its letters as outlines, not as text in a font");
+    /* Opaque and full bleed: iOS fills a transparent region with black, which
+       is what made the old four-square icon look unfinished. */
+    assert.match(svg, /<rect width="1024" height="1024" fill="#06275C"\/>/, name + " needs an opaque full-bleed ground");
+  }
+
+  /* The letters are drawn in closer on the maskable one. Same artwork
+     otherwise — if this scale ever reaches 1 the two files are the same
+     drawing and the maskable entry is pointless. */
+  const scale = Number(maskable.match(/translate\(512 512\) scale\(([\d.]+)\)/)[1]);
+  assert.ok(scale > 0 && scale < 0.8, "maskable letters must sit inside the 0.4 safe radius: 507 x scale <= 410");
+});
+
 test("ALREADY LOGGED can reach the record it is blocking on", async () => {
  const [page, css] = await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8"),
