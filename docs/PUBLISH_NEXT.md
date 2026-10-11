@@ -1,8 +1,10 @@
 # Publish next
 
-**STATUS: 182, 183, 184, 185, 186 AND 187 PENDING. Curtis has asked for this to
-go live, and has deliberately NOT given the word yet — he is holding so that all
-six go out together and he only has to move his devices once.**
+**STATUS: ICON AND BACKUP RELEASES THROUGH 187 APPROVED FOR PUBLICATION.**
+
+Sites platform version 183 is currently live from `aebe0aad334ce328c78c009d7c3d6a70e1c43c2a`. It already includes releases 182–185 and the later Defect Log action-layout/help-text fixes. The icon change numbered 186 in this handoff and backup change 187 are not yet live. Curtis approved reconciling both histories and publishing the combined source on 2026-10-11. Publication remains pending until Sites confirms success.
+
+The six original change descriptions below are retained for verification; their historical pending/live statements are superseded by this status.
 182: the Defect Log's two pickers say what they are, and their drop-down arrow
 works. 183: the repository is laid out by what each file is; nothing on screen
 changes. 184: three Defect Log lists can be narrowed to the shift somebody is

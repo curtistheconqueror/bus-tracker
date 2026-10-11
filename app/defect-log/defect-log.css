@@ -380,27 +380,30 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-defect{margin:0 0 11px;white-space:pre-wrap;font-size:21px;line-height:1.35;font-weight:700;color:var(--log-text)}
 .log-focus-record p{margin:0 0 9px;font-size:15px;line-height:1.45;color:var(--log-text);overflow-wrap:anywhere}
 .log-focus-record p b{display:block;margin-bottom:2px;font-size:10px;font-weight:900;letter-spacing:.8px;color:var(--log-muted)}
-.log-focus-record-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
+.log-focus-record-foot{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:11px;padding-top:11px;border-top:1px solid var(--log-border)}
 .log-focus-record-foot time{font-size:11px;font-weight:800;color:var(--log-muted)}
-.log-focus-record-actions{display:flex;align-items:center;gap:8px}
-.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-header-text);padding:0 14px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.log-focus-record-actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;width:100%}
+.log-focus-record-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.log-focus-record-foot button{min-height:44px;border:0;border-radius:8px;color:var(--log-header-text);padding:0 6px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+/* At 320px, body/card padding and borders leave 79.67px per action before
+   a possible scrollbar. Let labels wrap, rather than overflow or shrink, and
+   let one grid row stretch all three buttons to the same 44px-or-taller size. */
+.log-focus-record-actions>button{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;align-self:stretch;padding:8px 6px;line-height:1.2;text-align:center;white-space:normal;overflow-wrap:anywhere}
 .edit-log-focus-defect{background:var(--log-accent)}
 .fix-log-focus-defect{background:#08733f}
 .edit-log-focus-defect:hover,.edit-log-focus-defect:focus-visible{filter:brightness(1.1)}
 .fix-log-focus-defect:hover,.fix-log-focus-defect:focus-visible{background:#0a8b4c}
-.log-focus-record-actions .undo-deferred{min-height:44px;border:0!important;border-radius:8px;padding:0 14px;font-size:11px;font-weight:900;white-space:nowrap}
+.log-focus-record-meta .undo-deferred{min-height:44px;border:0!important;border-radius:8px;padding:0 14px;font-size:11px;font-weight:900;white-space:nowrap}
 @media(max-width:760px){
  .log-focus-shade{align-items:stretch;padding:0}
- .log-focus-record-actions{flex-wrap:wrap;justify-content:flex-end}
  .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
  .log-focus-head{gap:9px;padding-top:calc(16px + env(safe-area-inset-top))}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}
- .log-focus-record-foot{align-items:flex-end}
  .log-focus-record-actions{gap:7px}
- .log-focus-record-foot button{padding:0 12px;font-size:10.5px}
+ .log-focus-record-foot button{font-size:10.5px}
  .log-card-group>.log-focus-button{min-height:40px}
  .log-card-group>.log-group-header{padding-right:62px}
 }

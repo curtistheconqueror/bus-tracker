@@ -1545,7 +1545,7 @@ export default function DefectLog(){
      if(ptrEditing)return <div className="ptr-body">
       <label className="ptr-edit">STEPS — GENERAL DIRECTION, NOT A PROCEDURE
        <textarea value={ptrDraft} maxLength={MAX_PATH_TO_REPAIR} rows={9} autoFocus
-        placeholder={"Check the oil level first.\nRefer to Cummins INSIGHT for the fault code.\nLook for corrosion on the harness behind the AC filters."}
+        placeholder="Add the first checks and useful references to help someone start this repair."
         onChange={event=>setPtrDraft(event.target.value)}/></label>
       <small className="ptr-count">{ptrDraft.trim().length} / {MAX_PATH_TO_REPAIR}</small>
       {ptrProblem&&<p className="ptr-problem">{ptrProblem}</p>}
@@ -1557,7 +1557,7 @@ export default function DefectLog(){
           entitled to know who will see it. */}
       <p className="ptr-note">This is written once for <b>{repairCategoryLabel(ptrFor.category)} — {ptrFor.issue}</b> and shows on every bus with that repair. It stays on this device; it does not travel to the Shop Cloud yet.</p>
      </div>;
-     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first steps somebody should take — a manual to check, a code to pull, a place to look.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
+     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first checks and useful references to help someone start this repair.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
      return <div className="ptr-body">
       <p className="ptr-steps">{saved.steps}</p>
       <div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>{setPtrDraft(saved.steps);setPtrEditing(true)}}>EDIT</button></div>
@@ -1585,7 +1585,16 @@ export default function DefectLog(){
      {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
-     <div className="log-focus-record-foot"><time>LOGGED {timeLabel(record.createdAt)}</time><span className="log-focus-record-actions">{/* PTR sits on the DEFECT CARD rather than beside FOCUS on the feed, which is where Curtis put it: "somewhere on each of the defect cards so that way it's specified to that defect". The writeup it opens belongs to the REPAIR, so the button carries that defect's category and issue rather than its id. */}<button className="ptr-log-focus-defect" type="button" onClick={()=>openPathToRepair(record.defect.category,record.defect.issue)} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button><button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}{isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}</span></div>
+     <div className="log-focus-record-foot">
+      {/* The three main actions span the card above its date. PTR still opens
+          the REPAIR's writeup, shared by matching faults on this device. */}
+      <div className="log-focus-record-actions">
+       <button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>
+       {isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}
+       <button className="ptr-log-focus-defect" type="button" onClick={()=>openPathToRepair(record.defect.category,record.defect.issue)} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button>
+      </div>
+      <div className="log-focus-record-meta"><time>LOGGED {timeLabel(record.createdAt)}</time>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}</div>
+     </div>
     </article>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,

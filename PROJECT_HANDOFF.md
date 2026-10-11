@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-09-14
+Updated: 2026-10-09
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 181 (repository release 181)
-Live feature checkpoint: commit 148a45e
+Live release: Sites Version 182 (repository release 185; cumulative releases 182–185)
+Live feature checkpoint: commit b9c1e81
 
 ## Read this first
 
@@ -53,7 +53,9 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 181 is live as Sites Version 181 from commit 148a45e. It distinguishes hard Down Sheet buses from Soft Down and IDOT preparation through collapsed boards, and adds an optional per-entry inService flag for a Soft Down bus actually in use. It also adds IDOT Prep to Inspection, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. Two new per-device collapse keys and the entry detail field add no migration or Supabase schema change. The normal rollback target is Version 180 from commit b6e0cba.
+Repository release 185 is live as Sites Version 182 from commit b9c1e81, published on 2026-10-09. This one deployment includes repository releases 182–185: usable and labelled defect pickers; the app/src repository reorganization; shift-scoped Defect Log lists and initials-aware LOGGED reports; outstanding repair hours; a device-local shop repair-time ledger; PATH TO REPAIR; preserved description line breaks; and the FIXED TODAY count correction. No existing LocalStorage key was renamed and no Supabase schema changed. The additive pace-ptr-v1 and pace-repair-hours-v1 keys remain device-local. The normal rollback target is Sites Version 181 from commit 148a45e (`sites-v181`).
+
+Sites and repository numbering differ: the prepared local `sites-v182` tag points to the live source for repository release 185. Its remote GitHub tag push is pending Git authentication; do not assume that tag exists on GitHub. Native deployment succeeded; fresh cloud build, lint and 346 tests passed. The original phone/offline and live-device editing checklists remain in docs/archive/PUBLISH_RELEASE_185.md and were not rerun during publishing. No real fleet records were changed.
 
 The Version 171 baseline details below remain useful historical context:
 
@@ -89,16 +91,16 @@ The history is intentionally linear. Do not rewrite published commits, force-pus
 ## Source map
 
 - app/page.tsx — Facility Map orchestration and device persistence
-- app/facility-layout.ts — facility sections, slots, capacities, and migrations
-- app/facility-areas.ts — shared Facility Map and Defect Log section membership plus first-open-space relocation
-- app/cloud-client.ts, app/cloud-sync.ts, and app/cloud-sync-control.tsx — optional Supabase sign-in, row synchronization, merge controls, and device status
-- app/smart-status.ts — destination-aware status rules
-- app/operator-engine.ts and app/operator-batch.ts — AI Operator parsing and atomic actions
-- app/down-sheet/ — Down Sheet route, editor, estimates, scan review, and two-way synchronization
-- app/defect-log/ — Defect Log route, grouping, filters, settings, and linked-repair behavior
-- app/fixed-repairs/ — offline completed-repair history and completion-detail editing
-- app/repair-catalog.ts — structured repair categories and quick selections
-- tests/rendered-html.test.mjs — release-gate regression coverage
+- src/lib/fleet/facility-layout.ts — facility sections, slots, capacities, and migrations
+- src/lib/fleet/facility-areas.ts — shared Facility Map and Defect Log section membership plus first-open-space relocation
+- src/lib/cloud/cloud-client.ts, src/lib/cloud/cloud-sync.ts, and app/settings/_components/cloud-sync-control.tsx — optional Supabase sign-in, row synchronization, merge controls, and device status
+- src/lib/fleet/smart-status.ts — destination-aware status rules
+- src/lib/operator/operator-engine.ts and src/lib/operator/operator-batch.ts — AI Operator parsing and atomic actions
+- app/down-sheet/ — Down Sheet route, stylesheet and route-specific UI; src/lib/down-sheet/ owns estimates, scan import and synchronization
+- app/defect-log/ — Defect Log route, stylesheet and route-specific UI; src/lib/defects/ owns repair, filtering and linked-record logic
+- app/fixed-repairs/ — completed-repair history route and styles; shared UI lives under src/components/
+- src/lib/defects/repair-catalog.ts — structured repair categories and quick selections
+- tests/*.test.mjs — release-gate regression coverage
 - db/ and drizzle/ — intentionally dormant shared-backend scaffolding
 - docs/roadmap/ — future product phases
 
@@ -118,6 +120,8 @@ Primary stores are versioned browser records:
 - pace-cloud-config-v1 — per-device Shop Cloud project, account, initials, and device-label settings
 - pace-cloud-state-v1 and pace-cloud-sent-v1 — per-device sync status and successfully sent row fingerprints
 - pace-cloud-auth-v1 — Supabase's persisted per-device shop session
+- pace-ptr-v1 — device-local PATH TO REPAIR writeups, keyed by repair
+- pace-repair-hours-v1 — device-local shop repair-time ledger, keyed by repair
 
 Undo snapshots exist for destructive Down Sheet actions. Backup export includes the fleet, connected Down Sheet state, and interface settings. Treat real exported backups as operational data and never commit them.
 
