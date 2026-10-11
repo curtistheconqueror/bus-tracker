@@ -469,7 +469,7 @@ export default function SettingsPage(){
      <SettingsDrawer title="BACKUP, RESTORE &amp; MOVING DEVICE" note="MASTER EXPORT and IMPORT, and the last known good copy of the board.">
      <section className="settings-group master-transfer" aria-labelledby="master-transfer-heading">
       <h3 id="master-transfer-heading">MASTER EXPORT &amp; MASTER IMPORT</h3>
-      <p>Everything this device holds, in one file: the map, the Defect Log, the Down Sheet, Fleet Campaigns, remembered parts and findings, and every page's settings. Export on the old device, then import that file on the new one.</p>
+      <p>Everything this device holds, in one file: the map, the Defect Log, the Down Sheet, Fleet Campaigns, remembered parts and findings, your PATH TO REPAIR writeups, the shop's own repair times, and every page's settings. Export on the old device, then import that file on the new one.</p>
       <div className="master-transfer-row">
        <button type="button" className="master-export" onClick={masterExport}>MASTER EXPORT</button>
        <label className="master-import">MASTER IMPORT<input type="file" accept=".json,application/json" onChange={masterImport}/></label>

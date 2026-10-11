@@ -381,11 +381,19 @@ silent, which is the whole reason the key is computed rather than stored raw.
 rule that this app never deletes history is about defects and the work done on
 them; a cleared PTR is somebody saying the advice was wrong.
 
-**It is DEVICE-LOCAL today, and that is a limitation rather than a decision.**
+**It does not SYNC, and that is a limitation rather than a decision.**
 The two memories beside it travel through `shop_memory`, which is constrained to
 `kind in ('part','finding')` — carrying PTR would need a schema migration, which
 is a write to the live database and therefore Curtis's call. The screen says so
 where it is written, rather than letting somebody assume the shop can see it.
+
+**MASTER EXPORT carries it, and is the only thing that does.** It was left out
+of the backup for the two releases it had existed — an oversight, found by
+reading the payload against the key list while planning a device move that would
+have dropped every writeup on the floor. Being device-local is not what keeps a
+key out of that file: `fleet-backup.ts` says in its own words that a device
+CLONE already carries five keys that are per-device and never synced. A part
+number re-learns itself the next time somebody types it; a writeup does not.
 
 **`pace-repair-hours-v1` is a LEDGER, not a learner.** Curtis, after being
 offered a version that watches completed work and averages its way to a figure:
@@ -417,6 +425,16 @@ the defect editor uses, keeps one unit in the data and one in the hand.
 
 **An empty box REMOVES the entry** and the catalog estimate comes back.
 Withdrawing a claim is the same gesture as never having made one.
+
+**It rides MASTER EXPORT, alongside PATH TO REPAIR**, and like it was missing
+from the backup for its first two releases. `tests/storage.test.mjs` now reads
+both sides of that file out of the source and asserts they name the same set of
+keys, so the next one added to the export and forgotten in the restore — or the
+other way round — fails there rather than two releases later on somebody's new
+phone. A whole-app import REPLACES both, which is the rule everything in that
+file follows except the swap ledger: a swap is an event two devices never both
+perform, while a repair time is a current statement about a repair that two
+devices can disagree about, and a merge would have no honest way to pick.
 
 **`pace-crash-report-v1` is a breadcrumb, not a log.** One record, overwritten
 each time. A render error unmounts the whole tree, and saved to a home screen
