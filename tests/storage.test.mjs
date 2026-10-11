@@ -1104,7 +1104,7 @@ test("a hold rides MASTER EXPORT but never a share",async()=>{
  /* The clone keeps it — asserted on the payload builder, which passes `buses`
     through verbatim, and on the absence of any filter being added later. */
  const source=await readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8");
- assert.match(source,/payload=\{kind:"pace-south-fleet-board-backup",version:5,exportedAt:exportedAt\.toISOString\(\),buses,/,
+ assert.match(source,/payload=\{kind:"pace-south-fleet-board-backup",version:6,exportedAt:exportedAt\.toISOString\(\),buses,/,
   "MASTER EXPORT passes the buses through unfiltered, holds included");
  /* Checked against the CODE, not the comments: the comment below deliberately
     names MAP_EXCLUDED to explain why it is not used here, and the first cut of
@@ -1114,6 +1114,85 @@ test("a hold rides MASTER EXPORT but never a share",async()=>{
   "no filter has been added here — if one is, this distinction was broken by accident");
  assert.match(source,/THIS FILE CARRIES A BUS'S `hold` AND THAT IS DELIBERATE/,
   "and the reason is written where somebody would come to change it");
+});
+
+test("MASTER EXPORT and MASTER IMPORT carry the same set of keys",async()=>{
+ /* THE STRUCTURAL FIX, and the reason this test exists at all.
+
+    PATH TO REPAIR and the shop's repair times shipped in 185 and neither one
+    rode MASTER EXPORT. Nothing failed, nothing complained, and the Settings
+    page went on saying "everything this device holds" — the omission was only
+    found by reading the payload against the key list by hand, two releases
+    later, while planning a device move that would have silently dropped both.
+
+    So rather than pin the two keys and wait for the third to be forgotten the
+    same way, this reads BOTH SIDES out of the source and asserts they agree.
+    A key added to one and not the other fails here, whatever the key is. */
+ const [backupSource,restoreSource]=await Promise.all([
+  readFile(new URL("../src/lib/storage/fleet-backup.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/fleet-restore.ts",import.meta.url),"utf8"),
+ ]);
+
+ /* What the export puts in the file: `fieldName:readSavedValue(storage,KEY)`. */
+ const exported=new Map([...backupSource.matchAll(/(\w+):readSavedValue\(storage,(\w+)\)/g)].map(m=>[m[1],m[2]]));
+ /* What the import takes out of it: the `put(KEY,backup.fieldName,...)` calls,
+    plus the ledger, which merges through its own branch rather than `put`. */
+ const restored=new Map([...restoreSource.matchAll(/put\((\w+),backup\.(\w+),/g)].map(m=>[m[2],m[1]]));
+ const ledger=restoreSource.match(/writeSetting\(storage,(\w+),JSON\.stringify\(mergeSheetLedgers\(readSheetLedger\(storage\),backup\.(\w+)\)/);
+ assert.ok(ledger,"the sheet ledger no longer merges through the branch this test knows about");
+ restored.set(ledger[2],ledger[1]);
+
+ assert.ok(exported.size>=10,"expected the export to read at least ten keys, found "+exported.size);
+ assert.deepEqual([...restored.keys()].sort(),[...exported.keys()].sort(),
+  "every field MASTER EXPORT writes must be a field MASTER IMPORT reads back, and the other way round");
+ for(const [field,key] of exported)assert.equal(restored.get(field),key,
+  field+" is exported from "+key+" but restored to "+restored.get(field));
+
+ /* The two that were missing, named so the failure says which. */
+ for(const field of ["pathToRepairs","repairHours"])assert.ok(exported.has(field),"MASTER EXPORT does not carry "+field);
+});
+
+test("a version 5 backup does not wipe the writeups on the device it lands on",async()=>{
+ /* `put` skips an absent key, which is what makes an older file safe. Curtis
+    is about to move both his devices onto home-screen apps, so a file written
+    before this release landing on a device that already has writeups is a real
+    case and not a hypothetical one. */
+ const {restoreFleetBackup}=await import("../src/lib/storage/fleet-restore.ts");
+ const {PATH_TO_REPAIR_KEY}=await import("../src/lib/defects/path-to-repair.ts");
+ const {REPAIR_HOURS_KEY}=await import("../src/lib/defects/repair-hours-ledger.ts");
+
+ const mine={entries:[{category:"A/C and HVAC",issue:"No cooling",steps:"Check the filters.",updatedAt:"2026-10-01T00:00:00.000Z"}]};
+ const myHours={entries:[{category:"A/C and HVAC",issue:"No cooling",minutes:90,updatedAt:"2026-10-01T00:00:00.000Z"}]};
+ const storage=memoryStorage({
+  [PATH_TO_REPAIR_KEY]:JSON.stringify(mine),
+  [REPAIR_HOURS_KEY]:JSON.stringify(myHours),
+ });
+
+ /* A version 5 file: buses and nothing else of ours. */
+ const old=restoreFleetBackup(storage,{buses:[{id:"b1",n:"18505",l:"garage-3"}],legacy:false});
+ assert.equal(old.ok,true,old.reason);
+ assert.deepEqual(JSON.parse(storage.value(PATH_TO_REPAIR_KEY)),mine,"an older file must leave this device's writeups alone");
+ assert.deepEqual(JSON.parse(storage.value(REPAIR_HOURS_KEY)),myHours,"an older file must leave this device's repair times alone");
+
+ /* A version 6 file REPLACES them, which is what the confirm promises and what
+    separates these two from the swap ledger right below them. */
+ const theirs={entries:[{category:"Brakes",issue:"Chamber leak",steps:"Soap the fittings.",updatedAt:"2026-10-05T00:00:00.000Z"}]};
+ const theirHours={entries:[{category:"Brakes",issue:"Chamber leak",minutes:45,updatedAt:"2026-10-05T00:00:00.000Z"}]};
+ const fresh=restoreFleetBackup(storage,{buses:[{id:"b1",n:"18505",l:"garage-3"}],legacy:false,pathToRepairs:theirs,repairHours:theirHours});
+ assert.equal(fresh.ok,true,fresh.reason);
+ assert.deepEqual(JSON.parse(storage.value(PATH_TO_REPAIR_KEY)),theirs,"a whole-app import replaces");
+ assert.deepEqual(JSON.parse(storage.value(REPAIR_HOURS_KEY)),theirHours,"a whole-app import replaces");
+ assert.ok(fresh.restored.includes("paths to repair")&&fresh.restored.includes("shop repair times"),
+  "both must be named in what the import reports it restored: "+fresh.restored.join(", "));
+
+ /* Read through their own normalizers on the way in, so a hand-edited or
+    corrupt file cannot plant a shape the app will later choke on. */
+ const junk=restoreFleetBackup(storage,{buses:[{id:"b1",n:"18505",l:"garage-3"}],legacy:false,
+  pathToRepairs:{entries:[{category:"Brakes",issue:"Chamber leak",steps:""},"nonsense"]},
+  repairHours:{entries:[{category:"Brakes",issue:"Chamber leak",minutes:-5},null]}});
+ assert.equal(junk.ok,true,junk.reason);
+ assert.deepEqual(JSON.parse(storage.value(PATH_TO_REPAIR_KEY)),{entries:[]},"an empty writeup is not a writeup");
+ assert.deepEqual(JSON.parse(storage.value(REPAIR_HOURS_KEY)),{entries:[]},"a negative time is not a time");
 });
 
 test("the sheet ledger keeps the tempo the app used to throw away",async()=>{
