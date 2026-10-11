@@ -1642,8 +1642,10 @@ test("release safety keeps interval units and learned parts attached to the righ
  // Campaigns were absent from the backup until version 4. Everything that
  // page holds — completed rows, initials, timestamps, billable hours — sat
  // outside the one control that promises to save the whole board, and the
- // Work Time totals are built from those same rows.
- assert.match(backup,/version:5/);
+ // Work Time totals are built from those same rows. Version 6 added the two
+ // the shop writes about a repair, PATH TO REPAIR and its own repair times,
+ // missing for the two releases they had existed.
+ assert.match(backup,/version:6/);
  assert.match(backup,/busLists:readSavedValue\(storage,BUS_LISTS_STORAGE_KEY\)/);
  assert.match(backup,/busListTemplates:readSavedValue\(storage,BUS_LIST_TEMPLATES_STORAGE_KEY\)/);
  // Learned causes went into the backup in the same change that created them,

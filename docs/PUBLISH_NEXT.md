@@ -1,22 +1,37 @@
 # Publish next
 
-**STATUS: 182, 183, 184, 185 AND 186 PENDING. Curtis has asked for this to go
-live.**
+**STATUS: 182, 183, 184, 185, 186 AND 187 PENDING. Curtis has asked for this to
+go live, and has deliberately NOT given the word yet — he is holding so that all
+six go out together and he only has to move his devices once.**
 182: the Defect Log's two pickers say what they are, and their drop-down arrow
 works. 183: the repository is laid out by what each file is; nothing on screen
 changes. 184: three Defect Log lists can be narrowed to the shift somebody is
 standing in, and shared that way. 185: the Defect Log shows how many hours are
 standing on it, the shop can set its own repair times, PATH TO REPAIR arrives,
 and typed line breaks stop being flattened. 186: the home-screen icon is a real
-FS mark, and the apple-touch-icon is a PNG iOS can actually use.
+FS mark, and the apple-touch-icon is a PNG iOS can actually use. 187: MASTER
+EXPORT carries the PATH TO REPAIR writeups and the shop's own repair times,
+which it had been leaving behind since 185.
 
-**186 IS TIME-SENSITIVE IN A WAY THE OTHERS ARE NOT.** Curtis has not yet added
-the app to the home screen on his iPad or his phone, and is waiting on this to
-do it. iOS captures the icon AT THE MOMENT the bookmark is added and never
-updates it in place — a bookmark made before this is live keeps the old icon
-until it is deleted and re-added, and re-adding gives the web app a fresh,
-empty LocalStorage. So this one wants to be live before he taps Add to Home
-Screen, not after.
+**186 AND 187 BOTH HAVE TO BE LIVE BEFORE CURTIS MOVES HIS DEVICES**, and that
+is the reason this batch is being held rather than published piecemeal. He is
+about to add the app to the home screen on his iPad and his phone, which gives
+each one a fresh, empty LocalStorage, and then carry his data across with
+MASTER EXPORT and MASTER IMPORT.
+
+**186** because iOS captures the icon AT THE MOMENT the bookmark is added and
+never updates it in place: a bookmark made before 186 is live keeps the old icon
+until it is deleted and re-added, and re-adding empties the web app again — so
+the cost of the wrong order is a second export and import, not just a stale
+picture.
+
+**187** because MASTER EXPORT was leaving the PATH TO REPAIR writeups and the
+shop's repair times behind. Moving a device on 186 would carry everything except
+those two.
+
+The order on the day: publish → open in Safari and reload twice → MASTER EXPORT
+→ Add to Home Screen → MASTER IMPORT → reconnect SHOP CLOUD (the cloud config is
+per-device and is not in the backup). Each device uses its OWN export file.
 
 | Version | Publish from | What | Section |
 | --- | --- | --- | --- |
@@ -25,6 +40,7 @@ Screen, not after.
 | 184 | `c296486` | A THIS SHIFT window, and a new LOGGED list keyed off initials | [184](#184--publish-from-c296486) |
 | 185 | `b9c1e81` | Hours badge, shop repair times, PATH TO REPAIR, readable descriptions | [185](#185--publish-from-b9c1e81) |
 | 186 | `97a34ae` | The FS home-screen icon, and a PNG apple-touch-icon | [186](#186--publish-from-97a34ae) |
+| 187 | `016fae4` | MASTER EXPORT carries PTR and the shop's repair times | [187](#187--publish-from-016fae4) |
 
 **182** publishes from `807357a` (`The drop-down arrow is a button now, because it never
 was one`). Derive the range with:
@@ -36,15 +52,16 @@ git log --oneline 5d5a033..807357a
 Version 181 was published from `148a45e` on 2026-09-15 and is the rollback
 point; its tag is `sites-v181`. The one before it is 180 from `b6e0cba`.
 
-Five releases are pending, and they STACK. **Publish in order: 182, 183, 184,
-185, then 186.** Each is built on the one before it — 183's range starts at
-`807357a`, 184's at `6dc96fe`, 185's at `c296486`, 186's at `b9c1e81` — so
-publishing a later one alone also ships everything beneath it.
+Six releases are pending, and they STACK. **Publish in order: 182, 183, 184,
+185, 186, then 187.** Each is built on the one before it — 183's range starts at
+`807357a`, 184's at `6dc96fe`, 185's at `c296486`, 186's at `b9c1e81`, 187's at
+`97a34ae` — so publishing a later one alone also ships everything beneath it.
 
-**If Curtis wants one Sites version rather than five, publish 186 from
-`97a34ae`: it carries all five.** He asked for 182-185 to go live on 2026-10-08
-and added 186 on 2026-10-11. Walk all five checklists below afterwards, because
-each lists different things to look at on the phone.
+**If Curtis wants one Sites version rather than six, publish 187 from
+`016fae4`: it carries all six.** He asked for 182-185 to go live on 2026-10-08,
+added 186 and 187 on 2026-10-11, and is holding the word until all six are
+ready. Walk all six checklists below afterwards, because each lists different
+things to look at on the phone.
 
 # 182 — publish from 807357a
 
@@ -961,3 +978,133 @@ shell, online, on first launch.
 **One thing a rollback does NOT undo:** a home-screen bookmark already added
 keeps whatever icon it captured at the time it was added. iOS never refreshes it
 in place. That is a property of iOS, not of this release.
+\n
+
+# 187 — publish from 016fae4
+
+## Source
+
+```
+$ git log --oneline 97a34ae..016fae4
+016fae4 MASTER EXPORT carries the two things the shop writes about a repair
+e8ed7d6 Hand 186 to Codex from 97a34ae — the icon wants to be live before the bookmark
+
+$ git diff --name-only 97a34ae..016fae4
+CLAUDE.md
+app/settings/page.tsx
+docs/PUBLISH_NEXT.md
+src/lib/storage/fleet-backup.ts
+src/lib/storage/fleet-restore.ts
+tests/fleet.test.mjs
+tests/storage.test.mjs
+
+$ git diff --shortstat 97a34ae..016fae4
+ 7 files changed, 320 insertions(+), 18 deletions(-)
+
+$ git diff --name-only 97a34ae..016fae4 -- supabase package.json package-lock.json .github public worker
+```
+
+The last command prints nothing: no schema change, no dependency change, no CI
+change, no public asset. `e8ed7d6` is the 186 handoff written into this file and
+carries no app code.
+
+## Migrations
+
+**None, and no key is renamed, moved or rewritten.** The backup FILE gains two
+fields and its `version` goes 5 to 6, but nothing in LocalStorage changes shape.
+A version-5 file still restores correctly, which is asserted rather than assumed
+— see Verified.
+
+## What was wrong
+
+PATH TO REPAIR (`pace-ptr-v1`) and the shop's own repair times
+(`pace-repair-hours-v1`) arrived in 185 and **neither rode MASTER EXPORT**.
+Nothing failed and nothing complained. The Settings page went on saying
+"Everything this device holds, in one file" while two of the keys it holds were
+not in that file.
+
+It was found by reading the payload against the key list by hand, while planning
+the device move Curtis is about to make — a move that would have carried his
+board, sheet, campaigns and memories across and dropped every writeup and every
+repair time on the floor, silently.
+
+## What changed
+
+**The two keys join the payload**, and MASTER IMPORT reads them back through
+their own normalizers (`normalizePathToRepairs`, `normalizeRepairHoursLedger`),
+so a hand-edited or corrupt file cannot plant a shape the app later chokes on.
+
+**Why they belong there.** `fleet-backup.ts` already answered the obvious
+objection in its own words: being device-local is not what keeps a key out of a
+MASTER EXPORT. "MASTER EXPORT is not sharing. It is a device CLONE", and it
+already carried five keys CLAUDE.md lists as per-device and never synced.
+CLAUDE.md files these two under "what the shop has taught it" beside parts
+memory and findings memory, both of which have ridden the file from the start.
+Same group, different treatment, for no reason anybody had written down.
+
+**They REPLACE; the swap ledger three lines below them MERGES.** A swap is an
+EVENT that happened once on one device, so the union is the history. A writeup
+and a repair time are a CURRENT STATEMENT about a repair, one per repair, and
+two devices can hold different ones after both have been edited — a merge would
+have to pick a winner and there is no honest rule for picking one. So they
+follow the rule everything else in the file follows, which is what the confirm
+in front of MASTER IMPORT already promises.
+
+**An older file is still safe.** `put` skips an absent key, so restoring a
+version-5 backup onto a device that already has writeups leaves them alone.
+
+**The Settings copy now names what it carries** — the one thing on screen that
+changes in this release. It reads "... remembered parts and findings, your PATH
+TO REPAIR writeups, the shop's own repair times, and every page's settings."
+Text only; no control moved and no flow changed.
+
+## Verified
+
+- `npm test` 349 pass (347 before), `npm run lint` clean, `npm run build`
+  complete — on `016fae4`, the merged commit.
+- The round-trip test drives real behaviour through `restoreFleetBackup` against
+  a memory storage rather than matching source: a version-5 file leaves the
+  device's own writeups alone, a version-6 file replaces them, both are named in
+  what the import reports it restored, and a corrupt file is normalised on the
+  way in (an empty writeup and a negative repair time are both dropped).
+- **The structural guard.** A second test reads BOTH SIDES of the backup out of
+  the source and asserts they name the same set of fields AND map each field to
+  the same storage key. The next key added to the export and forgotten in the
+  restore, or the other way round, fails there rather than two releases later on
+  somebody's new phone.
+- Both new tests were mutation-checked against **six** broken versions: export
+  dropping `pathToRepairs`, export dropping `repairHours`, restore dropping the
+  PTR `put`, restore writing PTR to the WRONG storage key, restore skipping the
+  normalizer, and `put` clearing an absent key instead of skipping it. All six
+  go red; the unmutated version passes.
+- The Settings copy was confirmed in the RENDERED HTML, not just in the source.
+
+## What to check once it is live
+
+1. Open **Settings → BACKUP, RESTORE & MOVING DEVICE**. The paragraph under
+   MASTER EXPORT should now name PATH TO REPAIR and the shop's repair times.
+2. Write a **PTR** on any defect and set a **SHOP TIME** for that repair.
+3. Press **MASTER EXPORT** and open the file. It should read `"version": 6` and
+   carry a `pathToRepairs` and a `repairHours` object with what you just wrote.
+4. On a second device (or after a MASTER IMPORT), the writeup and the time
+   should both be there.
+5. Confirm the **swap history still merges**: importing onto a device that has
+   its own swaps must keep them. That is the one key in the file that does not
+   replace, and this release did not touch it.
+
+## Rollback
+
+Roll back to 186 (`97a34ae`) if it is live, else 185 (`b9c1e81`), else 184
+(`c296486`), else 183 (`6dc96fe`), else 182 (`807357a`), else `sites-v181`
+(`148a45e`).
+
+**Nothing stored is altered**, so no defect, entry, recommendation, deferral,
+writeup or repair time is lost by rolling back. An earlier version simply stops
+PUTTING the two keys in new backup files and stops reading them out of one — a
+version-6 file restored on 186 has its extra two fields ignored, and the device's
+own writeups are left where they are.
+
+**One asymmetry worth knowing:** a backup written under 187 and restored under
+186 silently drops those two keys from the restore. If a device is moved while
+rolled back, move it again once 187 is live, or the writeups stay on the old
+device only.

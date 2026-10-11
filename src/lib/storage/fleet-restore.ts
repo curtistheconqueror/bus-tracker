@@ -4,7 +4,8 @@
    in at all - the three EXPORT ... REPORT buttons write snapshots for a person
    to read, and `REPORT_EXPORT_HINT` next door says so. This is the other one:
    the map, the Defect Log, the Down Sheet, campaigns, the remembered parts and
-   findings, and every page's settings, together.
+   findings, the PATH TO REPAIR writeups, the shop's own repair times, and
+   every page's settings, together.
 
    It lived inside the Facility Map's own component, wired directly to that
    page's React setters, which is why it could only ever be pressed there. It
@@ -20,6 +21,8 @@ import {BOARD_SETTINGS_STORAGE_KEY,DEFECT_LOG_SETTINGS_STORAGE_KEY,DOWN_SHEET_SE
 import {PARTS_MEMORY_STORAGE_KEY,normalizePartsMemory} from "../defects/parts-memory.ts";
 import {BUS_LISTS_STORAGE_KEY,BUS_LIST_TEMPLATES_STORAGE_KEY,normalizeBusLists,normalizeBusListTemplates} from "../fleet/bus-lists.ts";
 import {FINDINGS_MEMORY_STORAGE_KEY,normalizeFindingsMemory} from "../defects/findings-memory.ts";
+import {PATH_TO_REPAIR_KEY,normalizePathToRepairs} from "../defects/path-to-repair.ts";
+import {REPAIR_HOURS_KEY,normalizeRepairHoursLedger} from "../defects/repair-hours-ledger.ts";
 import {SHEET_LEDGER_KEY,mergeSheetLedgers,readSheetLedger} from "../down-sheet/sheet-ledger.ts";
 
 export type FleetBackupBus={id:string;n:string;l:string;[key:string]:unknown};
@@ -37,6 +40,8 @@ export type FleetBackup={
  busLists?:unknown;
  busListTemplates?:unknown;
  findingsMemory?:unknown;
+ pathToRepairs?:unknown;
+ repairHours?:unknown;
  sheetLedger?:unknown;
 };
 
@@ -66,7 +71,8 @@ export function readFleetBackup(text:string):FleetBackupRead{
  return {ok:true,backup:{buses,legacy,
   settings:rest.settings,downSheet:rest.downSheet,downSheetSettings:rest.downSheetSettings,
   defectLogSettings:rest.defectLogSettings,partsMemory:rest.partsMemory,
-  busLists:rest.busLists,busListTemplates:rest.busListTemplates,findingsMemory:rest.findingsMemory,sheetLedger:rest.sheetLedger}};
+  busLists:rest.busLists,busListTemplates:rest.busListTemplates,findingsMemory:rest.findingsMemory,
+  pathToRepairs:rest.pathToRepairs,repairHours:rest.repairHours,sheetLedger:rest.sheetLedger}};
 }
 
 export const FLEET_BACKUP_ERRORS:Record<FleetBackupError,string>={
@@ -105,6 +111,26 @@ export function restoreFleetBackup(storage:Storage,backup:FleetBackup):FleetRest
  put(BUS_LISTS_STORAGE_KEY,backup.busLists,"campaigns",normalizeBusLists);
  put(BUS_LIST_TEMPLATES_STORAGE_KEY,backup.busListTemplates,"campaign templates",normalizeBusListTemplates);
  put(FINDINGS_MEMORY_STORAGE_KEY,backup.findingsMemory,"remembered findings",normalizeFindingsMemory);
+ /* THESE TWO REPLACE, and the ledger directly below does not — so the
+    difference is worth stating, because they arrived in the same release and
+    the obvious question is why they are not treated alike.
+
+    A swap is an EVENT. It happened once, on one device, and two devices never
+    perform the same one, so there is nothing to reconcile and the union is the
+    history. A PTR writeup and a shop repair time are neither events nor
+    history: they are a CURRENT STATEMENT about a repair, one per repair, and
+    two devices can easily hold different ones for the same repair after both
+    have been edited. A merge would have to pick a winner, and there is no
+    honest rule for picking one — newest-wins would silently discard the
+    better-written advice on the grounds of a timestamp.
+
+    So they follow the rule everything else here follows: a whole-app import
+    REPLACES, which is what the confirm in front of it promises. A file that
+    does not carry them still leaves this device's own alone, because `put`
+    skips an absent key — which is what makes restoring a version-5 file onto a
+    device that has writeups safe. */
+ put(PATH_TO_REPAIR_KEY,backup.pathToRepairs,"paths to repair",normalizePathToRepairs);
+ put(REPAIR_HOURS_KEY,backup.repairHours,"shop repair times",normalizeRepairHoursLedger);
  /* THE ONE THING A WHOLE-APP IMPORT MERGES INSTEAD OF REPLACING, and the
     exception is deliberate.
 
