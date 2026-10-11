@@ -1,12 +1,22 @@
 # Publish next
 
-**STATUS: 182, 183, 184 AND 185 PENDING. Curtis has asked for this to go live.**
+**STATUS: 182, 183, 184, 185 AND 186 PENDING. Curtis has asked for this to go
+live.**
 182: the Defect Log's two pickers say what they are, and their drop-down arrow
 works. 183: the repository is laid out by what each file is; nothing on screen
 changes. 184: three Defect Log lists can be narrowed to the shift somebody is
 standing in, and shared that way. 185: the Defect Log shows how many hours are
 standing on it, the shop can set its own repair times, PATH TO REPAIR arrives,
-and typed line breaks stop being flattened.
+and typed line breaks stop being flattened. 186: the home-screen icon is a real
+FS mark, and the apple-touch-icon is a PNG iOS can actually use.
+
+**186 IS TIME-SENSITIVE IN A WAY THE OTHERS ARE NOT.** Curtis has not yet added
+the app to the home screen on his iPad or his phone, and is waiting on this to
+do it. iOS captures the icon AT THE MOMENT the bookmark is added and never
+updates it in place — a bookmark made before this is live keeps the old icon
+until it is deleted and re-added, and re-adding gives the web app a fresh,
+empty LocalStorage. So this one wants to be live before he taps Add to Home
+Screen, not after.
 
 | Version | Publish from | What | Section |
 | --- | --- | --- | --- |
@@ -14,6 +24,7 @@ and typed line breaks stop being flattened.
 | 183 | `6dc96fe` | Repository layout only, no UI or flow change | [183](#183--publish-from-6dc96fe) |
 | 184 | `c296486` | A THIS SHIFT window, and a new LOGGED list keyed off initials | [184](#184--publish-from-c296486) |
 | 185 | `b9c1e81` | Hours badge, shop repair times, PATH TO REPAIR, readable descriptions | [185](#185--publish-from-b9c1e81) |
+| 186 | `97a34ae` | The FS home-screen icon, and a PNG apple-touch-icon | [186](#186--publish-from-97a34ae) |
 
 **182** publishes from `807357a` (`The drop-down arrow is a button now, because it never
 was one`). Derive the range with:
@@ -25,15 +36,15 @@ git log --oneline 5d5a033..807357a
 Version 181 was published from `148a45e` on 2026-09-15 and is the rollback
 point; its tag is `sites-v181`. The one before it is 180 from `b6e0cba`.
 
-Four releases are pending, and they STACK. **Publish in order: 182, 183, 184,
-then 185.** Each is built on the one before it — 183's range starts at
-`807357a`, 184's at `6dc96fe`, 185's at `c296486` — so publishing a later one
-alone also ships everything beneath it.
+Five releases are pending, and they STACK. **Publish in order: 182, 183, 184,
+185, then 186.** Each is built on the one before it — 183's range starts at
+`807357a`, 184's at `6dc96fe`, 185's at `c296486`, 186's at `b9c1e81` — so
+publishing a later one alone also ships everything beneath it.
 
-**If Curtis wants one Sites version rather than four, publish 185 from
-`b9c1e81`: it carries all four.** He asked for this to go live on 2026-10-08.
-Walk all four checklists below afterwards, because each lists different things
-to look at on the phone.
+**If Curtis wants one Sites version rather than five, publish 186 from
+`97a34ae`: it carries all five.** He asked for 182-185 to go live on 2026-10-08
+and added 186 on 2026-10-11. Walk all five checklists below afterwards, because
+each lists different things to look at on the phone.
 
 # 182 — publish from 807357a
 
@@ -802,3 +813,151 @@ Roll back to 184 (`c296486`) if it is live, else 183 (`6dc96fe`), else 182
 deferral logged under 185 is lost. The two new keys are simply not read by an
 earlier version: a PTR writeup and a shop repair time stay on the device,
 untouched, and reappear when 185 is published again.
+\n
+
+# 186 — publish from 97a34ae
+
+## Source
+
+```
+$ git log --oneline b9c1e81..97a34ae
+97a34ae FS on the home screen, and an icon iOS can actually use
+57e0c04 Hand 185 to Codex from b9c1e81 — Curtis has asked for this to go live
+
+$ git diff --name-only b9c1e81..97a34ae
+app/layout.tsx
+docs/PUBLISH_NEXT.md
+public/apple-touch-icon.png
+public/favicon.svg
+public/icon-192.png
+public/icon-512.png
+public/icon-maskable-512.png
+public/icon-maskable.svg
+public/manifest.webmanifest
+public/sw.js
+tests/app-shell.test.mjs
+tests/settings.test.mjs
+
+$ git diff --shortstat b9c1e81..97a34ae
+ 12 files changed, 338 insertions(+), 27 deletions(-)
+
+$ git diff --name-only b9c1e81..97a34ae -- supabase package.json package-lock.json .github worker
+```
+
+The last command prints nothing: no schema change, no dependency change, no CI
+change. `57e0c04` is the 185 handoff written into this file and carries no app
+code.
+
+## Migrations
+
+**None.** Nothing is stored, read or written differently. This release does not
+touch a single LocalStorage key, and the Supabase schema is untouched.
+
+## What was wrong
+
+Two separate faults, and only one of them was visible.
+
+**The one nobody could see.** `app/layout.tsx` declared
+`icons:{icon:"/favicon.svg",apple:"/favicon.svg"}`, and **iOS does not accept
+SVG for an apple-touch-icon**. Handed one it cannot use, iOS falls back to a
+screenshot of the page. So for as long as this app has had a home screen, the
+icon on it was never the icon in this repository — whatever artwork was here was
+beside the point until that line took a PNG.
+
+**The one he could.** `public/favicon.svg` was four pale blue squares on a
+TRANSPARENT ground at a 24px viewBox, declared `"purpose": "any maskable"`.
+Transparent plus maskable is the worst pairing available: iOS fills a clear
+region with black, and Android crops into it. It was also generic — it said
+nothing about the app.
+
+Curtis: the bookmark *"doesn't look good"*.
+
+## What changed
+
+**A new mark.** FS split on the diagonal: navy `#06275C` above the line, white
+below, and the two colours swap across it — the F is white on navy, the S is
+navy on white. Curtis picked it from eight options and corrected the first
+draft himself: no third blue, just the two crossing over, and the letters kept
+clear of the dividing line.
+
+The letters are Archivo Black (SIL Open Font License) converted to **outlines**.
+An icon that names a `font-family` renders in whatever the device happens to
+have, which for a logo means a different logo on every phone; a test now forbids
+`font-family` and `<text>` in either icon file.
+
+**Two artworks, not one file claiming two purposes.** Android guarantees only
+the centre circle of 80% diameter on a maskable icon — radius 410 of 1024. At
+their natural placement the F's farthest ink sits 507 units from the centre and
+the S's 478, so a circular crop bites both. `icon-maskable.svg` is the same
+drawing with the letters, and only the letters, scaled 0.76 about the centre:
+385 and 363, inside 410 with room. The ground stays full bleed because the crop
+can also be a square. The old manifest declared one file `"any maskable"`, which
+is a promise one drawing cannot keep.
+
+**The service worker had to move with it, and this is the part that would
+otherwise have shipped silently.** `CORE_FILES` is served cache-first, and those
+files keep their NAMES from one release to the next, unlike the hashed build
+chunks. A new `favicon.svg` and `manifest.webmanifest` under an unbumped cache
+name is a file every phone already holds and will never request again — the new
+icon would have reached nobody who already had the app open. `CACHE_NAME` is
+`pace-bus-tracker-shell-v6`, the six icon files joined `CORE_FILES` so they are
+there in a bay with no signal, and the comment above it now states the rule as
+contents, not just `CORE_PAGES`.
+
+## Verified
+
+- `npm test` 347 pass (346 before; the new one is "the home-screen icon is one a
+  phone can actually use"), `npm run lint` clean, `npm run build` complete — on
+  `97a34ae`, the merged commit, not just the branch.
+- The four PNGs are **probed pixel by pixel** rather than eyeballed: navy
+  ground, white ground, a point inside the F's stem, a point inside the S's
+  lower arm, and minimum alpha across every pixel in the image (255 — iOS fills
+  a transparent region with black).
+- Those probes were then run against **four deliberately broken** versions of the
+  artwork — F filled navy, the white half removed, the letters slid across the
+  line, and the unmutated baseline. Each break was caught; the baseline passed.
+  A probe that passes on a broken icon is proving the renderer ran.
+- The new test was **mutation-checked against six ways of reintroducing the
+  bugs**: apple icon back to `.svg`, manifest back to `"any maskable"`, a
+  manifest claiming a wrong PNG size, the favicon drawn with a font instead of
+  outlines, a transparent ground, and the maskable letters not drawn in. All six
+  go red.
+- Clearances were **measured off the rendered artwork** rather than worked out on
+  paper, which corrected two of my own figures: the F clears the diagonal by 193
+  units and the S by 122, and the S's farthest ink from centre is 478, not the
+  451 I had calculated.
+- Served locally and confirmed the HTML emits
+  `<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>` and that all six
+  files return 200 with the right content types.
+
+## What to check once it is live
+
+1. Open the site in **Safari**. The browser tab should show the navy/white FS
+   split, not four pale squares.
+2. **Reload once more** before anything else. The new service worker installs on
+   the first load and claims the page; the second load is what proves the v6
+   cache is serving.
+3. **Add to Home Screen.** The icon in the preview sheet, and then on the home
+   screen itself, should be the FS split inside Apple's rounded square. If it is
+   a tiny screenshot of the Facility Map, the apple-touch-icon is not being read
+   and this release did not land.
+4. On Android, if any device there has it: the icon should be the FS split
+   cropped to a circle, with both letters whole and neither touching the edge.
+5. The app must still work **offline** — open it in a bay with no signal and
+   confirm all six pages still draw. `CORE_FILES` and `CORE_PAGES` both changed
+   shape in this release.
+
+## Rollback
+
+Roll back to 185 (`b9c1e81`) if it is live, else 184 (`c296486`), else 183
+(`6dc96fe`), else 182 (`807357a`), else `sites-v181` (`148a45e`).
+
+**Nothing stored is altered and no key is touched**, so no defect, entry,
+recommendation, deferral, PTR writeup or shop repair time is at risk. A rollback
+restores the old icon files under the old `v5` cache name, which the activate
+handler will purge v6 to install — so the only cost is one re-download of the
+shell, online, on first launch.
+
+**One thing a rollback does NOT undo:** a home-screen bookmark already added
+keeps whatever icon it captured at the time it was added. iOS never refreshes it
+in place. That is a property of iOS, not of this release.
