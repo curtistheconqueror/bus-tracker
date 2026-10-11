@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-09
+Updated: 2026-10-11
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 182 (repository release 185; cumulative releases 182–185)
-Live feature checkpoint: commit b9c1e81
+Live release: Sites Version 184 (application release 187)
+Live feature checkpoint: commit b182776394e2b3b59ef7b969c58bf35c9c93f6a2
 
 ## Read this first
 
@@ -53,9 +53,13 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 185 is live as Sites Version 182 from commit b9c1e81, published on 2026-10-09. This one deployment includes repository releases 182–185: usable and labelled defect pickers; the app/src repository reorganization; shift-scoped Defect Log lists and initials-aware LOGGED reports; outstanding repair hours; a device-local shop repair-time ledger; PATH TO REPAIR; preserved description line breaks; and the FIXED TODAY count correction. No existing LocalStorage key was renamed and no Supabase schema changed. The additive pace-ptr-v1 and pace-repair-hours-v1 keys remain device-local. The normal rollback target is Sites Version 181 from commit 148a45e (`sites-v181`).
+Application release 187 is live as Sites platform Version 184 from b182776394e2b3b59ef7b969c58bf35c9c93f6a2, published 2026-10-11. The reconciled source preserves the previously deployed Defect Log equal action row, narrow-screen wrapping and neutral PTR help text while adding the FS PNG Apple icon, separate maskable artwork, v6 offline cache, and version-6 MASTER EXPORT/IMPORT coverage for PTR writeups and shop repair times. Releases 182–185 were already included in the prior live source and remain included. No storage key was renamed and no Supabase schema changed.
 
-Sites and repository numbering differ: the prepared local `sites-v182` tag points to the live source for repository release 185. Its remote GitHub tag push is pending Git authentication; do not assume that tag exists on GitHub. Native deployment succeeded; fresh cloud build, lint and 346 tests passed. The original phone/offline and live-device editing checklists remain in docs/archive/PUBLISH_RELEASE_185.md and were not rerun during publishing. No real fleet records were changed.
+Fresh production build, lint and all 350 tests passed locally and in exact-source GitHub CI. Sites deployment appgdep_6acc030438188191899ba2a8cd5c2ca7 succeeded. All six public pages respond successfully; Settings renders the new backup copy, and deployed icon/cache/runtime assets match the tested build. One generated optional preload names an un-emitted file and returns 404; the actual page bundle is present. Browser automation was unavailable, so hydration, physical Safari/Home Screen installation and offline device acceptance are not claimed. No real fleet data was changed.
+
+The rollback checkpoint is Sites platform Version 183 from aebe0aad334ce328c78c009d7c3d6a70e1c43c2a. Earlier historical notes called that layout deployment application release 186; it did not contain the later icon release also numbered 186. Use source SHA and platform version for rollback. Tag sites-v184 identifies this deployed source; sites-release187 is an application-release alias.
+
+Each device needs its own MASTER EXPORT after refreshing the new release. Import replaces board/state, PTR writeups and shop times; absent fields in older backups remain untouched and swap history merges. Shop Cloud configuration/auth and remembered scan hints are not in the backup. Installation/import/reconnection remain Curtis's actions.
 
 The Version 171 baseline details below remain useful historical context:
 
