@@ -5357,8 +5357,10 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
  /* ONE CLOCK READ, SHARED by the limit and the label. Two `new Date()` calls a
     line apart can straddle a minute, or midnight, where TODAY's limit drops
     from 1439 to 0 — and feed-window.ts's whole degradation rule is that those
-    two must never disagree. */
- assert.match(page,/const feedWindowNow=new Date\(\)/);
+    two must never disagree. It is STATE rather than a render-body const so it
+    also advances while the page sits idle; the timer itself is pinned in "TODAY
+    is measured from a real local midnight". */
+ assert.match(page,/const \[feedWindowNow,setFeedWindowNow\]=useState\(\(\)=>new Date\(\)\)/);
  assert.match(page,/const feedWindowLimit=search\.trim\(\)\?null:feedWindowMinutes\(feedWindow,feedWindowNow,shiftSettings\)/,
   "a search must stand the window down, not merely be applied after it");
  assert.match(page,/const feedWindowText=search\.trim\(\)\?"":feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/,
@@ -5394,4 +5396,58 @@ test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outran
  assert.match(css,/\.log-window-filtered\{/);
  assert.doesNotMatch(css,/\.log-window-filtered\{[^}]*background:#eaf3fd/,
   "it must not be the search bar's blue: both can be on screen at once");
+});
+
+test("TODAY is measured from a real local midnight, and the window clock advances on its own",async()=>{
+ const {feedWindowMinutes,feedWindowLabel,defectWithinFeedWindow}=await import("../src/lib/defects/feed-window.ts");
+
+ /* BOTH OF THESE SHIPPED WRONG IN THE FIRST CUT and were caught in review.
+    TODAY used `minuteOfDay`, which is right for the shift clock — it compares
+    clock readings to clock readings — and wrong here, where the answer is
+    compared against an ELAPSED age.
+
+    IT FLOORED TO THE MINUTE. `loggedMinutesElapsed` returns fractions, so at
+    09:30:45 the limit was 570 while a defect logged at 00:00:10 had an age of
+    570.58: logged today, hidden from TODAY. */
+ const at=new Date(2026,5,15,9,30,45);
+ const limit=feedWindowMinutes("today",at);
+ assert.ok(limit>570.7&&limit<570.8,"the limit keeps its seconds, got "+limit);
+ const loggedJustAfterMidnight={category:"Brakes",issue:"Chamber leak",createdAt:new Date(2026,5,15,0,0,10).toISOString()};
+ assert.equal(defectWithinFeedWindow(loggedJustAfterMidnight,limit,at),true,
+  "a defect logged at 00:00:10 was logged today");
+
+ /* AND IT COUNTED CLOCK MINUTES RATHER THAN REAL ONES. On a spring-forward day
+    10:00 is 600 clock minutes past midnight but only 540 real ones, so TODAY
+    reached a full hour into yesterday. Asserted only where the clock really
+    shifts, so the test says what it means on a UTC runner rather than passing
+    for the wrong reason. */
+ const springForward=new Date(2026,2,8,10,0,0);
+ const shifts=springForward.getTimezoneOffset()!==new Date(2026,2,8,0,0,0).getTimezoneOffset();
+ const springLimit=feedWindowMinutes("today",springForward);
+ if(shifts){
+  assert.ok(springLimit<595,"on a DST day TODAY must measure real elapsed time, got "+springLimit);
+ }else{
+  assert.ok(Math.abs(springLimit-600)<1,"no DST here, so 10:00 is 600 minutes in; got "+springLimit);
+ }
+
+ /* An unreadable clock gives null AND "", the pair that must move together. */
+ const broken=new Date(NaN);
+ assert.equal(feedWindowMinutes("today",broken),null);
+ assert.equal(feedWindowLabel("today",broken),"");
+
+ /* THE CLOCK ADVANCES WITHOUT THE OPERATOR. Read in the render body the instant
+    only moved when something else caused a render, and this control was built
+    for a shop computer left open on this page all day: at 14:00 the board went
+    on showing the morning crew's window under a heading reading 1ST SHIFT.
+    It is state now, refreshed on a timer while a window is in force. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const \[feedWindowNow,setFeedWindowNow\]=useState\(\(\)=>new Date\(\)\)/);
+ assert.match(page,/setInterval\(\(\)=>setFeedWindowNow\(new Date\(\)\),30000\)/,"it re-reads the clock every half minute");
+ assert.match(page,/return \(\)=>clearInterval\(id\)/,"and clears the timer, so leaving the page does not leak one");
+ const effect=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const feedWindowLimit="));
+ assert.match(effect,/if\(feedWindow==="all"\)return;/,
+  "ALL does not tick: there is no limit to keep current and an idle board should not re-render for nothing");
+ assert.match(effect,/setFeedWindowNow\(new Date\(\)\);\s*\n\s*const id=setInterval/,
+  "and it reads the clock immediately on picking a window, not up to thirty seconds late");
+ assert.match(effect,/\},\[feedWindow\]\)/,"re-armed when the window changes");
 });

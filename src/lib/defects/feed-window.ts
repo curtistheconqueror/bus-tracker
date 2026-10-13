@@ -1,4 +1,4 @@
-import {activeShift,minuteOfDay,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
+import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
 import {loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
@@ -64,11 +64,28 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
  if(fixed!==undefined)return fixed;
  if(key==="shift")return activeShift(now,settings)?.since??null;
  /* TODAY IS THE CALENDAR DAY ON THIS DEVICE, not a rolling 24 hours — they are
-    different questions and he asked for both. At 06:00 "today" is six minutes
-    past six hours of work and "the last 24 hours" still carries all of
-    yesterday afternoon. Measured as minutes since local midnight, which is what
-    `minuteOfDay` already computes for the shift clock. */
- if(key==="today")return minuteOfDay(now);
+    different questions and he asked for both. At 06:00 "today" is six hours of
+    work and "the last 24 hours" still carries all of yesterday afternoon.
+
+    MEASURED FROM A REAL LOCAL MIDNIGHT, not from `minuteOfDay`. That function
+    is right for the shift clock, which compares clock readings to clock
+    readings, and wrong here, where the answer is compared against an ELAPSED
+    age. Two ways it goes wrong, both measured rather than argued:
+
+    It floors to the minute while `loggedMinutesElapsed` returns fractions, so
+    at 09:30:45 the limit is 570 and a defect logged at 00:00:10 has an age of
+    570.58 — logged today and hidden from TODAY.
+
+    And it counts clock minutes rather than real ones, so on a spring-forward
+    day 10:00 reads as 600 minutes past midnight when only 540 have passed;
+    TODAY would reach a full hour into yesterday. Subtracting a Date built from
+    this date's own year, month and day gets both right at once, because that
+    Date is the real instant local midnight happened. */
+ if(key==="today"){
+  const at=now.getTime();
+  if(Number.isNaN(at))return null;
+  return (at-new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime())/60000;
+ }
  return null;
 }
 
@@ -108,6 +125,8 @@ export function feedWindowLabel(key:FeedWindowKey,now:Date=new Date(),settings:S
   const shift=activeShift(now,settings);
   return shift?shiftLabel(shift.key)+" · SINCE "+shift.start:"";
  }
- if(key==="today")return minuteOfDay(now)===null?"":"TODAY";
+ /* Checked the same way the limit is, so the pair cannot disagree about whether
+    there is a window at all. */
+ if(key==="today")return Number.isNaN(now.getTime())?"":"TODAY";
  return FEED_WINDOWS.find(item=>item.key===key)?.label||"";
 }

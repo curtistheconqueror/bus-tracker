@@ -825,11 +825,33 @@ export default function DefectLog(){
     one question it is being asked directly, so an active search sets the limit
     to null and the bar below says so. Nothing is remembered differently — clear
     the search and the window he picked is still the one in force. */
- /* ONE CLOCK READ, SHARED. The limit and the label are the pair feed-window.ts
-    says must never disagree, and two `new Date()` calls a line apart can
-    straddle a minute — or midnight, where TODAY's limit jumps from 1439 to 0.
-    Read once and hand the same instant to both. */
- const feedWindowNow=new Date();
+ /* ONE CLOCK READ, SHARED, AND IT HAS TO ADVANCE ON ITS OWN.
+
+    The limit and the label are the pair feed-window.ts says must never
+    disagree, so they are handed the same instant rather than each calling
+    `new Date()`.
+
+    Read in the render body it would only ever move when something else caused
+    a render, and the device this control was built for is a shop computer left
+    open on this page all day. At 14:00 with THIS SHIFT selected, the board
+    would go on showing the morning crew's window under a heading reading
+    1ST SHIFT · SINCE 06:00 until somebody happened to click something — the
+    screen claiming a window it is not applying, which is exactly the failure
+    feed-window.ts is written to prevent. Rolling windows drift the same way,
+    holding records past their own edge.
+
+    So the instant is STATE, refreshed every half minute while a window is in
+    force. It does not tick on ALL: there is no limit to keep current, and an
+    idle board should not re-render every thirty seconds for nothing. */
+ const [feedWindowNow,setFeedWindowNow]=useState(()=>new Date());
+ useEffect(()=>{
+  if(feedWindow==="all")return;
+  /* Immediately as well as on the interval, so picking a window reads the
+     clock now rather than up to thirty seconds late. */
+  setFeedWindowNow(new Date());
+  const id=setInterval(()=>setFeedWindowNow(new Date()),30000);
+  return ()=>clearInterval(id);
+ },[feedWindow]);
  const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
  const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit);
  /* Three stages, narrowest last, so each bar can name what IT is holding back:
