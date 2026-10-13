@@ -4,7 +4,10 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 181 / release 181 | Live | 148a45e | Distinguishes hard Down Sheet buses from Soft Down and IDOT preparation with collapsed boards and an optional in-service override; adds IDOT Prep, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. |
+| 184 / application release 187 | Live | b182776394e2b3b59ef7b969c58bf35c9c93f6a2 | Reconciles the live Defect Log fixes with the FS Apple/maskable icons and v6 cache; MASTER EXPORT/IMPORT includes PTR writeups and shop repair times. |
+| 183 / historical layout release | Previous live | aebe0aad334ce328c78c009d7c3d6a70e1c43c2a | Equal full-width repair actions, narrow-screen label wrapping, and neutral PTR help text; historically called release 186, separate from the later icon release 186. |
+| 182 / release 185 (includes 182–184) | Previous live | b9c1e81 | Publishes the cumulative picker fixes, repository layout, shift-scoped lists, repair-hours badge, shop repair-time ledger, PATH TO REPAIR, description line breaks and FIXED TODAY correction. |
+| 181 / release 181 | Previous live | 148a45e | Distinguishes hard Down Sheet buses from Soft Down and IDOT preparation with collapsed boards and an optional in-service override; adds IDOT Prep, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. |
 | 180 / release 180 | Previous live | b6e0cba | Adds four Brakes symptom choices: Brakes sticking / dragging, brakes will not release after the service pedal, brakes will not release at the parking brake, and Brake chamber leaking. |
 | 179 / release 179 | Previous live | fe467c0 | Adds optional HOLD UNTIL and EXTEND controls for deferred Defect Log repairs without resetting their original 90-minute alarm or deferred history; the facility-config extraction is internal and renders identically. |
 | 178 / release 178 | Previous live | 531c3f8 | Keeps the Fleet Status Report CLOSE action reachable in its iOS modal, makes first-run role selection follow Full/Lite selection, and fixes the cross-timezone forecast fixture so CI passes consistently. |
@@ -90,6 +93,37 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 | 106 | Previous live | 194c0b4 | Facility Map repairs route explicitly to Defect Log, Down Sheet, or both; legacy map-only repair cleanup is scoped and undoable |
 | 105 | Previous live | bdfe8e2 | Phone Facility Map navigation moved to the uniform top position; Fixed Repairs now shares Defect Log theme, font, and color settings |
 | 104 | Previous live | 519e748 | Authoritative reviewed-photo Down Sheet replacement, automatic DS badge reconciliation, explicit coming-off review, undo coverage, and preserved Defect Log records |
+
+## Sites Version 182 / repository release 185 — 2026-10-09
+
+Published once to the existing public Site, carrying repository releases 182–185.
+Sites version numbers and repository release numbers now differ; no empty
+versions were created to align them.
+
+- Source: `b9c1e81b93046ad8c7053c986cc72bb1a8a9eda3`
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_d68d190544d88191a9ca5887c2988177`
+- Deployment: `appgdep_6ac86486486c8191959f52970f349923`
+- Native result: `succeeded` at `2026-10-09T03:50:39.237210+00:00`
+- Public URL: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site
+- Archive SHA-256: `2c7ed1005db14f3f2ff7741d875e28ba30c59d64d2b19cbdde0aeb5e29adf48a`
+- Gates: fresh cloud production build, ESLint and 346 tests passed; `git diff --check` clean. Exact-source [GitHub CI](https://github.com/curtistheconqueror/bus-tracker/actions/runs/37851672242) also passed.
+- Validation boundary: publication confirmed by native deployment and saved-version results. Live-device phone, editing and offline checklists were not rerun; no real fleet records were changed.
+- Data: no schema migration or existing-key rename. `pace-ptr-v1` and `pace-repair-hours-v1` are additive, device-local keys.
+- Prepared local rollback tag for this source: `sites-v182`, pointing to `b9c1e81`. Its remote GitHub push is pending Git authentication; the tag is not yet present on GitHub. Previous live target: `sites-v181` (`148a45e`). Rolling back leaves the two new keys untouched but unread until this release returns.
+- Historical handoff and all four phone checklists: [published releases 182–185](archive/PUBLISH_RELEASE_185.md).
+
+## Sites platform 184 / application release 187 publication
+
+- Published 2026-10-11 at 21:43:41.132231 UTC to https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site with public audience unchanged.
+- Source: b182776394e2b3b59ef7b969c58bf35c9c93f6a2; a history-preserving merge with parents 1d730a4ba7d441d4ea1b664efad1ca56bbe7b4e1 and aebe0aad334ce328c78c009d7c3d6a70e1c43c2a. Approved original release source: 016fae430d30db6f6f1f85bb9f12653323f94e80.
+- Saved version: appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_70ec7cb544c08191b2c2575f67834e88.
+- Successful deployment: appgdep_6acc030438188191899ba2a8cd5c2ca7.
+- Native saved archive hash: sha256:3b393637dfe617023a88cb4bf9f267f3c36ed8b784d83b3d7e73a14873a186b6.
+- Validation: local lint, production build and 350 tests pass; [exact-source GitHub CI](https://github.com/curtistheconqueror/bus-tracker/actions/runs/38177465073) also passed install, lint, build and test. Backup tests use memory storage, never real user data.
+- Postpublication: six routes return 200; Settings names PTR writeups/shop times; Apple PNG declaration and v6 service worker confirmed. Emitted live icons, manifest, service worker, CSS and JS match the tested build bytes. One generated optional preload references an un-emitted defect-log-DTlrLlDu.js and returns 404; the actual defect page bundle is present. Browser automation unavailable; physical Safari/Home Screen/offline checks remain unverified.
+- Backup version 6 adds pathToRepairs and repairHours. Import normalizes/replaces those fields, skips absent older-file fields, and continues merging swap history. Cloud configuration/auth and scan hints are not backed up.
+- Rollback: previous platform Version 183, source aebe0aad334ce328c78c009d7c3d6a70e1c43c2a. Rolling back stops new exports/imports carrying the two fields; do not move devices while rolled back. No installation, import, Shop Cloud reconnection, or operational-data changes were performed.
+- Preserved six-section handoff: [release 187](archive/PUBLISH_RELEASE_187.md). Rollback tag sites-v184 and application alias sites-release187 point to deployed source.
 
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 

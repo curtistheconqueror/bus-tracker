@@ -30,6 +30,7 @@ import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
+import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -655,6 +656,17 @@ export default function DefectLog(){
     time-window-chips.tsx for why a remembered window is the wrong default on
     a list of buses nobody has ruled on yet. */
  const [quickFilterWindow,setQuickFilterWindow]=useState<TimeWindowKey>("all");
+ /* WHEN WAS IT LOGGED. Curtis: "filter everything that's being put down ... by
+    the day and by the shift ... it should be like a drop-down somewhere at the
+    work computer." Sticky once chosen — he puts it back to ALL himself, which
+    is why the bar below the controls carries its own way out.
+
+    Held in state rather than written to storage, and that is the deliberate
+    half. The shop computer's tab does not reload, so within a session is
+    permanent for the person who asked for this; across a reload it is ALL
+    again, so nobody ever walks up to that computer and reads a short board
+    without having narrowed it themselves. */
+ const [feedWindow,setFeedWindow]=useState<FeedWindowKey>("all");
  /* The garage's own hours, for the SHIFT window. The defaults ARE this shop's
     real shifts, so the window is already correct on the first render and the
     effect only matters on a device where somebody edited them in Settings —
@@ -807,7 +819,23 @@ export default function DefectLog(){
   const query=search.trim().toLowerCase();if(!query)return true;
   return [record.bus.n,record.defect.category,record.defect.issue,...(record.defect.symptoms||[]),...(record.defect.fluids||[]),record.defect.details,record.defect.diagnosticNote,record.defect.actionTaken,record.defect.shopNotes].filter(Boolean).join(" ").toLowerCase().includes(query);
  };
- const unsearched=records.filter(matchesStateFilter);
+ /* A SEARCH STANDS THE WINDOW DOWN, and that was Curtis's own condition: he
+    wants to reach a bus "no matter what time" it was logged. A window that can
+    hide a bus somebody has just typed the number of is a board that lies to the
+    one question it is being asked directly, so an active search sets the limit
+    to null and the bar below says so. Nothing is remembered differently — clear
+    the search and the window he picked is still the one in force. */
+ /* ONE CLOCK READ, SHARED. The limit and the label are the pair feed-window.ts
+    says must never disagree, and two `new Date()` calls a line apart can
+    straddle a minute — or midnight, where TODAY's limit jumps from 1439 to 0.
+    Read once and hand the same instant to both. */
+ const feedWindowNow=new Date();
+ const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
+ const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit);
+ /* Three stages, narrowest last, so each bar can name what IT is holding back:
+    the state buttons, then when it was logged, then the search. */
+ const stateOnly=records.filter(matchesStateFilter);
+ const unsearched=stateOnly.filter(matchesFeedWindow);
  const visible=unsearched.filter(matchesSearch);
  const visibleGroups=groupDefectLogRecords(visible);
  /* WHAT THE WORK ON SCREEN WOULD TAKE, in the same scope as the two counts it
@@ -822,6 +850,13 @@ export default function DefectLog(){
  /* How many buses the search alone is holding back. Zero when nothing is typed,
     which is what keeps the banner off the page the rest of the time. */
  const hiddenBySearch=search.trim()?groupDefectLogRecords(unsearched).length-visibleGroups.length:0;
+ /* How many buses the WINDOW alone is holding back — measured against the state
+    filter's own result, not the whole board, so the number answers "what did
+    this drop-down cost me" rather than double-counting what OPEN or FIXED TODAY
+    had already set aside. Zero while a search is running, because the window is
+    standing down and claiming otherwise would be the lie above. */
+ const feedWindowText=search.trim()?"":feedWindowLabel(feedWindow,feedWindowNow,shiftSettings);
+ const hiddenByFeedWindow=feedWindowLimit===null?0:groupDefectLogRecords(stateOnly).length-groupDefectLogRecords(unsearched).length;
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
  const focusedGroup=focusedBusId?visibleGroups.find(group=>group.bus.id===focusedBusId):undefined;
@@ -1319,6 +1354,20 @@ export default function DefectLog(){
        buttons back for everybody else. */
     ...(filter==="open"?[["open","OPEN"] as [Filter,string]]:[]),
     ...(filter==="downsheet"?[["downsheet","DOWN SHEET"] as [Filter,string]]:[])] as [Filter,string][]).map(([value,label])=><button className={filter===value?"active":""} aria-pressed={filter===value} onClick={()=>showEverythingOr(value)} key={value}>{label}</button>)}</div>
+      {/* A DROP-DOWN RATHER THAN MORE CHIPS, which is how Curtis asked for it —
+          "like a drop-down somewhere at the work computer". The row above is
+          thumb targets on a phone; this is one question asked at a desk, and a
+          seventh button would have cost that row its single line at 360px.
+
+          It lives in VIEW because it changes what the feed shows, which is what
+          this group is for. VIEW is collapsed by default, so the bar above the
+          feed carries both the state and the way out — nobody has to open a
+          drawer to undo it. */}
+      <label className="log-feed-window">WHEN LOGGED
+       <select value={feedWindow} onChange={event=>setFeedWindow(event.target.value as FeedWindowKey)} aria-label="Show defects logged within">
+        {FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
+       </select>
+      </label>
       <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow("all")}}/>
       <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
      </div>
@@ -1358,8 +1407,18 @@ export default function DefectLog(){
        to undo it — the small CLEAR in the field stays for whoever finds it
        first. Only while something is typed, so it is never in the way. */}
    {search.trim()&&<div className="log-search-filtered" role="status">
-    <span><b>{visibleGroups.length}</b> BUS{visibleGroups.length===1?"":"ES"} SHOWN{hiddenBySearch>0?" · "+hiddenBySearch+" HIDDEN BY THIS SEARCH":""}</span>
+    <span><b>{visibleGroups.length}</b> BUS{visibleGroups.length===1?"":"ES"} SHOWN{hiddenBySearch>0?" · "+hiddenBySearch+" HIDDEN BY THIS SEARCH":""}{feedWindow!=="all"?" · SEARCHING EVERY DATE":""}</span>
     <button type="button" className="show-all-buses" onClick={()=>setSearch("")}>SHOW ALL</button>
+   </div>}
+   {/* OUTSIDE the collapsed VIEW drawer on purpose. A narrowed board that
+       explains itself nowhere is the trap this whole control could have been,
+       and the drop-down that set it is behind ADVANCED ACTIONS — so the state
+       and the way back both live here, where the search bar already taught
+       somebody to look. Hidden entirely on ALL, which is every board that has
+       not been narrowed. */}
+   {feedWindowText&&<div className="log-window-filtered" role="status">
+    <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+" OLDER BUS"+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
+    <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
    </div>}</div>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is
     not a stat and must not collapse with them. A bare gear on its own read as
@@ -1545,7 +1604,7 @@ export default function DefectLog(){
      if(ptrEditing)return <div className="ptr-body">
       <label className="ptr-edit">STEPS — GENERAL DIRECTION, NOT A PROCEDURE
        <textarea value={ptrDraft} maxLength={MAX_PATH_TO_REPAIR} rows={9} autoFocus
-        placeholder={"Check the oil level first.\nRefer to Cummins INSIGHT for the fault code.\nLook for corrosion on the harness behind the AC filters."}
+        placeholder="Add the first checks and useful references to help someone start this repair."
         onChange={event=>setPtrDraft(event.target.value)}/></label>
       <small className="ptr-count">{ptrDraft.trim().length} / {MAX_PATH_TO_REPAIR}</small>
       {ptrProblem&&<p className="ptr-problem">{ptrProblem}</p>}
@@ -1557,7 +1616,7 @@ export default function DefectLog(){
           entitled to know who will see it. */}
       <p className="ptr-note">This is written once for <b>{repairCategoryLabel(ptrFor.category)} — {ptrFor.issue}</b> and shows on every bus with that repair. It stays on this device; it does not travel to the Shop Cloud yet.</p>
      </div>;
-     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first steps somebody should take — a manual to check, a code to pull, a place to look.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
+     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first checks and useful references to help someone start this repair.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
      return <div className="ptr-body">
       <p className="ptr-steps">{saved.steps}</p>
       <div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>{setPtrDraft(saved.steps);setPtrEditing(true)}}>EDIT</button></div>
@@ -1585,7 +1644,16 @@ export default function DefectLog(){
      {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
-     <div className="log-focus-record-foot"><time>LOGGED {timeLabel(record.createdAt)}</time><span className="log-focus-record-actions">{/* PTR sits on the DEFECT CARD rather than beside FOCUS on the feed, which is where Curtis put it: "somewhere on each of the defect cards so that way it's specified to that defect". The writeup it opens belongs to the REPAIR, so the button carries that defect's category and issue rather than its id. */}<button className="ptr-log-focus-defect" type="button" onClick={()=>openPathToRepair(record.defect.category,record.defect.issue)} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button><button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}{isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}</span></div>
+     <div className="log-focus-record-foot">
+      {/* The three main actions span the card above its date. PTR still opens
+          the REPAIR's writeup, shared by matching faults on this device. */}
+      <div className="log-focus-record-actions">
+       <button className="edit-log-focus-defect" type="button" onClick={()=>{setFocusedBusId("");setEditing(recordDraft(record))}}>EDIT DEFECT</button>
+       {isUnresolved(record.defect)&&<button className="fix-log-focus-defect" type="button" onClick={()=>markFixed(record)}>MARK FIXED</button>}
+       <button className="ptr-log-focus-defect" type="button" onClick={()=>openPathToRepair(record.defect.category,record.defect.issue)} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button>
+      </div>
+      <div className="log-focus-record-meta"><time>LOGGED {timeLabel(record.createdAt)}</time>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}</div>
+     </div>
     </article>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,

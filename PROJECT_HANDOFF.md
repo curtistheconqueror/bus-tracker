@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-09-14
+Updated: 2026-10-11
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 181 (repository release 181)
-Live feature checkpoint: commit 148a45e
+Live release: Sites Version 184 (application release 187)
+Live feature checkpoint: commit b182776394e2b3b59ef7b969c58bf35c9c93f6a2
 
 ## Read this first
 
@@ -53,7 +53,13 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Repository release 181 is live as Sites Version 181 from commit 148a45e. It distinguishes hard Down Sheet buses from Soft Down and IDOT preparation through collapsed boards, and adds an optional per-entry inService flag for a Soft Down bus actually in use. It also adds IDOT Prep to Inspection, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. Two new per-device collapse keys and the entry detail field add no migration or Supabase schema change. The normal rollback target is Version 180 from commit b6e0cba.
+Application release 187 is live as Sites platform Version 184 from b182776394e2b3b59ef7b969c58bf35c9c93f6a2, published 2026-10-11. The reconciled source preserves the previously deployed Defect Log equal action row, narrow-screen wrapping and neutral PTR help text while adding the FS PNG Apple icon, separate maskable artwork, v6 offline cache, and version-6 MASTER EXPORT/IMPORT coverage for PTR writeups and shop repair times. Releases 182–185 were already included in the prior live source and remain included. No storage key was renamed and no Supabase schema changed.
+
+Fresh production build, lint and all 350 tests passed locally and in exact-source GitHub CI. Sites deployment appgdep_6acc030438188191899ba2a8cd5c2ca7 succeeded. All six public pages respond successfully; Settings renders the new backup copy, and deployed icon/cache/runtime assets match the tested build. One generated optional preload names an un-emitted file and returns 404; the actual page bundle is present. Browser automation was unavailable, so hydration, physical Safari/Home Screen installation and offline device acceptance are not claimed. No real fleet data was changed.
+
+The rollback checkpoint is Sites platform Version 183 from aebe0aad334ce328c78c009d7c3d6a70e1c43c2a. Earlier historical notes called that layout deployment application release 186; it did not contain the later icon release also numbered 186. Use source SHA and platform version for rollback. Tag sites-v184 identifies this deployed source; sites-release187 is an application-release alias.
+
+Each device needs its own MASTER EXPORT after refreshing the new release. Import replaces board/state, PTR writeups and shop times; absent fields in older backups remain untouched and swap history merges. Shop Cloud configuration/auth and remembered scan hints are not in the backup. Installation/import/reconnection remain Curtis's actions.
 
 The Version 171 baseline details below remain useful historical context:
 
@@ -89,16 +95,16 @@ The history is intentionally linear. Do not rewrite published commits, force-pus
 ## Source map
 
 - app/page.tsx — Facility Map orchestration and device persistence
-- app/facility-layout.ts — facility sections, slots, capacities, and migrations
-- app/facility-areas.ts — shared Facility Map and Defect Log section membership plus first-open-space relocation
-- app/cloud-client.ts, app/cloud-sync.ts, and app/cloud-sync-control.tsx — optional Supabase sign-in, row synchronization, merge controls, and device status
-- app/smart-status.ts — destination-aware status rules
-- app/operator-engine.ts and app/operator-batch.ts — AI Operator parsing and atomic actions
-- app/down-sheet/ — Down Sheet route, editor, estimates, scan review, and two-way synchronization
-- app/defect-log/ — Defect Log route, grouping, filters, settings, and linked-repair behavior
-- app/fixed-repairs/ — offline completed-repair history and completion-detail editing
-- app/repair-catalog.ts — structured repair categories and quick selections
-- tests/rendered-html.test.mjs — release-gate regression coverage
+- src/lib/fleet/facility-layout.ts — facility sections, slots, capacities, and migrations
+- src/lib/fleet/facility-areas.ts — shared Facility Map and Defect Log section membership plus first-open-space relocation
+- src/lib/cloud/cloud-client.ts, src/lib/cloud/cloud-sync.ts, and app/settings/_components/cloud-sync-control.tsx — optional Supabase sign-in, row synchronization, merge controls, and device status
+- src/lib/fleet/smart-status.ts — destination-aware status rules
+- src/lib/operator/operator-engine.ts and src/lib/operator/operator-batch.ts — AI Operator parsing and atomic actions
+- app/down-sheet/ — Down Sheet route, stylesheet and route-specific UI; src/lib/down-sheet/ owns estimates, scan import and synchronization
+- app/defect-log/ — Defect Log route, stylesheet and route-specific UI; src/lib/defects/ owns repair, filtering and linked-record logic
+- app/fixed-repairs/ — completed-repair history route and styles; shared UI lives under src/components/
+- src/lib/defects/repair-catalog.ts — structured repair categories and quick selections
+- tests/*.test.mjs — release-gate regression coverage
 - db/ and drizzle/ — intentionally dormant shared-backend scaffolding
 - docs/roadmap/ — future product phases
 
@@ -118,6 +124,8 @@ Primary stores are versioned browser records:
 - pace-cloud-config-v1 — per-device Shop Cloud project, account, initials, and device-label settings
 - pace-cloud-state-v1 and pace-cloud-sent-v1 — per-device sync status and successfully sent row fingerprints
 - pace-cloud-auth-v1 — Supabase's persisted per-device shop session
+- pace-ptr-v1 — device-local PATH TO REPAIR writeups, keyed by repair
+- pace-repair-hours-v1 — device-local shop repair-time ledger, keyed by repair
 
 Undo snapshots exist for destructive Down Sheet actions. Backup export includes the fleet, connected Down Sheet state, and interface settings. Treat real exported backups as operational data and never commit them.
 

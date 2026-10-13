@@ -643,11 +643,21 @@ test("a search ends when somebody ends it, and never says so silently", async ()
  assert.match(page, /const clearSearchIfItHides=\(busId:string,defect:StructuredDefect\)=>/,
   "the save-time check takes the whole record, so a text search it still matches survives");
 
- // It counts what the SEARCH is hiding, not what the state filter is hiding —
- // different questions, and the banner only answers the first.
- assert.match(page, /const unsearched=records\.filter\(matchesStateFilter\)/);
+ /* It counts what the SEARCH is hiding, not what the other filters are hiding —
+    different questions, and the banner only answers the first.
+
+    THREE STAGES SINCE THE WHEN-LOGGED DROP-DOWN: the state buttons, then when
+    it was logged, then the search. Each bar is measured against the stage
+    directly above it, which is what keeps every bar answering for its own
+    control. The search banner therefore counts against the WINDOWED board, not
+    the whole log — "what did my typing hide from what I was looking at" — and
+    `search.trim()` still gates it, so an unsearched board shows no banner. */
+ assert.match(page, /const stateOnly=records\.filter\(matchesStateFilter\)/);
+ assert.match(page, /const unsearched=stateOnly\.filter\(matchesFeedWindow\)/);
  assert.match(page, /const visible=unsearched\.filter\(matchesSearch\)/);
  assert.match(page, /const hiddenBySearch=search\.trim\(\)\?groupDefectLogRecords\(unsearched\)\.length-visibleGroups\.length:0/);
+ assert.match(page, /const hiddenByFeedWindow=feedWindowLimit===null\?0:groupDefectLogRecords\(stateOnly\)\.length-groupDefectLogRecords\(unsearched\)\.length/,
+  "the window's own bar is measured against the state filter's result, not the whole board");
 });
 
 test("a repair already on the Down Sheet follows its record when the bus number changes", () => {
@@ -1825,8 +1835,8 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  assert.match(css,/\.log-focus-defect\{margin:0 0 11px;white-space:pre-wrap;font-size:21px/);
  assert.match(css,/\.log-focus-bus strong\{font-size:34px/);
  assert.match(css,/\.log-focus-record-foot button\{min-height:44px/);
- assert.match(css,/\.log-focus-record-actions\{display:flex;align-items:center;gap:8px\}/);
- assert.match(css,/\.log-focus-record-foot button\{[^}]*padding:0 14px[^}]*font-size:11px/);
+ assert.match(css,/\.log-focus-record-actions\{display:grid;grid-auto-flow:column;grid-auto-columns:minmax\(0,1fr\);gap:8px;width:100%\}/);
+ assert.match(css,/\.log-focus-record-foot button\{[^}]*padding:0 6px[^}]*font-size:11px/);
  assert.match(css,/\.fix-log-focus-defect\{background:#08733f\}/);
  assert.match(css,/\.log-card-group>\.log-focus-button\{position:absolute;top:6px;right:6px/);
  // the card header reserves the corner so repair text cannot run under the control
@@ -5215,4 +5225,173 @@ test("SHOP TIME sits on the PATH TO REPAIR screen and feeds the hours badge",asy
  assert.match(page,/NOT SET — ESTIMATING "\+formatRepairTime\(fallback\)\+" FROM THE CATALOG/);
  /* And who set it when one is. */
  assert.match(page,/"SET BY "\+\(shop\.updatedBy\|\|"SOMEONE"\)\+" · USED FOR EVERY BUS WITH THIS REPAIR"/);
+});
+
+
+test("focus repair actions share one full-width row above the date, with PTR last",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ const foot=page.slice(page.indexOf('<div className="log-focus-record-foot">'),page.indexOf('    </article>)}',page.indexOf('<div className="log-focus-record-foot">')));
+ const actions=foot.slice(foot.indexOf('<div className="log-focus-record-actions">'),foot.indexOf('<div className="log-focus-record-meta">'));
+ assert.ok(actions.indexOf('className="edit-log-focus-defect"')<actions.indexOf('className="fix-log-focus-defect"'));
+ assert.ok(actions.indexOf('className="fix-log-focus-defect"')<actions.indexOf('className="ptr-log-focus-defect"'));
+ assert.equal((actions.match(/<button /g)||[]).length,3);
+ assert.equal(actions.includes('UNDO DEFERRED'),false,"the optional action must not squeeze the equal main row");
+ assert.match(foot,/<div className="log-focus-record-meta"><time>LOGGED/);
+ assert.match(foot,/className="undo-deferred"[^>]*onClick=\{\(\)=>undoDeferred\(record\)\}>UNDO DEFERRED/);
+ assert.match(css,/\.log-focus-record-foot\{display:flex;flex-direction:column;align-items:stretch/);
+ assert.match(css,/\.log-focus-record-actions>button\{[^}]*width:100%;min-width:0;align-self:stretch;padding:8px 6px;line-height:1\.2;text-align:center;white-space:normal;overflow-wrap:anywhere\}/);
+ assert.equal(/\.log-focus-record-actions\{[^}]*flex-wrap/.test(css),false);
+ assert.match(page,/placeholder="Add the first checks and useful references to help someone start this repair\."/);
+ assert.equal(page.includes('Check the oil level first.'),false,"example instructions are not shown as repair advice");
+ assert.match(page,/<textarea value=\{ptrDraft\}/,"saved notes stay in the editor value, separate from help text");
+ assert.match(page,/<p className="ptr-steps">\{saved.steps\}<\/p>/,"reading still shows the user's saved writeup");
+});
+
+test("the LIVE REPAIR FEED can be narrowed to a shift or a day without touching the four chip rows",async()=>{
+ const {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,isFeedWindowKey,withinFeedWindow}=
+  await import("../src/lib/defects/feed-window.ts");
+ const {DEFAULT_SHIFT_SETTINGS}=await import("../src/lib/settings/shift-clock.ts");
+
+ /* Curtis: "filter everything that's being put down ... by the day and by the
+    shift, so in the last 24 hours, or by the shift". ALL first, because it is
+    the way out of every window and the board's own behaviour until now. */
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d"]);
+ assert.equal(FEED_WINDOWS[0].key,"all","ALL has to stay first: it is the way back to the whole board");
+ assert.equal(isFeedWindowKey("today"),true);
+ assert.equal(isFeedWindowKey("8h"),false,"a key only the shared chip row has must not resolve here");
+
+ /* EVERY WINDOW IS A NUMBER OF MINUTES BACK FROM NOW, which is what lets one
+    comparison serve a rolling span, a shift and a calendar day alike. */
+ const at=(hhmm)=>new Date("2026-10-13T"+hhmm+":00.000");
+ assert.equal(feedWindowMinutes("all",at("15:00")),null,"ALL has no limit");
+ assert.equal(feedWindowMinutes("24h",at("15:00")),1440);
+ assert.equal(feedWindowMinutes("3d",at("15:00")),3*1440);
+ assert.equal(feedWindowMinutes("7d",at("15:00")),7*1440);
+
+ /* TODAY is minutes since local midnight — a calendar day, not a rolling 24h,
+    and the two differ by the whole of yesterday afternoon at 06:00. */
+ assert.equal(feedWindowMinutes("today",at("06:00")),360);
+ assert.equal(feedWindowMinutes("today",at("00:00")),0,"at midnight TODAY is zero minutes, not the whole board");
+ assert.notEqual(feedWindowMinutes("today",at("06:00")),feedWindowMinutes("24h",at("06:00")),
+  "TODAY and LAST 24H are different questions");
+
+ /* THIS SHIFT is however long the shift has been running, on the same clock as
+    the Down Sheet and the forecast — the INCOMING crew owns the handover, so
+    at 14:05 it is five minutes rather than 8H's eight hours. */
+ assert.equal(feedWindowMinutes("shift",at("14:05"),DEFAULT_SHIFT_SETTINGS),5);
+ assert.equal(feedWindowMinutes("shift",at("14:00"),DEFAULT_SHIFT_SETTINGS),0,
+  "at 14:00 exactly the shift is zero minutes old, which is a real limit and not 'no window'");
+ assert.equal(feedWindowMinutes("shift",at("20:00"),DEFAULT_SHIFT_SETTINGS),360);
+
+ /* ZERO IS A REAL LIMIT. A falsy check here would hand back the whole board at
+    14:00 and at midnight, under a heading promising a shift or a day. */
+ assert.equal(withinFeedWindow(0,0),true);
+ assert.equal(withinFeedWindow(1,0),false,"something logged a minute before the shift began is not in it");
+ assert.equal(withinFeedWindow(99999,null),true,"ALL keeps everything");
+
+ /* AN UNDATED DEFECT falls out of every narrowed window and stays in ALL. */
+ assert.equal(withinFeedWindow(null,null),true);
+ assert.equal(withinFeedWindow(null,1440),false);
+
+ /* THE AGE IS `createdAt`, NEVER `updatedAt`. A defect logged on Monday and
+    edited this morning was still logged on Monday; keying off the edit would
+    refill TODAY with last week's work every time somebody touched a record. */
+ const now=new Date("2026-10-13T15:00:00.000Z");
+ const old={category:"Brakes",issue:"Chamber leak",createdAt:"2026-10-06T15:00:00.000Z",updatedAt:"2026-10-13T14:59:00.000Z"};
+ const fresh={category:"Brakes",issue:"Chamber leak",createdAt:"2026-10-13T14:30:00.000Z"};
+ const undated={category:"Brakes",issue:"Chamber leak"};
+ assert.equal(defectWithinFeedWindow(old,1440,now),false,"a week-old defect edited a minute ago is still a week old");
+ assert.equal(defectWithinFeedWindow(fresh,1440,now),true);
+ assert.equal(defectWithinFeedWindow(undated,1440,now),false);
+ assert.equal(defectWithinFeedWindow(old,null,now),true,"ALL keeps the old one");
+ assert.equal(defectWithinFeedWindow(undated,null,now),true,"ALL keeps the undated one");
+
+ /* THE LABEL AND THE FILTER DEGRADE TOGETHER. A board that keeps everything
+    under a heading claiming a window is the one outcome worth preventing, so
+    an unresolvable shift gives null AND "" rather than one of each. */
+ const broken={shifts:[],pullouts:[]};
+ assert.equal(feedWindowMinutes("shift",at("15:00"),broken),null);
+ assert.equal(feedWindowLabel("shift",at("15:00"),broken),"","no shift to name, so claim no window");
+ assert.equal(feedWindowLabel("all",at("15:00")),"","a board with no window is just the board");
+ assert.equal(feedWindowLabel("shift",at("20:00"),DEFAULT_SHIFT_SETTINGS),"2ND SHIFT · SINCE 14:00",
+  "it names the shift and its start, because somebody reading at 23:00 cannot ask which one it was");
+ assert.equal(feedWindowLabel("today",at("09:00")),"TODAY");
+ assert.equal(feedWindowLabel("24h",at("09:00")),"LAST 24H");
+
+ /* THE FOUR EXISTING CHIP ROWS ARE UNTOUCHED. TODAY needs a clock the Down
+    Sheet boards never ask for, so it lives here and not in the shared list —
+    the same reason SHIFT is not in TIME_WINDOWS. */
+ const {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT}=await import("../src/lib/shared/time-window.ts");
+ assert.deepEqual(TIME_WINDOWS.map(item=>item.key),["all","1h","4h","8h","24h","3d","7d"],
+  "the shared chip row must not gain or lose a chip because the feed got a drop-down");
+ assert.equal(TIME_WINDOWS_WITH_SHIFT.length,8);
+ assert.equal(TIME_WINDOWS.some(item=>item.key==="today"),false,"TODAY must not reach the four lists that draw TIME_WINDOWS");
+ /* Checked against the CODE, not the comments: that file's own header uses the
+    word "today" in prose, explaining why a window does not belong on the
+    filters that ask what is true right now. */
+ const shared=(await readFile(new URL("../src/lib/shared/time-window.ts",import.meta.url),"utf8"))
+  .replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.doesNotMatch(shared,/today/i,"the shared module must not have learned about TODAY");
+});
+
+test("WHEN LOGGED narrows the feed, says so outside the drawer, and never outranks a search",async()=>{
+ const [page,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+
+ /* A DROP-DOWN, which is how Curtis asked for it: "it should be like a
+    drop-down somewhere at the work computer". Not a seventh chip — that row is
+    thumb targets and has to stay on one line at 360px. */
+ assert.match(page,/<label className="log-feed-window">WHEN LOGGED/);
+ assert.match(page,/<select value=\{feedWindow\} onChange=\{event=>setFeedWindow\(event\.target\.value as FeedWindowKey\)\}/);
+ assert.match(page,/\{FEED_WINDOWS\.map\(item=><option value=\{item\.key\} key=\{item\.key\}>\{item\.label\}<\/option>\)\}/,
+  "the options come from the one list, so the drop-down cannot drift from the filter");
+ assert.match(page,/aria-label="Show defects logged within"/);
+
+ /* SEARCH WINS. Curtis wants to reach a bus "no matter what time" it was
+    logged, so an active search sets the limit to null outright. */
+ /* ONE CLOCK READ, SHARED by the limit and the label. Two `new Date()` calls a
+    line apart can straddle a minute, or midnight, where TODAY's limit drops
+    from 1439 to 0 — and feed-window.ts's whole degradation rule is that those
+    two must never disagree. */
+ assert.match(page,/const feedWindowNow=new Date\(\)/);
+ assert.match(page,/const feedWindowLimit=search\.trim\(\)\?null:feedWindowMinutes\(feedWindow,feedWindowNow,shiftSettings\)/,
+  "a search must stand the window down, not merely be applied after it");
+ assert.match(page,/const feedWindowText=search\.trim\(\)\?"":feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/,
+  "and the bar has to go quiet with it, or it would claim a window that is not in force");
+ assert.match(page,/SEARCHING EVERY DATE/,"the search bar says why the window stopped applying");
+
+ /* THE STATE AND THE WAY OUT LIVE OUTSIDE THE DRAWER. The control sits in VIEW,
+    which is collapsed by default, so a narrowed board that explained itself
+    only in there would be the trap this control could have been. */
+ assert.match(page,/\{feedWindowText&&<div className="log-window-filtered" role="status">/);
+ assert.match(page,/className="show-all-buses" onClick=\{\(\)=>setFeedWindow\("all"\)\}/,"one tap back to the whole board");
+ assert.match(page,/OLDER BUS/,"it says how many buses the window is holding back");
+ /* Pinned by what sits BETWEEN the two bars rather than by their order. A bare
+    "the window bar comes after the drawer opens" passes with the bar moved
+    inside the drawer, which is exactly the regression worth catching — found by
+    making that move and watching the assertion stay green. The search bar is
+    known to be outside the drawer, so: the window bar follows it, and nothing
+    belonging to the drawer comes between them. */
+ const searchBar=page.indexOf('className="log-search-filtered"'),windowBar=page.indexOf('className="log-window-filtered"');
+ assert.ok(searchBar>0&&windowBar>searchBar,"the window bar renders beside the search bar, not before it");
+ assert.doesNotMatch(page.slice(searchBar,windowBar),/log-advanced/,
+  "nothing of the collapsible drawer may come between them: the bar has to be reachable with VIEW shut");
+
+ /* STICKY, NOT STORED. The shop computer's tab does not reload, so useState is
+    permanent in practice; a storage key would instead mean somebody walks up to
+    that computer tomorrow and reads a short board nobody narrowed today. */
+ assert.match(page,/const \[feedWindow,setFeedWindow\]=useState<FeedWindowKey>\("all"\)/,"it opens on ALL, which is the board as it was");
+ const code=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\{\/\*[\s\S]*?\*\/\}/g,"");
+ assert.doesNotMatch(code,/feed-window-v1|feedWindow[^)]*localStorage|localStorage[^;\n]*feedWindow/,
+  "the window is not written to storage");
+
+ assert.match(css,/\.log-feed-window select\{width:100%;min-height:44px/,"a real tap target, matching the buttons beside it");
+ assert.match(css,/\.log-window-filtered\{/);
+ assert.doesNotMatch(css,/\.log-window-filtered\{[^}]*background:#eaf3fd/,
+  "it must not be the search bar's blue: both can be on screen at once");
 });
