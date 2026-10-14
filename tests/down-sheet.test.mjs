@@ -2049,7 +2049,12 @@ test("the Down Sheet uses the Defect Log's bus picker, and adds to a bus already
  assert.match(log,/<BusSelector /);
  assert.equal(/<select value=\{draft\.busId\}/.test(editorCode),false,"the bare select is gone");
  assert.equal(/function BusSelector/.test(logCode),false,"and the Defect Log no longer declares its own");
- assert.match(picker,/export default function BusSelector/);
+ /* Still exactly one declaration, in the shared module — which is what this
+    line is for. The spelling changed when the picker was memoised to keep a
+    keystroke in another field from redrawing its two 84-row option lists; the
+    default export is the memoised wrapper around the one function. */
+ assert.match(picker,/^function BusSelector\(/m,"declared once, in the shared module");
+ assert.match(picker,/^export default memo\(BusSelector\);$/m,"and that one declaration is what is exported");
 
  /* The whole FLEET, not availableFleet. Typing a number already on the sheet
     has to RESOLVE so the notice below can say so in words; a number that

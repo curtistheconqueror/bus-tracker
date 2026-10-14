@@ -90,7 +90,22 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     of string matching against an array already in memory, which is nothing next
     to the render it is part of, and a stale memo here would show the mechanic a
     list that does not match what he just typed. */
- const options=search(open?query:"");
+ /* NOTHING IS RANKED FOR A LIST NOBODY IS LOOKING AT.
+
+    This ran on every render whether the list was open or shut, which is once
+    per character typed anywhere else in the same form — and once the browse
+    stopped being capped at forty rows, a shut picker was building the whole
+    catalog, 338 rows, for a keystroke in the DETAILS box.
+
+    Measured at 6x, 162 characters into DETAILS at phone width, it buys less
+    than the row count suggests: median 33.6ms to 32.6ms, p95 50.2ms to 47.7ms,
+    and the characters over 50ms down from 9 to 4. The ranking was never the
+    bulk of the cost — the form redrawing around the field is — so this is the
+    small, certain part of it rather than the fix.
+
+    Safe because every reader of it is already behind `open`: the list itself,
+    the group count, the rows, and the three keyboard branches that act. */
+ const options=open?search(query):[];
 
  /* TITLES FIRST, DEFECTS SECOND.
 

@@ -2,7 +2,7 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect,useMemo,useRef,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -143,6 +143,12 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  /* Open only while the part prompt is up. Held here rather than as a separate
     route so closing the editor cannot strand it. */
  const [partPrompt,setPartPrompt]=useState(false);
+ /* HELD STILL SO THE PICKER CAN BE MEMOISED. Inline, this was a new function
+    on every render, which is every character typed anywhere in this form — and
+    a changed prop is a re-render, so the picker rebuilt its two option lists
+    for a keystroke in DETAILS. `onBusPicked` comes from the page, which does
+    not re-render while the editor is open. */
+ const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
@@ -351,7 +357,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    <div className="log-form">
-    <BusSelector fleet={fleet} busId={value.busId} select={busId=>{onBusPicked(busId);setValue(current=>({...current,busId}))}}/>
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus}/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens

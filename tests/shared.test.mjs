@@ -958,3 +958,46 @@ test("the picker opens on group titles, and typing still searches everything",as
  assert.match(log,/search=\{query=>searchCategories\(query\)\.map\(row=>\(\{value:row\.value,label:row\.label\}\)\)\}/,
   "the category picker passes no sections, so nothing groups it");
 });
+
+test("a form redrawing around a text field does not drag the picker with it",async()=>{
+ const [combo,picker,log]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+ ]);
+ const comboCode=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ const pickerCode=picker.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis widened the report himself: "Not just the bus number input into the
+    bus number field, but any other text input." The editor holds one draft, so
+    a character typed into DETAILS redraws the whole 312-node form around it.
+    Profiled with source maps, NONE of our own functions showed above the 0.2ms
+    sampling floor — the cost is React reconciling that form. So the fix is not
+    to make our code faster, it is to give React less of the form to walk. */
+
+ /* NOTHING IS RANKED FOR A LIST NOBODY IS LOOKING AT. This ran open or shut,
+    and once browsing stopped being capped at forty rows a SHUT picker was
+    building all 338 catalog rows for a keystroke in another field. */
+ assert.match(comboCode,/const options=open\?search\(query\):\[\]/,
+  "a closed picker ranks nothing");
+
+ /* AND THE PICKER ITSELF SITS STILL. 174 of the editor's 312 nodes are its two
+    option lists; its props do not move while somebody types a sentence. */
+ assert.match(pickerCode,/^function BusSelector\(/m,"declared, so it can be wrapped");
+ assert.match(pickerCode,/^export default memo\(BusSelector\);$/m);
+ assert.match(pickerCode,/import \{memo,useEffect,useMemo,useState\} from "react"/);
+ /* A memo over an inline arrow is a comparison that can never pass. */
+ assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
+  "the callback is held still, or the memo does nothing but cost a comparison");
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}\/>/,
+  "and the held callback is the one passed");
+ assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
+  "no inline arrow remains on that prop");
+
+ /* MEASURED, typing 162 characters into DETAILS at 6x and phone width:
+      before            median 33.6ms  p95 50.2ms  worst 63.6ms  9 over 50ms
+      closed-list fix   median 32.6ms  p95 47.7ms  worst 57.4ms  4 over 50ms
+      + memo            median 31.0ms  p95 42.6ms  worst 47.5ms  0 over 50ms
+    The median barely moves and the TAIL is where it lands, which is the half
+    Curtis described: "It's not, you know, smooth and consistent." */
+});

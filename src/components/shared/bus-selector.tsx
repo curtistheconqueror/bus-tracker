@@ -17,7 +17,7 @@
    and autoFocus, because the Down Sheet's editor opens with other fields above
    this one and stealing focus there moves the page under somebody's thumb. */
 
-import {useEffect,useMemo,useState} from "react";
+import {memo,useEffect,useMemo,useState} from "react";
 
 import {locationLabel} from "@/src/lib/fleet/location-label";
 import "./bus-selector.css";
@@ -50,7 +50,16 @@ export type PickerBus={id:string;n:string;l:string};
 export function busGeneration(number:string){const value=String(number??"").slice(0,2);return /^\d{2}$/.test(value)?value:"OTHER"}
 
 function generationLabel(value:string){return value==="OTHER"?"OTHER":value+"s"}
-export default function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean}){
+/* MEMOISED, because the form around it redraws on every character typed in any
+   other field and this is the biggest thing in that form: 174 of the editor's
+   312 nodes are this picker's two option lists. Its props — the fleet, the
+   chosen bus id, and one callback — do not move while somebody types a
+   sentence into DETAILS, so there is nothing here to re-render.
+
+   The callback has to be stable for this to bite at all; see the useCallback
+   where it is passed. Given an inline arrow it would be a new prop every
+   render and the memo would do nothing but cost a comparison. */
+function BusSelector({fleet,busId,select,listId="bus-number-options",autoFocus=true}:{fleet:PickerBus[];busId:string;select:(busId:string)=>void;listId?:string;autoFocus?:boolean}){
  const selected=fleet.find(bus=>bus.id===busId);
  /* THE FLEET DECIDES THESE, AND THE FLEET IS NOT WHAT CHANGES WHILE SOMEBODY
     TYPES. Every list below was rebuilt on every keystroke — see the measurement
@@ -109,3 +118,5 @@ export default function BusSelector({fleet,busId,select,listId="bus-number-optio
   </fieldset>
  </>;
 }
+
+export default memo(BusSelector);
