@@ -5461,11 +5461,12 @@ test("TODAY is measured from a real local midnight, and the window clock advance
  assert.match(page,/setInterval\(\(\)=>setFeedWindowNow\(new Date\(\)\),30000\)/,"it re-reads the clock every half minute");
  assert.match(page,/return \(\)=>clearInterval\(id\)/,"and clears the timer, so leaving the page does not leak one");
  const effect=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const feedWindowLimit="));
- assert.match(effect,/if\(feedWindow==="all"\)return;/,
+ assert.match(effect,/if\(feedWindow==="all"&&\(!quickFilterMenuOpen\|\|loggedCountWindow==="all"\)\)return;/,
   "ALL does not tick: there is no limit to keep current and an idle board should not re-render for nothing");
  assert.match(effect,/setFeedWindowNow\(new Date\(\)\);\s*\n\s*const id=setInterval/,
   "and it reads the clock immediately on picking a window, not up to thirty seconds late");
- assert.match(effect,/\},\[feedWindow\]\)/,"re-armed when the window changes");
+ assert.match(effect,/\},\[feedWindow,quickFilterMenuOpen,loggedCountWindow\]\)/,
+  "re-armed when the window changes, and when the count beside it comes on screen or changes span");
 });
 
 test("one clock reaches the limit, the ages and the label",async()=>{
@@ -5503,10 +5504,12 @@ test("one clock reaches the limit, the ages and the label",async()=>{
 });
 
 test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row changes",async()=>{
- const [page,menu,css]=await Promise.all([
+ const [page,menu,css,downSheetEarly,mapEarly]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/components/defects/quick-filter-menu.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
  ]);
 
  /* Curtis, looking at the row reading 108: "I want a per shift and 24 hour
@@ -5518,6 +5521,41 @@ test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row ch
  assert.match(page,/counts=\{quickFilterMenuCounts\}/,"the menu is given the windowed counts");
  assert.match(page,/withinTimeWindow\(loggedAgeMinutes\(bus\),loggedCountWindow,shiftWindowMinutes\)/,
   "the count is narrowed by the picked span, with the shift's own limit resolved");
+
+ /* THE COUNT AND THE LIST IT OPENS ARE READ OFF ONE PASS.
+
+    The first cut memoized the count on `[fleet,loggedCountWindow,
+    shiftWindowMinutes,myInitials]`. `fleet` is state, so it holds its identity
+    across renders and that cache really held: the drawer's `quickFilterBuses`
+    was rebuilt from a fresh clock on every render while the number on the row
+    stayed whatever the deps last produced. The two were kept honest only by
+    `shiftWindowMinutes` ticking once a minute — which is null the moment a
+    shift cannot be resolved, leaving the memo with no clock input at all. So
+    the count is computed in the same pass as the counts and the list either
+    side of it, and there is nothing left to cache wrongly. */
+ assert.match(page,/const loggedWindowedCount=fleet\.filter\(bus=>loggedCandidateIds\.has\(bus\.id\)&&withinTimeWindow\(/,
+  "the count is computed at render, not memoized beside a list that is not");
+ const countSpan=page.slice(page.indexOf("const loggedCandidateIds="),page.indexOf("const quickFilterMenuCounts="));
+ assert.doesNotMatch(countSpan,/useMemo/,
+  "a cache here is a number quoted off a different instant from the rows behind it");
+ /* ONE QUESTION, ASKED ONCE. The row's count and the menu's other counts come
+    through the same `candidateIdsFor`, so neither can drift from the other. */
+ assert.match(page,/const loggedCandidateIds=new Set\(candidateIdsFor\("logged"\)\)/);
+ assert.equal(page.split('quickFilterBusIds(fleet,"logged"').length-1,0,
+  "no second way of asking which buses this person logged");
+
+ /* AND IT IS KEPT CURRENT WHILE SOMEBODY IS LOOKING AT IT. The span moves on
+    its own — 14:00 arrives, the 24 hours roll — and nothing else re-renders
+    this screen, so a frozen number is the default outcome rather than an edge
+    case. The menu reports when it is open because the count is drawn inside
+    the popover and nowhere else; that is what buys the tick without making
+    every phone re-render twice a minute for a number nobody can see. */
+ assert.match(page,/onOpenChange=\{setQuickFilterMenuOpen\}/);
+ assert.match(menu,/onOpenChange\?:\(open:boolean\)=>void/);
+ assert.match(menu,/useEffect\(\(\)=>\{onOpenChange\?\.\(open\)\},\[open\]\)/,
+  "derived from the state, so none of the five places that close this menu can forget to report it");
+ assert.doesNotMatch(downSheetEarly,/onOpenChange/,"the Down Sheet passes none");
+ assert.doesNotMatch(mapEarly,/onOpenChange/,"the Facility Map passes none");
 
  /* ONE AGE FUNCTION, used by the count and by the drawer — this repo has
     already paid for five copies of one table. */
@@ -5550,10 +5588,8 @@ test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row ch
  assert.match(menu,/itemAside\?:\(key:K\)=>React\.ReactNode/);
  assert.match(menu,/return aside\?<div className="quick-filter-row" key=\{item\.key\}>\{row\}\{aside\}<\/div>:row;/,
   "no wrapper where there is no aside");
- const downSheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
- const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
- assert.doesNotMatch(downSheet,/itemAside/,"the Down Sheet passes none");
- assert.doesNotMatch(map,/itemAside/,"the Facility Map passes none");
+ assert.doesNotMatch(downSheetEarly,/itemAside/,"the Down Sheet passes none");
+ assert.doesNotMatch(mapEarly,/itemAside/,"the Facility Map passes none");
 
  /* THE CASCADE. The stylesheet reaches these rows with a DIRECT-child
     selector, so the wrapped shape is named in that same selector list rather
