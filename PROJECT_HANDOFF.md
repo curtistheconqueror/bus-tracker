@@ -4,8 +4,8 @@ Updated: 2026-10-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 185 (application release 188)
-Live feature checkpoint: commit 3b19e339446a9784898aa1cdd1f37b514c3a9d7d
+Live release: Sites Version 186 (application releases 189 and 190 together)
+Live feature checkpoint: commit c9c03d661177c04706f7beb33f2e4c24bf728e58
 
 ## Read this first
 
@@ -53,7 +53,13 @@ Preserve these rules through refactors and backend migration:
 
 ## Current release state
 
-Application release 188 is live as Sites platform Version 185 from 3b19e339446a9784898aa1cdd1f37b514c3a9d7d, published 2026-10-14 at 01:06:44.898408 UTC. The Defect Log feed has a session-only WHEN LOGGED selector; active search bypasses its window and SHOW ALL DATES remains outside the collapsed drawer. The corrected source refreshes the clock every 30 seconds, measures TODAY from real local midnight, and uses the same instant for limits, record ages and labels. No storage key, schema, dependency or permission changed.
+Application releases 189 and 190 are live together as Sites platform Version 186 from c9c03d661177c04706f7beb33f2e4c24bf728e58, deployed 2026-10-14 at 21:07:34 UTC. Release 189 gives the DEFECTS LOGGED quick-filter count a selectable span shared with its drawer, and keeps that count current while the menu is open. Release 190 makes the Defect Log AI OPERATOR ask before leaving for Facility Map, opens grouped defect and Down Sheet repair pickers on section titles, and reduces typing stutter by leaving unchanged picker work alone. A typed query still searches the full catalog, and the Defect Category picker stays flat. No storage key, schema, dependency, permission, or public asset changed.
+
+Sites deployment appgdep_6acfef0f1c9c8191b74b886401a42328 succeeded at the existing public URL with audience unchanged. The exact merged source passed the production build, lint and 359 tests locally; PR #37 CI run 38630239061 passed on the same feature tree, and CodeRabbit completed its review through 86afbc7 with no actionable comments or review threads. Six public routes returned HTTP 200, and the live Defect Log page bundle matched the tested build byte-for-byte (SHA256 ADB2BCC4D4918A0108F4FCC37BA5E76073EF078431E30455668A05BD58073543). Interactive hydration, physical Safari/Home Screen, offline device use, and subjective typing feel were not verified in this release check. Rollback is application 188 / Sites 185 from 3b19e339446a9784898aa1cdd1f37b514c3a9d7d. See docs/RELEASES.md and docs/archive/PUBLISH_RELEASE_189_190.md.
+
+### Previous release 188
+
+Application release 188 was published as Sites platform Version 185 from 3b19e339446a9784898aa1cdd1f37b514c3a9d7d on 2026-10-14 at 01:06:44.898408 UTC. The Defect Log feed has a session-only WHEN LOGGED selector; active search bypasses its window and SHOW ALL DATES remains outside the collapsed drawer. The corrected source refreshes the clock every 30 seconds, measures TODAY from real local midnight, and uses the same instant for limits, record ages and labels. No storage key, schema, dependency or permission changed.
 
 Sites deployment appgdep_6aced59af00c819186aac11111341181 succeeded with public audience unchanged. Local lint, production build and 354 tests passed. CI run 38488281309 independently reports lint/build and 354 passing tests; its checkout was the PR test merge 0365b6e, so local merged-source verification is recorded separately. All CodeRabbit inline findings, issue comments and review bodies on PR34/35 were reviewed against the corrected source. PR34's two historical threads remain unresolved in GitHub despite their fixes being present; PR35's same-clock thread is resolved. Docstring coverage and the review runner's ESLint installation timeout do not establish product defects.
 

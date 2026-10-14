@@ -4,7 +4,9 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 185 / application release 188 | Live | 3b19e339446a9784898aa1cdd1f37b514c3a9d7d | Adds WHEN LOGGED feed windows with an advancing shared clock, correct local-midnight TODAY boundary, search bypass and always-reachable SHOW ALL DATES. |
+| 186 / application release 190 | Live, includes 189 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | Defect Log AI OPERATOR confirms before leaving for Facility Map; grouped defect and Down Sheet repair browsing; smoother typing through stable bus-picker rendering. |
+| 186 / application release 189 | Live, shipped with 190 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | DEFECTS LOGGED count and drawer share a selected time span, with a count that updates while the menu stays open. |
+| 185 / application release 188 | Previous live; rollback | 3b19e339446a9784898aa1cdd1f37b514c3a9d7d | Adds WHEN LOGGED feed windows with an advancing shared clock, correct local-midnight TODAY boundary, search bypass and always-reachable SHOW ALL DATES. |
 | 184 / application release 187 | Previous live | b182776394e2b3b59ef7b969c58bf35c9c93f6a2 | Reconciles the live Defect Log fixes with the FS Apple/maskable icons and v6 cache; MASTER EXPORT/IMPORT includes PTR writeups and shop repair times. |
 | 183 / historical layout release | Previous live | aebe0aad334ce328c78c009d7c3d6a70e1c43c2a | Equal full-width repair actions, narrow-screen label wrapping, and neutral PTR help text; historically called release 186, separate from the later icon release 186. |
 | 182 / release 185 (includes 182–184) | Previous live | b9c1e81 | Publishes the cumulative picker fixes, repository layout, shift-scoped lists, repair-hours badge, shop repair-time ledger, PATH TO REPAIR, description line breaks and FIXED TODAY correction. |
