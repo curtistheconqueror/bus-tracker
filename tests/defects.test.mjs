@@ -5451,3 +5451,37 @@ test("TODAY is measured from a real local midnight, and the window clock advance
   "and it reads the clock immediately on picking a window, not up to thirty seconds late");
  assert.match(effect,/\},\[feedWindow\]\)/,"re-armed when the window changes");
 });
+
+test("one clock reaches the limit, the ages and the label",async()=>{
+ const {defectWithinFeedWindow,feedWindowMinutes}=await import("../src/lib/defects/feed-window.ts");
+
+ /* THE BUG THIS PINS, in the shape it really had: the limit was computed from
+    `feedWindowNow` while every defect's AGE defaulted to a fresh `new Date()`.
+    Two clocks, and the gap was microseconds until the instant became state
+    refreshed every thirty seconds — at which point a defect stamped at local
+    midnight is OLDER than a TODAY limit read half a minute ago, and falls off a
+    board it belongs on. Reproduced here by passing the stale instant to one and
+    letting the other default. */
+ const midnight=new Date(2026,5,15,0,0,0);
+ const stale=new Date(2026,5,15,9,0,0);
+ const later=new Date(stale.getTime()+30000);
+ const atMidnight={category:"Brakes",issue:"Chamber leak",createdAt:midnight.toISOString()};
+ const limit=feedWindowMinutes("today",stale);
+
+ assert.equal(defectWithinFeedWindow(atMidnight,limit,later),false,
+  "two clocks: the age outruns a limit read half a minute earlier — this is the bug");
+ assert.equal(defectWithinFeedWindow(atMidnight,limit,stale),true,
+  "one clock: a defect stamped at local midnight belongs in TODAY");
+
+ /* So the page must hand the same instant to all three. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/defectWithinFeedWindow\(record\.defect,feedWindowLimit,feedWindowNow\)/,
+  "the ages read the same instant as the limit");
+ assert.match(page,/feedWindowMinutes\(feedWindow,feedWindowNow,shiftSettings\)/);
+ assert.match(page,/feedWindowLabel\(feedWindow,feedWindowNow,shiftSettings\)/);
+ /* No fourth reading anywhere in the window's own code path. */
+ const span=page.slice(page.indexOf("const [feedWindowNow,setFeedWindowNow]"),page.indexOf("const hiddenByFeedWindow="));
+ const reads=span.match(/new Date\(\)/g)||[];
+ assert.equal(reads.length,3,
+  "expected exactly three clock reads in this span — the initial state, the effect's immediate read and the interval's — found "+reads.length);
+});
