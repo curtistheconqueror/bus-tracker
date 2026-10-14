@@ -812,3 +812,50 @@ test("THIS SHIFT is a window the clock decides, and it cannot claim a shift it c
     cannot drift as spans are added. */
  assert.deepEqual(TIME_WINDOWS_WITH_SHIFT.filter(item=>item.key!=="shift"),TIME_WINDOWS);
 });
+
+test("the bus picker does not rebuild the fleet on every character",async()=>{
+ const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
+ const code=picker.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* WHAT THIS PINS, and it was measured before it was written.
+
+    Curtis: "when I'm inputting the bus number, there's a slight delay or lag.
+    It's not, you know, smooth and consistent."
+
+    The editor holds its own draft, so a keystroke in the number box re-renders
+    this picker. Measured in the production build, that subtree is 312 nodes and
+    174 of them are `<option>` — the one fleet drawn twice, as an 85-option BUS
+    LIST and an 84-option type-ahead. All of it, plus a filter and a sort of the
+    whole fleet, ran once per character. On a CPU throttled 6x — the usual stand
+    -in for a tablet — the median keystroke took 40-45ms against a 10ms floor for
+    a bare input in the same browser, and a quarter of all keystrokes crossed
+    50ms. Latency that tracks CPU speed while barely moving with board size is
+    work this code does per character, not the platform's input pipeline. */
+ assert.match(code,/const generations=useMemo\(/,"the generation list is not rebuilt per character");
+ assert.match(code,/const candidates=useMemo\(/);
+ assert.match(code,/\.sort\(\(a,b\)=>COLLATOR\.compare\(a\.n,b\.n\)\),\[fleet,generation\]\)/,
+  "the filtered, sorted fleet is computed from the fleet and the generation, not from the keystroke");
+ assert.match(code,/const busListOptions=useMemo\(/);
+ assert.match(code,/const numberOptions=useMemo\(/);
+ assert.match(code,/<datalist id=\{listId\}>\{numberOptions\}<\/datalist>/,
+  "the type-ahead takes the built list");
+ assert.doesNotMatch(code,/\{candidates\.map\(/,
+  "no option list is mapped inline, which would hand React new elements every character");
+
+ /* ONE COLLATOR, MADE ONCE. `localeCompare` with numeric collation builds a
+    fresh collator per comparison: measured at 0.439ms a sort over 84 buses
+    against 0.017ms through a collator made once. Numeric order is the part that
+    matters and it is kept — it is what puts 17509 before 175010. */
+ assert.match(code,/^const COLLATOR=new Intl\.Collator\(undefined,\{numeric:true\}\);$/m,
+  "the collator is module scope, so it outlives a render");
+ assert.doesNotMatch(code,/localeCompare/,
+  "a per-comparison collator is the thing this replaced");
+
+ /* AND THE BEHAVIOUR IS UNTOUCHED, which is the whole claim of a performance
+    change. `typeNumber` still reports on every character, including the empty
+    id for a number that matches no bus — that call is what clears a page search
+    the chosen bus would hide, and skipping it when the id has not changed is
+    worth about 6ms more but is a CHANGE, so it is not smuggled in here. */
+ assert.match(code,/const exact=fleet\.find\(bus=>bus\.n===digits\);select\(exact\?\.id\|\|""\)/,
+  "every character still reports its resolved bus, exactly as before");
+});
