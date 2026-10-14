@@ -7,7 +7,7 @@ and including 187 is already live.
 
 | Version | Publish from | What | Section |
 | --- | --- | --- | --- |
-| 188 | `1b8ab7c` | A WHEN LOGGED drop-down on the Defect Log feed | [188](#188--publish-from-1b8ab7c) |
+| 188 | `3b19e33` | A WHEN LOGGED drop-down on the Defect Log feed | [188](#188--publish-from-3b19e33) |
 
 Application release 187 is live as Sites platform version 184 from
 `b182776394e2b3b59ef7b969c58bf35c9c93f6a2`, published 2026-10-11, and is the
@@ -16,25 +16,33 @@ rollback point. It includes releases 182-187.
 See [release evidence](RELEASES.md) and the preserved [release 187 handoff](archive/PUBLISH_RELEASE_187.md). Physical Safari/Home Screen/device migration checks remain for Curtis; no operational data was changed during publication.
 \n
 
-# 188 — publish from 1b8ab7c
+# 188 — publish from 3b19e33
 
 ## Source
 
 ```
-$ git log --oneline 5135c39..1b8ab7c
+$ git log --oneline 5135c39..3b19e33
+3b19e33 One clock reaches the limit, the ages and the label
+42a10b5 The feed's window keeps its own time, and TODAY counts real minutes
+84bf618 Hand 188 to Codex from 1b8ab7c — the feed's WHEN LOGGED drop-down
 1b8ab7c The LIVE REPAIR FEED can be narrowed to a shift or a day
 
-$ git diff --name-only 5135c39..1b8ab7c
+$ git diff --name-only 5135c39..3b19e33
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
+docs/PUBLISH_NEXT.md
 src/lib/defects/feed-window.ts
 tests/defects.test.mjs
 
-$ git diff --shortstat 5135c39..1b8ab7c
- 4 files changed, 346 insertions(+), 5 deletions(-)
-
-$ git diff --name-only 5135c39..1b8ab7c -- supabase package.json package-lock.json .github public worker
+$ git diff --name-only 5135c39..3b19e33 -- supabase package.json package-lock.json .github public worker
 ```
+
+**PUBLISH FROM `3b19e33`, NOT `1b8ab7c`.** The feature landed first and then took
+two rounds of fixes, all three defects being about TIME PASSING rather than
+about the filter. `1b8ab7c` alone has a window whose clock never advances and a
+TODAY that drops a defect logged just after midnight; it was never live and
+should not be. `84bf618` is this file's own earlier handoff and carries no app
+code.
 
 The last command prints nothing: no schema change, no dependency change, no CI
 change, no public asset. One commit, one screen.
@@ -92,8 +100,34 @@ that cannot resolve it. The age is read off `createdAt`, never `updatedAt`.
 
 ## Verified
 
-- `npm test` 352 pass (351 before), `npm run lint` clean, `npm run build`
-  complete — on `1b8ab7c`, the merged commit.
+- `npm test` 354 pass (351 before this feature), `npm run lint` clean,
+  `npm run build` complete — on `3b19e33`, the merged commit.
+
+**THREE DEFECTS WERE FOUND AFTER THE FEATURE FIRST MERGED**, and all three were
+about TIME PASSING rather than about the filter. Recorded because the pattern is
+the lesson: the browser measurements and the mutation tests were real and did
+their job, and none of them could catch a clock that stops.
+
+1. **The window's clock never advanced.** `feedWindowNow` was read in the render
+   body, so it only moved when something else caused a render — and the device
+   this was built for is a shop computer left open on this page all day. At
+   14:00 with THIS SHIFT selected the board went on showing the morning crew's
+   window under a heading reading 1ST SHIFT · SINCE 06:00. It is state now,
+   re-read every thirty seconds while a window is in force and never on ALL.
+2. **TODAY counted clock minutes, not real ones.** It used `minuteOfDay`, which
+   is right for the shift clock and wrong against an elapsed age: it floors to
+   the minute, so a defect logged at 00:00:10 was hidden from TODAY, and on a
+   spring-forward day 10:00 reads as 600 minutes past midnight when 540 have
+   passed, reaching an hour into yesterday. Measured both ways before fixing.
+3. **The limit and the ages read different clocks**, which fix 1 made worse
+   rather than introduced: the gap was microseconds while both were render-body
+   reads and became up to thirty seconds once one was state. Long enough that a
+   defect stamped at local midnight falls off TODAY. One instant now reaches the
+   limit, the ages and the label, and a test counts the clock reads in that span.
+
+Two of the three were caught by CodeRabbit on PR #34 and #35. The first pair
+posted fifty seconds before I merged #34 and I did not see them: I read the PR's
+issue comments, and review comments are a separate endpoint.
 - **Eight mutations** against the two new tests: zero treated as "no window", an
   undated defect kept in a narrowed one, TODAY made rolling, the age read off
   `updatedAt`, an unresolvable shift claiming a window, TODAY leaked into the
