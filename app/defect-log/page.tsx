@@ -853,7 +853,15 @@ export default function DefectLog(){
   return ()=>clearInterval(id);
  },[feedWindow]);
  const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
- const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit);
+ /* THE SAME INSTANT REACHES THE AGES TOO, and leaving it off was the bug the
+    clock fix above made worse rather than introduced. `defectWithinFeedWindow`
+    defaults `now` to a fresh read, so the LIMIT came from `feedWindowNow` while
+    every defect's AGE came from a later one. That gap used to be the
+    microseconds between two statements; once the instant became state refreshed
+    every thirty seconds, it became up to thirty seconds — long enough that with
+    TODAY selected a defect stamped at local midnight is older than the limit
+    and drops off a board it belongs on. One clock, all the way through. */
+ const matchesFeedWindow=(record:DefectLogRecord)=>defectWithinFeedWindow(record.defect,feedWindowLimit,feedWindowNow);
  /* Three stages, narrowest last, so each bar can name what IT is holding back:
     the state buttons, then when it was logged, then the search. */
  const stateOnly=records.filter(matchesStateFilter);
