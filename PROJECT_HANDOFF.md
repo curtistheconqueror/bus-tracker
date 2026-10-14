@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-11
+Updated: 2026-10-14
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 184 (application release 187)
-Live feature checkpoint: commit b182776394e2b3b59ef7b969c58bf35c9c93f6a2
+Live release: Sites Version 185 (application release 188)
+Live feature checkpoint: commit 3b19e339446a9784898aa1cdd1f37b514c3a9d7d
 
 ## Read this first
 
@@ -52,6 +52,14 @@ Preserve these rules through refactors and backend migration:
 - Export and import remain the durable recovery path while Shop Cloud is introduced, configured, and verified across devices.
 
 ## Current release state
+
+Application release 188 is live as Sites platform Version 185 from 3b19e339446a9784898aa1cdd1f37b514c3a9d7d, published 2026-10-14 at 01:06:44.898408 UTC. The Defect Log feed has a session-only WHEN LOGGED selector; active search bypasses its window and SHOW ALL DATES remains outside the collapsed drawer. The corrected source refreshes the clock every 30 seconds, measures TODAY from real local midnight, and uses the same instant for limits, record ages and labels. No storage key, schema, dependency or permission changed.
+
+Sites deployment appgdep_6aced59af00c819186aac11111341181 succeeded with public audience unchanged. Local lint, production build and 354 tests passed. CI run 38488281309 independently reports lint/build and 354 passing tests; its checkout was the PR test merge 0365b6e, so local merged-source verification is recorded separately. All CodeRabbit inline findings, issue comments and review bodies on PR34/35 were reviewed against the corrected source. PR34's two historical threads remain unresolved in GitHub despite their fixes being present; PR35's same-clock thread is resolved. Docstring coverage and the review runner's ESLint installation timeout do not establish product defects.
+
+Postpublication: six routes return 200; 33 emitted live JS/CSS/icon/cache assets match the tested build bytes. The actual Defect Log bundle contains WHEN LOGGED, SEARCHING EVERY DATE and SHOW ALL DATES. An optional preload still names an un-emitted file and returns 404, as documented for the previous release. Browser automation failed to initialize, so hydration, filter interaction, idle shift rollover, physical Safari/Home Screen and offline acceptance are not claimed. No operational data was changed. Rollback is application 187 / Sites 184 from b182776394e2b3b59ef7b969c58bf35c9c93f6a2; sites-v185 and sites-release188 identify the newly deployed source. See docs/RELEASES.md and docs/archive/PUBLISH_RELEASE_188.md.
+
+### Previous release 187
 
 Application release 187 is live as Sites platform Version 184 from b182776394e2b3b59ef7b969c58bf35c9c93f6a2, published 2026-10-11. The reconciled source preserves the previously deployed Defect Log equal action row, narrow-screen wrapping and neutral PTR help text while adding the FS PNG Apple icon, separate maskable artwork, v6 offline cache, and version-6 MASTER EXPORT/IMPORT coverage for PTR writeups and shop repair times. Releases 182–185 were already included in the prior live source and remain included. No storage key was renamed and no Supabase schema changed.
 
