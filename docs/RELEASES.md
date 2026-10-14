@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 184 / application release 187 | Live | b182776394e2b3b59ef7b969c58bf35c9c93f6a2 | Reconciles the live Defect Log fixes with the FS Apple/maskable icons and v6 cache; MASTER EXPORT/IMPORT includes PTR writeups and shop repair times. |
+| 185 / application release 188 | Live | 3b19e339446a9784898aa1cdd1f37b514c3a9d7d | Adds WHEN LOGGED feed windows with an advancing shared clock, correct local-midnight TODAY boundary, search bypass and always-reachable SHOW ALL DATES. |
+| 184 / application release 187 | Previous live | b182776394e2b3b59ef7b969c58bf35c9c93f6a2 | Reconciles the live Defect Log fixes with the FS Apple/maskable icons and v6 cache; MASTER EXPORT/IMPORT includes PTR writeups and shop repair times. |
 | 183 / historical layout release | Previous live | aebe0aad334ce328c78c009d7c3d6a70e1c43c2a | Equal full-width repair actions, narrow-screen label wrapping, and neutral PTR help text; historically called release 186, separate from the later icon release 186. |
 | 182 / release 185 (includes 182–184) | Previous live | b9c1e81 | Publishes the cumulative picker fixes, repository layout, shift-scoped lists, repair-hours badge, shop repair-time ledger, PATH TO REPAIR, description line breaks and FIXED TODAY correction. |
 | 181 / release 181 | Previous live | 148a45e | Distinguishes hard Down Sheet buses from Soft Down and IDOT preparation with collapsed boards and an optional in-service override; adds IDOT Prep, clears stale Defect Log search after logging, and clarifies Full Sweep's No path. |
@@ -128,3 +129,17 @@ versions were created to align them.
 Earlier history remains available through git log. Version-specific continuation snapshots are preserved in docs/archive.
 
 When a release is published, update this table and PROJECT_HANDOFF.md in the same follow-up commit, and reset `docs/PUBLISH_NEXT.md` to STATUS: NONE PENDING.
+
+## Sites platform 185 / application release 188 publication
+
+- Published 2026-10-14 at 01:06:44.898408 UTC to https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site with public audience unchanged.
+- Frozen source: `3b19e339446a9784898aa1cdd1f37b514c3a9d7d`. Later GitHub main `94656d8` changed only the handoff; it introduced no application difference. Never publish the defective first cut `1b8ab7c`.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_80bb1d1f2a988191b1d35017e0e56bef`.
+- Successful deployment: `appgdep_6aced59af00c819186aac11111341181`.
+- Local compressed archive SHA-256: `fc7be58065b06ab4b66eccda6a03216ff1808564e94363aeeaf1c2f34a29edb4`; native saved tar hash: `sha256:cc8fb074da6b94d599667cc964df2faced46381ada837bfe69b369757b610f5c` (5,160,960 bytes, 86 files).
+- Validation: fresh local lint and production build, all 354 tests pass with zero failures, and `git diff --check` clean. [CI run 38488281309](https://github.com/curtistheconqueror/bus-tracker/actions/runs/38488281309), job 115607127646, confirms install/lint/build and 354 pass, zero fail. CI checked out the PR test merge `0365b6e` containing `7a6760c`; local gates separately verified the actual merged release `3b19e33`.
+- Reviewed CodeRabbit inline threads, issue comments and review bodies on PR34 and PR35. All three correctness findings are addressed: clock refresh every 30 seconds, elapsed time since real local midnight, and the same clock for limits/ages/labels. PR34's historical threads remain marked unresolved; PR35's same-clock thread is resolved. Its ESLint installation timeout and default docstring coverage threshold are not product failures; repository lint passed.
+- Postpublication HTTP smoke: `/`, `/down-sheet`, `/defect-log`, `/fixed-repairs`, `/lists`, `/settings` return 200 with fleet navigation. All 33 checked emitted JS/CSS/icon/manifest/service-worker assets match the tested build bytes. The actual Defect Log bundle `/assets/page-DNdjubqB.js` contains WHEN LOGGED, SEARCHING EVERY DATE and SHOW ALL DATES. An optional preload `/assets/defect-log-CoHc7eh3.js` names an un-emitted file and returns 404; this generated-preload issue was already documented on release 187, and the actual bundle is present.
+- Browser runtime could not initialize (missing Windows platform directory); hydration, filter clicks, idle shift rollover, physical Safari/Home Screen and offline device acceptance are not claimed. Follow the six live checks in the preserved handoff. No real fleet data, backup import, browser-data clearing, permissions or cloud schema was changed.
+- Rollback: application 187 / Sites 184, source `b182776394e2b3b59ef7b969c58bf35c9c93f6a2`, saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_70ec7cb544c08191b2c2575f67834e88`. No stored record changes are introduced by 188. Tags `sites-v185` and `sites-release188` identify the new deployed source.
+- Preserved handoff: [release 188](archive/PUBLISH_RELEASE_188.md). Release records are a documentation-only follow-up on current GitHub main; they do not change the frozen deployment source.

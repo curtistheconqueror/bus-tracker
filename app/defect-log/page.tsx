@@ -656,6 +656,15 @@ export default function DefectLog(){
     time-window-chips.tsx for why a remembered window is the wrong default on
     a list of buses nobody has ruled on yet. */
  const [quickFilterWindow,setQuickFilterWindow]=useState<TimeWindowKey>("all");
+ /* The span the DEFECTS LOGGED count in the quick-filter menu is quoted over,
+    and the one its drawer opens on. Starts on THIS SHIFT because that is what
+    the drawer already opened on — the count simply agrees with it now. Not
+    stored, like the chips it mirrors. */
+ const [loggedCountWindow,setLoggedCountWindow]=useState<TimeWindowKey>("shift");
+ /* WHETHER THAT COUNT IS ON SCREEN. It is drawn inside the quick-filter
+    popover and nowhere else, so this is what decides whether its span is worth
+    keeping current — see the clock effect below. */
+ const [quickFilterMenuOpen,setQuickFilterMenuOpen]=useState(false);
  /* WHEN WAS IT LOGGED. Curtis: "filter everything that's being put down ... by
     the day and by the shift ... it should be like a drop-down somewhere at the
     work computer." Sticky once chosen — he puts it back to ALL himself, which
@@ -844,14 +853,36 @@ export default function DefectLog(){
     force. It does not tick on ALL: there is no limit to keep current, and an
     idle board should not re-render every thirty seconds for nothing. */
  const [feedWindowNow,setFeedWindowNow]=useState(()=>new Date());
+ /* IT ALSO TICKS FOR THE DEFECTS LOGGED COUNT, AND ONLY WHILE THAT IS VISIBLE.
+
+    The count is quoted over a span of its own and goes stale with nothing on
+    the page changing: left on a desk through 14:00 it keeps quoting the morning
+    crew's work, which is the one reading the window exists to prevent. Nothing
+    else re-renders this screen on its own, so without a tick the number is
+    simply frozen at whatever the last render computed, however long ago.
+
+    Gated on the POPOVER being open rather than on the span being bounded, and
+    that is the whole of why this is not one condition. `loggedCountWindow`
+    starts on SHIFT, so "tick whenever it is bounded" would have every Defect
+    Log on every phone re-rendering twice a minute for the life of the tab — the
+    cost this effect's own comment above refuses to pay. `loggedWindowedCount`
+    is drawn inside the popover and nowhere else, so while that is shut there is
+    no stale number on screen to read, and opening it re-runs this effect and so
+    reads the clock before the first render that shows one.
+
+    It does not claim the same of the DRAWER behind the row. That list is built
+    from `quickFilterBuses` on every render and has never had a tick of its own,
+    exactly like the DEFERRED and RECOMMENDED drawers it shares the control
+    with; left open it ages the way those two always have. Giving all three a
+    heartbeat is a bigger change than this one and is not what was asked for. */
  useEffect(()=>{
-  if(feedWindow==="all")return;
+  if(feedWindow==="all"&&(!quickFilterMenuOpen||loggedCountWindow==="all"))return;
   /* Immediately as well as on the interval, so picking a window reads the
      clock now rather than up to thirty seconds late. */
   setFeedWindowNow(new Date());
   const id=setInterval(()=>setFeedWindowNow(new Date()),30000);
   return ()=>clearInterval(id);
- },[feedWindow]);
+ },[feedWindow,quickFilterMenuOpen,loggedCountWindow]);
  const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
  /* THE SAME INSTANT REACHES THE AGES TOO, and leaving it off was the bug the
     clock fix above made worse rather than introduced. `defectWithinFeedWindow`
@@ -923,6 +954,14 @@ export default function DefectLog(){
     chips. */
  const myInitials=(settings.defaultInitials||"").trim().toUpperCase();
  const loggedNarrow={initials:myInitials};
+ /* HOW OLD THIS BUS'S NEWEST REPORT IS, asked without any window, so a bus's
+    age stays its own fact rather than a function of the chip or the drop-down
+    currently set. One function, used by the menu's count and by the drawer's
+    own age below — this repo has already paid for five copies of one table. */
+ const loggedAgeMinutes=(bus:DefectLogFleetBus)=>{
+  const defects=quickFilterDefects(bus,"logged",new Date().toISOString(),loggedNarrow);
+  return defects.length?busLoggedMinutes(defects):null;
+ };
  const candidateIdsFor=(key:QuickFilterKey)=>key==="deferred"?deferredCandidateIds:key==="down-sheet-recommended"?recommendedCandidateIds:quickFilterBusIds(fleet,key,new Date().toISOString(),key==="logged"?loggedNarrow:{});
  const quickFilterCounts=Object.fromEntries(QUICK_FILTERS.map(item=>[item.key,candidateIdsFor(item.key).length])) as Record<QuickFilterKey,number>,quickFilterIds=quickFilter?new Set(candidateIdsFor(quickFilter)):new Set<string>(),quickFilterAllBuses=quickFilter?fleet.filter(bus=>quickFilterIds.has(bus.id)).sort((a,b)=>quickFilter==="deferred"?deferredSince(a)-deferredSince(b):quickFilter==="down-sheet-recommended"?recommendedSince(a)-recommendedSince(b):a.n.localeCompare(b.n,undefined,{numeric:true})):[],quickFilterLabel=QUICK_FILTERS.find(item=>item.key===quickFilter)?.label||"Quick Filter";
  /* HOW OLD THIS ROW IS, for the window chips, in the two filters that carry
@@ -950,13 +989,9 @@ export default function DefectLog(){
      would drop a bus logged ten minutes ago because it also carries something
      from last Tuesday. Asked with no window so the bus's age is its own fact,
      not a function of the chip that is currently pressed. */
-  if(quickFilter==="logged"){
-   /* Narrowed by initials but NOT by the window: a bus's age is its own fact,
-      not a function of the chip currently pressed. Somebody else's report on
-      the same bus must not decide how recent HIS list thinks it is. */
-   const defects=quickFilterDefects(bus,"logged",new Date().toISOString(),loggedNarrow);
-   return defects.length?busLoggedMinutes(defects):null;
-  }
+  /* Narrowed by initials but NOT by the window: somebody else's report on the
+     same bus must not decide how recent HIS list thinks it is. */
+  if(quickFilter==="logged")return loggedAgeMinutes(bus);
   return null;
  };
  const quickFilterWindowed=quickFilter==="deferred"||quickFilter==="down-sheet-recommended"||quickFilter==="logged";
@@ -989,7 +1024,39 @@ export default function DefectLog(){
     of the handover list it exists to be. A window already chosen is left
     alone, and the other two filters keep whatever was last picked, as they
     always have. */
- useEffect(()=>{if(quickFilter==="logged"&&shiftResolved)setQuickFilterWindow(current=>current==="all"?"shift":current)},[quickFilter,shiftResolved]);
+ useEffect(()=>{if(quickFilter==="logged"&&shiftResolved)setQuickFilterWindow(current=>current==="all"?loggedCountWindow:current)},[quickFilter,shiftResolved,loggedCountWindow]);
+ /* THE COUNT BESIDE "DEFECTS LOGGED" IS QUOTED OVER A SPAN SOMEBODY PICKS.
+
+    Curtis, looking at it reading 108: "I want a per shift and 24 hour selection
+    too. Just turn this field into a dropdown so I can pick what I want."
+
+    It was answering a different question from the list it opens. The count came
+    from `candidateIdsFor`, which narrows by initials and by nothing else, while
+    the drawer behind it opens on THIS SHIFT — so the menu said 108 and the list
+    showed a morning's work, and neither was wrong about its own question.
+
+    One window now serves both. The drop-down sets it, the drawer's chips set
+    the same thing while LOGGED is open, and the count is counted over it, so
+    the number on the row is the number of rows behind it.
+
+    COMPUTED ON EVERY RENDER, like `quickFilterCounts` and `quickFilterBuses`
+    either side of it, and it was memoized on the first cut. `fleet` is state
+    and so holds its identity across renders, which is exactly what made that
+    cache bite: the list in the drawer is rebuilt from a fresh clock every
+    render while the number on the row stayed the one computed whenever the
+    deps last moved. A count and a list that must agree cannot be read off two
+    different instants, and keeping them in one pass is the only way to say so
+    that a later edit cannot undo. It survived review because the cache was
+    invalidated in practice by `shiftWindowMinutes` ticking once a minute — a
+    dependency that is null the moment a shift cannot be resolved, so the
+    agreement rested on something that is not even always there.
+
+    The ids come from `candidateIdsFor` rather than a second
+    `quickFilterBusIds` call, so the row's count and the menu's other counts
+    cannot ask the question two ways. */
+ const loggedCandidateIds=new Set(candidateIdsFor("logged"));
+ const loggedWindowedCount=fleet.filter(bus=>loggedCandidateIds.has(bus.id)&&withinTimeWindow(loggedAgeMinutes(bus),loggedCountWindow,shiftWindowMinutes)).length;
+ const quickFilterMenuCounts={...quickFilterCounts,logged:loggedWindowedCount};
  const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow,shiftWindowMinutes)):quickFilterAllBuses;
  /* HOW FAR BACK THE PRINTED LINES MAY REACH, for `logged` alone. The window
     picked the buses; this stops a bus that qualified on a 14:20 defect from
@@ -1398,7 +1465,18 @@ export default function DefectLog(){
         {FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
        </select>
       </label>
-      <QuickFilterMenu active={quickFilter} counts={quickFilterCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow("all")}}/>
+      <QuickFilterMenu active={quickFilter} counts={quickFilterMenuCounts} onOpenChange={setQuickFilterMenuOpen} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(value==="logged"?loggedCountWindow:"all")}} itemAside={key=>key!=="logged"?null:
+       /* Only this row. Every other count answers "what is true right now",
+          where the age of the record is not the question — the same reason
+          time-window.ts keeps a window off those filters. */
+       <label className="quick-filter-window" onClick={event=>event.stopPropagation()}>
+        <span className="sr-only">Count defects logged within</span>
+        <select value={quickFilterWindowChoices.some(item=>item.key===loggedCountWindow)?loggedCountWindow:"all"}
+         onChange={event=>{const next=event.target.value as TimeWindowKey;setLoggedCountWindow(next);if(quickFilter==="logged")setQuickFilterWindow(next)}}
+         aria-label="Count defects logged within">
+         {quickFilterWindowChoices.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
+        </select>
+       </label>}/>
       <button className="log-undo-button" type="button" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent defect-log change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button>
      </div>
      <div className="log-advanced-group">
@@ -1455,7 +1533,7 @@ export default function DefectLog(){
     decoration, so it carries its name and is shaped like the buttons beside it. */}
    
   </section>
-  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={setQuickFilterWindow} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
+  {quickFilter&&<aside className="quick-filter-drawer" aria-label={quickFilterLabel+" buses"}><header className="quick-filter-head"><span><small>QUICK FILTER</small><b>{quickFilterOwnedLabel}</b></span><strong aria-label={quickFilterBuses.length+" buses"}>{quickFilterBuses.length}</strong><button className="quick-filter-close" onClick={()=>setQuickFilter(null)} aria-label="Close quick filter">×</button></header>{quickFilterWindowed&&quickFilterAllBuses.length>0&&<TimeWindowChips value={quickFilterWindow} onChange={value=>{setQuickFilterWindow(value);if(quickFilter==="logged")setLoggedCountWindow(value)}} hidden={quickFilterAllBuses.length-quickFilterBuses.length} label={quickFilterLabel.toLowerCase()+" buses"} windows={quickFilterWindowChoices}/>}{quickFilter==="logged"&&!myInitials&&<p className="quick-filter-initials-note">NO INITIALS SET — SHOWING EVERYONE'S REPORTS. ADD YOUR INITIALS IN DEFECT LOG SETTINGS TO SEE ONLY YOURS.</p>}<div className="quick-filter-share-actions"><button type="button" onClick={copyQuickFilterList} aria-label="Copy filtered bus list">{quickFilterShareStatus==="copied"?"COPIED!":"COPY LIST"}</button><button type="button" onClick={shareQuickFilterList} aria-label="Share filtered bus list as text">SHARE</button><button type="button" onClick={shareQuickFilterPage} aria-label="Share filtered bus list as a page">SHARE PAGE</button>{quickFilterShareStatus==="shared"&&<small>SHARED</small>}{quickFilterShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY LIST</small>}</div><div className="quick-filter-results">{quickFilterBuses.length?quickFilterBuses.map(bus=>{/* The same lines the share will carry, narrowed by the same window — a drawer that shows more than it sends is how somebody learns not to trust the heading. */const defects=quickFilterDefects(bus,quickFilter,new Date().toISOString(),quickFilterShareOptions),fallback=quickFilterFallbackLabel(quickFilter),preview=defects.length?defects.slice(0,2).map(defectLabel).join("; "):fallback,expanded=quickFilterExpandedBusIds.includes(bus.id),/* Floored at zero: a device with a wrong clock, or a record synced from
       one, can carry a deferredAt in the future, and "DEFERRED -120M" is the
       kind of number that makes somebody stop trusting every other number on
       the card. The comparisons that matter — the 90-minute alert and the

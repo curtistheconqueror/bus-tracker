@@ -1,0 +1,244 @@
+{
+  "routes": [
+    {
+      "route": "/",
+      "status": 200,
+      "bytes": 115449,
+      "fleetNavigation": true
+    },
+    {
+      "route": "/down-sheet",
+      "status": 200,
+      "bytes": 11876,
+      "fleetNavigation": true
+    },
+    {
+      "route": "/defect-log",
+      "status": 200,
+      "bytes": 9015,
+      "fleetNavigation": true
+    },
+    {
+      "route": "/fixed-repairs",
+      "status": 200,
+      "bytes": 8331,
+      "fleetNavigation": true
+    },
+    {
+      "route": "/lists",
+      "status": 200,
+      "bytes": 7375,
+      "fleetNavigation": true
+    },
+    {
+      "route": "/settings",
+      "status": 200,
+      "bytes": 60265,
+      "fleetNavigation": true
+    }
+  ],
+  "assets": [
+    {
+      "ref": "/sw.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "0ff433b40dc3a14ddd47733de6c6e5cbc58ea4d4346d024e171f8172ebbcb7a6"
+    },
+    {
+      "ref": "/manifest.webmanifest",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "68da4276f175d899d1f5cc2ac17887a93a93ff8bb4c91b7586c0a7b865104e6c"
+    },
+    {
+      "ref": "/apple-touch-icon.png",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "6264b205d66e9c461e18f5c3e3622d90c1619563b6fd39afcf8feda7613b65d6"
+    },
+    {
+      "ref": "/assets/index-DcxQU--B.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "2577b0b5a6e43aa563cefde5cecfd25ce75fc36cd54d7f33e3ae5563793fbfb6"
+    },
+    {
+      "ref": "/assets/layout-segment-context-Cw_V6mSw.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "bb8e739480014c3ea3606cedea168223ebba7378f4c09f2da2838ab5608d7a12"
+    },
+    {
+      "ref": "/assets/rolldown-runtime-S-ySWqyJ.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "5db5ba82eef00d1dee7e86e663098c9427d01183a88d357437daff295aec3e75"
+    },
+    {
+      "ref": "/assets/index-C3eW-cgf.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "de6cd8a0e8c26896d5a46a911084c6c9c7b9d9ca1be3504805e54dfff8535d3a"
+    },
+    {
+      "ref": "/assets/framework-CXnKph_e.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "73b45b606448e4dc310fbe851d8089ee752f3eb081980b3a6fec88988820ee12"
+    },
+    {
+      "ref": "/assets/crash-guard-rf65DVL6.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "12ebc03bf54233f9da8772a56a91fb4863dd4e66fe1a1baa7ff15fbd3e48e213"
+    },
+    {
+      "ref": "/assets/page-Bbr_tTH0.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "ce1ad9fa308b44dd5ae6eea62d494740966682795ae0007fb0a074a31fc9e7ec"
+    },
+    {
+      "ref": "/assets/mystery-buses-Dowp_51G.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "9de1e3ae2c5f79a1782f791ab80ebc4b38becb78cb1942c79d323eafca7d3bfe"
+    },
+    {
+      "ref": "/assets/shop-cloud-live-DgGYuNpr.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "dbc1ae4353717a67a75f6566c29e83446b5ecb1aba10847a5ed503592c2f8798"
+    },
+    {
+      "ref": "/assets/deferred-watch-BrOeS-hg.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "df91ef337642a5603c276fdac0f52122ea5a738aa962d8ddd84c58ead7cff73a"
+    },
+    {
+      "ref": "/assets/hold-board-WeOhFIcL.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "0b880d79bf468ed6de0602b5192814365d3a993cba2214577197d1426481610b"
+    },
+    {
+      "ref": "/assets/section-transfer-controls-CkaRz2s1.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "55acca1e01dfb76368cda165c2b6248fe55ffd57a608f7192f126a8280f7f1e8"
+    },
+    {
+      "ref": "/assets/down-sheet-clear-DUAXd3Bl.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "674a6e2ac143ced2ab63e3621bab41367eca85c59570d35a4324c7cbe1282087"
+    },
+    {
+      "ref": "/assets/down-sheet-view-C5X8QtSN.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "06219a8ec2b246e8f99fc5f589c8a1e06b08dc38c721233584fb61ca042904a1"
+    },
+    {
+      "ref": "/assets/save-alert-BbvcG3YK.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "d4d0916dde29f1edf39cc3fb591efe424983ff49e5f25d634de1455a220d8854"
+    },
+    {
+      "ref": "/assets/bus-number-resolver-lGuqAULA.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "3b7dd85917c8e6d3f99f00281d043048e1ebd17ecf6dd7e72b5759655cfdfb76"
+    },
+    {
+      "ref": "/assets/down-sheet-settings-store-CgXluFdh.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "2ebcb71308035bda7179ef592067cd2c42edd836749d620e43d32cb383a80909"
+    },
+    {
+      "ref": "/assets/defect-search-Buc5DIwA.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "f3576d9abe2f5fd444e8fe6b4e218d66b3994122c25cf3d591fe76405a06b5c6"
+    },
+    {
+      "ref": "/assets/page-C1cK1PMi.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "89aae109b27adfa4c0c73028cbf96842910899e9869569d4181c20e47eaec249"
+    },
+    {
+      "ref": "/assets/down-sheet-settings-store-DvEZw8a7.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "2df9a8c61ee4326ef2e7e41d045b26df62674f79cb03dd0c239eb50f236453f1"
+    },
+    {
+      "ref": "/assets/defect-search-RbEh5Icv.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "b6303e04b13c0f21f94a7df158e9bde9a3e68ee36680792dfc1138d5c8c28803"
+    },
+    {
+      "ref": "/assets/defect-log-QPhgXG1w.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "47df4a698db47082ff30c380bd4f4d8b654990aad1d2ff08ebe260d822129e2e"
+    },
+    {
+      "ref": "/assets/page-DNdjubqB.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "76a48e519467093000802bcdef5f57699f7273c5db09cb40f52fafd1f7ab8180"
+    },
+    {
+      "ref": "/assets/fixed-repairs-settings-CtArpS7d.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "a5075294176f9a6ff7cdf501940445b01f09e19d5d4e00e6bf0b5625cc98cea1"
+    },
+    {
+      "ref": "/assets/page-CnfxNIQn.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "5ebd46798a9630f17510861cd2257320515bb6fd11b06d20d16640240a7c0c27"
+    },
+    {
+      "ref": "/assets/fixed-repairs-settings-CIGxLk_n.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "49471a85663d523688964b476c32c22c6082864ab5a49d0eb56d3718f09cfcba"
+    },
+    {
+      "ref": "/assets/page-BLXmcepe.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "3bd8add6fc856aed92af34389c76ef431bd8e184fd9501d673f63892b4f82c61"
+    },
+    {
+      "ref": "/assets/page-Bc2P-HSt.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "626ada50e5a4b134291ff6e246800b8ea1047fca25dcd356757897dd88600490"
+    },
+    {
+      "ref": "/assets/page-D9LIbtV3.css",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "1ae5d0a37baec8d934b4ab752e36f4d7721fa026b2547312dd0caa34456e9973"
+    },
+    {
+      "ref": "/assets/page-BCimHfGn.js",
+      "status": 200,
+      "sameBytes": true,
+      "sha256": "86feee77ee8353fac1c193b5a038e15e3ddeda3ea7205dceb7af077e7246600d"
+    }
+  ],
+  "missingReferences": [
+    "/assets/defect-log-CoHc7eh3.js"
+  ],
+  "passed": true
+}
