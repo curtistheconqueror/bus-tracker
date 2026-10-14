@@ -812,3 +812,192 @@ test("THIS SHIFT is a window the clock decides, and it cannot claim a shift it c
     cannot drift as spans are added. */
  assert.deepEqual(TIME_WINDOWS_WITH_SHIFT.filter(item=>item.key!=="shift"),TIME_WINDOWS);
 });
+
+test("the bus picker does not rebuild the fleet on every character",async()=>{
+ const picker=await readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8");
+ const code=picker.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* WHAT THIS PINS, and it was measured before it was written.
+
+    Curtis: "when I'm inputting the bus number, there's a slight delay or lag.
+    It's not, you know, smooth and consistent."
+
+    The editor holds its own draft, so a keystroke in the number box re-renders
+    this picker. Measured in the production build, that subtree is 312 nodes and
+    174 of them are `<option>` — the one fleet drawn twice, as an 85-option BUS
+    LIST and an 84-option type-ahead. All of it, plus a filter and a sort of the
+    whole fleet, ran once per character. On a CPU throttled 6x — the usual stand
+    -in for a tablet — the median keystroke took 40-45ms against a 10ms floor for
+    a bare input in the same browser, and a quarter of all keystrokes crossed
+    50ms. Latency that tracks CPU speed while barely moving with board size is
+    work this code does per character, not the platform's input pipeline. */
+ assert.match(code,/const generations=useMemo\(/,"the generation list is not rebuilt per character");
+ assert.match(code,/const candidates=useMemo\(/);
+ assert.match(code,/\.sort\(\(a,b\)=>COLLATOR\.compare\(a\.n,b\.n\)\),\[fleet,generation\]\)/,
+  "the filtered, sorted fleet is computed from the fleet and the generation, not from the keystroke");
+ assert.match(code,/const busListOptions=useMemo\(/);
+ assert.match(code,/const numberOptions=useMemo\(/);
+ assert.match(code,/<datalist id=\{listId\}>\{numberOptions\}<\/datalist>/,
+  "the type-ahead takes the built list");
+ assert.doesNotMatch(code,/\{candidates\.map\(/,
+  "no option list is mapped inline, which would hand React new elements every character");
+
+ /* ONE COLLATOR, MADE ONCE. `localeCompare` with numeric collation builds a
+    fresh collator per comparison: measured at 0.439ms a sort over 84 buses
+    against 0.017ms through a collator made once. Numeric order is the part that
+    matters and it is kept — it is what puts 17509 before 175010. */
+ assert.match(code,/^const COLLATOR=new Intl\.Collator\(undefined,\{numeric:true\}\);$/m,
+  "the collator is module scope, so it outlives a render");
+ assert.doesNotMatch(code,/localeCompare/,
+  "a per-comparison collator is the thing this replaced");
+
+ /* AND THE BEHAVIOUR IS UNTOUCHED, which is the whole claim of a performance
+    change. `typeNumber` still reports on every character, including the empty
+    id for a number that matches no bus — that call is what clears a page search
+    the chosen bus would hide, and skipping it when the id has not changed is
+    worth about 6ms more but is a CHANGE, so it is not smuggled in here. */
+ assert.match(code,/const exact=fleet\.find\(bus=>bus\.n===digits\);select\(exact\?\.id\|\|""\)/,
+  "every character still reports its resolved bus, exactly as before");
+});
+
+test("the picker opens on group titles, and typing still searches everything",async()=>{
+ const [combo,css,log,sheet,searchLib]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/combo-field.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/defect-search.ts",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis: "when the person presses that the sub category I only need those
+    titles to show first those main titles so it's a lot more organized and you
+    can get to what you need faster instead of scrolling through all the
+    defects." */
+ assert.match(code,/const \[browseGroup,setBrowseGroup\]=useState\(""\)/);
+ assert.match(code,/const browsing=!query\.trim\(\)/,"browsing is the empty query, nothing else");
+ assert.match(code,/if\(!browsing\)return options\.map\(option=>\(\{kind:"option",option\}\)\)/,
+  "a query still produces the flat ranked list it always did");
+ assert.match(code,/if\(browseGroup\)return options\.filter\(option=>option\.section===browseGroup\)/,
+  "inside a group the rows are that group's defects and nothing else");
+ /* THE WAY BACK IS A HEADER, NOT A WALKABLE ROW, and the keyboard is what
+    proved it has to be. As a row it sat at index 0 of the group, so entering
+    with Enter left the highlight on the way OUT — the next Enter undid the tap
+    and no defect was reachable by keyboard at all. Driven in Chromium: before
+    this, ArrowDown/Enter/Enter chose nothing and left the list open. */
+ assert.match(code,/\{grouped&&browseGroup&&<li className="combo-back" role="presentation"/,
+  "it is presentation, so the arrows never land on it");
+ assert.doesNotMatch(code,/kind:"back"/,"and it is not one of the rows at all");
+ assert.match(code,/setBrowseGroup\(row\.name\);\s*setActive\(0\)/,
+  "entering a group highlights its first defect");
+ assert.match(code,/built\.push\(\{kind:"group",name:option\.section,count:groupCounts\.get\(option\.section\)\|\|0\}\)/,
+  "one row per group, carrying how many are behind it");
+
+ /* A ROW WITH NO GROUP IS NEVER SWALLOWED. Browsing, the Defect Log leads the
+    list with the wording a record was saved under when the catalog no longer
+    offers it — the one row that keeps an old record editable. It has no section,
+    so grouping has to draw it as itself rather than drop it. */
+ assert.match(code,/if\(!option\.section\)\{built\.push\(\{kind:"option",option\}\);continue\}/,
+  "an ungrouped row keeps its own place among the titles");
+ assert.match(log,/offCatalogIssue&&!query\?\[\{value:offCatalogIssue/,
+  "the Defect Log still leads the browse with the as-logged wording");
+
+ /* TYPING LEAVES THE GROUP, or a query would be searched inside one group and
+    silently miss most of what matched. */
+ assert.match(code,/setQuery\(event\.target\.value\);setActive\(0\);setBrowseGroup\(""\)/);
+ /* And a shut list forgets where it was. */
+ assert.match(code,/useEffect\(\(\)=>\{if\(!open\)setBrowseGroup\(""\)\},\[open\]\)/);
+
+ /* THE RACE THIS CHANGE CREATED, and the fix it needs. React 18 flushes
+    mousedown synchronously, so pressing a title replaced the rows before a
+    bubble-phase listener ran — the pressed `<li>` was already detached, the box
+    did not contain it, and the list closed itself on a tap that landed inside
+    it. Driven in Chromium before the fix: the list vanished on the first title
+    press. Capture runs ahead of React. */
+ assert.match(code,/document\.addEventListener\("mousedown",away,true\)/,
+  "the outside-press listener judges the target before React detaches it");
+ assert.match(code,/document\.addEventListener\("touchstart",away,true\)/);
+ assert.match(code,/document\.removeEventListener\("mousedown",away,true\)/,
+  "and it is removed with the same phase it was added on, or it is never removed");
+
+ /* THE KEYBOARD WALKS WHAT THE THUMB CAN PRESS. Headings drawn while typing are
+    not pickable and must not be counted; keyed on `.combo-option` the highlight
+    walked off by one for every group row on screen. */
+ assert.match(code,/querySelectorAll\("\.combo-row"\)\[active\]/);
+ assert.match(code,/return \(next\+rows\.length\)%rows\.length/,"arrow keys wrap over the rows on screen");
+ assert.match(code,/if\(open&&rows\[active\]\)\{event\.preventDefault\(\);choose\(rows\[active\]\);?\}/,
+  "Enter does whatever the highlighted row does");
+ assert.match(code,/if\(browseGroup\)\{leaveGroup\(\);return\}/,
+  "Escape steps out of a group before it closes the list");
+ assert.match(code,/const leaveGroup=\(\)=>\{setBrowseGroup\(""\);setActive\(0\)\}/,
+  "one way out, used by Escape and by the header");
+
+ /* THE CAP BELONGED TO THE RANKED LIST, NOT TO THE BROWSE. Applied before the
+    grouping it cut the catalog at an arbitrary row: measured with no category
+    chosen, the first 40 rows were all A/C and Engine, so every other category
+    had no title at all. */
+ assert.match(searchLib,/export const BROWSE_ALL=Number\.MAX_SAFE_INTEGER/);
+ for(const [name,caller,expr] of [["Defect Log",log,"value.defect.category"],["Down Sheet",sheet,"item.category"]])
+  assert.ok(caller.includes("searchCatalogForCategory(query,"+expr+",query.trim()?40:BROWSE_ALL)"),
+   name+" asks for every group while browsing and caps only what a query ranks");
+
+ /* BIGGER, BECAUSE THEY ARE WHAT IS READ FIRST. Measured at 390px: the option
+    rows are 16px — what the old <select> drew — so a 17px title read as the
+    same line as the things under it. */
+ assert.match(css,/\.combo-group>b\{font-size:13px/,"desktop title above the 10px option line");
+ assert.match(css,/\.combo-group>b\{font-size:19px/,"phone title above the 16px option line");
+ assert.match(css,/\.combo-group\{display:flex;[^}]*min-height:44px/,"a title is a row, not a heading");
+ assert.match(css,/\.combo-group\{min-height:52px/,"and it matches the option rows' phone target");
+
+ /* THE SHARED CONTROL STAYS SHARED, and the category picker's rows carry no
+    groups, so it is the same flat list it always was. */
+ /* Asked of the OPTIONS, not the rows: inside a group every row is a defect,
+    and "is this a grouped list" has to keep its answer one level down or the
+    header that leads back disappears the moment you use it. */
+ assert.match(code,/const grouped=browsing&&options\.some\(option=>option\.section\)/);
+ assert.match(log,/search=\{query=>searchCategories\(query\)\.map\(row=>\(\{value:row\.value,label:row\.label\}\)\)\}/,
+  "the category picker passes no sections, so nothing groups it");
+});
+
+test("a form redrawing around a text field does not drag the picker with it",async()=>{
+ const [combo,picker,log]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+ ]);
+ const comboCode=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ const pickerCode=picker.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis widened the report himself: "Not just the bus number input into the
+    bus number field, but any other text input." The editor holds one draft, so
+    a character typed into DETAILS redraws the whole 312-node form around it.
+    Profiled with source maps, NONE of our own functions showed above the 0.2ms
+    sampling floor — the cost is React reconciling that form. So the fix is not
+    to make our code faster, it is to give React less of the form to walk. */
+
+ /* NOTHING IS RANKED FOR A LIST NOBODY IS LOOKING AT. This ran open or shut,
+    and once browsing stopped being capped at forty rows a SHUT picker was
+    building all 338 catalog rows for a keystroke in another field. */
+ assert.match(comboCode,/const options=open\?search\(query\):\[\]/,
+  "a closed picker ranks nothing");
+
+ /* AND THE PICKER ITSELF SITS STILL. 174 of the editor's 312 nodes are its two
+    option lists; its props do not move while somebody types a sentence. */
+ assert.match(pickerCode,/^function BusSelector\(/m,"declared, so it can be wrapped");
+ assert.match(pickerCode,/^export default memo\(BusSelector\);$/m);
+ assert.match(pickerCode,/import \{memo,useEffect,useMemo,useState\} from "react"/);
+ /* A memo over an inline arrow is a comparison that can never pass. */
+ assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
+  "the callback is held still, or the memo does nothing but cost a comparison");
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}\/>/,
+  "and the held callback is the one passed");
+ assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
+  "no inline arrow remains on that prop");
+
+ /* MEASURED, typing 162 characters into DETAILS at 6x and phone width:
+      before            median 33.6ms  p95 50.2ms  worst 63.6ms  9 over 50ms
+      closed-list fix   median 32.6ms  p95 47.7ms  worst 57.4ms  4 over 50ms
+      + memo            median 31.0ms  p95 42.6ms  worst 47.5ms  0 over 50ms
+    The median barely moves and the TAIL is where it lands, which is the half
+    Curtis described: "It's not, you know, smooth and consistent." */
+});

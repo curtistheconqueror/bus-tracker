@@ -104,3 +104,51 @@
     field that opened it stays on screen above it. */
  .combo-list{max-height:min(300px,42vh)}
 }
+
+/* ── Titles first ─────────────────────────────────────────────────────────────
+   Curtis: "I need those titles to be a little bit bigger they they have to be
+   now since those are the first things showing."
+
+   They were `.combo-section` — a faded 8px optgroup heading you read past on the
+   way to a defect. Pressing one is now how you reach a defect at all, so it is
+   a ROW: the size of a thing you choose, with the field's own text colour
+   rather than the muted grey of a label, and a count of what is behind it.
+
+   It deliberately does NOT inherit `.combo-option`'s two-line shape. An option
+   stacks a wording over its group; a title is one line with a number at the end
+   of it, so it is a row rather than a column, and the number sits in the gutter
+   where the same eye-line finds it on every row. */
+.combo-group{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:8px 9px;border-bottom:1px solid #eef2f8;cursor:pointer}
+.combo-group:last-child{border-bottom:0}
+.combo-group>b{font-size:13px;font-weight:900;color:#193357;line-height:1.2}
+/* The count, in the gutter. A pill rather than bare digits so a two-figure
+   group does not read as part of the title's last word. */
+.combo-group>span{flex:0 0 auto;min-width:22px;padding:2px 6px;border-radius:9px;background:#e7eefa;color:#42597d;font-size:9px;font-weight:900;text-align:center;line-height:1.5}
+.combo-group.active{background:#eaf3ff}
+.combo-group.active>b{color:#0b4f9e}
+.combo-group.active>span{background:#cfe3ff;color:#0b4f9e}
+/* THE WAY BACK sits at the top of a group's defects and is styled apart from
+   them, because it is the one row in that list that does not log anything. */
+.combo-back{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:38px;padding:7px 9px;background:#f2f6fc;border-bottom:1px solid #dde5f1;cursor:pointer}
+.combo-back>b{font-size:9px;font-weight:900;letter-spacing:1.1px;color:#42597d;line-height:1.2}
+.combo-back>small{font-size:9px;font-weight:700;color:#74819a;text-align:right;line-height:1.2}
+.combo-back:hover{background:#e2ecfb}
+.combo-back:hover>b{color:#0b4f9e}
+
+@media(max-width:760px){
+ /* The same jump the options get at this width, for the same reason: this is
+    what the old <select> drew its lines at, and these are now the lines being
+    read first. 52px to match the option rows beside them, so stepping into a
+    group does not change how big a target anything is. */
+ .combo-group{min-height:52px;padding:10px 11px}
+ /* 19px, NOT 17. The option rows are already 16px at this width — that is what
+    the old <select> drew — so 17px is a title the same size as the things under
+    it, which is not what was asked for: "I need those titles to be a little bit
+    bigger they they have to be now since those are the first things showing."
+    Measured at 390px: 17px read as the same line, 19px reads as the heading. */
+ .combo-group>b{font-size:19px;line-height:1.15}
+ .combo-group>span{min-width:26px;padding:3px 8px;font-size:12px}
+ .combo-back{min-height:44px;padding:9px 11px}
+ .combo-back>b{font-size:11px}
+ .combo-back>small{font-size:11px}
+}

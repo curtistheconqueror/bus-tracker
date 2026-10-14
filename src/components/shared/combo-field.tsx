@@ -77,6 +77,9 @@ export default function ComboField({label,value,display,search,onPick,placeholde
 }){
  const [open,setOpen]=useState(false);
  const [query,setQuery]=useState("");
+ /* WHICH GROUP IS OPEN, while browsing. Empty means the list is showing its
+    group titles and nothing else — see the row builder below. */
+ const [browseGroup,setBrowseGroup]=useState("");
  const [active,setActive]=useState(0);
  const inputRef=useRef<HTMLInputElement|null>(null);
  const listRef=useRef<HTMLUListElement|null>(null);
@@ -87,7 +90,79 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     of string matching against an array already in memory, which is nothing next
     to the render it is part of, and a stale memo here would show the mechanic a
     list that does not match what he just typed. */
- const options=search(open?query:"");
+ /* NOTHING IS RANKED FOR A LIST NOBODY IS LOOKING AT.
+
+    This ran on every render whether the list was open or shut, which is once
+    per character typed anywhere else in the same form — and once the browse
+    stopped being capped at forty rows, a shut picker was building the whole
+    catalog, 338 rows, for a keystroke in the DETAILS box.
+
+    Measured at 6x, 162 characters into DETAILS at phone width, it buys less
+    than the row count suggests: median 33.6ms to 32.6ms, p95 50.2ms to 47.7ms,
+    and the characters over 50ms down from 9 to 4. The ranking was never the
+    bulk of the cost — the form redrawing around the field is — so this is the
+    small, certain part of it rather than the fix.
+
+    Safe because every reader of it is already behind `open`: the list itself,
+    the group count, the rows, and the three keyboard branches that act. */
+ const options=open?search(query):[];
+
+ /* TITLES FIRST, DEFECTS SECOND.
+
+    Curtis: "when the person presses that the sub category I only need those
+    titles to show first those main titles so it's a lot more organized and you
+    can get to what you need faster instead of scrolling through all the
+    defects."
+
+    Tapping this field used to open the whole catalog — every defect in the
+    chosen category, divided by light-grey headings you scrolled past. Now
+    browsing opens the HEADINGS, each one a row you press to see what is under
+    it. Typing is untouched: a query still searches every wording in one ranked
+    flat list, because that is the fast path for somebody who knows the words.
+
+    And he asked for it everywhere rather than only where the groups are many:
+    "if you should just be all seamless and look the same then just do it for
+    everything regardless even if they only have two sub categories just to keep
+    a consistent looking feel." So the shape is decided by whether the rows carry
+    groups at all, not by how many — which also leaves the CATEGORY picker, whose
+    rows carry none, exactly as it was.
+
+    A ROW WITHOUT A GROUP STAYS WHERE IT IS, and that is not a detail. Browsing,
+    the Defect Log puts the wording a record was saved under at the top of the
+    list when the catalog no longer offers it — the one row that keeps an old
+    record reachable and editable. It has no group, so grouping must not swallow
+    it: section-less rows are drawn as themselves, in their own place, beside the
+    titles. */
+ const browsing=!query.trim();
+ const groupCounts=new Map<string,number>();
+ if(browsing)for(const option of options)if(option.section)groupCounts.set(option.section,(groupCounts.get(option.section)||0)+1);
+ type Row=
+  |{kind:"group";name:string;count:number}
+  |{kind:"option";option:ComboOption};
+ const rows:Row[]=(()=>{
+  /* Typing: the ranked flat list, exactly as before. */
+  if(!browsing)return options.map(option=>({kind:"option",option}));
+  /* Inside a group: its defects. The way back out is drawn above them and is
+     NOT one of these rows — see the row it renders for why. */
+  if(browseGroup)return options.filter(option=>option.section===browseGroup).map(option=>({kind:"option" as const,option}));
+  /* The top of the browse: one row per group, in catalog order, with anything
+     ungrouped left in place. Built in one pass over the options so the order is
+     the catalog's rather than a Set's. */
+  const built:Row[]=[];
+  const seen=new Set<string>();
+  for(const option of options){
+   if(!option.section){built.push({kind:"option",option});continue}
+   if(seen.has(option.section))continue;
+   seen.add(option.section);
+   built.push({kind:"group",name:option.section,count:groupCounts.get(option.section)||0});
+  }
+  return built;
+ })();
+ /* WHETHER THIS LIST IS A DRILL-DOWN AT ALL. False for the CATEGORY picker,
+    whose rows carry no groups. Asked of the OPTIONS rather than of the rows,
+    because inside a group the rows are all defects and the question "is this a
+    grouped list" has to keep the same answer one level down. */
+ const grouped=browsing&&options.some(option=>option.section);
 
  /* A tap outside is a dismissal, and on a phone that is the usual way out —
     there is no Escape key on a bus. */
@@ -96,10 +171,24 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   const away=(event:MouseEvent|TouchEvent)=>{
    if(boxRef.current&&!boxRef.current.contains(event.target as Node)){setOpen(false);setQuery("");}
   };
-  document.addEventListener("mousedown",away);
-  document.addEventListener("touchstart",away);
-  return ()=>{document.removeEventListener("mousedown",away);document.removeEventListener("touchstart",away);};
+  /* CAPTURE, AND THE REASON IS A RACE THIS CHANGE CREATED.
+
+     React 18 flushes a discrete event like mousedown SYNCHRONOUSLY, so pressing
+     a group title replaced the rows before this listener — on the bubble phase,
+     after React's — ever ran. By then the `<li>` that was pressed is detached
+     from the document, `boxRef.contains(it)` is false, and the list closed
+     itself on a tap that landed inside it. It never showed before because every
+     row press closed the list anyway; the drill-down is the first row that
+     leaves it open. Capture runs ahead of React, where the target is still
+     where the finger put it. */
+  document.addEventListener("mousedown",away,true);
+  document.addEventListener("touchstart",away,true);
+  return ()=>{document.removeEventListener("mousedown",away,true);document.removeEventListener("touchstart",away,true);};
  },[open]);
+
+ /* A SHUT LIST REMEMBERS NOTHING. Reopening starts at the titles, because the
+    group somebody browsed into last time is not where the next defect lives. */
+ useEffect(()=>{if(!open)setBrowseGroup("")},[open]);
 
  /* OPENING SCROLLS THE WHOLE CONTROL INTO VIEW, not just the input. The list is
     in flow, so opening it makes this box suddenly ~300px taller — and the form
@@ -126,7 +215,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   if(!open||!listRef.current)return;
   /* NOT children[active]: the headings are list items too, so the nth child and
      the nth OPTION stopped being the same thing the moment sections went in. */
-  const row=listRef.current.querySelectorAll(".combo-option")[active] as HTMLElement|undefined;
+  /* `.combo-row` is on every PICKABLE row — a group, the way back, an option —
+     while the plain headings drawn while typing are not pickable and are not
+     counted. Keyed on `.combo-option` this walked off by one for every group
+     row on screen. */
+  const row=listRef.current.querySelectorAll(".combo-row")[active] as HTMLElement|undefined;
   row?.scrollIntoView({block:"nearest"});
  },[active,open]);
 
@@ -134,8 +227,20 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   onPick(option.value,option);
   setOpen(false);
   setQuery("");
+  setBrowseGroup("");
   inputRef.current?.blur();
  };
+
+ /* WHAT PRESSING A ROW DOES, in one place, because three things can be pressed
+    now and the keyboard and the thumb must agree about all three. Entering a
+    group lands on its first defect rather than on the way back out: the back row
+    is index 0, so starting there would make the first ArrowDown undo the tap. */
+ const choose=(row:Row)=>{
+  if(row.kind==="option"){pick(row.option);return}
+  setBrowseGroup(row.name);
+  setActive(0);
+ };
+ const leaveGroup=()=>{setBrowseGroup("");setActive(0)};
 
  const keys=(event:React.KeyboardEvent<HTMLInputElement>)=>{
   if(event.key==="ArrowDown"||event.key==="ArrowUp"){
@@ -143,18 +248,24 @@ export default function ComboField({label,value,display,search,onPick,placeholde
    if(!open){setOpen(true);setActive(0);return;}
    setActive(current=>{
     const next=event.key==="ArrowDown"?current+1:current-1;
-    if(!options.length)return 0;
-    return (next+options.length)%options.length;
+    if(!rows.length)return 0;
+    return (next+rows.length)%rows.length;
    });
    return;
   }
   if(event.key==="Enter"){
    /* Only swallow Enter when it is doing something. Otherwise it belongs to the
       form, and a mechanic who has already chosen should be able to submit. */
-   if(open&&options[active]){event.preventDefault();pick(options[active]);}
+   if(open&&rows[active]){event.preventDefault();choose(rows[active]);}
    return;
   }
-  if(event.key==="Escape"&&open){event.preventDefault();setOpen(false);setQuery("");}
+  /* ESCAPE STEPS BACK OUT OF A GROUP BEFORE IT CLOSES THE LIST, which is what
+     a person expects of a list they went one level into. */
+  if(event.key==="Escape"&&open){
+   event.preventDefault();
+   if(browseGroup){leaveGroup();return}
+   setOpen(false);setQuery("");
+  }
  };
 
  return <label className={className?"combo-field "+className:"combo-field"}>
@@ -168,14 +279,16 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     aria-expanded={open}
     aria-controls={id+"-list"}
     aria-autocomplete="list"
-    aria-activedescendant={open&&options[active]?id+"-option-"+active:undefined}
+    aria-activedescendant={open&&rows[active]?id+"-option-"+active:undefined}
     autoComplete="off"
     disabled={disabled}
     /* Closed, the field reads as the answer. Open, it is the question. */
     value={open?query:display}
     placeholder={placeholder||"Type or tap to choose"}
-    onFocus={()=>{if(!disabled){setOpen(true);setQuery("");setActive(0);}}}
-    onChange={event=>{setQuery(event.target.value);setActive(0);if(!open)setOpen(true);}}
+    onFocus={()=>{if(!disabled){setOpen(true);setQuery("");setBrowseGroup("");setActive(0);}}}
+    /* TYPING LEAVES THE GROUP. A query searches every wording in the catalog,
+       so staying inside one group would quietly hide most of what matched. */
+    onChange={event=>{setQuery(event.target.value);setActive(0);setBrowseGroup("");if(!open)setOpen(true);}}
     onKeyDown={keys}/>
    {/* A REAL BUTTON, because it was a span with pointer-events:none and it looked
        exactly like a control. The list has one opener -- the input's onFocus --
@@ -206,29 +319,72 @@ export default function ComboField({label,value,display,search,onPick,placeholde
      event.preventDefault();
      if(disabled)return;
      if(open){setOpen(false);setQuery("");return;}
-     setOpen(true);setQuery("");setActive(0);
+     setOpen(true);setQuery("");setBrowseGroup("");setActive(0);
      inputRef.current?.focus();
     }}>▾</button>
    {value&&!open&&!disabled&&<button type="button" className="combo-clear" aria-label={"Clear "+label}
     onClick={event=>{event.preventDefault();onPick("",null);}}>×</button>}
-   {open&&<ul className="combo-list" id={id+"-list"} role="listbox" ref={listRef}>
-    {options.length===0&&<li className="combo-empty" role="presentation">{emptyText||"Nothing matches that"}</li>}
-    {options.map((option,index)=><Fragment key={option.value+"|"+index}>
-     {option.section&&option.section!==options[index-1]?.section&&
-      <li className="combo-section" role="presentation">{option.section}</li>}
-     <li
+   {open&&<ul className={grouped?"combo-list grouped":"combo-list"} id={id+"-list"} role="listbox" ref={listRef}>
+    {/* THE WAY BACK IS A HEADER, NOT A ROW THE KEYBOARD WALKS, and that was
+        found by driving the keyboard rather than the thumb. As a walkable row it
+        sat at index 0, so entering a group with Enter left the highlight on the
+        way OUT: the next Enter undid the one before it and no defect could be
+        reached by keyboard at all. Taking it out of the walk means arrows move
+        over defects and Escape is the way back, which is what a keyboard
+        already expects — and a thumb still has a full-width row to press.
+
+        Sticky like the headings it replaces, so it stays reachable after
+        scrolling into a long group. */}
+    {grouped&&browseGroup&&<li className="combo-back" role="presentation"
+     onMouseDown={event=>{event.preventDefault();leaveGroup();}}>
+     <b>← ALL GROUPS</b><small>{browseGroup}</small>
+    </li>}
+    {rows.length===0&&<li className="combo-empty" role="presentation">{emptyText||"Nothing matches that"}</li>}
+    {rows.map((row,index)=>{
+     const selected=index===active;
+     /* mousedown, not click, on every row: click fires after blur, and by then
+        the list is gone and the tap has landed on whatever moved into its
+        place. */
+     const press=(event:React.MouseEvent)=>{event.preventDefault();choose(row);};
+
+     /* A GROUP TITLE IS A ROW YOU PRESS, so it is a real option in the listbox
+        rather than the presentational heading it used to be — it is what the
+        keyboard walks and what the thumb lands on at this level. Bigger than
+        the headings were, because it is now the first thing on screen and the
+        thing being chosen. The count says what is behind it, which is the
+        difference between pressing a title hopefully and pressing it knowing. */
+     if(row.kind==="group")return <li
+      key={"group|"+row.name}
       id={id+"-option-"+index}
       role="option"
-      aria-selected={index===active}
-      className={"combo-option"+(index===active?" active":"")+(option.foreign?" foreign":"")}
-      /* mousedown, not click: click fires after blur, and by then the list is
-         gone and the tap has landed on whatever moved into its place. */
-      onMouseDown={event=>{event.preventDefault();pick(option);}}
+      aria-selected={selected}
+      className={"combo-row combo-group"+(selected?" active":"")}
+      onMouseDown={press}
       onMouseEnter={()=>setActive(index)}>
-      <b>{option.label}</b>
-      {option.hint&&<small>{option.hint}</small>}
-     </li>
-    </Fragment>)}
+      <b>{row.name}</b>
+      <span aria-hidden="true">{row.count}</span>
+     </li>;
+
+     const option=row.option;
+     return <Fragment key={option.value+"|"+index}>
+      {/* HEADINGS ONLY WHERE THEY STILL DIVIDE SOMETHING: while typing, where
+          the ranked rows come from everywhere. Browsing, the group is the row
+          above or the one you pressed to get here, so repeating it over every
+          defect is the noise the drill-down just removed. */}
+      {!browsing&&option.section&&option.section!==(rows[index-1]?.kind==="option"?(rows[index-1] as {option:ComboOption}).option.section:undefined)&&
+       <li className="combo-section" role="presentation">{option.section}</li>}
+      <li
+       id={id+"-option-"+index}
+       role="option"
+       aria-selected={selected}
+       className={"combo-row combo-option"+(selected?" active":"")+(option.foreign?" foreign":"")}
+       onMouseDown={press}
+       onMouseEnter={()=>setActive(index)}>
+       <b>{option.label}</b>
+       {option.hint&&<small>{option.hint}</small>}
+      </li>
+     </Fragment>;
+    })}
    </ul>}
   </div>
   {footnote&&<small className="combo-footnote">{footnote}</small>}
