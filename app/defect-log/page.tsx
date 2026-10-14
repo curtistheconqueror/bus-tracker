@@ -661,6 +661,10 @@ export default function DefectLog(){
     the drawer already opened on — the count simply agrees with it now. Not
     stored, like the chips it mirrors. */
  const [loggedCountWindow,setLoggedCountWindow]=useState<TimeWindowKey>("shift");
+ /* WHETHER THAT COUNT IS ON SCREEN. It is drawn inside the quick-filter
+    popover and nowhere else, so this is what decides whether its span is worth
+    keeping current — see the clock effect below. */
+ const [quickFilterMenuOpen,setQuickFilterMenuOpen]=useState(false);
  /* WHEN WAS IT LOGGED. Curtis: "filter everything that's being put down ... by
     the day and by the shift ... it should be like a drop-down somewhere at the
     work computer." Sticky once chosen — he puts it back to ALL himself, which
@@ -849,14 +853,36 @@ export default function DefectLog(){
     force. It does not tick on ALL: there is no limit to keep current, and an
     idle board should not re-render every thirty seconds for nothing. */
  const [feedWindowNow,setFeedWindowNow]=useState(()=>new Date());
+ /* IT ALSO TICKS FOR THE DEFECTS LOGGED COUNT, AND ONLY WHILE THAT IS VISIBLE.
+
+    The count is quoted over a span of its own and goes stale with nothing on
+    the page changing: left on a desk through 14:00 it keeps quoting the morning
+    crew's work, which is the one reading the window exists to prevent. Nothing
+    else re-renders this screen on its own, so without a tick the number is
+    simply frozen at whatever the last render computed, however long ago.
+
+    Gated on the POPOVER being open rather than on the span being bounded, and
+    that is the whole of why this is not one condition. `loggedCountWindow`
+    starts on SHIFT, so "tick whenever it is bounded" would have every Defect
+    Log on every phone re-rendering twice a minute for the life of the tab — the
+    cost this effect's own comment above refuses to pay. `loggedWindowedCount`
+    is drawn inside the popover and nowhere else, so while that is shut there is
+    no stale number on screen to read, and opening it re-runs this effect and so
+    reads the clock before the first render that shows one.
+
+    It does not claim the same of the DRAWER behind the row. That list is built
+    from `quickFilterBuses` on every render and has never had a tick of its own,
+    exactly like the DEFERRED and RECOMMENDED drawers it shares the control
+    with; left open it ages the way those two always have. Giving all three a
+    heartbeat is a bigger change than this one and is not what was asked for. */
  useEffect(()=>{
-  if(feedWindow==="all")return;
+  if(feedWindow==="all"&&(!quickFilterMenuOpen||loggedCountWindow==="all"))return;
   /* Immediately as well as on the interval, so picking a window reads the
      clock now rather than up to thirty seconds late. */
   setFeedWindowNow(new Date());
   const id=setInterval(()=>setFeedWindowNow(new Date()),30000);
   return ()=>clearInterval(id);
- },[feedWindow]);
+ },[feedWindow,quickFilterMenuOpen,loggedCountWindow]);
  const feedWindowLimit=search.trim()?null:feedWindowMinutes(feedWindow,feedWindowNow,shiftSettings);
  /* THE SAME INSTANT REACHES THE AGES TOO, and leaving it off was the bug the
     clock fix above made worse rather than introduced. `defectWithinFeedWindow`
@@ -1011,14 +1037,25 @@ export default function DefectLog(){
 
     One window now serves both. The drop-down sets it, the drawer's chips set
     the same thing while LOGGED is open, and the count is counted over it, so
-    the number on the row is the number of rows behind it. */
- const loggedWindowedCount=useMemo(()=>{
-  const ids=new Set(quickFilterBusIds(fleet,"logged",new Date().toISOString(),loggedNarrow));
-  return fleet.filter(bus=>ids.has(bus.id)&&withinTimeWindow(loggedAgeMinutes(bus),loggedCountWindow,shiftWindowMinutes)).length;
- /* eslint-disable-next-line react-hooks/exhaustive-deps -- loggedAgeMinutes and
-    loggedNarrow are rebuilt every render from fleet and settings, which are the
-    real inputs and are both listed. */
- },[fleet,loggedCountWindow,shiftWindowMinutes,myInitials]);
+    the number on the row is the number of rows behind it.
+
+    COMPUTED ON EVERY RENDER, like `quickFilterCounts` and `quickFilterBuses`
+    either side of it, and it was memoized on the first cut. `fleet` is state
+    and so holds its identity across renders, which is exactly what made that
+    cache bite: the list in the drawer is rebuilt from a fresh clock every
+    render while the number on the row stayed the one computed whenever the
+    deps last moved. A count and a list that must agree cannot be read off two
+    different instants, and keeping them in one pass is the only way to say so
+    that a later edit cannot undo. It survived review because the cache was
+    invalidated in practice by `shiftWindowMinutes` ticking once a minute — a
+    dependency that is null the moment a shift cannot be resolved, so the
+    agreement rested on something that is not even always there.
+
+    The ids come from `candidateIdsFor` rather than a second
+    `quickFilterBusIds` call, so the row's count and the menu's other counts
+    cannot ask the question two ways. */
+ const loggedCandidateIds=new Set(candidateIdsFor("logged"));
+ const loggedWindowedCount=fleet.filter(bus=>loggedCandidateIds.has(bus.id)&&withinTimeWindow(loggedAgeMinutes(bus),loggedCountWindow,shiftWindowMinutes)).length;
  const quickFilterMenuCounts={...quickFilterCounts,logged:loggedWindowedCount};
  const quickFilterBuses=quickFilterWindowed?quickFilterAllBuses.filter(bus=>withinTimeWindow(quickFilterAgeMinutes(bus),quickFilterWindow,shiftWindowMinutes)):quickFilterAllBuses;
  /* HOW FAR BACK THE PRINTED LINES MAY REACH, for `logged` alone. The window
@@ -1428,7 +1465,7 @@ export default function DefectLog(){
         {FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}
        </select>
       </label>
-      <QuickFilterMenu active={quickFilter} counts={quickFilterMenuCounts} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(value==="logged"?loggedCountWindow:"all")}} itemAside={key=>key!=="logged"?null:
+      <QuickFilterMenu active={quickFilter} counts={quickFilterMenuCounts} onOpenChange={setQuickFilterMenuOpen} onSelect={value=>{setQuickFilter(value);setQuickFilterExpandedBusIds([]);setQuickFilterShareStatus("");setQuickFilterWindow(value==="logged"?loggedCountWindow:"all")}} itemAside={key=>key!=="logged"?null:
        /* Only this row. Every other count answers "what is true right now",
           where the age of the record is not the question — the same reason
           time-window.ts keeps a window off those filters. */
