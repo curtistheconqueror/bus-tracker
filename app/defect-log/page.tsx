@@ -2,7 +2,7 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
-import {useEffect,useMemo,useRef,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -55,7 +55,7 @@ import {moveBusToArea} from "@/src/lib/fleet/facility-areas";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import AppName from "@/src/components/shared/app-name";
 import ComboField from "@/src/components/shared/combo-field";
-import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search.ts";
+import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search.ts";
 import WelcomeGate from "@/src/components/shared/welcome-gate";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
@@ -143,6 +143,12 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
  /* Open only while the part prompt is up. Held here rather than as a separate
     route so closing the editor cannot strand it. */
  const [partPrompt,setPartPrompt]=useState(false);
+ /* HELD STILL SO THE PICKER CAN BE MEMOISED. Inline, this was a new function
+    on every render, which is every character typed anywhere in this form — and
+    a changed prop is a re-render, so the picker rebuilt its two option lists
+    for a keystroke in DETAILS. `onBusPicked` comes from the page, which does
+    not re-render while the editor is open. */
+ const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
  const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
@@ -351,7 +357,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    <div className="log-form">
-    <BusSelector fleet={fleet} busId={value.busId} select={busId=>{onBusPicked(busId);setValue(current=>({...current,busId}))}}/>
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus}/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
@@ -375,7 +381,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      emptyText="Nothing in the catalog matches that"
      footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
      search={query=>{
-      const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category);
+      const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category,query.trim()?40:BROWSE_ALL);
       /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that
          split is measured rather than chosen. Browsing, the rows arrive in
          catalog order, so a heading each time the group changes reproduces
@@ -1368,7 +1374,35 @@ export default function DefectLog(){
   setSearch("");
   setEditing(recordDraft(record));
  };
- const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
+/* AI OPERATOR SAYS WHERE IT IS GOING BEFORE IT GOES.
+
+   Curtis: "When I press Ai operator and I am on the Defect page it routes me to
+   the map. With no warning."
+
+   It always did. The control is an `<a href="/?operator=1">` and the modal it
+   opens cannot render here: `executeOperator` is bound to the map's own state —
+   `setBuses`, `setLocatedBusIds`, `revealLocatedBuses` — and the plan kinds it
+   runs (`locate`, `move`, `bulkMove`, `batch`) are map actions. So the
+   navigation is the feature rather than a bug in it, and what was missing was
+   it being said out loud. The Facility Map's own two copies of this control
+   open the modal in place and have nothing to warn about; this is the one
+   instance that leaves a screen.
+
+   WHAT LEAVING ACTUALLY COSTS, and it is not a record. Nothing on this screen
+   is unsaved — every defect is written on save, and the editor is a full-screen
+   shade at z-index 2147483000, so a draft cannot even be open while this
+   control is reachable. What a reload loses is the way the BOARD is set: the
+   search, the WHEN LOGGED window, the state filter, the quick filter, the focus
+   view. Curtis's own reason for keeping the window in state rather than storage
+   was that "the shop computer's tab does not reload" — navigating is that
+   reload, and on a board somebody has narrowed, that is the whole of the cost.
+
+   So the second sentence appears only when there is something to lose. Warning
+   about filters that are not set would train somebody to dismiss the one case
+   that matters. */
+ const boardIsNarrowed=Boolean(search.trim())||feedWindow!=="all"||filter!=="all"||Boolean(quickFilter)||Boolean(focusedBusId);
+ const leaveForOperator=()=>confirm("AI OPERATOR runs on the Facility Map, so this leaves the Defect Log."+(boardIsNarrowed?"\n\nThe way you have this board set — the search, the filters and WHEN LOGGED — goes back to showing everything when you come back.":"")+"\n\nOpen it on the map?");
+  const removeFromLog=(record:DefectLogRecord)=>{if(!confirm("Remove this repair from the Defect Log only? Bus status, location, defects, and Down Sheet records will stay unchanged."))return;persist(hideDefectLogRecords(fleet,[{busId:record.bus.id,defectId:record.defect.id}]),downEntries)};
  const cleanUpLog=()=>{const cleanable=records.filter(record=>isDefectLogCleanupCandidate(record,activeDownBusIdSet));if(!cleanable.length){alert("Nothing is ready for cleanup. Active repairs that started in this log stay until that repair is fixed.");return}if(!confirm("Clean up "+cleanable.length+" fixed, out-of-service, or Down Sheet record"+(cleanable.length===1?"":"s")+"? Repair data and every bus status will stay unchanged."))return;persist(hideDefectLogRecords(fleet,cleanable.map(record=>({busId:record.bus.id,defectId:record.defect.id}))),downEntries)};
  const copyQuickFilterList=async()=>{if(!quickFilter)return;try{await copyText(quickFilterShareText(quickFilterShareLabel,quickFilterBuses,quickFilter,quickFilterShareOptions));setQuickFilterShareStatus("copied")}catch{setQuickFilterShareStatus("error")}};
 /* The same list as a page rather than a paragraph.
@@ -1481,7 +1515,7 @@ export default function DefectLog(){
      </div>
      <div className="log-advanced-group">
       <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1"><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
+      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
      </div>
     </div>
   </section>}

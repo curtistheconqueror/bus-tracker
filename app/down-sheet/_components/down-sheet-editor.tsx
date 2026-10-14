@@ -1,6 +1,6 @@
 "use client";
 
-import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search";
+import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search";
 import ComboField from "@/src/components/shared/combo-field";
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
@@ -200,7 +200,7 @@ export default function DownSheetEditor({entry,fleet,entries,defaultInitials,onC
                  emptyText="Nothing in the catalog matches that"
                  footnote={item.category?undefined:"Searching every category. Picking one sets the category for you."}
                  search={query=>{
-                  const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category);
+                  const {inCategory,elsewhere}=searchCatalogForCategory(query,item.category,query.trim()?40:BROWSE_ALL);
                   /* Headings while browsing, the group on each row while
                      searching - the same split the Defect Log measured, kept
                      identical here so the two surfaces read the same. */

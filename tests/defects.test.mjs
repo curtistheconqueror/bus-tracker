@@ -5606,3 +5606,63 @@ test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row ch
  assert.ok(css.includes(".quick-filter-popover>div>button,.quick-filter-popover>div>.quick-filter-row>button,.quick-filter-window select,.ds-badge-view-popover>div>button{min-height:44px}"),
   "the wrapped row and its picker take the phone tap-target rule with the rest");
 });
+
+test("AI OPERATOR says where it is going before it goes",async()=>{
+ const [page,map,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Curtis: "When I press Ai operator and I am on the Defect page it routes me
+    to the map. With no warning." It always did — the control is a link, and the
+    modal cannot render on this screen because `executeOperator` is bound to the
+    map's own state. The navigation is the feature; saying so was missing. */
+ assert.match(page,/onClick=\{event=>\{if\(!leaveForOperator\(\)\)event\.preventDefault\(\)\}\}/,
+  "the navigation is held until somebody agrees to it");
+ assert.match(page,/const leaveForOperator=\(\)=>confirm\("AI OPERATOR runs on the Facility Map, so this leaves the Defect Log\."/,
+  "and the first thing it says is where it is going");
+
+ /* STILL A LINK. An anchor that is prevented keeps the href, so a long-press
+    can open the map in a second tab — which leaves this board standing and has
+    nothing to warn about. A button would have thrown that away, and the
+    stylesheet reaches this control by class on a descendant selector, so the
+    element was never what was holding the look together. */
+ assert.match(page,/<a className="feed-operator" href="\/\?operator=1"/,
+  "the anchor and its href survive the fix");
+ assert.match(page,/title="Opens the AI Operator on the Facility Map — this leaves the Defect Log"/,
+  "and it names its destination before it is pressed, with no change to the label");
+ assert.match(page,/>&#10022;<\/span> AI OPERATOR<\/a>/,"the label is untouched");
+ assert.ok(css.includes(".feed-title .feed-operator,.log-advanced .feed-operator{"),
+  "the look comes from the class on a descendant selector, not from the tag");
+
+ /* THE SECOND SENTENCE ONLY WHEN THERE IS SOMETHING TO LOSE. Nothing here is
+    unsaved — the editor is a full-screen shade, so a draft cannot be open while
+    this control is reachable. What a reload costs is the way the BOARD is set,
+    and warning about filters nobody set would train somebody to dismiss the one
+    case that matters. */
+ assert.match(page,/const boardIsNarrowed=Boolean\(search\.trim\(\)\)\|\|feedWindow!=="all"\|\|filter!=="all"\|\|Boolean\(quickFilter\)\|\|Boolean\(focusedBusId\)/,
+  "every way this board can be narrowed counts, and nothing else does");
+ assert.match(page,/\(boardIsNarrowed\?"\\n\\nThe way you have this board set/,
+  "the cost is named only when there is one");
+ assert.doesNotMatch(page,/leaveForOperator\(\)\?"/,
+  "the warning is not the thing that decides what the message says");
+
+ /* THE MAP'S OWN TWO COPIES ARE LEFT ALONE. They open the modal in place and
+    leave no screen, so there is nothing for them to warn about — and a confirm
+    on them would be a confirm on the surface the Operator actually runs on. */
+ assert.doesNotMatch(map,/leaveForOperator/,"the Facility Map asks nobody");
+ assert.match(map,/className="ai-operator-command" type="button" onClick=\{\(\)=>setOperatorOpen\(true\)\}/,
+  "its command bar still opens the modal in place");
+ assert.equal(map.split("setOperatorOpen(true)").length-1,3,
+  "the command bar, the phone dock and the operator=1 landing — all in place");
+ /* COUNTED IN THE CODE, NOT THE PROSE. The comment above the handler quotes
+    the element it is explaining, and a count taken over the raw file reads that
+    quotation as a second control — the same trap a release ago, where an
+    assertion matched a comment rather than the thing it was about. */
+ const pageCode=page.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+ assert.equal(pageCode.split('href="/?operator=1"').length-1,1,
+  "one navigating instance on this screen, and it is the one that now warns");
+ assert.match(pageCode,/onClick=\{event=>\{if\(!leaveForOperator\(\)\)event\.preventDefault\(\)\}\}/,
+  "and the guard is on that instance in the code, not described in a comment");
+});
