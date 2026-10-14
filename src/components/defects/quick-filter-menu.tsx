@@ -17,12 +17,31 @@ import {QUICK_FILTERS,type QuickFilterKey} from "@/src/lib/defects/quick-filters
    call sites has to say anything. */
 export type QuickFilterMenuItem<K extends string>={key:K;label:string;shortLabel:string};
 
-export default function QuickFilterMenu<K extends string=QuickFilterKey>({active,counts,onSelect,placement="below",items,title="QUICK FILTERS",menuLabel="Quick bus filters"}:{active:K|null;counts:Record<K,number>;onSelect:(key:K|null)=>void;placement?:"above"|"below";items?:QuickFilterMenuItem<K>[];title?:string;menuLabel?:string}){
+/* An OPTIONAL control beside one row's count, and optional is the whole point.
+
+   Three screens draw this menu — the Defect Log, the Down Sheet and the
+   Facility Map — and exactly one of them has a row whose count means nothing
+   until you say over what span. `itemAside` returns nothing for every other row
+   and every other screen, so those two render byte-identical markup to before.
+
+   It sits OUTSIDE the row's button rather than inside it: a control nested in a
+   button swallows its own clicks, and `role="menuitemcheckbox"` describes one
+   thing to press, not a press and a picker. */
+export default function QuickFilterMenu<K extends string=QuickFilterKey>({active,counts,onSelect,placement="below",items,title="QUICK FILTERS",menuLabel="Quick bus filters",itemAside}:{active:K|null;counts:Record<K,number>;onSelect:(key:K|null)=>void;placement?:"above"|"below";items?:QuickFilterMenuItem<K>[];title?:string;menuLabel?:string;itemAside?:(key:K)=>React.ReactNode}){
  const [open,setOpen]=useState(false),[position,setPosition]=useState({left:8,top:0,bottom:0});
  const trigger=useRef<HTMLButtonElement>(null),popover=useRef<HTMLDivElement>(null);
  const options=items||(QUICK_FILTERS as unknown as QuickFilterMenuItem<K>[]);
  const activeLabel=options.find(item=>item.key===active)?.shortLabel;
  const place=()=>{const rect=trigger.current?.getBoundingClientRect();if(!rect)return;setPosition({left:Math.max(8,Math.min(rect.left,window.innerWidth-252)),top:rect.bottom+7,bottom:window.innerHeight-rect.top+7})};
  useEffect(()=>{if(!open)return;place();const close=(event:PointerEvent)=>{const target=event.target as Node;if(!trigger.current?.contains(target)&&!popover.current?.contains(target))setOpen(false)},escape=(event:KeyboardEvent)=>{if(event.key==="Escape")setOpen(false)},reposition=()=>place();window.addEventListener("pointerdown",close);window.addEventListener("keydown",escape);window.addEventListener("resize",reposition);return()=>{window.removeEventListener("pointerdown",close);window.removeEventListener("keydown",escape);window.removeEventListener("resize",reposition)}},[open]);
- return <span className="quick-filter-control"><button ref={trigger} type="button" className={"quick-filter-trigger"+(active?" active":"")} aria-expanded={open} aria-haspopup="menu" onClick={()=>setOpen(value=>!value)}><span>{activeLabel?"FILTER: "+activeLabel:title}</span><b aria-hidden="true">{open?"▴":"▾"}</b></button>{open&&typeof document!=="undefined"&&createPortal(<div ref={popover} className={"quick-filter-popover "+placement} style={placement==="above"?{left:position.left,bottom:position.bottom}:{left:position.left,top:position.top}} role="menu" aria-label={menuLabel}><header><b>{title}</b>{active&&<button type="button" onClick={()=>{onSelect(null);setOpen(false)}}>CLEAR</button>}</header><div>{options.map(item=><button type="button" role="menuitemcheckbox" aria-checked={active===item.key} className={active===item.key?"active":""} onClick={()=>{onSelect(active===item.key?null:item.key);setOpen(false)}} key={item.key}><span>{item.label}</span><b>{counts[item.key]}</b></button>)}</div></div>,document.body)}</span>
+ return <span className="quick-filter-control"><button ref={trigger} type="button" className={"quick-filter-trigger"+(active?" active":"")} aria-expanded={open} aria-haspopup="menu" onClick={()=>setOpen(value=>!value)}><span>{activeLabel?"FILTER: "+activeLabel:title}</span><b aria-hidden="true">{open?"▴":"▾"}</b></button>{open&&typeof document!=="undefined"&&createPortal(<div ref={popover} className={"quick-filter-popover "+placement} style={placement==="above"?{left:position.left,bottom:position.bottom}:{left:position.left,top:position.top}} role="menu" aria-label={menuLabel}><header><b>{title}</b>{active&&<button type="button" onClick={()=>{onSelect(null);setOpen(false)}}>CLEAR</button>}</header><div>{options.map(item=>{
+ const aside=itemAside?.(item.key);
+ const row=<button key={item.key} type="button" role="menuitemcheckbox" aria-checked={active===item.key} className={active===item.key?"active":""} onClick={()=>{onSelect(active===item.key?null:item.key);setOpen(false)}}><span>{item.label}</span><b>{counts[item.key]}</b></button>;
+ /* NO WRAPPER WHERE THERE IS NO ASIDE. The stylesheet reaches these rows with
+    `.quick-filter-popover>div>button`, a DIRECT-child selector, so wrapping
+    them unconditionally would have stripped every row on all three screens of
+    its border, height and padding while changing nothing anybody asked for.
+    The wrapped shape is given its own place in that same selector list. */
+ return aside?<div className="quick-filter-row" key={item.key}>{row}{aside}</div>:row;
+})}</div></div>,document.body)}</span>
 }

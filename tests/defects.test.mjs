@@ -4502,8 +4502,19 @@ test("the window narrows the shared list, not just the drawn one",async()=>{
     beside them because its whole question is when. */
  assert.match(page,/quickFilterWindowed=quickFilter==="deferred"\|\|quickFilter==="down-sheet-recommended"\|\|quickFilter==="logged"/);
  /* Reset on open, and never written to storage — a window restored from
-    yesterday would open the drawer already hiding buses. */
- assert.equal(page.split('setQuickFilterWindow("all")').length-1,2,"both entry points reset it");
+    yesterday would open the drawer already hiding buses.
+
+    TWO ENTRY POINTS, AND ONE OF THEM NOW CARRIES A SPAN IN ON PURPOSE. The
+    event/URL route still resets to ALL outright. The menu route resets every
+    filter to ALL except LOGGED, which opens on the span its own drop-down is
+    quoting a count over — the whole point of that control being that the number
+    on the row is the number of rows behind it. Both still land in the same
+    place for LOGGED, because the effect below lifts ALL to that same span; the
+    menu route simply gets there without a second render. Neither is persisted,
+    which is what the chips assertion underneath guards. */
+ assert.equal(page.split('setQuickFilterWindow("all")').length-1,1,"the event route resets outright");
+ assert.match(page,/setQuickFilterWindow\(value==="logged"\?loggedCountWindow:"all"\)/,
+  "the menu route resets every other filter and seeds LOGGED from its drop-down");
  const chips=await readFile(new URL("../src/components/shared/time-window-chips.tsx",import.meta.url),"utf8");
  assert.equal(/localStorage|STORAGE_KEY/.test(chips),false,"the window is not persisted");
  /* The count of what is held back is on screen AND is the button that clears
@@ -4790,9 +4801,14 @@ test("the drawer resolves the shift itself, and only offers the chip when it did
  assert.match(page,/windows=\{quickFilterWindowChoices\}/);
  /* The resolved limit reaches the filter, or SHIFT would read as ALL. */
  assert.match(page,/withinTimeWindow\(quickFilterAgeMinutes\(bus\),quickFilterWindow,shiftWindowMinutes\)/);
- /* LOGGED opens on this shift; on ALL it is every bus in the fleet with an open
-    defect, which is the opposite of a handover list. */
- assert.match(page,/if\(quickFilter==="logged"&&shiftResolved\)setQuickFilterWindow\(current=>current==="all"\?"shift":current\)/);
+ /* LOGGED opens on the span its own drop-down is quoting, which starts at THIS
+    SHIFT; on ALL it is every bus in the fleet with an open defect, which is the
+    opposite of a handover list. The literal "shift" that used to sit here moved
+    into `loggedCountWindow`'s initial value, so the drawer and the count on the
+    row it was opened from can no longer answer different questions. */
+ assert.match(page,/if\(quickFilter==="logged"&&shiftResolved\)setQuickFilterWindow\(current=>current==="all"\?loggedCountWindow:current\)/);
+ assert.match(page,/const \[loggedCountWindow,setLoggedCountWindow\]=useState<TimeWindowKey>\("shift"\)/,
+  "and it still starts on THIS SHIFT, which is where the drawer already opened");
  /* And the line window is LOGGED's alone — the other filters answer "what is
     true now", where the age of the record is not the question. */
  assert.match(page,/quickFilterLineMaxAge=quickFilter!=="logged"\|\|quickFilterWindow==="all"\?null:quickFilterWindow==="shift"\?shiftWindowMinutes:timeWindowMinutes\(quickFilterWindow\)/);
@@ -5484,4 +5500,73 @@ test("one clock reaches the limit, the ages and the label",async()=>{
  const reads=span.match(/new Date\(\)/g)||[];
  assert.equal(reads.length,3,
   "expected exactly three clock reads in this span — the initial state, the effect's immediate read and the interval's — found "+reads.length);
+});
+
+test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row changes",async()=>{
+ const [page,menu,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/defects/quick-filter-menu.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+ ]);
+
+ /* Curtis, looking at the row reading 108: "I want a per shift and 24 hour
+    selection too. Just turn this field into a dropdown so I can pick what I
+    want." It was answering a different question from the list it opened — the
+    count narrowed by initials and nothing else, the drawer behind it opening on
+    THIS SHIFT. One window serves both now. */
+ assert.match(page,/const quickFilterMenuCounts=\{\.\.\.quickFilterCounts,logged:loggedWindowedCount\}/);
+ assert.match(page,/counts=\{quickFilterMenuCounts\}/,"the menu is given the windowed counts");
+ assert.match(page,/withinTimeWindow\(loggedAgeMinutes\(bus\),loggedCountWindow,shiftWindowMinutes\)/,
+  "the count is narrowed by the picked span, with the shift's own limit resolved");
+
+ /* ONE AGE FUNCTION, used by the count and by the drawer — this repo has
+    already paid for five copies of one table. */
+ assert.match(page,/const loggedAgeMinutes=\(bus:DefectLogFleetBus\)=>\{/);
+ assert.match(page,/if\(quickFilter==="logged"\)return loggedAgeMinutes\(bus\);/);
+ assert.equal(page.split("busLoggedMinutes(defects)").length-1,1,
+  "only one place reduces a bus to its newest report");
+
+ /* THE TWO CONTROLS CANNOT DISAGREE. The drop-down sets the drawer's window
+    while LOGGED is open, and the drawer's chips set the drop-down's. */
+ assert.match(page,/onChange=\{value=>\{setQuickFilterWindow\(value\);if\(quickFilter==="logged"\)setLoggedCountWindow\(value\)\}\}/,
+  "the chips mirror back into the count's span");
+ assert.match(page,/setLoggedCountWindow\(next\);if\(quickFilter==="logged"\)setQuickFilterWindow\(next\)/,
+  "and the drop-down drives the drawer while it is open");
+
+ /* The drop-down offers the same spans as the chips below it, from the one
+    list, so a shift that cannot be resolved is not offered in either. */
+ assert.match(page,/\{quickFilterWindowChoices\.map\(item=><option value=\{item\.key\} key=\{item\.key\}>\{item\.label\}<\/option>\)\}/);
+ assert.match(page,/quickFilterWindowChoices\.some\(item=>item\.key===loggedCountWindow\)\?loggedCountWindow:"all"/,
+  "a span the current choices do not offer falls back rather than showing blank");
+ assert.match(page,/onClick=\{event=>event\.stopPropagation\(\)\}/,
+  "using the picker must not also toggle the filter the row sits on");
+
+ /* ONLY THIS ROW. Every other count answers 'what is true right now', where the
+    age of the record is not the question. */
+ assert.match(page,/itemAside=\{key=>key!=="logged"\?null:/);
+
+ /* THE SHARED MENU STAYS SHARED. Three screens draw it; the aside is optional
+    and the other two pass nothing, so their markup is what it always was. */
+ assert.match(menu,/itemAside\?:\(key:K\)=>React\.ReactNode/);
+ assert.match(menu,/return aside\?<div className="quick-filter-row" key=\{item\.key\}>\{row\}\{aside\}<\/div>:row;/,
+  "no wrapper where there is no aside");
+ const downSheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ const map=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.doesNotMatch(downSheet,/itemAside/,"the Down Sheet passes none");
+ assert.doesNotMatch(map,/itemAside/,"the Facility Map passes none");
+
+ /* THE CASCADE. The stylesheet reaches these rows with a DIRECT-child
+    selector, so the wrapped shape is named in that same selector list rather
+    than given a second copy of the look — and the unwrapped rows the other two
+    screens draw keep matching it untouched. */
+ for(const part of ["button","button>b","button.active"])assert.ok(
+  css.includes(".quick-filter-popover>div>"+part+",.quick-filter-popover>div>.quick-filter-row>"+part+"{"),
+  "the wrapped row must share the rule for "+part+" rather than get a copy of it");
+ assert.match(css,/\.quick-filter-window select\{min-height:39px/,"it matches the rows beside it on a desktop");
+ /* AND THE PHONE RULE, which is a separate selector list and was missed on the
+    first cut: measured at 390px the wrapped button came back 39px while every
+    row beside it was 44. A shorter tap target on one row, below the minimum
+    this repo holds everywhere else, found by measuring rather than reading. */
+ assert.ok(css.includes(".quick-filter-popover>div>button,.quick-filter-popover>div>.quick-filter-row>button,.quick-filter-window select,.ds-badge-view-popover>div>button{min-height:44px}"),
+  "the wrapped row and its picker take the phone tap-target rule with the rest");
 });
