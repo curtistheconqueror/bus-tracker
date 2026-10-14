@@ -877,7 +877,15 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 /* Themed with the rest of the editor, so a re-themed Defect Log carries it. */
 .log-form .combo-list{border-color:color-mix(in srgb,var(--log-text,#193357) 26%,transparent);background:var(--log-surface,#fff)}
 .log-form .combo-section{background:color-mix(in srgb,var(--log-surface,#fff) 88%,var(--log-text,#193357));border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 14%,transparent);color:var(--log-muted,#5d718d)}
-.log-form .combo-option{border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 10%,transparent)}
+/* The group rows and the way back take this surface's theme with the options
+   beside them. Left out, a title drew near-black on a dark board — the rows it
+   sits among are themed here and it would have been the one row that was not. */
+.log-form .combo-option,.log-form .combo-group{border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 10%,transparent)}
+.log-form .combo-group>b{color:var(--log-text,#193357)}
+.log-form .combo-group>span{background:color-mix(in srgb,var(--log-surface,#fff) 84%,var(--log-text,#193357));color:var(--log-text,#42597d)}
+.log-form .combo-back{background:color-mix(in srgb,var(--log-surface,#fff) 88%,var(--log-text,#193357));border-bottom-color:color-mix(in srgb,var(--log-text,#193357) 14%,transparent)}
+.log-form .combo-back>b{color:var(--log-text,#42597d)}
+.log-form .combo-back>small{color:var(--log-muted,#74819a)}
 .log-form .combo-option>b{color:var(--log-text,#193357)}
 .log-form .combo-option>small,.log-form .combo-footnote,.log-form .combo-clear{color:var(--log-muted,#74819a)}
 /* Not muted with the rest: this one is a button a mechanic has to find. */

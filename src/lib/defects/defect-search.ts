@@ -162,6 +162,15 @@ export function searchCategories(query:string,rows:CategoryOption[]=CATEGORY_OPT
    filing cabinet, and somebody who chose Bus Controls and then typed "wiper
    motor" wants the wiper motor, not an empty list telling him he is in the
    wrong drawer. Picking one of those carries its category with it. */
+/* WHY BROWSING IS NOT CAPPED THE WAY SEARCHING IS.
+
+   The cap exists so an untouched field does not open on hundreds of rows. The
+   picker now opens on GROUP TITLES instead, a dozen or so, and a cap applied
+   before the grouping cuts the catalog at an arbitrary row: with no category
+   chosen, the first 40 rows were all A/C and Engine, so the whole rest of the
+   catalog had no title at all. The cap belongs to the ranked list a query
+   produces, which is the thing that can run long. */
+export const BROWSE_ALL=Number.MAX_SAFE_INTEGER;
 export function searchCatalogForCategory(query:string,category:string,limit=40):{inCategory:CatalogOption[];elsewhere:CatalogOption[]}{
  if(!category)return {inCategory:searchCatalog(query,CATALOG_OPTIONS,limit),elsewhere:[]};
  const mine=CATALOG_OPTIONS.filter(row=>row.category===category);

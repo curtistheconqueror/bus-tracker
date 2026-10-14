@@ -859,3 +859,102 @@ test("the bus picker does not rebuild the fleet on every character",async()=>{
  assert.match(code,/const exact=fleet\.find\(bus=>bus\.n===digits\);select\(exact\?\.id\|\|""\)/,
   "every character still reports its resolved bus, exactly as before");
 });
+
+test("the picker opens on group titles, and typing still searches everything",async()=>{
+ const [combo,css,log,sheet,searchLib]=await Promise.all([
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/combo-field.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/defect-search.ts",import.meta.url),"utf8"),
+ ]);
+ const code=combo.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+
+ /* Curtis: "when the person presses that the sub category I only need those
+    titles to show first those main titles so it's a lot more organized and you
+    can get to what you need faster instead of scrolling through all the
+    defects." */
+ assert.match(code,/const \[browseGroup,setBrowseGroup\]=useState\(""\)/);
+ assert.match(code,/const browsing=!query\.trim\(\)/,"browsing is the empty query, nothing else");
+ assert.match(code,/if\(!browsing\)return options\.map\(option=>\(\{kind:"option",option\}\)\)/,
+  "a query still produces the flat ranked list it always did");
+ assert.match(code,/if\(browseGroup\)return options\.filter\(option=>option\.section===browseGroup\)/,
+  "inside a group the rows are that group's defects and nothing else");
+ /* THE WAY BACK IS A HEADER, NOT A WALKABLE ROW, and the keyboard is what
+    proved it has to be. As a row it sat at index 0 of the group, so entering
+    with Enter left the highlight on the way OUT — the next Enter undid the tap
+    and no defect was reachable by keyboard at all. Driven in Chromium: before
+    this, ArrowDown/Enter/Enter chose nothing and left the list open. */
+ assert.match(code,/\{grouped&&browseGroup&&<li className="combo-back" role="presentation"/,
+  "it is presentation, so the arrows never land on it");
+ assert.doesNotMatch(code,/kind:"back"/,"and it is not one of the rows at all");
+ assert.match(code,/setBrowseGroup\(row\.name\);\s*setActive\(0\)/,
+  "entering a group highlights its first defect");
+ assert.match(code,/built\.push\(\{kind:"group",name:option\.section,count:groupCounts\.get\(option\.section\)\|\|0\}\)/,
+  "one row per group, carrying how many are behind it");
+
+ /* A ROW WITH NO GROUP IS NEVER SWALLOWED. Browsing, the Defect Log leads the
+    list with the wording a record was saved under when the catalog no longer
+    offers it — the one row that keeps an old record editable. It has no section,
+    so grouping has to draw it as itself rather than drop it. */
+ assert.match(code,/if\(!option\.section\)\{built\.push\(\{kind:"option",option\}\);continue\}/,
+  "an ungrouped row keeps its own place among the titles");
+ assert.match(log,/offCatalogIssue&&!query\?\[\{value:offCatalogIssue/,
+  "the Defect Log still leads the browse with the as-logged wording");
+
+ /* TYPING LEAVES THE GROUP, or a query would be searched inside one group and
+    silently miss most of what matched. */
+ assert.match(code,/setQuery\(event\.target\.value\);setActive\(0\);setBrowseGroup\(""\)/);
+ /* And a shut list forgets where it was. */
+ assert.match(code,/useEffect\(\(\)=>\{if\(!open\)setBrowseGroup\(""\)\},\[open\]\)/);
+
+ /* THE RACE THIS CHANGE CREATED, and the fix it needs. React 18 flushes
+    mousedown synchronously, so pressing a title replaced the rows before a
+    bubble-phase listener ran — the pressed `<li>` was already detached, the box
+    did not contain it, and the list closed itself on a tap that landed inside
+    it. Driven in Chromium before the fix: the list vanished on the first title
+    press. Capture runs ahead of React. */
+ assert.match(code,/document\.addEventListener\("mousedown",away,true\)/,
+  "the outside-press listener judges the target before React detaches it");
+ assert.match(code,/document\.addEventListener\("touchstart",away,true\)/);
+ assert.match(code,/document\.removeEventListener\("mousedown",away,true\)/,
+  "and it is removed with the same phase it was added on, or it is never removed");
+
+ /* THE KEYBOARD WALKS WHAT THE THUMB CAN PRESS. Headings drawn while typing are
+    not pickable and must not be counted; keyed on `.combo-option` the highlight
+    walked off by one for every group row on screen. */
+ assert.match(code,/querySelectorAll\("\.combo-row"\)\[active\]/);
+ assert.match(code,/return \(next\+rows\.length\)%rows\.length/,"arrow keys wrap over the rows on screen");
+ assert.match(code,/if\(open&&rows\[active\]\)\{event\.preventDefault\(\);choose\(rows\[active\]\);?\}/,
+  "Enter does whatever the highlighted row does");
+ assert.match(code,/if\(browseGroup\)\{leaveGroup\(\);return\}/,
+  "Escape steps out of a group before it closes the list");
+ assert.match(code,/const leaveGroup=\(\)=>\{setBrowseGroup\(""\);setActive\(0\)\}/,
+  "one way out, used by Escape and by the header");
+
+ /* THE CAP BELONGED TO THE RANKED LIST, NOT TO THE BROWSE. Applied before the
+    grouping it cut the catalog at an arbitrary row: measured with no category
+    chosen, the first 40 rows were all A/C and Engine, so every other category
+    had no title at all. */
+ assert.match(searchLib,/export const BROWSE_ALL=Number\.MAX_SAFE_INTEGER/);
+ for(const [name,caller,expr] of [["Defect Log",log,"value.defect.category"],["Down Sheet",sheet,"item.category"]])
+  assert.ok(caller.includes("searchCatalogForCategory(query,"+expr+",query.trim()?40:BROWSE_ALL)"),
+   name+" asks for every group while browsing and caps only what a query ranks");
+
+ /* BIGGER, BECAUSE THEY ARE WHAT IS READ FIRST. Measured at 390px: the option
+    rows are 16px — what the old <select> drew — so a 17px title read as the
+    same line as the things under it. */
+ assert.match(css,/\.combo-group>b\{font-size:13px/,"desktop title above the 10px option line");
+ assert.match(css,/\.combo-group>b\{font-size:19px/,"phone title above the 16px option line");
+ assert.match(css,/\.combo-group\{display:flex;[^}]*min-height:44px/,"a title is a row, not a heading");
+ assert.match(css,/\.combo-group\{min-height:52px/,"and it matches the option rows' phone target");
+
+ /* THE SHARED CONTROL STAYS SHARED, and the category picker's rows carry no
+    groups, so it is the same flat list it always was. */
+ /* Asked of the OPTIONS, not the rows: inside a group every row is a defect,
+    and "is this a grouped list" has to keep its answer one level down or the
+    header that leads back disappears the moment you use it. */
+ assert.match(code,/const grouped=browsing&&options\.some\(option=>option\.section\)/);
+ assert.match(log,/search=\{query=>searchCategories\(query\)\.map\(row=>\(\{value:row\.value,label:row\.label\}\)\)\}/,
+  "the category picker passes no sections, so nothing groups it");
+});

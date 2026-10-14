@@ -55,7 +55,7 @@ import {moveBusToArea} from "@/src/lib/fleet/facility-areas";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import AppName from "@/src/components/shared/app-name";
 import ComboField from "@/src/components/shared/combo-field";
-import {CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search.ts";
+import {BROWSE_ALL,CATALOG_OPTIONS,searchCatalogForCategory,searchCategories} from "@/src/lib/defects/defect-search.ts";
 import WelcomeGate from "@/src/components/shared/welcome-gate";
 type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownSheet:boolean;rememberScope?:PartMemoryScope};
 /* scanBatch marks a removal of a whole scan sweep. Undoing one is not a plain
@@ -375,7 +375,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      emptyText="Nothing in the catalog matches that"
      footnote={value.defect.category?undefined:"Searching every category. Picking one sets the category for you."}
      search={query=>{
-      const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category);
+      const {inCategory,elsewhere}=searchCatalogForCategory(query,value.defect.category,query.trim()?40:BROWSE_ALL);
       /* HEADINGS WHEN BROWSING, THE GROUP ON EACH ROW WHEN SEARCHING, and that
          split is measured rather than chosen. Browsing, the rows arrive in
          catalog order, so a heading each time the group changes reproduces
