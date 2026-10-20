@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "source": "GitHub PR38 merge candidate 1aba8a87bcee7ca795f731b74fbfb4ebec500f61",
+  "kind": "Node VM execution of actual page handlers with browser API stubs; not browser interaction",
+  "checks": [
+    "COPY exports both bus records although the view shows one, including prior year",
+    "SHARE sends selected-bus text and reports shared",
+    "SHARE falls back to COPY without native sharing",
+    "COPY failure reports error",
+    "Native text-share cancellation is silent",
+    "Native text-share failure reports error",
+    "SHARE PAGE exports two escaped cards with no scripts/network and reports saved",
+    "Native file-share success reports shared",
+    "Native file-share cancellation is silent",
+    "No focused bus produces no export"
+  ]
+}

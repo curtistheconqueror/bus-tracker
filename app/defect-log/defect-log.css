@@ -362,6 +362,33 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-shade{padding:24px}
 .log-focus{display:flex;width:100%;max-width:760px;max-height:92vh;flex-direction:column;border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
 .log-focus-head{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:2px solid var(--log-accent);background:var(--log-page)}
+/* SHARING ONE BUS. Three controls in a row under the head, drawn from the same
+   variables as the drawer's share so the two read as one feature — the first
+   filled, the rest outlined, which is how the drawer says "this is the plain
+   one and these are the other shapes".
+
+   Three columns rather than the drawer's two: this row has exactly three
+   buttons where the drawer's wraps, and COPY / SHARE / SHARE PAGE fit on one
+   line at 360px. The status line spans all three so it never widens a column
+   and shifts the buttons under a thumb already on its way down. */
+.log-focus-share{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px 18px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface))}
+.log-focus-share button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.log-focus-share button+button{background:var(--log-surface);color:var(--log-accent)}
+.log-focus-share>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}
+/* The live region is always in the markup so a screen reader can hear it
+   change; empty it must take no room, or every share row would carry a blank
+   line waiting for news.
+
+   HIDDEN THE SCREEN-READER WAY, NOT WITH `display:none`. That was the first
+   spelling and it quietly undid the whole point: an element set to display:none
+   is not in the accessibility tree, so text arriving moved the region from
+   ABSENT to present — the insertion that gets read late or not at all, which is
+   the thing being avoided. Taken out of flow instead, so it occupies no grid
+   row and adds no gap while staying in the tree the entire time. */
+.log-focus-share>.log-focus-share-status:empty{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+/* What the share will send, when the board is hiding some of it. Coloured as a
+   notice rather than as a status: it is true before anything is pressed. */
+.log-focus-share>.log-focus-share-scope{color:var(--log-accent)}
 .log-focus-bus{display:flex;flex-direction:column}
 .log-focus-bus small{font-size:10px;font-weight:900;letter-spacing:.9px;color:var(--log-muted)}
 .log-focus-bus strong{font-size:34px;line-height:1.05;color:var(--log-accent)}
@@ -411,6 +438,11 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-focus-shade{align-items:stretch;padding:0}
  .log-focus{max-width:none;max-height:none;height:100%;border:0;border-radius:0}
  .log-focus-head{gap:9px;padding-top:calc(16px + env(safe-area-inset-top))}
+ /* 44px, matching every other row in this modal — this is pressed with a glove
+    on, and the drawer's share buttons take the same jump at this width. */
+ .log-focus-share{padding:8px 12px}
+ .log-focus-share button{min-height:44px;font-size:10px}
+ .log-focus-share>small{font-size:9px}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
  .log-focus-bus strong{font-size:30px}

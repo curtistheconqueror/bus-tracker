@@ -79,6 +79,8 @@ Use the existing Supabase project and authenticated Curtis account. Preserve the
 
 ## Current Claude task
 
+Release checkpoint: application 191 is live as Sites 187 from b33775685b61acafdf4325807c82e92281c9fc2c (2026-10-20). PR38's per-bus FOCUS sharing is complete; see docs/RELEASES.md and docs/archive/PUBLISH_RELEASE_191.md for verification limits. The older claude-contributions mirror has divergent history and was preserved; do not force-push it to match main.
+
 There is no active implementation assignment. Stages 1 through 6 are implemented. Stage 7, the shared offline-first backend on the existing Supabase project, has not been started and should not begin without Curtis scoping it.
 
 ## Required handoff format

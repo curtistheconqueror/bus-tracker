@@ -5666,3 +5666,174 @@ test("AI OPERATOR says where it is going before it goes",async()=>{
  assert.match(pageCode,/onClick=\{event=>\{if\(!leaveForOperator\(\)\)event\.preventDefault\(\)\}\}/,
   "and the guard is on that instance in the code, not described in a comment");
 });
+
+test("FOCUS shares one bus, as text or as a page",async()=>{
+ const {busShareText,busShareHtml,busShareFilename}=await import("../src/lib/defects/bus-share.ts");
+ /* Through `normalizeDefects`, the way every stored defect reaches the app.
+    A hand-written literal is missing fields `defectLabel` reads straight off —
+    it threw on `details.trim()` — and a fixture thinner than the real thing
+    tests a code path the app never takes. */
+ const {normalizeDefects}=await import("../src/lib/defects/repair-catalog.ts");
+ const asDefect=(raw)=>normalizeDefects([raw])[0];
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+
+ /* Curtis: "I want you to place a share button that will share as text or share
+    as the page itself like the other function does but I want this is per bus
+    in case I wanna send somebody a picture or share all the defects with a bus
+    quickly and efficiently." */
+ const bus={n:"17553",l:"bay-1",status:"In Service with Defects"};
+ const rows=[
+  {defect:asDefect({id:"a",category:"Bus Accessories",issue:"Doors - Front door opens / closes slowly",state:"open",createdAt:"2026-10-15T23:49:00.000Z"}),
+   state:"OPEN",logged:"Oct 15 at 6:49 PM",updated:"Oct 15 at 6:51 PM",onSheet:true},
+  {defect:asDefect({id:"b",category:"Operator/Driver Controls",issue:"Operating Controls - Horn",state:"open",createdAt:"2026-09-07T03:24:00.000Z"}),
+   state:"OPEN",logged:"Sep 6 at 10:24 PM",updated:"Sep 6 at 10:24 PM"},
+ ];
+ const text=busShareText(bus,rows,"Oct 15 at 6:55 PM");
+
+ /* THE BUS, THEN WHAT IS WRONG WITH IT. */
+ assert.match(text,/^Bus 17553/,"the bus leads, because that is what the message is about");
+ assert.match(text,/2 defects — shared Oct 15 at 6:55 PM/);
+ assert.match(text,/^1\. .*Front door/m,"numbered the way the focus view numbers them");
+ assert.match(text,/^2\. .*Horn/m);
+ assert.match(text,/ON SHEET/,"a defect already on the sheet says so — it is somebody else's column, not a new job");
+
+ /* ONE LABEL PER DEFECT. `defectLabel` already leads with the category, and
+    prefixing it with `repairCategoryLabel` printed "Brakes — Brakes — Will not
+    open". Found by reading the real share text out of a browser. */
+ assert.doesNotMatch(text,/Bus Accessories — Bus Accessories/,"the category is not printed twice");
+ assert.doesNotMatch(text,/Operator\/Driver Controls — Operator\/Driver Controls/);
+
+ /* UPDATED IS DROPPED WHEN IT MATCHES LOGGED. On a record nobody has touched,
+    the two are the same string and printing both makes a short list look long. */
+ assert.match(text,/Logged Oct 15 at 6:49 PM {2}· {2}Updated Oct 15 at 6:51 PM/);
+ assert.doesNotMatch(text,/Logged Sep 6 at 10:24 PM {2}· {2}Updated/);
+
+ /* A BUS WITH NOTHING ON IT STILL SHARES, rather than sending a heading and a
+    silence the reader has to interpret. */
+ assert.match(busShareText(bus,[],"now"),/No defects on this bus\./);
+
+ /* THE PAGE IS THE SAME CONTENT, SELF-CONTAINED. Opened from a text message on
+    a phone in a garage with no signal, so nothing may be fetched. Rendered
+    offline in Chromium at 390px: 2 cards, no external requests, no sideways
+    scroll, ~2KB. */
+ const html=busShareHtml(bus,rows,"Oct 15 at 6:55 PM");
+ assert.match(html,/^<!doctype html>/);
+ assert.doesNotMatch(html,/<script/i,"no scripts");
+ assert.doesNotMatch(html,/https?:\/\//,"nothing fetched from anywhere");
+ assert.doesNotMatch(html,/<link/i,"no stylesheet or font to load");
+ assert.match(html,/<title>Bus 17553 — Pace South<\/title>/);
+ assert.equal(html.split("<article>").length-1,2,"one card per defect");
+ /* The wording is ESCAPED, because a defect typed by a mechanic is not markup. */
+ const risky=busShareHtml({n:"1<b>",l:""},[{defect:asDefect({id:"x",category:"Brakes",issue:"Chamber leak",state:"open",details:"a \"quoted\" <tag> & more"}),state:"OPEN",logged:"now",updated:"now"}],"now");
+ assert.doesNotMatch(risky,/<b>1<b>/);
+ assert.match(risky,/&lt;tag&gt; &amp; more/);
+ assert.match(risky,/&quot;quoted&quot;/);
+
+ assert.match(busShareFilename("17553",new Date(2026,9,15,12,0,0)),/^pace-bus-17553-2026-10-15\.html$/);
+ /* A record thin enough to have lost its number still names a file. */
+ assert.match(busShareFilename("",new Date(2026,9,15,12,0,0)),/^pace-bus-bus-2026-10-15\.html$/);
+ /* THE DATE ON THE WALL CLOCK, NOT UTC — ASSERTED IN THIS SHOP'S OWN ZONE.
+
+    Shared at seven in the evening in Chicago, `toISOString()` has already
+    rolled over to tomorrow, so the file carried one date while the stamp inside
+    it carried another — and the filename is what somebody sorts by.
+
+    The zone is set here on purpose. This container runs UTC, where local and
+    UTC are the same thing, so the first version of this assertion passed
+    against BOTH implementations and proved nothing: a mutation putting
+    `toISOString()` back went green. A timezone test in a UTC container has to
+    name a zone or it is not a timezone test. */
+ const realZone=process.env.TZ;
+ process.env.TZ="America/Chicago";
+ try{
+  const evening=new Date(2026,9,15,19,30,0);
+  assert.equal(evening.toISOString().slice(0,10),"2026-10-16",
+   "the fixture must be an evening that UTC has already carried into tomorrow");
+  assert.match(busShareFilename("17553",evening),/-2026-10-15\.html$/,
+   "an evening share is named today, not tomorrow");
+  assert.match(busShareFilename("17553",new Date(2026,0,1,23,59,0)),/-2026-01-01\.html$/,
+   "and the last minute of a year does not borrow the next one");
+ }finally{
+  if(realZone===undefined)delete process.env.TZ; else process.env.TZ=realZone;
+ }
+
+ /* THE SAME THREE CONTROLS THE DRAWER CARRIES, wired to this bus. */
+ assert.match(page,/<div className="log-focus-share" role="group"/);
+ assert.match(page,/onClick=\{copyFocusBus\}/);
+ assert.match(page,/onClick=\{shareFocusBusText\}/);
+ assert.match(page,/onClick=\{shareFocusBusPage\}/);
+ /* Text falls back to the clipboard where there is no share sheet, the same
+    order the drawer settled on — driven in Chromium with navigator.share
+    deleted, where SHARE still put the text on the clipboard. */
+ assert.match(page,/if\(typeof navigator\.share!=="function"\)\{await copyFocusBus\(\);return\}/);
+ /* Dismissing the sheet is a decision, not a failure. */
+ assert.match(page,/if\(!\(error instanceof DOMException&&error\.name==="AbortError"\)\)setFocusShareStatus\("error"\)/);
+ /* Its own status, because the drawer can be open at the same time. */
+ assert.match(page,/const \[focusShareStatus,setFocusShareStatus\]=useState/);
+ /* EVERY CHANGE OF BUS, not only the close. The focus dialog does not trap the
+    keyboard, so a tab can reach another card's FOCUS button and go straight
+    from bus A to bus B without passing through empty — and the first cut, whose
+    own comment claimed otherwise, carried A's SHARED onto B. */
+ assert.match(page,/useEffect\(\(\)=>\{setFocusShareStatus\(""\)\},\[focusedBusId\]\)/,
+  "opening another bus never greets somebody with the last one's SHARED");
+
+ /* THE SHARE CARRIES THE WHOLE BUS. `focusedGroup` comes out of `visibleGroups`,
+    which the state filter, the WHEN LOGGED window and the search have already
+    narrowed: with IN PROGRESS on, a bus carrying six showed two and the first
+    cut shared those two under a heading reading "2 defects". The reader of that
+    message has no filter and no way to know there was one. Curtis asked for the
+    opposite in as many words — "share all the defects with a bus". */
+ assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/);
+ assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusedAllRecords\.map/,
+  "the share is built from the unfiltered records");
+ assert.doesNotMatch(page,/focusShareRows=\(\):BusShareDefect\[\]=>\(focusedGroup\?\.records/,
+  "never from the board's filtered view of the bus");
+ /* And it says so, rather than quietly sending more than the screen shows. */
+ assert.match(page,/SHARES ALL \{focusedAllRecords\.length\} — \{focusHiddenByBoard\} HIDDEN BY THE BOARD FILTER/);
+ assert.match(page,/const focusHiddenByBoard=focusedGroup\?focusedAllRecords\.length-focusedGroup\.records\.length:0/);
+
+ /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when it fell
+    back to downloading; folding that into "copied" lit the COPY button with
+    COPIED! over a clipboard nothing had touched. */
+ assert.match(page,/setFocusShareStatus\(outcome==="cancelled"\?"":outcome==="shared"\?"shared":"saved"\)/);
+ assert.match(page,/focusShareStatus==="saved"\?"SAVED TO THIS DEVICE"/);
+
+ /* A YEAR THAT IS NOT THIS ONE IS NAMED. `timeLabel` draws "Sep 6 at 10:24 PM",
+    which is right on today's screen and wrong in a file meant to still read a
+    year from now. */
+ assert.match(page,/const shareTimeLabel=\(iso:string\)=>\{/);
+ assert.match(page,/at\.getFullYear\(\)!==new Date\(\)\.getFullYear\(\)\?", "\+at\.getFullYear\(\):""/);
+ assert.match(page,/logged:shareTimeLabel\(record\.createdAt\)/);
+
+ /* THE LIVE REGION IS MOUNTED whether or not it has anything to say: one that
+    appears with its text is a new element to a screen reader rather than an
+    update, and is read late or not at all. Empty it draws nothing. */
+ assert.match(page,/<small className="log-focus-share-status" role="status" aria-live="polite">/);
+ /* AND IT CARRIES ALL FOUR OUTCOMES, COPY INCLUDED. On a copy the only signal
+    was the button's own label changing to COPIED!, which a screen reader does
+    not announce — the outcome a mechanic uses most was the one nobody was
+    told about. */
+ assert.match(page,/\{focusShareStatus==="copied"\?"COPIED":/);
+ /* HIDDEN THE SCREEN-READER WAY WHEN EMPTY, NOT WITH `display:none`. That was
+    the first spelling and it undid the point of mounting the region at all: a
+    display:none element is not in the accessibility tree, so the text arriving
+    moved it from ABSENT to present — the insertion this is meant to avoid.
+    Out of flow instead: no grid row, no gap, in the tree throughout. */
+ assert.match(css,/\.log-focus-share>\.log-focus-share-status:empty\{position:absolute;width:1px;height:1px;[^}]*clip-path:inset\(50%\)/);
+ assert.doesNotMatch(css,/\.log-focus-share>small:empty\{display:none\}/,
+  "display:none takes it out of the accessibility tree");
+ assert.match(css,/\.log-focus-share\{position:relative;display:grid;/,
+  "and the row is the containing block, so the hidden region cannot escape it");
+ /* The state wording and the times come from the page, not a second copy. */
+ assert.match(page,/state:STATE_LABELS\[record\.defect\.state\]\|\|record\.defect\.state/);
+ /* And the share's own formatter BUILDS ON `timeLabel` rather than replacing
+    it, so the line in the message and the line on the card cannot drift apart
+    — the year is the only thing added. */
+ assert.match(page,/return timeLabel\(iso\)\+\(at\.getFullYear\(\)/);
+
+ /* 44px at phone width, matching every other row in this modal. */
+ assert.match(css,/\.log-focus-share button\{min-height:36px/);
+ assert.match(css,/\.log-focus-share button\{min-height:44px;font-size:10px\}/);
+ assert.match(css,/\.log-focus-share\{position:relative;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
