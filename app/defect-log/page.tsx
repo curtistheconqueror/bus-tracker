@@ -43,6 +43,7 @@ import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
+import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
 import SaveAlert from "@/src/components/shared/save-alert";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {clockValue,nextOccurrenceISO} from "@/src/lib/defects/deferral-clock";
@@ -691,6 +692,11 @@ export default function DefectLog(){
  const [quickFilterExpandedBusIds,setQuickFilterExpandedBusIds]=useState<string[]>([]);
  const [downSheetBadgeColors,setDownSheetBadgeColors]=useState({badge:"#7c3aed",text:"#fff"});
  const [quickFilterShareStatus,setQuickFilterShareStatus]=useState<""|"copied"|"shared"|"error">("");
+ /* The focus view's own, kept apart from the drawer's: both can be open at
+    once and a shared status would have one of them reporting the other's
+    outcome. Cleared when the focus view closes, so reopening a bus never
+    greets somebody with a stale SHARED from the last one. */
+ const [focusShareStatus,setFocusShareStatus]=useState<""|"copied"|"shared"|"error">("");
  /* Opened from the pulsing DEFERRED badge: by query string when it was pressed
     on another page, by event when it was pressed on this one. The drawer is
     scrolled to, because a filter that opens below the fold has not shown
@@ -927,6 +933,9 @@ export default function DefectLog(){
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
  const focusedGroup=focusedBusId?visibleGroups.find(group=>group.bus.id===focusedBusId):undefined;
+ /* See the status state's own note: closing clears it, so opening the next bus
+    starts silent rather than inheriting SHARED from the last one. */
+ useEffect(()=>{if(!focusedBusId)setFocusShareStatus("")},[focusedBusId]);
  /* "Deferred" is genuinely held-back only when the bus carries no active Down
     Sheet entry — quick-filters.ts has no way to know that, since it never
     sees Down Sheet entries, so the exclusion and the wait-time sort both
@@ -1412,6 +1421,50 @@ export default function DefectLog(){
     sends a self-contained file that opens looking like the cards on screen,
     with no fonts, scripts or network of any kind, so it still renders on a
     phone with no signal and still reads a year from now. */
+ /* SHARING ONE BUS, FROM THE SCREEN THAT IS ALREADY ABOUT ONE BUS.
+
+    Curtis: "I want you to place a share button that will share as text or
+    share as the page itself like the other function does but I want this is
+    per bus in case I wanna send somebody a picture or share all the defects
+    with a bus quickly and efficiently."
+
+    The same three controls the drawer carries, in the same order, because this
+    is that errand at a different size and a second idiom would be a second
+    thing to learn. The rows are built once and both shapes read from them, so
+    the text and the page can never disagree about what is on the bus.
+
+    The STATE and the two times are resolved here rather than in the share
+    module: `STATE_LABELS` and `timeLabel` are this page's, and a second copy of
+    either is the duplication this project has paid for before. */
+ const focusShareRows=():BusShareDefect[]=>(focusedGroup?.records||[]).map(record=>({
+  defect:record.defect,
+  state:STATE_LABELS[record.defect.state]||record.defect.state,
+  logged:timeLabel(record.createdAt),
+  updated:timeLabel(record.updatedAt),
+  onSheet:Boolean(record.downSheetEntry),
+ }));
+ const focusShareBus=()=>({n:focusedGroup?.bus.n||"",l:focusedGroup?.bus.l,status:focusedGroup?(STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s):""});
+ const copyFocusBus=async()=>{
+  if(!focusedGroup)return;
+  try{await copyText(busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString()));setFocusShareStatus("copied")}
+  catch{setFocusShareStatus("error")}
+ };
+ /* Text first, falling back to the clipboard where there is no share sheet —
+    the same order the drawer settled on, so a browser without one never leaves
+    somebody pressing a button that does nothing. */
+ const shareFocusBusText=async()=>{
+  if(!focusedGroup)return;
+  const text=busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString());
+  if(typeof navigator.share!=="function"){await copyFocusBus();return}
+  try{await navigator.share({title:"Bus "+focusedGroup.bus.n+" defects",text});setFocusShareStatus("shared")}
+  catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFocusShareStatus("error")}
+ };
+ const shareFocusBusPage=async()=>{
+  if(!focusedGroup)return;
+  const html=busShareHtml(focusShareBus(),focusShareRows(),new Date().toLocaleString());
+  const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),busShareFilename(focusedGroup.bus.n),"Bus "+focusedGroup.bus.n+" defects");
+  setFocusShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"copied");
+ };
  const shareQuickFilterPage=async()=>{
   if(!quickFilter)return;
   const stamp=new Date().toLocaleString();
@@ -1770,6 +1823,17 @@ export default function DefectLog(){
   {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>
    <section className="log-focus" role="dialog" aria-modal="true" aria-label={"Bus "+focusedGroup.bus.n+" defects"}>
     <div className="log-focus-head"><span className="log-focus-bus"><small>BUS</small><strong>{focusedGroup.bus.n}</strong></span><span className="log-focus-where"><b>{locationLabel(focusedGroup.bus.l)}</b><small>{STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s}</small></span><button className="add-log-focus-defect" type="button" onClick={()=>{const busId=focusedGroup.bus.id;setFocusedBusId("");setEditing({...newDraft(),busId})}} aria-label={"Add a defect to bus "+focusedGroup.bus.n}>+ ADD DEFECT</button><button className="close-log-focus" type="button" onClick={()=>setFocusedBusId("")} aria-label="Close focus view">×</button></div>
+    {/* THE SAME THREE CONTROLS THE DRAWER CARRIES, for one bus. Above the
+        defects rather than below them: on a bus carrying nine, a share button
+        at the bottom is a scroll away from the thing somebody opened this to
+        send. */}
+    <div className="log-focus-share" role="group" aria-label={"Share bus "+focusedGroup.bus.n+" defects"}>
+     <button type="button" onClick={copyFocusBus} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
+     <button type="button" onClick={shareFocusBusText} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
+     <button type="button" onClick={shareFocusBusPage} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
+     {focusShareStatus==="shared"&&<small>SHARED</small>}
+     {focusShareStatus==="error"&&<small>COULD NOT SHARE — TRY COPY</small>}
+    </div>
     <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
      <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
