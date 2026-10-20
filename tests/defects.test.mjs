@@ -5810,7 +5810,21 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     appears with its text is a new element to a screen reader rather than an
     update, and is read late or not at all. Empty it draws nothing. */
  assert.match(page,/<small className="log-focus-share-status" role="status" aria-live="polite">/);
- assert.match(css,/\.log-focus-share>small:empty\{display:none\}/);
+ /* AND IT CARRIES ALL FOUR OUTCOMES, COPY INCLUDED. On a copy the only signal
+    was the button's own label changing to COPIED!, which a screen reader does
+    not announce — the outcome a mechanic uses most was the one nobody was
+    told about. */
+ assert.match(page,/\{focusShareStatus==="copied"\?"COPIED":/);
+ /* HIDDEN THE SCREEN-READER WAY WHEN EMPTY, NOT WITH `display:none`. That was
+    the first spelling and it undid the point of mounting the region at all: a
+    display:none element is not in the accessibility tree, so the text arriving
+    moved it from ABSENT to present — the insertion this is meant to avoid.
+    Out of flow instead: no grid row, no gap, in the tree throughout. */
+ assert.match(css,/\.log-focus-share>\.log-focus-share-status:empty\{position:absolute;width:1px;height:1px;[^}]*clip-path:inset\(50%\)/);
+ assert.doesNotMatch(css,/\.log-focus-share>small:empty\{display:none\}/,
+  "display:none takes it out of the accessibility tree");
+ assert.match(css,/\.log-focus-share\{position:relative;display:grid;/,
+  "and the row is the containing block, so the hidden region cannot escape it");
  /* The state wording and the times come from the page, not a second copy. */
  assert.match(page,/state:STATE_LABELS\[record\.defect\.state\]\|\|record\.defect\.state/);
  /* And the share's own formatter BUILDS ON `timeLabel` rather than replacing
@@ -5821,5 +5835,5 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  /* 44px at phone width, matching every other row in this modal. */
  assert.match(css,/\.log-focus-share button\{min-height:36px/);
  assert.match(css,/\.log-focus-share button\{min-height:44px;font-size:10px\}/);
- assert.match(css,/\.log-focus-share\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.log-focus-share\{position:relative;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 });

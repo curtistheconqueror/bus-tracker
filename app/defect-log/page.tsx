@@ -1866,9 +1866,21 @@ export default function DefectLog(){
      {/* MOUNTED WHETHER OR NOT IT HAS ANYTHING TO SAY. A live region only
          announces what changes INSIDE it; one that appears at the same moment
          as its text is a new element to a screen reader, not an update, and is
-         read late or not at all. Empty it draws nothing. */}
+         read late or not at all.
+
+         AND EMPTY IT IS HIDDEN VISUALLY RATHER THAN WITH `display:none`, which
+         the first cut got wrong in the one way that made the sentence above
+         untrue: a `display:none` element is not in the accessibility tree at
+         all, so the text arriving took the region from absent to present in a
+         single update — exactly the insertion this comment exists to avoid.
+
+         IT CARRIES ALL FOUR OUTCOMES, COPY INCLUDED. On a copy the only signal
+         used to be the button's own label changing to COPIED!, which a screen
+         reader does not announce, so the one outcome a mechanic uses most was
+         the one nobody was told about. */}
      <small className="log-focus-share-status" role="status" aria-live="polite">
-      {focusShareStatus==="shared"?"SHARED":
+      {focusShareStatus==="copied"?"COPIED":
+       focusShareStatus==="shared"?"SHARED":
        focusShareStatus==="saved"?"SAVED TO THIS DEVICE":
        focusShareStatus==="error"?"COULD NOT SHARE — TRY COPY":""}
      </small>
