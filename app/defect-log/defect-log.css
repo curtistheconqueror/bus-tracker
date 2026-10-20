@@ -375,6 +375,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-share button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-header-text);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .log-focus-share button+button{background:var(--log-surface);color:var(--log-accent)}
 .log-focus-share>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}
+/* The live region is always in the markup so a screen reader can hear it
+   change; empty it must take no room, or every share row would carry a blank
+   line waiting for news. */
+.log-focus-share>small:empty{display:none}
+/* What the share will send, when the board is hiding some of it. Coloured as a
+   notice rather than as a status: it is true before anything is pressed. */
+.log-focus-share>.log-focus-share-scope{color:var(--log-accent)}
 .log-focus-bus{display:flex;flex-direction:column}
 .log-focus-bus small{font-size:10px;font-weight:900;letter-spacing:.9px;color:var(--log-muted)}
 .log-focus-bus strong{font-size:34px;line-height:1.05;color:var(--log-accent)}

@@ -126,7 +126,13 @@ export function busShareHtml(bus:BusShareBus,defects:BusShareDefect[],stamp:stri
   "<footer>Snapshot taken when this was shared. It does not update.</footer></body></html>";
 }
 
+/* THE DATE ON THE WALL CLOCK, NOT UTC. `toISOString()` is UTC, and this garage
+   is five or six hours behind it: a bus shared at seven in the evening came out
+   named with TOMORROW's date while the stamp inside the file said today. Two
+   dates on one artifact, and the one in the filename is what somebody sorts by. */
 export function busShareFilename(busNumber:string,now=new Date()){
  const slug=String(busNumber||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"bus";
- return "pace-bus-"+slug+"-"+now.toISOString().slice(0,10)+".html";
+ const pad=(value:number)=>String(value).padStart(2,"0");
+ const day=now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+ return "pace-bus-"+slug+"-"+day+".html";
 }

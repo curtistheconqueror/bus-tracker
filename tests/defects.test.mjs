@@ -5730,9 +5730,33 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(risky,/&lt;tag&gt; &amp; more/);
  assert.match(risky,/&quot;quoted&quot;/);
 
- assert.match(busShareFilename("17553",new Date("2026-10-15T12:00:00Z")),/^pace-bus-17553-2026-10-15\.html$/);
+ assert.match(busShareFilename("17553",new Date(2026,9,15,12,0,0)),/^pace-bus-17553-2026-10-15\.html$/);
  /* A record thin enough to have lost its number still names a file. */
- assert.match(busShareFilename("",new Date("2026-10-15T12:00:00Z")),/^pace-bus-bus-2026-10-15\.html$/);
+ assert.match(busShareFilename("",new Date(2026,9,15,12,0,0)),/^pace-bus-bus-2026-10-15\.html$/);
+ /* THE DATE ON THE WALL CLOCK, NOT UTC — ASSERTED IN THIS SHOP'S OWN ZONE.
+
+    Shared at seven in the evening in Chicago, `toISOString()` has already
+    rolled over to tomorrow, so the file carried one date while the stamp inside
+    it carried another — and the filename is what somebody sorts by.
+
+    The zone is set here on purpose. This container runs UTC, where local and
+    UTC are the same thing, so the first version of this assertion passed
+    against BOTH implementations and proved nothing: a mutation putting
+    `toISOString()` back went green. A timezone test in a UTC container has to
+    name a zone or it is not a timezone test. */
+ const realZone=process.env.TZ;
+ process.env.TZ="America/Chicago";
+ try{
+  const evening=new Date(2026,9,15,19,30,0);
+  assert.equal(evening.toISOString().slice(0,10),"2026-10-16",
+   "the fixture must be an evening that UTC has already carried into tomorrow");
+  assert.match(busShareFilename("17553",evening),/-2026-10-15\.html$/,
+   "an evening share is named today, not tomorrow");
+  assert.match(busShareFilename("17553",new Date(2026,0,1,23,59,0)),/-2026-01-01\.html$/,
+   "and the last minute of a year does not borrow the next one");
+ }finally{
+  if(realZone===undefined)delete process.env.TZ; else process.env.TZ=realZone;
+ }
 
  /* THE SAME THREE CONTROLS THE DRAWER CARRIES, wired to this bus. */
  assert.match(page,/<div className="log-focus-share" role="group"/);
@@ -5747,11 +5771,52 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(page,/if\(!\(error instanceof DOMException&&error\.name==="AbortError"\)\)setFocusShareStatus\("error"\)/);
  /* Its own status, because the drawer can be open at the same time. */
  assert.match(page,/const \[focusShareStatus,setFocusShareStatus\]=useState/);
- assert.match(page,/useEffect\(\(\)=>\{if\(!focusedBusId\)setFocusShareStatus\(""\)\},\[focusedBusId\]\)/,
-  "reopening a bus never greets somebody with the last one's SHARED");
+ /* EVERY CHANGE OF BUS, not only the close. The focus dialog does not trap the
+    keyboard, so a tab can reach another card's FOCUS button and go straight
+    from bus A to bus B without passing through empty — and the first cut, whose
+    own comment claimed otherwise, carried A's SHARED onto B. */
+ assert.match(page,/useEffect\(\(\)=>\{setFocusShareStatus\(""\)\},\[focusedBusId\]\)/,
+  "opening another bus never greets somebody with the last one's SHARED");
+
+ /* THE SHARE CARRIES THE WHOLE BUS. `focusedGroup` comes out of `visibleGroups`,
+    which the state filter, the WHEN LOGGED window and the search have already
+    narrowed: with IN PROGRESS on, a bus carrying six showed two and the first
+    cut shared those two under a heading reading "2 defects". The reader of that
+    message has no filter and no way to know there was one. Curtis asked for the
+    opposite in as many words — "share all the defects with a bus". */
+ assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/);
+ assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusedAllRecords\.map/,
+  "the share is built from the unfiltered records");
+ assert.doesNotMatch(page,/focusShareRows=\(\):BusShareDefect\[\]=>\(focusedGroup\?\.records/,
+  "never from the board's filtered view of the bus");
+ /* And it says so, rather than quietly sending more than the screen shows. */
+ assert.match(page,/SHARES ALL \{focusedAllRecords\.length\} — \{focusHiddenByBoard\} HIDDEN BY THE BOARD FILTER/);
+ assert.match(page,/const focusHiddenByBoard=focusedGroup\?focusedAllRecords\.length-focusedGroup\.records\.length:0/);
+
+ /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when it fell
+    back to downloading; folding that into "copied" lit the COPY button with
+    COPIED! over a clipboard nothing had touched. */
+ assert.match(page,/setFocusShareStatus\(outcome==="cancelled"\?"":outcome==="shared"\?"shared":"saved"\)/);
+ assert.match(page,/focusShareStatus==="saved"\?"SAVED TO THIS DEVICE"/);
+
+ /* A YEAR THAT IS NOT THIS ONE IS NAMED. `timeLabel` draws "Sep 6 at 10:24 PM",
+    which is right on today's screen and wrong in a file meant to still read a
+    year from now. */
+ assert.match(page,/const shareTimeLabel=\(iso:string\)=>\{/);
+ assert.match(page,/at\.getFullYear\(\)!==new Date\(\)\.getFullYear\(\)\?", "\+at\.getFullYear\(\):""/);
+ assert.match(page,/logged:shareTimeLabel\(record\.createdAt\)/);
+
+ /* THE LIVE REGION IS MOUNTED whether or not it has anything to say: one that
+    appears with its text is a new element to a screen reader rather than an
+    update, and is read late or not at all. Empty it draws nothing. */
+ assert.match(page,/<small className="log-focus-share-status" role="status" aria-live="polite">/);
+ assert.match(css,/\.log-focus-share>small:empty\{display:none\}/);
  /* The state wording and the times come from the page, not a second copy. */
  assert.match(page,/state:STATE_LABELS\[record\.defect\.state\]\|\|record\.defect\.state/);
- assert.match(page,/logged:timeLabel\(record\.createdAt\)/);
+ /* And the share's own formatter BUILDS ON `timeLabel` rather than replacing
+    it, so the line in the message and the line on the card cannot drift apart
+    — the year is the only thing added. */
+ assert.match(page,/return timeLabel\(iso\)\+\(at\.getFullYear\(\)/);
 
  /* 44px at phone width, matching every other row in this modal. */
  assert.match(css,/\.log-focus-share button\{min-height:36px/);
