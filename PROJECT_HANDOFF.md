@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-14
+Updated: 2026-10-20
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 186 (application releases 189 and 190 together)
-Live feature checkpoint: commit c9c03d661177c04706f7beb33f2e4c24bf728e58
+Live release: Sites Version 187 (application release 191)
+Live feature checkpoint: commit b33775685b61acafdf4325807c82e92281c9fc2c
 
 ## Read this first
 
@@ -52,6 +52,14 @@ Preserve these rules through refactors and backend migration:
 - Export and import remain the durable recovery path while Shop Cloud is introduced, configured, and verified across devices.
 
 ## Current release state
+
+Application release 191 is live as Sites platform Version 187 from b33775685b61acafdf4325807c82e92281c9fc2c, deployed 2026-10-20 at 19:35:00.450217 UTC. PR38 adds COPY, SHARE and SHARE PAGE under the Defect Log FOCUS heading. Exports include all the selected bus's non-hidden Defect Log records despite board filters; a scope notice explains any difference from the filtered view. HTML is escaped and self-contained, filenames use the local date, prior-year records identify their year, and a polite live region announces copy/share/download outcomes. No stored data, schema, dependency, public asset, permission or hosting configuration changed.
+
+Sites deployment appgdep_6ad7c25a710c819198921cf4db16f5ed succeeded with public audience unchanged. Local lint/build and 360 tests passed on GitHub's merge candidate 1aba8a8, whose full tree is identical to the actual merged release. PR-head CI 39368201168 and exact merged-source CI 39484398384 both passed; the latter's logs confirm 360 pass, zero fail. All seven CodeRabbit inline findings are resolved and its latest review covers c92e819 with no new actionable comments. Ten additional Node VM checks execute the actual sharing handlers with browser API stubs; these are not browser interaction checks.
+
+Postpublication: all six public routes return 200 and 33 emitted assets match the tested bytes, including the Defect Log bundle carrying FOCUS sharing. A generated optional preload names an un-emitted file and returns 404, as on previous releases; the actual bundle is available. Browser-control tools were unavailable, so fresh layout/hydration, native phone share, VoiceOver, Safari/Home Screen and offline-device checks are not claimed. One minor limitation remains: a share finishing after focus changes can report its status on the later bus; its payload stays scoped to the original bus. Rollback: application 189/190 / Sites 186 from c9c03d661177c04706f7beb33f2e4c24bf728e58, tag sites-v186. Tags sites-v187 and sites-release191 identify the new release. No production records were touched. The divergent claude-contributions mirror branch was preserved because it cannot fast-forward to main. See docs/RELEASES.md and docs/archive/PUBLISH_RELEASE_191.md.
+
+### Previous releases 189 and 190
 
 Application releases 189 and 190 are live together as Sites platform Version 186 from c9c03d661177c04706f7beb33f2e4c24bf728e58, deployed 2026-10-14 at 21:07:34 UTC. Release 189 gives the DEFECTS LOGGED quick-filter count a selectable span shared with its drawer, and keeps that count current while the menu is open. Release 190 makes the Defect Log AI OPERATOR ask before leaving for Facility Map, opens grouped defect and Down Sheet repair pickers on section titles, and reduces typing stutter by leaving unchanged picker work alone. A typed query still searches the full catalog, and the Defect Category picker stays flat. No storage key, schema, dependency, permission, or public asset changed.
 
