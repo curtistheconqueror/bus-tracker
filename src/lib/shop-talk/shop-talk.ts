@@ -50,8 +50,10 @@ export type ShopTalkNote={
  by:string;
  kind:ShopTalkKind;
  text:string;
- /* An area name from site-config, so "Trouble Bay 12" cannot read as "Main
-    Garage" — see location-label.ts for what that cost twice. */
+ /* An area name from site-config, so a note posted in Trouble Bay 12 says
+    Trouble Bay 12. That bay IS in the main garage — the distinction is that
+    "Main Garage" here means bays 1-10, and somebody sent to find oil in "the
+    main garage" has 84 spaces to walk. See location-label.ts. */
  area:string;
  handledAt?:string;
  handledBy?:string;

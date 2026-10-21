@@ -15,10 +15,15 @@ import {siteAreaLabels} from "@/src/lib/fleet/site-config";
 
    location-label.ts exists because five copies of this table drifted and all
    five matched on a slot prefix, so every one of the 84 garage spaces read
-   "Main Garage" — including Trouble Bays 11 and 12, which the move editor
-   treats as separate destinations. A sixth copy would bring that back. These
-   are the same names the map writes, so an incident filed in Trouble Bay 12
-   says Trouble Bay 12. */
+   "Main Garage". A sixth copy would bring that back.
+
+   TROUBLE BAY 12 IS IN THE MAIN GARAGE — Curtis: "it believes that it's in b
+   twelve, which is in the main garage, but there is a distinction there."
+   The distinction is not that it is somewhere else in the yard; it is that
+   "Main Garage" in this app means BAYS 1-10, and 11 and 12 are their own
+   destinations in the move editor. On a safety record that precision is the
+   whole point: an incident that says Main Garage sends the next person
+   searching 84 spaces for the thing somebody already found. */
 const AREAS=Object.entries(siteAreaLabels()).map(([name,label])=>({name,label}));
 
 /* A `datetime-local` input wants local wall-clock with no zone, and an ISO
