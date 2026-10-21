@@ -95,6 +95,59 @@ then tells you whether the cloud half is.
 
 ---
 
+## Connecting a chat session
+
+**The three clients are not equal, and the difference is authentication rather
+than the endpoint.** Checked against each vendor's current documentation on
+2026-10-21; all three move, so re-check before concluding something is broken.
+
+### Claude Code — works, one command
+
+```
+claude mcp add --transport http fleetstep \
+  https://<the site>/api/mcp \
+  --header "Authorization: Bearer <MCP_TOKEN>"
+```
+
+`/mcp` inside a session shows whether it connected; `claude mcp list` says so
+from a shell and names the failure when it did not. `--scope user` makes it
+available in every project on that machine, `--scope project` writes a
+`.mcp.json` the repository can carry.
+
+This is the case the bearer token was designed for, and the only one that needs
+nothing from a vendor.
+
+### Claude.ai web and desktop — conditionally
+
+Customize → Connectors → **Add custom connector**, the URL, then
+Authentication → **No sign-in**, and under **Request headers** a header named
+`authorization` whose value is `Bearer <MCP_TOKEN>`.
+
+**The value is sent exactly as typed**, so the word `Bearer` and the space after
+it have to be in it. Omitting them sends `Authorization: <token>`, which this
+route reads as no bearer at all and answers 401 — a failure that looks like a
+wrong token and is not.
+
+**The catch: Request headers is in beta and limited to some organizations.** If
+that section is not in the dialog, claude.ai cannot send a bearer token, and the
+connector cannot authenticate against this endpoint at all. There is no
+workaround short of OAuth.
+
+### ChatGPT — two separate walls
+
+1. **Plan.** Full MCP custom connectors are Business and Enterprise/Edu, web
+   only. On Pro a custom server can be connected with **read/fetch permissions
+   only** — which is every tool Phase 1 has, so Pro may be enough now and will
+   stop dead at Phase 2's writes.
+2. **Authentication.** Its connector form documents OAuth or no authentication.
+   No static-header field is documented, so there is most likely nowhere to put
+   a bearer token.
+
+So ChatGPT is the client that needs OAuth, and that is why OAuth is its own
+piece of work rather than a setting.
+
+---
+
 ## The security model, stated plainly
 
 Two layers, and neither is the other's job:
@@ -157,7 +210,8 @@ already do for old sheets.
 
 ## What was verified
 
-- 20 tests, all ten mutants of their key assertions caught.
+- 34 tests. Mutation-tested every round: each key assertion was checked by
+  breaking the code it guards and confirming the test went red.
 - The map **cannot** put a bus on the Down Sheet: a bus row whose `map_fields`
   claim `down`, `onDownSheet` and `downSheetReady`, with nothing on the sheet,
   still reads as not on the sheet. The Down Sheet owns that badge.
@@ -165,6 +219,11 @@ already do for old sheets.
 - `asOf` comes off the rows, not off the clock.
 - A table larger than one page is read to the end — PostgREST's row cap is
   silent, and a truncated read would have an agent describing part of the shop.
+- The walk cannot shift under a phone that writes mid-read. It resumes after
+  the last key it actually saw, so a soft delete or an insert behind it loses
+  no live row and duplicates none — both of which an offset walk does while
+  reporting success. Its two tests mutate the table between pages rather than
+  restating the implementation.
 - One unreadable table fails the whole board: "nothing is down" because the
   `buses` read was refused is wrong in the worst direction.
 - Driven over HTTP against the dev server: handshake, discovery, batching,
