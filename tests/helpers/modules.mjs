@@ -55,3 +55,4 @@ export {DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDE
 export {boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, locateBus, newestStamp} from "../../src/lib/mcp/fleet-reads.ts";
 export {FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, SERVER_INFO, TOOLS, TOOL_NAMES, handleRpc, isReadOnlyToolSurface, textResult} from "../../src/lib/mcp/mcp-protocol.ts";
 export {BOARD_TABLES, PAGE, readBoardRows, readLiveRows} from "../../src/lib/mcp/cloud-read.ts";
+export {createSessionCache, sessionCacheKey} from "../../src/lib/mcp/session-cache.ts";

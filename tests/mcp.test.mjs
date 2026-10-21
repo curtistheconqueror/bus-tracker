@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, readBoardRows, readLiveRows, textResult } from "./helpers/modules.mjs";
+import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, readBoardRows, readLiveRows, textResult, createSessionCache, sessionCacheKey } from "./helpers/modules.mjs";
 
 const FETCHED="2026-10-21T12:00:00.000Z";
 
@@ -414,4 +414,92 @@ test("the agent route holds no write call and no hard-coded secret",async()=>{
  /* A bearer compared with === leaks how much of it was right. */
  assert.ok(source.includes("sameSecret"),"the token comparison must be the length-safe one");
  assert.ok(!/offered===token|token===offered/.test(source),"the token must not be compared with ===");
+});
+
+/* ---- the signed-in client cache ---- */
+
+/* The whole value of this cache is in when it LETS GO. Nothing renews the
+   token behind a cached client — no storage, no refresh timer — so a cache
+   that held on forever would answer "the shop cloud could not be read" for as
+   long as the isolate lived, which is an endpoint that works for an hour of
+   uptime and then stops. */
+test("a signed-in client is reused for the same credentials and re-signed-in after a failure",async()=>{
+ let signIns=0;
+ const signIn=async()=>{signIns+=1;return {client:{id:signIns},error:""}};
+ const cache=createSessionCache();
+ const key=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"p"});
+
+ const first=await cache.get(key,signIn);
+ assert.equal(first.client.id,1);
+ assert.equal(cache.isWarm(),true);
+ /* Warm: the same credentials must not pay for a second round trip. */
+ assert.equal((await cache.get(key,signIn)).client.id,1);
+ assert.equal(signIns,1);
+
+ /* A read failed, so the client is suspect and goes. */
+ cache.invalidate();
+ assert.equal(cache.isWarm(),false);
+ assert.equal((await cache.get(key,signIn)).client.id,2);
+ assert.equal(signIns,2);
+});
+
+/* Keyed on the URL and email alone, a rotated password would leave a warm
+   isolate serving from the old session and the rotation would look like it had
+   not taken. */
+test("changing any credential, the password included, re-signs in",async()=>{
+ const base={url:"u",anonKey:"a",email:"e",password:"p"};
+ const keys=new Set([
+  sessionCacheKey(base),
+  sessionCacheKey({...base,url:"u2"}),
+  sessionCacheKey({...base,anonKey:"a2"}),
+  sessionCacheKey({...base,email:"e2"}),
+  sessionCacheKey({...base,password:"p2"}),
+ ]);
+ assert.equal(keys.size,5,"every credential must take part in the key");
+
+ let signIns=0;
+ const signIn=async()=>{signIns+=1;return {client:{id:signIns},error:""}};
+ const cache=createSessionCache();
+ await cache.get(sessionCacheKey(base),signIn);
+ await cache.get(sessionCacheKey({...base,password:"rotated"}),signIn);
+ assert.equal(signIns,2,"a rotated password must not be served from the old session");
+});
+
+/* A bad minute must not be inherited by every later request in this isolate. */
+test("a failed sign-in is not cached",async()=>{
+ let attempts=0;
+ const signIn=async()=>{
+  attempts+=1;
+  return attempts===1?{client:null,error:"the shop cloud rejected the sign-in"}:{client:{ok:true},error:""};
+ };
+ const cache=createSessionCache();
+ const key=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"p"});
+ const failed=await cache.get(key,signIn);
+ assert.equal(failed.client,null);
+ assert.match(failed.error,/rejected/);
+ assert.equal(cache.isWarm(),false);
+ const recovered=await cache.get(key,signIn);
+ assert.deepEqual(recovered.client,{ok:true});
+ assert.equal(recovered.error,"");
+ assert.equal(attempts,2);
+});
+
+/* A sign-in that resolves with neither a client nor a reason still has to say
+   something an agent can read. */
+test("a sign-in that fails without a message still reports one",async()=>{
+ const cache=createSessionCache();
+ const {client,error}=await cache.get("k",async()=>({client:null,error:""}));
+ assert.equal(client,null);
+ assert.ok(error.length>0);
+});
+
+/* The route must actually drop the client when a read fails, not merely own a
+   cache that could. Asserted against the source, because the alternative needs
+   a Worker and a live project. */
+test("the route invalidates the cached session when a board read fails",async()=>{
+ const source=await readFile(new URL("../app/api/mcp/route.ts",import.meta.url),"utf8");
+ assert.match(source,/if\(rows\.error\)\{sessions\.invalidate\(\)/,
+  "a failed board read must drop the cached client");
+ assert.ok(!source.includes("let clientKey"),"the hand-rolled cache must be gone");
+ assert.match(source,/sessionCacheKey\(credentials\)/,"the cache key must come from session-cache.ts");
 });

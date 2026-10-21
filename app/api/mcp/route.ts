@@ -1,6 +1,7 @@
 import {boardFromRows,busDefects,discrepancies,downSheetView,fleetCounts,locateBus} from "@/src/lib/mcp/fleet-reads";
 import {readBoardRows,type ReadableClient} from "@/src/lib/mcp/cloud-read";
 import {handleRpc,textResult,type ToolResult} from "@/src/lib/mcp/mcp-protocol";
+import {createSessionCache,sessionCacheKey} from "@/src/lib/mcp/session-cache";
 
 /* The agent surface: one MCP endpoint over the Shop Cloud, read-only.
 
@@ -58,39 +59,43 @@ function bearer(request:Request){
  return header.toLowerCase().startsWith("bearer ")?header.slice(7).trim():"";
 }
 
-/* One client per isolate, signed in once.
+/* One client per isolate, signed in once — and dropped when a read fails.
 
-   `cloud-client.ts` caches its client for the same reason. `persistSession` is
-   off because there is no storage here and nothing to restore from: the session
-   lives in this instance's memory and dies with the isolate, which is correct
-   for a server and means a cold start costs one sign-in rather than one per
-   tool call. */
-let client:ReadableClient|null=null;
-let clientKey="";
+   `persistSession` is off because there is no storage here and nothing to
+   restore from: the session lives in this instance's memory and dies with the
+   isolate, which is correct for a server and means a cold start costs one
+   sign-in rather than one per tool call.
+
+   `autoRefreshToken` is off too, which is right for a Worker — a background
+   refresh timer in an environment that suspends between requests is a timer
+   that fires at nobody. It also means the token behind this client expires on
+   its own schedule and nothing renews it, so the cache HAS to let go: see
+   `session-cache.ts`, which owns when, and the `sessions.invalidate()` beside
+   the read below, which is the case that would otherwise have made this
+   endpoint work for an hour of uptime and then stop. */
+const sessions=createSessionCache<ReadableClient>();
 
 type Credentials={url:string;anonKey:string;email:string;password:string};
 
 async function signedInClient(credentials:Credentials):Promise<{client:ReadableClient|null;error:string}>{
- const key=credentials.url+"|"+credentials.anonKey+"|"+credentials.email;
- if(client&&clientKey===key)return {client,error:""};
- try{
-  const {createClient}=await import("@supabase/supabase-js");
-  const created=createClient(credentials.url,credentials.anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const {error}=await created.auth.signInWithPassword({email:credentials.email,password:credentials.password});
-  /* The underlying message rides along, because without it "rejected the
-     sign-in" is what a WRONG PROJECT URL looks like too — measured, by pointing
-     this at a host that does not exist and reading what came back. Whoever is
-     wiring the endpoint up is the only person who sees this, they are already
-     past the bearer token, and it is about configuration rather than about any
-     bus. Sending them after a password that was never wrong is the expensive
-     outcome here. */
-  if(error)return {client:null,error:"The shop cloud rejected the sign-in: "+(error.message||"no reason given")};
-  client=created as unknown as ReadableClient;
-  clientKey=key;
-  return {client,error:""};
- }catch{
-  return {client:null,error:"The shop cloud could not be reached."};
- }
+ return sessions.get(sessionCacheKey(credentials),async()=>{
+  try{
+   const {createClient}=await import("@supabase/supabase-js");
+   const created=createClient(credentials.url,credentials.anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+   const {error}=await created.auth.signInWithPassword({email:credentials.email,password:credentials.password});
+   /* The underlying message rides along, because without it "rejected the
+      sign-in" is what a WRONG PROJECT URL looks like too — measured, by
+      pointing this at a host that does not exist and reading what came back.
+      Whoever is wiring the endpoint up is the only person who sees this, they
+      are already past the bearer token, and it is about configuration rather
+      than about any bus. Sending them after a password that was never wrong is
+      the expensive outcome here. */
+   if(error)return {client:null,error:"The shop cloud rejected the sign-in: "+(error.message||"no reason given")};
+   return {client:created as unknown as ReadableClient,error:""};
+  }catch{
+   return {client:null,error:"The shop cloud could not be reached."};
+  }
+ });
 }
 
 export async function GET(){
@@ -143,7 +148,13 @@ export async function POST(request:Request){
   const signedIn=await signedInClient(credentials);
   if(!signedIn.client)return {error:signedIn.error,board:null};
   const rows=await readBoardRows(signedIn.client);
-  if(rows.error)return {error:rows.error,board:null};
+  /* A read that failed on a client which just signed in successfully has most
+     likely lost its session, and nothing here renews one. Dropping the cached
+     client means the next request signs in again instead of this isolate
+     answering "could not be read" for as long as it lives. A refused read —
+     a permission problem rather than an expiry — costs one extra sign-in on a
+     request that had already failed, which is the right way round to be wrong. */
+  if(rows.error){sessions.invalidate();return {error:rows.error,board:null}}
   return {error:"",board:boardFromRows(rows.buses,rows.defects,rows.entries,new Date().toISOString())};
  }
 
