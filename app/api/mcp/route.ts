@@ -2,6 +2,7 @@ import {boardFromRows,busDefects,discrepancies,downSheetView,fleetCounts,locateB
 import {readBoardRows,type ReadableClient} from "@/src/lib/mcp/cloud-read";
 import {handleRpc,textResult,type ToolResult} from "@/src/lib/mcp/mcp-protocol";
 import {createSessionCache,sessionCacheKey} from "@/src/lib/mcp/session-cache";
+import {offeredToken,sameSecret} from "@/src/lib/mcp/agent-token";
 
 /* The agent surface: one MCP endpoint over the Shop Cloud, read-only.
 
@@ -41,22 +42,11 @@ export const runtime="edge";
 
 function json(body:unknown,status=200){return Response.json(body,{status,headers:{"Cache-Control":"no-store"}})}
 
-/* Compared without leaking where it stopped matching.
-
-   A plain === on a secret returns as soon as two bytes differ, and the time it
-   took is a measurement of how much of the token was right. This matters less
-   over the public internet than the literature suggests, and it costs four
-   lines, so there is no interesting reason to get it wrong. */
-function sameSecret(offered:string,expected:string){
- if(offered.length!==expected.length)return false;
- let difference=0;
- for(let index=0;index<offered.length;index+=1)difference|=offered.charCodeAt(index)^expected.charCodeAt(index);
- return difference===0;
-}
-
+/* The token an agent offered, and the length-safe comparison, both in
+   `src/lib/mcp/agent-token.ts` — the header-beats-URL precedence is a rule
+   worth a test, and this file cannot be run without a Worker. */
 function bearer(request:Request){
- const header=request.headers.get("Authorization")||"";
- return header.toLowerCase().startsWith("bearer ")?header.slice(7).trim():"";
+ return offeredToken(request.headers.get("Authorization")||"",request.url);
 }
 
 /* One client per isolate, signed in once — and dropped when a read fails.
@@ -101,7 +91,7 @@ async function signedInClient(credentials:Credentials):Promise<{client:ReadableC
 export async function GET(){
  /* MCP is a POST protocol. Answered rather than left to 404 so somebody opening
     the URL in a browser learns what it is instead of thinking it is missing. */
- return json({error:"This is an MCP endpoint. Send JSON-RPC over POST with a bearer token."},405);
+ return json({error:"This is an MCP endpoint. Send JSON-RPC over POST, with the token either as an Authorization: Bearer header or as ?token= on this URL."},405);
 }
 
 export async function POST(request:Request){

@@ -78,8 +78,13 @@ already lives:
 | `SHOP_EMAIL` | The shared shop login's email |
 | `SHOP_PASSWORD` | Its password |
 
-Then point an agent at `https://<the site>/api/mcp` with
-`Authorization: Bearer <MCP_TOKEN>`.
+`MCP_TOKEN` has no issuer — it is a string you mint (`openssl rand -hex 32`),
+set in the Worker environment, and give to a client. Rotating it means changing
+it in both places.
+
+Then point an agent at `https://<the site>/api/mcp`, with the token either as an
+`Authorization: Bearer` header or as `?token=` on the URL. See *Connecting a
+chat session* below for which clients take which.
 
 Check it with a handshake, which needs no cloud at all:
 
@@ -97,11 +102,12 @@ then tells you whether the cloud half is.
 
 ## Connecting a chat session
 
-**The three clients are not equal, and the difference is authentication rather
-than the endpoint.** Checked against each vendor's current documentation on
-2026-10-21; all three move, so re-check before concluding something is broken.
+**One URL connects everything, and a header is the better option where a client
+can send one.** Checked against each vendor's current documentation on
+2026-10-21 and driven over HTTP against the dev server the same day; the vendor
+pages move, so re-check them before concluding something is broken.
 
-### Claude Code — works, one command
+### Claude Code — one command
 
 ```
 claude mcp add --transport http fleetstep \
@@ -114,37 +120,79 @@ from a shell and names the failure when it did not. `--scope user` makes it
 available in every project on that machine, `--scope project` writes a
 `.mcp.json` the repository can carry.
 
-This is the case the bearer token was designed for, and the only one that needs
-nothing from a vendor.
+A header is the better channel, and this is the one client that can always
+send one.
 
-### Claude.ai web and desktop — conditionally
+### Everything else — the token rides in the URL
 
-Customize → Connectors → **Add custom connector**, the URL, then
-Authentication → **No sign-in**, and under **Request headers** a header named
-`authorization` whose value is `Bearer <MCP_TOKEN>`.
+```
+https://<the site>/api/mcp?token=<MCP_TOKEN>
+```
 
-**The value is sent exactly as typed**, so the word `Bearer` and the space after
-it have to be in it. Omitting them sends `Authorization: <token>`, which this
-route reads as no bearer at all and answers 401 — a failure that looks like a
-wrong token and is not.
+That one line is the whole configuration for **claude.ai, ChatGPT, Grok, Codex
+and Perplexity**, because each of them has a connector form that takes a URL and
+nothing else.
 
-**The catch: Request headers is in beta and limited to some organizations.** If
-that section is not in the dialog, claude.ai cannot send a bearer token, and the
-connector cannot authenticate against this endpoint at all. There is no
-workaround short of OAuth.
+**This is not a shortcut, it is the only way in.** claude.ai can attach a header
+only where its **Request headers** beta is open to that organization, and
+ChatGPT's connector form documents OAuth or no authentication at all. Without
+`?token=`, neither can authenticate here and the endpoint is Claude-Code-only.
+It is also what every hosted MCP server does — Unusual Whales, whose setup page
+this was modelled on, says so in their own troubleshooting: *"For URL-based
+clients (Claude connector, ChatGPT, Grok, Codex) the key rides along as
+?token=YOUR_KEY."*
 
-### ChatGPT — two separate walls
+**The header wins when both are present**, which is deliberate rather than
+incidental: a header does not land in a browser history, a connector's settings
+screen or an access log, so the better channel must not be overridable by a
+stale URL somebody pasted months ago. Driven over HTTP rather than reasoned
+about — a good header with a wrong `?token=` returns the tool list, and a wrong
+header with a good `?token=` returns 401.
 
-1. **Plan.** Full MCP custom connectors are Business and Enterprise/Edu, web
-   only. On Pro a custom server can be connected with **read/fetch permissions
-   only** — which is every tool Phase 1 has, so Pro may be enough now and will
-   stop dead at Phase 2's writes.
-2. **Authentication.** Its connector form documents OAuth or no authentication.
-   No static-header field is documented, so there is most likely nowhere to put
-   a bearer token.
+**And that is the cost, stated rather than discovered.** A URL travels where a
+header does not. It is the trade every hosted MCP server has made, it is
+affordable here because the surface is read-only, and it is why rotating
+`MCP_TOKEN` has to stay a one-line job. It would want re-deciding before any
+tool here can write.
 
-So ChatGPT is the client that needs OAuth, and that is why OAuth is its own
-piece of work rather than a setting.
+#### claude.ai
+
+Customize → Connectors → **Add custom connector**, paste the URL above, **Add**.
+Nothing else to fill in. Anthropic also publishes a deep link that pre-fills the
+dialog:
+
+```
+https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=FLEETSTEP&connectorUrl=<the URL, percent-encoded>
+```
+
+It only fills the form — the person still reviews and confirms, and the link
+grants nothing by itself. Team and Enterprise owners use
+`admin-settings/connectors` in place of `customize/connectors`.
+
+#### ChatGPT
+
+Plugins → **+** → **Add custom MCP server**, the URL above under **Connection**.
+
+One limit here is OpenAI's rather than ours, and no amount of code moves it:
+**full MCP custom connectors are Business and Enterprise/Edu, web only.** On Pro
+a custom server connects with **read/fetch permissions only** — which is every
+tool Phase 1 has, so Pro should be enough today and would stop dead at Phase 2's
+writes.
+
+### Why there is no OAuth
+
+It was scoped, and then dropped once `?token=` was measured working. OAuth's job
+is to authenticate a **person**, and this app has no login to authenticate one
+against — so an OAuth flow here would be a compatibility wrapper issuing tokens
+for the same read-only surface, buying nothing the URL does not already buy, at
+several times the code. Unusual Whales does run one, on a separate host, purely
+so somebody can sign in with their Unusual Whales *account*. There is no
+equivalent account here.
+
+That changes if a login ever arrives. Per-person access is the login Curtis has
+described as coming with the questionnaire, and the roles in
+`src/lib/settings/roles.ts` are waiting on it — this endpoint is not the place
+that decision gets made.
 
 ---
 

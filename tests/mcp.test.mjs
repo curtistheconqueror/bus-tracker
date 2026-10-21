@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, readBoardRows, readLiveRows, textResult, createSessionCache, sessionCacheKey } from "./helpers/modules.mjs";
+import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, offeredToken, readBoardRows, readLiveRows, sameSecret, textResult, createSessionCache, sessionCacheKey } from "./helpers/modules.mjs";
 
 const FETCHED="2026-10-21T12:00:00.000Z";
 
@@ -582,4 +582,76 @@ test("a sign-in that finishes late does not overwrite a newer key's client",asyn
  assert.deepEqual(late.client,{id:"old"});
  /* ...but the cache keeps the newer one. */
  assert.deepEqual((await cache.get(newKey,async()=>({client:{id:"unused"},error:""}))).client,{id:"new"});
+});
+
+/* ---- how an agent presents its token ---- */
+
+/* The query string is the ONLY way into most chat clients: claude.ai can attach
+   a header only where its Request-headers beta is open, and ChatGPT's connector
+   form takes a URL. Without this, the endpoint cannot be connected by either,
+   which would make "plug an agent into the fleet" false for every client except
+   Claude Code. */
+test("a token may arrive in the URL, because most clients cannot send a header",()=>{
+ assert.equal(offeredToken("","https://fleet.example/api/mcp?token=shop-token"),"shop-token");
+ /* Other parameters alongside it must not confuse the read. */
+ assert.equal(offeredToken("","https://fleet.example/api/mcp?a=1&token=shop-token&b=2"),"shop-token");
+ /* Percent-encoding is decoded by searchParams, which is what a connector form
+    pasting into a URL field will produce. */
+ assert.equal(offeredToken("","https://fleet.example/api/mcp?token=a%20b"),"a b");
+});
+
+/* The header is the better channel — it does not land in a browser history, a
+   connector's settings screen or an access log — so when both are present it
+   has to win. Reversed, a stale URL left in a connector would silently override
+   the header an operator deliberately configured. */
+test("the Authorization header beats a token in the URL",()=>{
+ assert.equal(offeredToken("Bearer from-header","https://fleet.example/api/mcp?token=from-url"),"from-header");
+ /* The scheme is case-insensitive in HTTP, so a client that sends "bearer"
+    must not be turned away. */
+ assert.equal(offeredToken("bearer from-header","https://fleet.example/api/mcp?token=from-url"),"from-header");
+ /* A header that is present but NOT a bearer is not a token, so the URL is
+    still read — this is the Basic-auth-in-front-of-a-proxy case. */
+ assert.equal(offeredToken("Basic abc","https://fleet.example/api/mcp?token=from-url"),"from-url");
+});
+
+/* A connector form that stores a pasted value verbatim will eventually store a
+   trailing space, and a token that fails only because of whitespace is the
+   hardest possible failure to see from the outside. */
+test("a token is trimmed, and absence is empty rather than a throw",()=>{
+ assert.equal(offeredToken("Bearer  padded  ","https://fleet.example/api/mcp"),"padded");
+ assert.equal(offeredToken("","https://fleet.example/api/mcp?token=%20padded%20"),"padded");
+ assert.equal(offeredToken("","https://fleet.example/api/mcp"),"");
+ assert.equal(offeredToken("","https://fleet.example/api/mcp?token="),"");
+ /* A URL that will not parse cannot authenticate anybody. It must read as no
+    token and let the 401 say so, rather than throwing a 500 at somebody who is
+    only holding the wrong address. */
+ assert.equal(offeredToken("","not a url"),"");
+});
+
+/* A === on a secret returns as soon as two bytes differ, and how long it took
+   measures how much of the token was right. */
+test("the token comparison does not stop at the first wrong byte",()=>{
+ assert.equal(sameSecret("abc123","abc123"),true);
+ assert.equal(sameSecret("abc123","abc124"),false);
+ /* Differing in the FIRST byte and in the LAST must both be false — the test
+    that catches a comparison rewritten to bail early. */
+ assert.equal(sameSecret("xbc123","abc123"),false);
+ assert.equal(sameSecret("","" ),true);
+ /* Length is checked first, so a prefix is never a match. */
+ assert.equal(sameSecret("abc","abc123"),false);
+ assert.equal(sameSecret("abc123","abc"),false);
+});
+
+/* Timing-safety is not observable in a return value: a comparison that bails at
+   the first wrong byte returns exactly the same boolean for every input, and
+   the only difference is how long it took. A behavioural test for that is a
+   flaky test. So this reads the source, the same way the route's read-only
+   promise is asserted — the mutant that rewrites the loop to `return false`
+   early is caught here or nowhere. */
+test("the token comparison reads every byte, asserted from its source",async()=>{
+ const source=await readFile(new URL("../src/lib/mcp/agent-token.ts",import.meta.url),"utf8");
+ const body=source.slice(source.indexOf("export function sameSecret"));
+ const loop=body.slice(body.indexOf("for("),body.indexOf("return difference===0"));
+ assert.ok(loop.includes("difference|="),"the comparison must accumulate differences rather than branch");
+ assert.ok(!loop.includes("return"),"the comparison loop must not return early — that is what leaks the token");
 });
