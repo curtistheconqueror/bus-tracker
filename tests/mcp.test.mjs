@@ -498,8 +498,88 @@ test("a sign-in that fails without a message still reports one",async()=>{
    a Worker and a live project. */
 test("the route invalidates the cached session when a board read fails",async()=>{
  const source=await readFile(new URL("../app/api/mcp/route.ts",import.meta.url),"utf8");
- assert.match(source,/if\(rows\.error\)\{sessions\.invalidate\(\)/,
-  "a failed board read must drop the cached client");
+ assert.match(source,/if\(rows\.error\)\{sessions\.invalidate\(signedIn\.client\)/,
+  "a failed board read must drop the client THAT failed, not whatever is cached");
  assert.ok(!source.includes("let clientKey"),"the hand-rolled cache must be gone");
  assert.match(source,/sessionCacheKey\(credentials\)/,"the cache key must come from session-cache.ts");
+});
+
+/* An isolate serves requests concurrently and `await` yields, so two requests
+   arriving on a cold cache both used to get past the cache check and sign in
+   separately. An agent firing five tools at once would then cost five sign-ins
+   against an auth endpoint that rate-limits — on exactly the cold start the
+   route's own comment promises costs one. */
+test("concurrent requests on a cold cache share one sign-in",async()=>{
+ let signIns=0;
+ let release=()=>{};
+ const gate=new Promise(resolve=>{release=resolve});
+ const signIn=async()=>{signIns+=1;await gate;return {client:{id:signIns},error:""}};
+ const cache=createSessionCache();
+ const key=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"p"});
+
+ const both=Promise.all([cache.get(key,signIn),cache.get(key,signIn),cache.get(key,signIn)]);
+ release();
+ const [first,second,third]=await both;
+ assert.equal(signIns,1,"three overlapping requests must cost one sign-in");
+ assert.deepEqual(first.client,{id:1});
+ assert.deepEqual(second.client,{id:1});
+ assert.deepEqual(third.client,{id:1});
+ /* And the next request after they settle is served warm, not from a pending
+    entry that was never cleaned up. */
+ assert.equal((await cache.get(key,signIn)).client.id,1);
+ assert.equal(signIns,1);
+});
+
+/* A slow failing read must not throw away a session a later request already
+   signed in: A reads, something invalidates, B signs in fresh, then A's
+   failure arrives. Clearing B there costs another sign-in for nothing. */
+test("a failed read clears only the client that failed",async()=>{
+ const cache=createSessionCache();
+ const key=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"p"});
+ const clientA={id:"A"};
+ const clientB={id:"B"};
+
+ await cache.get(key,async()=>({client:clientA,error:""}));
+ cache.invalidate(clientA);
+ assert.equal(cache.isWarm(),false);
+
+ await cache.get(key,async()=>({client:clientB,error:""}));
+ assert.equal(cache.isWarm(),true);
+ /* A's stale failure arrives late and must not touch B. */
+ cache.invalidate(clientA);
+ assert.equal(cache.isWarm(),true,"a stale client's failure must not clear a newer session");
+ assert.deepEqual((await cache.get(key,async()=>({client:{id:"C"},error:""}))).client,clientB);
+
+ /* Told which client failed, when it IS the cached one, it clears. */
+ cache.invalidate(clientB);
+ assert.equal(cache.isWarm(),false);
+
+ /* And a caller that does not know which client failed still gets the safe
+    thing. */
+ await cache.get(key,async()=>({client:clientA,error:""}));
+ cache.invalidate();
+ assert.equal(cache.isWarm(),false);
+});
+
+/* Credentials can change while a sign-in is in flight, and `await` yields, so
+   the older attempt can finish last. It must not overwrite the newer client
+   with a session signed in against the old password. */
+test("a sign-in that finishes late does not overwrite a newer key's client",async()=>{
+ const cache=createSessionCache();
+ const oldKey=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"old"});
+ const newKey=sessionCacheKey({url:"u",anonKey:"a",email:"e",password:"new"});
+ let releaseOld=()=>{};
+ const oldGate=new Promise(resolve=>{releaseOld=resolve});
+
+ const slow=cache.get(oldKey,async()=>{await oldGate;return {client:{id:"old"},error:""}});
+ /* The rotated credentials sign in and land first. */
+ await cache.get(newKey,async()=>({client:{id:"new"},error:""}));
+ assert.deepEqual((await cache.get(newKey,async()=>({client:{id:"unused"},error:""}))).client,{id:"new"});
+
+ releaseOld();
+ const late=await slow;
+ /* The late attempt still hands its own client back to its own caller... */
+ assert.deepEqual(late.client,{id:"old"});
+ /* ...but the cache keeps the newer one. */
+ assert.deepEqual((await cache.get(newKey,async()=>({client:{id:"unused"},error:""}))).client,{id:"new"});
 });

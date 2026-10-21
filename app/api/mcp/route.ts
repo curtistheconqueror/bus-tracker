@@ -154,7 +154,7 @@ export async function POST(request:Request){
      answering "could not be read" for as long as it lives. A refused read —
      a permission problem rather than an expiry — costs one extra sign-in on a
      request that had already failed, which is the right way round to be wrong. */
-  if(rows.error){sessions.invalidate();return {error:rows.error,board:null}}
+  if(rows.error){sessions.invalidate(signedIn.client);return {error:rows.error,board:null}}
   return {error:"",board:boardFromRows(rows.buses,rows.defects,rows.entries,new Date().toISOString())};
  }
 
