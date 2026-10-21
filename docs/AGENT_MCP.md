@@ -1,5 +1,12 @@
 # Plugging an agent into the fleet — Phase 1, read-only
 
+**Open security follow-up:** the reusable URL token has an unresolved
+CodeRabbit Major finding. Curtis temporarily accepted it for the initial
+single-user read-only connection on 2026-10-21. See
+[the risk record, release protections, and closure criteria](MCP_SECURITY_FOLLOWUP.md).
+That exception does not approve writes or waive reader isolation and secure
+runtime configuration. The record takes precedence over safety claims below.
+
 **Status: BUILT, READ-ONLY. Not configured until the five variables below are
 set**, and the two halves fail differently:
 
