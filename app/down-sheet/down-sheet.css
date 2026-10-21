@@ -7,7 +7,7 @@ button,input,select,textarea{font:inherit}
 .down-header span{font-size:9px;font-weight:900;letter-spacing:1.5px;color:#9fc7ff}
 .down-header h1{margin:1px 0 0;font-size:25px;line-height:1;text-transform:uppercase}
 .down-header p{margin:4px 0 0;font-size:9px;letter-spacing:.5px;color:#dbeaff}
-.down-header nav{display:flex;gap:7px}
+.down-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;gap:7px}
 .down-header nav a{min-width:108px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid #81a9dc;border-radius:6px;color:#eaf3ff;text-decoration:none;font-size:10px;font-weight:900}
 .down-header nav a.active{background:#fff;color:var(--down-navy);border-color:#fff}
 .down-summary{margin:12px 14px 8px;display:grid;grid-template-columns:1.25fr repeat(7,1fr);gap:7px}
@@ -179,7 +179,7 @@ button,input,select,textarea{font:inherit}
  .down-header{flex-wrap:wrap}
  .down-header>div{order:1}
  .down-header>.app-refresh{order:2}
- .down-header nav{order:3;flex:1 0 100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+ .down-header nav{order:3;flex:1 0 100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px}
  .down-header nav a{min-width:0;width:100%}
 }
 @media(max-width:900px){.down-header{padding:9px 12px}.down-header h1{font-size:20px}.down-summary{grid-template-columns:repeat(3,1fr)}.down-controls{flex-wrap:wrap}.completed-toggle{margin-left:0}.sheet-scroll{max-height:none}.down-app{padding-bottom:16px}}

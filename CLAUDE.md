@@ -11,8 +11,9 @@ surface.
 ## What it is
 
 An offline-first fleet maintenance app for the Pace South garage, used by shop
-foremen and mechanics on phones and one shop computer. Five surfaces: Facility
-Map, Down Sheet, Defect Log, Fixed Repairs, Fleet Campaigns.
+foremen and mechanics on phones and one shop computer. Seven surfaces: Facility
+Map, Down Sheet, Defect Log, Fixed Repairs, Fleet Campaigns, Incidents, Shop
+Talk.
 
 **Offline-first is not a feature, it is the premise.** Everything lives in the
 device's LocalStorage and works with the garage wifi down. Anything that syncs
@@ -142,6 +143,8 @@ the records
   pace-down-sheet-v1               Down Sheet entries
   pace-bus-lists-v1                Fleet Campaigns
   pace-bus-list-templates-v1       campaign column formats
+  pace-incidents-v1                INCIDENTS: what happened to a person, where
+  pace-shop-talk-v1                SHOP TALK: hazards, heads ups, suggestions
 
 what the shop has taught it
   pace-parts-memory-v1             learned part numbers
@@ -357,6 +360,52 @@ that comes back without a bus on it is. When more mechanics carry the app, a
 repair marked done by the mechanic who did it becomes the finer signal and the
 sheet updates from it — at which point this ledger becomes the coarse check on
 that, not the only input.
+
+**`pace-incidents-v1` and `pace-shop-talk-v1` are about PEOPLE AND PLACES, not
+buses.** Added the night Curtis slipped on oil in the shop. A defect is attached
+to a fleet number; the oil was on the floor and belonged to no bus, so filing it
+against one would have buried a safety record in a maintenance history. Curtis:
+*"you're right it doesn't belong in defect"*.
+
+**The only required field on an incident is WHAT HAPPENED.** Curtis asked for it
+in those words — *"don't make any of the fields except for the ones that matter
+mandatory to save the incident"* — and the reason outlasts the convenience: the
+incident most worth having is filed by somebody shaken, sore, or halfway out the
+door. A form that refuses to save over an empty witness box does not collect a
+better report, it collects no report. `care:""` is *not recorded* and is
+deliberately distinct from `"none"`; reading a blank box as "no treatment
+needed" would have the app inventing a medical fact.
+
+**The time it HAPPENED is editable and the time it was FILED is not.** Reports
+get written an hour later or the next morning, and the gap between the two is
+itself a fact about how one came to exist. An edit keeps the record and its
+filing stamp — a correction to an incident is still that incident.
+
+**The shift is resolved once and STORED**, the rule `pace-sheet-ledger-v1`
+follows: if somebody edits the garage's hours in six weeks, the shift a fall
+happened on must not migrate to another crew. It is resolved from when it
+HAPPENED, not when it was filed, so a fall at 23:50 written up at 00:20 belongs
+to the night crew who were on the floor.
+
+**INCIDENTS IS DEVICE-LOCAL AND NEVER SYNCS**, for the reason a HOLD is: it
+names a person and an injury, and this app has no login, so a synced incident
+would put "who got hurt and how" on every phone with nothing deciding who may
+read it. Curtis chose that when asked. Sharing one is a deliberate act, and the
+screen says the app does not report it for anybody.
+
+**SHOP TALK is the cheap version of an incident.** A hazard posted and cleared
+is an incident that never had to be filed, which is why open hazards sort above
+everything and stay visible until somebody marks them handled. Nothing is
+deleted — "the oil in bay 7 was reported four times this month" is a fact that
+only exists if the first three are kept — and the nav badge counts OPEN HAZARDS
+only, because a badge that includes suggestions stops meaning "go look now".
+Its not syncing is a limitation rather than a decision: carrying it would need
+the `shop_memory` migration, which is Curtis's call.
+
+**Both draw their location list from `site-config.ts`**, never a prefix and
+never a hand-typed list — a sixth copy of that table would bring back the bug
+that named all 84 garage spaces "Main Garage". A bus, when one is involved, is
+remembered by FLEET NUMBER, never by a device-local id.
 
 **`pace-ptr-v1` is PATH TO REPAIR, and it is keyed to the REPAIR rather than
 to the defect.** Curtis: *"basically steps, general steps to point people in the
