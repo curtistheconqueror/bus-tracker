@@ -173,6 +173,16 @@ export async function POST(request:Request){
     batch of only notifications is answered with 202 and no body, which is what
     the transport expects. */
  if(Array.isArray(body)){
+  /* An empty batch is an invalid request, not an empty one. Answered rather
+     than 202'd for the same reason a bare `null` is: silence is the one answer
+     the caller cannot act on.
+
+     HTTP 200, matching the -32600 that `handleRpc` returns for a non-object
+     body. The same error code must not arrive under two different statuses
+     from one endpoint, and 200 is the right one: the transport worked, and the
+     refusal is in the envelope. The unparseable-body case above stays 400
+     because there is no envelope there to put an answer in. */
+  if(!body.length)return json({jsonrpc:"2.0",id:null,error:{code:-32600,message:"A JSON-RPC batch must not be empty."}});
   const responses=[];
   for(const item of body){
    const response=await handleRpc(item as Record<string,unknown>,runner);

@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, readBoardRows, readLiveRows, textResult } from "./helpers/modules.mjs";
+import { BOARD_TABLES, FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PAGE, TOOLS, TOOL_NAMES, boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, handleRpc, isReadOnlyToolSurface, locateBus, newestStamp, readBoardRows, readLiveRows, textResult } from "./helpers/modules.mjs";
 
 const FETCHED="2026-10-21T12:00:00.000Z";
 
@@ -185,6 +185,19 @@ test("a notification is not answered",async()=>{
  assert.equal(await handleRpc({jsonrpc:"2.0"},runner),null);
 });
 
+/* A body that is valid JSON but not an object has no id, and an absent id is
+   how a notification is recognised — so `null` and `42` came back as 202 with
+   an empty body, which the caller cannot tell from "accepted, nothing to say". */
+test("a body that is not an object is an invalid request, not a notification",async()=>{
+ const runner=async()=>textResult({});
+ for(const body of [null,42,"hello",true,[]]){
+  const response=await handleRpc(body,runner);
+  assert.ok(response,JSON.stringify(body)+" must be answered, not swallowed");
+  assert.equal(response.error.code,INVALID_REQUEST,JSON.stringify(body)+" must be -32600");
+  assert.equal(response.id,null);
+ }
+});
+
 test("initialize echoes the version the client offered and falls back when it offers none",async()=>{
  const runner=async()=>textResult({});
  const echoed=await handleRpc({jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2099-01-01"}},runner);
@@ -239,19 +252,34 @@ test("a tool call reaches the runner with its arguments",async()=>{
 
 /* ---- paging ---- */
 
-/* `serverCap` is the fake project's own PostgREST max-rows, which is NOT the
-   same number as the page we ask for and is the whole point of two of these
-   tests. `ordered` records what each table was sorted by. */
-function pagingClient(rowsByTable,{failOn="",serverCap=PAGE,ordered=[]}={}){
- return {from:table=>({select:()=>({is:()=>({order:(column,options)=>{
-  ordered.push({table,column,options});
-  return {range:async(from,to)=>{
-   if(table===failOn)return {data:null,error:{message:"permission denied for table "+table}};
-   const rows=rowsByTable[table]||[];
-   const width=Math.min(to-from+1,serverCap);
-   return {data:rows.slice(from,from+width),error:null};
-  }};
- }})})})};
+/* A keyset-aware fake of the Shop Cloud.
+
+   `serverCap` is the fake project's own PostgREST row cap, which is NOT the
+   page we ask for — the difference is the point of one of these tests.
+   `afterFirstPage` rewrites the table between pages, which is what makes the
+   two concurrency tests regression tests rather than restatements of the
+   implementation: the rows genuinely move under the walk, the way they do when
+   a phone pushes mid-read. */
+function pagingClient(rowsByTable,{failOn="",serverCap=PAGE,ordered=[],afterFirstPage=null}={}){
+ const tables=new Map(Object.entries(rowsByTable).map(([table,rows])=>[table,rows.slice()]));
+ let requests=0;
+ const sorted=(rows,key)=>rows.slice().sort((a,b)=>
+  String(a[key])<String(b[key])?-1:String(a[key])>String(b[key])?1:0);
+ return {from:table=>({select:()=>({is:()=>{
+  const serve=after=>({order:(column,options)=>{
+   ordered.push({table,column,options});
+   return {limit:async count=>{
+    if(table===failOn)return {data:null,error:{message:"permission denied for table "+table}};
+    const rows=sorted(tables.get(table)||[],column);
+    const eligible=after===undefined?rows:rows.filter(row=>String(row[column])>String(after));
+    const page=eligible.slice(0,Math.min(count,serverCap));
+    requests+=1;
+    if(requests===1&&afterFirstPage)tables.set(table,afterFirstPage(tables.get(table)||[]));
+    return {data:page,error:null};
+   }};
+  }});
+  return Object.assign(serve(undefined),{gt:(column,value)=>serve(value)});
+ }})})};
 }
 
 const TABLE_NAMES=BOARD_TABLES.map(entry=>entry.table);
@@ -301,6 +329,46 @@ test("every table is paged in a stable order, by a unique key",async()=>{
  assert.deepEqual([...columnsByTable.keys()],TABLE_NAMES,"every board table must be ordered");
  for(const {table,key} of BOARD_TABLES)
   assert.deepEqual([...columnsByTable.get(table)],[key],table+" must page by "+key+" and nothing else");
+});
+
+/* THE CASE ORDERING ALONE DID NOT FIX. A phone soft-deletes a row behind the
+   walk: it leaves the result set, everything after it shifts up one, and an
+   offset-based next page starts one row too far — a live row never read, with
+   error:"" reported. A keyset walk resumes after the last key it SAW, so what
+   happens elsewhere in the table cannot move it. */
+test("a row soft-deleted behind the walk does not cost a live row",async()=>{
+ const rows=["a","b","c","d","e"].map(id=>({fleet_number:id}));
+ const {rows:read,error}=await readLiveRows(
+  pagingClient({buses:rows},{serverCap:2,afterFirstPage:live=>live.filter(row=>row.fleet_number!=="a")}),
+  BUSES.table,BUSES.key);
+ assert.equal(error,"");
+ const numbers=read.map(row=>row.fleet_number);
+ for(const survivor of ["b","c","d","e"])
+  assert.equal(numbers.filter(number=>number===survivor).length,1,survivor+" must be read exactly once");
+});
+
+/* The mirror case: an insert behind the walk shifts an offset DOWN one and a
+   row is read twice, so the board would hold two copies of one defect and
+   report a bus somebody then goes looking for. */
+test("a row inserted behind the walk is not read twice",async()=>{
+ const rows=["b","c","d","e","f"].map(id=>({fleet_number:id}));
+ const {rows:read,error}=await readLiveRows(
+  pagingClient({buses:rows},{serverCap:2,afterFirstPage:live=>[{fleet_number:"a"},...live]}),
+  BUSES.table,BUSES.key);
+ assert.equal(error,"");
+ const numbers=read.map(row=>row.fleet_number);
+ assert.equal(numbers.length,new Set(numbers).size,"no row may be read twice: "+numbers.join(","));
+});
+
+/* A row with no key would make the next request ask for everything greater
+   than undefined — the whole table, forever — in an edge function that would
+   spin until it was killed. The columns are NOT NULL so Postgres cannot
+   produce this; it is refused anyway. */
+test("a row missing its page key fails the read instead of looping",async()=>{
+ const {rows,error}=await readLiveRows(
+  pagingClient({buses:[{fleet_number:"a"},{}]},{serverCap:2}),BUSES.table,BUSES.key);
+ assert.deepEqual(rows,[]);
+ assert.match(error,/missing its fleet_number/);
 });
 
 test("a refused read returns no rows and says why",async()=>{

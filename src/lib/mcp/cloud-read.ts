@@ -39,22 +39,44 @@ export const BOARD_TABLES=[
    page, so any server cap at or below this one is read to the end. */
 export const PAGE=1000;
 
-type Paged={range(from:number,to:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>};
-type Ordered={order(column:string,options?:{ascending?:boolean}):Paged};
-export type ReadableClient={from(table:string):{select(columns:string):{is(column:string,value:null):Ordered}}};
+type Limited={limit(count:number):Promise<{data:CloudRow[]|null;error:{message:string}|null}>};
+type Ordered={order(column:string,options?:{ascending?:boolean}):Limited};
+type Filtered=Ordered&{gt(column:string,value:unknown):Ordered};
+export type ReadableClient={from(table:string):{select(columns:string):{is(column:string,value:null):Filtered}}};
 
 export type RowsOutcome={rows:CloudRow[];error:string};
 
-/* The live rows of one table: `deleted_at is null`, ordered, in pages.
+/* The live rows of one table: `deleted_at is null`, walked by KEY rather than
+   by offset.
 
-   ORDERED BECAUSE POSTGRES MAKES NO PROMISE OTHERWISE. Without an `order by`,
-   two queries against the same table may return rows in different sequences,
-   and `range` is an offset into that sequence. Phones push while this walk is
-   half way through, so an updated row can move — and once a table is bigger
-   than one page, a row that moves can be read twice or not at all. The symptom
-   would be a defect count that is quietly wrong, which is the one direction a
-   maintenance number must never be wrong in. Ordering on a unique key makes the
-   sequence the same every time.
+   WHY NOT AN OFFSET, since that is the obvious way and was the first way. An
+   offset is a position in a result set that other devices are changing while
+   this walk is half way down it, and three different things can go wrong, of
+   which ordering fixes only the first:
+
+     1. A row is UPDATED and moves. Fixed by `order by` — and an earlier version
+        of this comment claimed that was the whole problem. It was not.
+     2. A row below the current offset is SOFT-DELETED. It leaves the result set
+        because of the `deleted_at` filter, every later row shifts up one, and
+        the next page starts one row too far. A live row is never read.
+     3. A row below the current offset is INSERTED. Everything shifts down one
+        and one row is read twice, so the board holds two copies of a defect.
+
+   Both 2 and 3 report success. That is the silent miscount, and a defect count
+   that is quietly wrong is the one direction a maintenance number must never be
+   wrong in — a bus counted twice is a bus somebody goes looking for.
+
+   A KEYSET WALK cannot shift. Each request asks for the rows whose key is
+   greater than the last key seen, so an insert or a delete anywhere else in the
+   table changes nothing about where this walk resumes. `>` is only safe because
+   every one of these keys is declared UNIQUE in the schema — `fleet_number`,
+   `defect_id` and `entry_id` all are — so no two rows can share a boundary and
+   be skipped together.
+
+   It also keeps the one property the offset version was fixed to have: a
+   project whose own row cap is smaller than PAGE still gets read to the end,
+   because the next request resumes after the last key it actually received
+   rather than at a position this code guessed.
 
    Deleted rows are left behind deliberately. The schema soft-deletes so a
    removal can travel between devices as a tombstone, and an agent has no
@@ -63,9 +85,11 @@ export type RowsOutcome={rows:CloudRow[];error:string};
    exist to prevent on the devices. */
 export async function readLiveRows(client:ReadableClient,table:string,key:string):Promise<RowsOutcome>{
  const rows:CloudRow[]=[];
- for(let from=0;;){
-  const {data,error}=await client.from(table).select("*").is("deleted_at",null)
-   .order(key,{ascending:true}).range(from,from+PAGE-1);
+ let after:unknown;
+ for(;;){
+  const live=client.from(table).select("*").is("deleted_at",null);
+  const {data,error}=await (after===undefined?live:live.gt(key,after))
+   .order(key,{ascending:true}).limit(PAGE);
   if(error)return {rows:[],error:error.message||"The shop cloud could not be read."};
   const page=data||[];
   /* Empty is the only end. A SHORT page is not: it is what a server whose own
@@ -77,7 +101,18 @@ export async function readLiveRows(client:ReadableClient,table:string,key:string
      early and says it succeeded. */
   if(!page.length)return {rows,error:""};
   rows.push(...page);
-  from+=page.length;
+  after=page[page.length-1][key];
+  /* A row too thin to carry its own key would make the next request ask for
+     everything greater than undefined, which is the whole table again, forever.
+     The columns are NOT NULL in the schema so this cannot happen from Postgres,
+     and it is checked anyway because the alternative is an edge function that
+     spins until it is killed. */
+  /* No rows alongside an error, matching the refused-read path above. Handing
+     back a half-read board next to an error invites a caller that checks the
+     rows before the error, and half a board is the shape of answer this whole
+     module exists to refuse. */
+  if(after===undefined||after===null)
+   return {rows:[],error:"A row in "+table+" is missing its "+key+"."};
  }
 }
 

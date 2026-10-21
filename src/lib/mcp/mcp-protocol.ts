@@ -164,6 +164,21 @@ function params(request:RpcRequest):Record<string,unknown>{
    for a fixture in the tests, and so this file never grows a reason to know what
    a bus is. */
 export async function handleRpc(request:RpcRequest,runner:ToolRunner):Promise<RpcResponse|null>{
+ /* A body that is valid JSON but is not an object — `null`, `42`, `"hello"`,
+    `true` — is an INVALID REQUEST and not a notification.
+
+    It read as one, because nothing that is not an object has an `id`, and an
+    absent id is how a notification is recognised. So a POST of `null` came back
+    as 202 with an empty body: the most confusing answer available, since the
+    caller cannot tell the difference between "accepted, nothing to say" and
+    "I did not understand a word of that". An id of null is what JSON-RPC says
+    to answer with when the request was too broken to have one.
+
+    Arrays are rejected here too. The route unwraps a batch before calling this,
+    so one should never arrive, and a pure function that is total is worth more
+    than one that relies on its only caller staying correct. */
+ if(request===null||typeof request!=="object"||Array.isArray(request))
+  return rpcError(null,INVALID_REQUEST,"A JSON-RPC request must be an object.");
  const {present,id}=requestId(request);
  const method=typeof request?.method==="string"?request.method:"";
 
