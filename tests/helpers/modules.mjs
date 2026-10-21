@@ -52,3 +52,6 @@ export {DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay} from "../../src/l
 export {DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay} from "../../src/lib/defects/defect-log-display-settings.ts";
 export {quickFilterShareText} from "../../src/lib/defects/quick-filter-share.ts";
 export {DOWN_SHEET_STORAGE_KEY, DOWN_SHEET_STORAGE_VERSION, FLEET_BACKUP_REMINDER_STORAGE_KEY, FLEET_RECOVERY_STORAGE_KEY, FLEET_STORAGE_KEY, FLEET_STORAGE_VERSION, FLEET_BACKUP_INTERVAL, FLEET_BACKUP_INTERVAL_CHOICES, normalizeFleetBackupInterval, fleetBackupDue, fleetDefectCount, fleetDefectLogCount, markFleetBackupExported, readDownSheetPayload, readFleetPayload, readFleetRecoverySnapshot, serializeDownSheetPayload, serializeFleetPayload, writeDownSheetStorage, writeFleetStorage} from "../../src/lib/storage/storage.ts";
+export {boardFromRows, busDefects, discrepancies, downSheetView, findBus, fleetCounts, locateBus, newestStamp} from "../../src/lib/mcp/fleet-reads.ts";
+export {FALLBACK_PROTOCOL_VERSION, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, SERVER_INFO, TOOLS, TOOL_NAMES, handleRpc, isReadOnlyToolSurface, textResult} from "../../src/lib/mcp/mcp-protocol.ts";
+export {BOARD_TABLES, PAGE, readBoardRows, readLiveRows} from "../../src/lib/mcp/cloud-read.ts";
