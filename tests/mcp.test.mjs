@@ -169,6 +169,11 @@ test("the tool surface is the five read questions and carries no write tool",()=
   assert.ok(tool.description.length>40,tool.name+" needs a description a model can act on");
   assert.equal(tool.inputSchema.additionalProperties,false,tool.name+" must refuse arguments it does not know");
   assert.ok(!/log_|add_|set_|move_|relocate|update_|delete_|write_|clear_/.test(tool.name),tool.name+" looks like a write tool");
+  /* The read-only promise has to reach the AGENT, not just this test. A client
+     that cannot see these hints may stop and ask its user before every read. */
+  assert.equal(tool.annotations.readOnlyHint,true,tool.name+" must declare itself read-only to the client");
+  assert.equal(tool.annotations.destructiveHint,false,tool.name+" must declare itself non-destructive");
+  assert.equal(tool.annotations.idempotentHint,true,tool.name+" must declare itself idempotent");
  }
 });
 

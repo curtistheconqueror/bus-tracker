@@ -43,6 +43,24 @@ export const METHOD_NOT_FOUND=-32601;
 export const INVALID_PARAMS=-32602;
 export const INTERNAL_ERROR=-32603;
 
+/* WHAT THESE TOOLS DO TO THE WORLD, in the form a client can act on.
+
+   The comment above says the surface is read-only and the test below asserts
+   it, but neither reaches the agent. MCP carries these hints on the tool
+   definition itself, and a client uses them to decide whether to stop and ask
+   its user before each call. Without them a conforming client may treat all
+   five as possibly destructive and prompt before every read, which would make
+   "where is 17549" a question somebody has to approve.
+
+   readOnlyHint       nothing here writes a record.
+   destructiveHint    nothing here can remove one either.
+   idempotentHint     asking twice costs a second read and changes nothing.
+   openWorldHint      the shop's own records are the whole world this touches.
+
+   Unknown fields are ignored by clients that predate them, so this is additive
+   and cannot break an older agent. */
+const READ_ONLY={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false} as const;
+
 const BUS_ARG={fleet_number:{type:"string",description:"The bus's fleet number as a person says it, e.g. \"17549\". Not an internal id."}};
 
 /* The tool surface, and it is READ-ONLY on purpose.
@@ -59,11 +77,13 @@ const BUS_ARG={fleet_number:{type:"string",description:"The bus's fleet number a
 export const TOOLS=[
  {
   name:"locate_bus",
+  annotations:READ_ONLY,
   description:"Where one bus is right now, by fleet number: the area in the words the shop uses, its status, whether the Down Sheet has it, and how many defects are still open on it.",
   inputSchema:{type:"object",properties:BUS_ARG,required:["fleet_number"],additionalProperties:false},
  },
  {
   name:"bus_defects",
+  annotations:READ_ONLY,
   description:"Every defect logged against one bus. Open ones by default; pass include_completed to see the history too. Each defect comes back with the wording the shop's current catalog uses, not whatever wording it was saved under.",
   inputSchema:{
    type:"object",
@@ -74,6 +94,7 @@ export const TOOLS=[
  },
  {
   name:"down_sheet",
+  annotations:READ_ONLY,
   description:"The Down Sheet as the Shop Cloud has it — which buses are written up, for what, by which shift. Completed rows are left out unless asked for. The Down Sheet is the source of truth for whether a bus is down.",
   inputSchema:{
    type:"object",
@@ -87,11 +108,13 @@ export const TOOLS=[
  },
  {
   name:"fleet_counts",
+  annotations:READ_ONLY,
   description:"The shop's headline numbers: how many buses are down, how many are soft down and still drivable, how many are on the sheet, and how many carry open defects. The same figures the printed Fleet Status Report uses, counted by bus rather than by row.",
   inputSchema:{type:"object",properties:{},additionalProperties:false},
  },
  {
   name:"discrepancies",
+  annotations:READ_ONLY,
   description:"Where the map and the Down Sheet disagree. Mystery buses are parked in a working area — a bay, the pit, the wash, body or paint — with nobody's write-up behind them, which usually means somebody moved a bus for a reason that was never recorded. Bay 12 awareness is the narrower case: a bus flagged for watching, carrying active defects, still not on the sheet.",
   inputSchema:{type:"object",properties:{},additionalProperties:false},
  },
