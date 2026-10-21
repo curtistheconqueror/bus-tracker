@@ -1,9 +1,16 @@
 # Plugging an agent into the fleet — Phase 1, read-only
 
 **Status: BUILT, READ-ONLY. Not configured until the five variables below are
-set.** Until then the endpoint answers a handshake and refuses every tool call
-with a message saying so, which is deliberate — see *Why discovery works
-without credentials*.
+set**, and the two halves fail differently:
+
+- **No `MCP_TOKEN`** — every request, handshake included, answers **503**. There
+  is no token to check a caller against, so nothing is served.
+- **`MCP_TOKEN` set, the four Shop Cloud variables missing** — the handshake and
+  `tools/list` work, and every tool call comes back with a message saying the
+  records could not be reached. That half is deliberate; see *Why discovery
+  works without credentials*.
+
+So set `MCP_TOKEN` first if you want the curl below to tell you anything.
 
 Curtis asked for this: *"get this MCP ready so that way I can plug in agents to
 the site... it can basically navigate its way around the entire platform, log

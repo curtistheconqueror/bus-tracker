@@ -234,27 +234,72 @@ test("a tool call reaches the runner with its arguments",async()=>{
 
 /* ---- paging ---- */
 
-function pagingClient(rowsByTable,failOn=""){
- return {from:table=>({select:()=>({is:()=>({range:async(from,to)=>{
-  if(table===failOn)return {data:null,error:{message:"permission denied for table "+table}};
-  const rows=rowsByTable[table]||[];
-  return {data:rows.slice(from,to+1),error:null};
+/* `serverCap` is the fake project's own PostgREST max-rows, which is NOT the
+   same number as the page we ask for and is the whole point of two of these
+   tests. `ordered` records what each table was sorted by. */
+function pagingClient(rowsByTable,{failOn="",serverCap=PAGE,ordered=[]}={}){
+ return {from:table=>({select:()=>({is:()=>({order:(column,options)=>{
+  ordered.push({table,column,options});
+  return {range:async(from,to)=>{
+   if(table===failOn)return {data:null,error:{message:"permission denied for table "+table}};
+   const rows=rowsByTable[table]||[];
+   const width=Math.min(to-from+1,serverCap);
+   return {data:rows.slice(from,from+width),error:null};
+  }};
  }})})})};
 }
+
+const TABLE_NAMES=BOARD_TABLES.map(entry=>entry.table);
+const BUSES=BOARD_TABLES[0];
 
 /* PostgREST's row cap is silent — the response looks complete. A reader that
    takes the first page at face value has an agent confidently describing part
    of the shop, which is worse than an error. */
 test("a table larger than one page is read to the end",async()=>{
  const rows=Array.from({length:PAGE+7},(unused,index)=>({fleet_number:String(20000+index)}));
- const {rows:read,error}=await readLiveRows(pagingClient({buses:rows}),"buses");
+ const {rows:read,error}=await readLiveRows(pagingClient({buses:rows}),BUSES.table,BUSES.key);
  assert.equal(error,"");
  assert.equal(read.length,PAGE+7);
  assert.equal(read[PAGE+6].fleet_number,String(20000+PAGE+6));
 });
 
+/* THE ONE THE OLD LOOP GOT WRONG. A project whose own max-rows is set below
+   the page we ask for returns a short page on EVERY request, including the
+   first. Stopping on a short page therefore ended the read at the server's cap
+   and reported success — 500 of 1,600 defects, silently. The walk now advances
+   by what came back and stops only on an empty page. */
+test("a project whose own row cap is smaller than the page size is still read to the end",async()=>{
+ const rows=Array.from({length:PAGE+7},(unused,index)=>({fleet_number:String(20000+index)}));
+ for(const serverCap of [1,7,499,500,PAGE-1]){
+  const {rows:read,error}=await readLiveRows(pagingClient({buses:rows},{serverCap}),BUSES.table,BUSES.key);
+  assert.equal(error,"");
+  assert.equal(read.length,PAGE+7,"a cap of "+serverCap+" must not truncate the read");
+ }
+});
+
+/* Postgres promises no row order without an `order by`, and `range` is an
+   offset into that order. Phones push while this walk is half way through, so
+   an unordered read can see a moved row twice or never. */
+test("every table is paged in a stable order, by a unique key",async()=>{
+ const ordered=[];
+ const rowsByTable={buses:[{fleet_number:"17549"}],bus_defects:[{defect_id:"d1"}],down_sheet_entries:[{entry_id:"e1"}]};
+ await readBoardRows(pagingClient(rowsByTable,{ordered}));
+ /* Asserted per table rather than as a call list, because the number of calls
+    is not the point and is not fixed: every table costs one extra request that
+    comes back empty, which is what ending on an empty page buys. What must
+    hold is that each table was ordered, only ever by its own key, ascending. */
+ const columnsByTable=new Map();
+ for(const call of ordered){
+  assert.equal(call.options.ascending,true,call.table+" must be ordered ascending");
+  columnsByTable.set(call.table,(columnsByTable.get(call.table)||new Set()).add(call.column));
+ }
+ assert.deepEqual([...columnsByTable.keys()],TABLE_NAMES,"every board table must be ordered");
+ for(const {table,key} of BOARD_TABLES)
+  assert.deepEqual([...columnsByTable.get(table)],[key],table+" must page by "+key+" and nothing else");
+});
+
 test("a refused read returns no rows and says why",async()=>{
- const {rows,error}=await readLiveRows(pagingClient({buses:[]},"buses"),"buses");
+ const {rows,error}=await readLiveRows(pagingClient({buses:[]},{failOn:"buses"}),BUSES.table,BUSES.key);
  assert.deepEqual(rows,[]);
  assert.match(error,/permission denied/);
 });
@@ -268,8 +313,8 @@ test("one unreadable table fails the whole board rather than half of it",async()
  assert.equal(ok.buses.length,1);
  assert.equal(ok.defects.length,1);
  assert.equal(ok.entries.length,1);
- for(const table of BOARD_TABLES){
-  const failed=await readBoardRows(pagingClient(rowsByTable,table));
+ for(const table of TABLE_NAMES){
+  const failed=await readBoardRows(pagingClient(rowsByTable,{failOn:table}));
   assert.match(failed.error,new RegExp(table),table+" failing must be reported");
   assert.deepEqual(failed.buses,[]);
   assert.deepEqual(failed.defects,[]);
