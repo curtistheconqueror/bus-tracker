@@ -302,7 +302,13 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
 };
 
 export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
- "A/C and HVAC":"❄️",
+ /* Two glyphs, because the category holds both halves now. The heating group
+    arrived in winter and a snowflake on its own said the opposite of what a
+    no-heat bus needs. Curtis picked the pair. The thermometer and the puff of
+    air were not available to pair with it - they name Cooling System and
+    Pneumatic System, and two tables that must agree about a glyph are two
+    tables that will eventually disagree. */
+ "A/C and HVAC":"❄️+♨️",
  Engine:"⚙️",
  "Cooling System":"🌡️",
  Transmission:"🕹️",

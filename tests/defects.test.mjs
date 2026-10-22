@@ -1502,6 +1502,18 @@ test("grouping A/C and HVAC did not quietly cost the operator, the notes or the 
    JSON.stringify(details)+" must not reach the heat sheet");
  /* And the real thing still does, with the category present. */
  assert.ok(quickFilterMatch(bus("A/C and HVAC","Heating - Floor heat INOP",""),"no-cabin-heat"));
+
+ /* 5. THE CATEGORY GLYPH NAMES BOTH HALVES. Curtis picked the pair once the
+    heating group landed: a snowflake on its own tells a mechanic holding a
+    bus with no heat in December that this is the cold box. Pinned because the
+    cost of losing it is silent - the heating half simply stops being
+    advertised, and nothing else fails. The thermometer and the puff of air
+    stay out of it: they name Cooling System and Pneumatic System. */
+ assert.equal(repairCategoryEmoji("A/C and HVAC"),"❄️+♨️");
+ assert.equal(repairCategoryLabel("A/C and HVAC"),"❄️+♨️ A/C and HVAC");
+ for(const taken of ["Cooling System","Pneumatic System"])
+  assert.notEqual(repairCategoryEmoji("A/C and HVAC"),repairCategoryEmoji(taken),
+   taken+" owns its own glyph and must not share the HVAC one");
 });
 
 test("belts, pulley alignment and air bags are catalog repairs, and a counted repair carries its number",async()=>{
