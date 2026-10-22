@@ -16,7 +16,7 @@ test("defect normalization preserves future odometer and parts fields",()=>{
 
 test("shared Quick Filters classify active tracker and Defect Log records", () => {
   const buses=[
-    {id:"ac",n:"1",defects:[{category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]},
+    {id:"ac",n:"1",defects:[{category:"A/C and HVAC",issue:"Cooling - No cooling",details:"",state:"open"}]},
     {id:"engine",n:"2",checkEngine:true,defects:[]},
     {id:"ramp",n:"3",badRampKneeler:true,defects:[]},
     {id:"horn",n:"4",noHorn:true,defects:[]},
@@ -47,14 +47,14 @@ test("shared Quick Filters classify active tracker and Defect Log records", () =
   assert.deepEqual(quickFilterBusIds(buses,"not-duplicated"),["notDuplicated"]);
   assert.equal(defectLabel(buses[7].defects[0]),"Preventive Maintenance — Add engine oil — 10 quarts");
   const mixed={id:"mixed",n:"8",defects:[buses[0].defects[0],buses[7].defects[0]]};
-  assert.deepEqual(quickFilterDefects(mixed,"ac").map(defect=>defect.issue),["No cooling"]);
+  assert.deepEqual(quickFilterDefects(mixed,"ac").map(defect=>defect.issue),["Cooling - No cooling"]);
   // A blank line between buses and the defects indented under the number. This
   // gets read on a phone in a garage, where fourteen buses of run-on text is a
   // wall the eye slides off. A bus with no location simply omits it.
-  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\n\nBus 8\n   A/C and HVAC — No cooling");
+  assert.equal(quickFilterShareText("A/C",[mixed],"ac"),"A/C — 1 bus\n\nBus 8\n   A/C and HVAC — Cooling - No cooling");
   assert.equal(quickFilterShareText("Farebox",[{id:"flag",n:"9",farebox:true,defects:[buses[7].defects[0]]}],"farebox"),"Farebox — 1 bus\n\nBus 9\n   Farebox tracker flag");
   assert.equal(quickFilterShareText("IBS & Ventra",[{id:"legacy",n:"10",pendingRepair:"Ventra reader blank",defects:[]}],"ibs-ventra"),"IBS & Ventra — 1 bus\n\nBus 10\n   Ventra reader blank");
-  const fifteen=Array.from({length:15},(_,index)=>({id:"fare-"+index,n:String(17500+index),defects:[{id:"farebox-"+index,category:"Tech Services",issue:"Farebox",details:"Reader offline",state:"open"},{id:"ac-"+index,category:"A/C and HVAC",issue:"No cooling",details:"",state:"open"}]}));
+  const fifteen=Array.from({length:15},(_,index)=>({id:"fare-"+index,n:String(17500+index),defects:[{id:"farebox-"+index,category:"Tech Services",issue:"Farebox",details:"Reader offline",state:"open"},{id:"ac-"+index,category:"A/C and HVAC",issue:"Cooling - No cooling",details:"",state:"open"}]}));
   const fifteenFarebox=quickFilterShareText("Farebox",fifteen,"farebox");
   assert.equal(quickFilterBusIds(fifteen,"farebox").length,15);
   // One block per bus, each separated by a blank line. Asserting the structure
@@ -210,7 +210,7 @@ test("manual defect drafts are captured when the main editor is saved", () => {
 test("repair catalog exposes robust category and issue choices", () => {
   assert.equal(Object.keys(REPAIR_OPTIONS).length, 21);
   assert.ok(Object.entries(REPAIR_OPTIONS).filter(([category]) => category !== "Interior Cleaning").every(([, options]) => options.length >= 5));
-  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("No cooling"));
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Cooling - No cooling"));
   assert.ok(REPAIR_OPTIONS["Brakes"].includes("ABS warning"));
   assert.ok(REPAIR_OPTIONS["Inspection"].includes("B-12"));
   assert.ok(REPAIR_OPTIONS["Operator/Driver Controls"].includes("Operating Controls - Horn"));
@@ -1264,8 +1264,14 @@ test("dash lights are named as reported, and the start rename does not invert hi
 test("the operator blower and the mirror switches land in both structures a grouped category needs",()=>{
  // The driver's own blower is not the cabin one, and "Blower motor" could not
  // say which was out.
+ // A/C and HVAC became grouped, and both blowers moved into "Controls and
+ // Blowers" together rather than being split by the heat/cool line: the cabin
+ // blower moves whatever the unit made, and the driver's own is still its own
+ // entry. The pairing this test was written for is what kept them together.
  const ac=REPAIR_OPTIONS["A/C and HVAC"];
- assert.equal(ac.indexOf("Operator A/C blower"),ac.indexOf("Blower motor")+1);
+ assert.equal(ac.indexOf("Controls and Blowers - Operator A/C blower"),ac.indexOf("Controls and Blowers - Blower motor")+1);
+ const blowers=REPAIR_OPTION_GROUPS["A/C and HVAC"]["Controls and Blowers"];
+ assert.equal(blowers.indexOf("Operator A/C blower"),blowers.indexOf("Blower motor")+1);
 
  // Bus Controls is grouped, which means the entry has to exist twice: once
  // prefixed in REPAIR_OPTIONS, which is what gets stored, and once bare in
@@ -1293,8 +1299,11 @@ test("the operator blower and the mirror switches land in both structures a grou
 
 test("the split surge tank is two independent sides, and the empty one builds the winter list",async()=>{
  const cooling=REPAIR_OPTIONS["Cooling System"];
- assert.deepEqual(cooling.slice(cooling.indexOf("Coolant leak"),cooling.indexOf("Coolant leak")+4),
-  ["Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low"]);
+ /* The heat-side leak sits directly after the plain one: in winter WHICH side
+    is losing glycol is the whole question, and the engine side can read full
+    and normal while this one empties. Both reach the No Heat Buses list. */
+ assert.deepEqual(cooling.slice(cooling.indexOf("Coolant leak"),cooling.indexOf("Coolant leak")+5),
+  ["Coolant leak","Coolant leak - heating side","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low"]);
 
  // How much a tank drinks is the only measure of how fast it is losing it, so
  // every side carries the amount. None of them blocks a report for it.
@@ -1341,6 +1350,158 @@ test("the split surge tank is two independent sides, and the empty one builds th
  assert.ok(QUICK_FILTERS.some(item=>item.key==="no-cabin-heat"&&item.label==="No Heat Buses"&&item.shortLabel==="No Heat Buses"));
  assert.equal(typeof quickFilterFallbackLabel("no-cabin-heat"),"string");
  assert.ok(quickFilterFallbackLabel("no-cabin-heat").length>0);
+});
+
+test("the heating half of HVAC is its own group, and every repair in it builds the heat sheet",async()=>{
+ /* Curtis, in December, against a paper heat sheet: "just like you can tag
+    buses with no AC, I want a no heat section for the buses ... being able to
+    quick filter them, like search them". The filter already existed and found
+    two repairs; what did not exist were the repairs. He named them: no heat at
+    the front dash, floor heat not working, a coolant leak on the heat side, a
+    bad boost pump, and the heat control knob.
+
+    Asked where they belonged he chose a subcategory over a new top-level
+    category — "that might be appropriate instead of just making a whole
+    another category" — which is right: IntelligAIRE III runs the heat and the
+    cooling off one panel. */
+ const heating=REPAIR_OPTION_GROUPS["A/C and HVAC"]["Heating"];
+ assert.deepEqual(heating,["No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"]);
+
+ /* Both structures, for every one of them. The picker draws
+    REPAIR_OPTION_GROUPS and the stored identity comes from REPAIR_OPTIONS, so
+    an entry in one and not the other is storable and invisible. */
+ for(const issue of heating)
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Heating - "+issue),issue+" is not storable");
+
+ /* THE FILTER IS DRIVEN OFF THE GROUP, NOT A LIST OF WORDINGS, and that is
+    the property worth holding: everything in this group is by definition a
+    no-heat defect, so a heating repair added next winter reaches the heat
+    sheet without anybody remembering to edit the filter. Iterated from the
+    catalog here on purpose — a hard-coded list in this test would pass while
+    the real list quietly stopped being complete. */
+ const withIssue=(category,issue,details="")=>({id:"b",n:"17549",
+  defects:[{id:"d",category,issue,details,operability:"service",state:"open"}]});
+ for(const issue of heating)
+  assert.ok(quickFilterMatch(withIssue("A/C and HVAC","Heating - "+issue),"no-cabin-heat"),
+   "Heating - "+issue+" must reach the No Heat Buses list");
+
+ /* The leak Curtis described — "a leak in the heat side of the cooling
+    system" — sits in Cooling System with the other coolant leaks rather than
+    in HVAC, because that is where somebody looks for a leak, and it reaches
+    the same list from there. */
+ assert.ok(REPAIR_OPTIONS["Cooling System"].includes("Coolant leak - heating side"));
+ assert.ok(quickFilterMatch(withIssue("Cooling System","Coolant leak - heating side"),"no-cabin-heat"));
+ assert.match(defectNote("Cooling System","Coolant leak - heating side"),/engine side can read full/i);
+
+ /* THE HEAT CONTROL KNOB WAS NOT DUPLICATED INTO HVAC. It already existed
+    under Bus Controls, and Curtis chose to leave it there rather than have one
+    fault filed in two categories. So the filter reaches across to it instead:
+    a bus whose heat knob is broken has no heat whichever category holds the
+    record. */
+ assert.ok(!heating.some(issue=>/knob|control/i.test(issue)),"the knob stays in System Switches, unduplicated");
+ for(const knob of ["HVAC / heat controls","Floor heat switch"]){
+  assert.ok(REPAIR_OPTION_GROUPS["Operator/Driver Controls"]["System Switches"].includes(knob));
+  assert.ok(quickFilterMatch(withIssue("Operator/Driver Controls","System Switches - "+knob),"no-cabin-heat"),
+   knob+" must reach the No Heat Buses list from Bus Controls");
+ }
+
+ /* The boost pump is the one Curtis called out by name — "a bad boost pump, so
+    you can't blow the hot air" — and the note sends somebody to the cheaper
+    check first, because an empty heating side gives the same complaint. */
+ assert.match(defectNote("A/C and HVAC","Heating - Heater boost pump"),/surge tank before you condemn the pump/i);
+ assert.match(defectNote("A/C and HVAC","Heating - No heat at front dash"),/FLOOR heat/);
+ assert.match(defectNote("A/C and HVAC","Heating - Floor heat INOP"),/floor heat switch/i);
+
+ /* THE GROUP PREFIX MUST NOT CATCH "Overheating". \b needs a non-word
+    boundary and "r"→"h" is not one, so /\bheating\s*-\s/ cannot fire inside
+    it — checked rather than assumed, because the whole filter now rests on it
+    and an overheating bus on the heat sheet is how a foreman stops trusting
+    the list. */
+ for(const wrong of [
+  {category:"Engine",issue:"Overheating"},
+  {category:"Engine",issue:"Overheat shutdown (235-240F)"},
+  {category:"Cooling System",issue:"Overheating",details:"overheating - coolant everywhere"},
+  {category:"Amerex",issue:"Fire Suppression - Heat sensor communication fault"},
+ ]) assert.ok(!quickFilterMatch(withIssue(wrong.category,wrong.issue,wrong.details||""),"no-cabin-heat"),
+  wrong.issue+" must not reach the heat sheet");
+
+ /* A cooling repair is not a heating one, and the shared controls are on
+    neither list: a blower motor out is as much an A/C complaint as a heat one,
+    and putting it on the winter list would pad it in July. */
+ assert.ok(!quickFilterMatch(withIssue("A/C and HVAC","Cooling - No cooling"),"no-cabin-heat"));
+ assert.ok(!quickFilterMatch(withIssue("A/C and HVAC","Controls and Blowers - Blower motor"),"no-cabin-heat"));
+
+ /* AND IT IS SEARCHABLE, which is the other half of what Curtis asked for.
+    The catalog search builds its index off the groups, so the heating entries
+    are findable by typing "heat" without a synonym table. */
+ const {searchCatalog}=await import("../src/lib/defects/defect-search.ts");
+ const hits=searchCatalog("heat").map(option=>option.value);
+ for(const issue of heating)assert.ok(hits.includes("Heating - "+issue),issue+" is not findable by searching \"heat\"");
+ assert.ok(searchCatalog("boost pump").some(option=>option.value==="Heating - Heater boost pump"));
+});
+
+test("grouping A/C and HVAC did not quietly cost the operator, the notes or the estimates",async()=>{
+ /* Everything here is something a flat-to-grouped conversion breaks WITHOUT
+    failing a test, which is why each one is pinned rather than described. */
+
+ /* 1. THE VOICE AND TEXT OPERATOR. DEFECT_CHOICES keys off the stored string,
+    so the moment the category was grouped "defect no cooling" matched nothing
+    — nineteen wordings that had worked the day before. A grouped category now
+    also answers to the bare item. */
+ const {planOperatorCommand}=await import("../src/lib/operator/operator-engine.ts");
+ const fleet=[{id:"b1",n:"17559",location:"garage-1",status:"ok",defects:[]}];
+ const picked=text=>{const result=planOperatorCommand(text,fleet,[]);
+  const draft=result?.plan?.defect;return draft?draft.category+" | "+draft.issue:null};
+ assert.equal(picked("bus 17559 defect no cooling"),"A/C and HVAC | Cooling - No cooling");
+ assert.equal(picked("bus 17559 defect semi cold air"),"A/C and HVAC | Cooling - Semi cold air");
+ assert.equal(picked("bus 17559 defect blower motor"),"A/C and HVAC | Controls and Blowers - Blower motor");
+ assert.equal(picked("bus 17559 defect heater boost pump"),"A/C and HVAC | Heating - Heater boost pump");
+ assert.equal(picked("bus 17559 defect floor heat inop"),"A/C and HVAC | Heating - Floor heat INOP");
+ /* An ungrouped category is untouched by the alias. */
+ assert.equal(picked("bus 17559 defect abs warning"),"Brakes | ABS warning");
+
+ /* AN AMBIGUOUS ALIAS IS REFUSED, NOT GUESSED. "INOP (general)" is the tail of
+    three Tech Services devices and "Screen black" of two, so the bare key is
+    dropped and the full phrase is required. A matcher that picked one of three
+    fareboxes would send somebody to the wrong box, which is the failure this
+    app refuses everywhere else. */
+ assert.equal(picked("bus 17559 defect inop general"),null,"three devices share that tail — it must ask");
+ assert.equal(picked("bus 17559 defect screen black"),null,"two screens share that tail — it must ask");
+ assert.equal(picked("bus 17559 defect ventra inop general"),"Tech Services | Ventra - INOP (general)");
+
+ /* 2. THE SHOP NOTES NAME A LIVE PATH. The floor-heat note sends somebody to
+    the switch, and "Bus Controls" is not a category anybody can open — it only
+    survives inside migrateRepairIdentity. A note is read at the bus, at the
+    moment of picking, which is the one place a wrong path costs something. */
+ const {REPAIR_OPTIONS:OPTIONS,REPAIR_OPTION_GROUPS:GROUPS}=await import("../src/lib/defects/repair-catalog.ts");
+ const floorNote=defectNote("A/C and HVAC","Heating - Floor heat INOP");
+ const trail=floorNote.match(/under (.+?) → (.+?) → ([^,.]+)/);
+ assert.ok(trail,"the floor-heat note must still spell out where the switch is logged");
+ const [,category,group,issue]=trail.map(part=>part.trim());
+ assert.ok(Object.keys(OPTIONS).includes(category),category+" is named in a note but is not a live category");
+ assert.ok(GROUPS[category]?.[group],group+" is named in a note but is not a group of "+category);
+ assert.ok(GROUPS[category][group].includes(issue),issue+" is named in a note but is not in "+category+" → "+group);
+
+ /* 3. THE BIG A/C ESTIMATES. Covered in down-sheet.test.mjs off the catalog's
+    own wording; asserted here too because the number is what a foreman plans a
+    day around, and a 16-hour compressor reading as 2h30 is the kind of wrong
+    that looks like a working app. */
+ const {recommendedCoreEstimate}=await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const total=issue=>{const e=recommendedCoreEstimate("A/C and HVAC",issue);
+  return e.repairMinutes+e.diagnosticMinutes+e.accessMinutes};
+ assert.equal(total("Cooling - Compressor"),960);
+ assert.equal(total("Compressor"),960,"a record stored before the grouping still estimates");
+ assert.equal(total("Cooling - No cooling"),150);
+
+ /* 4. FREE TEXT CANNOT FAKE ITS WAY ONTO THE HEAT SHEET. defectText joins
+    details and the shop notes, so an unanchored group match read whatever a
+    mechanic typed. */
+ const bus=(category,issue,details)=>({id:"b",defects:[{id:"d",category,issue,details,operability:"service",state:"open"}]});
+ for(const details of ["engine heating - 225F","coolant heating - fast","bus heating - too hot in cab"])
+  assert.ok(!quickFilterMatch(bus("Engine","Overheating",details),"no-cabin-heat"),
+   JSON.stringify(details)+" must not reach the heat sheet");
+ /* And the real thing still does, with the category present. */
+ assert.ok(quickFilterMatch(bus("A/C and HVAC","Heating - Floor heat INOP",""),"no-cabin-heat"));
 });
 
 test("belts, pulley alignment and air bags are catalog repairs, and a counted repair carries its number",async()=>{
@@ -1419,8 +1580,8 @@ test("belts, pulley alignment and air bags are catalog repairs, and a counted re
  const editorCode=editor.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
  assert.equal(/disabled=\{!item\.category\}/.test(editorCode),false,
   "and the repair box is no longer locked behind naming the category first");
- assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C belt"));
- assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("A/C compressor pulley misaligned"));
+ assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Cooling - A/C belt"));
+ assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Cooling - A/C compressor pulley misaligned"));
  assert.deepEqual(REPAIR_OPTIONS["Pneumatic System"].slice(0,4),
   ["Air leak","Leaking air bag - Front C/S","Leaking air bag - Front R/S","Leaking air bag - Rear"]);
 
@@ -2386,7 +2547,7 @@ test("a shared filter list collapses repeats and can go as a page",async()=>{
 
 test("the IntelligAIRE III panel is named in the A/C list",()=>{
  const ac=REPAIR_OPTIONS["A/C and HVAC"];
- const entry="IntelligAIRE III control panel - screen blank / black";
+ const entry="Controls and Blowers - IntelligAIRE III control panel - screen blank / black";
 
  // The Thermo King panel on the bulkhead is called IntelligAIRE III, and the
  // screen going black is a fault in its own right. Until now the only place for
@@ -2397,12 +2558,18 @@ test("the IntelligAIRE III panel is named in the A/C list",()=>{
  assert.ok(ac.includes(entry));
  // Sits with the other control entry rather than at the end of the list, since
  // that is where somebody looking for a control fault will already be.
- assert.equal(ac.indexOf(entry),ac.indexOf("Controls / electrical")+1);
+ assert.equal(ac.indexOf(entry),ac.indexOf("Controls and Blowers - Controls / electrical")+1);
 
- // A/C and HVAC is an ungrouped category, so the entry belongs in REPAIR_OPTIONS
- // only. Adding a REPAIR_OPTION_GROUPS entry would turn the whole category into
- // a two-step picker for every other A/C defect.
- assert.equal(REPAIR_OPTION_GROUPS["A/C and HVAC"],undefined);
+ /* A/C and HVAC IS GROUPED NOW, and this assertion used to say the opposite.
+    It was right at the time: a group added then would have turned the whole
+    category into a three-step picker for one entry's benefit. What changed is
+    that winter gave the category a second half worth naming — Curtis asked for
+    a no-heat list off a paper heat sheet — so the three-step picker is now
+    paying for five heating entries rather than for this one panel.
+    The panel sits in the group with the wiring and the blowers, which is the
+    control side it was always part of. */
+ assert.deepEqual(Object.keys(REPAIR_OPTION_GROUPS["A/C and HVAC"]),["Heating","Cooling","Controls and Blowers"]);
+ assert.ok(REPAIR_OPTION_GROUPS["A/C and HVAC"]["Controls and Blowers"].includes("IntelligAIRE III control panel - screen blank / black"));
 
  // A blank display is not a road failure: the bus still runs.
  assert.equal(defaultDefectOperability("A/C and HVAC",entry),"service");
@@ -2412,8 +2579,8 @@ test("the IntelligAIRE III panel is named in the A/C list",()=>{
  assert.equal(defect.issue,entry);
 
  // The vague entry it was hiding inside stays, because the A/C control side has
- // faults that are not this panel.
- assert.ok(ac.includes("Controls / electrical"));
+ // faults that are not this panel. It is in the same group now.
+ assert.ok(ac.includes("Controls and Blowers - Controls / electrical"));
 });
 
 test("bus accessories and the two start buttons land in both catalog structures",()=>{
@@ -3002,16 +3169,19 @@ test("the A/C catalog counts fans, names Freon, and keeps every old wording read
  const options=REPAIR_OPTIONS["A/C and HVAC"];
 
  /* One fan down and both fans down are different jobs and must stay separable. */
- for(const issue of ["Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Semi cold air","Bad connection / wiring"]){
+ for(const issue of ["Cooling - Condenser fan INOP - 1 fan","Cooling - Condenser fans INOP - both fans","Cooling - Evaporator fan / motor INOP - 1","Cooling - Evaporator fans / motors INOP - both","Cooling - Semi cold air","Controls and Blowers - Bad connection / wiring"]){
   assert.ok(options.includes(issue),issue+" must be pickable in A/C and HVAC");
  }
 
  /* The floor says Freon. Records logged under the old wording read as the new
     one — nothing stored is rewritten — and the old wording is gone from the
     picker so it cannot be chosen again. */
- assert.ok(options.includes("Refrigerant / Freon leak"));
+ assert.ok(options.includes("Cooling - Refrigerant / Freon leak"));
  assert.ok(!options.includes("Refrigerant leak"),"the old wording must not still be pickable");
- assert.deepEqual(migrateRepairIdentity("A/C and HVAC","Refrigerant leak"),{category:"A/C and HVAC",issue:"Refrigerant / Freon leak"});
+ /* Straight to its grouped home. CATEGORY_ISSUE_RENAMES is applied once, so
+    this entry names the final wording rather than chaining through the Freon
+    rename — a chain would stop at the ungrouped name and never match again. */
+ assert.deepEqual(migrateRepairIdentity("A/C and HVAC","Refrigerant leak"),{category:"A/C and HVAC",issue:"Cooling - Refrigerant / Freon leak"});
 
  /* Every A/C option a previous build could have written still lands on
     something pickable, so nothing already on the board is orphaned. */
@@ -5031,12 +5201,30 @@ test("PATH TO REPAIR is written once per repair and survives a catalog rename",a
  assert.equal(findPathToRepair(legacy,"Air System","Leak").steps,"Soap the fittings.","and under yesterday's");
  assert.equal(legacy.entries[0].category,moved.category,"stored in today's words");
  assert.equal(pathToRepairKey("Air System","Leak"),pathToRepairKey(moved.category,moved.issue));
- /* Case and spacing are wordings people type, not identifiers. */
- assert.equal(pathToRepairKey("a/c and hvac","  No   cooling "),pathToRepairKey("A/C and HVAC","No cooling"));
+ /* Case and spacing are wordings people type, not identifiers. Checked on a
+    repair the rename maps do not touch, because of the limit below. */
+ assert.deepEqual(migrateRepairIdentity("Engine","Check engine light"),{category:"Engine",issue:"Check engine light"},
+  "the pair this property is checked on is one nothing migrates");
+ assert.equal(pathToRepairKey("engine","  Check   engine light "),pathToRepairKey("Engine","Check engine light"));
+
+ /* THE CASE FOLD HAPPENS AFTER THE MIGRATION, SO THE RENAME MAPS ARE
+    CASE-SENSITIVE. Recorded rather than fixed: every category this is ever
+    called with comes from REPAIR_OPTIONS or from a defect that was saved out
+    of it, so the casing is the catalog's own. Making the maps case-insensitive
+    would mean re-keying all of them for a path nothing takes. It only became
+    visible when A/C and HVAC was grouped — before that "No cooling" had no
+    rename, so the mis-cased category reached the same key by luck. */
+ assert.notEqual(pathToRepairKey("a/c and hvac","No cooling"),pathToRepairKey("A/C and HVAC","No cooling"),
+  "a mis-cased category skips the rename maps; callers pass the catalog's own wording");
+ assert.equal(pathToRepairKey("A/C and HVAC","No cooling"),pathToRepairKey("A/C and HVAC","Cooling - No cooling"),
+  "and the old flat wording and its grouped home are one repair");
 
  /* SAVING EMPTY CLEARS IT — there is no separate delete. Guidance is not a
     repair record; the rule that this app never deletes history is about
     defects and the work done on them. */
+ /* Still written and cleared under the pre-grouping wording on purpose: it
+    resolves to the same repair as "Cooling - No cooling", which is what the
+    assertion above establishes. */
  const cleared=savePathToRepair(after,{category:"A/C and HVAC",issue:"No cooling",steps:"   "});
  assert.equal(cleared.entries.length,0);
  assert.equal(findPathToRepair(cleared,"A/C and HVAC","No cooling"),null);
@@ -5046,7 +5234,7 @@ test("PATH TO REPAIR is written once per repair and survives a catalog rename",a
   {category:"A/C and HVAC",issue:"No cooling",steps:"Replaced."});
  assert.equal(twice.entries.length,2);
  assert.equal(findPathToRepair(twice,"A/C and HVAC","No cooling").steps,"Replaced.");
- assert.equal(twice.entries[0].issue,"No cooling","the one just written is on top");
+ assert.equal(twice.entries[0].issue,"Cooling - No cooling","the one just written is on top, stored in today's words");
 
  /* Capped, so one entry cannot fill a phone on its own. */
  const long=savePathToRepair({entries:[]},{category:"Engine",issue:"Check engine light",steps:"x".repeat(MAX_PATH_TO_REPAIR+500)});

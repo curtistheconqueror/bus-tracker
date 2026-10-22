@@ -1,5 +1,5 @@
 import {candidateBusNumbers,resolveBusNumber} from "../fleet/bus-number-resolver.ts";
-import {REPAIR_OPTIONS,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
+import {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "../fleet/fleet-intelligence.ts";
 import type {FleetStatus} from "../fleet/smart-status.ts";
 import {describeScanBatch,scanBatches,type ScanBatch} from "../defects/scan-batches.ts";
@@ -178,7 +178,35 @@ function areaFromCommand(command:string,areas:OperatorArea[]){
  return findOperatorArea(command,areas);
 }
 
-const DEFECT_CHOICES=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>issues.map(issue=>({category,issue,key:normalized(issue)}))).sort((a,b)=>b.key.length-a.key.length);
+/* WHAT A SPOKEN COMMAND IS MATCHED AGAINST, longest key first so the most
+   specific wording wins.
+
+   A GROUPED CATEGORY ALSO ANSWERS TO THE BARE ITEM, because nobody says the
+   group out loud. The stored identity is "Group - Item", so keying only on the
+   full string meant "defect no cooling" matched nothing the moment A/C and
+   HVAC was grouped — nineteen wordings that had worked the day before. The
+   alias restores them, and incidentally gives the other grouped categories the
+   same reach flat ones always had.
+
+   AN AMBIGUOUS ALIAS IS DROPPED RATHER THAN GUESSED. Three Tech Services
+   wordings share a tail — "INOP (general)" belongs to Farebox, Ventra and the
+   IBS Screen, and "Screen black" to both the CUBIC and IBS screens — so a bare
+   key there would pick one device out of three and send somebody to the wrong
+   box. Those keep needing the full phrase, which is the same rule the rest of
+   this app follows: where a record does not say which, nothing guesses. */
+const DEFECT_CHOICES=(()=>{
+ const full=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>
+  issues.map(issue=>({category,issue,key:normalized(issue)})));
+ const taken=new Set(full.map(choice=>choice.key));
+ const counts=new Map<string,number>();
+ const aliases=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>
+  REPAIR_OPTION_GROUPS[category]
+   ?issues.map(issue=>({category,issue,key:normalized(issue.split(" - ").slice(1).join(" - "))}))
+   :[]).filter(choice=>choice.key&&!taken.has(choice.key));
+ for(const choice of aliases)counts.set(choice.key,(counts.get(choice.key)||0)+1);
+ return [...full,...aliases.filter(choice=>counts.get(choice.key)===1)]
+  .sort((a,b)=>b.key.length-a.key.length);
+})();
 
 function defectFromCommand(command:string):{defect:DefectDraft;flag?:"checkEngine"|"noHorn"|"badRampKneeler"}|null{
  const text=normalized(command);
@@ -421,7 +449,7 @@ export function planOperatorCommand(command:string,fleet:OperatorBus[],areas:Ope
     from. Both spellings route here now, and `asked` decides what happens. */
  if(/\b(defects?|issues?|check engine|horn|ramp|kneeler)\b/.test(text)){
   const selected=defectFromCommand(command);
-  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp.",context:busContext(bus)};
+  if(!selected)return {kind:"message",message:"I found Bus "+bus.n+", but I could not match the requested repair to the approved defect catalog. Try a specific item such as Check engine light, Horn, No cooling, ABS warning, or Wheelchair ramp. For a farebox or a screen, say which one.",context:busContext(bus)};
   /* THE INVERSION, CLOSED. Asked whether a bus HAS a repair, answer from the
      record rather than offering to create it. */
   if(asked){

@@ -78,8 +78,41 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
  /* Matched on the repair rather than on the word "heat", which appears in
     Amerex heat sensors, in Overheating, and in half the estimate notes in the
     fleet. A winter list that pulls in an overheating bus is a list somebody
-    checks once and then stops trusting. */
- if(key==="no-cabin-heat")return /\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)||/\bheater\s*\/\s*defroster\b/i.test(text);
+    checks once and then stops trusting.
+
+    THE FIRST TEST IS THE GROUP, NOT A LIST OF ISSUES. Everything in the
+    catalog's "A/C and HVAC → Heating" group is by definition a no-heat
+    defect, so matching the group prefix means a heating repair added to the
+    catalog next winter lands on this list without anybody remembering to come
+    back here. An issue list would have to be edited twice and would quietly
+    stop being complete the first time it was not.
+
+    `\bheating\s*-\s` cannot catch "Overheating": \b needs a non-word
+    boundary and "r"→"h" is not one. Checked, not assumed.
+
+    IT IS ANCHORED TO THE CATEGORY ANYWAY. defectText joins the category with
+    the issue AND with details, diagnosticNote, actionTaken and shopNotes, so
+    an unanchored group match also read free text a mechanic typed: "engine
+    heating - 225F" and "coolant heating - fast" both reached the list. Neither
+    is a wording anybody is likely to write - they write "overheating" or
+    "running hot" - but this filter is only worth having if a foreman trusts
+    it, and requiring the category costs nothing to be sure.
+
+    The two switches are matched by name because they live in Bus Controls, not
+    in HVAC — Curtis kept them there, and a bus whose heat knob is broken has
+    no heat whichever category the record sits in.
+
+    `heater / defroster` keeps its own branch even though it is now
+    "Heating - Heater / defroster": the legacy free-text `pendingRepair`
+    string at the bottom of quickFilterDefects never passes through
+    migrateRepairIdentity, so a bus carrying the old bare wording there would
+    drop off this list the day the catalog was grouped. */
+ if(key==="no-cabin-heat")return /\bhvac\s+heating\s*-\s/i.test(text)||/(?:^|\s)heating\s*-\s/i.test(text)&&/a\/c and hvac/i.test(text)
+  ||/\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)
+  ||/\bcoolant leak\s*-\s*heating side\b/i.test(text)
+  ||/\bheater\s*\/\s*defroster\b/i.test(text)
+  ||/\bfloor heat switch\b/i.test(text)
+  ||/\bhvac\s*\/\s*heat controls\b/i.test(text);
  /* None of these five is a wording question. The legacy `pendingRepair` string
     at the bottom of quickFilterDefects is matched through here, and a free-text
     match would put a bus into "logged" on the strength of a sentence that
