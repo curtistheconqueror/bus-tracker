@@ -1524,6 +1524,43 @@ test("grouping A/C and HVAC did not quietly cost the operator, the notes or the 
  assert.ok(!quickFilterMatch(bus("A/C and HVAC","Controls and Blowers - Blower motor","heating - see notes"),"no-cabin-heat"),
   "a controls defect must not ride a heating word in its details");
 
+ /* 5. AND THE SAME BUG WAS IN THE FIVE NAMED BRANCHES, which the group fix did
+    not touch. These are worse than the group case, because a sentence CLEARING
+    a bus is the likeliest place for these words to appear: a mechanic who
+    writes down what he checked was putting the bus on the heat sheet. */
+ for(const [category,issue,details] of [
+  ["A/C and HVAC","Cooling - No cooling","Floor heat switch checked and working"],
+  ["Engine","Overheating","heater / defroster was fine"],
+  ["Brakes","Chamber leak","no coolant leak - heating side found"],
+  ["Cooling System","Water pump","surge tank - both sides topped off, no leak"],
+ ]) assert.ok(!quickFilterMatch(bus(category,issue,details),"no-cabin-heat"),
+  JSON.stringify(details)+" records what was CHECKED and must not reach the heat sheet");
+
+ /* Every real heating repair still does, read off the catalog rather than
+    retyped, so a sixth heating repair added later is covered here too. */
+ for(const stored of REPAIR_OPTIONS["A/C and HVAC"].filter(option=>option.startsWith("Heating - ")))
+  assert.ok(quickFilterMatch(bus("A/C and HVAC",stored,""),"no-cabin-heat"),stored+" must reach the heat sheet");
+ for(const [category,issue] of [
+  ["Cooling System","Coolant leak - heating side"],
+  ["Cooling System","Surge tank - heating side low"],
+  ["Operator/Driver Controls","System Switches - Floor heat switch"],
+  ["Operator/Driver Controls","System Switches - HVAC / heat controls"],
+ ]) assert.ok(quickFilterMatch(bus(category,issue,""),"no-cabin-heat"),category+" / "+issue+" must reach the heat sheet");
+
+ /* 6. THE LEGACY SHAPES, which are the reason the fix could not simply ignore
+    details. A bus can arrive carrying its whole complaint in details under one
+    of two placeholder issues, and neither has any structured identity to read
+    instead. Both measured rather than reasoned about: `Driver-reported defect`
+    is what normalizeDefects synthesises for a legacy pendingRepair with no
+    defects array, `Manual entry` is what quickFilterDefects synthesises when
+    the array is empty. */
+ assert.ok(quickFilterMatch({id:"legacy-1",pendingRepair:"heater / defroster inop"},"no-cabin-heat"),
+  "a bus with only a legacy pendingRepair must still reach the heat sheet");
+ assert.ok(quickFilterMatch({id:"legacy-2",defects:[],pendingRepair:"heater / defroster inop"},"no-cabin-heat"),
+  "an empty defects array with a legacy pendingRepair must still reach the heat sheet");
+ assert.ok(quickFilterMatch(bus("Miscellaneous","Driver-reported defect","floor heat switch dead"),"no-cabin-heat"),
+  "a driver-reported defect carries its identity in details and must still match");
+
  /* 5. THE CATEGORY GLYPH NAMES BOTH HALVES. Curtis picked the pair once the
     heating group landed: a snowflake on its own tells a mechanic holding a
     bus with no heat in December that this is the cold box. Pinned because the
