@@ -139,7 +139,8 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(defectPage,/className="log-undo-button"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.match(defectCss,/\.log-undo-button\{[^}]*background:var\(--log-surface[^}]*color:var\(--log-muted/);
   assert.match(defectCss,/@media\(max-width:760px\)\{\.log-controls\{grid-template-columns:minmax\(0,1fr\) 82px 48px/);
-  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
+  assert.match(fixedCss,/\.fixed-header nav\{[^}]*grid-template-columns:repeat\(auto-fit/,
+    "the column count must not encode how many pages exist — repeat(6) hid the gear when an eighth page arrived");
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-header\{[^}]*overflow:visible/);
   assert.match(fixedCss,/\.fixed-repairs-app>\.fixed-header\{height:auto\}/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{\.fixed-settings-shade\{align-items:stretch/);
@@ -149,7 +150,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
-  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/settings"\]/);
+  assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/incidents", "\/shop-talk", "\/settings"\]/);
   /* Checked against the real route list rather than a second copy of it, so
      adding a page and forgetting the service worker fails here instead of
      going unnoticed until a phone loses signal in a bay and that page is
@@ -167,7 +168,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
      one never asks for it again. The new icon in Version 186 changed
      favicon.svg and the manifest without renaming either, which is why that
      release bumped this line too. */
-  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v6"/);
+  assert.match(worker,/CACHE_NAME = "pace-bus-tracker-shell-v7"/);
   assert.match(catalog,/completedBy\?:string/);
   assert.match(catalog,/conditionNotDuplicated\?:boolean/);
   const response=await render("/fixed-repairs");
@@ -175,7 +176,7 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(await response.text(),/Fixed Repairs/);
 });
 
-test("every page draws the same six links from one list",async()=>{
+test("every page draws the same eight links from one list",async()=>{
  const nav=await readFile(new URL("../src/components/shared/tracker-nav.tsx",import.meta.url),"utf8");
  const {TRACKER_PAGES,otherPages}=await import("../src/lib/settings/tracker-pages.ts");
  const pagesSource=await readFile(new URL("../src/lib/settings/tracker-pages.ts",import.meta.url),"utf8");
@@ -184,9 +185,10 @@ test("every page draws the same six links from one list",async()=>{
     TRACKER in its own nav while every other page called it FACILITY MAP. One
     list, one name. */
  assert.deepEqual(TRACKER_PAGES.map(page=>page.label),
-  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS","⚙ SETTINGS"]);
- assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
- assert.equal(TRACKER_PAGES.length%3,0,"six links: two full rows of three on a phone, never one alone");
+  ["FACILITY MAP","DOWN SHEET","DEFECT LOG","FIXED REPAIRS","FLEET CAMPAIGNS","INCIDENTS","SHOP TALK","⚙ SETTINGS"]);
+ assert.deepEqual(TRACKER_PAGES.map(page=>page.href),["/","/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]);
+ assert.notEqual(TRACKER_PAGES.length%3,1,
+  "a phone draws three across, and the last row must never strand a single tab on its own");
  /* Checked on the data, not the source: the file's own comment records the old
     name to explain why the component exists, and prose is not a label. */
  assert.equal(TRACKER_PAGES.some(page=>page.label==="FLEET TRACKER"),false,"the map's private name for itself is gone");
@@ -198,6 +200,7 @@ test("every page draws the same six links from one list",async()=>{
 
  // Every page renders it, marking itself, and none still carries a hand-written copy.
  const pages=[["app/page.tsx","/"],["app/down-sheet/page.tsx","/down-sheet"],["app/defect-log/page.tsx","/defect-log"],
+  ["app/incidents/page.tsx","/incidents"],["app/shop-talk/page.tsx","/shop-talk"],
   ["app/fixed-repairs/page.tsx","/fixed-repairs"],["app/lists/page.tsx","/lists"],["app/settings/page.tsx","/settings"]];
  for(const [file,active] of pages){
   const source=await readFile(new URL("../"+file,import.meta.url),"utf8");
@@ -208,7 +211,7 @@ test("every page draws the same six links from one list",async()=>{
 
  // The map's desktop menu is the same list minus the map, with counts attached.
  const other=otherPages({"/defect-log":7,"/down-sheet":2});
- assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists","/settings"]);
+ assert.deepEqual(other.map(page=>page.href),["/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]);
  assert.equal(other.find(page=>page.href==="/defect-log").count,7);
  assert.equal(other.find(page=>page.href==="/lists").count,undefined,"no count is no count, not zero");
 });

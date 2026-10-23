@@ -45,7 +45,18 @@ const CATEGORY_REPAIR_MINUTES:Record<string,number>={
 };
 
 const SPECIFIC_ESTIMATE_RULES:EstimateRule[]=[
- {pattern:/A\/C and HVAC - (Compressor|Evaporator core|Condenser core)$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},
+ /* THE GROUP SEGMENT IS OPTIONAL, and both halves are load-bearing. A/C and
+    HVAC became a grouped category, so the picker now stores
+    "Cooling - Compressor" and this rule is matched against
+    "A/C and HVAC - Cooling - Compressor". With the `$` sitting straight after
+    the category the three big jobs fell through to the 90-minute rule below —
+    a 16-hour compressor planned as 2h30, silently, on the Down Sheet and on
+    the Defect Log's hours badge. Nothing here migrates the issue first, so the
+    BARE wordings must keep matching too: a record written before the grouping
+    reaches this function exactly as it was stored.
+    The same shape as the Bus Accessories rules further down, which carry their
+    group for the same reason. */
+ {pattern:/A\/C and HVAC - (?:Cooling - )?(Compressor|Evaporator core|Condenser core)$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/A\/C and HVAC - /i,estimate:{repairMinutes:90,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Engine - (Check engine light|Stop engine light|Check engine and stop engine light|Check-engine diagnosis)$/i,estimate:{repairMinutes:120,diagnosticMinutes:60,accessMinutes:0}},
  {pattern:/Engine - Rear main seal$/i,estimate:{repairMinutes:900,diagnosticMinutes:60,accessMinutes:0}},

@@ -1,0 +1,110 @@
+/* SHOP TALK. A notice board, so it reads like one: posts, not records.
+
+   Green rather than the fleet's blue or the incident page's rust, because
+   this is the surface where something gets caught BEFORE it costs anybody
+   anything. */
+
+/* globals.css gives every bare <header> a fixed height:38px that min-height
+   cannot undo. See the cascade-check skill. */
+.talk-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#07301d,#0d5c34);color:#fff;box-shadow:0 3px 14px #03200f55}
+.talk-app{min-height:100vh;padding-bottom:28px;background:linear-gradient(180deg,#eef5f0,#fafcfa);color:#1d2b22;font-family:Arial,Helvetica,sans-serif}
+.talk-header>div{min-width:0}
+.talk-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#79c99a}
+.talk-header h1{margin:2px 0 1px;font-size:25px;line-height:1}
+.talk-header p{margin:4px 0 0;font-size:9px;color:#b9e0c9}
+.talk-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid #5aa37a;border-radius:6px;background:#0a4527}
+.talk-header nav a{min-width:104px;padding:10px 12px;background:#0a4527;color:#fff;font-size:8px;font-weight:900;text-align:center;text-decoration:none;text-shadow:0 1px 2px #03200f}
+.talk-header nav a.active{background:#fff;color:#0d5c34}
+.talk-header nav a+a{border-left:1px solid #46805f}
+
+.talk-scope{margin:0;padding:9px 18px;background:#eaf5ee;border-bottom:1px solid #bcdcc8;font-size:10px;font-weight:700;color:#2c6442}
+/* Open hazards get a line of their own above the form. A count buried in a
+   list is a count nobody acts on. */
+.talk-alarm{margin:0;padding:10px 18px;background:#fdf0e3;border-bottom:1px solid #e8bf93;font-size:11px;font-weight:900;letter-spacing:.4px;color:#8a4a0e}
+
+.talk-post{display:grid;gap:9px;margin:12px 14px;padding:13px 15px;border:1px solid #c3d9cc;border-radius:9px;background:#fff;box-shadow:0 6px 22px #07301d12}
+.talk-post label{display:grid;gap:3px;font-size:8px;font-weight:900;letter-spacing:.6px;color:#5c7267}
+.talk-post textarea,.talk-post input,.talk-post select{border:1px solid #bcccc2;border-radius:6px;padding:9px;font-size:13px;font-family:inherit;color:#1d2b22;background:#fff}
+.talk-post input,.talk-post select{min-height:40px}
+.talk-post textarea{resize:vertical;line-height:1.35;border-color:#5aa37a;border-width:2px;font-size:14px}
+.talk-say{font-size:10px;color:#0d5c34}
+
+.talk-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.talk-kinds button{min-height:42px;border:1px solid #bcccc2;border-radius:6px;background:#f4f8f5;font-size:9px;font-weight:900;letter-spacing:.6px;color:#5c7267;cursor:pointer}
+.talk-kinds button.active{color:#fff;border-color:transparent}
+.talk-kinds button.active.hazard{background:#a3290b}
+.talk-kinds button.active.notice{background:#0d5c34}
+.talk-kinds button.active.suggestion{background:#1d4f7a}
+
+.talk-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:9px;align-items:end}
+.talk-row>label,.talk-row input,.talk-row select{min-width:0;max-width:100%}
+.talk-send{min-height:44px;padding:0 20px;border:0;border-radius:6px;background:#0d5c34;color:#fff;font-size:10px;font-weight:900;letter-spacing:.8px;cursor:pointer}
+.talk-send:hover:not(:disabled){background:#127544}
+.talk-send:disabled{background:#c2cfc7;cursor:not-allowed}
+
+.talk-saved{margin:0 14px;padding:10px 12px;border-radius:7px;background:#e7f3e9;border:1px solid #9ec8a6;font-size:10px;font-weight:800;color:#1d5c2c}
+.talk-saved.failed{background:#fdeaea;border-color:#d79a9a;color:#8c1d1d}
+
+.talk-board{margin:14px}
+.talk-board>h2{display:flex;align-items:center;gap:9px;margin:0 0 9px;font-size:10px;font-weight:900;letter-spacing:1.2px;color:#5c7267}
+.talk-board>h2 b{padding:2px 7px;border-radius:9px;background:#0d5c34;color:#fff;font-size:10px}
+.talk-board>h2 button{margin-left:auto;min-height:30px;padding:0 11px;border:1px solid #bcccc2;border-radius:6px;background:#fff;font-size:8px;font-weight:900;letter-spacing:.5px;color:#5c7267;cursor:pointer}
+.talk-empty{margin:0;padding:18px;border:1px dashed #bcd4c4;border-radius:9px;background:#fbfdfc;font-size:11px;color:#5c7267;text-align:center}
+
+.talk-note{margin-bottom:9px;border:1px solid #c3d9cc;border-left:5px solid #0d5c34;border-radius:9px;background:#fff;padding:10px 12px;box-shadow:0 4px 14px #07301d0f}
+/* The band the sort already puts first, said again in colour. */
+.talk-note.hazard{border-left-color:#a3290b;background:#fffaf8}
+.talk-note.suggestion{border-left-color:#1d4f7a}
+/* Handled notes stay — nothing here deletes — but they stop competing for
+   attention with the ones still live. */
+.talk-note.handled{opacity:.62;border-left-color:#9aaea3;background:#f7f9f8}
+.talk-note>header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.talk-note>header strong{font-size:9px;font-weight:900;letter-spacing:.7px;color:#0d5c34}
+.talk-note.hazard>header strong{color:#a3290b}
+.talk-note>header span{font-size:8px;font-weight:900;letter-spacing:.5px;color:#fff;background:#5c7267;border-radius:9px;padding:2px 7px}
+.talk-note>header time{font-size:10px;color:#5c7267}
+.talk-note>header em{margin-left:auto;font-size:9px;font-weight:900;color:#5c7267;font-style:normal}
+.talk-note>p{margin:7px 0 8px;font-size:13px;line-height:1.4;color:#1d2b22;overflow-wrap:anywhere}
+.talk-note>footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:7px;border-top:1px solid #e8f0ea}
+.talk-note>footer small{font-size:8px;color:#8ba195}
+.talk-note>footer button{min-height:34px;padding:0 13px;border:1px solid #bcccc2;border-radius:6px;background:#fff;font-size:9px;font-weight:900;letter-spacing:.6px;color:#5c7267;cursor:pointer}
+.talk-handle{background:#0d5c34 !important;border-color:transparent !important;color:#fff !important}
+
+/* A CARD'S OWN <header> AND <footer> ARE NOT THE PAGE'S.
+
+   globals.css styles every bare element: `header` gets height:38px, a navy
+   gradient, white centred 22px text and a text-shadow; `footer` gets
+   position:fixed, bottom:10px, left:50%, a translateX, a gradient, a shadow
+   and white-space:nowrap. Both are written for the app shell, and both landed
+   on the <header> and <footer> inside every card here — the headers rendered
+   as navy bars covering their own text, and the footers detached and stacked
+   on top of one another over the list.
+
+   No box measurement showed it; a screenshot did. Each property is undone by
+   name because `all:unset` would also discard the display and inherited
+   typography these rely on. See the cascade-check skill. */
+.incident-card>header,.talk-note>header{height:auto;min-height:0;background:none;color:inherit;font-size:inherit;font-weight:inherit;text-shadow:none;justify-content:flex-start}
+.incident-card>footer,.talk-note>footer{position:static;bottom:auto;left:auto;transform:none;background:none;color:inherit;border-radius:0;box-shadow:none;z-index:auto;font-size:inherit;letter-spacing:normal;white-space:normal}
+
+
+/* 760px, NOT the 620px phone breakpoint, and the difference is load-bearing.
+   globals.css carries `@media(max-width:760px){.app-refresh{width:100%}}`,
+   written for the pages whose header stacks into a column at 760 — the
+   Defect Log and the Down Sheet both do. Stacking at 620 instead left a
+   full-width refresh button inside a header that was still a ROW between
+   621 and 760: measured, the button took 724 of 760px, the title collapsed
+   to 0 and the nav to 22px with its links overflowing it. Matching the
+   breakpoint that already exists removes the fight rather than overriding
+   it. See the cascade-check skill. */
+@media(max-width:760px){
+ .talk-header{align-items:flex-start;flex-direction:column;padding:11px 12px}
+ .talk-header nav{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .talk-header nav a{min-width:0;padding:9px 4px}
+ .talk-header nav a+a{border-left:0}
+ .talk-post{margin:10px 8px}
+ .talk-board{margin:10px 8px}
+ /* The send button gets its own row rather than being squeezed to whatever
+    is left of 360px beside two fields. */
+ .talk-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .talk-send{grid-column:1 / -1}
+}

@@ -9,7 +9,7 @@
    cache-first and keep their NAMES across releases, unlike the hashed chunks.
    A new icon or a changed manifest under an unbumped name is a file the phone
    already holds and will never ask for again. */
-const CACHE_NAME = "pace-bus-tracker-shell-v6";
+const CACHE_NAME = "pace-bus-tracker-shell-v7";
 /* The icons are here so a phone that first opens the app in a bay with no
    signal still has them, and because the fetch handler below serves anything
    in this list cache-first. */
@@ -18,8 +18,14 @@ const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg", "/apple-touch-icon.
    phone that had never opened it while online got nothing when it lost signal
    in a bay — which is the one situation this whole file exists for. Settings
    is a page now too, and one somebody may well open for the first time in a
-   bay to turn a theme on. */
-const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/settings"];
+   bay to turn a theme on.
+
+   INCIDENTS and SHOP TALK are here for a sharper version of the same reason.
+   Somebody reaching for the incident form has just been hurt, and somebody
+   posting a hazard is standing next to it — neither is going to walk out to
+   the yard for signal first, and a blank page at that moment is the report
+   never getting written. */
+const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/incidents", "/shop-talk", "/settings"];
 
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);

@@ -136,7 +136,8 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  assert.deepEqual([...positions].sort((left,right)=>left-right),positions,"settings.css is imported last");
  assert.match(layout,/import "\.\/globals\.css"/,"globals.css still comes first, from the layout");
  assert.match(css,/^html,body\{/m,"the page shell is restated after three stylesheets that each set it");
- assert.match(css,/\.settings-header nav\{[^}]*grid-template-columns:repeat\(6/,"six links, one row on a desktop");
+ assert.match(css,/\.settings-header nav\{[^}]*grid-template-columns:repeat\(4/,
+  "four across, two rows — a layout choice rather than a count of how many pages exist");
  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.settings-header nav\{[^}]*grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
 
  /* One section per page, each rendering that page's OWN panel inline - the
