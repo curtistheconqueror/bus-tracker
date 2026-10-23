@@ -807,7 +807,14 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    accent edge, the height and the type instead, none of which costs a
    contrast point. */
 .daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:52px;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 34%,var(--log-border,#bac7d9));border-left:4px solid var(--log-accent,#0b64bd);border-radius:8px;background:var(--log-surface,#fff);padding:9px 13px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
-.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 7%,var(--log-surface,#fff));outline:none}
+/* THE FEEDBACK IS THE RING, NOT THE FILL, for the reason above. This rule
+   kept the 7% tint it always had, which put the label at 4.12:1 on the
+   tactical theme for as long as the control was hovered or FOCUSED - and
+   focus is a reading state, not a passing one: a keyboard user sits in it.
+   Moving the feedback to the border and a ring leaves the label on plain
+   --log-surface at 4.63:1 in every state, and replaces an outline:none
+   that had removed the focus ring without putting anything back. */
+.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:var(--log-surface,#fff);border-color:var(--log-accent,#0b64bd);box-shadow:0 0 0 3px color-mix(in srgb,var(--log-accent,#0b64bd) 30%,var(--log-surface,#fff));outline:none}
 .daily-stats-toggle>b{flex:none;font-size:14px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
 .daily-stats-toggle>small{flex:1;min-width:0;font-size:10px;font-weight:800;color:var(--log-muted,#6e7e94);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .daily-stats-toggle>i{flex:none;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 52%,var(--log-surface,#fff));border-radius:6px;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}

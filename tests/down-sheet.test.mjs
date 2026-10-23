@@ -2625,7 +2625,7 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
   const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
   /* Any translucent white: the opacity moved when the toggle was made easier
      to find, and what matters here is only that it is not this page's purple. */
-  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:#ffffff[0-9a-f]{2}/);
+  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:#ffffff(?!00|ff)[0-9a-f]{2}/);
   assert.doesNotMatch(logCss,/\.header-advanced-toggle\{[^}]*background:#6b31b6/,"the two toggles must not share a colour");
 
   /* What went in, and what deliberately stayed out. ADD DOWN BUS and SEARCH

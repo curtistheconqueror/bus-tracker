@@ -126,8 +126,14 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
      #ffffff1f exactly, so brightening the toggle to make it easier to find on
      a phone failed a test about something else. What must not change is that
      both halves are translucent WHITE: a light-surface background is the bug
-     this line was written for, and #6b31b6 is the Down Sheet's. */
-  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff[0-9a-f]{2};[^}]*background:#ffffff[0-9a-f]{2}/,
+     this line was written for, and #6b31b6 is the Down Sheet's.
+
+     TRANSLUCENT, THOUGH - 00 and ff are excluded by hand. A first pass at
+     loosening this took any two hex digits, which accepted #ffffff00 and
+     #ffffffff: invisible, and an opaque light surface. Those are precisely the
+     two failures the rule exists to catch, so the looser regex would have
+     permitted the bug while still reading like a guard. */
+  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff(?!00|ff)[0-9a-f]{2};[^}]*background:#ffffff(?!00|ff)[0-9a-f]{2}/,
    "the toggle keeps the header's translucent-white pair");
   assert.doesNotMatch(css,/\.header-advanced-toggle\{[^}]*background:var\(--log-surface/,
    "a light surface is invisible against navy, which is why this rule exists");
