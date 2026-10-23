@@ -40,20 +40,25 @@ export default function ShopTalkPage(){
   setReady(true);
  },[]);
 
+ /* The write REPORTS, the same rule the incident form follows. A board that
+    cleared the box over a refused write would throw away the hazard somebody
+    just typed while showing them "NOT SAVED" — the report is gone and the
+    only copy was in that textarea. */
  function persist(next:ShopTalkNote[],message:string){
   if(!writeShopTalk(localStorage,next)){
-   setSaved("NOT SAVED — this device refused the write.");
-   return;
+   setSaved("NOT SAVED — this device refused the write. Leave the text here and try again.");
+   return false;
   }
   setNotes(next);
   setSaved(message);
+  return true;
  }
 
  function post(){
   const note=createShopTalkNote({text,kind,area,by:initials});
   if(!note)return;
-  persist([note,...notes],"Posted.");
-  setText("");
+  /* Only a write that actually landed empties the box. */
+  if(persist([note,...notes],"Posted."))setText("");
  }
 
  const openHazards=useMemo(()=>openHazardCount(notes),[notes]);
@@ -70,7 +75,7 @@ export default function ShopTalkPage(){
   {/* A hazard board only pays for itself when the next person reads it, so the
       fact that it currently cannot travel is said out loud rather than left
       to be discovered. */}
-  <p className="talk-scope">Stays on this device for now — carrying it to the Shop Cloud needs a schema change Curtis has to approve. It rides MASTER EXPORT in the meantime.</p>
+  <p className="talk-scope">Stays on this device. Carrying it to the Shop Cloud needs a schema change Curtis has to approve, and MASTER EXPORT does not carry it yet either — so a hazard worth keeping is worth telling somebody about too.</p>
 
   {openHazards>0&&<p className="talk-alarm" role="status">{openHazards} open hazard{openHazards===1?"":"s"} on this board.</p>}
 

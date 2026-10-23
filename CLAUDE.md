@@ -397,10 +397,21 @@ screen says the app does not report it for anybody.
 is an incident that never had to be filed, which is why open hazards sort above
 everything and stay visible until somebody marks them handled. Nothing is
 deleted — "the oil in bay 7 was reported four times this month" is a fact that
-only exists if the first three are kept — and the nav badge counts OPEN HAZARDS
-only, because a badge that includes suggestions stops meaning "go look now".
+only exists if the first three are kept. The count on the board itself is OPEN
+HAZARDS only, because a count that includes suggestions stops meaning "go look
+now". **There is no nav badge** — `TrackerNav` draws labels and nothing else.
+An earlier version of this paragraph said there was one, in the same change
+that added the surface and did not build it; a badge on every page is a UI
+change and therefore Curtis's call before it exists, not after.
 Its not syncing is a limitation rather than a decision: carrying it would need
-the `shop_memory` migration, which is Curtis's call.
+the `shop_memory` migration, which is Curtis's call. **MASTER EXPORT does not
+carry `pace-shop-talk-v1` or `pace-incidents-v1` either** — `fleet-backup.ts`
+names its keys explicitly and neither is in the list, so a device move loses
+both. The Shop Talk screen used to claim the export carried it; it no longer
+does. Whether these two should ride that file is open: the argument for is the
+one PATH TO REPAIR won on — a hazard board does not re-learn itself — and the
+argument against, for incidents only, is that the file would then carry who
+got hurt onto another phone, which is the reason the surface does not sync.
 
 **Both draw their location list from `site-config.ts`**, never a prefix and
 never a hand-typed list — a sixth copy of that table would bring back the bug

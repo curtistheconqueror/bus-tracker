@@ -93,14 +93,56 @@ test("an unreadable time falls back rather than storing a broken date",()=>{
  assert.ok(!Number.isNaN(new Date(incident.at).getTime()));
 });
 
+/* ---- neither form may empty itself over a write that was refused ---- */
+
+test("a refused write never clears the box on either surface",async()=>{
+ /* The failure this pins is silent and costs the whole report: the page says
+    NOT SAVED and has ALREADY emptied the textarea, so the only copy of what
+    somebody typed is gone. On a hazard board that is the hazard; on the
+    incident form it is somebody's record of being hurt.
+
+    It shipped on the Shop Talk board while the incident form beside it did it
+    correctly — both written in the same change, which is precisely when an
+    inconsistency between two files is hardest to see from the inside. Pinned
+    by reading the source because the bug lives in a React handler, and the
+    repo already asserts handler shape this way elsewhere. */
+ const talk=await readFile(new URL("../app/shop-talk/page.tsx",import.meta.url),"utf8");
+ const incidents=await readFile(new URL("../app/incidents/page.tsx",import.meta.url),"utf8");
+
+ for(const [name,source] of [["Shop Talk",talk],["Incidents",incidents]]){
+  assert.match(source,/function persist\([\s\S]*?return false;/,
+   name+"'s persist must REPORT a refused write, not return undefined");
+  assert.match(source,/function persist\([\s\S]*?return true;/,
+   name+"'s persist must report a successful write");
+ }
+
+ /* The clear has to be GATED on that report rather than merely sitting after
+    it. The mutant worth catching is the sequential pair. */
+ assert.match(talk,/if\(persist\(.*\)\)setText\(""\)/,
+  "the Shop Talk box may only empty when persist reported success");
+ assert.doesNotMatch(talk,/persist\([^\n]*\);\s*\n\s*setText\(""\)/,
+  "an unguarded setText beside persist is exactly the bug this test exists for");
+ assert.match(incidents,/if\(persist\([\s\S]{0,160}?setDraft\(\{\.\.\.EMPTY\}\)/,
+  "the incident draft may only reset when persist reported success");
+}); 
+
 /* ---- the shift, which is the trap ---- */
+
+/* shiftAt reads LOCAL wall-clock hours on purpose: a shift is a fact about the
+   building somebody is standing in. So these timestamps have to be BUILT from
+   local parts. Written as UTC literals they asserted "02:40Z is 3rd shift",
+   which is true on a UTC runner and false in America/Chicago, where that
+   instant is 21:40 the previous evening and belongs to 2nd. The suite would
+   have stayed green in CI and failed on the machine of anybody sitting in the
+   shop's own timezone — the worst shape for a test to fail in. */
+const localIso=(year,month,day,hour,minute)=>new Date(year,month-1,day,hour,minute).toISOString();
 
 /* Same rule the swap ledger follows: resolved once and STORED. If somebody
    edits the garage's hours in six weeks, the shift this fall happened on must
    not silently move to a different crew. What shift it WAS is a fact. */
 test("the shift is stored, not recomputed from the stamp",()=>{
  /* 02:40 is 3rd shift under the shop's real hours (22:00-06:30). */
- const incident=createIncident({what:"Fell",at:"2026-10-21T02:40:00.000Z"},DEFAULT_SHIFT_SETTINGS,new Date("2026-10-21T02:45:00.000Z"));
+ const incident=createIncident({what:"Fell",at:localIso(2026,10,21,2,40)},DEFAULT_SHIFT_SETTINGS,new Date(localIso(2026,10,21,2,45)));
  assert.equal(incident.shift,"3rd");
 
  /* Re-read through normalize with NO settings in sight: the stored value has
@@ -113,9 +155,11 @@ test("the shift is stored, not recomputed from the stamp",()=>{
    somebody typed it up. */
 test("the shift comes from when it happened, not when it was filed",()=>{
  const incident=createIncident(
-  {what:"Fell at the end of nights",at:"2026-10-21T05:50:00.000Z"},
+  {what:"Fell at the end of nights",at:localIso(2026,10,21,5,50)},
   DEFAULT_SHIFT_SETTINGS,
-  new Date("2026-10-21T08:30:00.000Z"),
+  /* Filed in 1st shift, local, so the contrast the test is about survives in
+     any timezone rather than only on a UTC runner. */
+  new Date(localIso(2026,10,21,8,30)),
  );
  assert.equal(incident.shift,"3rd","05:50 belongs to the night crew who were there");
 });

@@ -1503,6 +1503,27 @@ test("grouping A/C and HVAC did not quietly cost the operator, the notes or the 
  /* And the real thing still does, with the category present. */
  assert.ok(quickFilterMatch(bus("A/C and HVAC","Heating - Floor heat INOP",""),"no-cabin-heat"));
 
+ /* THE HOLE THIS TEST ORIGINALLY LEFT OPEN. The loop above only varied the
+    free text while holding the category at Engine, so it proved the category
+    was REQUIRED and nothing about WHERE. Three cases got through:
+
+    - the same free text inside A/C and HVAC on a COOLING defect, because
+      `/heating\s*-\s/ && /a\/c and hvac/` lets the two halves be satisfied by
+      different parts of one joined string;
+    - "hvac heating - ..." typed into any category at all, because that
+      alternative asked for no category.
+
+    All three reproduced before the ^ anchor. A foreman working the heat sheet
+    would have walked to a bus whose heat was fine. */
+ assert.ok(!quickFilterMatch(bus("A/C and HVAC","Cooling - No cooling","floor heating - works fine"),"no-cabin-heat"),
+  "a cooling defect must not reach the heat sheet on the strength of typed details");
+ for(const category of ["Engine","Bodywork","Brakes"])
+  assert.ok(!quickFilterMatch(bus(category,"Panel damage","hvac heating - runs warm"),"no-cabin-heat"),
+   category+" must not reach the heat sheet on typed details alone");
+ /* The group has to be where the category is, not merely somewhere after it. */
+ assert.ok(!quickFilterMatch(bus("A/C and HVAC","Controls and Blowers - Blower motor","heating - see notes"),"no-cabin-heat"),
+  "a controls defect must not ride a heating word in its details");
+
  /* 5. THE CATEGORY GLYPH NAMES BOTH HALVES. Curtis picked the pair once the
     heating group landed: a snowflake on its own tells a mechanic holding a
     bus with no heat in December that this is the cold box. Pinned because the

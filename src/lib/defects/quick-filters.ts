@@ -90,13 +90,25 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
     `\bheating\s*-\s` cannot catch "Overheating": \b needs a non-word
     boundary and "r"→"h" is not one. Checked, not assumed.
 
-    IT IS ANCHORED TO THE CATEGORY ANYWAY. defectText joins the category with
-    the issue AND with details, diagnosticNote, actionTaken and shopNotes, so
-    an unanchored group match also read free text a mechanic typed: "engine
-    heating - 225F" and "coolant heating - fast" both reached the list. Neither
-    is a wording anybody is likely to write - they write "overheating" or
-    "running hot" - but this filter is only worth having if a foreman trusts
-    it, and requiring the category costs nothing to be sure.
+    IT IS ANCHORED TO THE START OF THE TEXT, WHERE THE CATEGORY IS. defectText
+    joins the category FIRST and then the issue, details, diagnosticNote,
+    actionTaken and shopNotes, so any group match loose in that string also
+    reads free text a mechanic typed.
+
+    Requiring the category somewhere in the string was not enough and shipped
+    once believing it was: `/heating\s*-\s/ && /a\/c and hvac/` is satisfied by
+    an HVAC record whose issue is COOLING and whose details say "floor heating
+    - works fine", because the two halves can be satisfied by different parts
+    of the same string. A separate `/\bhvac\s+heating\s*-\s/` alternative was
+    looser still - it needed no category at all, so "hvac heating - runs warm"
+    typed into an Engine or Bodywork record reached the heat sheet too. All
+    three reproduced. Anchoring with ^ ties the group to the category position
+    rather than to the category's mere presence, which is the thing that was
+    actually meant.
+
+    The legacy free-text `pendingRepair` string carries no category at all, so
+    it can never satisfy this branch - it is covered by `heater / defroster`
+    below, which is the only legacy heating wording that predates the grouping.
 
     The two switches are matched by name because they live in Bus Controls, not
     in HVAC — Curtis kept them there, and a bus whose heat knob is broken has
@@ -107,7 +119,7 @@ function quickFilterTextMatch(text:string,key:QuickFilterKey){
     string at the bottom of quickFilterDefects never passes through
     migrateRepairIdentity, so a bus carrying the old bare wording there would
     drop off this list the day the catalog was grouped. */
- if(key==="no-cabin-heat")return /\bhvac\s+heating\s*-\s/i.test(text)||/(?:^|\s)heating\s*-\s/i.test(text)&&/a\/c and hvac/i.test(text)
+ if(key==="no-cabin-heat")return /^a\/c and hvac heating\s*-\s/i.test(text)
   ||/\bsurge tank\s*-\s*(?:heating side|both sides)\b/i.test(text)
   ||/\bcoolant leak\s*-\s*heating side\b/i.test(text)
   ||/\bheater\s*\/\s*defroster\b/i.test(text)
