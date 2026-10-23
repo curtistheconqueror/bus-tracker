@@ -247,9 +247,9 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     loses that the moment it is saved. "Semi cold air" sits between No cooling
     and nothing at all: the unit runs, the air is not cold enough, and that is
     what a driver actually reports. */
- "A/C and HVAC":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Blower motor","Operator A/C blower","Refrigerant / Freon leak","Bad connection / wiring","Controls / electrical","IntelligAIRE III control panel - screen blank / black","Heater / defroster","Other A/C repair"],
+ "A/C and HVAC":["Heating - No heat at front dash","Heating - Floor heat INOP","Heating - Heater boost pump","Heating - Heater / defroster","Heating - Other heating repair","Cooling - No cooling","Cooling - Semi cold air","Cooling - Compressor","Cooling - A/C belt","Cooling - A/C compressor pulley misaligned","Cooling - Evaporator core","Cooling - Condenser core","Cooling - Condenser fan INOP - 1 fan","Cooling - Condenser fans INOP - both fans","Cooling - Evaporator fan / motor INOP - 1","Cooling - Evaporator fans / motors INOP - both","Cooling - Refrigerant / Freon leak","Cooling - Other A/C repair","Controls and Blowers - Blower motor","Controls and Blowers - Operator A/C blower","Controls and Blowers - Bad connection / wiring","Controls and Blowers - Controls / electrical","Controls and Blowers - IntelligAIRE III control panel - screen blank / black"],
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
- "Cooling System":["Overheating","Coolant leak","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
+ "Cooling System":["Overheating","Coolant leak","Coolant leak - heating side","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
  "Suspension and Steering":["NVH (noise, vibration, harshness)","Shock / strut","Stabilizer link","Dogtracking","Leveling valve","Ride-height issue","Bus leaning - C/S","Bus leaning - R/S","Suspension leak","Bushing / linkage","Loose steering","Steering pull","Power steering leak","Steering gear","Tie rod / linkage","Alignment","Missing grease fitting (Zerk)","Grease fitting will not take grease","Other suspension or steering repair"],
  /* A sticking brake had no wording at all, so the only way to log one was to
@@ -302,7 +302,13 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
 };
 
 export const REPAIR_CATEGORY_EMOJI:Record<string,string>={
- "A/C and HVAC":"❄️",
+ /* Two glyphs, because the category holds both halves now. The heating group
+    arrived in winter and a snowflake on its own said the opposite of what a
+    no-heat bus needs. Curtis picked the pair. The thermometer and the puff of
+    air were not available to pair with it - they name Cooling System and
+    Pneumatic System, and two tables that must agree about a glyph are two
+    tables that will eventually disagree. */
+ "A/C and HVAC":"❄️+♨️",
  Engine:"⚙️",
  "Cooling System":"🌡️",
  Transmission:"🕹️",
@@ -385,12 +391,23 @@ const ISSUE_DISPLAY_MARKS:Record<string,string>={"Fire extinguisher missing":"�
    really a way of moving the bus. */
 const DEFECT_NOTES:Record<string,Record<string,string>>={
  "A/C and HVAC":{
-  "A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
+  "Cooling - A/C compressor pulley misaligned":"Lay a straight edge across the crank pulley and the compressor pulley before you order a belt. A pulley out of line is what eats belts, so a belt fitted to a misaligned pulley comes back. Note in the description how far out and which way.",
+  /* The one heating fault where the obvious reading is wrong often enough to
+     be worth a line: no hot air and a full tank is usually the pump, not the
+     core, and the two repairs share no parts. */
+  "Heating - Heater boost pump":"Check the heating side of the surge tank before you condemn the pump — an empty side gives you the same no-hot-air complaint and is the cheaper find. A pump that is getting power and not moving coolant is the pump; log it here. Say in the description whether the hoses were hot at the core.",
+  "Heating - No heat at front dash":"Say whether the FLOOR heat still works, because that is what separates a dash duct or blower problem from a whole-bus heating fault. If neither works, the heating side of the surge tank and the boost pump are the first two checks.",
+  "Heating - Floor heat INOP":"Try the floor heat switch before the heat itself — that switch is logged separately under Operator/Driver Controls → System Switches → Floor heat switch, and a dead switch is not a dead heater. Note in the description whether dash heat still works.",
  },
  /* The surge tank on the 17s, 18s and 20s is split, and the two halves do not
     talk to each other. Somebody who does not know that tops up the side they
     can see and walks away from a bus that will have no heat in December. */
  "Cooling System":{
+  /* Named apart from the plain Coolant leak because WHICH side is leaking is
+     the whole question in winter: the engine side losing glycol is a shutdown
+     risk, and this side losing it is a bus with no heat and an engine that
+     reads perfectly normal. Both are on the No Heat Buses list. */
+  "Coolant leak - heating side":"A leak on the heating circuit — heater hoses, the core, the boost pump or the heating half of the surge tank. The engine side can read full and the engine temperature normal while this one empties, so a bus can get through a pre-trip and still have no heat by the afternoon. Say where the wet spot is.",
   "Surge tank - heating side low":"This side feeds cabin heat only, and it is independent of the engine side — a full engine side says nothing about this one. Empty here means no cabin heat when the weather turns. The winter list is QUICK FILTERS → No Heat Buses.",
   "Surge tank - both sides low":"Two halves that cannot drain into each other went down together, which points at a leak somewhere they share rather than two separate ones. Worth finding before either side is topped up again.",
  },
@@ -771,6 +788,28 @@ function normalizedSymptoms(value:unknown){
 }
 
 export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
+ /* ONE CATEGORY, THREE GROUPS, because the unit is one unit. IntelligAIRE III
+    runs the heat and the cooling off the same panel, so a separate top-level
+    Heating category would have put two halves of one box in two places and
+    left the shared wiring belonging to neither.
+
+    HEATING IS FIRST, and that is a seasonal choice rather than an alphabetical
+    one. Curtis asked for this in December against a paper heat sheet, and the
+    five entries under it are what gets picked every morning until spring. Flip
+    the order here when that stops being true; nothing else depends on it.
+
+    The category was FLAT until this change, so every wording in it moved into
+    a group. That is a read-time move through CATEGORY_ISSUE_RENAMES below -
+    the same conversion Bus Controls and Tech Services already went through -
+    and nothing in storage is rewritten. */
+ "A/C and HVAC":{
+  "Heating":["No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"],
+  "Cooling":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Refrigerant / Freon leak","Other A/C repair"],
+  /* The parts that serve both sides. A blower motor moves whatever the unit
+     has made, hot or cold, so filing it under either one would have it missing
+     from the other half of the year. */
+  "Controls and Blowers":["Blower motor","Operator A/C blower","Bad connection / wiring","Controls / electrical","IntelligAIRE III control panel - screen blank / black"],
+ },
  "Operator/Driver Controls":{
   "Driver Seat":["Seat belt","Leaking air","Will not lock","Adjustment / locking bar","Controls / buttons"],
   "Gauges and Dash":["Fuel gauge INOP / false reading","Speedometer","Other gauge / indicator","Front dash damage","Front instrument dash damaged / replacement"],
@@ -980,7 +1019,31 @@ const CATEGORY_ISSUE_RENAMES:Record<string,Record<string,string>>={
     so either search hits it. Records logged under the old name read as the new
     one; nothing stored is rewritten. */
  "A/C and HVAC":{
-  "Refrigerant leak":"Refrigerant / Freon leak",
+  /* A/C and HVAC became a grouped category, so every flat wording it had moves
+     to its group. This map is applied ONCE, so "Refrigerant leak" names its
+     final grouped home directly rather than chaining through the Freon rename
+     below it - a two-step chain here would stop at the ungrouped name and then
+     never match the picker again, silently. */
+  "No cooling":"Cooling - No cooling",
+  "Semi cold air":"Cooling - Semi cold air",
+  "Compressor":"Cooling - Compressor",
+  "A/C belt":"Cooling - A/C belt",
+  "A/C compressor pulley misaligned":"Cooling - A/C compressor pulley misaligned",
+  "Evaporator core":"Cooling - Evaporator core",
+  "Condenser core":"Cooling - Condenser core",
+  "Condenser fan INOP - 1 fan":"Cooling - Condenser fan INOP - 1 fan",
+  "Condenser fans INOP - both fans":"Cooling - Condenser fans INOP - both fans",
+  "Evaporator fan / motor INOP - 1":"Cooling - Evaporator fan / motor INOP - 1",
+  "Evaporator fans / motors INOP - both":"Cooling - Evaporator fans / motors INOP - both",
+  "Operator A/C blower":"Controls and Blowers - Operator A/C blower",
+  "Refrigerant / Freon leak":"Cooling - Refrigerant / Freon leak",
+  "Other A/C repair":"Cooling - Other A/C repair",
+  "Heater / defroster":"Heating - Heater / defroster",
+  "Blower motor":"Controls and Blowers - Blower motor",
+  "Bad connection / wiring":"Controls and Blowers - Bad connection / wiring",
+  "Controls / electrical":"Controls and Blowers - Controls / electrical",
+  "IntelligAIRE III control panel - screen blank / black":"Controls and Blowers - IntelligAIRE III control panel - screen blank / black",
+  "Refrigerant leak":"Cooling - Refrigerant / Freon leak",
  },
  /* Tech Services became a grouped category. Every flat wording it had moves to
     its group; the two CUBIC Screen wordings already carried their group and are

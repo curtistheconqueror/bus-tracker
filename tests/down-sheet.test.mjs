@@ -477,10 +477,25 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.equal(normalizeRepairTimeEstimate(undefined, "Battery, Starting and Charging", "Crank no start").diagnosticMinutes, 90);
   assert.equal(estimateTotal("Battery, Starting and Charging", "Crank no start"), 120);
   assert.equal(estimateTotal("No Start", "Cranks / no start"), 120);
+  /* THE BIG THREE A/C JOBS, ASSERTED ON THE WORDING THE PICKER ACTUALLY
+     STORES rather than on a literal. A/C and HVAC became a grouped category
+     and these three assertions kept passing on wordings the picker could no
+     longer produce, while the live estimate quietly fell from 960 to 150 — a
+     16-hour compressor planned as 2h30. Driven off REPAIR_OPTIONS so the next
+     regrouping fails here instead of halving somebody's day.
+
+     Both forms are checked: nothing on this path migrates the issue first, so
+     a record stored before the grouping arrives bare and must still estimate. */
+  for(const bare of ["Compressor","Evaporator core","Condenser core"]){
+   const stored=REPAIR_OPTIONS["A/C and HVAC"].find(option=>option.endsWith(" - "+bare));
+   assert.ok(stored,bare+" is no longer in the A/C catalog under any group");
+   assert.equal(estimateTotal("A/C and HVAC",stored),960,stored+" must still plan as the big job");
+   assert.equal(estimateTotal("A/C and HVAC",bare),960,bare+" stored before the grouping must still estimate");
+  }
+  /* And an ordinary A/C repair still falls to the category rule, grouped or not. */
   assert.equal(estimateTotal("A/C and HVAC", "No cooling"), 150);
-  assert.equal(estimateTotal("A/C and HVAC", "Compressor"), 960);
-  assert.equal(estimateTotal("A/C and HVAC", "Evaporator core"), 960);
-  assert.equal(estimateTotal("A/C and HVAC", "Condenser core"), 960);
+  assert.equal(estimateTotal("A/C and HVAC", "Cooling - No cooling"), 150);
+  assert.equal(estimateTotal("A/C and HVAC", "Heating - Heater boost pump"), 150);
   assert.equal(estimateTotal("Engine", "Rear main seal"), 960);
   assert.equal(estimateTotal("Engine", "Spark plugs"), 300);
   assert.equal(estimateTotal("Engine", "Valve adjustment"), 360);
@@ -496,7 +511,7 @@ test("mechanic planning estimates enforce Curtis's shop baselines and accumulate
   assert.equal(normalizeRepairTimeEstimate(undefined, "Electrical / Multiplex", "MOD light").diagnosticMinutes, 60);
   assert.equal(recommendedRepairMinutes("Engine", "Engine replacement"), 960);
 
-  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Evaporator core"));
+  assert.ok(REPAIR_OPTIONS["A/C and HVAC"].includes("Cooling - Evaporator core"));
   assert.ok(REPAIR_OPTIONS.Engine.includes("Rear main seal"));
   assert.ok(REPAIR_OPTIONS.Brakes.includes("Rear shoes and drums"));
   assert.ok(REPAIR_OPTIONS["Battery, Starting and Charging"].includes("Jump / boost bus"));
