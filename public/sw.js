@@ -27,16 +27,36 @@ const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg", "/apple-touch-icon.
    never getting written. */
 const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/incidents", "/shop-talk", "/settings"];
 
+/* ONE PAGE OFF THE WIFI MUST NOT COST THE OTHER SEVEN. This loop used to let a
+   single rejected fetch out of Promise.all, which rejected the whole install:
+   skipWaiting never ran, the worker never activated, and the phone was left
+   with no offline shell at all — silently, and in exactly the conditions this
+   file exists for, a first launch on garage wifi that drops. The asset loop
+   below had been tolerant from the start; the page loop had not, and nothing
+   made that asymmetry deliberate.
+
+   `/` IS STILL FATAL, and that is the other half. Every navigation falls back
+   to it (see the fetch handler), so a shell without it is not a shell, and a
+   failed install is what makes the browser try again on the next load. Swallow
+   that too and the worker activates holding nothing and never retries, which
+   is worse than failing. */
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);
   const assets = new Set(CORE_FILES);
+  const cachedPages = new Set();
   await Promise.all(CORE_PAGES.map(async path => {
-    const page = await fetch(new Request(path, { cache: "reload" }));
-    if (!page.ok) return;
-    await cache.put(path, page.clone());
-    const html = await page.text();
-    for (const match of html.matchAll(/(?:href|src)="(\/assets\/[^"?#]+(?:\?[^"#]*)?)"/g)) assets.add(match[1]);
+    try {
+      const page = await fetch(new Request(path, { cache: "reload" }));
+      if (!page.ok) return;
+      await cache.put(path, page.clone());
+      cachedPages.add(path);
+      const html = await page.text();
+      for (const match of html.matchAll(/(?:href|src)="(\/assets\/[^"?#]+(?:\?[^"#]*)?)"/g)) assets.add(match[1]);
+    } catch {
+      /* Left out of this install. The next one picks it up. */
+    }
   }));
+  if (!cachedPages.has("/")) throw new Error("app shell not cached: / is unreachable");
   await Promise.allSettled([...assets].map(async url => {
     const response = await fetch(url, { cache: "reload" });
     if (response.ok) await cache.put(url, response);

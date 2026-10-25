@@ -1019,3 +1019,77 @@ test("scrolling the facility map does not move a bus", async () => {
     editor. */
  assert.match(mapPage,/if\(now-lastTouch\.current<350\)\{lastTouch\.current=0;setQuick\(false\);edit\(bus\)\}else\{lastTouch\.current=now;showQuick\(\)\}/);
 });
+
+test("one page off the wifi does not cost the whole offline shell", async () => {
+ const src=await readFile(new URL("../public/sw.js",import.meta.url),"utf8");
+
+ /* THIS ONE RUNS THE REAL FILE rather than reading it, because the defect it
+    guards is a Promise.all that rejects — a thing no amount of string matching
+    can see. `install` used to await Promise.all over the eight core pages, so
+    one rejected fetch rejected the whole install: skipWaiting never ran, the
+    worker never activated, and the phone kept no offline shell at all. Silent,
+    and in exactly the conditions this file exists for — a first launch on
+    garage wifi that drops. */
+ const install=async failPath=>{
+  const listeners={},store=new Map();
+  const cacheApi={
+   open:async name=>{if(!store.has(name))store.set(name,new Map());const held=store.get(name);
+    return {put:async(key,value)=>held.set(typeof key==="string"?key:key.url,value),keys:async()=>[...held.keys()]}},
+   keys:async()=>[...store.keys()],delete:async name=>store.delete(name),match:async()=>undefined,
+  };
+  const worker={addEventListener:(type,fn)=>{listeners[type]=fn},skipWaiting:async()=>{},clients:{claim:async()=>{}},location:{origin:"http://x"}};
+  const FakeRequest=class{constructor(url){this.url=url}};
+  const fetchStub=async target=>{
+   const url=typeof target==="string"?target:target.url;
+   if(url===failPath)throw new TypeError("Failed to fetch");
+   return {ok:true,clone(){return this},async text(){return '<link href="/assets/x'+url.replace(/\W/g,"")+'.css">'}};
+  };
+  new Function("self","caches","fetch","Request",src)(worker,cacheApi,fetchStub,FakeRequest);
+  let waited=null;
+  listeners.install({waitUntil:promise=>{waited=promise}});
+  let failed=false;
+  try{await waited}catch{failed=true}
+  const held=store.get("pace-bus-tracker-shell-v7");
+  return {failed,pages:held?[...held.keys()].filter(key=>!key.startsWith("/assets")&&!key.includes(".")):[]};
+ };
+
+ const clean=await install(null);
+ assert.equal(clean.failed,false,"a clean install still succeeds");
+ assert.equal(clean.pages.length,8,"all eight pages are cached when the wifi holds");
+
+ /* The seven good pages survive the one bad one. */
+ const flaky=await install("/shop-talk");
+ assert.equal(flaky.failed,false,"one unreachable page no longer fails the install");
+ assert.equal(flaky.pages.length,7,"the other seven are kept");
+ assert.equal(flaky.pages.includes("/"),true,"including the one every navigation falls back to");
+
+ /* And `/` is still fatal, deliberately. The fetch handler falls back to it for
+    every navigation, so a shell without it is not a shell — and a FAILED
+    install is what makes the browser try again on the next load. Swallowing
+    this too would activate a worker holding nothing that never retries. */
+ const noRoot=await install("/");
+ assert.equal(noRoot.failed,true,"an install that could not cache / fails, so the browser retries");
+});
+
+test("Escape closes the map layer that locked the page behind it", async () => {
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+
+ /* The bus editor was the worst of these: alone among the map's modals it has
+    no backdrop click either, so the only way out was finding its X — and every
+    layer in `modalOpen` FIXES the body, so a layer nobody can dismiss is a
+    page that will not scroll. The Defect Log's part prompt has closed on
+    Escape all along. */
+ const escape=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{\n if\(event\.key!=="Escape"\)return;[\s\S]*?\};/);
+ assert.ok(escape,"the map closes a layer on Escape");
+ for(const closer of ["setOperatorOpen(false)","setRelocateSpot(null)","setRemoveSection(null)","setMultiLocateOpen(false)","setSettingsOpen(false)","closeEditor()"])
+  assert.match(escape[0],new RegExp(closer.replace(/[().]/g,"\\$&")),closer+" is reachable from the keyboard");
+ assert.match(mapPage,/window\.addEventListener\("keydown",escape,true\)/);
+
+ /* One close path, so the X and Escape cannot drift apart — Escape discards
+    exactly what the X has always discarded, including an unsaved draft bus. */
+ assert.match(mapPage,/const closeEditor=\(\)=>\{if\(edit&&draftNewId===edit\.id\)setBuses\(v=>v\.filter\(bus=>bus\.id!==edit\.id\)\);setDraftNewId\(null\);setEdit\(null\)\}/);
+ assert.match(mapPage,/close=\{closeEditor\}/,"the editor's own X calls the same thing");
+
+ /* HOLD THIS BUS locks nothing, so it traps nobody and is deliberately absent. */
+ assert.doesNotMatch(escape[0],/setHoldBoardOpen/);
+});
