@@ -150,7 +150,7 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      armed a touch drag, so scrolling the map moved buses. The hold is the rule
      now — app-shell.test.mjs holds the whole contract and the reasoning. */
   assert.match(page, /const HOLD_MS=\d+,HOLD_SLOP=\d+,DRAG_SLOP=\d+;/);
-  assert.match(page, /travel>=DRAG_SLOP/);
+  assert.match(page, /\)>=DRAG_SLOP\)state\.moved=true/);
   assert.match(page, /data-empty-touch=\{singleTapEmptySpaces\?"single":"double"\}/);
   assert.match(page, /now-lastEmptyTouch\.current<700/);
   assert.match(panel, /ALLOW SINGLE-TAP EMPTY SPACES ON TOUCHSCREENS/);
