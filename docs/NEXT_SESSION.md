@@ -104,7 +104,7 @@ ever will, and it is the only one of the three with no downside at all.
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Clean. Nothing stashed, nothing uncommitted. |
-| Gate at handoff | All three green: the full suite passing, ESLint clean, production build succeeds. Run them; the count moves with every change that adds a test. |
+| Gate at handoff | All four green: the full suite passing, ESLint clean, production build succeeds, and a cold read of the diff answered. Run them; the count moves with every change that adds a test. |
 
 **Neither is the test count, for the same reason.** It was written down as 229
 by the very commit that added the 230th test, so the first thing a fresh session
@@ -141,7 +141,10 @@ Codex at that file. That is the whole protocol.
 ### Your half of it, step by step
 
 1. Do the work on `main`. Small, coherent commits.
-2. Run the gates (below). All three.
+2. Run the gates (below). All four — the three commands, and a cold read of
+   the whole change against `main` by one subagent that has not seen your
+   reasoning, every finding of which is fixed in a named commit or declined
+   with the reason on the record. See `.claude/skills/fresh-context-review`.
 3. Commit and push to `main`.
 4. **In a separate commit, add a new version section to
    `docs/PUBLISH_NEXT.md`** and update its STATUS line, the summary table, and
@@ -275,7 +278,13 @@ npm run lint
 npm run build
 ```
 
-All three, every time. `npm test` runs the build itself, so a green suite means
+All three, every time, and then the cold read: one subagent on the whole
+diff against `main`, handed the code and never your conclusion, with every
+finding answered. It is the standing replacement for the review bot this
+project used until its trial expired, and `.claude/skills/fresh-context-review`
+records the nine findings that make it a gate rather than a courtesy.
+
+`npm test` runs the build itself, so a green suite means
 the build is green too.
 
 **Measure the UI in a browser. Do not read the CSS and conclude.** Nearly every
