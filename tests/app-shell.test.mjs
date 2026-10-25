@@ -1020,76 +1020,101 @@ test("scrolling the facility map does not move a bus", async () => {
  assert.match(mapPage,/if\(now-lastTouch\.current<350\)\{lastTouch\.current=0;setQuick\(false\);edit\(bus\)\}else\{lastTouch\.current=now;showQuick\(\)\}/);
 });
 
-test("one page off the wifi does not cost the whole offline shell", async () => {
+test("the offline shell install is all-or-nothing", async () => {
  const src=await readFile(new URL("../public/sw.js",import.meta.url),"utf8");
+ const cacheName=src.match(/const CACHE_NAME = "([^"]+)"/)?.[1];
+ assert.ok(cacheName,"the cache name is readable from the source rather than pinned here");
 
- /* THIS ONE RUNS THE REAL FILE rather than reading it, because the defect it
-    guards is a Promise.all that rejects — a thing no amount of string matching
-    can see. `install` used to await Promise.all over the eight core pages, so
-    one rejected fetch rejected the whole install: skipWaiting never ran, the
-    worker never activated, and the phone kept no offline shell at all. Silent,
-    and in exactly the conditions this file exists for — a first launch on
-    garage wifi that drops. */
- const install=async failPath=>{
+ /* THIS ONE RUNS THE REAL FILE rather than reading it, because what it guards
+    is a Promise.all that rejects — invisible to any string match, which is how
+    somebody (me) came to read the rejection as a bug and soften it.
+
+    The rejection IS the retry. A failed install means the worker never
+    activates, and register() runs on every map load, so the browser tries
+    again. Catch per page instead and a worker activates holding a PARTIAL
+    shell that never heals: installs re-run only on a script byte change, and
+    `activate` keeps every cache under CACHE_NAME. The navigate handler is
+    network-first and caches each page as somebody visits it online, so the
+    hole closes for pages they walk to and never for the ones they do not —
+    and the ones they do not are the entire reason this file exists. */
+ const install=async failing=>{
   const listeners={},store=new Map();
   const cacheApi={
    open:async name=>{if(!store.has(name))store.set(name,new Map());const held=store.get(name);
     return {put:async(key,value)=>held.set(typeof key==="string"?key:key.url,value),keys:async()=>[...held.keys()]}},
    keys:async()=>[...store.keys()],delete:async name=>store.delete(name),match:async()=>undefined,
   };
-  const worker={addEventListener:(type,fn)=>{listeners[type]=fn},skipWaiting:async()=>{},clients:{claim:async()=>{}},location:{origin:"http://x"}};
+  let activated=false;
+  const worker={addEventListener:(type,fn)=>{listeners[type]=fn},skipWaiting:async()=>{activated=true},
+   clients:{claim:async()=>{}},location:{origin:"http://x"}};
   const FakeRequest=class{constructor(url){this.url=url}};
   const fetchStub=async target=>{
    const url=typeof target==="string"?target:target.url;
-   if(url===failPath)throw new TypeError("Failed to fetch");
-   return {ok:true,clone(){return this},async text(){return '<link href="/assets/x'+url.replace(/\W/g,"")+'.css">'}};
+   if(failing.includes(url))throw new TypeError("Failed to fetch");
+   /* A real Response body can only be read once, so clone() must hand back a
+      DIFFERENT object. Returning `this` would let a dropped .clone() pass here
+      and fail on a phone. */
+   const body='<link href="/assets/x'+url.replace(/\W/g,"")+'.css">';
+   const make=()=>({ok:true,clone:()=>make(),async text(){return body}});
+   return make();
   };
   new Function("self","caches","fetch","Request",src)(worker,cacheApi,fetchStub,FakeRequest);
   let waited=null;
   listeners.install({waitUntil:promise=>{waited=promise}});
   let failed=false;
   try{await waited}catch{failed=true}
-  const held=store.get("pace-bus-tracker-shell-v7");
-  return {failed,pages:held?[...held.keys()].filter(key=>!key.startsWith("/assets")&&!key.includes(".")):[]};
+  const held=store.get(cacheName);
+  return {failed,activated,pages:held?[...held.keys()].filter(key=>!key.startsWith("/assets")&&!key.includes(".")):[]};
  };
 
- const clean=await install(null);
- assert.equal(clean.failed,false,"a clean install still succeeds");
- assert.equal(clean.pages.length,8,"all eight pages are cached when the wifi holds");
+ const clean=await install([]);
+ assert.equal(clean.failed,false,"a clean install succeeds");
+ assert.equal(clean.activated,true,"and the worker takes over");
+ assert.equal(clean.pages.length,8,"holding every core page");
 
- /* The seven good pages survive the one bad one. */
- const flaky=await install("/shop-talk");
- assert.equal(flaky.failed,false,"one unreachable page no longer fails the install");
- assert.equal(flaky.pages.length,7,"the other seven are kept");
- assert.equal(flaky.pages.includes("/"),true,"including the one every navigation falls back to");
-
- /* And `/` is still fatal, deliberately. The fetch handler falls back to it for
-    every navigation, so a shell without it is not a shell — and a FAILED
-    install is what makes the browser try again on the next load. Swallowing
-    this too would activate a worker holding nothing that never retries. */
- const noRoot=await install("/");
- assert.equal(noRoot.failed,true,"an install that could not cache / fails, so the browser retries");
+ /* One page, seven pages, or the root: any of them fails the install, and the
+    worker must NOT activate holding what it managed to get. */
+ for(const failing of [["/shop-talk"],["/"],["/down-sheet","/defect-log","/fixed-repairs","/lists","/incidents","/shop-talk","/settings"]]){
+  const partial=await install(failing);
+  assert.equal(partial.failed,true,failing.length+" unreachable page(s) fails the install, so the browser retries");
+  assert.equal(partial.activated,false,"and no worker activates holding a partial shell");
+ }
 });
 
 test("Escape closes the map layer that locked the page behind it", async () => {
  const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
-
- /* The bus editor was the worst of these: alone among the map's modals it has
-    no backdrop click either, so the only way out was finding its X — and every
-    layer in `modalOpen` FIXES the body, so a layer nobody can dismiss is a
-    page that will not scroll. The Defect Log's part prompt has closed on
-    Escape all along. */
- const escape=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{\n if\(event\.key!=="Escape"\)return;[\s\S]*?\};/);
+ const escape=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{[\s\S]*?\n\};/);
  assert.ok(escape,"the map closes a layer on Escape");
- for(const closer of ["setOperatorOpen(false)","setRelocateSpot(null)","setRemoveSection(null)","setMultiLocateOpen(false)","setSettingsOpen(false)","closeEditor()"])
-  assert.match(escape[0],new RegExp(closer.replace(/[().]/g,"\\$&")),closer+" is reachable from the keyboard");
+
+ /* ONE PRESS CLOSES ONE LAYER. Asserted as a chain rather than by matching the
+    characters: an earlier version of this test passed if every `else if`
+    became `if`, which is one press closing all five at once — exactly the
+    claim it exists to guard. */
+ const closers=[...escape[0].matchAll(/(else )?if\((\w+)\)(set\w+)\(/g)];
+ assert.equal(closers.length,5,"five layers, and only the five that lock the page");
+ assert.equal(closers[0][1],undefined,"the first is a plain if");
+ for(const branch of closers.slice(1))assert.equal(branch[1],"else ",branch[2]+" is chained, so one press cannot close two layers");
+
+ /* NOT stopPropagation. On `window` in the capture phase it is first in the
+    path, so it silenced every other Escape handler in the app -- the phone
+    command panel, the page menu, the badge menu, the quick-filter menu, the
+    welcome gate -- for as long as a map modal was open. */
+ assert.doesNotMatch(escape[0],/stopPropagation/,"a capture-phase window listener must not swallow everybody else's Escape");
  assert.match(mapPage,/window\.addEventListener\("keydown",escape,true\)/);
+ assert.match(mapPage,/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and it comes off again");
 
- /* One close path, so the X and Escape cannot drift apart — Escape discards
-    exactly what the X has always discarded, including an unsaved draft bus. */
- assert.match(mapPage,/const closeEditor=\(\)=>\{if\(edit&&draftNewId===edit\.id\)setBuses\(v=>v\.filter\(bus=>bus\.id!==edit\.id\)\);setDraftNewId\(null\);setEdit\(null\)\}/);
- assert.match(mapPage,/close=\{closeEditor\}/,"the editor's own X calls the same thing");
+ /* A dependency array, like the other twenty-three effects in this file. */
+ const effect=mapPage.slice(mapPage.indexOf("const escape=(event:KeyboardEvent)"));
+ assert.match(effect.slice(0,1200),/\[modalOpen,operatorOpen,relocateSpot,removeSection,multiLocateOpen,settingsOpen\]/,"the effect declares what it depends on");
 
- /* HOLD THIS BUS locks nothing, so it traps nobody and is deliberately absent. */
+ /* THE BUS EDITOR IS NOT HERE ON PURPOSE. The other five close on a backdrop
+    click already, so Escape is a second harmless way out; the editor holds
+    typed work and closing it DELETES an unsaved new bus. That keystroke is
+    Curtis's call. HOLD THIS BUS locks nothing, so it traps nobody. */
+ assert.doesNotMatch(escape[0],/closeEditor|setEdit/,"Escape must not discard typed work without being asked for");
  assert.doesNotMatch(escape[0],/setHoldBoardOpen/);
+
+ /* One close path, so the editor's X and anything added later cannot drift. */
+ assert.match(mapPage,/const closeEditor=\(\)=>\{if\(edit&&draftNewId===edit\.id\)setBuses\(v=>v\.filter\(bus=>bus\.id!==edit\.id\)\);setDraftNewId\(null\);setEdit\(null\)\}/);
+ assert.match(mapPage,/close=\{closeEditor\}/,"the editor's X calls it");
 });

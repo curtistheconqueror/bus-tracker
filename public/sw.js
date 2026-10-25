@@ -27,36 +27,38 @@ const CORE_FILES = ["/manifest.webmanifest", "/favicon.svg", "/apple-touch-icon.
    never getting written. */
 const CORE_PAGES = ["/", "/down-sheet", "/defect-log", "/fixed-repairs", "/lists", "/incidents", "/shop-talk", "/settings"];
 
-/* ONE PAGE OFF THE WIFI MUST NOT COST THE OTHER SEVEN. This loop used to let a
-   single rejected fetch out of Promise.all, which rejected the whole install:
-   skipWaiting never ran, the worker never activated, and the phone was left
-   with no offline shell at all — silently, and in exactly the conditions this
-   file exists for, a first launch on garage wifi that drops. The asset loop
-   below had been tolerant from the start; the page loop had not, and nothing
-   made that asymmetry deliberate.
+/* THE PAGE LOOP IS ALL-OR-NOTHING ON PURPOSE, and the asset loop below is not.
+   That asymmetry reads like an oversight and is the thing holding this file up.
 
-   `/` IS STILL FATAL, and that is the other half. Every navigation falls back
-   to it (see the fetch handler), so a shell without it is not a shell, and a
-   failed install is what makes the browser try again on the next load. Swallow
-   that too and the worker activates holding nothing and never retries, which
-   is worse than failing. */
+   A rejected page fetch rejects this whole function, which rejects the install:
+   skipWaiting never runs, the worker never activates, and the browser tries
+   again on the next load, because register() runs on every map load. So the
+   worker only ever activates holding a COMPLETE shell. Soften it -- catch per
+   page and carry on -- and a worker activates holding whatever it managed, the
+   install never re-runs (installs re-run on a script byte change, nothing
+   else), and `activate` keeps every cache under CACHE_NAME rather than
+   clearing it. The gap is then permanent for every page the person never
+   happens to open while online, which is precisely the phone this file was
+   written for. The navigate handler is network-first and does cache each page
+   as it is visited, so the hole heals for pages somebody walks to online --
+   and never for the ones they do not, which is the whole job.
+
+   Assets are different and are allSettled for a reason: a missing chunk is
+   re-fetched by the page that needs it, and losing one is not losing a page.
+
+   This was softened once, in the belief that one bad fetch costing seven good
+   pages was a bug. It is the price of atomicity, and atomicity is what makes
+   an offline shell trustworthy. Reverted. */
 async function cacheAppShell() {
   const cache = await caches.open(CACHE_NAME);
   const assets = new Set(CORE_FILES);
-  const cachedPages = new Set();
   await Promise.all(CORE_PAGES.map(async path => {
-    try {
-      const page = await fetch(new Request(path, { cache: "reload" }));
-      if (!page.ok) return;
-      await cache.put(path, page.clone());
-      cachedPages.add(path);
-      const html = await page.text();
-      for (const match of html.matchAll(/(?:href|src)="(\/assets\/[^"?#]+(?:\?[^"#]*)?)"/g)) assets.add(match[1]);
-    } catch {
-      /* Left out of this install. The next one picks it up. */
-    }
+    const page = await fetch(new Request(path, { cache: "reload" }));
+    if (!page.ok) return;
+    await cache.put(path, page.clone());
+    const html = await page.text();
+    for (const match of html.matchAll(/(?:href|src)="(\/assets\/[^"?#]+(?:\?[^"#]*)?)"/g)) assets.add(match[1]);
   }));
-  if (!cachedPages.has("/")) throw new Error("app shell not cached: / is unreachable");
   await Promise.allSettled([...assets].map(async url => {
     const response = await fetch(url, { cache: "reload" });
     if (response.ok) await cache.put(url, response);

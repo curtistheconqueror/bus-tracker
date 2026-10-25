@@ -1,7 +1,10 @@
 # Publish next
 
 **STATUS: 194 PENDING.** Scrolling the Facility Map on a phone no longer moves
-buses — a bus follows a finger only after the finger has been held on it.
+buses — a bus follows a finger only after the finger has been held on it. Also
+in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
+BUS and AI OPERATOR layers, which until now locked the page behind them with
+no way out from the keyboard.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -162,6 +165,53 @@ Every exit releases the listener, and the last finger leaving the glass releases
 it too, because the cost of missing one is not a lost drag but a page that
 cannot scroll.
 
+### Escape closes a layer that locked the page
+
+Every one of those layers fixes `document.body` while it is open, so the page
+behind it cannot scroll, and none of them listened for Escape. They all close
+on a backdrop click already, so this is a second, harmless way out of each.
+
+**The BUS EDITOR is deliberately NOT on that list, and it is the one that
+prompted this.** It is the only map modal with no backdrop click either, so
+its X really is the only way out — but it is also the only one holding typed
+work, and closing it DELETES an unsaved new bus. Escape is the reflex for
+dismissing a dropdown, and that editor is full of native `<select>`s on the
+one machine in the shop with a keyboard. Adding a reflex keystroke that
+destroys work is Curtis's call rather than a bug fix, so it is **asked, not
+assumed** — see the question at the end of this section.
+
+Measured: SETTINGS and MULTI-LOCATE each go from `locked:true` to
+`locked:false` on Escape and the page scrolls again; with a map modal open, an
+Escape still reaches the window-capture, document-bubble and window-bubble
+handlers, so nothing else in the app has lost its own Escape.
+
+### The service worker is unchanged, and that is the finding
+
+`public/sw.js` differs from 193 by **comments only**. It was changed in this
+branch and then reverted.
+
+The change made the install tolerate a failed page fetch. That was wrong. The
+`Promise.all` over the core pages makes the install **atomic**: a rejected
+fetch rejects the install, no worker activates, and `register()` runs on every
+map load so the browser tries again — the worker therefore only ever activates
+holding a COMPLETE shell. Softened, a worker activates holding whatever it
+got, the install never re-runs (installs re-run on a script byte change and
+nothing else), and `activate` keeps every cache under `CACHE_NAME` rather than
+clearing it. The navigate handler is network-first and does cache each page as
+somebody opens it online, so the hole heals for pages they walk to — and never
+for the ones they do not, which is the entire reason the file exists.
+
+The asymmetry with the asset loop beside it, which IS tolerant, is the point
+rather than an oversight: a missing chunk is re-fetched by the page that needs
+it; a missing page is a blank screen in a bay. That reasoning is now written
+into the file so the next person does not re-make the same change, and
+`tests/app-shell.test.mjs` executes the real worker and fails if the install
+ever stops being all-or-nothing.
+
+**No cache bump.** `CORE_PAGES` is unchanged and no CORE_FILE's contents
+changed, so `CACHE_NAME` correctly stays at v7 and phones take this as an
+ordinary asset change.
+
 ### Verified
 
 Gates on `319f2cd`:
@@ -210,3 +260,15 @@ that refusal has not been measured on an Android device.
 5. On the **shop computer**, dragging a bus with the mouse should feel exactly
    as it did.
 6. If 0.4s feels slow or twitchy with gloves on, say so — it is one number.
+7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
+   Escape. It should close. The bus editor still will not — see the question
+   below.
+
+### One open question for Curtis
+
+**Should Escape close the BUS EDITOR too?** It is the one modal with no other
+way out than its X, so it is the one that traps — but Escape there discards
+whatever was typed and deletes an unsaved new bus, exactly as the X does
+today. Three options: leave it as it is, let Escape close it the way the X
+does, or let Escape close it but ask first when something has been typed.
+Not built either way until he says.
