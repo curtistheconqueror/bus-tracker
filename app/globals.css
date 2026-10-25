@@ -62,7 +62,7 @@
 .road p{margin:5px 0 0}
 
 /* Section bus controls, wider vertical spaces, and touch gestures */
-.token{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.token *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.token{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.token *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .title-actions{position:absolute;right:4px;display:flex;align-items:center;gap:5px}
 .title>span:first-child{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
 .section-count{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:18px;padding:0 6px;border:1px solid #9badd0;border-radius:10px;background:#edf3fc;color:#173e73;font-size:9px;line-height:1}
@@ -1285,3 +1285,30 @@ html.page-scroll-locked,body.page-scroll-locked{overflow:hidden;overscroll-behav
    a fourth would push END & REPORT off the edge. display:block is what makes
    the <em> take a line of its own inside the span that holds both. */
 .sweep-banner span em{display:block;margin-top:3px;font-style:normal;font-weight:700;color:#ffd7a8}
+
+/* A bus that has been picked up says so. The hold is 400ms of nothing
+   happening, so without a mark at the end of it the gesture feels broken
+   rather than deliberate — and on iOS, where navigator.vibrate does not
+   exist, this mark is the only confirmation the hold landed at all.
+
+   DRAWN AS A PSEUDO-ELEMENT, and that is the whole point of it. The first
+   version of this rule was `.app .token.drag-armed{box-shadow:...}` under a
+   comment reasoning about the two competing box-shadow rules it had found.
+   There are FIFTEEN. Thirteen of them carry an attribute selector
+   (`.app.highlight-ac .token[data-ac="true"]` and its twelve siblings at
+   lines 137-141, 230, 322-323 and 527), which outweighs any plain chain of
+   three classes whatever its source position — so under HIGHLIGHT A/C, any
+   quick filter, or any status highlight, the ring measured as the highlight's
+   own glow and the person holding the phone got no feedback whatsoever.
+   `.token.single-locate` beat it for a different reason again: its
+   single-locate-glow keyframes ANIMATE box-shadow, and an animation outranks
+   a normal declaration at any specificity. Measured in Chromium against the
+   real stylesheet, after a comment asserting the opposite had already been
+   checked in. `.token::after` is contested by nothing in this repository, so
+   the ring cannot be outranked by a highlight the shop actually works in.
+
+   No `outline` here either: the first version used `outline:none` and erased
+   the purple multi-select ring on `.token.multi-locate`, so arming a drag on
+   a multi-selected bus looked like it had deselected it. */
+.token.drag-armed{position:relative}
+.token.drag-armed::after{content:"";position:absolute;inset:-3px;border:2px solid #0969d9;border-radius:6px;box-shadow:0 7px 16px #0b3a7a66;pointer-events:none}

@@ -146,13 +146,17 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(page, /pace-touch-drop/);
   assert.match(page, /clearDragHighlights\(\)/);
   assert.match(page, /data-location=\{id\}/);
-  assert.match(page, /Math\.hypot\([^)]*\)>=7/);
+  /* Was `Math.hypot(...)>=7`, which pinned the shape of the bug: travel alone
+     armed a touch drag, so scrolling the map moved buses. The hold is the rule
+     now — app-shell.test.mjs holds the whole contract and the reasoning. */
+  assert.match(page, /const HOLD_MS=\d+,HOLD_SLOP=\d+,DRAG_SLOP=\d+;/);
+  assert.match(page, /\)>=DRAG_SLOP\)state\.moved=true/);
   assert.match(page, /data-empty-touch=\{singleTapEmptySpaces\?"single":"double"\}/);
   assert.match(page, /now-lastEmptyTouch\.current<700/);
   assert.match(panel, /ALLOW SINGLE-TAP EMPTY SPACES ON TOUCHSCREENS/);
   assert.match(css, /-webkit-touch-callout:none/);
   assert.match(page, /onContextMenu=\{event=>\{if\(pointerType\.current==="touch"\)event\.preventDefault\(\)\}\}/);
-  assert.match(css, /\.token\{touch-action:none/);
+  assert.match(css, /\.token\{touch-action:manipulation/);
   assert.match(page, /setLocatedBusIds\(\[resolution\.bus\.id\]\)/);
   assert.doesNotMatch(page, /resolved to Bus/);
   assert.match(css, /\.vertical-zone\.tow\{[^}]*border-right-color:transparent/);

@@ -624,6 +624,17 @@ npm run lint
 npm run build
 ```
 
+**A COLD READ of the diff, before any push that carries a code change.** One
+subagent, handed the diff and the question and never your reasoning — a
+reviewer given your conclusion returns it to you agreed with. Read the whole
+change against `main`, not the last commit: two of the defects this has caught
+were invisible in a single-commit diff. **Every finding gets answered** — fixed
+in a named commit, or declined with the reason on the record — because a pass
+nobody must answer is not a gate. It does not replace the three above or your
+own reading, and it is never the sole witness to a claim. The mirror push
+carries no diff of its own and needs none. Why this is a gate, and what it has
+caught: `.claude/skills/fresh-context-review`.
+
 **Measure the UI in a real browser rather than reading the CSS.** Chromium is at
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`; `npm run dev` serves on
 5173. Nearly every significant layout bug in this project was found by

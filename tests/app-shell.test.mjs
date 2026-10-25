@@ -917,3 +917,105 @@ test("Fixed Repairs is themed all the way into the card, not just around it",asy
   assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
  }
 });
+
+test("scrolling the facility map does not move a bus", async () => {
+ const [css,mapPage]=await Promise.all([
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+
+ /* THE REGRESSION THIS TEST EXISTS TO CATCH, and it shipped in the first
+    commit this repository has. `.token{touch-action:none}` told the browser
+    never to scroll when a finger landed on a bus, and the drag armed on 7px of
+    travel with no time requirement at all. The map is 4366px tall on a 390px
+    phone and a bus token is most of what is under a thumb, so a plain swipe up
+    carried garage-6 to wall-7 and scrolled the page zero pixels. Measured in
+    Chromium, not read off the stylesheet. Curtis: "when you're moving up and
+    down on the screen, you're gonna be moving buses all over the place." */
+ const tokenRule=css.match(/\n\.token\{touch-action:[^;]+;/);
+ assert.ok(tokenRule,"the token still declares a touch-action");
+ assert.doesNotMatch(tokenRule[0],/touch-action:none/,"a finger on a bus must still be able to scroll the page");
+ assert.match(tokenRule[0],/touch-action:manipulation/,"panning passes through; double-tap zoom stays off, since double tap opens the editor");
+
+ /* A hold, not a distance. The constants are the fix; a bare Math.hypot test
+    in onPointerMove deciding `active` is what it replaced.
+
+    READ AS NUMBERS rather than matched as \d+, which `HOLD_MS=0` satisfies —
+    the first version of this assertion passed on a hold of zero, which is the
+    bug with the constants renamed. */
+ const held=mapPage.match(/const HOLD_MS=(\d+),HOLD_SLOP=(\d+),DRAG_SLOP=(\d+);/);
+ assert.ok(held,"the hold is spelled out in named constants");
+ const [holdMs,holdSlop,dragSlop]=held.slice(1,4).map(Number);
+ assert.ok(holdMs>=250,"a hold shorter than a quarter second does not survive a scroll flick, measured at 250ms");
+ assert.ok(holdMs<=700,"a hold this long reads as the app ignoring the finger");
+ assert.ok(holdSlop>0&&dragSlop>0,"both slops have to admit some drift; a thumb is not a mouse");
+ assert.match(mapPage,/holdTimer\.current=window\.setTimeout\(armTouchDrag,HOLD_MS\)/,"pointerdown arms a timer rather than the drag itself");
+ assert.doesNotMatch(mapPage,/!state\.active&&Math\.hypot\([^)]*\)>=7\)\{state\.active=true/,"travel alone must never arm a drag");
+ assert.match(mapPage,/if\(!state\.active\)\{if\(Math\.hypot\([^)]*\)>=HOLD_SLOP\)cancelHold\(\);return\}/,"movement before the hold fires is a scroll, and gives up on the drag");
+
+ /* Only a non-passive touchmove listener can cancel a scroll: a pointermove
+    preventDefault does not, and React registers touchmove passively. Blocking
+    it is also why every exit path has to release it, or the page is left
+    unable to scroll at all. */
+ assert.match(mapPage,/document\.addEventListener\("touchmove",handler,\{passive:false\}\)/,"an armed drag takes scrolling back");
+ /* And the arm has to CALL it. Without this line the whole suite passed with
+    blockScroll() deleted from armTouchDrag — which is the original bug back
+    in full, because touch-action no longer stops the scroll either. */
+ const arm=mapPage.match(/const armTouchDrag=\(\)=>\{[\s\S]*?\};/);
+ assert.ok(arm,"armTouchDrag still exists");
+ assert.match(arm[0],/blockScroll\(\)/,"arming a drag is what takes scrolling back");
+ assert.match(arm[0],/state\.armX=state\.lastX;state\.armY=state\.lastY/,"travel is measured from where the drag armed, not from touchdown");
+ assert.match(mapPage,/Math\.hypot\(event\.clientX-state\.armX,event\.clientY-state\.armY\)>=DRAG_SLOP/);
+
+ /* One finger owns a token. A second used to overwrite the first's gesture,
+    leaving the ring and the scroll block on a page that could no longer
+    scroll, and turning the first finger's lift into a tap. */
+ assert.match(mapPage,/if\(touchDrag\.current\.pointerId>=0\)return;touchDrag\.current=\{pointerId:event\.pointerId/,"a live gesture is not replaced by a second finger");
+ assert.match(mapPage,/if\(touchDrag\.current\.pointerId>=0&&event\.pointerId!==touchDrag\.current\.pointerId\)return;/,"a finger we are not tracking says nothing about this bus");
+
+ /* The net that does not need a pointerup: the last finger off the glass
+    releases the block however the gesture ended. */
+ assert.match(mapPage,/const lift=\(event:TouchEvent\)=>\{if\(event\.touches\.length===0\)releaseScroll\(\)\}/,"the last finger up frees scrolling");
+ assert.match(mapPage,/document\.addEventListener\("touchend",lift\);document\.addEventListener\("touchcancel",lift\)/);
+ const release=mapPage.match(/const releaseScroll=\(\)=>\{[\s\S]*?\};/);
+ assert.ok(release,"releaseScroll still exists");
+ assert.match(release[0],/document\.removeEventListener\("touchmove",scrollBlock\.current\)/,"the blocker comes off");
+ assert.match(release[0],/document\.removeEventListener\("touchend",touchLift\.current\);document\.removeEventListener\("touchcancel",touchLift\.current\)/,"and so does its net, or the next drag leaks one");
+ const finish=mapPage.match(/const finishTouchDrag=[\s\S]*?return \{active:wasActive,moved\};/);
+ assert.ok(finish,"finishTouchDrag still reports what the gesture was");
+ /* Stated narrowly on purpose. The first version of this line claimed "every
+    end of a touch drag gives scrolling back", which the code made false: the
+    pointerId guard above returns before either call. What is true is that the
+    path which OWNS the gesture releases both, and the touchend net above
+    covers the rest. */
+ assert.match(finish[0],/if\(event\.pointerId!==state\.pointerId\)return \{active:false,moved:false\};cancelHold\(\);releaseScroll\(\);/,"the gesture's own end releases the hold and the scroll block");
+ assert.match(mapPage,/onPointerCancel=\{event=>\{if\(event\.pointerType==="touch"\)finishTouchDrag\(event,true\)\}\}/,"a gesture the browser takes over ends the drag too");
+
+ /* A hold that lifts in place is a look at the bus, not a drop onto its own
+    space: without `moved` the drop target under the finger is the token's own
+    spot and the move is a self-move. */
+ assert.match(finish[0],/const target=cancelled\|\|!moved\?null:touchDropTarget/);
+ assert.match(mapPage,/const drag=finishTouchDrag\(event\);if\(drag\.active\)\{if\(!drag\.moved\)showQuick\(\);return\}/);
+
+ /* The ring is the only confirmation of the hold on iOS, where
+    navigator.vibrate does not exist. Drawn as a pseudo-element because
+    fifteen rules in globals.css set box-shadow on a token and thirteen carry
+    an attribute selector, outweighing any chain of three classes whatever
+    its position: under HIGHLIGHT A/C or any quick filter the first version of
+    this ring measured as the highlight's own glow and the person holding the
+    phone got nothing. Nothing in this repository styles `.token::after`. */
+ assert.match(mapPage,/\(dragArmed\?" drag-armed":""\)/,"the armed token carries the class");
+ assert.match(css,/\.token\.drag-armed::after\{content:"";position:absolute;inset:-3px;border:2px solid/,"the ring is a pseudo-element, not a box-shadow in a fight it loses");
+ assert.doesNotMatch(css,/\.token\.drag-armed\{[^}]*outline:none/,"outline:none erased the multi-select ring on an armed bus");
+
+ /* A Token keyed by nothing kept its refs when the bus under it changed, so a
+    cloud pull mid-gesture dropped the NEW occupant's id. The 400ms hold makes
+    that window longer on every drag, which is what turned a latent bug into
+    one worth fixing here. */
+ assert.match(mapPage,/\{b&&<Token key=\{b\.id\} bus=\{b\} edit=\{edit\}\/>\}/,"a token is identified by its bus");
+
+ /* Three touch gestures share this element and the hold must not have eaten
+    the other two: one tap still shows the quick view, two still open the
+    editor. */
+ assert.match(mapPage,/if\(now-lastTouch\.current<350\)\{lastTouch\.current=0;setQuick\(false\);edit\(bus\)\}else\{lastTouch\.current=now;showQuick\(\)\}/);
+});
