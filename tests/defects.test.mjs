@@ -120,8 +120,33 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
   assert.match(css,/\.log-advanced \.feed-operator\{[^}]*linear-gradient\(120deg,#4a2389,#7138c5\)/,"AI OPERATOR keeps its purple");
   assert.match(css,/\.log-advanced \.cleanup-log\{border:1px solid/,"CLEAN UP has a border you can see");
   /* The toggle is drawn from the header's own translucent-white pair, not the
-     light-surface one it had as a card - that was invisible against navy. */
-  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff5c;[^}]*background:#ffffff1f/);
+     light-surface one it had as a card - that was invisible against navy.
+
+     THE PAIR IS THE RULE, NOT ITS OPACITY. This asserted #ffffff5c and
+     #ffffff1f exactly, so brightening the toggle to make it easier to find on
+     a phone failed a test about something else. What must not change is that
+     both halves are translucent WHITE: a light-surface background is the bug
+     this line was written for, and #6b31b6 is the Down Sheet's.
+
+     TRANSLUCENT, THOUGH - 00 and ff are excluded by hand. A first pass at
+     loosening this took any two hex digits, which accepted #ffffff00 and
+     #ffffffff: invisible, and an opaque light surface. Those are precisely the
+     two failures the rule exists to catch, so the looser regex would have
+     permitted the bug while still reading like a guard. */
+  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff(?!00|ff)[0-9a-f]{2};[^}]*background:#ffffff(?!00|ff)[0-9a-f]{2}/,
+   "the toggle keeps the header's translucent-white pair");
+  assert.doesNotMatch(css,/\.header-advanced-toggle\{[^}]*background:var\(--log-surface/,
+   "a light surface is invisible against navy, which is why this rule exists");
+
+  /* AND THE DRAWER WEARS THE SAME COLOUR AS THE BUTTON THAT OPENS IT. Curtis,
+     on the old white panel: "it opens up a white list ... the colors don't
+     match and it kind of looks like it's unrelated." --log-header is the one
+     background guaranteed dark on all four themes, so the drawer follows the
+     header rather than a mix that would invert on the dark ones. */
+  assert.match(css,/\.log-advanced\{[^}]*background:var\(--log-header/,
+   "the ADVANCED ACTIONS drawer takes the header colour its button sits on");
+  assert.match(css,/\.log-advanced-body\{[^}]*background:transparent/,
+   "the body lets the drawer colour through instead of painting a light sheet over it");
   assert.match(css,/\.log-header-actions\{[^}]*flex-direction:column/,"REFRESH and ADVANCED ACTIONS stack in one column");
   /* The board's phone rules moved to globals.css with the board itself — that
      is the one stylesheet both pages load, and the Defect Log still needs the

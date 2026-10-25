@@ -1,17 +1,17 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-20
+Updated: 2026-10-23
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 187 (application release 191)
-Live feature checkpoint: commit b33775685b61acafdf4325807c82e92281c9fc2c
+Live release: Sites Version 188 (application release 192)
+Live feature checkpoint: commit 2ddc026c139c45acec7c24128633841d96e7dee3
 
 ## Read this first
 
 This file is the authoritative continuation guide. Older snapshots are preserved under docs/archive for historical reference only. Do not use an archived handoff as current implementation guidance.
 
-The project is an offline-capable fleet maintenance operations application with five surfaces:
+The project is an offline-capable fleet maintenance operations application with seven surfaces:
 
 1. Facility Map — physical location, operating status, fleet markers, fast movement, and AI Operator commands.
 2. Interactive Down Sheet — scheduled repairs, shifts, assignments, estimates, photo import, and completion workflow.
@@ -19,7 +19,29 @@ The project is an offline-capable fleet maintenance operations application with 
 4. Fixed Repairs — offline completed-repair history used for future diagnosis, with carried defect facts plus editable fix, verification, part, technician, and completion-time fields.
 5. Fleet Campaigns — independent device-local punch lists with custom columns, reusable report formats, completion initials/timestamps, and shareable text output. Also hosts the Work Time panel, which totals a person's day across campaign rows and Defect Log repairs; the panel takes its records as props and is built to be relocated.
 
+6. Incidents — device-local records of events involving people and places.
+7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
+
 ## Domain ownership
+
+Application 192 adds Incidents and Shop Talk alongside the five operational
+surfaces above. Both use device-local stores, do not sync, and are excluded
+from MASTER EXPORT/IMPORT. A device move or loss does not carry these records.
+Incidents does not replace supervisor reporting. Shop Talk keeps handled notes.
+The grouped HVAC picker adds Heating; No Heat Buses reads repair identity,
+while A/C Buses continues to include heating repairs in the shared category.
+The category glyph is now ❄️+♨️. No navigation badge was added.
+
+Published 2026-10-23 02:26:48.844011 UTC. Eight HTTP routes and 40 deployed
+asset byte comparisons passed, including service-worker v7 and both new
+surface bundles. Local and exact-source CI lint/build/388 tests passed.
+Fresh browser interaction, native phone/iPad/Safari and offline-device checks
+remain unperformed here. An existing generated Defect Log preload reference
+is absent from build output; the actual manifest asset was verified.
+Rollback is application 191 / Sites 187, `sites-v187` at
+`b33775685b61acafdf4325807c82e92281c9fc2c`.
+PR39 MCP remains unmerged and excluded; no Supabase or credential changes were
+made by this release. See docs/RELEASES.md for publication identifiers.
 
 These boundaries prevent synchronization bugs:
 

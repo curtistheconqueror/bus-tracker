@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 187 / application release 191 | Live | b33775685b61acafdf4325807c82e92281c9fc2c | FOCUS shares one bus as text or a self-contained HTML page, including records hidden by board filters and accessible action outcomes. |
+| 188 / application release 192 | Live | 2ddc026c139c45acec7c24128633841d96e7dee3 | Device-local Incidents and Shop Talk, wrapping navigation, grouped HVAC Heating and No Heat Buses, with preserved estimates and operator aliases. |
+| 187 / application release 191 | Previous live; rollback | b33775685b61acafdf4325807c82e92281c9fc2c | FOCUS shares one bus as text or a self-contained HTML page, including records hidden by board filters and accessible action outcomes. |
 | 186 / application release 190 | Previous live; rollback, includes 189 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | Defect Log AI OPERATOR confirms before leaving for Facility Map; grouped defect and Down Sheet repair browsing; smoother typing through stable bus-picker rendering. |
 | 186 / application release 189 | Previous live, shipped with 190 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | DEFECTS LOGGED count and drawer share a selected time span, with a count that updates while the menu stays open. |
 | 185 / application release 188 | Previous live; rollback | 3b19e339446a9784898aa1cdd1f37b514c3a9d7d | Adds WHEN LOGGED feed windows with an advancing shared clock, correct local-midnight TODAY boundary, search bypass and always-reachable SHOW ALL DATES. |
@@ -161,3 +162,36 @@ When a release is published, update this table and PROJECT_HANDOFF.md in the sam
 - Limits: no browser-control tools were available; fresh hydration/layout, native phone sharing, VoiceOver announcements, Safari/Home Screen and offline-device acceptance are not claimed. Follow the five device checks in the [preserved handoff](archive/PUBLISH_RELEASE_191.md). A late async share completion can label a newly focused bus with the earlier action's status; the payload remains scoped to the original bus. CodeRabbit classifies the release as minimal merge risk; this minor status race is recorded rather than treated as a data leak.
 - Rollback: application 189/190 / Sites 186, source `c9c03d661177c04706f7beb33f2e4c24bf728e58` (`sites-v186`), saved version `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_3a17719e51808191bed75bc71024bd47`. No storage keys, schema, dependencies, hosting configuration or public assets changed; no production records, imports, browser data, access settings or unrelated services were touched.
 - New rollback tag `sites-v187` and application alias `sites-release191` identify the deployed source. The divergent `claude-contributions` mirror branch cannot fast-forward to main and was preserved without rewriting history. Canonical computer checkout remains untouched; release work used an isolated task checkout.
+
+## Application 192 / Sites 188 evidence
+
+- PR40 head: `0ba8e5c7d27677c1998303f9f45be73f6b2e426e`.
+- Merge: `cc495d5a3f4fd0f6eacde35d4e2b58527a8792a3`.
+- Frozen pushed source: `2ddc026c139c45acec7c24128633841d96e7dee3`.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_48672032f2d88191bbba69e7e67e598f`.
+- Deployment: `appgdep_6adac5df4e6481918503d1b79946ede2`, succeeded
+  2026-10-23 02:26:48.844011 UTC; existing public URL unchanged.
+- Archive SHA256: `daccddeb71516cb44b37c75d7c7da16413debfcecd32a0deca8e717f03d0c6ad`.
+- Exact-source [CI 39889311395](https://github.com/curtistheconqueror/bus-tracker/actions/runs/39889311395)
+  passed install/lint/build and 388 tests, zero failures/skips. Fresh local
+  lint/build/388 tests also passed on the identical feature tree.
+- Live HTTP: `/`, `/down-sheet`, `/defect-log`, `/fixed-repairs`, `/lists`,
+  `/settings`, `/incidents`, `/shop-talk` all 200 with both new nav links.
+  Forty built assets matched production byte-for-byte. Service-worker v7
+  contains both new routes. POST `/api/mcp` is 404, confirming no MCP route.
+- Existing generated preload `/assets/defect-log-Dho7tEB9.js` is absent from
+  local build output. The actual manifest assets were available and matched.
+  This is a retained verification limitation, not a claim of browser success.
+- Fresh browser interaction, device-local persistence/refused-write flows,
+  phone/iPad layout, Safari/Home Screen and offline-device checks were not
+  performed in this publishing environment. Relevant domain regressions passed
+  in the automated suite; earlier browser/mutation claims remain author evidence.
+- New device-local keys `pace-incidents-v1` and `pace-shop-talk-v1` do not sync
+  or ride MASTER EXPORT/IMPORT. A/C Buses includes Heating in the HVAC category.
+  These disclosed behaviors remain approved as-is. No nav badge was added.
+- Rollback: application 191 / Sites 187, `sites-v187` at
+  `b33775685b61acafdf4325807c82e92281c9fc2c`; release-192 tags point to the
+  frozen source, not the later documentation commit.
+- PR39 remains separate at `17b7b2a07f790cbf4aefdeeaf800057efd0165d2`.
+  No Supabase migration, credential, policy or runtime environment change was
+  performed by this publication. The platform reported environment revision 2.
