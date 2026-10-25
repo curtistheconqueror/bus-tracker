@@ -1,7 +1,9 @@
 # Publish next
 
 **STATUS: 194 PENDING.** Scrolling the Facility Map on a phone no longer moves
-buses — a bus follows a finger only after the finger has been held on it.
+buses — a bus follows a finger only after the finger has been held on it. Also
+in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
+BUS and AI OPERATOR layers, each of which fixes the page behind it.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -162,11 +164,79 @@ Every exit releases the listener, and the last finger leaving the glass releases
 it too, because the cost of missing one is not a lost drag but a page that
 cannot scroll.
 
+### Escape closes a layer that locked the page
+
+Every one of those layers fixes `document.body` while it is open, so the page
+behind it cannot scroll, and none of them listened for Escape. Each already
+had two ways out — its X, which is tabbable, and a backdrop tap — so this is
+a third, and the point of it is that Escape is what a person's hand reaches
+for.
+
+**The BUS EDITOR is deliberately NOT on that list, and it is the one that
+prompted this.** The line is not which of them holds typed work: MULTI-LOCATE
+holds seven typed bus numbers and a free-text defect description, and MOVE BUS
+HERE holds a typed bus number. The line is whether **one stray gesture already
+discards that work**. All five close on a backdrop tap with no confirmation
+today, so Escape is a second door onto a room that already had one. The editor
+has no backdrop tap, so Escape there would be a NEW way to lose a half-filled
+defect, an odometer reading, or an unsaved new bus that closing DELETES — and
+Escape is the reflex for dismissing a dropdown, on the one machine in the shop
+with a keyboard. A new destructive keystroke is Curtis's call rather than a bug
+fix, so it is **asked, not assumed** — see the question at the end.
+
+**Measured, all five** at 1180px: AI OPERATOR, SETTINGS, MULTI-LOCATE, MOVE BUS
+HERE and REMOVE BUS each go from `locked:true` to `locked:false` on Escape. And
+with a map modal open, an Escape still reaches the window-capture,
+document-bubble and window-bubble handlers, so nothing else in the app lost its
+own Escape — an earlier version of this change called `stopPropagation` on a
+capture-phase window listener and silenced every one of them.
+
+### The service worker is unchanged, and that is the finding
+
+`public/sw.js` differs from 193 by **comments only**. It was changed in this
+branch and then reverted.
+
+The change made the install tolerate a failed page fetch. That was wrong. The
+`Promise.all` over the core pages makes the install **atomic**: a rejected
+fetch rejects the install, no worker activates, and `register()` runs on every
+map load so the browser tries again — the worker therefore only ever activates
+holding a COMPLETE shell. Softened, a worker activates holding whatever it
+got, the install never re-runs (installs re-run on a script byte change and
+nothing else), and `activate` keeps every cache under `CACHE_NAME` rather than
+clearing it. The navigate handler is network-first and does cache each page as
+somebody opens it online, so the hole heals for pages they walk to — and not
+for the ones they do not, which is the entire reason the file exists. (A later
+release that edits `sw.js` at all re-runs the install and heals it; one that
+does not, never does.)
+
+**One thing this does NOT cover, and it is Curtis's call.** A page that answers
+with an error rather than failing to answer — a 503, a 404 mid-deploy — is
+SKIPPED by `if(!page.ok)return` and the install still succeeds, so atomicity
+holds for a dropped connection and not for a bad reply. The sharp end is a
+captive portal: it answers **200 with a login page**, and that HTML would be
+cached as a core page and served offline from then on. Pre-existing, not
+introduced here, and pinned by a test so it is visible rather than assumed
+away. Fixing it means failing the install on a non-ok page, which is a change
+to the file that is the offline premise — so it is raised, not done.
+
+The asymmetry with the asset loop beside it, which IS tolerant, is the point
+rather than an oversight: a missing chunk is re-fetched by the page that needs
+it; a missing page is a blank screen in a bay. That reasoning is now written
+into the file so the next person does not re-make the same change, and
+`tests/app-shell.test.mjs` executes the real worker and fails if the install
+ever stops being all-or-nothing.
+
+**No cache bump.** `CORE_PAGES` is unchanged and no CORE_FILE's contents
+changed, so `CACHE_NAME` correctly stays at v7 and phones take this as an
+ordinary asset change.
+
 ### Verified
 
-Gates on `319f2cd`:
+Gates re-run on `2b0af96`, this release's source — not quoted from an earlier
+run. An earlier draft of this section cited `319f2cd`, a hash no ref contains
+(its pre-rebase twin), and a count of 389 that two commits had since moved:
 
-- `npm test` — **389 pass, 0 fail**
+- `npm test` — **391 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -178,7 +248,7 @@ drag clears the ring and gives scrolling back; a hold lifted in place shows the
 quick view; single and double tap unchanged; and the page scrolls after a drag.
 
 A **cold read of the diff from a fresh context** found six defects, every one
-real, each answered in `319f2cd`. Two are worth knowing about because they were
+real, each answered in `033cb98`. Two are worth knowing about because they were
 reintroductions of the very bug being fixed:
 
 - **A second finger on the same bus froze the page.** Measured against the
@@ -210,3 +280,21 @@ that refusal has not been measured on an Android device.
 5. On the **shop computer**, dragging a bus with the mouse should feel exactly
    as it did.
 6. If 0.4s feels slow or twitchy with gloves on, say so — it is one number.
+7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
+   Escape. It should close. The bus editor still will not — see the question
+   below.
+
+### One open question for Curtis
+
+**Should Escape close the BUS EDITOR too?** It is the one modal whose only way
+out is its X, so it is the one that traps — but Escape there discards whatever
+was typed and deletes an unsaved new bus, exactly as the X does today, and
+unlike the other five it has no backdrop tap already doing that. Three
+options: leave it as it is, let Escape close it the way the X does, or let
+Escape close it but ask first when something has been typed. Not built either
+way until he says.
+
+**Should a bad reply fail the shell install the way a dropped connection
+does?** See the service-worker section above — today a 503 or a captive
+portal's login page does not fail it, and the portal's page gets cached as a
+core page.
