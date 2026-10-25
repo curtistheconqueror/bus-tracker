@@ -917,3 +917,52 @@ test("Fixed Repairs is themed all the way into the card, not just around it",asy
   assert.doesNotMatch(rule,/var\(--fixed-green/,selector+" no longer uses the light-theme green");
  }
 });
+
+test("scrolling the facility map does not move a bus", async () => {
+ const [css,mapPage]=await Promise.all([
+  readFile(new URL("../app/globals.css",import.meta.url),"utf8"),
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+ ]);
+
+ /* THE REGRESSION THIS TEST EXISTS TO CATCH, and it shipped in the first
+    commit this repository has. `.token{touch-action:none}` told the browser
+    never to scroll when a finger landed on a bus, and the drag armed on 7px of
+    travel with no time requirement at all. The map is 4366px tall on a 390px
+    phone and a bus token is most of what is under a thumb, so a plain swipe up
+    carried garage-6 to wall-7 and scrolled the page zero pixels. Measured in
+    Chromium, not read off the stylesheet. Curtis: "when you're moving up and
+    down on the screen, you're gonna be moving buses all over the place." */
+ const tokenRule=css.match(/\n\.token\{touch-action:[^;]+;/);
+ assert.ok(tokenRule,"the token still declares a touch-action");
+ assert.doesNotMatch(tokenRule[0],/touch-action:none/,"a finger on a bus must still be able to scroll the page");
+ assert.match(tokenRule[0],/touch-action:manipulation/,"panning passes through; double-tap zoom stays off, since double tap opens the editor");
+
+ /* A hold, not a distance. The constants are the fix; a bare Math.hypot test
+    in onPointerMove deciding `active` is what it replaced. */
+ assert.match(mapPage,/const HOLD_MS=\d+,HOLD_SLOP=\d+,DRAG_SLOP=\d+;/,"the hold is spelled out in named constants");
+ assert.match(mapPage,/holdTimer\.current=window\.setTimeout\(armTouchDrag,HOLD_MS\)/,"pointerdown arms a timer rather than the drag itself");
+ assert.doesNotMatch(mapPage,/!state\.active&&Math\.hypot\([^)]*\)>=7\)\{state\.active=true/,"travel alone must never arm a drag");
+ assert.match(mapPage,/if\(!state\.active\)\{if\(travel>=HOLD_SLOP\)cancelHold\(\);return\}/,"movement before the hold fires is a scroll, and gives up on the drag");
+
+ /* Only a non-passive touchmove listener can cancel a scroll: a pointermove
+    preventDefault does not, and React registers touchmove passively. Blocking
+    it is also why every exit path has to release it, or the page is left
+    unable to scroll at all. */
+ assert.match(mapPage,/document\.addEventListener\("touchmove",handler,\{passive:false\}\)/,"an armed drag takes scrolling back");
+ assert.match(mapPage,/const releaseScroll=\(\)=>\{if\(!scrollBlock\.current\)return;document\.removeEventListener\("touchmove",scrollBlock\.current\)/);
+ const finish=mapPage.match(/const finishTouchDrag=[\s\S]*?return \{active:wasActive,moved\};/);
+ assert.ok(finish,"finishTouchDrag still reports what the gesture was");
+ assert.match(finish[0],/cancelHold\(\);releaseScroll\(\);/,"every end of a touch drag gives scrolling back");
+ assert.match(mapPage,/onPointerCancel=\{event=>\{if\(event\.pointerType==="touch"\)finishTouchDrag\(event,true\)\}\}/,"a gesture the browser takes over ends the drag too");
+
+ /* A hold that lifts in place is a look at the bus, not a drop onto its own
+    space: without `moved` the drop target under the finger is the token's own
+    spot and the move is a self-move. */
+ assert.match(finish[0],/const target=cancelled\|\|!moved\?null:touchDropTarget/);
+ assert.match(mapPage,/const drag=finishTouchDrag\(event\);if\(drag\.active\)\{if\(!drag\.moved\)showQuick\(\);return\}/);
+
+ /* Three touch gestures share this element and the hold must not have eaten
+    the other two: one tap still shows the quick view, two still open the
+    editor. */
+ assert.match(mapPage,/if\(now-lastTouch\.current<350\)\{lastTouch\.current=0;setQuick\(false\);edit\(bus\)\}else\{lastTouch\.current=now;showQuick\(\)\}/);
+});
