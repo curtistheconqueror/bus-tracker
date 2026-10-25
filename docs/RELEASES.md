@@ -4,7 +4,8 @@ Sites version numbers are deployment checkpoints, not the package version in pac
 
 | Sites version | State | Source commit | Summary |
 | --- | --- | --- | --- |
-| 188 / application release 192 | Live | 2ddc026c139c45acec7c24128633841d96e7dee3 | Device-local Incidents and Shop Talk, wrapping navigation, grouped HVAC Heating and No Heat Buses, with preserved estimates and operator aliases. |
+| 189 / application release 193 | Live | a009c08fad02aa6859ec6445784f744c6e269c8d | ADVANCED ACTIONS drawers take their button colours; larger openers and reshaped DAILY STATS; service worker unchanged. |
+| 188 / application release 192 | Previous live; rollback | 2ddc026c139c45acec7c24128633841d96e7dee3 | Device-local Incidents and Shop Talk, wrapping navigation, grouped HVAC Heating and No Heat Buses, with preserved estimates and operator aliases. |
 | 187 / application release 191 | Previous live; rollback | b33775685b61acafdf4325807c82e92281c9fc2c | FOCUS shares one bus as text or a self-contained HTML page, including records hidden by board filters and accessible action outcomes. |
 | 186 / application release 190 | Previous live; rollback, includes 189 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | Defect Log AI OPERATOR confirms before leaving for Facility Map; grouped defect and Down Sheet repair browsing; smoother typing through stable bus-picker rendering. |
 | 186 / application release 189 | Previous live, shipped with 190 | c9c03d661177c04706f7beb33f2e4c24bf728e58 | DEFECTS LOGGED count and drawer share a selected time span, with a count that updates while the menu stays open. |
@@ -195,3 +196,54 @@ When a release is published, update this table and PROJECT_HANDOFF.md in the sam
 - PR39 remains separate at `17b7b2a07f790cbf4aefdeeaf800057efd0165d2`.
   No Supabase migration, credential, policy or runtime environment change was
   performed by this publication. The platform reported environment revision 2.
+
+## Application 193 / Sites 189 evidence
+
+- PR41 merge and frozen source: `a009c08fad02aa6859ec6445784f744c6e269c8d`.
+- Saved version: `appgprj_6a6f71ee10748191be94e962b3e665c2~appgver_51161d3c95308191a9ae49b7cda6e080`.
+- Deployment: `appgdep_6ade786b63a4819182e9ac72d32f1494`, succeeded
+  2026-10-25 21:45:24.014279 UTC; existing public site/audience unchanged.
+- Local gzip archive SHA256: `e25f359b9e4ff7c598b5fc8aef88903fc221176e0ad33dc93be4fb984731c520`.
+  Separately, Sites reports saved archive content hash
+  `0a5e22d09b13c49ab90c1f4085f73279e5912af52bd4fbc098f8b71e125746be`
+  with format `tar`; this is not asserted to equal the local gzip file hash.
+- Exact-source [CI 40232970655](https://github.com/curtistheconqueror/bus-tracker/actions/runs/40232970655)
+  passed lint/build and 388 tests, zero failures/skips. Fresh local lint/build
+  and 388 tests also passed. Dual-timezone/browser measurements in the archived
+  handoff are author claims, not new publishing-session measurements.
+- Independent cold review of the whole release diff, markup, cascade/themes and
+  tests found no actionable defect. The two affected named tests passed 2/2.
+  Test limits: CSS source-pattern assertions do not establish computed styles,
+  focus/contrast or responsive geometry, and DAILY STATS has no new dedicated
+  automated styling guard. Those limits were retained, not presented as proof.
+- Eight live routes returned 200 with navigation: `/`, `/down-sheet`,
+  `/defect-log`, `/fixed-repairs`, `/lists`, `/settings`, `/incidents`,
+  `/shop-talk`. Forty built assets matched production byte-for-byte.
+- Delivered CSS contracts passed for navy/purple drawers, transparent inner
+  bodies, 52px openers and 52px DAILY STATS. The minifier uses `background:0 0`
+  for transparent: an initial smoke matcher rejected that spelling; inspecting
+  the byte-matched CSS established the harness mismatch, then the corrected
+  smoke passed. No product source was changed to satisfy the check.
+- Service-worker v7 is byte-identical to 192, with no bump. POST `/api/mcp`
+  returns 404; PR39 remains excluded. Runtime environment revision remains 2.
+- Existing generated Defect Log preload is absent from the build; actual
+  manifest assets passed byte comparison. The prior release had the same
+  generated-preload limitation. A separate HTTP check returned 404 for
+  `/assets/defect-log-BSq6YvO5.js`. No browser-success claim is made.
+- Manual checks remain: open both ADVANCED ACTIONS drawers and inspect their
+  controls, DAILY STATS, all dark themes, keyboard focus/contrast, one-line
+  Down Sheet opener/no horizontal scroll on shop computer/iPad, and physical
+  phone/Safari/Home Screen/offline behavior. No supported browser tool was
+  exposed in this publishing environment; no physical-shop testing occurred.
+- Rollback: application 192 / Sites 188, `sites-v188` at
+  `2ddc026c139c45acec7c24128633841d96e7dee3`. Tags `sites-v189` and
+  `sites-release193` point to the frozen published source, not this later record.
+- Release bookkeeping starts from latest main `6681407f77e9dfc6937499ea26ad6d965253ea73`,
+  retaining its CLAUDE.md, NEXT_SESSION and review-skill documentation. No
+  application refactor, storage, dependency, Supabase, credential or audience
+  change was performed. PR39 remains separately held and unmerged.
+- Release-record cold review caught a mislabelled saved-content hash, damaged
+  Unicode in an initial handoff copy, and tags described before creation.
+  Corrected in this release-record change: file and saved-content hashes are
+  distinguished, the archive is extracted byte-for-byte from the Git handoff,
+  and both tags were created and verified at the pinned source before commit.

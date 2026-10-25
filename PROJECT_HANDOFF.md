@@ -1,11 +1,11 @@
 # Fleet Maintenance Bus Tracker - Current Project Handoff
 
-Updated: 2026-10-23
+Updated: 2026-10-25
 Repository: C:\Users\curti\pace-south-bus-tracker
 Branch: main
 Live application: https://pace-south-bus-tracker.curtistheconqueror.chatgpt.site/
-Live release: Sites Version 188 (application release 192)
-Live feature checkpoint: commit 2ddc026c139c45acec7c24128633841d96e7dee3
+Live release: Sites Version 189 (application release 193)
+Live feature checkpoint: commit a009c08fad02aa6859ec6445784f744c6e269c8d
 
 ## Read this first
 
@@ -23,6 +23,21 @@ The project is an offline-capable fleet maintenance operations application with 
 7. Shop Talk — device-local hazards, heads-ups and suggestions, retaining handled notes.
 
 ## Domain ownership
+
+Application 193 was published 2026-10-25 at 21:45:24.014279 UTC. ADVANCED
+ACTIONS drawers use navy on the Defect Log and purple on the Down Sheet;
+both openers are taller and DAILY STATS has a taller accent-edged bar.
+Only two stylesheets and their tests changed; service-worker v7 is unchanged.
+Local and exact-source CI lint/build/388 tests passed, and an independent cold
+read found no actionable defect. Eight live HTTP routes and 40 asset byte
+comparisons passed, including checks of the delivered CSS contracts.
+Those are source/asset checks, not computed-style or browser interaction tests.
+Phone/Safari/Home Screen and shop-computer/iPad drawer wrapping, contrast and
+focus checks remain manual. See docs/RELEASES.md for evidence and limits.
+Rollback is application 192 / Sites 188, `sites-v188` at
+`2ddc026c139c45acec7c24128633841d96e7dee3`. Later documentation-only work was
+preserved on main. PR39 remains separately held; no Supabase or credentials
+were changed by this release.
 
 Application 192 adds Incidents and Shop Talk alongside the five operational
 surfaces above. Both use device-local stores, do not sync, and are excluded
