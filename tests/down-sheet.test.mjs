@@ -2622,6 +2622,22 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
      wears #6b31b6 - what SCAN SHEET already wears on this page and nothing on
      the Defect Log does. */
   assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/);
+
+  /* AND THE DRAWER WEARS THAT SAME PURPLE. It opened white under the purple
+     button, so the two read as unrelated and the drawer looked like it
+     belonged to the sheet below it. Curtis, about both pages: "that button for
+     advanced features, it brings down the menu that doesn't look like it
+     belongs with the color of that button."
+
+     Purple here and navy on the Defect Log is the rule, not a drift: each
+     drawer takes the colour of the button that opens it, and the assertion
+     below keeps the two buttons -- and now the two drawers -- apart. */
+  assert.match(css,/\.down-advanced\{[^}]*background:#6b31b6/,
+   "the Down Sheet drawer takes the colour of the button that opens it");
+  assert.match(css,/\.down-advanced-body\{[^}]*background:transparent/,
+   "the body lets the drawer colour through instead of painting a light sheet over it");
+  assert.doesNotMatch(css,/\.down-advanced\{[^}]*background:#fff/,
+   "a white drawer under a purple button is the thing this fixed");
   const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
   /* Any translucent white: the opacity moved when the toggle was made easier
      to find, and what matters here is only that it is not this page's purple. */
