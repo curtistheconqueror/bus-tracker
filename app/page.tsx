@@ -237,7 +237,6 @@ export default function Home(){const [saveProblem,setSaveProblem]=useState<Fleet
  const closeEditor=()=>{if(edit&&draftNewId===edit.id)setBuses(v=>v.filter(bus=>bus.id!==edit.id));setDraftNewId(null);setEdit(null)};
  useEffect(()=>{if(new URLSearchParams(window.location.search).get('operator')==='1'){setOperatorOpen(true);window.history.replaceState({},'',window.location.pathname)}},[]);
 useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(COLLAPSED_SECTIONS_KEY)||"[]");if(Array.isArray(saved))setCollapsedSections(new Set(saved.filter(name=>typeof name==="string"&&name in SECTION_SLOTS)))}catch{}},[]);
-// Prevent touch and wheel gestures inside an editor from scrolling the facility map behind it.
 /* ESCAPE CLOSES THE LAYER ON TOP. Every layer in `modalOpen` fixes the body to
    lock the page behind it, so one that cannot be dismissed is a page that will
    not scroll. The Defect Log's part prompt and the page menu have closed on
@@ -252,14 +251,21 @@ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem(COLLAPSED_SECTION
    `else if` chain already makes the dispatch exclusive.
 
    THE BUS EDITOR IS DELIBERATELY NOT ON THIS LIST, and it is the one I set out
-   to fix. The other five all close on a backdrop click already, so Escape adds
-   them a second harmless way out. The editor has no backdrop click, which is
-   why it traps — but it is also the only one holding typed work: a half-filled
-   defect, an odometer reading, an unsaved new bus that closing DELETES. Escape
-   is the reflex for dismissing a dropdown, and the editor is full of native
-   <select>s on the one machine in the shop with a keyboard. Adding a reflex
-   keystroke that destroys work is Curtis's call, not a bug fix, so it is
-   asked rather than assumed. HOLD THIS BUS locks nothing and traps nobody. */
+   to fix. The line is NOT "which of them holds typed work" — an earlier
+   version of this comment said that and it was simply false: MULTI-LOCATE
+   holds seven typed bus numbers and a free-text defect description, and MOVE
+   BUS HERE holds a typed bus number.
+
+   The line is whether a single stray gesture ALREADY discards that work. All
+   five of these close on a backdrop tap, with no confirmation, today — so
+   Escape is a second door onto a room that already had one, and costs nothing
+   that a mis-tap did not already cost. The editor has no backdrop tap. Escape
+   there would be a NEW way to lose a half-filled defect, an odometer reading,
+   or an unsaved new bus that closing DELETES outright — and Escape is the
+   reflex for dismissing a dropdown, on the one machine in the shop with a
+   keyboard. A new destructive keystroke is Curtis's call, not a bug fix, so
+   it is asked rather than assumed. HOLD THIS BUS locks nothing and traps
+   nobody. */
 useEffect(()=>{if(!modalOpen)return;const escape=(event:KeyboardEvent)=>{
  if(event.key!=="Escape")return;
  if(operatorOpen)setOperatorOpen(false);
@@ -269,6 +275,7 @@ useEffect(()=>{if(!modalOpen)return;const escape=(event:KeyboardEvent)=>{
  else if(settingsOpen)setSettingsOpen(false);
 };window.addEventListener("keydown",escape,true);return()=>window.removeEventListener("keydown",escape,true)},
  [modalOpen,operatorOpen,relocateSpot,removeSection,multiLocateOpen,settingsOpen]);
+// Prevent touch and wheel gestures inside an editor from scrolling the facility map behind it.
 useEffect(()=>{if(!modalOpen)return;const body=document.body,root=document.documentElement,scrollX=window.scrollX,scrollY=window.scrollY,previous={position:body.style.position,top:body.style.top,left:body.style.left,right:body.style.right,width:body.style.width,overflow:body.style.overflow,rootOverscroll:root.style.overscrollBehavior};body.classList.add("modal-scroll-locked");Object.assign(body.style,{position:"fixed",top:"-"+scrollY+"px",left:"-"+scrollX+"px",right:"0",width:"100%",overflow:"hidden"});root.style.overscrollBehavior="none";return()=>{body.classList.remove("modal-scroll-locked");Object.assign(body.style,{position:previous.position,top:previous.top,left:previous.left,right:previous.right,width:previous.width,overflow:previous.overflow});root.style.overscrollBehavior=previous.rootOverscroll;window.scrollTo(scrollX,scrollY)}},[modalOpen]);
 useEffect(()=>{try{setFacilityClearUndoAvailable(Boolean(readFacilityDefectClearSnapshot(localStorage.getItem(FACILITY_DEFECT_CLEAR_UNDO_KEY))))}catch{}},[]);
 // Stored fleet state is intentionally restored once after client hydration.

@@ -1037,7 +1037,7 @@ test("the offline shell install is all-or-nothing", async () => {
     network-first and caches each page as somebody visits it online, so the
     hole closes for pages they walk to and never for the ones they do not —
     and the ones they do not are the entire reason this file exists. */
- const install=async failing=>{
+ const install=async(failing,notOk=[])=>{
   const listeners={},store=new Map();
   const cacheApi={
    open:async name=>{if(!store.has(name))store.set(name,new Map());const held=store.get(name);
@@ -1051,11 +1051,15 @@ test("the offline shell install is all-or-nothing", async () => {
   const fetchStub=async target=>{
    const url=typeof target==="string"?target:target.url;
    if(failing.includes(url))throw new TypeError("Failed to fetch");
-   /* A real Response body can only be read once, so clone() must hand back a
-      DIFFERENT object. Returning `this` would let a dropped .clone() pass here
-      and fail on a phone. */
+   if(notOk.includes(url))return {ok:false,clone(){return this},async text(){return ""}};
+   /* A real Response body reads ONCE, so the stub has to refuse a second read
+      or it protects nothing: an earlier version returned a fresh object from
+      clone() and a mutant that dropped the .clone() call entirely still
+      passed 8/8. bodyUsed is what makes a dropped clone fail here rather than
+      on somebody's phone. */
    const body='<link href="/assets/x'+url.replace(/\W/g,"")+'.css">';
-   const make=()=>({ok:true,clone:()=>make(),async text(){return body}});
+   const make=()=>{let used=false;return {ok:true,clone:()=>make(),
+    async text(){if(used)throw new TypeError("body already read");used=true;return body}}};
    return make();
   };
   new Function("self","caches","fetch","Request",src)(worker,cacheApi,fetchStub,FakeRequest);
@@ -1066,6 +1070,9 @@ test("the offline shell install is all-or-nothing", async () => {
   const held=store.get(cacheName);
   return {failed,activated,pages:held?[...held.keys()].filter(key=>!key.startsWith("/assets")&&!key.includes(".")):[]};
  };
+
+ /* Same harness, but the named pages answer with ok:false instead of throwing. */
+ const installNotOk=async notOk=>install([],notOk);
 
  const clean=await install([]);
  assert.equal(clean.failed,false,"a clean install succeeds");
@@ -1079,6 +1086,18 @@ test("the offline shell install is all-or-nothing", async () => {
   assert.equal(partial.failed,true,failing.length+" unreachable page(s) fails the install, so the browser retries");
   assert.equal(partial.activated,false,"and no worker activates holding a partial shell");
  }
+
+ /* A NON-OK RESPONSE IS NOT A THROWN FETCH, and this file does not treat it
+    like one: `if(!page.ok)return` skips the page and the install still
+    resolves. So the all-or-nothing property above holds for a connection that
+    drops and NOT for a 503, a 404 mid-deploy, or a captive portal. Pinned
+    here as the behaviour that is actually in the file, rather than asserted
+    away — and raised in docs/PUBLISH_NEXT.md, because a portal answering 200
+    with a login page would have that page cached AS a core page, which is a
+    worse outcome than a gap and is Curtis's call to fix. */
+ const notOk=await installNotOk(["/shop-talk"]);
+ assert.equal(notOk.failed,false,"a non-ok page does NOT fail the install today");
+ assert.equal(notOk.pages.length,7,"and the worker activates holding seven of eight");
 });
 
 test("Escape closes the map layer that locked the page behind it", async () => {
@@ -1086,12 +1105,21 @@ test("Escape closes the map layer that locked the page behind it", async () => {
  const escape=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{[\s\S]*?\n\};/);
  assert.ok(escape,"the map closes a layer on Escape");
 
- /* ONE PRESS CLOSES ONE LAYER. Asserted as a chain rather than by matching the
-    characters: an earlier version of this test passed if every `else if`
-    became `if`, which is one press closing all five at once — exactly the
-    claim it exists to guard. */
- const closers=[...escape[0].matchAll(/(else )?if\((\w+)\)(set\w+)\(/g)];
- assert.equal(closers.length,5,"five layers, and only the five that lock the page");
+ /* ONE PRESS CLOSES ONE LAYER, and it must be THESE layers. Counting branches
+    was not enough: swapping `settingsOpen`/`setSettingsOpen` for
+    `holdBoardOpen`/`setHoldBoardOpen` kept the count at five and passed,
+    which is SETTINGS silently losing its Escape in exchange for a layer that
+    locks nothing. The pairs are named now. Chaining is asserted separately,
+    because an earlier version passed if every `else if` became a plain `if` —
+    one press closing all five at once, the thing it exists to prevent. */
+ const closers=[...escape[0].matchAll(/(else )?if\((\w+)\)(set\w+)\(([^)]*)\)/g)];
+ assert.deepEqual(closers.map(branch=>[branch[2],branch[3],branch[4]]),[
+  ["operatorOpen","setOperatorOpen","false"],
+  ["relocateSpot","setRelocateSpot","null"],
+  ["removeSection","setRemoveSection","null"],
+  ["multiLocateOpen","setMultiLocateOpen","false"],
+  ["settingsOpen","setSettingsOpen","false"],
+ ],"exactly the five layers that lock the page, each closing itself");
  assert.equal(closers[0][1],undefined,"the first is a plain if");
  for(const branch of closers.slice(1))assert.equal(branch[1],"else ",branch[2]+" is chained, so one press cannot close two layers");
 
@@ -1104,8 +1132,12 @@ test("Escape closes the map layer that locked the page behind it", async () => {
  assert.match(mapPage,/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and it comes off again");
 
  /* A dependency array, like the other twenty-three effects in this file. */
- const effect=mapPage.slice(mapPage.indexOf("const escape=(event:KeyboardEvent)"));
- assert.match(effect.slice(0,1200),/\[modalOpen,operatorOpen,relocateSpot,removeSection,multiLocateOpen,settingsOpen\]/,"the effect declares what it depends on");
+ /* Read from the end of THIS effect rather than from a slice wide enough to
+    catch a neighbour's array. */
+ const tail=mapPage.slice(mapPage.indexOf("const escape=(event:KeyboardEvent)"));
+ const closing=tail.indexOf('window.removeEventListener("keydown",escape,true)');
+ assert.ok(closing>0,"the listener is removed again");
+ assert.match(tail.slice(closing,closing+200),/\},\s*\[modalOpen,operatorOpen,relocateSpot,removeSection,multiLocateOpen,settingsOpen\]\);/,"and this effect declares exactly what it reads");
 
  /* THE BUS EDITOR IS NOT HERE ON PURPOSE. The other five close on a backdrop
     click already, so Escape is a second harmless way out; the editor holds
