@@ -587,16 +587,42 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    SCAN SHEET already wears on this page and nothing on the Defect Log does, so
    the button says which sheet you are on before you have read a word of it. */
 .down-header-actions{flex:none;display:flex;min-width:0;max-width:210px;flex-direction:column;align-items:stretch;gap:7px}
-.down-advanced-toggle{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #a271e8;border-radius:6px;background:#6b31b6;color:#fff;padding:6px 12px;font:inherit;cursor:pointer;box-shadow:0 0 0 2px #6b31b633}
+.down-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #c49bf2;border-radius:8px;background:#6b31b6;color:#fff;padding:9px 13px;font:inherit;cursor:pointer;box-shadow:0 0 0 2px #6b31b633}
 .down-advanced-toggle:hover,.down-advanced-toggle:focus-visible{background:#7d3ccd;border-color:#fff;outline:none}
 .down-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
-.down-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.5px}
-.down-advanced-toggle small{min-width:0;color:#e4d3fb;font-size:7px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
-.down-advanced-toggle>i{flex:none;border:1px solid #ffffff8a;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+/* 11px here, 14px on phones, and the split is forced by MEASUREMENT rather
+   than taste. .down-header-actions is capped at 210px above 760px - a test
+   records that uncapping it pushed the page 40px sideways at 1180 - which
+   leaves the text column 118px wide once the chip, the padding and the gap
+   are taken out. "ADVANCED ACTIONS" needs about 125px at 12px and 148px at
+   14px, so both wrapped to two lines and the control grew to 87-96px against
+   the 48px it replaced.
+
+   11px wrapped too. 10px is what fits on one line in 118px, which is why the
+   original chose it - that number was not arbitrary and this change walked
+   into the same wall before reading it.
+
+   So above 760px the prominence comes from the purple fill and the taller
+   control, not the type. Below 760px the cap is lifted, the column is full
+   width, and the label takes the same 14px as the Defect Log's. */
+.down-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.4px}
+.down-advanced-toggle small{min-width:0;color:#eaddfd;font-size:7px;font-weight:900;line-height:1.2;overflow-wrap:anywhere}
+.down-advanced-toggle>i{flex:none;border:1px solid #ffffffad;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
 /* The drawer opens directly under the header, so it loses the rounded top a
-   card in the middle of the page would have. */
-.down-advanced{margin:0 14px 10px;overflow:hidden;border:1px solid #b7c3d7;border-top:0;border-radius:0 0 9px 9px;background:#fff}
-.down-advanced-body{display:grid;gap:9px;padding:9px;background:#eef2f8}
+   card in the middle of the page would have.
+
+   AND IT WEARS THE BUTTON'S PURPLE. It opened white under a #6b31b6 button,
+   so the two read as unrelated and the drawer looked like it belonged to the
+   sheet below it. Curtis, about both pages: "that button for advanced
+   features, it brings down the menu that doesn't look like it belongs with
+   the color of that button."
+
+   Purple here and navy on the Defect Log is the point, not an inconsistency:
+   each drawer takes the colour of the button that opens it, and those two
+   buttons are deliberately different so the two navy headers cannot be
+   mistaken for one another. A test holds that apart. */
+.down-advanced{margin:0 14px 10px;overflow:hidden;border:1px solid #a271e8;border-top:0;border-radius:0 0 9px 9px;background:#6b31b6;box-shadow:0 10px 22px #2a0f4d4d}
+.down-advanced-body{display:grid;gap:9px;padding:9px;background:transparent}
 .down-advanced-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px;align-items:center;border:1px solid #c4cedd;border-radius:7px;background:#fff;padding:8px}
 .down-advanced-label{grid-column:1/-1;font-size:7px;font-weight:900;letter-spacing:.6px;color:#60728c}
 .down-advanced-group>.shift-filter{display:contents}
@@ -604,7 +630,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-advanced-group>.shift-filter>button,.down-advanced-group>.completed-toggle,.down-advanced-group>button{width:100%;min-height:44px;display:flex;align-items:center;justify-content:center;gap:5px;margin:0;text-align:center}
 @media(max-width:760px){
  .down-header-actions{width:100%;max-width:none}
- .down-advanced-toggle{min-height:44px}
+ .down-advanced-toggle{min-height:56px}
+ .down-advanced-toggle b{font-size:14px}
+ .down-advanced-toggle small{font-size:9px}
  .down-advanced{margin:0 8px 8px}
  .down-advanced-group{grid-template-columns:repeat(2,minmax(0,1fr))}
  .down-advanced-group>.shift-filter>span{grid-column:1/-1}

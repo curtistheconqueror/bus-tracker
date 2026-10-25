@@ -26,10 +26,23 @@ button,input,select,textarea{font:inherit}
    the panel needs the rule for both or it comes out narrow in one of them.
    Measured: grid-column alone gave 192px and nine stacked controls at
    1280px; flex alone gave a 41px column on a phone. */
-.log-advanced{width:auto;min-width:0;margin:0 14px 10px;overflow:hidden;border:1px solid var(--log-border,#bac7d9);border-radius:9px;background:var(--log-surface,#fff);box-shadow:0 4px 16px #17355712}
-.log-advanced-body{display:grid;gap:9px;padding:9px;background:var(--log-soft,#edf2f8)}
+/* ADVANCED ACTIONS IS A DRAWER OFF THE HEADER, AND NOW LOOKS LIKE ONE.
+   Its button lives on the dark header; this panel used to open white on the
+   light page, so the two read as unrelated things and the panel looked like
+   it belonged to whatever was under it. Curtis: "it opens up a white list
+   ... the colors do not match and it kind of looks like it is unrelated."
+   The square top corners and margin-top:0 below were always here - the
+   drawer was built to butt against the header and was only ever missing the
+   colour. --log-header is the one background guaranteed dark on all four
+   themes, since it is what the white header text sits on, so this travels
+   where a mix toward --log-text would invert itself on the dark themes. */
+.log-advanced{width:auto;min-width:0;margin:0 14px 10px;overflow:hidden;border:1px solid color-mix(in srgb,var(--log-header-text,#fff) 34%,var(--log-header,#061d45));border-radius:9px;background:var(--log-header,#061d45);box-shadow:0 10px 22px #0416304d}
+.log-advanced-body{display:grid;gap:9px;padding:9px;background:transparent}
 .log-advanced-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:6px;border:1px solid var(--log-border,#c4cedd);border-radius:7px;background:var(--log-surface,#fff);padding:8px}
-.log-advanced-label{grid-column:1/-1;font-size:7px;font-weight:900;letter-spacing:.6px;color:var(--log-muted,#60728c)}
+/* These sit INSIDE .log-advanced-group, which is an opaque surface card, not
+   on the navy shell. Measured, after a first attempt coloured them for the
+   navy and would have put light grey on white. */
+.log-advanced-label{grid-column:1/-1;font-size:8px;font-weight:900;letter-spacing:.6px;color:var(--log-muted,#60728c)}
 /* The wrappers hand their children straight to the grid so every control is one
    cell wide, whatever it arrived wrapped in. */
 .log-advanced-group>.log-filters,.log-advanced-group>.feed-actions{display:contents}
@@ -781,13 +794,32 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    bar that carries the three numbers worth a glance, so the page opens on the
    filters and the log button instead of a status report. */
 .daily-stats{margin:0 14px 8px}
-.daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:44px;border:1px solid var(--log-border,#bac7d9);border-radius:8px;background:var(--log-surface,#fff);padding:8px 12px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
-.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:color-mix(in srgb,var(--log-accent,#0b64bd) 7%,var(--log-surface,#fff));outline:none}
-.daily-stats-toggle>b{flex:none;font-size:12px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
+/* THE TWO PANEL OPENERS ARE ONE CONTROL IN TWO PLACES. This one and
+   .header-advanced-toggle both read "name, what is inside, OPEN/CLOSE chip",
+   so a foreman learns the shape once. They differ only in where they sit:
+   this on the page, that on the header, each wearing its own surface. Both
+   were thin enough to scan past on a phone, which is what started this. */
+/* THE BACKGROUND STAYS --log-surface, and that is a measurement rather than
+   a preference. Tinting it 7% toward the accent took DAILY STATS from
+   4.63:1 to 4.12:1 on the tactical theme - under AA for 14px 900-weight,
+   which gets no large-text exemption - because that theme has the least
+   headroom of the four (#bca75f on #393e30). Prominence comes from the
+   accent edge, the height and the type instead, none of which costs a
+   contrast point. */
+.daily-stats-toggle{width:100%;display:flex;align-items:center;gap:10px;min-height:52px;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 34%,var(--log-border,#bac7d9));border-left:4px solid var(--log-accent,#0b64bd);border-radius:8px;background:var(--log-surface,#fff);padding:9px 13px;color:var(--log-text,#172b4d);font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+/* THE FEEDBACK IS THE RING, NOT THE FILL, for the reason above. This rule
+   kept the 7% tint it always had, which put the label at 4.12:1 on the
+   tactical theme for as long as the control was hovered or FOCUSED - and
+   focus is a reading state, not a passing one: a keyboard user sits in it.
+   Moving the feedback to the border and a ring leaves the label on plain
+   --log-surface at 4.63:1 in every state, and replaces an outline:none
+   that had removed the focus ring without putting anything back. */
+.daily-stats-toggle:hover,.daily-stats-toggle:focus-visible{background:var(--log-surface,#fff);border-color:var(--log-accent,#0b64bd);box-shadow:0 0 0 3px color-mix(in srgb,var(--log-accent,#0b64bd) 30%,var(--log-surface,#fff));outline:none}
+.daily-stats-toggle>b{flex:none;font-size:14px;font-weight:900;letter-spacing:.4px;color:var(--log-accent,#0b64bd)}
 .daily-stats-toggle>small{flex:1;min-width:0;font-size:10px;font-weight:800;color:var(--log-muted,#6e7e94);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.daily-stats-toggle>i{flex:none;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}
+.daily-stats-toggle>i{flex:none;border:1px solid color-mix(in srgb,var(--log-accent,#0b64bd) 52%,var(--log-surface,#fff));border-radius:6px;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px;color:var(--log-accent,#0b64bd)}
 .daily-stats.open .log-summary{padding-top:8px}
-@media(max-width:760px){.daily-stats{margin:0 8px 8px}.daily-stats-toggle{min-height:48px}.daily-stats-toggle>b{font-size:13px}.daily-stats-toggle>small{font-size:11px}}
+@media(max-width:760px){.daily-stats{margin:0 8px 8px}.daily-stats-toggle{min-height:56px}.daily-stats-toggle>b{font-size:14px}.daily-stats-toggle>small{font-size:11px}}
 
 /* LOG DEFECT, first thing under the header. Full width on a phone so the page
    answers "what is this for" before anything has to be scrolled. */
@@ -828,12 +860,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the light-surface toggle it replaced, which was invisible against the
    header. */
 .log-header-actions{flex:none;display:flex;min-width:0;flex-direction:column;align-items:stretch;gap:7px}
-.header-advanced-toggle{width:100%;min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #ffffff5c;border-radius:6px;background:#ffffff1f;color:#fff;padding:6px 12px;font:inherit;cursor:pointer}
-.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:#ffffff33;border-color:#fff9;outline:none}
+.header-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #ffffff8a;border-radius:8px;background:#ffffff2e;color:#fff;padding:9px 13px;font:inherit;cursor:pointer}
+.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:#ffffff45;border-color:#fff;outline:none}
 .header-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
-.header-advanced-toggle b{color:#fff;font-size:10px;font-weight:900;letter-spacing:.5px}
-.header-advanced-toggle small{color:#c4d7ee;font-size:7px;font-weight:900}
-.header-advanced-toggle>i{flex:none;border:1px solid #ffffff7a;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.5px}
+.header-advanced-toggle b{color:#fff;font-size:14px;font-weight:900;letter-spacing:.4px}
+.header-advanced-toggle small{color:#d3e3f7;font-size:9px;font-weight:900}
+.header-advanced-toggle>i{flex:none;border:1px solid #ffffffad;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
 /* The drawer opens directly under the header, so it loses the rounded top it
    had as a card in the middle of the page. */
 .log-advanced{border-top-left-radius:0;border-top-right-radius:0;margin-top:0}
@@ -841,7 +873,7 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    against whatever was above them, which read as one jammed stack; they are
    the two things used on every visit and they get their own air. */
 .log-controls{margin-top:12px}
-@media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:44px}.log-controls{margin-top:14px;row-gap:11px}}
+@media(max-width:760px){.log-header-actions{width:100%}.header-advanced-toggle{min-height:56px}.log-controls{margin-top:14px;row-gap:11px}}
 
 /* END DEFERRAL, beside MOVE / LOCATION on a held bus.
 
