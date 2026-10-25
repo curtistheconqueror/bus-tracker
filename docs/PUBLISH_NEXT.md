@@ -3,7 +3,9 @@
 **STATUS: 194 PENDING.** Scrolling the Facility Map on a phone no longer moves
 buses — a bus follows a finger only after the finger has been held on it. Also
 in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
-BUS and AI OPERATOR layers, each of which fixes the page behind it.
+BUS and AI OPERATOR layers, each of which fixes the page behind it; and
+**SOUND and VIBRATION switches in Settings, both OFF**, with a test that stops
+anything audible being added later without going through them.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -230,6 +232,37 @@ ever stops being all-or-nothing.
 changed, so `CACHE_NAME` correctly stays at v7 and phones take this as an
 ordinary asset change.
 
+### Sound and vibration, off by default
+
+Curtis: *"make sure the sound is off by default ok? Any sounds. Toggleable in
+settings."*
+
+**The app makes no sound at all, and did not when he asked.** No AudioContext,
+no Audio element, no audio file in the repository, no speech synthesis. The
+only thing a person could perceive without looking was the short buzz when a
+bus is picked up on the Facility Map, added earlier in this same release.
+
+So the deliverable is not an off switch for a sound that does not exist. It is
+a gate a sound added in six months cannot walk around: `tests/settings.test.mjs`
+walks `app/` and `src/` and fails if `navigator.vibrate`, `new Audio`,
+`AudioContext`, `speechSynthesis`, an `<audio>` tag or an audio file is named
+anywhere outside `src/lib/settings/feedback-settings.ts`. Comments are stripped
+first, so prose about the rule does not trip it. **That test is the guarantee.**
+Checked by planting `new Audio("/ding.mp3").play()` in Shop Talk: it fails and
+names the file and the API.
+
+**New key `pace-feedback-settings-v1`**, per device, never synced. Two flags in
+one key — a buzz is not a sound, and a loud garage is the case for vibration and
+against noise. Both default off, and anything that is not EXACTLY `true` reads
+as off, so a corrupt or hand-edited record cannot be what starts a phone making
+noise.
+
+**Measured in Chromium** on a device given a working `navigator.vibrate`: a
+fresh phone with nothing stored holds a bus, the bus lifts with its ring, and
+the vibration count is **0**. Turning VIBRATION on in Settings stores
+`{"version":1,"sound":false,"vibration":true}`, and the same gesture then
+counts **1**. The SOUND switch is present and unchecked on a fresh device.
+
 ### Verified
 
 Gates re-run on `2b0af96`, this release's source — not quoted from an earlier
@@ -283,6 +316,10 @@ that refusal has not been measured on an Android device.
 7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
    Escape. It should close. The bus editor still will not — see the question
    below.
+8. **SETTINGS → THIS DEVICE.** There should be SOUND and VIBRATION switches,
+   both off. Leave them off and hold a bus on the map: it lifts with a blue
+   ring and the phone stays still. Turn VIBRATION on and do it again — it
+   should buzz once.
 
 ### One open question for Curtis
 

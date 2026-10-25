@@ -174,6 +174,7 @@ per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
+  pace-feedback-settings-v1        sound and vibration on this device, both OFF
   pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
@@ -251,6 +252,36 @@ length of that one" — with overlaps the sum double-counts every handover.
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running
 different hours.
+
+**`pace-feedback-settings-v1` is OFF, and the switch matters more than the
+sound.** Curtis: *"make sure the sound is off by default ok? Any sounds.
+Toggleable in settings."* When he asked, the app made no sound at all — no
+AudioContext, no Audio element, no audio file, no speech. The only thing a
+person could perceive without looking was the short buzz when a bus is picked
+up on the Facility Map.
+
+So the deliverable was never an off switch for a sound that does not exist. It
+is a gate a sound added in six months cannot walk around: `tests/settings.test.mjs`
+walks `app/` and `src/` and fails if `navigator.vibrate`, `new Audio`,
+`AudioContext`, `speechSynthesis`, an `<audio>` tag or an audio file is named
+anywhere outside `src/lib/settings/feedback-settings.ts`. **That test is the
+guarantee; the module is only where it is kept.** Comments are stripped before
+the scan, so prose about the rule is not mistaken for breaking it.
+
+**Two flags, one key, both off.** A buzz is not a sound, and conflating them
+answers a question he did not ask — a loud garage is the case for vibration and
+against noise.
+
+**Off is the safe read, which inverts `app-mode.ts` on purpose.** That file
+resolves an unreadable record to FULL, because taking pages away from a mechanic
+mid-shift is the worse failure. Here the generous reading is the harmful one, so
+anything that is not EXACTLY `true` — missing, corrupt, `"yes"`, `1` — reads as
+off, the spelling discipline `setBusHold` and the ledger's `gap` already follow.
+
+**`src/lib/settings/feedback-settings.ts` reads the setting at the moment of the
+buzz** rather than taking it as a prop. A flag plumbed from the page root goes
+stale, and a stale copy is a phone still buzzing just after somebody turned it
+off — which is the exact moment they are watching to see whether it worked.
 
 **`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
 scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps

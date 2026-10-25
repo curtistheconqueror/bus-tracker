@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {BOARD_SETTINGS_KEY,type BusDisplayMode,DEFAULT_COLORS,DEFAULT_VISUALS,type S,ST,THEMES,readBoardSettings} from "@/src/lib/settings/map-settings";
+import {buzz} from "@/src/lib/settings/feedback-settings";
 import Icon from "@/src/components/fleet/status-icon";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import {otherPages} from "@/src/lib/settings/tracker-pages";
@@ -161,7 +162,7 @@ function Token({bus,edit}:{bus:B;edit:(b:B)=>void}){
   scrollBlock.current=handler;touchLift.current=lift};
  const releaseScroll=()=>{if(scrollBlock.current){document.removeEventListener("touchmove",scrollBlock.current);scrollBlock.current=null}if(touchLift.current){document.removeEventListener("touchend",touchLift.current);document.removeEventListener("touchcancel",touchLift.current);touchLift.current=null}};
  const cancelHold=()=>{if(holdTimer.current){window.clearTimeout(holdTimer.current);holdTimer.current=0}};
- const armTouchDrag=()=>{holdTimer.current=0;const state=touchDrag.current;if(state.pointerId<0||state.active)return;state.active=true;state.armX=state.lastX;state.armY=state.lastY;dragging.current=true;suppressClick.current=Date.now()+550;setQuick(false);setDragArmed(true);blockScroll();navigator.vibrate?.(12)};
+ const armTouchDrag=()=>{holdTimer.current=0;const state=touchDrag.current;if(state.pointerId<0||state.active)return;state.active=true;state.armX=state.lastX;state.armY=state.lastY;dragging.current=true;suppressClick.current=Date.now()+550;setQuick(false);setDragArmed(true);blockScroll();buzz(localStorage,12)};
  /* A finger lifted outside this component, or an unmount mid-drag, must not
     leave the page unable to scroll. */
  useEffect(()=>()=>{if(holdTimer.current)window.clearTimeout(holdTimer.current);if(scrollBlock.current)document.removeEventListener("touchmove",scrollBlock.current);if(touchLift.current){document.removeEventListener("touchend",touchLift.current);document.removeEventListener("touchcancel",touchLift.current)}},[]);

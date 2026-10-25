@@ -1005,3 +1005,92 @@ test("the shift clock says how long the current shift has been running",async()=
  assert.equal(activeShift(at(12),{shifts:[],pullouts:[]}),null);
  assert.equal(activeShift("not a time"),null);
 });
+
+test("nothing the app can be heard or felt doing happens before somebody asks", async () => {
+ const {DEFAULT_FEEDBACK,readFeedbackSettings,loadFeedbackSettings,serializeFeedbackSettings,buzz,soundAllowed,FEEDBACK_SETTINGS_KEY}
+  =await import("../src/lib/settings/feedback-settings.ts");
+
+ /* Curtis: "make sure the sound is off by default ok? Any sounds. Toggleable
+    in settings." Off is the whole requirement, so it is asserted from every
+    direction a device can arrive at it. */
+ assert.deepEqual(DEFAULT_FEEDBACK,{sound:false,vibration:false});
+ for(const raw of [null,"","null","{}",'{"sound":true}'.replace("true","null"),"not json","[]","0",'{"version":1}']){
+  const read=readFeedbackSettings(raw);
+  assert.deepEqual(read,{sound:false,vibration:false},JSON.stringify(raw)+" reads as silent");
+ }
+
+ /* OFF IS THE SAFE READ, which inverts what app-mode.ts does on purpose. A
+    corrupt record there resolves to FULL because taking pages away mid-shift
+    is the worse failure; a corrupt record here must not be what starts a
+    phone making noise. */
+ assert.deepEqual(readFeedbackSettings('{"sound":"yes","vibration":1}'),{sound:false,vibration:false},
+  "only a literal true counts, so a hand-edited file cannot switch this on");
+ assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":true}'),{sound:true,vibration:true},
+  "and an honest yes still works");
+
+ /* A storage that throws is a silent phone, not a crash. */
+ const throwing={getItem(){throw new Error("denied")},setItem(){throw new Error("denied")}};
+ assert.deepEqual(loadFeedbackSettings(throwing),{sound:false,vibration:false});
+ assert.equal(buzz(throwing,12),false);
+ assert.equal(soundAllowed(throwing),false);
+
+ /* A device that has never been to Settings. */
+ const empty={getItem:()=>null};
+ assert.equal(soundAllowed(empty),false);
+ assert.equal(buzz(empty,12),false,"and it does not reach navigator at all");
+
+ /* The default object is copied, so a caller mutating what it read cannot
+    turn the default on for everybody after it. */
+ const first=readFeedbackSettings(null);
+ first.sound=true;
+ assert.equal(readFeedbackSettings(null).sound,false);
+ assert.equal(DEFAULT_FEEDBACK.sound,false);
+
+ assert.match(serializeFeedbackSettings({sound:false,vibration:true}),/"sound":false/);
+ assert.equal(FEEDBACK_SETTINGS_KEY,"pace-feedback-settings-v1");
+});
+
+test("a sound added later cannot get around the switch", async () => {
+ /* THIS IS THE ACTUAL GUARANTEE, and the reason feedback-settings.ts exists
+    at all. When Curtis asked for sound off by default the app made no sound:
+    no AudioContext, no Audio element, no audio file, no speech synthesis. An
+    off switch for nothing is worth very little; a gate that something added
+    in six months cannot walk around is worth the file.
+
+    So this walks the source tree and fails if anything outside that one
+    module names an API that can be heard or felt. The same shape as the test
+    holding pace-role-v1 inside roles.ts, and for a stronger reason: a role
+    read in the wrong place is a bug somebody notices, and a chirp on a phone
+    in a meeting is the app being turned off. */
+ const roots=["app","src"],offenders=[],
+  banned=[/\bnavigator\s*\.\s*vibrate/,/\bnew\s+Audio\s*\(/,/\bAudioContext\b/,/\bwebkitAudioContext\b/,
+   /\bspeechSynthesis\b/,/\bSpeechSynthesisUtterance\b/,/<audio[\s>]/i,/\.(?:mp3|wav|ogg|m4a|aac)\b/i],
+  allowed="src/lib/settings/feedback-settings.ts";
+ const walk=async dir=>{
+  for(const entry of await readdir(new URL("../"+dir+"/",import.meta.url),{withFileTypes:true})){
+   const path=dir+"/"+entry.name;
+   if(entry.isDirectory()){await walk(path);continue}
+   if(!/\.(tsx?|jsx?|css)$/.test(entry.name))continue;
+   if(path===allowed)continue;
+   const source=await readFile(new URL("../"+path,import.meta.url),"utf8");
+   /* Comments are prose about the rule, not a way around it. */
+   const code=source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+   for(const pattern of banned)if(pattern.test(code))offenders.push(path+"  ->  "+pattern);
+  }
+ };
+ await Promise.all(roots.map(walk));
+ assert.deepEqual(offenders,[],
+  "anything audible or felt goes through src/lib/settings/feedback-settings.ts, which is off by default:\n"+offenders.join("\n"));
+
+ /* And the one buzz there is actually routes through it. */
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(mapPage,/buzz\(localStorage,12\)/,"picking a bus up asks the setting first");
+ assert.match(mapPage,/import \{buzz\} from "@\/src\/lib\/settings\/feedback-settings"/);
+
+ /* Settings can reach both switches. */
+ const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ assert.match(settingsPage,/SOUND ON THIS DEVICE/);
+ assert.match(settingsPage,/VIBRATION ON THIS DEVICE/);
+ assert.match(settingsPage,/checked=\{feedback\.sound\}/);
+ assert.match(settingsPage,/checked=\{feedback\.vibration\}/);
+});

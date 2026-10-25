@@ -38,6 +38,7 @@ import "../fixed-repairs/fixed-repairs.css";
 import "./settings.css";
 import MapSettingsPanel from "./_components/map-settings-panel";
 import CloudSyncControl from "./_components/cloud-sync-control";
+import {DEFAULT_FEEDBACK,type FeedbackSettings,loadFeedbackSettings,saveFeedbackSettings} from "@/src/lib/settings/feedback-settings";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
 import DownSheetSettings from "./_components/down-sheet-settings";
@@ -177,6 +178,16 @@ export default function SettingsPage(){
   const written=writeSetting(localStorage,APP_MODE_STORAGE_KEY,serializeAppMode({mode,answered:true}));
   if(!written.ok){alert("This device could not save that preference. It will go back to how it was next time the app opens.");return}
   window.dispatchEvent(new CustomEvent(APP_MODE_STORAGE_KEY));
+ };
+ /* Sound and vibration, both off until asked for. Written straight through
+    rather than via useStoredSettings, because the module owns its own
+    serializer and the rule that anything but a literal `true` reads as off
+    has to survive this page as well as a hand-edited file. */
+ const [feedback,setFeedbackState]=useState<FeedbackSettings>(DEFAULT_FEEDBACK);
+ useEffect(()=>{setFeedbackState(loadFeedbackSettings(localStorage))},[]);
+ const setFeedback=(next:FeedbackSettings)=>{
+  setFeedbackState(next);
+  if(!saveFeedbackSettings(localStorage,next))alert("This device could not save that preference. It will go back to how it was next time the app opens.");
  };
  const [log,updateLog,reloadLog]=useStoredSettings(LOG_SETTINGS_KEY,readLogSettings,writeLogSettings,report);
 
@@ -430,6 +441,18 @@ export default function SettingsPage(){
      <section className="settings-lite-switch">
       <label className="settings-check"><input type="checkbox" checked={appMode==="lite"} onChange={event=>setAppMode(event.target.checked?"lite":"full")}/>
        <span><b>LITE MODE ON THIS DEVICE</b><small>Draws less of the app so a new person can learn the workflow: Fleet Campaigns, the advanced actions on both sheets, DEFERRED, and the diagnosis half of the defect form all stand down. Nothing changes about what is saved or synced — a Lite phone and a full phone write the same records to the same Shop Cloud.</small></span></label>
+     </section>
+     {/* Curtis: "make sure the sound is off by default ok? Any sounds.
+         Toggleable in settings." Two switches rather than one because a buzz
+         is not a sound: a loud garage is the case for vibration and against
+         noise. Both start off, and anything the app gains later that can be
+         heard has to come through this same setting — a test scans the source
+         tree for audio APIs and fails if one appears outside that module. */}
+     <section className="settings-feedback">
+      <label className="settings-check"><input type="checkbox" checked={feedback.sound} onChange={event=>setFeedback({...feedback,sound:event.target.checked})}/>
+       <span><b>SOUND ON THIS DEVICE</b><small>Off. The app makes no sound at all today — no alerts, no chimes, nothing on save. This switch is here so that stays true on purpose rather than by accident: anything added later that can be heard stays silent until you turn this on.</small></span></label>
+      <label className="settings-check"><input type="checkbox" checked={feedback.vibration} onChange={event=>setFeedback({...feedback,vibration:event.target.checked})}/>
+       <span><b>VIBRATION ON THIS DEVICE</b><small>Off. The one buzz in the app is the short one when you hold a bus on the Facility Map and it lifts to be moved. The blue ring shows that too, so nothing is lost with this off. Phones only — iPhones and iPads have no vibration for web apps either way.</small></span></label>
      </section>
      <section className="settings-welcome-again">
       <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>
