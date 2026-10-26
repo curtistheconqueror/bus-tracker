@@ -246,10 +246,19 @@ So the deliverable is not an off switch for a sound that does not exist. It is
 a gate a sound added in six months cannot walk around: `tests/settings.test.mjs`
 walks `app/` and `src/` and fails if `navigator.vibrate`, `new Audio`,
 `AudioContext`, `speechSynthesis`, an `<audio>` tag or an audio file is named
-anywhere outside `src/lib/settings/feedback-settings.ts`. Comments are stripped
-first, so prose about the rule does not trip it. **That test is the guarantee.**
-Checked by planting `new Audio("/ding.mp3").play()` in Shop Talk: it fails and
-names the file and the API.
+anywhere outside `src/lib/settings/feedback-settings.ts` — `public/` included,
+since `sw.js` could call `showNotification`, which rings on Android.
+
+**It is a tripwire and not a proof**, and the difference is worth stating. It
+catches every ordinary way of adding a sound, including four that defeated its
+first draft: `createElement("audio")`, `new window.Audio`, an aliased
+`navigator`, and `Notification` — which was not in the list at all. It does not
+catch `navigator["vib"+"rate"]()`, and no static token scan can. What it stops
+is somebody honest adding a chime without knowing there was a rule.
+
+Mutation-tested rather than assumed: nine ways of making a sound are each
+planted in `src/` and the suite is re-run. Prose about the rule in a comment,
+and a `.wav` CSS class name, must NOT trip it; `url(ding.wav)` must.
 
 **New key `pace-feedback-settings-v1`**, per device, never synced. Two flags in
 one key — a buzz is not a sound, and a loud garage is the case for vibration and
@@ -263,13 +272,27 @@ the vibration count is **0**. Turning VIBRATION on in Settings stores
 `{"version":1,"sound":false,"vibration":true}`, and the same gesture then
 counts **1**. The SOUND switch is present and unchecked on a fresh device.
 
+**The two switches also needed a stylesheet rule of their own**, found by
+measuring and not by reading. `.settings-check` is styled in two places and
+neither reaches this page — `down-sheet.css` scopes its layout half to
+`.down-settings-body`, `defect-log.css` to `.log-settings` — so both labels
+computed `display:inline`, OVERLAPPED by 17px, and the second checkbox landed
+mid-sentence inside the first one's text. One such label gets away with it,
+which is why `.settings-lite-switch` beside it has no rule and looks fine.
+Re-measured at 360, 390, 430 and 820: no overlap, both boxes on the left
+margin, no horizontal scroll.
+
 ### Verified
 
-Gates re-run on `2b0af96`, this release's source — not quoted from an earlier
-run. An earlier draft of this section cited `319f2cd`, a hash no ref contains
-(its pre-rebase twin), and a count of 389 that two commits had since moved:
+Gates re-run on **the commit this file is updated in**, which is what "this
+release's source" means and is why no hash is written here any more. Two
+earlier drafts of this section went stale within a commit of each other — one
+cited `319f2cd`, a hash no ref contains after the rebase onto Codex's 193, and
+both quoted a test count that the next commit moved. A number copied forward is
+the thing `.claude/skills/fresh-context-review` was written about, and naming a
+hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **391 pass, 0 fail**
+- `npm test` — **393 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 

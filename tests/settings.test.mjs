@@ -1034,10 +1034,37 @@ test("nothing the app can be heard or felt doing happens before somebody asks", 
  assert.equal(buzz(throwing,12),false);
  assert.equal(soundAllowed(throwing),false);
 
- /* A device that has never been to Settings. */
- const empty={getItem:()=>null};
- assert.equal(soundAllowed(empty),false);
- assert.equal(buzz(empty,12),false,"and it does not reach navigator at all");
+ /* A DEVICE THAT CAN ACTUALLY VIBRATE, which Node is not: its global
+    navigator has no vibrate, so without this stub `buzz` returned false
+    because the API was missing rather than because the setting was off — and
+    deleting the setting check entirely left the whole suite green. */
+ const realNavigator=globalThis.navigator;
+ let buzzes=0;
+ Object.defineProperty(globalThis,"navigator",{value:{vibrate:()=>{buzzes++;return true}},configurable:true,writable:true});
+ try{
+  const off={getItem:()=>null};
+  assert.equal(buzz(off,12),false,"a device that has never been to Settings stays still");
+  assert.equal(buzzes,0,"and navigator is not reached at all");
+  assert.equal(soundAllowed(off),false);
+
+  const vibrationOnly={getItem:()=>'{"sound":false,"vibration":true}'};
+  assert.equal(buzz(vibrationOnly,12),true,"turning vibration on makes it buzz");
+  assert.equal(buzzes,1,"exactly once");
+  assert.equal(soundAllowed(vibrationOnly),false,"and sound is still off, since they are separate");
+
+  const soundOnly={getItem:()=>'{"sound":true,"vibration":false}'};
+  assert.equal(buzz(soundOnly,12),false,"sound on does not imply vibration");
+  assert.equal(buzzes,1,"still once");
+  assert.equal(soundAllowed(soundOnly),true);
+
+  /* A navigator whose vibrate refuses, and one that throws. */
+  globalThis.navigator={vibrate:()=>false};
+  assert.equal(buzz(vibrationOnly,12),false,"a refused vibrate is reported, not thrown");
+  globalThis.navigator={vibrate(){throw new Error("not allowed")}};
+  assert.equal(buzz(vibrationOnly,12),false,"and a throwing one is caught");
+ }finally{
+  Object.defineProperty(globalThis,"navigator",{value:realNavigator,configurable:true,writable:true});
+ }
 
  /* The default object is copied, so a caller mutating what it read cannot
     turn the default on for everybody after it. */
@@ -1062,19 +1089,59 @@ test("a sound added later cannot get around the switch", async () => {
     holding pace-role-v1 inside roles.ts, and for a stronger reason: a role
     read in the wrong place is a bug somebody notices, and a chirp on a phone
     in a meeting is the app being turned off. */
- const roots=["app","src"],offenders=[],
-  banned=[/\bnavigator\s*\.\s*vibrate/,/\bnew\s+Audio\s*\(/,/\bAudioContext\b/,/\bwebkitAudioContext\b/,
-   /\bspeechSynthesis\b/,/\bSpeechSynthesisUtterance\b/,/<audio[\s>]/i,/\.(?:mp3|wav|ogg|m4a|aac)\b/i],
+ /* STRING-AWARE, because a regex that merely deletes /* ... *\/ is not. A
+    source line holding "https://example.com/*" opened a pseudo-comment that
+    swallowed everything up to the file's next real close — a planted
+    new Audio("/ding.mp3") after one of those passed the scan. And a `//`
+    comment that did not start its line was never stripped at all, so prose
+    about this rule failed the build while real code hid from it: both bugs,
+    opposite directions, one cause.
+
+    Comments go; STRINGS STAY, because an audio path only ever appears in one.
+    A regex literal containing a quote can be mistaken for a string here, which
+    leaves more text in the scan rather than less — the safe direction. */
+ const stripComments=source=>{
+  let out="",i=0;
+  while(i<source.length){
+   const c=source[i],next=source[i+1];
+   if(c==='"'||c==="'"||c==="`"){
+    out+=c;i++;
+    while(i<source.length){
+     const d=source[i];out+=d;i++;
+     if(d==="\\"){if(i<source.length){out+=source[i];i++}continue}
+     if(d===c)break;
+    }
+    continue;
+   }
+   if(c==="/"&&next==="*"){i+=2;while(i<source.length&&!(source[i]==="*"&&source[i+1]==="/"))i++;i+=2;out+=" ";continue}
+   if(c==="/"&&next==="/"){while(i<source.length&&source[i]!=="\n")i++;out+=" ";continue}
+   out+=c;i++;
+  }
+  return out;
+ };
+
+ /* public/ is in scope because public/sw.js can call showNotification, which
+    on Android rings and vibrates. The extension list covers what actually
+    ships: a .mjs, a .json or an .html in these trees runs or renders. */
+ const roots=["app","src","public"],offenders=[],
+  banned=[
+   /\.\s*vibrate\s*\(/,              // navigator.vibrate, and any alias of it
+   /\bnew\s+(?:\w+\s*\.\s*)?Audio\s*\(/,  // new Audio, new window.Audio
+   /\bAudioContext\b/,/\bwebkitAudioContext\b/,
+   /createElement\s*\(\s*["'`]audio["'`]/i,
+   /\bspeechSynthesis\b/,/\bSpeechSynthesisUtterance\b/,
+   /\bnew\s+Notification\s*\(/,/\bshowNotification\s*\(/,  // rings on Android
+   /<audio[\s>]/i,
+   /["'`(\/][\w.\-\/]*\.(?:mp3|wav|ogg|m4a|aac)\b/i,  // a PATH, not a .wav class name
+  ],
   allowed="src/lib/settings/feedback-settings.ts";
  const walk=async dir=>{
   for(const entry of await readdir(new URL("../"+dir+"/",import.meta.url),{withFileTypes:true})){
    const path=dir+"/"+entry.name;
    if(entry.isDirectory()){await walk(path);continue}
-   if(!/\.(tsx?|jsx?|css)$/.test(entry.name))continue;
+   if(!/\.(tsx?|jsx?|mjs|css|html|json|webmanifest)$/.test(entry.name))continue;
    if(path===allowed)continue;
-   const source=await readFile(new URL("../"+path,import.meta.url),"utf8");
-   /* Comments are prose about the rule, not a way around it. */
-   const code=source.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,"");
+   const code=stripComments(await readFile(new URL("../"+path,import.meta.url),"utf8"));
    for(const pattern of banned)if(pattern.test(code))offenders.push(path+"  ->  "+pattern);
   }
  };

@@ -261,12 +261,28 @@ person could perceive without looking was the short buzz when a bus is picked
 up on the Facility Map.
 
 So the deliverable was never an off switch for a sound that does not exist. It
-is a gate a sound added in six months cannot walk around: `tests/settings.test.mjs`
-walks `app/` and `src/` and fails if `navigator.vibrate`, `new Audio`,
-`AudioContext`, `speechSynthesis`, an `<audio>` tag or an audio file is named
-anywhere outside `src/lib/settings/feedback-settings.ts`. **That test is the
-guarantee; the module is only where it is kept.** Comments are stripped before
-the scan, so prose about the rule is not mistaken for breaking it.
+is a tripwire a sound added in six months has to walk into:
+`tests/settings.test.mjs` scans `app/`, `src/` and `public/` and fails if a
+vibrate, an `Audio`, an `AudioContext`, a `speechSynthesis`, a `Notification`,
+a `showNotification`, an `<audio>` tag or an audio file path is named anywhere
+outside `src/lib/settings/feedback-settings.ts`.
+
+**It is a tripwire and not a proof.** It catches every ordinary way of adding a
+sound, including four that defeated its first draft — `createElement("audio")`,
+`new window.Audio`, an aliased `navigator`, and `Notification`, which rings and
+vibrates on Android and was not in the list at all. It does NOT catch
+`navigator["vib"+"rate"]()`, and no static token scan can. What it stops is
+somebody honest adding a chime without knowing there was a rule, which is the
+realistic failure.
+
+Comments are stripped by a **string-aware** scanner rather than a regex. The
+first version used `/\*[\s\S]*?\*\//g`, so a line holding `"https://x/*"`
+opened a pseudo-comment that swallowed real code after it — a planted
+`new Audio("/ding.mp3")` passed — while a `//` comment that did not start its
+line was never stripped at all, so prose about this rule failed the build. Two
+bugs in opposite directions, one cause. Strings are KEPT, because an audio path
+only ever lives in one, and a file extension is only matched after a quote,
+slash or `(`, so a `.wav` CSS class name is not an audio file.
 
 **Two flags, one key, both off.** A buzz is not a sound, and conflating them
 answers a question he did not ask — a loud garage is the case for vibration and

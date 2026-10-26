@@ -10,11 +10,22 @@
 
    So there was nothing to switch off, which is exactly why this file exists
    rather than a one-line fix: the thing worth building is not an off switch
-   for a sound that does not exist, it is a gate that a sound added in six
-   months cannot get around. `tests/settings.test.mjs` reads the whole source
-   tree and fails if `navigator.vibrate`, `AudioContext`, `new Audio`, an
-   audio file or `speechSynthesis` is named anywhere outside this module. That
-   test is the guarantee. This file is just where the guarantee is kept.
+   for a sound that does not exist, it is a tripwire a sound added in six
+   months has to walk into. `tests/settings.test.mjs` scans `app/`, `src/` and
+   `public/` and fails if a vibrate, an `Audio`, an `AudioContext`, a
+   `speechSynthesis`, a `Notification`, a `showNotification`, an `<audio>` tag
+   or an audio file path is named anywhere outside this module.
+
+   IT IS A TRIPWIRE AND NOT A PROOF, and the difference is worth stating
+   rather than glossing. It catches every ordinary way of adding a sound,
+   including the ones that defeated its first draft — `document.createElement
+   ("audio")`, `new window.Audio`, an aliased `navigator`, a notification. It
+   does NOT catch a deliberately computed call like
+   `navigator["vib"+"rate"]()`, and no static token scan can. Nothing stops
+   somebody determined; what it stops is somebody honest adding a chime and
+   not realising there was a rule. That is the realistic failure, so that is
+   what it is built against, and the rule is written here in words for the
+   case the scan cannot see.
 
    TWO FLAGS, ONE KEY, BOTH OFF. A buzz is not a sound and conflating them
    would answer a question he did not ask: he can have the phone shake in a
