@@ -4,8 +4,9 @@
 buses — a bus follows a finger only after the finger has been held on it. Also
 in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
 BUS and AI OPERATOR layers, each of which fixes the page behind it; and
-**SOUND and VIBRATION switches in Settings, both OFF**, with a test that stops
-anything audible being added later without going through them.
+**one SOUND & VIBRATION switch in Settings, OFF**, with a test that stops
+anything audible being added later without going through it; plus an optional
+**ESCAPE CLOSES THE BUS EDITOR**, also off.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -282,6 +283,40 @@ which is why `.settings-lite-switch` beside it has no rule and looks fine.
 Re-measured at 360, 390, 430 and 820: no overlap, both boxes on the left
 margin, no horizontal scroll.
 
+### Escape and the bus editor, as an option that starts off
+
+Curtis, choosing from the three options the last release raised: *"#1 leave it
+like it is but have an option setting to make this a confirm to ask before
+closing if any changes was made. I may not want the close but ask all the time
+because it's a friction point against speed. So optional."*
+
+So the default is **exactly what it is today** — Escape does nothing in the bus
+editor — and a switch in **SETTINGS → FACILITY MAP → TOUCH CONTROLS** turns it
+on. With it on, Escape closes the editor and **asks first only if something was
+changed**: looking at a bus and pressing Escape costs no extra tap, and losing
+typed work always asks.
+
+No new key. It rides `pace-board-settings-v1` beside `singleTapEmptySpaces`,
+which is the same kind of setting — how input behaves on the map.
+
+**The dirty check is taken in the editor, not on the page**, because the page
+knows which layers are open and only the editor knows whether anything has been
+typed into one. The fingerprint covers the three places a change can hide: the
+draft bus, the hold's datetime field, and a defect part-typed but not yet
+added. It is compared against what was opened rather than against the record,
+so typing a number and typing it back is correctly not a change.
+
+**Measured in Chromium**, five cases: with the setting OFF, Escape leaves the
+editor open whether or not anything was typed. With it ON — nothing typed:
+closes, no question. Typed then CANCEL: stays open, work intact. Typed then OK:
+closes.
+
+### One switch for sound and vibration, not two
+
+Curtis: *"Yes sound and vibration together."* The storage still holds two
+flags, so splitting them again later is a UI change rather than a migration,
+but one control sets both and either one being on reads as on.
+
 ### Verified
 
 Gates re-run on **the commit this file is updated in**, which is what "this
@@ -337,22 +372,17 @@ that refusal has not been measured on an Android device.
    as it did.
 6. If 0.4s feels slow or twitchy with gloves on, say so — it is one number.
 7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
-   Escape. It should close. The bus editor still will not — see the question
-   below.
-8. **SETTINGS → THIS DEVICE.** There should be SOUND and VIBRATION switches,
-   both off. Leave them off and hold a bus on the map: it lifts with a blue
-   ring and the phone stays still. Turn VIBRATION on and do it again — it
-   should buzz once.
+   Escape. It should close. The bus editor still will not, unless you turn the
+   setting on at step 9.
+8. **SETTINGS → THIS DEVICE.** There should be one SOUND & VIBRATION switch,
+   off. Leave it off and hold a bus on the map: it lifts with a blue ring and
+   the phone stays still. Turn it on and do it again — it should buzz once.
+9. **SETTINGS → FACILITY MAP → TOUCH CONTROLS.** ESCAPE CLOSES THE BUS EDITOR
+   should be off, and Escape in the bus editor should do nothing, as now. Turn
+   it on: open a bus, press Escape — it closes with no question. Open another,
+   change something, press Escape — it should ask.
 
 ### One open question for Curtis
-
-**Should Escape close the BUS EDITOR too?** It is the one modal whose only way
-out is its X, so it is the one that traps — but Escape there discards whatever
-was typed and deletes an unsaved new bus, exactly as the X does today, and
-unlike the other five it has no backdrop tap already doing that. Three
-options: leave it as it is, let Escape close it the way the X does, or let
-Escape close it but ask first when something has been typed. Not built either
-way until he says.
 
 **Should a bad reply fail the shell install the way a dropped connection
 does?** See the service-worker section above — today a 503 or a captive

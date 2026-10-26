@@ -59,8 +59,22 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
+  /* Asserted as a SET rather than as one exact string. The pin here used to be
+     the whole argument list in order, so adding a setting broke it in a way
+     that said nothing about what was wrong — and reordering two fields that
+     changes nothing would break it too. What matters is that every board
+     setting the page holds is in the object it writes: one left out is a
+     preference that silently never persists. */
+  const written=page.match(/JSON\.stringify\(\{statusVersion:3,([^}]*(?:\{[^}]*\}[^}]*)*)\}\)\)/);
+  assert.ok(written,"the map still writes its settings as one object");
+  /* DERIVED FROM BoardSettings, not hand-listed. A hand-written list cannot
+     know it is complete: add a setting to the type and to readBoardSettings,
+     forget the map's own write, and a hand-listed assertion passes while the
+     preference silently never persists. */
+  const {readBoardSettings:readBoard}=await import("../src/lib/settings/map-settings.ts");
+  for(const field of Object.keys(readBoard(null)))
+   assert.ok(new RegExp("(^|[,{])"+field+"\\s*([,:}]|$)").test(written[1].trim()),
+    field+" is in the map's own write, or it is a setting that never persists");
   /* A restored backup reaches the intervals through the board-settings reader
      now, rather than through a setter inside the map's own import handler. */
   const boardModel = await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
@@ -1028,6 +1042,16 @@ test("nothing the app can be heard or felt doing happens before somebody asks", 
  assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":true}'),{sound:true,vibration:true},
   "and an honest yes still works");
 
+ /* A MIXED RECORD READS AS BOTH ON. One switch draws these two flags now, and
+    a device that ticked only SOUND under the two-switch UI would otherwise
+    render that switch ON while holding a bus made no buzz at all -- the app's
+    only perceivable feedback, silently missing, with no way out but toggling
+    off and on. */
+ assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":false}'),{sound:true,vibration:true},
+  "a sound-only device from the old UI gets the vibration its switch claims");
+ assert.deepEqual(readFeedbackSettings('{"sound":false,"vibration":true}'),{sound:true,vibration:true},
+  "and the other way round");
+
  /* A storage that throws is a silent phone, not a crash. */
  const throwing={getItem(){throw new Error("denied")},setItem(){throw new Error("denied")}};
  assert.deepEqual(loadFeedbackSettings(throwing),{sound:false,vibration:false});
@@ -1047,15 +1071,21 @@ test("nothing the app can be heard or felt doing happens before somebody asks", 
   assert.equal(buzzes,0,"and navigator is not reached at all");
   assert.equal(soundAllowed(off),false);
 
-  const vibrationOnly={getItem:()=>'{"sound":false,"vibration":true}'};
-  assert.equal(buzz(vibrationOnly,12),true,"turning vibration on makes it buzz");
+  const on={getItem:()=>'{"sound":true,"vibration":true}'};
+  assert.equal(buzz(on,12),true,"turning the switch on makes it buzz");
   assert.equal(buzzes,1,"exactly once");
-  assert.equal(soundAllowed(vibrationOnly),false,"and sound is still off, since they are separate");
+  assert.equal(soundAllowed(on),true);
 
+  /* ONE SWITCH, so a record holding only one flag -- which is what a device
+     that used the two-switch UI holds -- must not leave half the feedback
+     dead behind a control that says it is on. */
+  const vibrationOnly={getItem:()=>'{"sound":false,"vibration":true}'};
+  assert.equal(buzz(vibrationOnly,12),true,"an old vibration-only device still buzzes");
+  assert.equal(soundAllowed(vibrationOnly),true,"and its switch is telling the truth");
   const soundOnly={getItem:()=>'{"sound":true,"vibration":false}'};
-  assert.equal(buzz(soundOnly,12),false,"sound on does not imply vibration");
-  assert.equal(buzzes,1,"still once");
+  assert.equal(buzz(soundOnly,12),true,"an old sound-only device buzzes, because its switch says on");
   assert.equal(soundAllowed(soundOnly),true);
+  assert.equal(buzzes,3,"three buzzes, one per call that was allowed");
 
   /* A navigator whose vibrate refuses, and one that throws. */
   globalThis.navigator={vibrate:()=>false};
@@ -1156,8 +1186,86 @@ test("a sound added later cannot get around the switch", async () => {
 
  /* Settings can reach both switches. */
  const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
- assert.match(settingsPage,/SOUND ON THIS DEVICE/);
- assert.match(settingsPage,/VIBRATION ON THIS DEVICE/);
- assert.match(settingsPage,/checked=\{feedback\.sound\}/);
- assert.match(settingsPage,/checked=\{feedback\.vibration\}/);
+ /* ONE switch for both, which is Curtis's call: "Yes sound and vibration
+    together." The storage keeps two flags, so splitting them again later is a
+    UI change and not a migration — but the control sets both, and a stored
+    record with only one of them on still reads as on. */
+ assert.match(settingsPage,/SOUND &amp; VIBRATION ON THIS DEVICE/);
+ assert.match(settingsPage,/checked=\{feedback\.sound\}/,"one flag is enough, because read normalises them together");
+ assert.match(settingsPage,/setFeedback\(\{sound:event\.target\.checked,vibration:event\.target\.checked\}\)/,"and the one switch sets both");
+ assert.doesNotMatch(settingsPage,/checked=\{feedback\.vibration\}/,"there is no second switch any more");
+});
+
+test("Escape in the bus editor is off, and asks only when something changed", async () => {
+ const [mapPage,panel,module]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/map-settings-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8"),
+ ]);
+ const {readBoardSettings}=await import("../src/lib/settings/map-settings.ts");
+
+ /* OFF unless somebody asked, like every other `===true` setting in this file.
+    Curtis chose "leave it like it is" and then asked for the switch, so the
+    default has to be the behaviour that already existed. */
+ assert.equal(readBoardSettings(null).escapeClosesEditor,false,"a device that has never been to Settings");
+ assert.equal(readBoardSettings("{}").escapeClosesEditor,false);
+ assert.equal(readBoardSettings('{"escapeClosesEditor":"yes"}').escapeClosesEditor,false,"only a literal true counts");
+ assert.equal(readBoardSettings('{"escapeClosesEditor":true}').escapeClosesEditor,true);
+ assert.match(module,/escapeClosesEditor:ui\.escapeClosesEditor===true/);
+
+ /* IT LIVES IN THE EDITOR, not in the page's Escape ladder, because the page
+    knows which layers are open and only this component knows whether anything
+    has been typed into one. */
+ const ladder=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{\n if\(event\.key!=="Escape"\)return;[\s\S]*?\n\};/);
+ assert.ok(ladder,"the page still has its own ladder");
+ assert.doesNotMatch(ladder[0],/closeEditor|setEdit/,"which still does not touch the editor");
+
+ /* The fingerprint covers all three places a change can hide. A draft-only
+    comparison would call a half-typed defect, or an edited hold time, clean. */
+ /* EVERY BOX, not three of twenty-three. The first version watched only the
+    draft bus, the hold time and a part-typed defect, so an odometer reading,
+    an engine-hour reading, a service completion or a switch target was thrown
+    away without a question -- while the comment beside it promised the
+    opposite. A reading only reaches the draft when its own ADD button is
+    pressed, which is exactly the state somebody is in when they hit Escape. */
+ const fingerprint=mapPage.match(/const typedInto=\[([\s\S]*?)\];/);
+ assert.ok(fingerprint,"the editor fingerprints what was typed into it");
+ for(const field of ["d","holdUntil","newDefect","repairGroup","odometerMiles","odometerRecordedAt","odometerNote",
+  "engineHours","engineHoursRecordedAt","engineHoursNote","maintenanceKind","completionMiles","completionHours",
+  "completionCompletedAt","completionNote","switchBusId","switchDestination","addToDefectLog","addToDownSheet","smartStatusEnabled"])
+  assert.ok(new RegExp("(^|[\\[,\\s])"+field+"\\s*([,\\]]|$)").test(fingerprint[1].trim()),field+" is watched, or Escape discards it silently");
+ /* And NOT these: they say which panel is open, not what is in it. */
+ for(const ui of ["adding","switchOpen","entryMode"])
+  assert.ok(!new RegExp("(^|[\\[,\\s])"+ui+"\\s*([,\\]]|$)").test(fingerprint[1].trim()),ui+" is panel state, and confirming over it is the friction Curtis asked to avoid");
+ assert.match(mapPage,/const \[openedAs\]=useState\(\(\)=>JSON\.stringify\(typedInto\)\)/,"taken once, on open");
+ assert.match(mapPage,/const changed=openedAs!==JSON\.stringify\(typedInto\)/);
+
+ /* Innermost first: a sub-panel takes the Escape before the editor does. */
+ assert.match(mapPage,/if\(adding\)\{setAdding\(false\);return\}/);
+ assert.match(mapPage,/if\(switchOpen\)\{setSwitchOpen\(false\);return\}/);
+
+ /* Guarded by the setting, and the confirm fires ONLY when dirty -- Curtis:
+    "I may not want the close but ask all the time because it's a friction
+    point against speed." */
+ const handler=mapPage.match(/if\(!escapeCloses\)return;[\s\S]*?\},\[([^\]]*)\]\);/);
+ assert.ok(handler,"the editor's Escape is behind the setting");
+ assert.match(handler[0],/if\(changed&&!confirm\(/,"a form nobody touched closes without a question");
+ assert.match(handler[0],/window\.addEventListener\("keydown",escape,true\)/);
+ assert.match(handler[0],/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and comes off again");
+ /* The dependency SET, not its order -- an order pin is the brittleness this
+    file has already been caught by twice. */
+ assert.deepEqual([...new Set(handler[1].split(",").map(name=>name.trim()))].sort(),
+  ["adding","changed","close","d.n","escapeCloses","switchOpen"],"the effect declares exactly what it reads");
+
+ /* THE MAP HAS TO READ IT AND HAND IT DOWN. Deleting either line left the
+    feature entirely dead with the whole suite green -- and worse, the map's
+    write is a full replace, so its stale false would go back over the true
+    that Settings had just written. */
+ assert.match(mapPage,/setEscapeClosesEditor\(ui\.escapeClosesEditor===true\)/,"read on hydration");
+ assert.match(mapPage,/setEscapeClosesEditor\(ui\.escapeClosesEditor\)/,"and refreshed when another tab changes it");
+ assert.match(mapPage,/escapeCloses=\{escapeClosesEditor\}/,"and handed to the editor");
+
+ /* Reachable, and described as what it is. */
+ assert.match(panel,/ESCAPE CLOSES THE BUS EDITOR/);
+ assert.match(panel,/checked=\{escapeClosesEditor\}/);
 });

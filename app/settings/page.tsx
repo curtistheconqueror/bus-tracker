@@ -449,10 +449,8 @@ export default function SettingsPage(){
          heard has to come through this same setting — a test scans the source
          tree for audio APIs and fails if one appears outside that module. */}
      <section className="settings-feedback">
-      <label className="settings-check"><input type="checkbox" checked={feedback.sound} onChange={event=>setFeedback({...feedback,sound:event.target.checked})}/>
-       <span><b>SOUND ON THIS DEVICE</b><small>Off. The app makes no sound at all today — no alerts, no chimes, nothing on save. This switch is here so that stays true on purpose rather than by accident: anything added later that can be heard stays silent until you turn this on.</small></span></label>
-      <label className="settings-check"><input type="checkbox" checked={feedback.vibration} onChange={event=>setFeedback({...feedback,vibration:event.target.checked})}/>
-       <span><b>VIBRATION ON THIS DEVICE</b><small>Off. The one buzz in the app is the short one when you hold a bus on the Facility Map and it lifts to be moved. The blue ring shows that too, so nothing is lost with this off. Phones only — iPhones and iPads have no vibration for web apps either way.</small></span></label>
+      <label className="settings-check"><input type="checkbox" checked={feedback.sound} onChange={event=>setFeedback({sound:event.target.checked,vibration:event.target.checked})}/>
+       <span><b>SOUND &amp; VIBRATION ON THIS DEVICE</b><small>Off. The app makes no sound at all today — no alerts, no chimes, nothing on save — and the one buzz is the short one when you hold a bus on the Facility Map and it lifts to be moved. The blue ring shows that too, so nothing is lost with this off. Anything added later that can be heard or felt stays quiet until you turn this on.</small></span></label>
      </section>
      <section className="settings-welcome-again">
       <div><b>FIRST-TIME WELCOME</b><small>Show the opening screen again and pick FULL or LITE, exactly as a device seeing this app for the first time would. Nothing is changed until you choose.</small></div>
