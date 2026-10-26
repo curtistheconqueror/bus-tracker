@@ -50,8 +50,8 @@ button,input,select,textarea{font:inherit}
 .log-advanced-group>.quick-filter-control{display:flex}
 @media(max-width:760px){.log-advanced-group{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .defect-log-app{min-height:100vh;padding-bottom:18px;background:linear-gradient(180deg,#e9eef6,#f8fafc);color:var(--log-ink);font-family:Arial,Helvetica,sans-serif;overflow-anchor:none}
-.log-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#031839,#07376d);color:#fff;box-shadow:0 3px 14px #00152d55}
-.log-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#74a8df}.log-header h1{margin:2px 0 1px;font-size:25px;line-height:1}.log-header p{margin:4px 0 0;font-size:9px;color:#c4d7ee}
+.log-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#031839,#07376d);color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00152d55}
+.log-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 84%,transparent)}.log-header h1{margin:2px 0 1px;font-size:25px;line-height:1}.log-header p{margin:4px 0 0;font-size:9px;color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 90%,transparent)}
 .log-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid #5c79a2;border-radius:6px}.log-header nav a{min-width:108px;padding:10px 12px;color:#dbe9fb;font-size:8px;font-weight:900;text-align:center;text-decoration:none}.log-header nav a.active{background:#fff;color:#0b407e}.log-header nav a+a{border-left:1px solid #5c79a2}
 .log-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:10px 14px}.log-summary>div{width:100%;min-width:0;display:flex;min-height:62px;flex-direction:column;align-items:center;justify-content:center;border:1px solid #bdc9da;border-radius:8px;background:#fff;box-shadow:0 2px 8px #1b365511}.log-summary strong{font-size:24px;color:#174e8d}.log-summary span{margin-top:3px;font-size:7px;font-weight:900;letter-spacing:.5px;color:#60728c}.log-summary .primary{border-color:#4a91d7;background:#edf6ff}.log-summary .downing strong{color:#b5252c}.log-summary .fixed-today strong{color:#087347}
 .log-controls{display:flex;align-items:center;gap:9px;margin:0 14px 10px;padding:8px;border:1px solid #bac7d9;border-radius:8px;background:#fff}.log-filters{display:flex;gap:5px}.log-filters button,.log-settings-button{height:34px;border:1px solid #b7c4d7;border-radius:5px;background:#f3f6fa;color:#344a69;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}.log-filters button.active{border-color:#0b64bd;background:#0b64bd;color:#fff}.log-search-wrap{min-width:190px;display:flex;flex:1;flex-direction:column;gap:3px}.log-search{width:100%;display:flex;align-items:center;border:1px solid #b7c4d7;border-radius:5px;background:#fff;overflow:hidden}.log-search span{padding:0 8px;font-size:7px;font-weight:900;color:#60728c}.log-search input{width:100%;height:32px;border:0;outline:none;color:#172b4d;font-size:10px}/* Says what the search is holding back, and undoes it in one press. The board
@@ -92,7 +92,7 @@ button,input,select,textarea{font:inherit}
 
 /* Defect Log appearance settings */
 .defect-log-app{--log-soft:color-mix(in srgb,var(--log-surface) 88%,var(--log-page));--log-border:color-mix(in srgb,var(--log-text) 22%,var(--log-surface));--log-card-border:color-mix(in srgb,var(--log-text) 42%,var(--log-surface));background:var(--log-page);color:var(--log-text);font-family:var(--log-font)}
-.log-header{background:var(--log-header);color:var(--log-header-text)}.log-header>div>span,.log-header p,.log-header nav a{color:color-mix(in srgb,var(--log-header-text) 78%,var(--log-header))}.log-header nav a.active{background:var(--log-surface);color:var(--log-accent)}
+.log-header{background:var(--app-header-fill,var(--log-header));color:var(--log-header-text)}.log-header>div>span,.log-header p,.log-header nav a{color:color-mix(in srgb,var(--log-header-text) 78%,var(--log-header))}.log-header nav a.active{background:var(--log-surface);color:var(--log-accent)}
 .log-summary>div,.log-controls,.log-feed,.log-search{border-color:var(--log-border);background:var(--log-surface)}
 /* The bus group is themed with the panels but keeps its own, heavier outline.
    It used to sit in the list above, which set every panel to --log-border and
@@ -136,7 +136,7 @@ button,input,select,textarea{font:inherit}
 
 /* Readable inactive page tabs */
 .log-header nav a{background:color-mix(in srgb,var(--log-header) 74%,#2877c8);color:var(--log-header-text);text-shadow:0 1px 2px #00182f;border-color:color-mix(in srgb,var(--log-header-text) 48%,var(--log-header))}
-.log-header nav a:hover,.log-header nav a:focus-visible{background:color-mix(in srgb,var(--log-header) 55%,#3d91df);color:#fff;outline:none}
+.log-header nav a:hover,.log-header nav a:focus-visible{background:color-mix(in srgb,var(--log-header) 55%,#3d91df);color:var(--app-header-text,var(--log-header-text,#fff));outline:none}
 .log-header nav a.active{background:var(--log-surface);color:var(--log-accent);text-shadow:none}
 /* Version 85 Shop Notes and editable text */
 .log-header h1{color:var(--log-page-title-color,var(--log-header-text));font-size:var(--log-page-title-size,25px)}
@@ -860,12 +860,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    the light-surface toggle it replaced, which was invisible against the
    header. */
 .log-header-actions{flex:none;display:flex;min-width:0;flex-direction:column;align-items:stretch;gap:7px}
-.header-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #ffffff8a;border-radius:8px;background:#ffffff2e;color:#fff;padding:9px 13px;font:inherit;cursor:pointer}
-.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:#ffffff45;border-color:#fff;outline:none}
+.header-advanced-toggle{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 54%,transparent);border-radius:8px;background:transparent;color:var(--app-header-text,var(--log-header-text,#fff));padding:9px 13px;font:inherit;cursor:pointer}
+.header-advanced-toggle:hover,.header-advanced-toggle:focus-visible{background:transparent;border-color:var(--app-header-text,var(--log-header-text,#fff));outline:none}
 .header-advanced-toggle>span{display:flex;min-width:0;flex-direction:column;gap:2px;text-align:left}
-.header-advanced-toggle b{color:#fff;font-size:14px;font-weight:900;letter-spacing:.4px}
-.header-advanced-toggle small{color:#d3e3f7;font-size:9px;font-weight:900}
-.header-advanced-toggle>i{flex:none;border:1px solid #ffffffad;border-radius:6px;color:#fff;padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
+.header-advanced-toggle b{color:var(--app-header-text,var(--log-header-text,#fff));font-size:14px;font-weight:900;letter-spacing:.4px}
+.header-advanced-toggle small{color:color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 82%,transparent);font-size:9px;font-weight:900}
+.header-advanced-toggle>i{flex:none;border:1px solid color-mix(in srgb,var(--app-header-text,var(--log-header-text,#fff)) 68%,transparent);border-radius:6px;color:var(--app-header-text,var(--log-header-text,#fff));padding:5px 9px;font-style:normal;font-size:9px;font-weight:900;letter-spacing:.5px}
 /* The drawer opens directly under the header, so it loses the rounded top it
    had as a card in the middle of the page. */
 .log-advanced{border-top-left-radius:0;border-top-right-radius:0;margin-top:0}

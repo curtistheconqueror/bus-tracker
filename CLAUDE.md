@@ -175,6 +175,7 @@ per-device settings, never synced
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-feedback-settings-v1        sound and vibration on this device, both OFF
+  pace-header-theme-v1             the app's header colour, and any per-page override
   pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
@@ -305,6 +306,63 @@ off, the spelling discipline `setBusHold` and the ledger's `gap` already follow.
 buzz** rather than taking it as a prop. A flag plumbed from the page root goes
 stale, and a stale copy is a phone still buzzing just after somebody turned it
 off — which is the exact moment they are watching to see whether it worked.
+
+**`pace-header-theme-v1` is the app's header colour, and it replaced five
+places that each decided one.** Curtis: *"B is fine all same color until I
+figure out a more solid color scheme because I do want to add some flare to
+it. Why is this not an option to color the headers differently in settings?"*
+
+It partly was, which is the whole problem. Three of the eight headers were
+already settable — the Facility Map through `--header-bg`, the Defect Log and
+Fixed Repairs through `--log-header` and `--fixed-header` — but through TWO
+page-level theme systems built when every page had its own gear, and the other
+five had the colour typed into a stylesheet. Nothing anywhere said what the
+APP's colour was. Measured before this: five different navies, two gradient
+angles, and flat against gradient.
+
+**ONE SHARED COLOUR AND A PER-PAGE OVERRIDE**, which is what was chosen when
+asked. Incidents' red and Shop Talk's green are gone from the default and are
+one override away. `src/lib/settings/header-theme.ts` owns it and
+`src/components/shared/header-theme-live.tsx` paints it, mounted ONCE in the
+root layout and following the route — the alternative is threading one value
+through eight pages that have nothing else in common, where a page that forgot
+to thread it keeps its old hard-coded colour silently, which is the bug this
+exists to remove. Every header rule reads `--app-header-fill` with its own old
+literal as the fallback, so a device that has never opened Settings and a
+render before hydration both draw what the app drew before.
+
+**A PAGE THEME IS THE MIDDLE RUNG, and that was learned by measuring.** The
+Facility Map, the Defect Log and Fixed Repairs each offer Terminal, Black,
+Midnight and Tactical, in which the header colour is one member of a page-wide
+palette. Handing them the shared colour unconditionally was built first and
+measured at 430 on Tactical: a navy header block with the olive page starting
+at its bottom edge in a hard line, and the active nav tile still olive because
+it is keyed to the page's surface. Two apps stacked. So `resolveHeaderColor`
+is a three-rung ladder — **an override typed for this surface, then a
+non-default page theme, then the shared colour**. On the default theme, which
+is every device that has not opened those panels, all eight match; on a theme
+the page stays whole; and an override still wins over both, so Settings is
+never describing something a page will not do.
+
+**The text colour is COMPUTED, never stored, and it is pure black or white.**
+The moment a background can be picked, "white on a dark header" is a trap: a
+light flare colour takes the page title with it. Whichever of the two reads
+better wins. It was a softer `#0b1b33` first; swept over the whole colour cube
+that bottoms out at 4.15:1, under AA on backgrounds the picker hands out,
+while `#000` floors at 4.58:1 because the two options bracket every background
+between them. A test sweeps the cube rather than sampling.
+
+**The gradient is 90deg, and that is not an angle the app used** — the
+literals it replaces were 110deg and 120deg, so there was none to preserve. A
+tilted gradient is height-dependent, and the Facility Map's header bar and the
+phone nav flush beneath it are two boxes of the same width and different
+heights that have always read as one block. Measured at 110deg: a 4-to-6 per
+channel step across that boundary, where the flat colour they shared before
+had none. At 90deg it is zero.
+
+Per device and never synced, like every appearance setting here: it describes
+what one person likes looking at, and a synced colour scheme repaints somebody
+else's phone mid-shift.
 
 **`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
 scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps
@@ -658,7 +716,10 @@ renaming one throws away what the device already holds. The name records where
 the panel used to live; the value is still "is this panel collapsed".
 
 `pace-locate-ack`, `pace-touch-drop` and `pace-open-quick-filter` look like keys
-and are not — they are CustomEvent names.
+and are not — they are CustomEvent names. **`pace-header-theme-v1` is BOTH**:
+the storage key, and the name Settings dispatches on `window` so the page it
+is on repaints without waiting for a `storage` event, which only ever fires
+in the OTHER tabs. One name for one thing changing, deliberately.
 
 **The two tombstone ledgers are load-bearing.** The merges are additive by
 design — they keep every record the receiver alone holds — so a removal can

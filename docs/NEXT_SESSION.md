@@ -267,6 +267,19 @@ strike the item the day it lands.
 - A live two-device sync test — never actually run with two real devices.
 - 15 editor controls below the 44px touch target on iPad. Deliberately deferred;
   do it as an iPad-scoped pass without collapsing the tablet two-column layout.
+- **FLEETSTEP still sits 3-5px further in on the Facility Map and the Down
+  Sheet**, and it is their 5px page frame (3px on a phone), not their padding
+  — the six pages with no frame now land on exactly the same x and y at 390
+  and 1180. Closing it means either dropping those two frames or trimming
+  those two headers' padding by their own frame width. **Both are visible, so
+  both are Curtis's call before building either.** Measured in 194.
+- **The eight pages switch to their phone layout at three different widths**
+  — 760, 800 and 860 — so on an iPad held in portrait at 820 the header titles
+  spread by 6px again. Unifying that moves real layouts at those widths on
+  several pages; it is not a tidy-up, and it needs saying first.
+- **Each page still has its own ACCENT colour** under the now-shared header:
+  rust on Incidents, green on Shop Talk, bright blue on the Down Sheet. 194
+  shared the header BAR only. Whether the whole block should match is open.
 
 ---
 

@@ -244,9 +244,12 @@ test("the lists page neutralises the global aside and section styling",async()=>
  // and it precedes the rules that then style them deliberately
  assert.ok(css.indexOf(".lists-index,.lists-layout{position:static")<css.indexOf(".lists-layout{display:grid"));
  // The global bare nav is white; Campaigns must explicitly restore the dark
- // header tab bar so inactive phone tabs cannot become white-on-white.
- assert.match(css,/\.lists-header nav\{[^}]*background:#082f60/);
- assert.match(css,/\.lists-header nav a\{[^}]*background:#082f60[^}]*color:#fff/);
+ // header tab bar so inactive phone tabs cannot become white-on-white. It was
+ // the literal #082f60, a navy picked to sit on the old navy header; the
+ // header's colour is a setting now, so what has to hold is that the band is
+ // DERIVED from it and its labels follow the header's computed text colour.
+ assert.match(css,/\.lists-header nav\{[^}]*background:color-mix\(in srgb,var\(--app-header,[^)]*\) \d+%,var\(--app-header-text,[^)]*\)\)/);
+ assert.match(css,/\.lists-header nav a\{[^}]*background:color-mix\(in srgb,var\(--app-header,[^)]*\) \d+%,var\(--app-header-text,[^)]*\)\);color:var\(--app-header-text,#fff\)/);
 });
 
 test("the repair details panel opens for a record that has repair details",async()=>{
@@ -599,7 +602,14 @@ test("a render error shows a screen with a way out, not a white one",async()=>{
     to refresh, and it's just stuck." A render error unmounts the entire tree,
     and in standalone mode there is no address bar, no reload button and no
     pull-to-refresh. The app is bricked until iOS kills the process. */
- assert.match(layout,/<CrashGuard>\{children\}<\/CrashGuard>/,"every page is inside the boundary");
+ /* Written as "CrashGuard is the only thing in <body>, and {children} is
+    inside it" rather than pinned as that exact pair of tags: what matters is
+    that nothing renders outside the boundary, and a component added beside
+    {children} INSIDE it — which is where a component that runs on every page
+    belongs — is the safe case, not the one to fail on. */
+ assert.match(layout,/<body><CrashGuard>[\s\S]*\{children\}[\s\S]*<\/CrashGuard><\/body>/,
+   "every page is inside the boundary");
+ assert.doesNotMatch(layout,/<body>(?!<CrashGuard>)/,"nothing renders outside the boundary");
  assert.match(guard,/static getDerivedStateFromError/,"a class component, because componentDidCatch has no hook equivalent");
  assert.match(guard,/componentDidCatch/);
  assert.match(guard,/location\.reload/,"the one control a standalone app cannot otherwise offer");

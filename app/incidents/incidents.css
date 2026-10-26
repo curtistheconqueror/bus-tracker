@@ -8,15 +8,15 @@
    gives every bare <header> a fixed `height:38px`, which `min-height` alone
    cannot undo — that one rule cost two separate rounds of debugging on other
    pages. See the cascade-check skill. */
-.incidents-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#3b1206,#7a2708);color:#fff;box-shadow:0 3px 14px #2a0c0355}
+.incidents-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,color-mix(in srgb,#ffffff 16%,#041d47)));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #2a0c0355}
 .incidents-app{min-height:100vh;padding-bottom:28px;background:linear-gradient(180deg,#f7efe9,#fbfaf8);color:#2b2118;font-family:Arial,Helvetica,sans-serif}
 .incidents-header>div{min-width:0}
-.incidents-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#e8a579}
+.incidents-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,#fff) 84%,transparent)}
 .incidents-header h1{margin:2px 0 1px;font-size:25px;line-height:1}
-.incidents-header p{margin:4px 0 0;font-size:9px;color:#f0cdb4}
-.incidents-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid #c98355;border-radius:6px;background:#5a1d07}
-.incidents-header nav a{min-width:104px;padding:10px 12px;background:#5a1d07;color:#fff;font-size:8px;font-weight:900;text-align:center;text-decoration:none;text-shadow:0 1px 2px #2a0c03}
-.incidents-header nav a.active{background:#fff;color:#7a2708}
+.incidents-header p{margin:4px 0 0;font-size:9px;color:color-mix(in srgb,var(--app-header-text,#fff) 90%,transparent)}
+.incidents-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid color-mix(in srgb,var(--app-header-text,#fff) 42%,transparent);border-radius:6px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff))}
+.incidents-header nav a{min-width:104px;padding:10px 12px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff));color:var(--app-header-text,#fff);font-size:8px;font-weight:900;text-align:center;text-decoration:none}
+.incidents-header nav a.active{background:var(--app-header-text,#fff);color:var(--app-header,#7a2708)}
 .incidents-header nav a+a{border-left:1px solid #a4663c}
 
 /* Said once, at the top. Somebody filing their first incident should not have
@@ -106,7 +106,7 @@
    breakpoint that already exists removes the fight rather than overriding
    it. See the cascade-check skill. */
 @media(max-width:760px){
- .incidents-header{align-items:flex-start;flex-direction:column;padding:11px 12px}
+ .incidents-header{align-items:flex-start;flex-direction:column;padding:12px}
  /* Three across, the same grid every other page's phone nav uses. Eight
     pages makes three rows; measured at 360, 390 and 430. */
  .incidents-header nav{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
