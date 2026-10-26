@@ -3,7 +3,9 @@
 **STATUS: 194 PENDING.** Scrolling the Facility Map on a phone no longer moves
 buses — a bus follows a finger only after the finger has been held on it. Also
 in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
-BUS and AI OPERATOR layers, each of which fixes the page behind it.
+BUS and AI OPERATOR layers, each of which fixes the page behind it; and
+**SOUND and VIBRATION switches in Settings, both OFF**, with a test that stops
+anything audible being added later without going through them.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -230,13 +232,67 @@ ever stops being all-or-nothing.
 changed, so `CACHE_NAME` correctly stays at v7 and phones take this as an
 ordinary asset change.
 
+### Sound and vibration, off by default
+
+Curtis: *"make sure the sound is off by default ok? Any sounds. Toggleable in
+settings."*
+
+**The app makes no sound at all, and did not when he asked.** No AudioContext,
+no Audio element, no audio file in the repository, no speech synthesis. The
+only thing a person could perceive without looking was the short buzz when a
+bus is picked up on the Facility Map, added earlier in this same release.
+
+So the deliverable is not an off switch for a sound that does not exist. It is
+a gate a sound added in six months cannot walk around: `tests/settings.test.mjs`
+walks `app/` and `src/` and fails if `navigator.vibrate`, `new Audio`,
+`AudioContext`, `speechSynthesis`, an `<audio>` tag or an audio file is named
+anywhere outside `src/lib/settings/feedback-settings.ts` — `public/` included,
+since `sw.js` could call `showNotification`, which rings on Android.
+
+**It is a tripwire and not a proof**, and the difference is worth stating. It
+catches every ordinary way of adding a sound, including four that defeated its
+first draft: `createElement("audio")`, `new window.Audio`, an aliased
+`navigator`, and `Notification` — which was not in the list at all. It does not
+catch `navigator["vib"+"rate"]()`, and no static token scan can. What it stops
+is somebody honest adding a chime without knowing there was a rule.
+
+Mutation-tested rather than assumed: nine ways of making a sound are each
+planted in `src/` and the suite is re-run. Prose about the rule in a comment,
+and a `.wav` CSS class name, must NOT trip it; `url(ding.wav)` must.
+
+**New key `pace-feedback-settings-v1`**, per device, never synced. Two flags in
+one key — a buzz is not a sound, and a loud garage is the case for vibration and
+against noise. Both default off, and anything that is not EXACTLY `true` reads
+as off, so a corrupt or hand-edited record cannot be what starts a phone making
+noise.
+
+**Measured in Chromium** on a device given a working `navigator.vibrate`: a
+fresh phone with nothing stored holds a bus, the bus lifts with its ring, and
+the vibration count is **0**. Turning VIBRATION on in Settings stores
+`{"version":1,"sound":false,"vibration":true}`, and the same gesture then
+counts **1**. The SOUND switch is present and unchecked on a fresh device.
+
+**The two switches also needed a stylesheet rule of their own**, found by
+measuring and not by reading. `.settings-check` is styled in two places and
+neither reaches this page — `down-sheet.css` scopes its layout half to
+`.down-settings-body`, `defect-log.css` to `.log-settings` — so both labels
+computed `display:inline`, OVERLAPPED by 17px, and the second checkbox landed
+mid-sentence inside the first one's text. One such label gets away with it,
+which is why `.settings-lite-switch` beside it has no rule and looks fine.
+Re-measured at 360, 390, 430 and 820: no overlap, both boxes on the left
+margin, no horizontal scroll.
+
 ### Verified
 
-Gates re-run on `2b0af96`, this release's source — not quoted from an earlier
-run. An earlier draft of this section cited `319f2cd`, a hash no ref contains
-(its pre-rebase twin), and a count of 389 that two commits had since moved:
+Gates re-run on **the commit this file is updated in**, which is what "this
+release's source" means and is why no hash is written here any more. Two
+earlier drafts of this section went stale within a commit of each other — one
+cited `319f2cd`, a hash no ref contains after the rebase onto Codex's 193, and
+both quoted a test count that the next commit moved. A number copied forward is
+the thing `.claude/skills/fresh-context-review` was written about, and naming a
+hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **391 pass, 0 fail**
+- `npm test` — **393 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -283,6 +339,10 @@ that refusal has not been measured on an Android device.
 7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
    Escape. It should close. The bus editor still will not — see the question
    below.
+8. **SETTINGS → THIS DEVICE.** There should be SOUND and VIBRATION switches,
+   both off. Leave them off and hold a bus on the map: it lifts with a blue
+   ring and the phone stays still. Turn VIBRATION on and do it again — it
+   should buzz once.
 
 ### One open question for Curtis
 

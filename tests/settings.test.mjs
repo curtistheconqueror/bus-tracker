@@ -1005,3 +1005,159 @@ test("the shift clock says how long the current shift has been running",async()=
  assert.equal(activeShift(at(12),{shifts:[],pullouts:[]}),null);
  assert.equal(activeShift("not a time"),null);
 });
+
+test("nothing the app can be heard or felt doing happens before somebody asks", async () => {
+ const {DEFAULT_FEEDBACK,readFeedbackSettings,loadFeedbackSettings,serializeFeedbackSettings,buzz,soundAllowed,FEEDBACK_SETTINGS_KEY}
+  =await import("../src/lib/settings/feedback-settings.ts");
+
+ /* Curtis: "make sure the sound is off by default ok? Any sounds. Toggleable
+    in settings." Off is the whole requirement, so it is asserted from every
+    direction a device can arrive at it. */
+ assert.deepEqual(DEFAULT_FEEDBACK,{sound:false,vibration:false});
+ for(const raw of [null,"","null","{}",'{"sound":true}'.replace("true","null"),"not json","[]","0",'{"version":1}']){
+  const read=readFeedbackSettings(raw);
+  assert.deepEqual(read,{sound:false,vibration:false},JSON.stringify(raw)+" reads as silent");
+ }
+
+ /* OFF IS THE SAFE READ, which inverts what app-mode.ts does on purpose. A
+    corrupt record there resolves to FULL because taking pages away mid-shift
+    is the worse failure; a corrupt record here must not be what starts a
+    phone making noise. */
+ assert.deepEqual(readFeedbackSettings('{"sound":"yes","vibration":1}'),{sound:false,vibration:false},
+  "only a literal true counts, so a hand-edited file cannot switch this on");
+ assert.deepEqual(readFeedbackSettings('{"sound":true,"vibration":true}'),{sound:true,vibration:true},
+  "and an honest yes still works");
+
+ /* A storage that throws is a silent phone, not a crash. */
+ const throwing={getItem(){throw new Error("denied")},setItem(){throw new Error("denied")}};
+ assert.deepEqual(loadFeedbackSettings(throwing),{sound:false,vibration:false});
+ assert.equal(buzz(throwing,12),false);
+ assert.equal(soundAllowed(throwing),false);
+
+ /* A DEVICE THAT CAN ACTUALLY VIBRATE, which Node is not: its global
+    navigator has no vibrate, so without this stub `buzz` returned false
+    because the API was missing rather than because the setting was off — and
+    deleting the setting check entirely left the whole suite green. */
+ const realNavigator=globalThis.navigator;
+ let buzzes=0;
+ Object.defineProperty(globalThis,"navigator",{value:{vibrate:()=>{buzzes++;return true}},configurable:true,writable:true});
+ try{
+  const off={getItem:()=>null};
+  assert.equal(buzz(off,12),false,"a device that has never been to Settings stays still");
+  assert.equal(buzzes,0,"and navigator is not reached at all");
+  assert.equal(soundAllowed(off),false);
+
+  const vibrationOnly={getItem:()=>'{"sound":false,"vibration":true}'};
+  assert.equal(buzz(vibrationOnly,12),true,"turning vibration on makes it buzz");
+  assert.equal(buzzes,1,"exactly once");
+  assert.equal(soundAllowed(vibrationOnly),false,"and sound is still off, since they are separate");
+
+  const soundOnly={getItem:()=>'{"sound":true,"vibration":false}'};
+  assert.equal(buzz(soundOnly,12),false,"sound on does not imply vibration");
+  assert.equal(buzzes,1,"still once");
+  assert.equal(soundAllowed(soundOnly),true);
+
+  /* A navigator whose vibrate refuses, and one that throws. */
+  globalThis.navigator={vibrate:()=>false};
+  assert.equal(buzz(vibrationOnly,12),false,"a refused vibrate is reported, not thrown");
+  globalThis.navigator={vibrate(){throw new Error("not allowed")}};
+  assert.equal(buzz(vibrationOnly,12),false,"and a throwing one is caught");
+ }finally{
+  Object.defineProperty(globalThis,"navigator",{value:realNavigator,configurable:true,writable:true});
+ }
+
+ /* The default object is copied, so a caller mutating what it read cannot
+    turn the default on for everybody after it. */
+ const first=readFeedbackSettings(null);
+ first.sound=true;
+ assert.equal(readFeedbackSettings(null).sound,false);
+ assert.equal(DEFAULT_FEEDBACK.sound,false);
+
+ assert.match(serializeFeedbackSettings({sound:false,vibration:true}),/"sound":false/);
+ assert.equal(FEEDBACK_SETTINGS_KEY,"pace-feedback-settings-v1");
+});
+
+test("a sound added later cannot get around the switch", async () => {
+ /* THIS IS THE ACTUAL GUARANTEE, and the reason feedback-settings.ts exists
+    at all. When Curtis asked for sound off by default the app made no sound:
+    no AudioContext, no Audio element, no audio file, no speech synthesis. An
+    off switch for nothing is worth very little; a gate that something added
+    in six months cannot walk around is worth the file.
+
+    So this walks the source tree and fails if anything outside that one
+    module names an API that can be heard or felt. The same shape as the test
+    holding pace-role-v1 inside roles.ts, and for a stronger reason: a role
+    read in the wrong place is a bug somebody notices, and a chirp on a phone
+    in a meeting is the app being turned off. */
+ /* STRING-AWARE, because a regex that merely deletes /* ... *\/ is not. A
+    source line holding "https://example.com/*" opened a pseudo-comment that
+    swallowed everything up to the file's next real close — a planted
+    new Audio("/ding.mp3") after one of those passed the scan. And a `//`
+    comment that did not start its line was never stripped at all, so prose
+    about this rule failed the build while real code hid from it: both bugs,
+    opposite directions, one cause.
+
+    Comments go; STRINGS STAY, because an audio path only ever appears in one.
+    A regex literal containing a quote can be mistaken for a string here, which
+    leaves more text in the scan rather than less — the safe direction. */
+ const stripComments=source=>{
+  let out="",i=0;
+  while(i<source.length){
+   const c=source[i],next=source[i+1];
+   if(c==='"'||c==="'"||c==="`"){
+    out+=c;i++;
+    while(i<source.length){
+     const d=source[i];out+=d;i++;
+     if(d==="\\"){if(i<source.length){out+=source[i];i++}continue}
+     if(d===c)break;
+    }
+    continue;
+   }
+   if(c==="/"&&next==="*"){i+=2;while(i<source.length&&!(source[i]==="*"&&source[i+1]==="/"))i++;i+=2;out+=" ";continue}
+   if(c==="/"&&next==="/"){while(i<source.length&&source[i]!=="\n")i++;out+=" ";continue}
+   out+=c;i++;
+  }
+  return out;
+ };
+
+ /* public/ is in scope because public/sw.js can call showNotification, which
+    on Android rings and vibrates. The extension list covers what actually
+    ships: a .mjs, a .json or an .html in these trees runs or renders. */
+ const roots=["app","src","public"],offenders=[],
+  banned=[
+   /\.\s*vibrate\s*\(/,              // navigator.vibrate, and any alias of it
+   /\bnew\s+(?:\w+\s*\.\s*)?Audio\s*\(/,  // new Audio, new window.Audio
+   /\bAudioContext\b/,/\bwebkitAudioContext\b/,
+   /createElement\s*\(\s*["'`]audio["'`]/i,
+   /\bspeechSynthesis\b/,/\bSpeechSynthesisUtterance\b/,
+   /\bnew\s+Notification\s*\(/,/\bshowNotification\s*\(/,  // rings on Android
+   /<audio[\s>]/i,
+   /["'`(\/][\w.\-\/]*\.(?:mp3|wav|ogg|m4a|aac)\b/i,  // a PATH, not a .wav class name
+  ],
+  allowed="src/lib/settings/feedback-settings.ts";
+ const walk=async dir=>{
+  for(const entry of await readdir(new URL("../"+dir+"/",import.meta.url),{withFileTypes:true})){
+   const path=dir+"/"+entry.name;
+   if(entry.isDirectory()){await walk(path);continue}
+   if(!/\.(tsx?|jsx?|mjs|css|html|json|webmanifest)$/.test(entry.name))continue;
+   if(path===allowed)continue;
+   const code=stripComments(await readFile(new URL("../"+path,import.meta.url),"utf8"));
+   for(const pattern of banned)if(pattern.test(code))offenders.push(path+"  ->  "+pattern);
+  }
+ };
+ await Promise.all(roots.map(walk));
+ assert.deepEqual(offenders,[],
+  "anything audible or felt goes through src/lib/settings/feedback-settings.ts, which is off by default:\n"+offenders.join("\n"));
+
+ /* And the one buzz there is actually routes through it. */
+ const mapPage=await readFile(new URL("../app/page.tsx",import.meta.url),"utf8");
+ assert.match(mapPage,/buzz\(localStorage,12\)/,"picking a bus up asks the setting first");
+ assert.match(mapPage,/import \{buzz\} from "@\/src\/lib\/settings\/feedback-settings"/);
+
+ /* Settings can reach both switches. */
+ const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ assert.match(settingsPage,/SOUND ON THIS DEVICE/);
+ assert.match(settingsPage,/VIBRATION ON THIS DEVICE/);
+ assert.match(settingsPage,/checked=\{feedback\.sound\}/);
+ assert.match(settingsPage,/checked=\{feedback\.vibration\}/);
+});

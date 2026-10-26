@@ -174,6 +174,7 @@ per-device settings, never synced
   pace-app-mode-v1                 FULL or LITE on this device, and whether it was ever asked
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
+  pace-feedback-settings-v1        sound and vibration on this device, both OFF
   pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
   pace-board-settings-v1
@@ -251,6 +252,52 @@ length of that one" — with overlaps the sum double-counts every handover.
 Device-local for the reason the sweep is: it describes the building somebody is
 standing in, and a device that synced it would overwrite a garage running
 different hours.
+
+**`pace-feedback-settings-v1` is OFF, and the switch matters more than the
+sound.** Curtis: *"make sure the sound is off by default ok? Any sounds.
+Toggleable in settings."* When he asked, the app made no sound at all — no
+AudioContext, no Audio element, no audio file, no speech. The only thing a
+person could perceive without looking was the short buzz when a bus is picked
+up on the Facility Map.
+
+So the deliverable was never an off switch for a sound that does not exist. It
+is a tripwire a sound added in six months has to walk into:
+`tests/settings.test.mjs` scans `app/`, `src/` and `public/` and fails if a
+vibrate, an `Audio`, an `AudioContext`, a `speechSynthesis`, a `Notification`,
+a `showNotification`, an `<audio>` tag or an audio file path is named anywhere
+outside `src/lib/settings/feedback-settings.ts`.
+
+**It is a tripwire and not a proof.** It catches every ordinary way of adding a
+sound, including four that defeated its first draft — `createElement("audio")`,
+`new window.Audio`, an aliased `navigator`, and `Notification`, which rings and
+vibrates on Android and was not in the list at all. It does NOT catch
+`navigator["vib"+"rate"]()`, and no static token scan can. What it stops is
+somebody honest adding a chime without knowing there was a rule, which is the
+realistic failure.
+
+Comments are stripped by a **string-aware** scanner rather than a regex. The
+first version used `/\*[\s\S]*?\*\//g`, so a line holding `"https://x/*"`
+opened a pseudo-comment that swallowed real code after it — a planted
+`new Audio("/ding.mp3")` passed — while a `//` comment that did not start its
+line was never stripped at all, so prose about this rule failed the build. Two
+bugs in opposite directions, one cause. Strings are KEPT, because an audio path
+only ever lives in one, and a file extension is only matched after a quote,
+slash or `(`, so a `.wav` CSS class name is not an audio file.
+
+**Two flags, one key, both off.** A buzz is not a sound, and conflating them
+answers a question he did not ask — a loud garage is the case for vibration and
+against noise.
+
+**Off is the safe read, which inverts `app-mode.ts` on purpose.** That file
+resolves an unreadable record to FULL, because taking pages away from a mechanic
+mid-shift is the worse failure. Here the generous reading is the harmful one, so
+anything that is not EXACTLY `true` — missing, corrupt, `"yes"`, `1` — reads as
+off, the spelling discipline `setBusHold` and the ledger's `gap` already follow.
+
+**`src/lib/settings/feedback-settings.ts` reads the setting at the moment of the
+buzz** rather than taking it as a prop. A flag plumbed from the page root goes
+stale, and a stale copy is a phone still buzzing just after somebody turned it
+off — which is the exact moment they are watching to see whether it worked.
 
 **`pace-sheet-ledger-v1` exists because the app was throwing this away.** A
 scanned sheet REPLACES the live one, `pace-down-sheet-scan-undo-v1` keeps
