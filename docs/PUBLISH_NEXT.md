@@ -317,6 +317,86 @@ Curtis: *"Yes sound and vibration together."* The storage still holds two
 flags, so splitting them again later is a UI change rather than a migration,
 but one control sets both and either one being on reads as on.
 
+### A re-report is visible where it happens
+
+Curtis, on the ALREADY LOGGED banner: *"pressing either the open this defect or
+the button next to it, it doesn't do anything... nothing happens on the screen
+so I don't know if anything happened."* And on the defect list: *"I don't see
+anything saying defect reported times three or times five with the last date
+reported... just a small drop-down feature, that's it."*
+
+**OPEN IT WAS BROKEN, and it was not a perception problem.** `DefectEditor`
+seeds its form from the draft with a plain `useState` and the element carried
+no `key`, so when OPEN IT swapped the draft underneath it React reused the same
+component and the form kept showing whatever had been typed. The record really
+was un-hidden and written to the board; it simply could not reach the screen.
+The same bug class as the unkeyed `<Token>` fixed earlier in this release.
+Keyed by bus and defect now: a different record remounts, a keystroke does not.
+Measured — OPEN IT loads the existing record's description, the banner goes
+(you are no longer making a duplicate) and SAVE is live.
+
+**+ COUNT THIS RETURN worked and said nothing.** Its only trace was an italic
+number inside a yellow box — and inside the two-minute debounce it did nothing
+at all, silently. Three of Curtis's screenshots a minute apart all read
+`CAME BACK 1×`: that is the guard working exactly as designed and reporting
+nothing. The guard stays, because one press is one return and a fumbled tap
+must not inflate evidence that a repair is not working. What changed is that
+the refusal has a name: the banner now says **COUNTED · REPORTED ×3, latest …** or names the refusal.
+There are five refusals and each has its own words: the two-minute guard, a bus
+that has left the board, a defect that is no longer on it, a board that could
+not be saved, and a clock that gave an unreadable time. An earlier version
+stamped "already counted a moment ago" on all of them — a false statement about
+somebody's own data in four cases out of five.
+
+**The count is on the card now.** `REPORTED ×N` — the original report plus
+every return — beside OPEN, with a `LAST REPORTED` date under the logged one,
+drawn only once a bus has actually come back. It reuses the amber badge the
+focus view already uses for a return rather than inventing a second colour.
+
+**And a small control to add one**, LAST in the card's action row: one tap arms
+it (`TAP AGAIN TO COUNT`), a second counts it, and the button itself says
+`COUNTED · REPORTED ×4`. Until now the only way to record a return was to start
+logging a duplicate and press a button inside the refusal that stopped you.
+
+**Its first version was dangerous and is worth recording.** It armed into a
+span holding a label, a COUNT IT and a cancel `×` — about 130px of content in a
+rail cell measured at 64–97px. The `×` overflowed and MARK FIXED, later in DOM
+order, painted over it: **tapping cancel at 360 and 430 marked the repair
+complete**, and at 820 and above the `×` was clipped out of reach entirely, so
+the armed state had no exit but counting. It was also placed FIRST, pushing
+MARK FIXED along a slot at every width — an addition Curtis asked for and a
+move he did not. One button with three states adds nothing to the cell, so
+there is nothing to overflow, and doing nothing for six seconds is the cancel.
+
+**Measured at 360, 390, 430, 820, 1180 and 1280** — not one width this time. At
+every one: a tap at the button's centre lands on the button itself, it
+overflows the rail by 0px, there is no horizontal scroll, the chip goes
+`REPORTED ×3` → `×4`, and the action row holds at 46px on phones and 104px on
+desktop through all three button states with nothing clipped.
+
+**And measured on all four Defect Log themes, which is the axis a fixed colour
+actually breaks.** An earlier version of this release made LAST REPORTED a
+hard-coded amber — it had been inert, losing to `.log-meta time` on
+specificity, and winning that fight is what broke it: **2.50 / 2.52 / 1.73:1**
+on dark, midnight and tactical, against the 8.04 / 7.29 / 5.28 it had while it
+was doing nothing. The resting button had the same fault from the same cause.
+Both take the theme's own ink now and the badge above carries the colour,
+because a badge brings its own fill and a bare date does not. Measured:
+LAST REPORTED 4.90 / 8.04 / 7.29 / 5.28, resting button the same, the REPORTED
+badge 5.81 and the armed button 6.39 on every theme — all above AA.
+
+**Two things it does NOT do, both worth knowing before it is live.**
+
+After + COUNT THIS RETURN, SAVE stays disabled. Saving would create the
+duplicate the banner exists to prevent.
+
+**OPEN IT DISCARDS WHAT WAS TYPED.** It loads the stored record, which is the
+whole point and is also the one path where the new `key` replaces the draft
+while the editor is open. An earlier draft of this section claimed the opposite
+— that OPEN IT was the way to put a typed description onto the existing record.
+It is not, and nothing warns before it happens. Whether it should carry the
+text across, or ask first, is Curtis's call.
+
 ### Verified
 
 Gates re-run on **the commit this file is updated in**, which is what "this
@@ -327,7 +407,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **393 pass, 0 fail**
+- `npm test` — **395 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -377,7 +457,19 @@ that refusal has not been measured on an Android device.
 8. **SETTINGS → THIS DEVICE.** There should be one SOUND & VIBRATION switch,
    off. Leave it off and hold a bus on the map: it lifts with a blue ring and
    the phone stays still. Turn it on and do it again — it should buzz once.
-9. **SETTINGS → FACILITY MAP → TOUCH CONTROLS.** ESCAPE CLOSES THE BUS EDITOR
+9. **DEFECT LOG.** Open a bus with a defect, expand it. On the defect card
+   there should be a `REPORTED ×N` chip once the bus has come back, a
+   `LAST REPORTED` date in amber, and a `REPORTED AGAIN` control at the END of
+   the action row — MARK FIXED must still be first. Tap it: it says
+   `TAP AGAIN`; tap again and the chip goes up by one and the button
+   says `COUNTED · REPORTED ×N`. Tap it once and walk away: it should go back
+   to normal by itself after six seconds. Do it twice quickly and it should
+   say it already counted.
+10. **DEFECT LOG → + LOG DEFECT**, typing a defect that already exists on that
+   bus. The yellow ALREADY LOGGED banner should appear. **+ COUNT THIS RETURN**
+   should now say COUNTED and the number on it move; **OPEN IT** should load
+   that existing defect into the form, with the banner gone and SAVE live.
+11. **SETTINGS → FACILITY MAP → TOUCH & KEYBOARD.** ESCAPE CLOSES THE BUS EDITOR
    should be off, and Escape in the bus editor should do nothing, as now. Turn
    it on: open a bus, press Escape — it closes with no question. Open another,
    change something, press Escape — it should ask.

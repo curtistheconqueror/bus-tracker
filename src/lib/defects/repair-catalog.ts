@@ -230,6 +230,12 @@ export function recordReportAttempt(defect:StructuredDefect,at:string,by=""):Str
 export function reportAttemptCount(defect:{reportAttempts?:ReportAttempt[]}){
  return normalizeReportAttempts(defect.reportAttempts).length;
 }
+/* When the bus last came back, for the card that says so. Null when it never
+   has, which is how the chip knows not to draw itself. */
+export function lastReportAttemptAt(defect:{reportAttempts?:ReportAttempt[]}){
+ const attempts=normalizeReportAttempts(defect.reportAttempts);
+ return attempts.length?attempts[attempts.length-1].at:null;
+}
 /* MERGED, NEVER REPLACED, when a record is saved.
 
    An editor opened before a return was stamped holds the older, shorter list,

@@ -4710,16 +4710,38 @@ test("counting a return must not take the bus off the Down Sheet",async()=>{
  /* The stamp goes on the STORED defect, not the copy the banner is holding, so
     a form left open cannot write back a tally it read before somebody added to
     it. */
- assert.match(body,/recordReportAttempt\(current,now,settings\.defaultInitials\)/);
+ /* The stamp still goes on the STORED defect rather than the copy the banner
+    is holding, but the logic moved to src/lib/defects/report-returns.ts so a
+    test could execute it -- four mutations of the old in-page handler passed
+    the suite. applyReportReturn re-reads the defect out of the fleet it is
+    given, which is what "the stored one" means here, and its own test proves
+    it touches that defect and no other. */
+ assert.match(body,/applyReportReturn\(fleet,busId,defect\.id,new Date\(\)\.toISOString\(\),settings\.defaultInitials\)/);
  /* A press the debounce refused writes nothing and takes no undo snapshot — an
     UNDO offering to reverse a change nobody made is worse than the fumbled tap. */
- assert.match(body,/if\(!counted\)return;/);
- assert.ok(body.indexOf("if(!counted)return;")<body.indexOf("setUndoSnapshot"));
+ /* THE RULE, not the statement. A press the debounce refused must not write
+    the board and must not take an undo snapshot -- and this has now been
+    pinned to three different spellings of the same line across three commits,
+    so it is matched on what it does. An earlier version compared
+    indexOf("if(!counted)return;"), which returns -1 once the spelling moves,
+    and -1 is less than any real index: it passed for the wrong reason rather
+    than failing. */
+ const guardAt=body.search(/if\(!result\.counted\)return result;/);
+ assert.ok(guardAt>=0,"a refused press returns before anything is written");
+ assert.ok(guardAt<body.indexOf("persist("),"and before the write");
+ assert.ok(guardAt<body.indexOf("setUndoSnapshot"),"and before the snapshot");
 
  /* THE BUTTON IS DELIBERATE, NOT AUTOMATIC. Counting the moment the ALREADY
     LOGGED banner appears would count a foreman scrolling the picker and every
     re-render. One press, one return. */
- assert.match(page,/className="count-return" onClick=\{\(\)=>countReturn\(value\.busId,recentDuplicate\)\}/);
+ /* The button still counts the return on the duplicate the banner is about.
+    It now also records what happened so the banner can say so, which the old
+    exact-shape pin could not survive. */
+ /* The button still counts the return on the duplicate the banner is about,
+    and records which of the four outcomes happened so the banner can say it.
+    Matched on the call, not on the whole handler body, which has now been
+    re-pinned three times for no behavioural reason. */
+ assert.match(page,/className="count-return" onClick=\{\(\)=>\{const result=countReturn\(value\.busId,recentDuplicate\);/);
  /* And the banner still refuses the duplicate — this adds a way to record the
     return, it does not re-open the door to a second record. */
  assert.match(page,/<button type="submit" className="save-log-middle" disabled=\{Boolean\(recentDuplicate\)\}/);
@@ -6119,4 +6141,201 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(css,/\.log-focus-share button\{min-height:36px/);
  assert.match(css,/\.log-focus-share button\{min-height:44px;font-size:10px\}/);
  assert.match(css,/\.log-focus-share\{position:relative;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+});
+
+test("a re-report is visible where it happens, and the count it claims is one it made", async () => {
+ const [logPage,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
+ const {applyReportReturn,reportTotal,refusalMessage,refusalHeadline,reportButtonState}=await import("../src/lib/defects/report-returns.ts");
+ const {reportAttemptCount,lastReportAttemptAt}=await import("../src/lib/defects/repair-catalog.ts");
+
+ /* RUN, NOT MATCHED. The first version of this test was source-regex all the
+    way down, and a cold read defeated four mutations through it: every refusal
+    claiming COUNTED, a missing bus claiming COUNTED, the card always saying
+    COUNTED, and the id check short-circuited so one press stamped EVERY defect
+    on the bus. All four passed. The logic moved to src/lib so the test can do
+    what the reviewer did by hand. */
+ const at=(mins)=>new Date(Date.UTC(2026,0,2,12,mins)).toISOString();
+ const defect=(id)=>({id,category:"Bus Accessories",issue:"Ramp, Lift and Kneeler - Ramp will not lock",
+  details:"",operability:"down",state:"open",source:"defect-log"});
+ const board=()=>[{id:"b1",n:"17561",pendingRepair:"",defects:[defect("d1"),defect("d2")]},
+                  {id:"b2",n:"17999",pendingRepair:"",defects:[defect("d9")]}];
+
+ /* A first return counts, and touches exactly one defect on exactly one bus. */
+ const one=applyReportReturn(board(),"b1","d1",at(0),"CT");
+ assert.equal(one.result.counted,true);
+ assert.equal(one.result.returns,1);
+ assert.equal(one.result.at,at(0));
+ assert.equal(reportAttemptCount(one.fleet[0].defects[0]),1,"the defect it was aimed at");
+ assert.equal(reportAttemptCount(one.fleet[0].defects[1]),0,"and NOT its neighbour on the same bus");
+ assert.equal(reportAttemptCount(one.fleet[1].defects[0]),0,"and NOT another bus");
+
+ /* The debounce still refuses a second press, and says which refusal it is. */
+ const tooSoon=applyReportReturn(one.fleet,"b1","d1",at(0.5),"CT");
+ assert.equal(tooSoon.result.counted,false);
+ assert.equal(tooSoon.result.reason,"too-soon");
+ assert.equal(tooSoon.result.returns,1,"reporting the count it refused to move");
+ assert.equal(tooSoon.fleet,one.fleet,"and changing nothing");
+
+ const later=applyReportReturn(one.fleet,"b1","d1",at(5),"CT");
+ assert.equal(later.result.counted,true);
+ assert.equal(later.result.returns,2);
+ assert.equal(lastReportAttemptAt(later.fleet[0].defects[0]),at(5));
+
+ /* TWO RECORDS SHARING AN ID KEEP THEIR OWN WORDING. The stamp was hoisted
+    out of the map and spliced into every id match, so a bus holding two
+    defects with the same id came back with BOTH rows reading the first one's
+    repair — a repair record merged away to make a count work, which this
+    project does not do. A cloud merge or an import can produce the duplicate;
+    normalizeDefects only mints unique ids for records that have none. */
+ const twinned=[{id:"b1",n:"17561",pendingRepair:"",defects:[
+  {...defect("dup"),issue:"Ramp, Lift and Kneeler - Ramp will not lock"},
+  {...defect("dup"),issue:"Seats - Torn cushion"}]}];
+ const twins=applyReportReturn(twinned,"b1","dup",at(0),"CT");
+ assert.equal(twins.result.counted,true);
+ assert.deepEqual(twins.fleet[0].defects.map(d=>d.issue),
+  ["Ramp, Lift and Kneeler - Ramp will not lock","Seats - Torn cushion"],
+  "neither record is overwritten by the other");
+
+ /* AN UNREADABLE STAMP IS NOT THE DEBOUNCE either. */
+ const badTime=applyReportReturn(board(),"b1","d1","not-a-date","CT");
+ assert.equal(badTime.result.counted,false);
+ assert.equal(badTime.result.reason,"bad-time");
+
+ /* A BUS OR DEFECT THAT IS GONE IS NOT "ALREADY COUNTED". The first version
+    stamped "too-soon" on every non-change, so somebody whose bus had left the
+    board was told their return had already been counted a moment ago — a
+    false statement about their own data. */
+ const noBus=applyReportReturn(board(),"nope","d1",at(0),"CT");
+ assert.equal(noBus.result.counted,false);
+ assert.equal(noBus.result.reason,"no-bus");
+ const noDefect=applyReportReturn(board(),"b1","nope",at(0),"CT");
+ assert.equal(noDefect.result.counted,false);
+ assert.equal(noDefect.result.reason,"no-defect");
+ for(const reason of ["too-soon","no-bus","no-defect","not-saved","bad-time"])
+  assert.ok(refusalMessage(reason).length>10,reason+" has words of its own");
+ assert.notEqual(refusalMessage("no-bus"),refusalMessage("too-soon"));
+
+ /* ONE WORDING FOR THE COUNT. The two messages this release added disagreed
+    with each other about the same press -- the banner said "come back 1x" and
+    the card "reported x2" -- so both go through one function now. */
+ assert.equal(reportTotal(defect("d1")),1,"a defect nobody re-reported was still reported once");
+ assert.equal(reportTotal(one.fleet[0].defects[0]),2);
+ assert.match(logPage,/REPORTED &times;\{reportTotal\(record\.defect\)\}/);
+ /* The BRANCH, not just the happy string. The tone it sets is what paints the
+    button green, and reportButtonState's own test above proves a "refused"
+    tone never renders as counted. */
+ assert.match(logPage,/tone:result\.counted\?"counted":"refused"/,"a refusal is never toned as a count");
+ assert.match(logPage,/text:result\.counted\?"COUNTED \\u00b7 \\u00d7"\+\(result\.returns\+1\):refusalHeadline\(result\.reason\|\|"too-soon"\)/,
+  "the card says COUNTED only when it counted");
+ assert.match(logPage,/"COUNTED \\u00b7 REPORTED \\u00d7"\+\(returnNoteFor\.count\+1\)/,"and so does the banner");
+ assert.match(logPage,/aria-label=\{button\.ariaLabel\}/,"the accessible name follows the state, not the pre-press one");
+ assert.match(logPage,/aria-live=\{button\.announce\?"polite":undefined\}/,"and the outcome is announced");
+
+ /* A REFUSED WRITE IS NOT A COUNT. This reported counted:true over a persist()
+    whose result it discarded, so an unwritable board still produced
+    "COUNTED - reported x3" beside a chip reading x2. */
+ const handler=logPage.slice(logPage.indexOf("const countReturn="),logPage.indexOf("const showExistingDefect="));
+ assert.match(handler,/const written=persist\(nextFleet,downEntries\);/);
+ assert.match(handler,/if\(!written\.ok\)return \{counted:false[^}]*reason:"not-saved"\}/,"a refused write is reported as one");
+ assert.ok(handler.indexOf("persist(nextFleet")<handler.indexOf("setUndoSnapshot"),
+  "and UNDO is not offered for a change nobody managed to make");
+
+ /* THE EDITOR'S KEY, which is the bug OPEN IT actually had. */
+ assert.match(logPage,/\{editing&&<DefectEditor key=\{editing\.busId\+":"\+editing\.defect\.id\} draft=\{editing\}/);
+
+ /* ONE BUTTON, THREE STATES, NO SECOND ELEMENT IN THE CELL. The armed confirm
+    it replaced overflowed the rail and MARK FIXED painted over its cancel, so
+    tapping cancel marked the repair COMPLETE at 360 and 430 and was clipped
+    out of reach entirely at 820 and above. */
+ assert.doesNotMatch(logPage,/report-again-confirm|report-again-yes|report-again-cancel/,
+  "nothing is added beside the button in a cell measured at 64-97px");
+
+ /* RUN, NOT MATCHED. Eleven mutations of the inline version survived the
+    suite -- a refused press rendering GREEN with NOT COUNTED on it, the armed
+    state sticking forever, the outcome painting on every row -- because a
+    button that changes its own words is a state machine, and one that lives
+    only in JSX can only be pinned by matching the JSX. */
+ const seat={busNumber:"17561",position:2};
+ const resting=reportButtonState({defectId:"d1",armedId:"",note:null,...seat});
+ assert.equal(resting.label,"REPORTED AGAIN");
+ assert.equal(resting.tone,"");
+ assert.equal(resting.announce,false,"a button nobody pressed announces nothing");
+ assert.match(resting.ariaLabel,/reported again for defect 2/);
+
+ const armed=reportButtonState({defectId:"d1",armedId:"d1",note:null,...seat});
+ assert.equal(armed.label,"TAP AGAIN","short enough for an 82px vertical rail cell");
+ assert.equal(armed.tone,"armed");
+ assert.equal(armed.announce,true);
+ assert.match(armed.ariaLabel,/Tap again to count/,"and the accessible name follows the visible one");
+
+ /* ARMING ONE DEFECT MUST NOT ARM ITS NEIGHBOUR. */
+ assert.equal(reportButtonState({defectId:"d2",armedId:"d1",note:null,...seat}).tone,"",
+  "the row below stays at rest");
+
+ const counted={id:"d1",tone:"counted",text:"COUNTED · ×3"};
+ const done=reportButtonState({defectId:"d1",armedId:"",note:counted,...seat});
+ assert.equal(done.label,"COUNTED · ×3");
+ assert.equal(done.tone,"counted");
+ assert.equal(done.ariaLabel,"COUNTED · ×3 for bus 17561 defect 2","the outcome is the accessible name too");
+ assert.equal(reportButtonState({defectId:"d2",armedId:"",note:counted,...seat}).label,"REPORTED AGAIN",
+  "an outcome paints on ONE row, not every row on the page");
+
+ /* A REFUSAL IS NOT GREEN. */
+ const refused=reportButtonState({defectId:"d1",armedId:"",note:{id:"d1",tone:"refused",text:"NOT SAVED"},...seat});
+ assert.equal(refused.tone,"refused");
+ assert.notEqual(refused.tone,"counted");
+
+ /* An outcome outranks the armed word, so a count that already happened
+    cannot sit under an invitation to count again. */
+ assert.equal(reportButtonState({defectId:"d1",armedId:"d1",note:counted,...seat}).label,"COUNTED · ×3");
+
+ /* SHORT ENOUGH FOR A BUTTON: the full sentences are written for the editor's
+    banner, and in a ~90px rail cell one wrapped to three lines and grew the
+    action row 104px -> 120px between the two taps it asks for. */
+ for(const reason of ["too-soon","no-bus","no-defect","not-saved","bad-time"]){
+  assert.ok(refusalHeadline(reason).length<=16,reason+" fits a rail cell");
+  assert.ok(refusalMessage(reason).length>refusalHeadline(reason).length,"and the banner still gets the sentence");
+ }
+ assert.equal(new Set(["too-soon","no-bus","no-defect","not-saved","bad-time"].map(refusalHeadline)).size,5,
+  "each refusal says which one it is");
+
+ /* THE TIMERS. Doing nothing is the cancel, so the window has to exist and be
+    short enough to be one: a mutation to 600000 left the six seconds the
+    handoff promises unpinned. */
+ const arm=Number(logPage.match(/const ARM_WINDOW_MS=(\d+)/)?.[1]);
+ const outcome=Number(logPage.match(/const OUTCOME_WINDOW_MS=(\d+)/)?.[1]);
+ assert.ok(arm>=3000&&arm<=10000,"long enough for a second tap with a glove, short enough to be a cancel");
+ assert.ok(outcome>=3000&&outcome<=15000,"long enough to read at a bus, short enough not to go stale");
+ assert.match(logPage,/setTimeout\(\(\)=>setReporting\(""\),ARM_WINDOW_MS\)[\s\S]{0,80}\},\[reporting\]\)/,
+  "the arm timer re-runs when the armed defect changes, or it never fires at all");
+ assert.match(logPage,/setTimeout\(\(\)=>setReportNote\(null\),OUTCOME_WINDOW_MS\)[\s\S]{0,80}\},\[reportNote\]\)/);
+ /* The editor's banner outcome expires too: without it, counting, clearing
+    the repair field and retyping it brought back a count read minutes ago. */
+ assert.match(logPage,/setTimeout\(\(\)=>setReturnNote\(null\),OUTCOME_WINDOW_MS\)/);
+
+ /* LAST in the rail, not first: adding a control was asked for, moving MARK
+    FIXED along a slot was not. */
+ const row=logPage.slice(logPage.indexOf('<div className="log-actions">'));
+ const rail=row.slice(0,row.indexOf("</div>"));
+ assert.ok(rail.indexOf('className="quick-fix"')<rail.indexOf('"report-again"'),
+  "MARK FIXED keeps the slot it has always had");
+
+ /* The chip and its date. */
+ assert.match(logPage,/reportAttemptCount\(record\.defect\)>0&&<b className="work-state-badge report-return"/);
+ assert.match(logPage,/lastReportAttemptAt\(record\.defect\)&&<time className="last-reported">LAST REPORTED/);
+ /* (0,2,1) so it is not inert -- its first rule was `.last-reported` and lost
+    to `.log-meta time` -- but it does NOT set a colour. Winning that fight
+    with a fixed #8a5200 measured 2.50 / 2.52 / 1.73:1 on the dark, midnight
+    and tactical themes, against the 8.04 / 7.29 / 5.28 it had while it was
+    inert. The badge above it carries the colour for this idea; this line only
+    needs to not read as one more grey timestamp. */
+ assert.match(css,/\.log-meta time\.last-reported\{font-weight:900/,"distinguished, and not by a fixed hex");
+ assert.doesNotMatch(css,/\.log-meta time\.last-reported\{[^}]*color:#/,"a hard-coded ink here breaks three of the four themes");
+ assert.doesNotMatch(css,/\.report-again\{[^}]*background:#/,"and the resting button takes the theme's ink, like .remove-log beside it");
+ for(const rule of [/\.report-again\{/,/\.report-again\.armed\{/,/\.report-again\.counted\{/,/\.report-again\.refused\{/,/\.report-again>span\{font-size:14px/])
+  assert.match(css,rule,String(rule)+" has a style");
+ assert.match(css,/\.work-state-badge\.report-return\{/,"and the chip reuses the badge the focus view already had");
 });

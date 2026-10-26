@@ -1000,6 +1000,56 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .duplicate-return-tally{display:inline-block;margin-left:4px;border-radius:4px;background:#8a5200;color:#fff;padding:1px 5px;font-style:normal;font-weight:900}
 .work-state-badge.report-return{border-color:#d49617;background:#fff4cf;color:#8a5200}
 
+/* WHAT THE PRESS DID, said where the press was. Both banner buttons used to
+   change nothing a person could see: one swapped a draft under a component
+   that ignored it, the other moved an italic number or, inside the two-minute
+   guard, did nothing at all. This is the line that says which happened. It
+   takes the full width of the wrapped banner so it cannot be mistaken for a
+   third button. */
+.duplicate-return-note{flex:1 0 100%;margin-top:2px;border-radius:5px;padding:5px 8px;font-size:8px;font-weight:900;letter-spacing:.3px}
+.duplicate-return-note.counted{background:#8a5200;color:#fff}
+.duplicate-return-note.refused{border:1px solid #8a5200;background:transparent;color:#8a5200}
+
+/* REPORTED AGAIN: ONE BUTTON, THREE STATES, and never a second element in the
+   cell. The first version armed into a span holding a label, a COUNT IT and a
+   cancel x — about 130px of min-content in a rail cell measured at 64-97px.
+   The x overflowed and MARK FIXED, later in DOM order, painted over it, so
+   tapping cancel at 360 and 430 MARKED THE REPAIR COMPLETE; at 820 and above
+   `.grouped-defect-row{overflow:hidden}` clipped it out of reach entirely and
+   the armed state had no exit but counting. Arming now changes this button's
+   own words and nothing else, so there is nothing to overflow.
+
+   It is also LAST in the rail. The first version was first and pushed MARK
+   FIXED along by a slot at every width — an addition Curtis asked for, and a
+   move he did not. */
+.report-again{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;color:var(--log-muted)}
+.report-again:hover,.report-again:focus-visible{background:color-mix(in srgb,var(--log-accent) 12%,transparent);outline:none}
+.report-again>span{font-size:14px;line-height:1}
+/* The three ACTIVE states paint their own background, so the pair is
+   self-consistent and the theme underneath cannot break either half. That is
+   the same reason the REPORTED badge above can hold a fixed amber: it brings
+   its own fill. The RESTING button cannot, so it takes the theme's own muted
+   ink like .remove-log beside it — an amber resting fill was declared here and
+   was dead anyway, losing to `.log-actions>button{background:transparent}` at
+   (0,1,1), which left #8a5200 text sitting directly on the theme surface:
+   1.73:1 on Tactical, measured. */
+.report-again.armed{background:#8a5200;color:#fff}
+.report-again.counted{background:#0d7a45;color:#fff}
+.report-again.refused{background:#fff;color:#8a5200;box-shadow:inset 0 0 0 1px #8a5200}
+/* THE DATE FOLLOWS THE THEME. Its first rule was `.last-reported`, which lost
+   to `.log-meta time{color:var(--log-muted)}` on specificity and was inert —
+   so a cold read called it out, and winning that fight with a fixed #8a5200
+   is what BROKE it: 2.50 / 2.52 / 1.73:1 on dark, midnight and tactical,
+   against the 8.04 / 7.29 / 5.28 it had while it was "inert". The badge above
+   it already carries the colour for this idea. This line only needs to not
+   read as one more grey timestamp, so it takes the weight and leaves the ink
+   to the theme. */
+.log-meta time.last-reported{font-weight:900;letter-spacing:.3px}
+@media(max-width:760px){
+ .report-again{flex-direction:row;gap:4px;border-top:0!important}
+ .duplicate-return-note{font-size:10px;padding:7px 10px}
+}
+
 /* ADVANCED STATS — the last block in the focus body, and the only place it
    appears. Curtis: "make it viewable only in focus, like the bottom of however
    many defects listed. This way the list can drop further down and just scroll
