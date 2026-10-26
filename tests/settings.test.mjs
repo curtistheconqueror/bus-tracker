@@ -59,8 +59,18 @@ test("confirmation prompts are per-device settings that default to on", async ()
   // Preferences persist, restore safely, and travel with backup export/import.
   assert.match(page, /setConfirmMoves\(confirmationPreference\(ui\.confirmMoves\)\)/);
   assert.match(page, /setConfirmDefects\(confirmationPreference\(ui\.confirmDefects\)\)/);
-  assert.match(page, /singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}\)\)/);
-  assert.match(page, /theme:themeName,singleTapEmptySpaces,busDisplay,showDownSheetBadges,downSheetBadgeView,confirmMoves,confirmDefects,serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals\}/);
+  /* Asserted as a SET rather than as one exact string. The pin here used to be
+     the whole argument list in order, so adding a setting broke it in a way
+     that said nothing about what was wrong — and reordering two fields that
+     changes nothing would break it too. What matters is that every board
+     setting the page holds is in the object it writes: one left out is a
+     preference that silently never persists. */
+  const written=page.match(/JSON\.stringify\(\{statusVersion:3,([^}]*(?:\{[^}]*\}[^}]*)*)\}\)\)/);
+  assert.ok(written,"the map still writes its settings as one object");
+  for(const field of ["colors","visuals","theme:themeName","singleTapEmptySpaces","escapeClosesEditor",
+   "busDisplay","showDownSheetBadges","downSheetBadgeView","confirmMoves","confirmDefects",
+   "serviceIntervalsUnit:SERVICE_INTERVALS_UNIT","serviceIntervals"])
+   assert.ok(written[1].includes(field),field+" is written, or it is a setting that never persists");
   /* A restored backup reaches the intervals through the board-settings reader
      now, rather than through a setter inside the map's own import handler. */
   const boardModel = await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
@@ -1156,8 +1166,55 @@ test("a sound added later cannot get around the switch", async () => {
 
  /* Settings can reach both switches. */
  const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
- assert.match(settingsPage,/SOUND ON THIS DEVICE/);
- assert.match(settingsPage,/VIBRATION ON THIS DEVICE/);
- assert.match(settingsPage,/checked=\{feedback\.sound\}/);
- assert.match(settingsPage,/checked=\{feedback\.vibration\}/);
+ /* ONE switch for both, which is Curtis's call: "Yes sound and vibration
+    together." The storage keeps two flags, so splitting them again later is a
+    UI change and not a migration — but the control sets both, and a stored
+    record with only one of them on still reads as on. */
+ assert.match(settingsPage,/SOUND &amp; VIBRATION ON THIS DEVICE/);
+ assert.match(settingsPage,/checked=\{feedback\.sound\|\|feedback\.vibration\}/,"either flag shows as on");
+ assert.match(settingsPage,/setFeedback\(\{sound:event\.target\.checked,vibration:event\.target\.checked\}\)/,"and the one switch sets both");
+ assert.doesNotMatch(settingsPage,/checked=\{feedback\.vibration\}/,"there is no second switch any more");
+});
+
+test("Escape in the bus editor is off, and asks only when something changed", async () => {
+ const [mapPage,panel,module]=await Promise.all([
+  readFile(new URL("../app/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/settings/_components/map-settings-panel.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8"),
+ ]);
+ const {readBoardSettings}=await import("../src/lib/settings/map-settings.ts");
+
+ /* OFF unless somebody asked, like every other `===true` setting in this file.
+    Curtis chose "leave it like it is" and then asked for the switch, so the
+    default has to be the behaviour that already existed. */
+ assert.equal(readBoardSettings(null).escapeClosesEditor,false,"a device that has never been to Settings");
+ assert.equal(readBoardSettings("{}").escapeClosesEditor,false);
+ assert.equal(readBoardSettings('{"escapeClosesEditor":"yes"}').escapeClosesEditor,false,"only a literal true counts");
+ assert.equal(readBoardSettings('{"escapeClosesEditor":true}').escapeClosesEditor,true);
+ assert.match(module,/escapeClosesEditor:ui\.escapeClosesEditor===true/);
+
+ /* IT LIVES IN THE EDITOR, not in the page's Escape ladder, because the page
+    knows which layers are open and only this component knows whether anything
+    has been typed into one. */
+ const ladder=mapPage.match(/const escape=\(event:KeyboardEvent\)=>\{\n if\(event\.key!=="Escape"\)return;[\s\S]*?\n\};/);
+ assert.ok(ladder,"the page still has its own ladder");
+ assert.doesNotMatch(ladder[0],/closeEditor|setEdit/,"which still does not touch the editor");
+
+ /* The fingerprint covers all three places a change can hide. A draft-only
+    comparison would call a half-typed defect, or an edited hold time, clean. */
+ assert.match(mapPage,/useState\(\(\)=>JSON\.stringify\(\[d,holdUntil,newDefect\]\)\)/,"taken once, on open");
+ assert.match(mapPage,/const changed=openedAs!==JSON\.stringify\(\[d,holdUntil,newDefect\]\)/);
+
+ /* Guarded by the setting, and the confirm fires ONLY when dirty -- Curtis:
+    "I may not want the close but ask all the time because it's a friction
+    point against speed." */
+ const handler=mapPage.match(/if\(!escapeCloses\)return;[\s\S]*?\},\[escapeCloses,changed,close,d\.n\]\);/);
+ assert.ok(handler,"the editor's Escape is behind the setting");
+ assert.match(handler[0],/if\(changed&&!confirm\(/,"a form nobody touched closes without a question");
+ assert.match(handler[0],/window\.addEventListener\("keydown",escape,true\)/);
+ assert.match(handler[0],/return\(\)=>window\.removeEventListener\("keydown",escape,true\)/,"and comes off again");
+
+ /* Reachable, and described as what it is. */
+ assert.match(panel,/ESCAPE CLOSES THE BUS EDITOR/);
+ assert.match(panel,/checked=\{escapeClosesEditor\}/);
 });

@@ -35,6 +35,13 @@ export type BoardSettings={
  visuals:Visuals;
  theme:string;
  singleTapEmptySpaces:boolean;
+ /* Escape in the bus editor: off, so Escape does nothing there, which is how
+    it has always behaved. On, Escape closes it and asks first IF anything was
+    changed. Curtis, choosing it: "I may not want the close but ask all the
+    time because it's a friction point against speed. So optional." Off is
+    therefore the default and the confirm only fires on a dirty form -- a look
+    that changed nothing closes with one key and no question. */
+ escapeClosesEditor:boolean;
  busDisplay:BusDisplayMode;
  showDownSheetBadges:boolean;
  downSheetBadgeView:"all"|"ready-road"|"off-road";
@@ -60,6 +67,7 @@ export function readBoardSettings(raw:string|null):BoardSettings{
   visuals,
   theme:savedTheme,
   singleTapEmptySpaces:ui.singleTapEmptySpaces===true,
+  escapeClosesEditor:ui.escapeClosesEditor===true,
   busDisplay:ui.busDisplay==="number"?"number":"icon",
   showDownSheetBadges:ui.showDownSheetBadges!==false,
   downSheetBadgeView:view==="ready-road"||view==="off-road"?view:"all",
@@ -73,7 +81,7 @@ export function writeBoardSettings(storage:Storage,next:BoardSettings){
  let current:Record<string,unknown>={};
  try{current=JSON.parse(storage.getItem(BOARD_SETTINGS_KEY)||"{}")||{}}catch{current={}}
  return writeSetting(storage,BOARD_SETTINGS_KEY,JSON.stringify({...current,statusVersion:3,
-  colors:next.colors,visuals:next.visuals,theme:next.theme,singleTapEmptySpaces:next.singleTapEmptySpaces,
+  colors:next.colors,visuals:next.visuals,theme:next.theme,singleTapEmptySpaces:next.singleTapEmptySpaces,escapeClosesEditor:next.escapeClosesEditor,
   busDisplay:next.busDisplay,showDownSheetBadges:next.showDownSheetBadges,downSheetBadgeView:next.downSheetBadgeView,
   confirmMoves:next.confirmMoves,confirmDefects:next.confirmDefects,
   serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals:next.serviceIntervals}));
