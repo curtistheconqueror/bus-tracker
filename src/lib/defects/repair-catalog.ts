@@ -236,24 +236,6 @@ export function lastReportAttemptAt(defect:{reportAttempts?:ReportAttempt[]}){
  const attempts=normalizeReportAttempts(defect.reportAttempts);
  return attempts.length?attempts[attempts.length-1].at:null;
 }
-/* WHY A PRESS DID NOTHING, in words a person can be shown.
-
-   `recordReportAttempt` returns the record unchanged when its debounce refuses
-   a stamp, and every caller used to drop that on the floor: the button moved,
-   the number did not, and nothing said why. Curtis, on pressing it: "it
-   doesn't do anything... nothing happens on the screen so I don't know if
-   anything happened." Three of his screenshots a minute apart all read
-   CAME BACK 1x, which is this guard working exactly as designed and reporting
-   nothing at all.
-
-   The debounce stays — one press is one return, and a fumbled double tap must
-   not inflate evidence that a repair is not working. What changes is that the
-   refusal has a name. */
-export type ReportAttemptOutcome={counted:boolean;count:number;at:string|null;reason?:"too-soon"};
-export function describeReportAttempt(before:StructuredDefect,after:StructuredDefect):ReportAttemptOutcome{
- const counted=after!==before;
- return {counted,count:reportAttemptCount(after),at:lastReportAttemptAt(after),...(counted?{}:{reason:"too-soon" as const})};
-}
 /* MERGED, NEVER REPLACED, when a record is saved.
 
    An editor opened before a return was stamped holds the older, shorter list,

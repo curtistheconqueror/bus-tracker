@@ -349,20 +349,39 @@ every return — beside OPEN, with a `LAST REPORTED` date under the logged one,
 drawn only once a bus has actually come back. It reuses the amber badge the
 focus view already uses for a return rather than inventing a second colour.
 
-**And a small control to add one**, in the card's own action row beside MARK
-FIXED, the same two-step shape `HOLD UNTIL` uses three buttons along: one press
-arms `COUNT A RETURN?`, a second counts it, and the card says what happened.
-Until now the only way to record a return was to start logging a duplicate and
-press a button inside the refusal that stopped you.
+**And a small control to add one**, LAST in the card's action row: one tap arms
+it (`TAP AGAIN TO COUNT`), a second counts it, and the button itself says
+`COUNTED · REPORTED ×4`. Until now the only way to record a return was to start
+logging a duplicate and press a button inside the refusal that stopped you.
 
-Measured at 390px: the chip reads `REPORTED ×3` on a defect with two returns
-stored, arming shows the confirm, counting moves it to `×4` with the new date,
-and a second press inside the guard says so. Action row 46px, no overflow, no
-horizontal scroll.
+**Its first version was dangerous and is worth recording.** It armed into a
+span holding a label, a COUNT IT and a cancel `×` — about 130px of content in a
+rail cell measured at 64–97px. The `×` overflowed and MARK FIXED, later in DOM
+order, painted over it: **tapping cancel at 360 and 430 marked the repair
+complete**, and at 820 and above the `×` was clipped out of reach entirely, so
+the armed state had no exit but counting. It was also placed FIRST, pushing
+MARK FIXED along a slot at every width — an addition Curtis asked for and a
+move he did not. One button with three states adds nothing to the cell, so
+there is nothing to overflow, and doing nothing for six seconds is the cancel.
 
-**Not changed, and worth saying:** after + COUNT THIS RETURN, SAVE stays
-disabled. Saving would create the duplicate the banner exists to prevent, so
-OPEN IT is there to put the typed description onto the existing record instead.
+**Measured at 360, 390, 430, 820, 1180 and 1280** — not one width this time. At
+every one: a tap at the button's centre lands on the button itself, it
+overflows the rail by 0px, there is no horizontal scroll, the chip goes
+`REPORTED ×3` → `×4`, and LAST REPORTED renders amber 900 against LOGGED's grey
+800 (its first rule was `.last-reported`, which lost to `.log-meta time` on
+specificity and was inert at every width).
+
+**Two things it does NOT do, both worth knowing before it is live.**
+
+After + COUNT THIS RETURN, SAVE stays disabled. Saving would create the
+duplicate the banner exists to prevent.
+
+**OPEN IT DISCARDS WHAT WAS TYPED.** It loads the stored record, which is the
+whole point and is also the one path where the new `key` replaces the draft
+while the editor is open. An earlier draft of this section claimed the opposite
+— that OPEN IT was the way to put a typed description onto the existing record.
+It is not, and nothing warns before it happens. Whether it should carry the
+text across, or ask first, is Curtis's call.
 
 ### Verified
 
@@ -424,16 +443,19 @@ that refusal has not been measured on an Android device.
 8. **SETTINGS → THIS DEVICE.** There should be one SOUND & VIBRATION switch,
    off. Leave it off and hold a bus on the map: it lifts with a blue ring and
    the phone stays still. Turn it on and do it again — it should buzz once.
-10. **DEFECT LOG.** Open a bus with a defect, expand it. On the defect card
+9. **DEFECT LOG.** Open a bus with a defect, expand it. On the defect card
    there should be a `REPORTED ×N` chip once the bus has come back, a
-   `LAST REPORTED` date, and a `REPORTED AGAIN` control. Press it: it asks
-   `COUNT A RETURN?`; press COUNT IT and the chip goes up by one. Press it
-   twice quickly and it should say it already counted.
-11. **DEFECT LOG → + LOG DEFECT**, typing a defect that already exists on that
+   `LAST REPORTED` date in amber, and a `REPORTED AGAIN` control at the END of
+   the action row — MARK FIXED must still be first. Tap it: it says
+   `TAP AGAIN TO COUNT`; tap again and the chip goes up by one and the button
+   says `COUNTED · REPORTED ×N`. Tap it once and walk away: it should go back
+   to normal by itself after six seconds. Do it twice quickly and it should
+   say it already counted.
+10. **DEFECT LOG → + LOG DEFECT**, typing a defect that already exists on that
    bus. The yellow ALREADY LOGGED banner should appear. **+ COUNT THIS RETURN**
    should now say COUNTED and the number on it move; **OPEN IT** should load
    that existing defect into the form, with the banner gone and SAVE live.
-9. **SETTINGS → FACILITY MAP → TOUCH & KEYBOARD.** ESCAPE CLOSES THE BUS EDITOR
+11. **SETTINGS → FACILITY MAP → TOUCH & KEYBOARD.** ESCAPE CLOSES THE BUS EDITOR
    should be off, and Escape in the bus editor should do nothing, as now. Turn
    it on: open a bus, press Escape — it closes with no question. Open another,
    change something, press Escape — it should ask.
