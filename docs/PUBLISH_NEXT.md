@@ -372,8 +372,8 @@ that refusal has not been measured on an Android device.
    as it did.
 6. If 0.4s feels slow or twitchy with gloves on, say so — it is one number.
 7. On the **shop computer**, open MULTI-LOCATE or SETTINGS on the map and press
-   Escape. It should close. The bus editor still will not — see the question
-   below.
+   Escape. It should close. The bus editor still will not, unless you turn the
+   setting on at step 9.
 8. **SETTINGS → THIS DEVICE.** There should be one SOUND & VIBRATION switch,
    off. Leave it off and hold a bus on the map: it lifts with a blue ring and
    the phone stays still. Turn it on and do it again — it should buzz once.
@@ -383,14 +383,6 @@ that refusal has not been measured on an Android device.
    change something, press Escape — it should ask.
 
 ### One open question for Curtis
-
-**Should Escape close the BUS EDITOR too?** It is the one modal whose only way
-out is its X, so it is the one that traps — but Escape there discards whatever
-was typed and deletes an unsaved new bus, exactly as the X does today, and
-unlike the other five it has no backdrop tap already doing that. Three
-options: leave it as it is, let Escape close it the way the X does, or let
-Escape close it but ask first when something has been typed. Not built either
-way until he says.
 
 **Should a bad reply fail the shell install the way a dropped connection
 does?** See the service-worker section above — today a 503 or a captive

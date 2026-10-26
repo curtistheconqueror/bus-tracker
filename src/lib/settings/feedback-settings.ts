@@ -27,12 +27,23 @@
    what it is built against, and the rule is written here in words for the
    case the scan cannot see.
 
-   TWO FLAGS, ONE KEY, BOTH OFF. A buzz is not a sound and conflating them
-   would answer a question he did not ask: he can have the phone shake in a
-   loud garage without it chirping on a quiet one. Both start off because that
-   is what he asked for, and because the cost of each default is not
-   symmetrical — a phone that stays quiet until somebody wants noise annoys
-   nobody, and a phone that chirps in a meeting is uninstalled.
+   ONE SWITCH, TWO FLAGS ON DISK, AND THEY MOVE TOGETHER. The first version
+   drew two switches, on the reasoning that a buzz is not a sound and a loud
+   garage is the case for one and against the other. Curtis: "Yes sound and
+   vibration together." So the control is one, and the two flags are kept only
+   so that splitting them again is a UI change rather than a migration.
+
+   A MIXED RECORD IS NORMALISED ON READ, and it has to be. A device that ticked
+   only SOUND under the two-switch UI holds {sound:true,vibration:false}; read
+   as-is, the single switch renders ON while holding a bus makes no buzz at
+   all — the app's only perceivable feedback, silently missing, with no way out
+   but toggling off and on again. Either flag set now reads as both set: the
+   person opted into feedback, and the switch they are looking at says so.
+
+   Both start off because that is what he asked for, and because the cost of
+   each default is not symmetrical — a phone that stays quiet until somebody
+   wants noise annoys nobody, and a phone that chirps in a meeting is
+   uninstalled.
 
    OFF IS THE SAFE READ, which inverts the rule its neighbour follows.
    `app-mode.ts` resolves an unreadable record to FULL, because taking pages
@@ -64,7 +75,8 @@ export function readFeedbackSettings(raw:string|null):FeedbackSettings{
  try{
   const saved=JSON.parse(raw||"null") as Partial<FeedbackSettings>|null;
   if(!saved||typeof saved!=="object")return {...DEFAULT_FEEDBACK};
-  return {sound:saved.sound===true,vibration:saved.vibration===true};
+  const on=saved.sound===true||saved.vibration===true;
+  return {sound:on,vibration:on};
  }catch{return {...DEFAULT_FEEDBACK}}
 }
 

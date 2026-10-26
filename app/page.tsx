@@ -289,7 +289,7 @@ useEffect(()=>{if("serviceWorker" in navigator)navigator.serviceWorker.register(
 useEffect(()=>{const acknowledge=(event:Event)=>{const id=(event as CustomEvent<string>).detail;if(id)setLocatedBusIds(current=>current.filter(item=>item!==id))};window.addEventListener("pace-locate-ack",acknowledge);return()=>window.removeEventListener("pace-locate-ack",acknowledge)},[]);
 useEffect(()=>{if(!locatedBusIds.length)return;const timeout=window.setTimeout(()=>setLocatedBusIds([]),10000);return()=>window.clearTimeout(timeout)},[locatedBusIds]);
 useEffect(()=>{const touchDrop=(event:Event)=>{const detail=(event as CustomEvent<{busId?:string;location?:string;section?:string}>).detail;if(!detail?.busId||!detail.location&&!detail.section)return;clearDragHighlights();if(detail.location)setBuses(current=>moveOrSwapBuses(current,detail.busId!,detail.location!));else if(detail.section){const result=moveBusToArea(buses,detail.busId,detail.section,SECTION_SLOTS);if(result.error==="insufficient-space")alert(detail.section+" is full. No bus was moved.");else if(!result.error&&!result.unchanged)setBuses(result.fleet as B[])}};const cleanup=()=>clearDragHighlights();window.addEventListener("pace-touch-drop",touchDrop);window.addEventListener("blur",cleanup);return()=>{window.removeEventListener("pace-touch-drop",touchDrop);window.removeEventListener("blur",cleanup)}},[buses]);
- useEffect(()=>{const refreshFromStorage=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const saved=readFleetPayload<unknown>(event.newValue);if(saved.valid)setBuses(migrateFacilitySlots(migrateBuses(saved.buses,saved.legacy)))}if(event.key===DOWN_KEY){const flags=downSheetHighlightIds(event.newValue);setActiveDownIds(flags.down);setAcIssueIds(flags.ac)}/* Settings are edited on the shared page now. The map writes the whole settings object back whenever one of these changes on this page - the DS badge menu still does - so it has to take the new values into its own state or its next write would put a stale copy over them. */if(event.key===BOARD_SETTINGS_KEY&&event.newValue){const ui=readBoardSettings(event.newValue);setColors(ui.colors);setVisuals(ui.visuals);setThemeName(ui.theme);setSingleTapEmptySpaces(ui.singleTapEmptySpaces);setBusDisplay(ui.busDisplay);setShowDownSheetBadges(ui.showDownSheetBadges);setDownSheetBadgeView(ui.downSheetBadgeView);setConfirmMoves(ui.confirmMoves);setConfirmDefects(ui.confirmDefects);setServiceIntervals(ui.serviceIntervals)}if(event.key===FACILITY_DEFECT_CLEAR_UNDO_KEY)setFacilityClearUndoAvailable(Boolean(readFacilityDefectClearSnapshot(event.newValue)))};window.addEventListener("storage",refreshFromStorage);return()=>window.removeEventListener("storage",refreshFromStorage)},[]);
+ useEffect(()=>{const refreshFromStorage=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const saved=readFleetPayload<unknown>(event.newValue);if(saved.valid)setBuses(migrateFacilitySlots(migrateBuses(saved.buses,saved.legacy)))}if(event.key===DOWN_KEY){const flags=downSheetHighlightIds(event.newValue);setActiveDownIds(flags.down);setAcIssueIds(flags.ac)}/* Settings are edited on the shared page now. The map writes the whole settings object back whenever one of these changes on this page - the DS badge menu still does - so it has to take the new values into its own state or its next write would put a stale copy over them. */if(event.key===BOARD_SETTINGS_KEY&&event.newValue){const ui=readBoardSettings(event.newValue);setColors(ui.colors);setVisuals(ui.visuals);setThemeName(ui.theme);setSingleTapEmptySpaces(ui.singleTapEmptySpaces);setEscapeClosesEditor(ui.escapeClosesEditor);setBusDisplay(ui.busDisplay);setShowDownSheetBadges(ui.showDownSheetBadges);setDownSheetBadgeView(ui.downSheetBadgeView);setConfirmMoves(ui.confirmMoves);setConfirmDefects(ui.confirmDefects);setServiceIntervals(ui.serviceIntervals)}if(event.key===FACILITY_DEFECT_CLEAR_UNDO_KEY)setFacilityClearUndoAvailable(Boolean(readFacilityDefectClearSnapshot(event.newValue)))};window.addEventListener("storage",refreshFromStorage);return()=>window.removeEventListener("storage",refreshFromStorage)},[]);
 // Keep the tracker checkbox state identical to the active Down Sheet bus IDs.
  /* FULL SWEEP, read on mount rather than assumed off: the walk survives a
     reload, which is the point — a phone that slept in a pocket for twenty
@@ -554,18 +554,42 @@ function Editor({b,buses,isNew,escapeCloses,areas,confirmMoves,serviceIntervals,
     ask all the time because it's a friction point against speed." Looking at a
     bus and pressing Escape closes it with no question; losing typed work
     always asks. */
- const [openedAs]=useState(()=>JSON.stringify([d,holdUntil,newDefect]));
- const changed=openedAs!==JSON.stringify([d,holdUntil,newDefect]);
+ /* EVERY BOX A PERSON CAN TYPE IN, not just the draft bus. The first version
+    fingerprinted [d,holdUntil,newDefect] — three of the editor's twenty-three
+    pieces of state — so typing an odometer reading, an engine-hour reading, a
+    recorded service completion or a switch target and pressing Escape read as
+    CLEAN and threw the lot away without asking. The comment under it claimed
+    "losing typed work always asks", which made it worse than a gap: a promise
+    the code did not keep.
+
+    A reading only reaches `d` when its own ADD button is pressed, which is
+    exactly the state somebody is in when they reach for Escape.
+
+    `adding`, `switchOpen` and `entryMode` are deliberately NOT here. They say
+    which panel is open, not what is in it, and asking somebody to confirm
+    because they opened a drawer is the friction Curtis asked to avoid. */
+ const typedInto=[d,holdUntil,newDefect,repairGroup,
+  odometerMiles,odometerRecordedAt,odometerNote,
+  engineHours,engineHoursRecordedAt,engineHoursNote,
+  maintenanceKind,completionMiles,completionHours,completionCompletedAt,completionNote,
+  switchBusId,switchDestination,addToDefectLog,addToDownSheet,smartStatusEnabled];
+ const [openedAs]=useState(()=>JSON.stringify(typedInto));
+ const changed=openedAs!==JSON.stringify(typedInto);
  useEffect(()=>{
   if(!escapeCloses)return;
   const escape=(event:KeyboardEvent)=>{
    if(event.key!=="Escape")return;
+   /* Innermost first. The add-defect form and the SWITCH BUS panel are layers
+      inside this one, and closing the whole editor because somebody wanted out
+      of a sub-panel is the same trap one level down. */
+   if(adding){setAdding(false);return}
+   if(switchOpen){setSwitchOpen(false);return}
    if(changed&&!confirm("Close Bus "+(d.n||"this bus")+" without saving? What you changed will be lost."))return;
    close();
   };
   window.addEventListener("keydown",escape,true);
   return()=>window.removeEventListener("keydown",escape,true);
- },[escapeCloses,changed,close,d.n]); useEffect(()=>{if(!adding)return;const frame=requestAnimationFrame(()=>pickerRef.current?.scrollIntoView({block:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[adding,d.defects.length]);useEffect(()=>{if(!newDefect.category)return;const frame=requestAnimationFrame(()=>secondaryRepairRef.current?.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[newDefect.category]);useEffect(()=>{if(!repairGroup)return;const frame=requestAnimationFrame(()=>tertiaryRepairRef.current?.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[repairGroup]);useEffect(()=>{if(newDefect.issue)setNewDefect(current=>({...current,operability:defaultDefectOperability(current.category,current.issue)}))},[newDefect.category,newDefect.issue]);
+ },[escapeCloses,changed,close,d.n,adding,switchOpen]); useEffect(()=>{if(!adding)return;const frame=requestAnimationFrame(()=>pickerRef.current?.scrollIntoView({block:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[adding,d.defects.length]);useEffect(()=>{if(!newDefect.category)return;const frame=requestAnimationFrame(()=>secondaryRepairRef.current?.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[newDefect.category]);useEffect(()=>{if(!repairGroup)return;const frame=requestAnimationFrame(()=>tertiaryRepairRef.current?.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}));return()=>cancelAnimationFrame(frame)},[repairGroup]);useEffect(()=>{if(newDefect.issue)setNewDefect(current=>({...current,operability:defaultDefectOperability(current.category,current.issue)}))},[newDefect.category,newDefect.issue]);
  const applyDefects=(defects:StructuredDefect[],markDownSheet=false)=>setD(current=>{const next={...current,down:current.down||markDownSheet,defects,pendingRepair:defectSummary(defects)},smartArea=current.l.startsWith("road-")||current.l.startsWith("garage-");return smartStatusEnabled&&smartArea?{...next,s:statusForLocation(current.l,current.s,next) as S}:next});
  const updateDefect=(id:string,patch:Partial<StructuredDefect>)=>applyDefects(d.defects.map(defect=>defect.id===id?{...defect,...patch}:defect));
  const resetDefect=()=>{setAdding(false);setEntryMode("select");setRepairGroup("");setNewDefect(blankDefect);setAddToDefectLog(true);setAddToDownSheet(Boolean(d.down))};

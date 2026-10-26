@@ -284,9 +284,16 @@ bugs in opposite directions, one cause. Strings are KEPT, because an audio path
 only ever lives in one, and a file extension is only matched after a quote,
 slash or `(`, so a `.wav` CSS class name is not an audio file.
 
-**Two flags, one key, both off.** A buzz is not a sound, and conflating them
-answers a question he did not ask — a loud garage is the case for vibration and
-against noise.
+**One switch, two flags on disk, and they move together.** It was built as two
+switches on the reasoning that a buzz is not a sound. Curtis: *"Yes sound and
+vibration together."* The two fields stay only so that splitting them again is
+a UI change rather than a migration.
+
+**A mixed record is normalised on read**, and it has to be. A device that
+ticked only SOUND under the two-switch UI holds `{sound:true,vibration:false}`;
+read as-is, the single switch renders ON while holding a bus makes no buzz at
+all — the app's only perceivable feedback, silently missing, with no way out
+but toggling off and on. Either flag set now reads as both set.
 
 **Off is the safe read, which inverts `app-mode.ts` on purpose.** That file
 resolves an unreadable record to FULL, because taking pages away from a mechanic
