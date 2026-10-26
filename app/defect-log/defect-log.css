@@ -1000,6 +1000,34 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .duplicate-return-tally{display:inline-block;margin-left:4px;border-radius:4px;background:#8a5200;color:#fff;padding:1px 5px;font-style:normal;font-weight:900}
 .work-state-badge.report-return{border-color:#d49617;background:#fff4cf;color:#8a5200}
 
+/* WHAT THE PRESS DID, said where the press was. Both banner buttons changed
+   nothing a person could see: one swapped a draft under a component that
+   ignored it, the other moved an italic number or, inside the two-minute
+   guard, did nothing at all. This is the line that says which happened. It
+   takes the full width of the wrapped banner so it cannot be mistaken for a
+   third button. */
+.duplicate-return-note{flex:1 0 100%;margin-top:2px;border-radius:5px;padding:5px 8px;font-size:8px;font-weight:900;letter-spacing:.3px}
+.duplicate-return-note.counted{background:#8a5200;color:#fff}
+.duplicate-return-note.too-soon{border:1px solid #8a5200;background:transparent;color:#8a5200}
+
+/* REPORTED AGAIN, in the card's own action row. Two steps on purpose: the
+   tally is evidence that a repair is not working, and a fumbled tap on a
+   phone in a bay must not be able to inflate it. Built on the same shape as
+   EXTEND / HOLD UNTIL three buttons along, so the gesture is learned once. */
+.report-again{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border-top:1px solid var(--log-border)!important;background:#fff4cf;color:#8a5200}
+.report-again:hover,.report-again:focus-visible{background:#f6e4b8;outline:none}
+.report-again-confirm{display:flex;align-items:center;justify-content:center;gap:4px;flex:1;min-width:0;background:#fff4cf;color:#8a5200;padding:0 4px;font-size:7px;font-weight:900;letter-spacing:.3px}
+.report-again-yes{min-height:30px;border:1px solid #8a5200;border-radius:5px;background:#8a5200;color:#fff;padding:0 8px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.3px;cursor:pointer;white-space:nowrap}
+.report-again-cancel{min-width:30px;min-height:30px;border:1px solid #8a5200;border-radius:5px;background:#fff;color:#8a5200;font-size:13px;line-height:1;cursor:pointer}
+.report-again-note{grid-column:1/-1;margin:0;border-radius:5px;background:#8a5200;color:#fff;padding:5px 9px;font-size:8px;font-weight:900;letter-spacing:.3px}
+.last-reported{color:#8a5200;font-weight:900}
+@media(max-width:760px){
+ .report-again{flex-direction:row;gap:4px;border-top:0!important}
+ .report-again-yes,.report-again-cancel{min-height:40px}
+ .report-again-confirm{font-size:9px}
+ .duplicate-return-note,.report-again-note{font-size:10px;padding:7px 10px}
+}
+
 /* ADVANCED STATS — the last block in the focus body, and the only place it
    appears. Curtis: "make it viewable only in focus, like the bottom of however
    many defects listed. This way the list can drop further down and just scroll

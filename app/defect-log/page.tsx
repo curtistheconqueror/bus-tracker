@@ -8,7 +8,7 @@ import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,recordReportAttempt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,recordReportAttempt,describeReportAttempt,lastReportAttemptAt,type ReportAttemptOutcome,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
 import SweepScanner from "./_components/sweep-scanner";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
@@ -132,8 +132,15 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>void;close:()=>void;onBusPicked:(busId:string)=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportAttemptOutcome;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
+ /* WHAT THE LAST PRESS DID. Both banner buttons used to change nothing a
+    person could see: OPEN IT swapped a draft under a component that ignored
+    it, and + COUNT THIS RETURN moved an italic number inside a yellow box, or
+    silently did nothing at all when the two-minute guard refused it. Curtis:
+    "it doesn't do anything... nothing happens on the screen so I don't know if
+    anything happened." */
+ const [returnNote,setReturnNote]=useState<{kind:"counted"|"too-soon";count:number;at:string|null}|null>(null);
  /* Held so BULLET can put the caret back after it appends — see its onClick. */
  const detailsRef=useRef<HTMLTextAreaElement|null>(null);
  /* defaultOpen is not a DOM prop, so this panel stayed shut even on a record
@@ -456,7 +463,8 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
      <span><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after {RECENT_DUPLICATE_WINDOW_LABEL}.
       {reportAttemptCount(recentDuplicate)>0&&<i className="duplicate-return-tally"> CAME BACK {reportAttemptCount(recentDuplicate)}× SINCE</i>}</span>
      <button type="button" className="open-existing-defect" onClick={()=>showExisting(value.busId,recentDuplicate)}>OPEN IT</button>
-     <button type="button" className="count-return" onClick={()=>countReturn(value.busId,recentDuplicate)} title="Records that this bus came back with the same complaint, with today's date, on the defect that is already open">+ COUNT THIS RETURN</button>
+     <button type="button" className="count-return" onClick={()=>{const outcome=countReturn(value.busId,recentDuplicate);setReturnNote({kind:outcome.counted?"counted":"too-soon",count:outcome.count,at:outcome.at})}} title="Records that this bus came back with the same complaint, with today's date, on the defect that is already open">+ COUNT THIS RETURN</button>
+     {returnNote&&<b className={"duplicate-return-note"+(returnNote.kind==="counted"?" counted":" too-soon")} role="status">{returnNote.kind==="counted"?"COUNTED — this bus has now come back "+returnNote.count+"\u00d7"+(returnNote.at?", latest "+timeLabel(returnNote.at):""):"ALREADY COUNTED a moment ago. One press is one return, so a second within two minutes is ignored."}</b>}
     </p>}
     {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
     {diagLightMode&&<fieldset className="wide diag-light-picker"><legend>HVAC DIAG LIGHT (OPTIONAL)</legend><div className="diag-light-choices">{DIAG_LIGHTS.map(light=><label className={"diag-light-"+light+(diagLight===light?" selected":"")} key={light}><input type="checkbox" checked={diagLight===light} onChange={()=>setDiagLight(light)}/><span>{DIAG_LIGHT_LABELS[light]}</span></label>)}<label className="diag-alarm-code">ALARM #<input inputMode="numeric" maxLength={2} placeholder="00" value={value.defect.alarmCode||""} onChange={event=>updateDefect("alarmCode",event.target.value.replace(/\D/g,"").slice(0,2))}/></label></div><small className={typedAlarmDigits.length===1?"diag-alarm-warning":undefined}>{
@@ -790,6 +798,18 @@ export default function DefectLog(){
     two open at once would be two rows mid-edit with no way to tell which
     CONFIRM belongs to which. */
  const [extending,setExtending]=useState("");
+ /* RE-REPORTING FROM THE LIST, which is where somebody is standing when they
+    hear a bus has come back with the same complaint. Until now the only way to
+    record one was to start logging a duplicate, read the banner that refused
+    it, and press the button inside that banner — a path through a refusal.
+    Curtis: "there should be like a little drop-down where you can easily add
+    another reported... just a small drop-down feature, that's it."
+
+    One press ARMS it and a second COUNTS it, the same two-step HOLD UNTIL uses
+    three buttons along. The tally is evidence that a repair is not working, so
+    a fumbled tap on a phone in a bay must not be able to inflate it. */
+ const [reporting,setReporting]=useState("");
+ const [reportNote,setReportNote]=useState<{id:string;text:string}|null>(null);
  const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
  const [batchesOpen,setBatchesOpen]=useState(false);
@@ -1371,24 +1391,31 @@ export default function DefectLog(){
     The stamp goes on the STORED defect rather than the copy the banner is
     holding, so a form that has been open a while cannot write back a tally it
     read before somebody else added to it. */
- const countReturn=(busId:string,defect:StructuredDefect)=>{
+ /* Returns WHAT HAPPENED, because the two things this can do are
+    indistinguishable from outside: a counted return and a refused one both
+    leave the button where it was. The refusal is the debounce in
+    recordReportAttempt, and it is right — one press, one return — but it has
+    to be sayable. */
+ const countReturn=(busId:string,defect:StructuredDefect):ReportAttemptOutcome=>{
   const now=new Date().toISOString();
   const bus=fleet.find(item=>item.id===busId);
-  if(!bus)return;
-  let counted=false;
+  if(!bus)return {counted:false,count:reportAttemptCount(defect),at:lastReportAttemptAt(defect)};
+  let counted=false,outcome:ReportAttemptOutcome={counted:false,count:reportAttemptCount(defect),at:lastReportAttemptAt(defect)};
   const nextFleet=fleet.map(item=>item.id!==busId?item:{...item,defects:normalizeDefects(item.defects,item.pendingRepair||"",item.id)
    .map(current=>{
     if(current.id!==defect.id)return current;
     const next=recordReportAttempt(current,now,settings.defaultInitials);
+    outcome=describeReportAttempt(current,next);
     if(next!==current)counted=true;
     return next;
    })});
   /* recordReportAttempt refuses a second stamp within two minutes, and a press
      it refused must not write the board back or take an undo snapshot — an UNDO
      offering to reverse a change nobody made is worse than the fumbled tap. */
-  if(!counted)return;
+  if(!counted)return outcome;
   setUndoSnapshot({fleet,downEntries,label:"Counted a return for Bus "+bus.n});
   persist(nextFleet,downEntries);
+  return outcome;
  };
  const showExistingDefect=(busId:string,defect:StructuredDefect)=>{
   const bus=fleet.find(item=>item.id===busId);
@@ -1775,9 +1802,23 @@ export default function DefectLog(){
          of these is the one. */}
      {unexplainedDownSheetEntries(group.records,group.bus.id,downEntries).map(entry=><p className="down-sheet-banner elsewhere" key={entry.id}><b>ON THE DOWN SHEET</b><span>{[entry.category,entry.repair,entry.customReason].map(part=>String(part||"").trim()).filter(Boolean).join(" — ")||"Repair required"} — not one of the defects below</span></p>)}{group.records.map((record,index)=><section className={"grouped-defect-row"+(record.onDownSheet?" on-down-sheet":"")} key={record.defect.id}>
      {record.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET</b><span>{downSheetEntryLabel(record.downSheetEntry)}</span></p>}
-     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}</span></button>
+     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"This bus came back with the same complaint "+reportAttemptCount(record.defect)+" time"+(reportAttemptCount(record.defect)===1?"":"s")+" since it was logged"}>REPORTED &times;{reportAttemptCount(record.defect)+1}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
-     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
+     {reportNote&&reportNote.id===record.defect.id&&<p className="report-again-note" role="status">{reportNote.text}</p>}
+     <div className="log-actions">{record.defect.state!=="completed"&&(reporting===record.defect.id
+      ?<span className="report-again-confirm"><b>COUNT A RETURN?</b>
+        <button className="report-again-yes" type="button" onClick={()=>{
+         const outcome=countReturn(record.bus.id,record.defect);
+         setReporting("");
+         setReportNote({id:record.defect.id,text:outcome.counted
+          ?"COUNTED \u2014 reported \u00d7"+(outcome.count+1)+(outcome.at?", latest "+timeLabel(outcome.at):"")
+          :"ALREADY COUNTED a moment ago. One press is one return."});
+        }}>COUNT IT</button>
+        <button className="report-again-cancel" type="button" onClick={()=>setReporting("")} aria-label="Do not count a return">&times;</button></span>
+      :<button className="report-again" type="button" onClick={()=>{setReporting(record.defect.id);setReportNote(null)}}
+         aria-label={"Record that bus "+record.bus.n+" was reported again for defect "+(index+1)}
+         title="Somebody reported this same defect again. Records the return with today's date.">
+        <span aria-hidden="true">&#8635;</span><b>REPORTED AGAIN</b></button>)}{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
       ?<span className="extend-deferral-field"><input type="time" value={extendUntil} autoFocus
          onChange={event=>setExtendUntil(event.target.value)}
          aria-label={"Hold bus "+record.bus.n+" until"}/>
@@ -1954,7 +1995,7 @@ export default function DefectLog(){
     </div>
    </section>
   </div>}
-  {editing&&<DefectEditor draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
+  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}

@@ -317,6 +317,53 @@ Curtis: *"Yes sound and vibration together."* The storage still holds two
 flags, so splitting them again later is a UI change rather than a migration,
 but one control sets both and either one being on reads as on.
 
+### A re-report is visible where it happens
+
+Curtis, on the ALREADY LOGGED banner: *"pressing either the open this defect or
+the button next to it, it doesn't do anything... nothing happens on the screen
+so I don't know if anything happened."* And on the defect list: *"I don't see
+anything saying defect reported times three or times five with the last date
+reported... just a small drop-down feature, that's it."*
+
+**OPEN IT WAS BROKEN, and it was not a perception problem.** `DefectEditor`
+seeds its form from the draft with a plain `useState` and the element carried
+no `key`, so when OPEN IT swapped the draft underneath it React reused the same
+component and the form kept showing whatever had been typed. The record really
+was un-hidden and written to the board; it simply could not reach the screen.
+The same bug class as the unkeyed `<Token>` fixed earlier in this release.
+Keyed by bus and defect now: a different record remounts, a keystroke does not.
+Measured — OPEN IT loads the existing record's description, the banner goes
+(you are no longer making a duplicate) and SAVE is live.
+
+**+ COUNT THIS RETURN worked and said nothing.** Its only trace was an italic
+number inside a yellow box — and inside the two-minute debounce it did nothing
+at all, silently. Three of Curtis's screenshots a minute apart all read
+`CAME BACK 1×`: that is the guard working exactly as designed and reporting
+nothing. The guard stays, because one press is one return and a fumbled tap
+must not inflate evidence that a repair is not working. What changed is that
+the refusal has a name: the banner now says **COUNTED — this bus has now come
+back 2×, latest …** or **ALREADY COUNTED a moment ago**.
+
+**The count is on the card now.** `REPORTED ×N` — the original report plus
+every return — beside OPEN, with a `LAST REPORTED` date under the logged one,
+drawn only once a bus has actually come back. It reuses the amber badge the
+focus view already uses for a return rather than inventing a second colour.
+
+**And a small control to add one**, in the card's own action row beside MARK
+FIXED, the same two-step shape `HOLD UNTIL` uses three buttons along: one press
+arms `COUNT A RETURN?`, a second counts it, and the card says what happened.
+Until now the only way to record a return was to start logging a duplicate and
+press a button inside the refusal that stopped you.
+
+Measured at 390px: the chip reads `REPORTED ×3` on a defect with two returns
+stored, arming shows the confirm, counting moves it to `×4` with the new date,
+and a second press inside the guard says so. Action row 46px, no overflow, no
+horizontal scroll.
+
+**Not changed, and worth saying:** after + COUNT THIS RETURN, SAVE stays
+disabled. Saving would create the duplicate the banner exists to prevent, so
+OPEN IT is there to put the typed description onto the existing record instead.
+
 ### Verified
 
 Gates re-run on **the commit this file is updated in**, which is what "this
@@ -377,7 +424,16 @@ that refusal has not been measured on an Android device.
 8. **SETTINGS → THIS DEVICE.** There should be one SOUND & VIBRATION switch,
    off. Leave it off and hold a bus on the map: it lifts with a blue ring and
    the phone stays still. Turn it on and do it again — it should buzz once.
-9. **SETTINGS → FACILITY MAP → TOUCH CONTROLS.** ESCAPE CLOSES THE BUS EDITOR
+10. **DEFECT LOG.** Open a bus with a defect, expand it. On the defect card
+   there should be a `REPORTED ×N` chip once the bus has come back, a
+   `LAST REPORTED` date, and a `REPORTED AGAIN` control. Press it: it asks
+   `COUNT A RETURN?`; press COUNT IT and the chip goes up by one. Press it
+   twice quickly and it should say it already counted.
+11. **DEFECT LOG → + LOG DEFECT**, typing a defect that already exists on that
+   bus. The yellow ALREADY LOGGED banner should appear. **+ COUNT THIS RETURN**
+   should now say COUNTED and the number on it move; **OPEN IT** should load
+   that existing defect into the form, with the banner gone and SAVE live.
+9. **SETTINGS → FACILITY MAP → TOUCH & KEYBOARD.** ESCAPE CLOSES THE BUS EDITOR
    should be off, and Escape in the bus editor should do nothing, as now. Turn
    it on: open a bus, press Escape — it closes with no question. Open another,
    change something, press Escape — it should ask.
