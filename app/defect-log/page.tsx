@@ -9,7 +9,7 @@ import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
 import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,lastReportAttemptAt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
-import {applyReportReturn,refusalMessage,reportTotal,type ReportReturnResult} from "@/src/lib/defects/report-returns";
+import {applyReportReturn,refusalHeadline,refusalMessage,reportButtonState,reportTotal,type ReportReturnResult} from "@/src/lib/defects/report-returns";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
 import SweepScanner from "./_components/sweep-scanner";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
@@ -357,6 +357,11 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     and then changing the repair to one that duplicates defect B left B's
     banner carrying A's number. */
  const returnNoteFor=returnNote&&recentDuplicate&&returnNote.id===recentDuplicate.id?returnNote:null;
+ /* And it expires, the way the card's does. Without this, counting a return,
+    clearing the repair field and retyping the same one brought the old
+    "COUNTED · REPORTED ×3" back, still carrying the number read at press
+    time — a stale count presented as current. */
+ useEffect(()=>{if(!returnNote)return;const timer=window.setTimeout(()=>setReturnNote(null),OUTCOME_WINDOW_MS);return()=>window.clearTimeout(timer)},[returnNote]);
  /* Takes an optional patch because the part prompt decides what to store at the
     moment it is confirmed. Setting that on state and then calling this would
     save the defect as it was one render ago — React has not applied the update
@@ -473,7 +478,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
       {reportAttemptCount(recentDuplicate)>0&&<i className="duplicate-return-tally"> CAME BACK {reportAttemptCount(recentDuplicate)}× SINCE</i>}</span>
      <button type="button" className="open-existing-defect" onClick={()=>showExisting(value.busId,recentDuplicate)}>OPEN IT</button>
      <button type="button" className="count-return" onClick={()=>{const result=countReturn(value.busId,recentDuplicate);setReturnNote({id:recentDuplicate.id,kind:result.counted?"counted":"refused",count:result.returns,at:result.at,text:result.counted?"":refusalMessage(result.reason||"too-soon")})}} title="Records that this bus came back with the same complaint, with today's date, on the defect that is already open">+ COUNT THIS RETURN</button>
-     {returnNoteFor&&<b className={"duplicate-return-note"+(returnNoteFor.kind==="counted"?" counted":" too-soon")}>{returnNoteFor.kind==="counted"?"COUNTED \u00b7 REPORTED \u00d7"+(returnNoteFor.count+1)+(returnNoteFor.at?", latest "+timeLabel(returnNoteFor.at):""):returnNoteFor.text}</b>}
+     {returnNoteFor&&<b className={"duplicate-return-note"+(returnNoteFor.kind==="counted"?" counted":" refused")}>{returnNoteFor.kind==="counted"?"COUNTED \u00b7 REPORTED \u00d7"+(returnNoteFor.count+1)+(returnNoteFor.at?", latest "+timeLabel(returnNoteFor.at):""):returnNoteFor.text}</b>}
     </p>}
     {checkEngineMode&&<fieldset className="wide engine-symptom-picker"><legend>CHECK ENGINE SYMPTOMS — SELECT ALL THAT APPLY</legend><div>{CHECK_ENGINE_SYMPTOMS.map(symptom=><label className={selectedSymptoms.includes(symptom)?"selected":""} key={symptom}><input type="checkbox" checked={selectedSymptoms.includes(symptom)} onChange={()=>toggleCheckEngineSymptom(symptom)}/><span>{symptom}</span></label>)}</div><small>{selectedSymptoms.length?selectedSymptoms.length+" symptom"+(selectedSymptoms.length===1?"":"s")+" selected":"Choose one or more symptoms if known."} All selections save as one defect record.</small></fieldset>}
     {diagLightMode&&<fieldset className="wide diag-light-picker"><legend>HVAC DIAG LIGHT (OPTIONAL)</legend><div className="diag-light-choices">{DIAG_LIGHTS.map(light=><label className={"diag-light-"+light+(diagLight===light?" selected":"")} key={light}><input type="checkbox" checked={diagLight===light} onChange={()=>setDiagLight(light)}/><span>{DIAG_LIGHT_LABELS[light]}</span></label>)}<label className="diag-alarm-code">ALARM #<input inputMode="numeric" maxLength={2} placeholder="00" value={value.defect.alarmCode||""} onChange={event=>updateDefect("alarmCode",event.target.value.replace(/\D/g,"").slice(0,2))}/></label></div><small className={typedAlarmDigits.length===1?"diag-alarm-warning":undefined}>{
@@ -1839,22 +1844,25 @@ export default function DefectLog(){
           So arming changes this button's own words and nothing else. It falls
           back on its own after ARM_WINDOW_MS, which is the cancel: the way out
           of an accidental press is to do nothing. */}
-       {record.defect.state!=="completed"&&<button type="button"
-        className={"report-again"+(reporting===record.defect.id?" armed":"")+(reportNote&&reportNote.id===record.defect.id?" "+reportNote.tone:"")}
-        onClick={()=>{
-         if(reporting!==record.defect.id){setReporting(record.defect.id);setReportNote(null);return}
-         const result=countReturn(record.bus.id,record.defect);
-         setReporting("");
-         setReportNote({id:record.defect.id,tone:result.counted?"counted":"refused",
-          text:result.counted?"COUNTED \u00b7 REPORTED \u00d7"+(result.returns+1):refusalMessage(result.reason||"too-soon")});
-        }}
-        aria-label={reporting===record.defect.id
-         ?"Tap again to count a return for bus "+record.bus.n+" defect "+(index+1)
-         :"Record that bus "+record.bus.n+" was reported again for defect "+(index+1)}
-        title="Somebody reported this same defect again. Two taps records the return with today's date.">
-        <span aria-hidden="true">&#8635;</span>
-        <b>{reportNote&&reportNote.id===record.defect.id?reportNote.text
-          :reporting===record.defect.id?"TAP AGAIN TO COUNT":"REPORTED AGAIN"}</b></button>}</div>
+       {record.defect.state!=="completed"&&(()=>{
+        const button=reportButtonState({defectId:record.defect.id,armedId:reporting,note:reportNote,busNumber:record.bus.n,position:index+1});
+        return <button type="button" className={"report-again"+(button.tone?" "+button.tone:"")}
+         onClick={()=>{
+          if(reporting!==record.defect.id){setReporting(record.defect.id);setReportNote(null);return}
+          const result=countReturn(record.bus.id,record.defect);
+          setReporting("");
+          setReportNote({id:record.defect.id,tone:result.counted?"counted":"refused",
+           text:result.counted?"COUNTED \u00b7 \u00d7"+(result.returns+1):refusalHeadline(result.reason||"too-soon")});
+         }}
+         aria-label={button.ariaLabel}
+         title="Somebody reported this same defect again. Two taps records the return with today's date.">
+         <span aria-hidden="true">&#8635;</span>
+         {/* The outcome is the whole point of a button that changes its own
+             words, and it was reaching nobody using a screen reader: the
+             aria-label still said the pre-press name in both outcome states,
+             and the card's only live region was removed with the old note. */}
+         <b aria-live={button.announce?"polite":undefined}>{button.label}</b></button>;
+       })()}</div>
     </section>)}
     </div>}
      {/* THE CLOSING LINE, off unless asked for. Curtis wanted this one kept as

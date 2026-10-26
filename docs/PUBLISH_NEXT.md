@@ -341,8 +341,12 @@ at all, silently. Three of Curtis's screenshots a minute apart all read
 `CAME BACK 1×`: that is the guard working exactly as designed and reporting
 nothing. The guard stays, because one press is one return and a fumbled tap
 must not inflate evidence that a repair is not working. What changed is that
-the refusal has a name: the banner now says **COUNTED — this bus has now come
-back 2×, latest …** or **ALREADY COUNTED a moment ago**.
+the refusal has a name: the banner now says **COUNTED · REPORTED ×3, latest …** or names the refusal.
+There are five refusals and each has its own words: the two-minute guard, a bus
+that has left the board, a defect that is no longer on it, a board that could
+not be saved, and a clock that gave an unreadable time. An earlier version
+stamped "already counted a moment ago" on all of them — a false statement about
+somebody's own data in four cases out of five.
 
 **The count is on the card now.** `REPORTED ×N` — the original report plus
 every return — beside OPEN, with a `LAST REPORTED` date under the logged one,
@@ -367,9 +371,19 @@ there is nothing to overflow, and doing nothing for six seconds is the cancel.
 **Measured at 360, 390, 430, 820, 1180 and 1280** — not one width this time. At
 every one: a tap at the button's centre lands on the button itself, it
 overflows the rail by 0px, there is no horizontal scroll, the chip goes
-`REPORTED ×3` → `×4`, and LAST REPORTED renders amber 900 against LOGGED's grey
-800 (its first rule was `.last-reported`, which lost to `.log-meta time` on
-specificity and was inert at every width).
+`REPORTED ×3` → `×4`, and the action row holds at 46px on phones and 104px on
+desktop through all three button states with nothing clipped.
+
+**And measured on all four Defect Log themes, which is the axis a fixed colour
+actually breaks.** An earlier version of this release made LAST REPORTED a
+hard-coded amber — it had been inert, losing to `.log-meta time` on
+specificity, and winning that fight is what broke it: **2.50 / 2.52 / 1.73:1**
+on dark, midnight and tactical, against the 8.04 / 7.29 / 5.28 it had while it
+was doing nothing. The resting button had the same fault from the same cause.
+Both take the theme's own ink now and the badge above carries the colour,
+because a badge brings its own fill and a bare date does not. Measured:
+LAST REPORTED 4.90 / 8.04 / 7.29 / 5.28, resting button the same, the REPORTED
+badge 5.81 and the armed button 6.39 on every theme — all above AA.
 
 **Two things it does NOT do, both worth knowing before it is live.**
 
@@ -393,7 +407,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **393 pass, 0 fail**
+- `npm test` — **395 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -447,7 +461,7 @@ that refusal has not been measured on an Android device.
    there should be a `REPORTED ×N` chip once the bus has come back, a
    `LAST REPORTED` date in amber, and a `REPORTED AGAIN` control at the END of
    the action row — MARK FIXED must still be first. Tap it: it says
-   `TAP AGAIN TO COUNT`; tap again and the chip goes up by one and the button
+   `TAP AGAIN`; tap again and the chip goes up by one and the button
    says `COUNTED · REPORTED ×N`. Tap it once and walk away: it should go back
    to normal by itself after six seconds. Do it twice quickly and it should
    say it already counted.
