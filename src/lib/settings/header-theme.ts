@@ -227,9 +227,38 @@ export function headerTextFor(background:string){
 }
 /* What the panel should quote, and what the cube sweep should assert: the
    worst place in the bar, not the left edge. */
-export function headerContrast(background:string){
- const ink=headerTextFor(background);
- return Math.min(...headerStops(background).map(stop=>contrastRatio(stop,ink)));
+export function headerContrast(background:string,ink?:string){
+ const against=isHeaderColor(ink)?normalizeHeaderColor(ink):headerTextFor(background);
+ return Math.min(...headerStops(background).map(stop=>contrastRatio(stop,against)));
+}
+
+/* WHICH INK, AND THE ANSWER IS NOT ALWAYS A COMPUTED ONE.
+
+   Curtis: *"Why did we have to change a theme?? The tactical theme. Themes
+   should not be affected by default design."* He is right, and the first
+   version of this release was wrong: `headerTextFor` was handed every header
+   including the three that a PAGE THEME decides, so Tactical's `#e7ddb2` and
+   Terminal's `#61ff9d` came out white. Nobody asked for that. A page theme is
+   a designed pairing of a background and an ink, and taking half of it is not
+   honouring it.
+
+   So the ladder answers the ink the same way it answers the colour, rung for
+   rung, and that is the whole point of resolving them through one function:
+
+   1. AN OVERRIDE TYPED FOR THIS SURFACE — computed. The colour came out of a
+      picker and has no ink attached, and "white on a dark header" is a trap
+      the moment somebody picks a pale one.
+   2. A NON-DEFAULT PAGE THEME — the theme's OWN ink, untouched.
+   3. THE SHARED APP COLOUR — computed, for the reason rung 1 is.
+
+   The gate on rung 2 is `isHeaderColor(pageTheme)`, the same expression
+   `resolveHeaderColor` uses, so the colour and the ink cannot come from
+   different rungs. A page theme with no ink of its own — `custom` on a device
+   that stored a header colour and no header text — falls through to the
+   computed one, because there is no pairing there to honour. */
+export function resolveHeaderInk(theme:HeaderTheme,surface:HeaderSurface,pageTheme?:string,pageInk?:string){
+ if(!hasHeaderOverride(theme,surface)&&isHeaderColor(pageTheme)&&isHeaderColor(pageInk))return normalizeHeaderColor(pageInk);
+ return headerTextFor(resolveHeaderColor(theme,surface,pageTheme));
 }
 
 /* The second stop of the gradient every header already drew, derived rather

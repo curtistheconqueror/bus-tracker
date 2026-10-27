@@ -41,7 +41,7 @@
 
 import {useEffect,useState} from "react";
 import {usePathname} from "next/navigation";
-import {DEFAULT_HEADER_THEME,HEADER_THEME_KEY,type HeaderSurface,headerColorFor,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor} from "@/src/lib/settings/header-theme";
+import {DEFAULT_HEADER_THEME,HEADER_THEME_KEY,type HeaderSurface,headerColorFor,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor,resolveHeaderInk} from "@/src/lib/settings/header-theme";
 import {BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 
 /* The nav's own paths. `/` is last because every path starts with it. */
@@ -65,12 +65,20 @@ export default function HeaderThemeLive(){
       and the page agree. They would not otherwise: a device on Tactical draws
       an olive header from its own inline value while everything keyed off
       <html> — and the phone's status bar below — stayed navy. */
-   const colour=resolveHeaderColor(theme,surface,pages[surface]);
+   const page=pages[surface];
+   const colour=resolveHeaderColor(theme,surface,page?.header);
    root.style.setProperty("--app-header",colour);
    root.style.setProperty("--app-header-fill",headerGradient(colour));
-   /* Computed, never stored: a light colour chosen for flare would otherwise
-      put white on white and take the page title with it. */
-   root.style.setProperty("--app-header-text",headerTextFor(colour));
+   /* THE INK COMES OFF THE SAME RUNG AS THE COLOUR. Computed for the shared
+      colour and for an override, because those came out of a picker and a
+      pale one would otherwise put white on white and take the page title with
+      it — but a PAGE THEME keeps its own, because the background and the ink
+      on it are one designed pairing and taking half of it is not honouring
+      the theme. This painted `headerTextFor(colour)` unconditionally for one
+      release, which is how the Facility Map's Tactical header lost its khaki:
+      the map sets `--header-text` from its own theme, and this wrote
+      `--app-header-text` on <html>, which every header rule reads first. */
+   root.style.setProperty("--app-header-text",resolveHeaderInk(theme,surface,page?.header,page?.text));
    /* AND THE PHONE'S OWN BAR ABOVE IT. Saved to a home screen, the strip of
       OS chrome above the header is painted from <meta name="theme-color">,
       which `app/layout.tsx` declares once at build time and cannot change.
@@ -120,11 +128,20 @@ export default function HeaderThemeLive(){
    device on Tactical keeps a whole Tactical page, a device on the default
    theme — which is every device that has not opened these panels — matches
    the other five, and Settings can still force either. */
-export function useHeaderColor(surface:HeaderSurface,pageTheme?:string){
+export function useHeaderColor(surface:HeaderSurface,pageTheme?:string,pageInk?:string){
  const [colour,setColour]=useState(()=>headerColorFor(DEFAULT_HEADER_THEME,surface));
+ /* Held in state beside the colour rather than derived on render, because
+    which ink wins depends on the stored OVERRIDE, and that is only readable
+    inside the effect. Derived outside it, a page on Tactical with an override
+    typed for it would draw the override's colour under the theme's ink. */
+ const [ink,setInk]=useState("");
  useEffect(()=>{
   const read=()=>{
-   try{setColour(resolveHeaderColor(loadHeaderTheme(localStorage),surface,pageTheme))}catch{}
+   try{
+    const theme=loadHeaderTheme(localStorage);
+    setColour(resolveHeaderColor(theme,surface,pageTheme));
+    setInk(resolveHeaderInk(theme,surface,pageTheme,pageInk));
+   }catch{}
   };
   read();
   const fromAnotherTab=(event:StorageEvent)=>{if(event.key===HEADER_THEME_KEY)read()};
@@ -136,7 +153,11 @@ export function useHeaderColor(surface:HeaderSurface,pageTheme?:string){
   };
   /* pageTheme is in the deps on purpose: switching this page's theme has to
      repaint its header on the spot, and it changes without the header key
-     being written at all, so neither listener above would ever fire. */
- },[surface,pageTheme]);
- return {color:colour,text:headerTextFor(colour),fill:headerGradient(colour)};
+     being written at all, so neither listener above would ever fire. The ink
+     is in there for the same reason — picking a theme changes both. */
+ },[surface,pageTheme,pageInk]);
+ /* The computed ink is the fallback for the first render, before the effect
+    has read the record: the shared colour is what that render draws, and the
+    shared colour's ink is computed. */
+ return {color:colour,text:ink||headerTextFor(colour),fill:headerGradient(colour)};
 }

@@ -352,11 +352,16 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  assert.match(fieldCode,/inputMode="decimal"/,"but still a numeric keypad on a phone");
  assert.match(field,/onBlur=\{\(\)=>setDraft\(null\)\}/,"the draft is dropped on blur so the stored value takes over");
 
- /* ALL SEVEN inputs go through it. The decimal fault existed on BOTH surfaces,
-    so fixing the Down Sheet alone would have left the Defect Log turning 1.5
-    into 15. */
+ /* ALL EIGHT inputs go through it — the two assertions below add to eight, and
+    this line said SEVEN against 4+4 because the old SIX was incremented rather
+    than re-counted, which is the habit `fresh-context-review` exists for. The
+    decimal fault existed on BOTH surfaces, so fixing the Down Sheet alone would
+    have left the Defect Log turning 1.5 into 15. */
  assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
  assert.equal((log.match(/<HoursField /g)||[]).length,4,"Defect Log: repair, diagnostic, ESTIMATED TIME OF REPAIR, and the shop's time for the repair on the PATH TO REPAIR screen");
+ /* The total, added up rather than asserted separately, so the sentence above
+    cannot drift from the two numbers under it again. */
+ assert.equal((editor.match(/<HoursField /g)||[]).length+(log.match(/<HoursField /g)||[]).length,8);
  /* Scoped to HOURS. The Defect Log's quantity box is also type=number and is
     left alone on purpose: it counts quarts, not time, so a trailing decimal
     point is not the thing people type into it. (It has a smaller relative of

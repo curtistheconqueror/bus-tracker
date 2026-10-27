@@ -1273,7 +1273,7 @@ test("Escape in the bus editor is off, and asks only when something changed", as
 test("one header colour for the whole app, with a page theme and an override above it", async () => {
  const {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,HEADER_TEXT_DARK,HEADER_TEXT_LIGHT,
   contrastRatio,hasHeaderOverride,headerColorFor,headerContrast,headerGradient,headerStops,headerTextFor,isHeaderColor,loadHeaderTheme,
-  readHeaderTheme,resolveHeaderColor,saveHeaderTheme,serializeHeaderTheme}
+  readHeaderTheme,resolveHeaderColor,resolveHeaderInk,saveHeaderTheme,serializeHeaderTheme}
   =await import("../src/lib/settings/header-theme.ts");
 
  assert.equal(HEADER_THEME_KEY,"pace-header-theme-v1");
@@ -1319,6 +1319,38 @@ test("one header colour for the whole app, with a page theme and an override abo
  assert.equal(resolveHeaderColor(mixed,"log","#15180f"),"#ff0000");
  /* A page theme that is not a colour is not a rung. */
  assert.equal(resolveHeaderColor(mixed,"fixed","chartreuse"),"#223344");
+
+ /* THE INK COMES OFF THE SAME RUNG AS THE COLOUR, and that is the whole
+    reason both are resolved through one pair of functions.
+
+    Curtis: "Why did we have to change a theme?? The tactical theme. Themes
+    should not be affected by default design." The first version of this
+    release computed black-or-white for every header, which turned Tactical's
+    `#e7ddb2` and Terminal's `#61ff9d` white on the three pages a theme
+    decides. A page theme is a designed pairing; taking half of it is not
+    honouring it.
+
+    Computed on rung 1 and rung 3 because those colours came out of a picker
+    and have no ink attached — "white on a dark header" stops being true the
+    moment somebody picks a pale one. */
+ assert.equal(resolveHeaderInk(mixed,"fixed",undefined,undefined),headerTextFor("#223344"),"shared colour: computed");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f","#e7ddb2"),"#e7ddb2","a page theme keeps its own ink");
+ assert.equal(resolveHeaderInk(mixed,"log","#15180f","#e7ddb2"),headerTextFor("#ff0000"),
+  "an override outranks the theme, and brings a computed ink with it");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f",undefined),headerTextFor("#15180f"),
+  "a theme with no ink of its own has no pairing to honour");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180f","chartreuse"),headerTextFor("#15180f"),
+  "and neither does one whose ink is not a colour");
+ assert.equal(resolveHeaderInk(mixed,"fixed","chartreuse","#e7ddb2"),headerTextFor("#223344"),
+  "the ink cannot come off a rung the colour did not come off");
+ assert.equal(resolveHeaderInk(mixed,"fixed","#15180F","#E7DDB2"),"#e7ddb2","normalised like every other colour here");
+
+ /* And the contrast note can be asked about the ink that will actually be
+    drawn rather than the one it would have computed. */
+ assert.equal(headerContrast("#15180f","#e7ddb2"),headerContrast("#15180f","#E7DDB2"));
+ assert.notEqual(headerContrast("#15180f","#e7ddb2"),headerContrast("#15180f"),
+  "or the panel would quote a figure for text the page is not using");
+ assert.equal(headerContrast("#15180f","chartreuse"),headerContrast("#15180f"),"junk falls back to the computed ink");
 
  /* AN EXTERNAL ANCHOR FIRST, because the sweep below is otherwise circular.
     It picks the text with `headerTextFor`, which calls `contrastRatio`, then
@@ -1400,9 +1432,16 @@ test("one header colour for the whole app, with a page theme and an override abo
 });
 
 test("the header panel can see which pages their own theme is deciding", async () => {
- const {readPageHeaderThemes,pageHeaderThemes,pageThemeHeader,DEFAULT_MAP_HEADER,DEFAULT_PAGE_HEADER,
+ const {readPageHeaderThemes,pageHeaderThemes,pageThemeHeader,pageThemeHeaderPair,DEFAULT_MAP_HEADER,DEFAULT_PAGE_HEADER,
   BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes}
   =await import("../src/lib/settings/page-header-themes.ts");
+ /* THE COLOUR AND THE INK DESIGNED WITH IT, as one value. Curtis: "Why did we
+    have to change a theme?? The tactical theme. Themes should not be affected
+    by default design." They are returned together because a caller that takes
+    the colour from here and computes the ink elsewhere is how Tactical's khaki
+    became white. */
+ const TACTICAL={header:"#15180f",text:"#e7ddb2"},TACTICAL_PAGE={header:"#15180f",text:"#f4e8b8"};
+ const MIDNIGHT={header:"#020a18",text:"#ffffff"};
  assert.equal(BOARD_SETTINGS_KEY,"pace-board-settings-v1");
  assert.equal(LOG_SETTINGS_KEY,"pace-defect-log-settings-v1");
 
@@ -1418,7 +1457,7 @@ test("the header panel can see which pages their own theme is deciding", async (
  assert.deepEqual(readPageHeaderThemes(
   JSON.stringify({theme:"tactical",visuals:{header:"#15180f"}}),
   JSON.stringify({theme:"midnight",appearance:{header:"#020a18"}})),
-  {map:"#15180f",log:"#020a18",fixed:"#020a18"});
+  {map:TACTICAL,log:MIDNIGHT,fixed:MIDNIGHT});
 
  /* `custom` IS NOT A LOOK SOMEBODY PICKED. Both appearance panels set it when
     ANY colour in them changes — one bus status colour, one section
@@ -1429,7 +1468,12 @@ test("the header panel can see which pages their own theme is deciding", async (
     header colour actually DIFFERS from the one the page would have had. */
  assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:DEFAULT_MAP_HEADER}},
    {theme:"custom",appearance:{header:DEFAULT_PAGE_HEADER}}),{});
- assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a"}},null),{map:"#5b0f3a"});
+ /* `custom` has no table ink either, so the stored one answers — and with
+    nothing stored there is no pairing to honour and the ink is computed by the
+    caller, which `text:""` is how this says so. */
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a"}},null),{map:{header:"#5b0f3a",text:""}});
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a",headerText:"#ffe9a0"}},null),
+  {map:{header:"#5b0f3a",text:"#ffe9a0"}});
  assert.equal(pageThemeHeader("map","default",DEFAULT_MAP_HEADER),"");
  assert.equal(pageThemeHeader("page","light",DEFAULT_PAGE_HEADER),"");
  assert.equal(pageThemeHeader("map","terminal",undefined),"#00150c");
@@ -1441,20 +1485,33 @@ test("the header panel can see which pages their own theme is deciding", async (
  assert.equal(pageThemeHeader("page","custom","#ff0000"),"#ff0000");
  assert.equal(pageThemeHeader("page",7,"#ff0000"),"");
 
+ /* THE INK RIDES THE SAME GATE AS THE COLOUR. No page theme deciding means no
+    entry at all, so there is no ink to mistake for one; a theme that IS
+    deciding hands back the pair out of its own table, whatever a stale
+    palette on disk says. */
+ assert.equal(pageThemeHeaderPair("map","default",DEFAULT_MAP_HEADER,"#ff0000"),null);
+ assert.equal(pageThemeHeaderPair("page","light",DEFAULT_PAGE_HEADER,"#ff0000"),null);
+ assert.deepEqual(pageThemeHeaderPair("map","tactical",undefined,undefined),TACTICAL);
+ assert.deepEqual(pageThemeHeaderPair("page","tactical",undefined,undefined),TACTICAL_PAGE);
+ assert.deepEqual(pageThemeHeaderPair("map","terminal",undefined,undefined),{header:"#00150c",text:"#61ff9d"});
+ assert.deepEqual(pageThemeHeaderPair("page","tactical","#ff0000","#00ff00"),TACTICAL_PAGE,"the table outranks a palette that disagrees");
+ assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","#f0e0a0"),{header:"#3b0f52",text:"#f0e0a0"});
+ assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","not a colour"),{header:"#3b0f52",text:""});
+
  /* THE THEME NAME IS THE FACT AND THE STORED PALETTE IS A COPY OF IT, so a
     record naming a theme resolves from the table even with the palette
     missing or corrupt — which is an ordinary record for an older build or a
     hand-seeded device, and used to answer "no theme" while the page's own
     drawer stayed on the theme. */
  for (const bad of ["",null,7,"chartreuse","red; background:url(x)",undefined])
-  assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical",visuals:{header:bad}}),null),{map:"#15180f"},String(bad));
+  assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical",visuals:{header:bad}}),null),{map:TACTICAL},String(bad));
  assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical"}),JSON.stringify({theme:"midnight"})),
-  {map:"#15180f",log:"#020a18",fixed:"#020a18"});
+  {map:TACTICAL,log:MIDNIGHT,fixed:MIDNIGHT});
 
  /* `custom` has no table entry, and there the stored palette IS the decision
     — so it is still the only source, and still has to be a colour. */
  assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:"#3b0f52"}})),
-  {log:"#3b0f52",fixed:"#3b0f52"});
+  {log:{header:"#3b0f52",text:""},fixed:{header:"#3b0f52",text:""}});
  for (const bad of ["",null,7,"chartreuse","red; background:url(x)"])
   assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:bad}})),{},String(bad));
  for (const bad of [null,"","{",'"text"',"[]","7",JSON.stringify({visuals:{header:"#15180f"}}),JSON.stringify({theme:"nonsuch"})])
@@ -1553,7 +1610,16 @@ test("the painting is wired up, and no header still names a colour of its own", 
  assert.match(live,/meta\[name="theme-color"\]/);
  /* It resolves through the ladder, not the shared colour alone — otherwise a
     themed page's <html> and status bar disagree with its own header. */
- assert.match(live,/resolveHeaderColor\(theme,surface,pages\[surface\]\)/);
+ assert.match(live,/resolveHeaderColor\(theme,surface,page\?\.header\)/);
+ /* AND THE INK COMES OFF THE SAME RUNG AS THE COLOUR. Painted as
+    `headerTextFor(colour)` for one release, which is how the Facility Map's
+    Tactical header lost its khaki: the map sets `--header-text` from its own
+    theme, and this writes `--app-header-text` on <html>, which every header
+    rule reads first. Curtis: "Themes should not be affected by default
+    design." */
+ assert.match(live,/setProperty\("--app-header-text",resolveHeaderInk\(theme,surface,page\?\.header,page\?\.text\)\)/);
+ assert.equal(/setProperty\("--app-header-text",headerTextFor/.test(live),false,
+  "the computed ink must not be painted over a page theme's own");
  /* And it never writes a record. */
  assert.equal(/setItem|saveHeaderTheme/.test(live),false,"HeaderThemeLive must not write storage");
 
@@ -1698,18 +1764,24 @@ test("the wiring between the colour and the pixels, which nothing used to exerci
    "/lists":"lists","/incidents":"incidents","/shop-talk":"talk","/settings":"settings","/":"map"});
  assert.equal(Object.keys(routes).length,HEADER_SURFACES.length);
 
- /* The hook watches the page theme as well as the surface, or switching a
-    page's own theme leaves its header on the colour it had. */
- assert.match(live,/\},\[surface,pageTheme\]\);/);
+ /* The hook watches the page theme AND ITS INK as well as the surface, or
+    switching a page's own theme leaves its header on the colour it had — and
+    picking a theme changes both halves of the pairing at once. */
+ assert.match(live,/\},\[surface,pageTheme,pageInk\]\);/);
 
  /* THE TWO THEMED PAGES FEED THEIR OWN VARIABLE FROM THE RESOLVED COLOUR,
     and pass their page theme in, which is the ladder's middle rung. Unplug
     either and that page keeps its own theme's header while the other seven
     move, which is the split this release exists to close. */
  assert.match(log,/"--log-header":headerSkin\.color,"--log-header-text":headerSkin\.text/);
- assert.match(log,/useHeaderColor\("log",pageThemeHeader\("page",settings\.theme,settings\.appearance\.header\)\)/);
+ /* THE INK TRAVELS WITH THE COLOUR, out of one pair, so a page on Tactical
+    keeps Tactical's header text. Curtis: "Why did we have to change a theme??
+    The tactical theme. Themes should not be affected by default design." */
+ assert.match(log,/pageThemeHeaderPair\("page",settings\.theme,settings\.appearance\.header,settings\.appearance\.headerText\)/);
+ assert.match(log,/useHeaderColor\("log",logHeaderTheme\?\.header,logHeaderTheme\?\.text\)/);
  assert.match(fixed,/"--fixed-header":headerSkin\.color,"--fixed-header-text":headerSkin\.text/);
- assert.match(fixed,/useHeaderColor\("fixed",pageThemeHeader\("page",fixedAppearance\.theme,fixedAppearance\.appearance\.header\)\)/);
+ assert.match(fixed,/pageThemeHeaderPair\("page",fixedAppearance\.theme,fixedAppearance\.appearance\.header,fixedAppearance\.appearance\.headerText\)/);
+ assert.match(fixed,/useHeaderColor\("fixed",fixedHeaderTheme\?\.header,fixedHeaderTheme\?\.text\)/);
  /* And the accent keeps an ink computed for the ACCENT, not the header's. */
  assert.match(log,/"--log-accent-text":headerTextFor\(settings\.appearance\.accent\)/);
 

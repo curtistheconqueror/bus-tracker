@@ -1,7 +1,6 @@
 import {normalizeFinding, normalizeRepairCount, normalizeRepairHours} from "../defects/repair-catalog.ts";
 import {
   normalizeRepairTimeEstimate,
-  repairTimeSum,
   repairTimeTotal,
   type RepairTimeEstimate,
 } from "./repair-time-estimates.ts";
@@ -95,30 +94,6 @@ export function normalizeRepairItems(
     timeEstimate: normalizeRepairTimeEstimate(legacy.timeEstimate, category, repair),
     done: legacy.entryCompleted === true,
   }];
-}
-
-/* WHAT SOMEBODY ON THE SHEET ACTUALLY CLAIMED about how long this repair runs.
-
-   Every card carries a `timeEstimate`, because one is seeded from the catalog
-   the moment a category is picked. So the presence of a number says nothing at
-   all: the question is whether it still equals the catalog's own
-   recommendation for that category and repair, and only a card that DIFFERS is
-   somebody's claim. That is the test `pageThemeHeader` makes about a header
-   colour, for the same reason — a stored copy of a default is not a decision,
-   and reading it as one would freeze a guess onto the record as a figure a
-   person stood behind.
-
-   An estimate switched OFF is not a claim either. The sheet's own totals skip
-   those cards and so does this.
-
-   Compared and returned through the UNFLOORED sum, because the floor belongs to
-   what the sheet prints rather than to what it was told. */
-export function repairItemEstimateHours(item: {category?: string; repair?: string; estimateEnabled?: boolean; timeEstimate?: unknown}) {
-  if (item.estimateEnabled === false) return undefined;
-  const category = item.category || "", repair = item.repair || "";
-  const minutes = repairTimeSum(normalizeRepairTimeEstimate(item.timeEstimate, category, repair));
-  if (minutes === repairTimeSum(normalizeRepairTimeEstimate(undefined, category, repair))) return undefined;
-  return normalizeRepairHours(minutes / 60);
 }
 
 export function repairItemsTotal(items: DownSheetRepairItem[]) {
