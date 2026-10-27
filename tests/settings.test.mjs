@@ -1755,3 +1755,130 @@ test("the Down Sheet's page title defers to the header, like the Defect Log's", 
  assert.match(css,/\.down-header h1\{color:var\(--down-page-title-color,var\(--app-header-text,#fff\)\)/,
    "and the fallback is the header's computed ink");
 });
+
+test("the header panel draws one control per row and nothing that does nothing", async () => {
+ /* Curtis: "Just make it as much of a minimalist design as you can. Even
+    though we have more settings controls."
+
+    Counted before: 57 elements, 18 controls, 112 words, 630px — a quarter of
+    the Settings page for one setting — of which SEVEN were disabled FOLLOW
+    buttons and eight were a second swatch showing a colour the picker beside
+    it already showed. After: 27 words, 11 controls, no disabled anything.
+    These assertions are the shape, not the pixels: a row carries a name and
+    one swatch, and a qualifier or a clear ONLY when there is something to
+    qualify or clear. */
+ const page=await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+ const css=await readFile(new URL("../app/settings/settings.css", import.meta.url), "utf8");
+
+ /* The swatch IS the input: one element per row, not a chip plus a picker. */
+ assert.match(page,/function HeaderSwatch\(/);
+ assert.match(page,/<label className="hc-swatch"[^>]*>\s*<span aria-hidden="true">Aa<\/span>\s*<input type="color"/,
+   "the swatch wraps the real input rather than sitting beside one");
+ const swatchInput=css.match(/\.hc-swatch input\{([^}]*)\}/);
+ assert.ok(swatchInput,"the input must have a rule");
+ assert.match(swatchInput[1],/position:absolute;inset:0;width:100%;height:100%/,
+   "the input fills the swatch - without the explicit size Chromium gives a colour input its own 50x27 and it pokes out of the box");
+ assert.match(swatchInput[1],/opacity:0/,"and is invisible rather than absent");
+ /* THE ONE THING THIS FILE CANNOT SEE is whether that input is the thing a
+    finger actually lands on, and a cold read proved it: adding
+    `visibility:hidden` to this rule left every assertion above passing while
+    all nine pickers stopped responding to a click and Tab stopped reaching
+    them at all. `opacity:0` hides a thing that is still there; these three
+    take it away. A source scan cannot hit-test, so it names them. */
+ for (const away of ["visibility:hidden","display:none","pointer-events:none"])
+  assert.equal(swatchInput[1].includes(away),false,
+    "`"+away+"` on the swatch input makes it untouchable while it still looks right");
+ assert.match(css,/\.hc-swatch:focus-within\{outline:/,"and the focus ring moves to the box");
+
+ /* EVERY CONTROL IS NAMED. The only text inside the swatch is an
+    `aria-hidden` "Aa", so without these the accessible name computes EMPTY —
+    nine colour pickers and a clear button with no page attached to any of
+    them. Dropping either passed every other assertion here. */
+ /* `[^>]*` cannot be used to cross this tag: `onChange={event=>…}` contains
+    a `>`, so the class stops inside the attribute it is meant to skip. */
+ assert.match(page,/<input type="color" value=\{colour\} onChange=\{event=>onPick\(event\.target\.value\)\} aria-label=\{label\}/,
+   "the swatch input must carry the page's name");
+ assert.match(page,/colour=\{headerTheme\.shared\} label="Header colour for every page"/);
+ assert.match(page,/colour=\{effective\} label=\{surface\.label\+" header colour"\}/);
+ assert.match(page,/className="hc-clear" aria-label=\{"Clear "\+surface\.label\+"'s own header colour"\}/);
+
+ /* The swatch draws the ink the header will be WRITTEN in, which is the only
+    reason it is a box with letters in it rather than a square of colour.
+    Hard-coding it white passed everything else. */
+ assert.match(page,/className="hc-swatch" style=\{\{background:headerGradient\(colour\),color:headerTextFor\(colour\)\}\}/);
+ /* One swatch component, used for the shared colour and for all eight rows. */
+ assert.ok((page.match(/<HeaderSwatch /g)||[]).length>=2,"one component, used for the shared colour and for the rows");
+
+ /* NOTHING DISABLED. The clear is rendered only on a row that has an
+    override; seven greyed-out buttons is the absence of news drawn eight
+    times. */
+ const panel=page.slice(page.indexOf('<section className="settings-header-colour">'),
+                        page.indexOf("</section>",page.indexOf('className="hc-foot"')));
+ assert.equal(/\bdisabled[=}]/.test(panel),false,"no control in this panel is ever drawn disabled");
+ assert.match(panel,/\{own\?<button type="button" className="hc-clear"/,"the clear exists only with an override");
+ assert.match(panel,/\{own\?<i>own<\/i>:page\?<i>page theme<\/i>:null\}/,
+   "and a row says what decides it only when something other than the shared colour does");
+
+ /* The column is reserved on every row, so one row having a clear does not
+    push its swatch out of line with the seven that do not. */
+ assert.match(css,/\.hc-list>\.hc-row\{grid-template-columns:minmax\(0,1fr\) auto 44px 44px\}/);
+ /* And each cell is placed, or the clear and the swatch share column 3 and
+    sit on top of each other on the one row that has both. */
+ for (const [sel,col] of [["\\.hc-row>b","1"],["\\.hc-row>i","2"],["\\.hc-row>\\.hc-clear","3"],["\\.hc-row>\\.hc-swatch","4"]])
+  assert.match(css,new RegExp(sel+"\\{[^}]*grid-column:"+col+"[;}]"),sel+" must sit in column "+col);
+ /* 44px: this app's tap target, and the panel's own measurement. */
+ assert.match(css,/\.hc-swatch\{[^}]*width:44px;height:44px/);
+ assert.match(css,/\.hc-clear\{width:44px;height:44px/);
+ assert.match(css,/\.hc-row\{min-height:44px/);
+
+ /* NO CARD. The drawer is already a box; every section inside THIS DEVICE is
+    separated by a rule instead, and the four of them agree. */
+ const SECTIONS=["settings-lite-switch","settings-header-colour","settings-feedback","settings-welcome-again"];
+ for (const name of SECTIONS) {
+  const rule=css.match(new RegExp("\\."+name+"\\{([^}]*)\\}"));
+  assert.ok(rule,name+" must have a layout rule");
+  /* box-shadow too: a card drawn as `box-shadow:0 0 0 2px` is still a card,
+     and passed when only `border` and `background` were looked for. */
+  assert.equal(/border:1px|background:#fff|background:#fdfefe|border-radius|box-shadow/.test(rule[1]),false,
+    name+" must not draw a card inside the drawer");
+ }
+ /* ALL FOUR on the hairline, not three — dropping one leaves two sections
+    running together with nothing between them. */
+ const hairline=css.match(/([^{}]*)\{border-top:1px solid #e1e8f3\}/);
+ assert.ok(hairline,"a hairline between them instead");
+ for (const name of SECTIONS)
+  assert.ok(hairline[1].includes(".settings-drawer-body>."+name),name+" must carry the hairline");
+ assert.match(css,/\.settings-drawer-body>\.settings-lite-switch:first-child\{border-top:0\}/,
+   "and none above the first");
+
+ /* The LITE MODE switch is styled at all, which it was not: `.settings-check`
+    is scoped to two other pages, so on this one it computed `display:inline`
+    and rendered as `LITE MODE ON THIS DEVICEDraws less of the app…`, one
+    run-together paragraph with the checkbox inside the first word. The
+    comment above the rule used to claim it "looks fine". */
+ assert.match(css,/\.settings-lite-switch \.settings-check\{display:flex/);
+ assert.match(css,/\.settings-lite-switch \.settings-check>span\{display:grid/);
+ /* AND AT THE PHONE BREAKPOINT TOO. The base rules were widened to cover it
+    and the 760px block one line below was not, so on every width this app
+    runs on the lite switch sat a size smaller and a tap target shorter than
+    the structurally identical row directly beneath it — 9px/8px/44px against
+    10px/9px/48px, measured. A fix that stops at a media query is half a fix. */
+ const phone=css.match(/@media\(max-width:760px\)\{\.settings-feedback b[^}]*\}[^@]*?\}\}/);
+ assert.ok(phone,"the feedback phone block must exist");
+ for (const piece of [".settings-lite-switch b",".settings-lite-switch small",".settings-lite-switch .settings-check"])
+  assert.ok(phone[0].includes(piece),piece+" must be sized with its neighbour on a phone");
+
+ /* THE TAG IS THE ONLY THING LEFT THAT SAYS A PAGE IS NOT FOLLOWING, so it
+    carries the `<small>` colour it replaced rather than a fainter one: 5.37:1
+    against 3.04:1, which is under AA at 8px. */
+ assert.match(css,/\.hc-row>i\{grid-column:2;color:#5a6b84;/);
+ assert.match(css,/\.hc-clear\{width:44px;height:44px;border:0;background:none;color:#5a6b84;/);
+
+ /* AND THE ONE SENTENCE SAYS THE OVERRIDE WINS. "a page on its own theme
+    keeps that" reads as "and you cannot change it from here", which is the
+    opposite of what the ladder does — a colour typed on a themed row beats
+    the theme, and clearing it falls back to the theme rather than to the
+    shared colour. It is the one thing the six-line paragraph carried that
+    the rows do not teach by themselves. */
+ assert.match(page,/Give one its own below \u2014 that wins, even on a page with its own theme\.|Give one its own below — that wins, even on a page with its own theme\./);
+});

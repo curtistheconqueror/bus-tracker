@@ -178,82 +178,118 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 /* Re-asking the first-run question, from the page that owns every other
    per-device choice. It re-opens the welcome rather than switching anything:
    the mode changes only when somebody picks one. */
-.settings-welcome-again{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:11px 13px}
+.settings-welcome-again{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:12px 0}
 .settings-welcome-again>div{display:grid;gap:3px;min-width:0}
 .settings-welcome-again b{color:#173e73;font-size:9px;font-weight:900;letter-spacing:.5px}
 .settings-welcome-again small{color:#5a6b84;font-size:8px;line-height:1.45}
-.show-welcome-again{flex-shrink:0;min-height:34px;border:1px solid #0b64bd;border-radius:6px;background:#0b64bd;color:#fff;padding:0 14px;font-size:8px;font-weight:900;letter-spacing:.4px;cursor:pointer}
-.show-welcome-again:hover{background:#09539d}
-@media(max-width:760px){.settings-welcome-again b{font-size:10px}.settings-welcome-again small{font-size:9px}.show-welcome-again{min-height:44px;font-size:10px;padding:0 16px}}
+.show-welcome-again{flex-shrink:0;min-height:44px;border:0;background:none;color:#0b64bd;padding:0;font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+.show-welcome-again:hover{text-decoration:underline}
+@media(max-width:760px){.settings-welcome-again b{font-size:10px}.settings-welcome-again small{font-size:9px}.show-welcome-again{min-height:44px;font-size:10px;padding:0}}
 
 /* SOUND AND VIBRATION, two switches that needed a rule of their own.
 
    `.settings-check` is styled in two places and NEITHER reaches this page:
    `down-sheet.css` scopes its layout half to `.down-settings-body`, and
    `defect-log.css` to `.log-settings`. What survives here is `input{...}` and
-   `span{font-size:8px}` — no display, no box. One such label gets away with
-   it, which is why `.settings-lite-switch` above has no rule and looks fine.
-   Two of them do not: measured at 390px both computed `display:inline`, the
-   labels OVERLAPPED by 17px, and the second checkbox landed at x=143 in the
-   middle of the first one's last sentence.
+   `span{font-size:8px}` — no display, no box. Measured at 390px both
+   computed `display:inline`, the labels OVERLAPPED by 17px, and the second
+   checkbox landed at x=143 in the middle of the first one's last sentence.
+
+   AND `.settings-lite-switch` WAS NEVER FINE. This comment used to say one
+   such label gets away with it, which is why that section had no rule —
+   looked at, it renders as `LITE MODE ON THIS DEVICEDraws less of the app…`,
+   one run-together paragraph with the checkbox sitting in the first word. It
+   predates this release and the claim was never measured; the selector below
+   now covers both.
 
    So this is the `.settings-welcome-again` card beside it, with its own
    tokens, holding rows instead of one line. */
-.settings-feedback{display:grid;gap:9px;margin:0 0 12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:11px 13px}
-.settings-feedback .settings-check{display:flex;flex-direction:row;align-items:flex-start;gap:9px;min-height:44px;margin:0;padding:0;cursor:pointer}
-.settings-feedback .settings-check input{flex:none;width:17px;height:17px;margin:2px 0 0;accent-color:#0b64bd}
-.settings-feedback .settings-check>span{display:grid;gap:3px;min-width:0}
-.settings-feedback b{color:#173e73;font-size:9px;font-weight:900;letter-spacing:.5px}
-.settings-feedback small{color:#5a6b84;font-size:8px;line-height:1.45}
-@media(max-width:760px){.settings-feedback b{font-size:10px}.settings-feedback small{font-size:9px}.settings-feedback .settings-check{min-height:48px}}
+.settings-feedback{display:grid;gap:9px;margin:0;padding:12px 0}
+/* ONE RULED LIST, NOT FOUR CARDS. Every other section on this page is a
+   bordered white card inside a drawer that is itself a bordered card inside a
+   section that is another one — three frames deep before any content, which
+   is what makes a settings page feel heavy no matter how little is in it.
+   THIS DEVICE is the drawer this release touched, so it is the one converted:
+   a hairline between sections says the same thing a border does and draws one
+   pixel instead of a box. The rest of the page is unchanged and is a bigger
+   change to offer than to make. */
+.settings-drawer-body>.settings-lite-switch,.settings-drawer-body>.settings-header-colour,
+.settings-drawer-body>.settings-feedback,.settings-drawer-body>.settings-welcome-again{border-top:1px solid #e1e8f3}
+.settings-drawer-body>.settings-lite-switch:first-child{border-top:0}
+.settings-lite-switch{display:grid;margin:0;padding:12px 0}
+.settings-feedback .settings-check,.settings-lite-switch .settings-check{display:flex;flex-direction:row;align-items:flex-start;gap:9px;min-height:44px;margin:0;padding:0;cursor:pointer}
+.settings-feedback .settings-check input,.settings-lite-switch .settings-check input{flex:none;width:17px;height:17px;margin:2px 0 0;accent-color:#0b64bd}
+.settings-feedback .settings-check>span,.settings-lite-switch .settings-check>span{display:grid;gap:3px;min-width:0}
+.settings-feedback b,.settings-lite-switch b{color:#173e73;font-size:9px;font-weight:900;letter-spacing:.5px}
+.settings-feedback small,.settings-lite-switch small{color:#5a6b84;font-size:8px;line-height:1.45}
+@media(max-width:760px){.settings-feedback b,.settings-lite-switch b{font-size:10px}.settings-feedback small,.settings-lite-switch small{font-size:9px}.settings-feedback .settings-check,.settings-lite-switch .settings-check{min-height:48px}}
 
-/* THE APP'S HEADER COLOUR, AND THE EIGHT PAGES THAT CAN DIFFER FROM IT.
+/* THE APP'S HEADER COLOUR, AS LITTLE AS IT CAN BE DRAWN AS.
 
-   It shipped as markup with no rules at all, which is not a smaller version
-   of the right thing — measured at 430 on a real page, every row rendered as
-   inline text: the label, the status and the FOLLOW button ran together in
-   the middle of a sentence, the swatch sat inside the words, and the section
-   was 519px of unstyled prose. The same trap `.settings-feedback` above
-   documents: this page's base stylesheet gives `b`, `small` and `button`
-   enough to look deliberate one at a time and nothing that makes a ROW.
+   It shipped as markup with no rules at all — measured at 430 on a real page,
+   every row rendered as inline text: the label, the status and the button ran
+   together in the middle of a sentence and the section was 519px of unstyled
+   prose. Then it was styled and was still too much: 57 elements, 18 controls, 149 words and 643px at 390,
+   a quarter of the Settings page for one setting — EIGHT of those controls
+   disabled FOLLOW buttons.
 
-   Written as a grid with named columns rather than flex, because the one
-   thing a row has to do is line its swatch, its name, its picker and its
-   button up with the row above it — eight of them in a column, where flex
-   would size each row to its own longest label. */
-.settings-header-colour{display:grid;gap:11px;margin:0 0 12px;border:1px solid #c8d3e4;border-radius:9px;background:#fff;padding:11px 13px}
+   (The first version of this comment said 112 words and 630px. 112 counted
+   the heading, the paragraph and the seven repeated status lines and left out
+   the row names, the swatch letters and the eight FOLLOW labels; 630 is the
+   height at 430 only. Both ends are measured from `innerText` and the box at
+   390 now, which is the only way the two numbers mean the same thing.)
+
+   Curtis: "Just make it as much of a minimalist design as you can. Even
+   though we have more settings controls."
+
+   So: NO CARD. The drawer above it is already a box; a second border inside a
+   border is the thing that makes a settings page feel heavy. A rule between
+   the heading and the list does the same job with one pixel.
+
+   A ROW IS A NAME AND A SWATCH, on one line, 44px tall because that is this
+   app's tap target everywhere. The qualifier and the clear button only exist
+   on a row that has something to qualify or to clear, so seven rows out of
+   eight carry exactly two things. */
+.settings-header-colour{display:grid;gap:3px;margin:0;padding:12px 0}
 .settings-header-colour b{color:#173e73;font-size:9px;font-weight:900;letter-spacing:.5px}
 .settings-header-colour small{color:#5a6b84;font-size:8px;line-height:1.45}
-.header-colour-shared{display:grid;gap:9px}
-.header-colour-shared>label{display:flex;align-items:flex-start;justify-content:space-between;gap:11px;min-height:44px;cursor:pointer}
-.header-colour-shared>label>span{display:grid;gap:3px;min-width:0}
-/* 44px: this is a colour swatch a thumb has to hit, not a form field. */
-.settings-header-colour input[type=color]{flex:none;width:52px;height:44px;border:1px solid #b9c6da;border-radius:7px;background:#fff;padding:3px;cursor:pointer}
-.header-colour-reset{justify-self:start;min-height:44px;border:1px solid #b9c6da;border-radius:7px;background:#eef3fb;color:#173e73;padding:0 14px;font-size:9px;font-weight:900;letter-spacing:.6px;cursor:pointer}
-.header-colour-reset:hover{background:#e0e9f7}
-.header-colour-list{display:grid;gap:7px;border-top:1px solid #e1e8f3;padding-top:10px}
-/* swatch · name and status · picker · button. The name column is the only
-   one that flexes, so the three controls stay in one vertical line. */
-.header-colour-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;align-items:center;gap:9px}
-.header-colour-row>b{grid-column:2;align-self:end}
-.header-colour-row>small{grid-column:2;grid-row:2;align-self:start}
-.header-colour-row>.header-colour-swatch{grid-row:1/3}
-.header-colour-row>input[type=color]{grid-row:1/3}
-.header-colour-row>button{grid-row:1/3;min-width:62px;min-height:44px;border:1px solid #b9c6da;border-radius:7px;background:#fff;color:#173e73;padding:0 9px;font-size:8px;font-weight:900;letter-spacing:.5px;cursor:pointer}
-.header-colour-row>button:disabled{border-color:#dde4ef;background:#f4f7fc;color:#9aa8bd;cursor:default}
-/* The swatch is the only thing on this screen that shows what the header
-   actually looks like, so it carries the computed text colour too — a light
-   pick that would hide the page title shows black "Aa" here first. */
-.header-colour-swatch{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid #b9c6da;border-radius:7px;font-size:11px;font-weight:900}
-.header-colour-note{display:block;border-top:1px solid #e1e8f3;padding-top:9px}
+.hc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 9px}
+.hc-head>div{display:grid;gap:3px;min-width:0}
+.hc-list{display:grid;border-top:1px solid #e1e8f3}
+/* name · qualifier · clear · swatch. Only the name column flexes, so the
+   swatches stand in one line down the panel whatever the labels do. */
+.hc-row{min-height:44px;display:grid;align-items:center;gap:9px}
+/* #5a6b84, which is what the `<small>` this replaced used: measured 5.37:1
+   on the drawer. Drawn at #8694ab it was 3.04:1 — under AA at 8px, and it is
+   now the ONLY thing on the row that says this page is not following the
+   shared colour. Quieter than the name beside it, not fainter than legible. */
+.hc-row>i{grid-column:2;color:#5a6b84;font-size:8px;font-style:normal;font-weight:900;letter-spacing:.4px;text-transform:uppercase}
+.hc-row>.hc-swatch{grid-column:4}
+/* The clear sits in its own column so a row that has one does not push its
+   swatch out of line with the seven that do not. */
+.hc-row>.hc-clear{grid-column:3}
+.hc-row>b{grid-column:1;font-size:10px;letter-spacing:.3px}
+.hc-list>.hc-row{grid-template-columns:minmax(0,1fr) auto 44px 44px}
+.hc-clear{width:44px;height:44px;border:0;background:none;color:#5a6b84;font-size:15px;line-height:1;cursor:pointer}
+.hc-clear:hover{color:#173e73}
+/* The swatch IS the picker: a real input at opacity 0 over a box that draws
+   the colour and the ink it will be written in. */
+.hc-swatch{position:relative;flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid #b9c6da;border-radius:8px;font-size:11px;font-weight:900;cursor:pointer}
+/* The input fills the swatch's padding box — 42px inside the 44px border —
+   and the remaining ring belongs to the <label>, which forwards a click to
+   the input it wraps. So the thing a finger hits is 44 even though the input
+   measures 42. Sized explicitly: dropping width/height and letting `inset`
+   do it gave Chromium's own intrinsic size for a colour input, 27px, poking
+   6px out of the box. */
+.hc-swatch input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}
+.hc-swatch:focus-within{outline:2px solid #0b64bd;outline-offset:2px}
+.hc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e1e8f3;padding-top:8px}
+.hc-reset{min-width:44px;min-height:44px;border:0;background:none;color:#0b64bd;padding:0;font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer}
+.hc-reset:hover{text-decoration:underline}
 @media(max-width:760px){
  .settings-header-colour b{font-size:10px}
  .settings-header-colour small{font-size:9px}
- /* The picker and FOLLOW keep their width; the name column gives way. */
- .header-colour-row{grid-template-columns:30px minmax(0,1fr) auto auto;gap:7px}
- .header-colour-swatch{width:30px;height:30px}
- .settings-header-colour input[type=color]{width:46px}
- .header-colour-row>button{min-width:56px}
+ .hc-row>b{font-size:11px}
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

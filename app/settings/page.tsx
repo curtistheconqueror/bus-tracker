@@ -39,7 +39,7 @@ import "./settings.css";
 import MapSettingsPanel from "./_components/map-settings-panel";
 import CloudSyncControl from "./_components/cloud-sync-control";
 import {DEFAULT_FEEDBACK,type FeedbackSettings,loadFeedbackSettings,saveFeedbackSettings} from "@/src/lib/settings/feedback-settings";
-import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerTextFor,loadHeaderTheme,resolveHeaderColor,saveHeaderTheme} from "@/src/lib/settings/header-theme";
+import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor,saveHeaderTheme} from "@/src/lib/settings/header-theme";
 import {pageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
@@ -162,6 +162,24 @@ function SectionHead({id,kicker,title,open,onToggle}:{id:string;kicker:string;ti
    stylesheet only has to not defeat it. */
 function SectionBody({id,open,children}:{id:string;open:boolean;children:ReactNode}){
  return <div id={id+"-body"} className="settings-section-body" hidden={!open}>{children}</div>;
+}
+
+/* ONE CONTROL THAT IS ALSO THE SWATCH.
+
+   `<input type="color">` cannot be given content, so showing a colour AND
+   what its text will look like took two elements per row — a swatch chip and
+   a picker, side by side, saying the same thing twice on eight rows. Here the
+   real input fills the box at opacity 0: the box draws the colour and the
+   computed ink, the input takes the click, the focus and the keyboard, and
+   `:focus-within` puts the ring back on the box. One element per row.
+
+   44px, because it is a swatch a thumb has to hit and this app's floor for
+   that is 44 everywhere else. */
+function HeaderSwatch({colour,label,onPick}:{colour:string;label:string;onPick:(value:string)=>void}){
+ return <label className="hc-swatch" style={{background:headerGradient(colour),color:headerTextFor(colour)}}>
+  <span aria-hidden="true">Aa</span>
+  <input type="color" value={colour} onChange={event=>onPick(event.target.value)} aria-label={label}/>
+ </label>;
 }
 
 export default function SettingsPage(){
@@ -499,44 +517,70 @@ export default function SettingsPage(){
          app's colour was, which is how five different navies happened. This is
          that missing thing: one colour, and a page can differ when it has a
          reason to. */}
+     {/* MINIMALIST, WITH MORE CONTROLS THAN BEFORE RATHER THAN FEWER. Curtis:
+         "Just make it as much of a minimalist design as you can. Even though
+         we have more settings controls."
+
+         Measured at 390, before and after, both from `innerText` and the
+         rendered box: 57 elements, 18 controls, 149 words and 643px at 390 became
+         51 elements, 10 controls, 53 words and 490px. Two swatches on every row showing the
+         same colour, "following the one above" written out seven times to say
+         that nothing is happening, EIGHT GREYED-OUT FOLLOW BUTTONS — one per
+         row, out of the box — and six lines of paragraph before the first
+         control.
+
+         What went, and why each was safe to lose:
+         - The second swatch. The colour well IS the swatch now: a real
+           <input type="color"> at opacity 0 filling a box that draws the
+           colour and the computed ink. One element doing both jobs, and the
+           `Aa` still shows a pale pick turning the words black.
+         - The status line, except when there IS something to say. Seven rows
+           saying "following the one above" is the absence of news.
+         - The disabled buttons. A row with no override has nothing to clear,
+           so it carries no control at all; one appears when there is.
+         - The paragraph. The rows teach it: a tagged row shows what decides
+           that page, and the swatch beside it shows the result. */}
      <section className="settings-header-colour">
-      <div className="header-colour-shared">
-       <label><span><b>HEADER COLOUR</b><small>Every page uses this unless you give one its own below, or unless that page is on a theme of its own — the Facility Map, the Defect Log and Fixed Repairs each have one, and a theme you picked for a page keeps its header. Giving a page its own colour here beats both. The text switches between white and black on its own, so a light colour cannot hide the page title.</small></span>
-        <input type="color" value={headerTheme.shared} onChange={event=>setHeaderTheme({...headerTheme,shared:event.target.value})} aria-label="Header colour for every page"/></label>
-       <button type="button" className="header-colour-reset" onClick={()=>setHeaderTheme({shared:DEFAULT_HEADER_COLOR,overrides:{}})}>RESET ALL TO NAVY</button>
+      <div className="hc-head">
+       <div><b>HEADER COLOUR</b><small>Every page uses this. Give one its own below — that wins, even on a page with its own theme.</small></div>
+       <HeaderSwatch colour={headerTheme.shared} label="Header colour for every page"
+        onPick={value=>setHeaderTheme({...headerTheme,shared:value})}/>
       </div>
-      <div className="header-colour-list">
+      <div className="hc-list">
        {HEADER_SURFACES.map(surface=>{
         const own=headerTheme.overrides[surface.key];
         const page=pageThemes[surface.key];
         /* The same function the pages resolve through, so this row shows what
            that page draws rather than a second opinion about it. */
         const effective=resolveHeaderColor(headerTheme,surface.key,page);
-        return <div className="header-colour-row" key={surface.key}>
-         <span className="header-colour-swatch" style={{background:effective,color:headerTextFor(effective)}} aria-hidden="true">Aa</span>
+        return <div className="hc-row" key={surface.key}>
          <b>{surface.label}</b>
-         <small>{own?"its own colour":page?"its page theme decides this":"following the one above"}</small>
-         <input type="color" value={effective} onChange={event=>setHeaderTheme({...headerTheme,overrides:{...headerTheme.overrides,[surface.key]:event.target.value}})} aria-label={surface.label+" header colour"}/>
-         <button type="button" disabled={!own} onClick={()=>{const next={...headerTheme.overrides};delete next[surface.key];setHeaderTheme({...headerTheme,overrides:next})}} aria-label={"Clear "+surface.label+"'s own header colour"}>FOLLOW</button>
+         {own?<i>own</i>:page?<i>page theme</i>:null}
+         {own?<button type="button" className="hc-clear" aria-label={"Clear "+surface.label+"'s own header colour"}
+          onClick={()=>{const next={...headerTheme.overrides};delete next[surface.key];setHeaderTheme({...headerTheme,overrides:next})}}>&#215;</button>:null}
+         <HeaderSwatch colour={effective} label={surface.label+" header colour"}
+          onPick={value=>setHeaderTheme({...headerTheme,overrides:{...headerTheme.overrides,[surface.key]:value}})}/>
         </div>;
        })}
       </div>
-      {/* THE WORST OF THE EIGHT, against the text that will actually be drawn.
-          It quoted the SHARED colour against WHITE: wrong twice over, because
-          the title switches to black on a light colour, and because a pale
-          override on one page left the note reporting the navy everybody else
-          has. Shown rather than enforced — the switch already keeps the title
-          legible, and this is about whether the header still reads as one. */}
-      <small className="header-colour-note">Lowest header contrast: {(() => {
-       const worst=HEADER_SURFACES.map(surface=>{
-        const colour=resolveHeaderColor(headerTheme,surface.key,pageThemes[surface.key]);
-        /* `headerContrast`, which scores BOTH ends of the bar. The flat
-           colour is only its left edge, and quoting that printed 4.58 for a
-           header whose right end was 3.37. */
-        return {label:surface.label,ratio:headerContrast(colour)};
-       }).reduce((low,row)=>row.ratio<low.ratio?row:low);
-       return Math.round(worst.ratio*100)/100+":1 on "+worst.label;
-      })()}</small>
+      <div className="hc-foot">
+       <button type="button" className="hc-reset" onClick={()=>setHeaderTheme({shared:DEFAULT_HEADER_COLOR,overrides:{}})}>Reset all to navy</button>
+       {/* THE WORST OF THE EIGHT, against the text that will actually be
+           drawn. It quoted the SHARED colour against WHITE: wrong twice over,
+           because the title switches to black on a light colour, and because
+           a pale override on one page left the note reporting the navy
+           everybody else has. Shown rather than enforced. */}
+       <small>{(() => {
+        const worst=HEADER_SURFACES.map(surface=>{
+         const colour=resolveHeaderColor(headerTheme,surface.key,pageThemes[surface.key]);
+         /* `headerContrast`, which scores BOTH ends of the bar. The flat
+            colour is only its left edge, and quoting that printed 4.58 for a
+            header whose right end was 3.37. */
+         return {label:surface.label,ratio:headerContrast(colour)};
+        }).reduce((low,row)=>row.ratio<low.ratio?row:low);
+        return Math.round(worst.ratio*100)/100+":1 on "+worst.label;
+       })()}</small>
+      </div>
      </section>
      <section className="settings-feedback">
       <label className="settings-check"><input type="checkbox" checked={feedback.sound} onChange={event=>setFeedback({sound:event.target.checked,vibration:event.target.checked})}/>
