@@ -19,7 +19,7 @@ import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
 import {reconcileRoadCallsFromSheet} from "@/src/lib/fleet/road-calls";
-import {formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
+import {estimateFromHours,formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
 import type {ScanImportRecord} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {prepareFleetForScannedReplacement,scannedSheetRemovals} from "@/src/lib/down-sheet/down-sheet-replace";
@@ -163,7 +163,7 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
   category:bus.defects?.find(isUnresolved)?.category||"Miscellaneous",
   repair:bus.defects?.find(isUnresolved)?.issue||bus.pendingRepair?.trim()||STATUS_LABELS[bus.s]||"Repair required",
   customReason:bus.defects?.find(isUnresolved)?.details||"",
-  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defectSupportingDetails(defect),estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,defect.category,defect.issue)})),
+  repairItems:(bus.defects||[]).filter(isUnresolved).map((defect,index)=>({...blankRepairItem(index),category:defect.category,repair:defect.issue,details:defectSupportingDetails(defect),estimateEnabled:true,timeEstimate:estimateFromHours(defect.estimateHours,defect.category,defect.issue)})),
   assignmentType:"Mechanic",
   assignedTo:bus.mechanic||"",
   section:bus.roadcall?"Roadcall":"Pending",

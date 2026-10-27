@@ -125,6 +125,7 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
   quantity:firstNumber(defect=>defect.quantity),
   repairHours:firstNumber(defect=>defect.repairHours),
   diagnosticHours:firstNumber(defect=>defect.diagnosticHours),
+  estimateHours:firstNumber(defect=>defect.estimateHours),
   conditionNotDuplicated:anyTrue(defect=>defect.conditionNotDuplicated),
   partsUsed:anyTrue(defect=>defect.partsUsed),
  };

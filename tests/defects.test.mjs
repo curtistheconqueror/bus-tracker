@@ -1950,11 +1950,23 @@ test("a diagnosed cause is learned under the symptom it was found beneath",async
  // nothing remembered, and never learns why.
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
  assert.match(page,/if\(normalizeFinding\(draft\.defect\.finding\)\)setFindingsMemory/);
- // offered under the finding field, scoped to the symptom on the form right now
- assert.match(page,/recallFindings\(findingsMemory,value\.defect\.category,value\.quickIssue\|\|value\.defect\.issue\)/);
- assert.match(page,/learned-findings/);
- // and forgettable from where they are shown
- assert.match(page,/forgetLearnedFinding\(entry\)/);
+
+ // IT STILL LEARNS AND NO LONGER OFFERS, and that is the whole shape of the
+ // change. Curtis took the finding box off this form — "We have description
+ // above, so it kind of redundant" — and ESTIMATED TIME OF REPAIR has its slot.
+ // A record that already carries a cause is still re-learned on every save
+ // here, which is why the line above stays; a read of the memory that starts
+ // from empty would replace the whole library with one entry.
+ assert.equal(/recallFindings\(/.test(page),false,"the chips are not offered on this form any more");
+ assert.equal(/learned-finding/.test(page),false,"nor is their markup left behind");
+ assert.match(page,/useState<FindingsMemory>\(EMPTY_FINDINGS_MEMORY\)/,"but the memory is still read before it is written to");
+ assert.match(page,/readFindingsMemory\(localStorage\)/);
+
+ // OFFERED ON THE DOWN SHEET ROW EDITOR, where a cause gets typed as a repair
+ // is finished, scoped to that card's own repair.
+ const sheet=await readFile(new URL("../app/down-sheet/_components/down-sheet-editor.tsx",import.meta.url),"utf8");
+ assert.match(sheet,/recallFindings\(findingsMemory,item\.category,item\.repair\)/);
+ assert.match(sheet,/learned-findings/);
 
  // Fixed Repairs learns too. A fault is often only named properly once the bus
  // is apart, and that is the page open at the time; a finding typed there
@@ -1964,13 +1976,18 @@ test("a diagnosed cause is learned under the symptom it was found beneath",async
  assert.match(fixed,/recallFindings\(findingsMemory,draft\.category,draft\.issue\)/);
  assert.match(fixed,/learned-findings/);
 
- // Both pages style the chips, because each ships its own stylesheet and an
- // unstyled chip row on one of them is how globals.css leaks in.
- for(const [name,file] of [["defect-log","../app/defect-log/defect-log.css"],["fixed-repairs","../app/fixed-repairs/fixed-repairs.css"]]){
+ // A page that draws the chips styles them itself, because each ships its own
+ // stylesheet and an unstyled chip row on one of them is how globals.css leaks
+ // in. The Defect Log is on the other side of that rule now: it draws none, so
+ // rules for them left in its stylesheet would be dead weight nobody deletes.
+ for(const [name,file] of [["fixed-repairs","../app/fixed-repairs/fixed-repairs.css"]]){
   const css=await readFile(new URL(file,import.meta.url),"utf8");
   assert.match(css,/\.learned-finding\{/,name+" styles the chip");
   assert.match(css,/\.learned-findings>div\{[^}]*flex-wrap:wrap/,name+" wraps them rather than running off a phone");
  }
+ const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.equal(/\.learned-finding/.test(logCss),false,"and the Defect Log keeps no rules for a chip it no longer draws");
+ assert.equal(/work-state-finding/.test(logCss),false,"nor for the box they filled");
 });
 
 test("a repair can be put forward for the Down Sheet without being put on it",async()=>{
@@ -5518,12 +5535,13 @@ test("the shop's own repair time is a ledger somebody sets, not something that d
  assert.equal(findRepairMinutes(legacy,moved.category,moved.issue).minutes,60,"found under today's wording");
  assert.equal(legacy.entries[0].category,moved.category,"and filed in today's words");
 
- /* THREE SOURCES, MOST SPECIFIC FIRST. */
+ /* FOUR SOURCES, MOST SPECIFIC FIRST. */
  const defect={id:"d",category:"Brakes",issue:"Brakes sticking / dragging",details:"",operability:"service",state:"open"};
  const catalog=repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Brakes","Brakes sticking / dragging"));
  assert.equal(defectEstimateMinutes(defect),catalog,"with no ledger it is the catalog's guess");
  assert.equal(defectEstimateMinutes(defect,ledger),120,"the shop's number beats the catalog");
  assert.equal(defectEstimateMinutes({...defect,repairHours:4},ledger),240,"and what was typed on THIS job beats the shop's");
+ assert.equal(defectEstimateMinutes({...defect,repairHours:4,estimateHours:3},ledger),180,"and the estimate for THIS repair beats even that");
  assert.notEqual(catalog,120,"the test would prove nothing if they happened to match");
 
  /* It reaches the badge's total too, not just one defect. */
@@ -6361,4 +6379,166 @@ test("a re-report is visible where it happens, and the count it claims is one it
  for(const rule of [/\.report-again\{/,/\.report-again\.armed\{/,/\.report-again\.counted\{/,/\.report-again\.refused\{/,/\.report-again>span\{font-size:14px/])
   assert.match(css,rule,String(rule)+" has a style");
  assert.match(css,/\.work-state-badge\.report-return\{/,"and the chip reuses the badge the focus view already had");
+});
+
+test("ESTIMATED TIME OF REPAIR is a claim about this bus, and it reaches every screen that quotes a number",async()=>{
+ /* Curtis: "where it says optional what was found replace this with estimated
+    time of repair. Make sure it's wired to all other related inputs." */
+ const {defectEstimateMinutes,openDefectsEstimateMinutes}=await import("../src/lib/defects/defect-estimates.ts");
+ const {normalizeDefects,MAX_REPAIR_HOURS}=await import("../src/lib/defects/repair-catalog.ts");
+ const {estimateFromHours,normalizeRepairTimeEstimate,repairTimeSum,repairTimeTotal}=await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ const {repairItemEstimateHours,blankRepairItem}=await import("../src/lib/down-sheet/down-sheet-repair-items.ts");
+ const {applyDownEntryToFleet}=await import("../src/lib/down-sheet/down-sheet-sync.ts");
+ const {saveRepairMinutes}=await import("../src/lib/defects/repair-hours-ledger.ts");
+
+ const CATEGORY="Brakes",ISSUE="Rear shoes and drums";
+ const catalog=repairTimeTotal(normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE));
+ const defect={id:"d1",category:CATEGORY,issue:ISSUE,details:"",operability:"service",state:"open"};
+
+ /* IT IS NOT THE BILLABLE HOURS BESIDE IT, and that is why it is a new field
+    rather than a relabelled one. `work-time.ts` sums repairHours and
+    diagnosticHours as time WORKED, per person per day, so an estimate written
+    into either would land on somebody's ledger as hours they never spent. */
+ const worked=await readFile(new URL("../src/lib/reports/work-time.ts",import.meta.url),"utf8");
+ assert.match(worked,/normalizeRepairHours\(defect\.repairHours\)/,"the work ledger still reads the billed hours");
+ assert.equal(/estimateHours/.test(worked),false,"and must never read the estimate");
+
+ /* ON TOP OF THE LADDER, and not floored: .25 is somebody saying fifteen
+    minutes, and rounding that up to the Down Sheet's half-hour minimum would
+    overstate the board. */
+ assert.equal(defectEstimateMinutes({...defect,estimateHours:2}),120);
+ assert.equal(defectEstimateMinutes({...defect,estimateHours:0.25}),15,"a mechanic's own number is never floored");
+ const ledger=saveRepairMinutes({entries:[]},{category:CATEGORY,issue:ISSUE,hours:"5"});
+ assert.equal(defectEstimateMinutes({...defect,estimateHours:2},ledger),120,"it outranks the shop's ledger");
+ assert.equal(defectEstimateMinutes(defect,ledger),300,"which still answers when nobody has estimated this one");
+ assert.equal(defectEstimateMinutes(defect),catalog,"and the catalog is still the last word");
+ assert.equal(openDefectsEstimateMinutes([{...defect,estimateHours:2}]),120,"the hours badge adds it up");
+ assert.equal(openDefectsEstimateMinutes([{...defect,estimateHours:2,state:"completed"}]),0,"and finished work still owes nothing");
+
+ /* AN EMPTY BOX REMOVES IT, the rule the shop's ledger and PATH TO REPAIR both
+    follow, and junk on disk reads as no estimate rather than as a number. */
+ assert.equal(normalizeDefects([{...defect,estimateHours:0}],"","b")[0].estimateHours,undefined);
+ assert.equal(normalizeDefects([{...defect,estimateHours:"nonsense"}],"","b")[0].estimateHours,undefined);
+ assert.equal(normalizeDefects([{...defect,estimateHours:-3}],"","b")[0].estimateHours,undefined);
+ assert.equal(normalizeDefects([{...defect,estimateHours:"1.5"}],"","b")[0].estimateHours,1.5,"and a stored string still reads");
+ assert.equal(normalizeDefects([{...defect,estimateHours:900}],"","b")[0].estimateHours,MAX_REPAIR_HOURS,"capped like every other hours field");
+
+ /* THE DOWN SHEET IS SEEDED FROM IT. Two screens quoting different figures for
+    the same repair on the same bus is the disagreement this app keeps being
+    bitten by, so a card built from an estimated defect prints the estimate and
+    one built from an unestimated defect prints the catalog's guess. */
+ assert.equal(repairTimeSum(estimateFromHours(2,CATEGORY,ISSUE)),120);
+ assert.equal(repairTimeTotal(estimateFromHours(2,CATEGORY,ISSUE)),120);
+ assert.deepEqual(estimateFromHours(undefined,CATEGORY,ISSUE),normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE));
+ assert.deepEqual(estimateFromHours("",CATEGORY,ISSUE),normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE));
+ assert.notEqual(repairTimeSum(estimateFromHours(2,CATEGORY,ISSUE)),catalog,"or the seeding would be unobservable");
+
+ /* AND READ BACK OFF IT WITHOUT DRIFTING. The round trip runs through the
+    UNFLOORED sum on purpose: `repairTimeTotal` never reports less than half an
+    hour, so a quarter-hour estimate carried out through the floor and back
+    would overwrite the fifteen minutes somebody typed with thirty, on every
+    save, until the record claimed something nobody had said. */
+ for(const hours of [0.25,0.5,1,1.75,2,7.5]){
+  const card={category:CATEGORY,repair:ISSUE,estimateEnabled:true,timeEstimate:estimateFromHours(hours,CATEGORY,ISSUE)};
+  assert.equal(repairItemEstimateHours(card),hours,"survives the trip through the sheet: "+hours);
+ }
+
+ /* A CARD STILL CARRYING THE CATALOG'S FIGURE HAS CLAIMED NOTHING. Every card
+    is seeded the moment a category is picked, so the presence of a number says
+    nothing at all — the same question `pageThemeHeader` asks about a header
+    colour, and for the same reason. */
+ const fresh={...blankRepairItem(0),category:CATEGORY,repair:ISSUE,estimateEnabled:true,timeEstimate:normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE)};
+ assert.equal(repairItemEstimateHours(fresh),undefined,"a default is not a decision");
+ assert.equal(repairItemEstimateHours({...fresh,estimateEnabled:false,timeEstimate:estimateFromHours(6,CATEGORY,ISSUE)}),undefined,"and an estimate switched off is not one either");
+ assert.equal(repairItemEstimateHours({...fresh,timeEstimate:{...fresh.timeEstimate,otherMinutes:fresh.timeEstimate.otherMinutes+90}}),
+  Math.round((repairTimeSum(fresh.timeEstimate)+90)/60*100)/100,"a card somebody added time to has");
+
+ /* SO A NUMBER TYPED ON THE SHEET BECOMES THE DEFECT'S ESTIMATE, and the hours
+    badge stops disagreeing with the sheet sitting next to it. */
+ const bus={id:"bus-1",l:"garage-1",s:"defect",defects:[{...defect}]};
+ const entry={id:"e1",busId:"bus-1",category:CATEGORY,repair:ISSUE,customReason:"",assignmentType:"Mechanic",assignedTo:"",workflow:"Scheduled",operationalStatus:"defect",
+  repairItems:[{id:"item-1",category:CATEGORY,repair:ISSUE,details:"",estimateEnabled:true,timeEstimate:estimateFromHours(6,CATEGORY,ISSUE)}]};
+ const saved=applyDownEntryToFleet([bus],entry,"2026-10-27T10:00:00.000Z");
+ assert.equal(saved[0].defects.find(item=>item.category===CATEGORY).estimateHours,6);
+
+ /* ONE DIRECTION ONLY. A card left on the catalog's figure writes nothing, so
+    the guess never hardens into a claim on a save that changed nothing — and a
+    defect that already carries an estimate keeps it. */
+ const untouched=applyDownEntryToFleet([{...bus,defects:[{...defect,estimateHours:3}]}],
+  {...entry,repairItems:[{...entry.repairItems[0],timeEstimate:normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE)}]},"2026-10-27T10:00:00.000Z");
+ const kept=untouched[0].defects.find(item=>item.category===CATEGORY);
+ assert.equal(kept.estimateHours,3,"the record's own estimate survives a sheet save");
+ const never=applyDownEntryToFleet([bus],
+  {...entry,repairItems:[{...entry.repairItems[0],timeEstimate:normalizeRepairTimeEstimate(undefined,CATEGORY,ISSUE)}]},"2026-10-27T10:00:00.000Z");
+ assert.equal(never[0].defects.find(item=>item.category===CATEGORY).estimateHours,undefined,"and an unestimated one stays unestimated");
+
+ /* IT IS CARRIED, NOT RE-DERIVED, EVERYWHERE A DEFECT TRAVELS. */
+ const {mergeDuplicateDefects}=await import("../src/lib/defects/duplicate-defects.ts");
+ const merged=mergeDuplicateDefects([{id:"bus-9",n:"6301",l:"bay-1",s:"defect",defects:[
+  {...defect,id:"a",details:"same",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
+  {...defect,id:"b",details:"same",estimateHours:4,createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z"},
+ ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+ assert.equal(merged.length,1,"the two copies merged");
+ assert.equal(merged[0].estimateHours,4,"and the merge keeps the one estimate either of them held");
+
+ /* Both seeding sites ask the defect rather than the catalog: the entry the
+    Defect Log opens when it puts a bus on the sheet, and the cards the Down
+    Sheet builds for a bus that is already down. */
+ const sync=await readFile(new URL("../src/lib/defects/defect-log-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/timeEstimate:estimateFromHours\(defect\.estimateHours,defect\.category,defect\.issue\)/);
+ const sheet=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(sheet,/timeEstimate:estimateFromHours\(defect\.estimateHours,defect\.category,defect\.issue\)/);
+});
+
+test("the Defect Log editor asks how long the repair takes where it used to ask what was found",async()=>{
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* Curtis, on the box this replaced: "We have description above, so it kind of
+    redundant." The cause and the description were two free-text boxes asking
+    nearly the same question on one screen. */
+ /* Matched on the JSX rather than on the prose: the comment where the box used
+    to be names it, which is the point of the comment. */
+ assert.equal(/>WHAT WAS FOUND/.test(page),false,"the finding box's label is gone from this form");
+ assert.equal(/className="work-state-finding"/.test(page),false,"and so is the box");
+ assert.equal(/updateDefect\("finding"/.test(page),false,"and nothing here writes a finding any more");
+ assert.match(page,/ESTIMATED TIME OF REPAIR — HOURS/);
+ assert.match(page,/updateDefect\("estimateHours",normalizeRepairHours\(/,"typed as hours, through the one rule every hours box uses");
+ assert.match(page,/value=\{value\.defect\.estimateHours\}/);
+
+ /* "Also change description to additional details. Capitalize the A & the D."
+    Every other label on this form is upper case, so one in title case would be
+    the odd one out on the screen he was looking at. */
+ assert.match(page,/<span className="description-head">ADDITIONAL DETAILS</);
+ assert.equal(/>DESCRIPTION</.test(page),false);
+ assert.match(page,/aria-label="Start a new bulleted line in the additional details"/,"the bullet button says the same thing the label does");
+
+ /* IN THE SAME PLACE ON THE SCREEN, directly above WORK STATUS and OUTSIDE
+    ADVANCED DETAILS: this is typed by somebody standing at the bus, and a
+    control behind a disclosure here goes unused, the way the campaign paste box
+    did. But outside the WORK DONE SO FAR fieldset the finding sat inside —
+    an estimate is not work done, and that legend would be wrong about the one
+    field under it that looks forward. */
+ const estimateAt=page.indexOf('className="wide repair-estimate-field"');
+ assert.ok(estimateAt>0,"the field is there to find");
+ assert.ok(estimateAt<page.indexOf("<label>WORK STATUS"),"above WORK STATUS");
+ const pickerAt=page.indexOf('className="wide work-state-picker"'),pickerClose=page.indexOf("</fieldset>",pickerAt);
+ assert.ok(pickerAt>0&&pickerClose>pickerAt,"the work-state fieldset is there to measure against");
+ assert.ok(estimateAt>pickerClose,"after the work-state fieldset closes, not inside it");
+ assert.ok(estimateAt<page.indexOf("advanced-defect-details"),"and not behind ADVANCED DETAILS");
+
+ /* IT QUOTES THE RUNG BENEATH IT. A field that hides what it is overriding
+    invites somebody to retype a figure the app already had, or to leave it
+    blank believing nothing has been estimated at all. Asked with every typed
+    figure stripped out, because billable hours are not an estimate. */
+ assert.match(page,/const estimateFallback=defectEstimateMinutes\(\{\.\.\.value\.defect,issue:estimateIssue,estimateHours:undefined,repairHours:undefined,diagnosticHours:undefined\},shopHours\)/);
+ assert.match(page,/findRepairMinutes\(shopHours,value\.defect\.category,estimateIssue\)/,"and names the shop's ledger when that is where the figure came from");
+ assert.match(page,/shopHours=\{repairHours\}/,"the editor is handed the same ledger the feed's badge reads");
+ assert.match(page,/placeholder=\{String\(Math\.round\(estimateFallback\/60\*100\)\/100\)\}/);
+ assert.match(page,/max=\{MAX_REPAIR_HOURS\}/,"so the box cannot show a number the record will not keep");
+
+ /* The box is reachable by name, and the stylesheet draws it. */
+ assert.match(page,/ariaLabel="Estimated time of repair, in hours"/);
+ const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(css,/\.repair-estimate-field input\{[^}]*min-height:48px/,"a phone-sized target at every width");
+ assert.match(css,/\.repair-estimate-field input\{[^}]*max-width:/,"and not a full-width box for two characters");
 });
