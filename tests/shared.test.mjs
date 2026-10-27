@@ -563,7 +563,17 @@ test("the app's name is drawn top-left on every page, from one place", async () 
      one line that reads as a mistake. `text-align:left` on `.app>header` is
      what beats the phone block's `center` on the same selector — same
      specificity, later rule, which only works while this file stays in order. */
-  assert.match(css,/\.app>header\{height:auto;min-height:38px;flex-direction:column;align-items:stretch;padding:11px 12px;text-align:left\}/);
+  {
+   /* Read as declarations rather than pinned as one string: this rule's
+      padding is the Facility Map's half of the one-shape measurement below,
+      and a literal pin fails on the number changing while saying nothing
+      about why the number matters. */
+   const stack=css.match(/\.app>header\{height:auto;min-height:38px;[^}]*\}/)[0];
+   assert.ok(stack.includes("text-align:left"),
+     "text-align:left here is what beats the phone block's `center` on the same selector");
+   assert.ok(/padding:12px[;}]/.test(stack),
+     "12px, the one padding all eight headers use - measured, the title lands at the same x on every page that has no frame");
+  }
   assert.match(css,/\.app>header>h1\{margin:2px 0 1px;font-size:25px;line-height:1\.05;text-align:left\}/,
     "an explicit size, because the phone block drops the header to 11px and the h1 inherited it");
   assert.match(css,/@media\(max-width:760px\)\{\.app>header>h1\{font-size:22px\}\}/,

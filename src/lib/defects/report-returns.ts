@@ -32,7 +32,12 @@ export type ReportReturnResult={
  reason?:ReportReturnRefusal;
 };
 
-type FleetLike={id:string;pendingRepair?:string;defects:StructuredDefect[]};
+/* `defects` is OPTIONAL because the fleet this is handed really does have
+   records without it — a bus imported or merged before the field existed — and
+   `normalizeDefects` takes `unknown` precisely so that is not a special case
+   here. Typed as required, the call site had to be cast to get past the
+   compiler, which is the same statement with the check removed. */
+type FleetLike={id:string;pendingRepair?:string;defects?:StructuredDefect[]};
 
 /* Takes the fleet and hands back the fleet it would write, plus what happened.
    It writes nothing: the caller owns persistence, and has to be able to decide

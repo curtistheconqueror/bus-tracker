@@ -710,7 +710,14 @@ test("quarantine down-sheet entries use non-labor treatment", async () => {
 test("inactive interface tabs keep an explicit high-contrast treatment", async () => {
   const downCss = await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
   const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
-  assert.match(downCss, /down-header nav a\{background:#0b4f9e/);
+  /* It was `background:#0b4f9e` — a navy picked to sit on the old navy
+     header. The header's colour is now a setting, so a literal here is a tab
+     that keeps its old blue on whatever somebody picks. What the rule is
+     actually for is a visible LIFT off the header behind it, so that is what
+     is asserted: a mix against the header's own colour, and a label that
+     follows the header's computed text colour. */
+  assert.match(downCss, /down-header nav a\{background:color-mix\(in srgb,var\(--app-header,[^)]*\) \d+%,var\(--app-header-text,[^)]*\)\)/);
+  assert.match(downCss, /down-header nav a\{[^}]*color:var\(--app-header-text,#fff\)/);
   assert.match(logCss, /Readable inactive page tabs/);
   assert.match(logCss, /log-header nav a\{background:/);
 });
@@ -2641,8 +2648,13 @@ test("the Down Sheet gets its own ADVANCED ACTIONS, and it cannot be mistaken fo
   const logCss = await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
   /* Any translucent white: the opacity moved when the toggle was made easier
      to find, and what matters here is only that it is not this page's purple. */
-  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:#ffffff(?!00|ff)[0-9a-f]{2}/);
+  /* The Defect Log's toggle belongs to its header and now takes the header's
+     computed ink rather than the translucent white it used while every header
+     was navy; the Down Sheet's stays purple. What matters here is that the
+     two cannot be confused, which is why this reads both sides. */
+  assert.match(logCss,/\.header-advanced-toggle\{[^}]*background:transparent/);
   assert.doesNotMatch(logCss,/\.header-advanced-toggle\{[^}]*background:#6b31b6/,"the two toggles must not share a colour");
+  assert.match(css,/\.down-advanced-toggle\{[^}]*background:#6b31b6/,"the Down Sheet's keeps its own purple");
 
   /* What went in, and what deliberately stayed out. ADD DOWN BUS and SEARCH
      are the two things used on every visit and now sit together, instead of

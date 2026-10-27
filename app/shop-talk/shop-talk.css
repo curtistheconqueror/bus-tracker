@@ -6,16 +6,16 @@
 
 /* globals.css gives every bare <header> a fixed height:38px that min-height
    cannot undo. See the cascade-check skill. */
-.talk-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:linear-gradient(110deg,#07301d,#0d5c34);color:#fff;box-shadow:0 3px 14px #03200f55}
+.talk-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,#1d3459));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00000055}
 .talk-app{min-height:100vh;padding-bottom:28px;background:linear-gradient(180deg,#eef5f0,#fafcfa);color:#1d2b22;font-family:Arial,Helvetica,sans-serif}
 .talk-header>div{min-width:0}
-.talk-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:#79c99a}
+.talk-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,#fff) 84%,transparent)}
 .talk-header h1{margin:2px 0 1px;font-size:25px;line-height:1}
-.talk-header p{margin:4px 0 0;font-size:9px;color:#b9e0c9}
-.talk-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid #5aa37a;border-radius:6px;background:#0a4527}
-.talk-header nav a{min-width:104px;padding:10px 12px;background:#0a4527;color:#fff;font-size:8px;font-weight:900;text-align:center;text-decoration:none;text-shadow:0 1px 2px #03200f}
-.talk-header nav a.active{background:#fff;color:#0d5c34}
-.talk-header nav a+a{border-left:1px solid #46805f}
+.talk-header p{margin:4px 0 0;font-size:9px;color:color-mix(in srgb,var(--app-header-text,#fff) 90%,transparent)}
+.talk-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid color-mix(in srgb,var(--app-header-text,#fff) 42%,transparent);border-radius:6px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff))}
+.talk-header nav a{min-width:104px;padding:10px 12px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff));color:var(--app-header-text,#fff);font-size:8px;font-weight:900;text-align:center;text-decoration:none}
+.talk-header nav a.active{background:var(--app-header-text,#fff);color:var(--app-header,#0d5c34)}
+.talk-header nav a+a{border-left:1px solid color-mix(in srgb,var(--app-header-text,#fff) 28%,transparent)}
 
 .talk-scope{margin:0;padding:9px 18px;background:#eaf5ee;border-bottom:1px solid #bcdcc8;font-size:10px;font-weight:700;color:#2c6442}
 /* Open hazards get a line of their own above the form. A count buried in a
@@ -97,7 +97,7 @@
    breakpoint that already exists removes the fight rather than overriding
    it. See the cascade-check skill. */
 @media(max-width:760px){
- .talk-header{align-items:flex-start;flex-direction:column;padding:11px 12px}
+ .talk-header{align-items:flex-start;flex-direction:column;padding:12px}
  .talk-header nav{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
  .talk-header nav a{min-width:0;padding:9px 4px}
  .talk-header nav a+a{border-left:0}

@@ -122,7 +122,16 @@ export function displayStyleVars(display:DefectLogDisplaySettings,theme:string){
  const vars:Record<string,string>={};
  for(const key of Object.keys(DEFAULT_DEFECT_LOG_DISPLAY.styles) as DefectLogStyleKey[]){
   const style=display.styles[key],name=key.replace(/[A-Z]/g,letter=>"-"+letter.toLowerCase());
-  if(theme==="light"||!followsTheme(key,style.color))vars["--log-"+name+"-color"]=style.color;
+  /* `pageTitle` is the one of the seven that is NOT drawn on white. It sits
+     on the header, and its default #ffffff was the header's colour back when
+     every header was dark navy. Emitted on light like the other six it pins
+     the page title white over whatever colour somebody picks in Settings —
+     measured, 1.35:1 on a pale yellow header, with the panel beside it
+     promising that cannot happen. Left out while it is still the default, the
+     header's own computed text colour answers; changed by hand, it is emitted
+     like anything else and the person's choice wins. */
+  const headerColour=key==="pageTitle";
+  if((theme==="light"&&!headerColour)||!followsTheme(key,style.color))vars["--log-"+name+"-color"]=style.color;
   vars["--log-"+name+"-size"]=style.fontSize+"px";
  }
  return vars;

@@ -1269,3 +1269,489 @@ test("Escape in the bus editor is off, and asks only when something changed", as
  assert.match(panel,/ESCAPE CLOSES THE BUS EDITOR/);
  assert.match(panel,/checked=\{escapeClosesEditor\}/);
 });
+
+test("one header colour for the whole app, with a page theme and an override above it", async () => {
+ const {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,HEADER_TEXT_DARK,HEADER_TEXT_LIGHT,
+  contrastRatio,hasHeaderOverride,headerColorFor,headerContrast,headerGradient,headerStops,headerTextFor,isHeaderColor,loadHeaderTheme,
+  readHeaderTheme,resolveHeaderColor,saveHeaderTheme,serializeHeaderTheme}
+  =await import("../src/lib/settings/header-theme.ts");
+
+ assert.equal(HEADER_THEME_KEY,"pace-header-theme-v1");
+ /* The eight surfaces of the app, and nothing else: a ninth would be a page
+    that exists, and a missing one a header this setting cannot reach. */
+ assert.deepEqual(HEADER_SURFACES.map(s=>s.key),["map","down","log","fixed","lists","incidents","talk","settings"]);
+
+ /* ALL EIGHT THE SAME is what was chosen, so a device that has never opened
+    this panel resolves every surface to one colour. */
+ for (const {key} of HEADER_SURFACES) assert.equal(headerColorFor(DEFAULT_HEADER_THEME,key),DEFAULT_HEADER_COLOR);
+
+ /* A colour goes straight into a style attribute. Only a hex colour is taken,
+    and everything else reads as "not set" rather than as itself. */
+ assert.ok(isHeaderColor("#041d47")&&isHeaderColor("#ABC")&&isHeaderColor(" #abc123 "));
+ for (const bad of ["red","rgb(4,29,71)","#12345","#gggggg","red; background:url(x)","",null,undefined,7,{}])
+  assert.equal(isHeaderColor(bad),false,String(bad));
+ assert.deepEqual(readHeaderTheme(JSON.stringify({shared:"red; background:url(x)",overrides:{log:"javascript:x"}})),
+  {shared:DEFAULT_HEADER_COLOR,overrides:{}});
+
+ /* An override that is not a colour is stored as an ABSENCE, the spelling
+    setBusHold and the ledger's `gap` use, so "" cannot read as a value. */
+ const mixed=readHeaderTheme(JSON.stringify({shared:"#223344",overrides:{log:"#ff0000",talk:"",lists:5}}));
+ assert.deepEqual(mixed,{shared:"#223344",overrides:{log:"#ff0000"}});
+ assert.equal("talk" in mixed.overrides,false);
+ assert.equal(hasHeaderOverride(mixed,"log"),true);
+ assert.equal(hasHeaderOverride(mixed,"talk"),false);
+ assert.equal(headerColorFor(mixed,"log"),"#ff0000");
+ assert.equal(headerColorFor(mixed,"talk"),"#223344");
+
+ /* Unreadable, missing and the wrong shape all land on the default rather
+    than throwing into a render. */
+ for (const bad of [null,"","{",'"text"',"[]","7"]) assert.deepEqual(readHeaderTheme(bad),{shared:DEFAULT_HEADER_COLOR,overrides:{}});
+ assert.deepEqual(loadHeaderTheme({getItem(){throw new Error("denied")}}),{shared:DEFAULT_HEADER_COLOR,overrides:{}});
+ assert.equal(saveHeaderTheme({getItem:()=>null,setItem(){throw new Error("full")}},DEFAULT_HEADER_THEME),false);
+ assert.deepEqual(readHeaderTheme(serializeHeaderTheme(mixed)),mixed);
+
+ /* THE LADDER: an override for this surface, then a page theme, then the
+    shared colour. A device on the default theme passes no page theme at all,
+    which is the case every surface is in until somebody picks one. */
+ assert.equal(resolveHeaderColor(mixed,"fixed",undefined),"#223344");
+ assert.equal(resolveHeaderColor(mixed,"fixed","#15180f"),"#15180f");
+ /* The override outranks the page theme, so Settings can always force it. */
+ assert.equal(resolveHeaderColor(mixed,"log","#15180f"),"#ff0000");
+ /* A page theme that is not a colour is not a rung. */
+ assert.equal(resolveHeaderColor(mixed,"fixed","chartreuse"),"#223344");
+
+ /* AN EXTERNAL ANCHOR FIRST, because the sweep below is otherwise circular.
+    It picks the text with `headerTextFor`, which calls `contrastRatio`, then
+    measures the result with `contrastRatio` — so any monotone replacement of
+    the luminance function reports ITSELF as fine. Dropping the sRGB
+    linearisation, or swapping the WCAG coefficients for a flat average, both
+    keep the sweep at 4.58 while the real floor falls to 3.75 and 4.32. These
+    three are WCAG's own published numbers and cannot be satisfied by a
+    function that has lost its gamma. */
+ assert.equal(Math.round(contrastRatio("#000000","#ffffff")*100)/100,21);
+ assert.equal(Math.round(contrastRatio("#ffffff","#ffffff")*100)/100,1);
+ assert.equal(Math.round(contrastRatio("#777777","#ffffff")*100)/100,4.48);
+ assert.equal(Math.round(contrastRatio("#0000ff","#ffffff")*100)/100,8.59);
+
+ /* THE TEXT COLOUR IS COMPUTED, so no chosen background can hide the title. */
+ assert.equal(headerTextFor("#041d47"),HEADER_TEXT_LIGHT);
+ assert.equal(headerTextFor("#ffd98a"),HEADER_TEXT_DARK);
+ assert.equal(headerTextFor("nonsense"),HEADER_TEXT_LIGHT);
+ /* Not a handful of samples: the whole colour cube, because the picker will
+    hand out any of it and the failures this guards against showed up on a
+    mid-grey, a magenta and a mid sage rather than on anything anybody chose.
+
+    MEASURED AGAINST BOTH ENDS OF THE GRADIENT, through `headerContrast`. The
+    first version scored the picked colour alone, which is only the bar's LEFT
+    edge: the far end is lighter, a title runs across both, and the sweep
+    reported 4.58 while the real worst square was 3.37. A step of 3 rather
+    than 15, because the 15-step grid missed the worst square by more than a
+    whole grade — 4.58 against 3.37 — and 85 cubed is still instant. */
+ let floor=99,worst="";
+ for (let r=0;r<256;r+=3) for (let g=0;g<256;g+=3) for (let b=0;b<256;b+=3) {
+  const background="#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
+  const ratio=headerContrast(background);
+  if (ratio<floor) { floor=ratio; worst=background; }
+ }
+ /* 4.0, not 4.5, and the number is the point. A gradient costs contrast at
+    its far end and no lift avoids it — 3.86 at 16%, 4.12 at 10%, 4.58 only
+    with no gradient at all. The page title is 25px bold, which needs 3.0 for
+    AA and gets 4.12 at the worst square in the cube. Written as a floor that
+    is true rather than a threshold that is aspirational. */
+ assert.ok(floor>=4.0,"worst header contrast "+floor.toFixed(2)+":1 on "+worst);
+ assert.ok(floor<4.5,"if this passes 4.5 the gradient has gone - check HEADER_LIFT");
+
+ /* Both stops are plain hex, so what the browser paints is what was scored. */
+ assert.equal(headerGradient("#041d47"),"linear-gradient(90deg,#041d47,#1d3459)");
+ assert.deepEqual(headerStops("#041d47"),["#041d47","#1d3459"]);
+ /* Mixed toward white on a dark colour and toward black on a light one. */
+ assert.ok(relativeLuminanceRose(headerStops("#ffd98a")[1])<relativeLuminanceRose("#ffd98a"));
+ function relativeLuminanceRose(hex){ return contrastRatio(hex,"#000000"); }
+
+ /* WHAT IS WRITTEN BACK IS VALIDATED, not just what is read. The read side
+    re-checks everything, so a bad value cannot reach a style attribute either
+    way — but this is the file's own stated rule ("a stored value is not a
+    place to accept `red; background:url(...)`") and nothing failed when the
+    guard was removed from the writer. */
+ assert.equal(JSON.parse(serializeHeaderTheme({shared:"nonsense",overrides:{}})).shared,DEFAULT_HEADER_COLOR);
+ assert.deepEqual(JSON.parse(serializeHeaderTheme({shared:"#223344",overrides:{log:"red; background:url(x)",talk:"#abc"}})).overrides,{talk:"#aabbcc"});
+ /* And only the eight surfaces are carried across, so a key somebody put in
+    the file by hand cannot ride back out of it. */
+ assert.deepEqual(Object.keys(JSON.parse(serializeHeaderTheme({shared:"#223344",overrides:{nonsuch:"#ff0000"}})).overrides),[]);
+ assert.deepEqual(readHeaderTheme(JSON.stringify({shared:"#223344",overrides:{nonsuch:"#ff0000"}})).overrides,{});
+ /* `hasHeaderOverride` must mean "has a COLOUR", not "has a key": the
+    Settings row and the ladder both branch on it, and a key holding junk
+    would make the panel claim an override the page cannot draw. */
+ assert.equal(hasHeaderOverride({shared:"#223344",overrides:{log:"chartreuse"}},"log"),false);
+ assert.equal(resolveHeaderColor({shared:"#223344",overrides:{log:"chartreuse"}},"log","#15180f"),"#15180f");
+
+ /* THREE-DIGIT HEX IS EXPANDED on the way in, because the control that edits
+    it is <input type="color">, which only accepts seven characters and
+    silently shows #000000 for anything shorter — a swatch reading black over
+    a header drawing the right colour. */
+ assert.equal(readHeaderTheme(JSON.stringify({shared:"#abc",overrides:{talk:"#0F8"}})).shared,"#aabbcc");
+ assert.equal(readHeaderTheme(JSON.stringify({shared:"#abc",overrides:{talk:"#0F8"}})).overrides.talk,"#00ff88");
+
+ /* 90deg, because the Facility Map's header bar and the phone nav under it
+    are two stacked boxes of different heights that have to paint the same
+    colour at the same x. A tilted gradient puts a seam between them. */
+ assert.match(headerGradient("#041d47"),/^linear-gradient\(90deg,/);
+ assert.match(headerGradient("nonsense"),/#041d47/);
+});
+
+test("the header panel can see which pages their own theme is deciding", async () => {
+ const {readPageHeaderThemes,pageHeaderThemes,pageThemeHeader,DEFAULT_MAP_HEADER,DEFAULT_PAGE_HEADER,
+  BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes}
+  =await import("../src/lib/settings/page-header-themes.ts");
+ assert.equal(BOARD_SETTINGS_KEY,"pace-board-settings-v1");
+ assert.equal(LOG_SETTINGS_KEY,"pace-defect-log-settings-v1");
+
+ /* The default theme on each page defers to the shared colour, so it is not
+    an entry: every device that has never opened those panels is here. */
+ assert.deepEqual(readPageHeaderThemes(null,null),{});
+ assert.deepEqual(readPageHeaderThemes(
+  JSON.stringify({theme:"default",visuals:{header:"#06275c"}}),
+  JSON.stringify({theme:"light",appearance:{header:"#061d45"}})),{});
+
+ /* A theme that is not the default IS deciding, and the Defect Log and Fixed
+    Repairs share one record, so one answer covers both surfaces. */
+ assert.deepEqual(readPageHeaderThemes(
+  JSON.stringify({theme:"tactical",visuals:{header:"#15180f"}}),
+  JSON.stringify({theme:"midnight",appearance:{header:"#020a18"}})),
+  {map:"#15180f",log:"#020a18",fixed:"#020a18"});
+
+ /* `custom` IS NOT A LOOK SOMEBODY PICKED. Both appearance panels set it when
+    ANY colour in them changes — one bus status colour, one section
+    background. Read as "this page has decided its own header" it took the
+    Facility Map out of the shared setting on every device that had ever
+    nudged a status colour, with the Settings row reporting "its page theme
+    decides this" about a header nobody chose. The question is whether the
+    header colour actually DIFFERS from the one the page would have had. */
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:DEFAULT_MAP_HEADER}},
+   {theme:"custom",appearance:{header:DEFAULT_PAGE_HEADER}}),{});
+ assert.deepEqual(pageHeaderThemes({theme:"custom",visuals:{header:"#5b0f3a"}},null),{map:"#5b0f3a"});
+ assert.equal(pageThemeHeader("map","default",DEFAULT_MAP_HEADER),"");
+ assert.equal(pageThemeHeader("page","light",DEFAULT_PAGE_HEADER),"");
+ assert.equal(pageThemeHeader("map","terminal",undefined),"#00150c");
+ assert.equal(pageThemeHeader("page","tactical",undefined),"#15180f");
+ /* The table outranks a palette that disagrees with it, so the module and the
+    two pages reading one record cannot answer differently — which is how a
+    header bar and the drawer under it end up different colours. */
+ assert.equal(pageThemeHeader("page","tactical","#ff0000"),"#15180f");
+ assert.equal(pageThemeHeader("page","custom","#ff0000"),"#ff0000");
+ assert.equal(pageThemeHeader("page",7,"#ff0000"),"");
+
+ /* THE THEME NAME IS THE FACT AND THE STORED PALETTE IS A COPY OF IT, so a
+    record naming a theme resolves from the table even with the palette
+    missing or corrupt — which is an ordinary record for an older build or a
+    hand-seeded device, and used to answer "no theme" while the page's own
+    drawer stayed on the theme. */
+ for (const bad of ["",null,7,"chartreuse","red; background:url(x)",undefined])
+  assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical",visuals:{header:bad}}),null),{map:"#15180f"},String(bad));
+ assert.deepEqual(readPageHeaderThemes(JSON.stringify({theme:"tactical"}),JSON.stringify({theme:"midnight"})),
+  {map:"#15180f",log:"#020a18",fixed:"#020a18"});
+
+ /* `custom` has no table entry, and there the stored palette IS the decision
+    — so it is still the only source, and still has to be a colour. */
+ assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:"#3b0f52"}})),
+  {log:"#3b0f52",fixed:"#3b0f52"});
+ for (const bad of ["",null,7,"chartreuse","red; background:url(x)"])
+  assert.deepEqual(readPageHeaderThemes(null,JSON.stringify({theme:"custom",appearance:{header:bad}})),{},String(bad));
+ for (const bad of [null,"","{",'"text"',"[]","7",JSON.stringify({visuals:{header:"#15180f"}}),JSON.stringify({theme:"nonsuch"})])
+  assert.deepEqual(readPageHeaderThemes(bad,null),{},String(bad));
+
+ /* Absence, not a key holding "" — so `"map" in themes` answers directly. */
+ const one=readPageHeaderThemes(JSON.stringify({theme:"black",visuals:{header:"#000000"}}),null);
+ assert.equal("map" in one,true);
+ assert.equal("log" in one,false);
+ assert.deepEqual(loadPageHeaderThemes({getItem(){throw new Error("denied")}}),{});
+
+ /* The Settings screen passes the settings it is already holding, not JSON,
+    because both appearance panels are on that same screen and a snapshot
+    read on mount would describe the theme as it was before the person
+    changed it. Same rule, so the two callers cannot drift. */
+ assert.deepEqual(
+  pageHeaderThemes({theme:"tactical",visuals:{header:"#15180f"}},{theme:"midnight",appearance:{header:"#020a18"}}),
+  readPageHeaderThemes(
+   JSON.stringify({theme:"tactical",visuals:{header:"#15180f"}}),
+   JSON.stringify({theme:"midnight",appearance:{header:"#020a18"}})));
+ assert.deepEqual(pageHeaderThemes(null,undefined),{});
+ assert.deepEqual(pageHeaderThemes({theme:"default",visuals:{header:"#06275c"}},{theme:"light",appearance:{header:"#061d45"}}),{});
+});
+
+test("a header's pre-JavaScript fallback is the colour it will settle on", async () => {
+ const {DEFAULT_HEADER_COLOR,headerGradient}=await import("../src/lib/settings/header-theme.ts");
+ const expected=headerGradient(DEFAULT_HEADER_COLOR);
+
+ /* HeaderThemeLive paints from an effect, so the browser has already drawn
+    the server's HTML by the time it runs. Whatever each header rule names as
+    its `--app-header-fill` fallback IS the first thing a person sees. Written
+    as each page's OLD colour it was a measured flash — Incidents came up rust
+    and turned navy 37ms later on a warm desktop. These five have no page
+    theme, so the colour they settle on is the app default, and that is what
+    they must open with. Five copies of one literal, asserted identical here
+    rather than trusted. */
+ for (const file of ["../app/down-sheet/down-sheet.css","../app/lists/lists.css","../app/incidents/incidents.css",
+                     "../app/shop-talk/shop-talk.css","../app/settings/settings.css"]) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  /* Balanced, not a regex: the fallback is `color-mix(...)` inside
+     `linear-gradient(...)` inside `var(...)`, and a non-greedy `[^;]*?\)`
+     stops at the first inner bracket and compares a truncated string. */
+  const found=[];
+  for (let at=css.indexOf("var(--app-header-fill,"); at>=0; at=css.indexOf("var(--app-header-fill,",at+1)) {
+   let depth=1,i=at+"var(--app-header-fill,".length; const from=i;
+   while (i<css.length&&depth>0) { if(css[i]==="(")depth++; else if(css[i]===")")depth--; i++; }
+   found.push(css.slice(from,i-1));
+  }
+  assert.equal(found.length,1,file+" should name the fallback exactly once");
+  assert.equal(found[0],expected,file+" must fall back to the app default, not its own old colour");
+ }
+
+ /* THE MAP IS IN THE SAME LIST, and it used to fall back through
+    `var(--header-bg)` — whose own literal is the OLD #06275c, and which the
+    map writes inline from its theme anyway. Measured: with JavaScript off the
+    eight headers drew two different navies, and with it on the map held
+    #06275c for 116ms before turning #041d47, while the other seven changed
+    colour not at all. The server render cannot read LocalStorage, so falling
+    back "to the theme" was never going to produce the theme. */
+ const globals=await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ const bare=globals.match(/(?:^|\})header\{background:var\(--app-header-fill,([^;]*)\);/m);
+ assert.ok(bare,"the bare header rule must read the shared fill");
+ assert.equal(bare[1],expected,"and fall back to the app default, not the old navy");
+
+ /* The Defect Log and Fixed Repairs fall back to their own page variable,
+    which React writes inline. NOT "correct without JavaScript" — the server
+    render writes the hook's default, which is the app default — but it keeps
+    the page's one source of truth in the chain. */
+ const log=await readFile(new URL("../app/defect-log/defect-log.css", import.meta.url), "utf8");
+ assert.match(log,/\.log-header\{background:var\(--app-header-fill,var\(--log-header\)\)/);
+ const fixed=await readFile(new URL("../app/fixed-repairs/fixed-repairs.css", import.meta.url), "utf8");
+ assert.match(fixed,/\.fixed-header\{background:var\(--app-header-fill,var\(--fixed-header,#061d45\)\)/);
+});
+
+test("the painting is wired up, and no header still names a colour of its own", async () => {
+ /* NOTHING IN tests/ TOUCHED THE COMPONENT THAT DOES THE PAINTING, which a
+    cold read found by grepping for it and getting nothing back. The modules
+    below are exercised; the wiring between them was not, and deleting
+    `var(--app-header-fill,…)` from one stylesheet leaves that page silently
+    keeping a hard-coded colour — which is the exact bug this change exists to
+    remove — with the suite still green. */
+ const live=await readFile(new URL("../src/components/shared/header-theme-live.tsx", import.meta.url), "utf8");
+ const layout=await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+ const {DEFAULT_HEADER_COLOR,HEADER_SURFACES}=await import("../src/lib/settings/header-theme.ts");
+
+ /* Mounted once, in the root layout, inside the crash boundary. */
+ assert.match(layout,/import HeaderThemeLive from "@\/src\/components\/shared\/header-theme-live"/);
+ assert.match(layout,/<CrashGuard><HeaderThemeLive\/>/);
+ /* The static status bar colour is the app default, not the old navy: it is
+    what the OS paints before any JavaScript runs. */
+ assert.match(layout,new RegExp('themeColor:"'+DEFAULT_HEADER_COLOR+'"'));
+
+ /* The three properties the stylesheets read, and the meta the OS reads. */
+ for (const name of ["--app-header","--app-header-fill","--app-header-text"])
+  assert.ok(live.includes('setProperty("'+name+'"'),"HeaderThemeLive must set "+name);
+ assert.match(live,/meta\[name="theme-color"\]/);
+ /* It resolves through the ladder, not the shared colour alone — otherwise a
+    themed page's <html> and status bar disagree with its own header. */
+ assert.match(live,/resolveHeaderColor\(theme,surface,pages\[surface\]\)/);
+ /* And it never writes a record. */
+ assert.equal(/setItem|saveHeaderTheme/.test(live),false,"HeaderThemeLive must not write storage");
+
+ /* Every route the nav offers has a surface, and `/` is matched last because
+    every path starts with it. */
+ const routes=[...live.matchAll(/\["(\/[a-z-]*)","([a-z]+)"\]/g)].map(m=>[m[1],m[2]]);
+ assert.deepEqual(routes.map(r=>r[1]).sort(),HEADER_SURFACES.map(s=>s.key).sort());
+ assert.equal(routes[routes.length-1][0],"/");
+
+ /* ALL EIGHT HEADER BARS READ THE SHARED FILL. */
+ const bars=[["../app/globals.css",/header\{background:var\(--app-header-fill,/],
+  ["../app/down-sheet/down-sheet.css",/\.down-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/defect-log/defect-log.css",/\.log-header\{background:var\(--app-header-fill,/],
+  ["../app/fixed-repairs/fixed-repairs.css",/\.fixed-header\{background:var\(--app-header-fill,/],
+  ["../app/lists/lists.css",/\.lists-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/incidents/incidents.css",/\.incidents-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/shop-talk/shop-talk.css",/\.talk-header\{[^}]*background:var\(--app-header-fill,/],
+  ["../app/settings/settings.css",/\.settings-header\{[^}]*background:var\(--app-header-fill,/]];
+ for (const [file,pattern] of bars) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(css,pattern,file+" must paint its header from the shared fill");
+ }
+
+ /* AND NOTHING INSIDE A HEADER STILL NAMES ITS OWN COLOUR. The change
+    converted the header's BACKGROUND on all eight pages and its FOREGROUND on
+    two, and the gap was only visible by picking a pale colour and measuring:
+    the kickers, subtitles, tab bands and tab labels stayed at literals chosen
+    for a navy header and came out at 1.0 to 1.9:1. Every colour inside a
+    header rule now derives from `--app-header` or `--app-header-text`, and a
+    literal reintroduced here fails before anybody has to look at it. */
+ /* `-header` and not `-header-anything`, or this catches the new
+    `.settings-header-colour` panel, which is a settings card and not a
+    header. And only the declaration that WINS: a base rule's literal that a
+    later rule converts is how every one of these files is written.
+
+    The `m` flag is load-bearing: these stylesheets put several rules on one
+    line, so a rule can be preceded by `}` OR by a newline, and without it
+    every rule that happens to start a line was skipped — including the two
+    that convert the Defect Log's active tab, which left this reporting a
+    literal that three lines later is not what paints.
+
+    FOUR HOLES A COLD READ GOT A REAL DEFECT THROUGH, all closed here:
+
+    - `app/globals.css` was not in the list, and it holds `.app-kicker`,
+      `.app-subtitle`, `.app-refresh`, the bare `header` rule and the phone
+      nav — every one of them drawn inside a header. Putting `.app-kicker`
+      back on its own pre-change blue passed.
+    - only four properties were read, so `border`, `border-left` and
+      `box-shadow` were invisible. Two rust and green dividers were in the
+      shipped code the whole time.
+    - a value counted as derived if it mentioned one of eight variable names
+      ANYWHERE, so a literal sitting beside one passed.
+    - in a comma-separated selector list only the LAST selector was recorded,
+      so `.talk-header p,.talk-scope-note{color:#b9e0c9}` was never examined. */
+ const HEADER_SELECTOR=/\b(?:down|log|fixed|lists|incidents|talk|settings)-header(?![\w-])|\.app-kicker|\.app-subtitle|\.app-refresh|\.mobile-mode-nav|\.app-name|\.header-advanced-toggle|^header\b/;
+ const RULE=/(^|\}|\{)([^{}]*?)\{([^{}]*)\}/gm;
+ const PAINTS=/^(color|background|background-color|border|border-color|border-left|border-right|border-top|border-bottom|box-shadow|outline-color)$/;
+ /* Derived means the value's EVERY colour comes from the header. A literal
+    beside a variable is still a literal, so the hex is looked for directly
+    and a `var(--app-header…)` fallback literal is not counted as one. */
+ const HEADER_VAR=/var\(--(app-header|app-header-text|app-header-fill|log-header|log-header-text|fixed-header|fixed-header-text|log-accent-text|header-bg|header-text|down-navy|panel-bg|log-surface|log-accent|fixed-surface|fixed-ink|theme-border)[^)]*\)/g;
+ const winner=new Map();
+ for (const file of ["../app/globals.css","../app/down-sheet/down-sheet.css","../app/defect-log/defect-log.css",
+   "../app/fixed-repairs/fixed-repairs.css","../app/lists/lists.css","../app/incidents/incidents.css",
+   "../app/shop-talk/shop-talk.css","../app/settings/settings.css"]) {
+  const css=(await readFile(new URL(file, import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g,"");
+  for (const match of css.matchAll(RULE)) {
+   const body=match[3];
+   /* EVERY selector in the list, not just the last one. */
+   for (const selector of match[2].split(",").map(part=>part.trim()).filter(Boolean)) {
+    /* The bare `header{…}` rule is the Facility Map's, and it is the one
+       selector with no class at all — pinning its text white was the headline
+       failure of the previous review and passed this check. */
+    if(!HEADER_SELECTOR.test(selector)) continue;
+    for (const decl of body.split(";")) {
+     const [property,...rest]=decl.split(":");
+     const name=(property||"").trim();
+     if(!PAINTS.test(name)) continue;
+     winner.set(file.replace("../app/","")+"  "+selector+"  "+name,rest.join(":").trim());
+    }
+   }
+  }
+ }
+ /* A shadow may be any colour — it is depth, not a surface somebody reads
+    words off — so only its being a LITERAL is allowed, not a branded one. */
+ const BRANDED=/#(?:[0-9a-f]{2})*(?:74a8df|9fc7ff|dbeaff|c4d7ee|e8a579|f0cdb4|79c99a|b9e0c9|082f60|5a1d07|0a4527|0b4f9e|a4663c|46805f|2a0c03|03200f|eaf3ff|d3e3f7|81a9dc|8fc0f3|c98355|5aa37a|7fa4cf|5c79a2)/i;
+ /* A DELIBERATE LIFT OFF THE HEADER IS DERIVED, and a literal wearing one is
+    not. The Defect Log tints its inactive tabs toward a fixed blue so they
+    stay readable, which is its own older rule and fine — the header colour is
+    still what dominates. The share is what separates that from
+    `color-mix(in srgb,var(--app-header-text) 10%,#b9e0c9)`, which is a
+    literal with a variable standing next to it and which got past the first
+    version of this check. At or above half, the header decides. */
+ const LIFT=/color-mix\(\s*in srgb\s*,\s*var\(--[\w-]+[^)]*\)\s*(\d+)%/;
+ const offenders=[...winner].filter(([where,value])=>{
+   const bare=value.replace(HEADER_VAR,"");
+   if(!/#[0-9a-f]{3,8}\b/i.test(bare)) return false;
+   const lift=value.match(LIFT);
+   if(lift&&Number(lift[1])>=50&&HEADER_VAR.test(value)) return false;
+   /* box-shadow and outline carry no text; a neutral literal there is fine. */
+   if(/ (box-shadow|outline-color)$/.test(where)) return BRANDED.test(bare);
+   return true;
+ }).map(([where,value])=>where+" : "+value);
+ assert.deepEqual(offenders,[],"a header rule still names its own colour:\n  "+offenders.join("\n  "));
+});
+
+test("the wiring between the colour and the pixels, which nothing used to exercise", async () => {
+ /* A cold read mutated this wiring twelve ways and the suite caught none of
+    them: the painter stopped following the route, both listeners came out,
+    two routes were swapped so Incidents drew Shop Talk's override, the two
+    themed pages were unplugged from the shared colour, the ladder's middle
+    rung was dropped at both call sites, Settings stopped asking for a
+    repaint, and the save was put back before the write. Every one is a
+    behaviour a person sees. The modules they connect are well covered; the
+    connections were not covered at all. */
+ const live=await readFile(new URL("../src/components/shared/header-theme-live.tsx", import.meta.url), "utf8");
+ const settings=await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+ const log=await readFile(new URL("../app/defect-log/page.tsx", import.meta.url), "utf8");
+ const fixed=await readFile(new URL("../app/fixed-repairs/page.tsx", import.meta.url), "utf8");
+ const {HEADER_SURFACES}=await import("../src/lib/settings/header-theme.ts");
+
+ /* IT FOLLOWS THE ROUTE. With `[]` for deps it paints the first page opened
+    and then never again, so a per-page override applies to whichever page you
+    happened to land on. */
+ assert.match(live,/\},\[path\]\);/,"the painter's effect must depend on the path");
+
+ /* BOTH LISTENERS, and both removed. `storage` fires only in OTHER tabs —
+    the shop computer's second tab — and the CustomEvent is the same-tab path
+    that repaints the Settings page you are changing the colour on. */
+ for (const pattern of [/window\.addEventListener\("storage",fromAnotherTab\)/,
+                        /window\.addEventListener\(HEADER_THEME_KEY,apply\)/,
+                        /window\.removeEventListener\("storage",fromAnotherTab\)/,
+                        /window\.removeEventListener\(HEADER_THEME_KEY,apply\)/])
+  assert.match(live,pattern,"HeaderThemeLive must add and remove "+pattern);
+ assert.match(settings,/window\.dispatchEvent\(new CustomEvent\(HEADER_THEME_KEY\)\)/,
+   "Settings must ask the page it is on to repaint");
+
+ /* THE PAIRINGS, not just the set. Swapping two of them made Incidents paint
+    Shop Talk's colour, and a sorted-set comparison cannot see that. */
+ const routes=Object.fromEntries([...live.matchAll(/\["(\/[a-z-]*)","([a-z]+)"\]/g)].map(m=>[m[1],m[2]]));
+ assert.deepEqual(routes,{"/down-sheet":"down","/defect-log":"log","/fixed-repairs":"fixed",
+   "/lists":"lists","/incidents":"incidents","/shop-talk":"talk","/settings":"settings","/":"map"});
+ assert.equal(Object.keys(routes).length,HEADER_SURFACES.length);
+
+ /* The hook watches the page theme as well as the surface, or switching a
+    page's own theme leaves its header on the colour it had. */
+ assert.match(live,/\},\[surface,pageTheme\]\);/);
+
+ /* THE TWO THEMED PAGES FEED THEIR OWN VARIABLE FROM THE RESOLVED COLOUR,
+    and pass their page theme in, which is the ladder's middle rung. Unplug
+    either and that page keeps its own theme's header while the other seven
+    move, which is the split this release exists to close. */
+ assert.match(log,/"--log-header":headerSkin\.color,"--log-header-text":headerSkin\.text/);
+ assert.match(log,/useHeaderColor\("log",pageThemeHeader\("page",settings\.theme,settings\.appearance\.header\)\)/);
+ assert.match(fixed,/"--fixed-header":headerSkin\.color,"--fixed-header-text":headerSkin\.text/);
+ assert.match(fixed,/useHeaderColor\("fixed",pageThemeHeader\("page",fixedAppearance\.theme,fixedAppearance\.appearance\.header\)\)/);
+ /* And the accent keeps an ink computed for the ACCENT, not the header's. */
+ assert.match(log,/"--log-accent-text":headerTextFor\(settings\.appearance\.accent\)/);
+
+ /* THE PANEL READS THE LIVE SETTINGS, so its rows cannot describe a theme the
+    person changed two rows further down the same screen. */
+ assert.match(settings,/const pageThemes=pageHeaderThemes\(board,log\);/);
+
+ /* SAVED BEFORE THE STATE MOVES. The other order leaves the swatches showing
+    a colour no header took and no repaint was asked for. */
+ const save=settings.indexOf("saveHeaderTheme(localStorage,next)");
+ const state=settings.indexOf("setHeaderThemeState(next);",settings.indexOf("const setHeaderTheme="));
+ assert.ok(save>0&&state>save,"the write must be attempted before the panel moves");
+});
+
+test("one header padding, in all five files that decide one", async () => {
+ /* The globals.css comment names five files as the fix and only one of them
+    was pinned, so four of the five could go back to `11px 12px` or vanish
+    with the suite green — which is how they were wrong in the first place. */
+ const files=[["../app/globals.css",/\.app>header\{height:auto;min-height:38px;[^}]*padding:12px[;}]/],
+  ["../app/lists/lists.css",/\.lists-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/incidents/incidents.css",/\.incidents-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/shop-talk/shop-talk.css",/\.talk-header\{align-items:flex-start;flex-direction:column;padding:12px\}/],
+  ["../app/fixed-repairs/fixed-repairs.css",/@media\(max-width:760px\)\{\.fixed-repairs-app>\.fixed-header\{padding:12px\}\}/]];
+ for (const [file,pattern] of files) {
+  const css=await readFile(new URL(file, import.meta.url), "utf8");
+  assert.match(css,pattern,file+" must put its header on the one 12px padding");
+ }
+ /* Measured at 390 and 1180: the six pages with no page FRAME land on exactly
+    12/7 and 18/8. The Facility Map and the Down Sheet sit further in by their
+    own frame width, which is a visible change and not this release's. */
+});
+
+test("the Down Sheet's page title defers to the header, like the Defect Log's", async () => {
+ /* The Defect Log half of this fix has two assertions; the Down Sheet half
+    had none, and emitting the variable unconditionally pins the title white
+    over whatever colour somebody picks — 1.35:1 on a pale yellow, measured,
+    beside a panel that says that cannot happen. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
+ assert.match(page,/const titleColor=displaySettings\.styles\.pageTitle\.color\.toLowerCase\(\)===DEFAULT_DOWN_SHEET_DISPLAY\.styles\.pageTitle\.color\.toLowerCase\(\)\?\{\}:\{"--down-page-title-color":/,
+   "the title colour is left out while it is still the default");
+ assert.match(page,/const appStyle=\{\.\.\.titleColor,/,"and spread first so a chosen one still wins");
+ const css=await readFile(new URL("../app/down-sheet/down-sheet.css", import.meta.url), "utf8");
+ assert.match(css,/\.down-header h1\{color:var\(--down-page-title-color,var\(--app-header-text,#fff\)\)/,
+   "and the fallback is the header's computed ink");
+});

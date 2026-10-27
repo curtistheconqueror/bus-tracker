@@ -1,5 +1,7 @@
 "use client";
 
+import {useHeaderColor} from "@/src/components/shared/header-theme-live";
+import {pageThemeHeader} from "@/src/lib/settings/page-header-themes";
 import {useEffect,useMemo,useState} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
@@ -156,7 +158,13 @@ export default function FixedRepairs(){
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
  const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
- const {style:appearanceStyle}=useFixedAppearance();
+ const {settings:fixedAppearance,style:appearanceStyle}=useFixedAppearance();
+ /* Same as the Defect Log: the header colour comes from the app setting, so
+    all eight surfaces match by default and everything keyed to follow this
+    page's header follows it. Merged OVER the appearance style, which still
+    owns every other colour on the page. */
+ const headerSkin=useHeaderColor("fixed",pageThemeHeader("page",fixedAppearance.theme,fixedAppearance.appearance.header));
+ const pageStyle={...appearanceStyle,"--fixed-header":headerSkin.color,"--fixed-header-text":headerSkin.text};
  useEffect(()=>{setFleet(readFleet(localStorage.getItem(FLEET_KEY)))},[]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
@@ -322,7 +330,7 @@ function repairOrigin(source:string|undefined){
  const stats={total:records.length,today:records.filter(record=>isToday(record.defect.completedAt||record.defect.updatedAt||"")).length,buses:new Set(records.map(record=>record.bus.id)).size,needsNotes:records.filter(record=>!record.defect.actionTaken?.trim()).length};
  /* This page had no save banner at all, alone among the four. A refused write
     here is the one that can lose the only copy of a record. */
- return <main className="fixed-repairs-app" style={appearanceStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="fixed-repairs-app" style={pageStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><TrackerNav active="/fixed-repairs"/><RefreshButton/></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
   <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>

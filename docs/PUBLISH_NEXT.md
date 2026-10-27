@@ -3,10 +3,13 @@
 **STATUS: 194 PENDING.** Scrolling the Facility Map on a phone no longer moves
 buses — a bus follows a finger only after the finger has been held on it. Also
 in 194: Escape closes the map's SETTINGS, MULTI-LOCATE, MOVE BUS HERE, REMOVE
-BUS and AI OPERATOR layers, each of which fixes the page behind it; and
+BUS and AI OPERATOR layers, each of which fixes the page behind it;
 **one SOUND & VIBRATION switch in Settings, OFF**, with a test that stops
-anything audible being added later without going through it; plus an optional
-**ESCAPE CLOSES THE BUS EDITOR**, also off.
+anything audible being added later without going through it; an optional
+**ESCAPE CLOSES THE BUS EDITOR**, also off; a re-report counted and SHOWN
+where it happens; and **one HEADER COLOUR for all eight pages, set in
+Settings**, with a per-page override — replacing five stylesheets and two page
+themes that each decided one.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -52,7 +55,7 @@ What follows is the pending work.
 
 ---
 
-## 194 — a bus follows a finger only after the finger has been held
+## 194 — a bus follows a finger only after the finger has been held, and one header colour
 
 ### Source
 
@@ -114,8 +117,19 @@ there is no service-worker cache bump and no app shell re-download.
 ### Migrations
 
 **None.** No schema change, no policy change, nothing executed against the live
-project. **No new LocalStorage keys, and no key renamed** — this release reads
-and writes no records at all.
+project. **No key renamed, and nothing in the fleet's records is read or
+written** — the gesture, Escape and re-report work touches no settings file at
+all, and the three settings this release adds are per-device preferences.
+
+**ONE NEW LOCALSTORAGE KEY: `pace-header-theme-v1`**, holding the app's header
+colour and any per-page override. Added, never renamed, and documented in
+`CLAUDE.md` alongside the rest — a test fails if a key exists in the code and
+not in that list. A device that has never opened Settings holds nothing under
+it and draws exactly what it drew before.
+
+`pace-defect-log-settings-v1` and `pace-board-settings-v1` are now READ by
+`src/lib/settings/page-header-themes.ts`, which writes neither. Those pages
+keep owning them.
 
 ### What was wrong
 
@@ -397,6 +411,146 @@ while the editor is open. An earlier draft of this section claimed the opposite
 It is not, and nothing warns before it happens. Whether it should carry the
 text across, or ask first, is Curtis's call.
 
+### One header colour for the whole app
+
+Curtis: *"B is fine all same color until I figure out a more solid color
+scheme because I do want to add some flare to it. Why is this not an option to
+color the headers differently in settings?"*
+
+**IT PARTLY WAS, AND THAT IS THE PROBLEM.** Three of the eight headers were
+already settable — the Facility Map through `--header-bg`, the Defect Log and
+Fixed Repairs through `--log-header` and `--fixed-header` — but through two
+PAGE-level theme systems built when every page had its own gear, and the other
+five had the colour typed into a stylesheet. Nothing anywhere said what the
+APP's colour was. Measured before this change: **five different navies, two
+gradient angles, and flat against gradient** across eight screens Curtis moves
+between all day.
+
+So this is the missing thing rather than a ninth special case.
+`src/lib/settings/header-theme.ts` owns the colour,
+`src/components/shared/header-theme-live.tsx` paints it, mounted ONCE in the
+root layout and following the route. Every header rule now reads `var(--app-header-fill, …)`, and the
+fallback is the APP'S DEFAULT rather than that page's old colour — because
+this paints from an effect, so the browser has already drawn the server's HTML
+by the time it runs. With the old literals that was a measured flash:
+Incidents came up rust and turned navy 37ms later, Shop Talk came up green,
+and the Facility Map held the old `#06275c` for 116ms. All eight now open on
+the colour they settle on.
+
+**WHAT IT LOOKS LIKE IN SETTINGS → THIS DEVICE.** One HEADER COLOUR picker,
+a RESET ALL TO NAVY, then eight rows — swatch, page name, what is deciding it,
+its own picker, and FOLLOW to clear an override. The swatch carries the
+computed text colour, so a light pick shows black `Aa` before it reaches a
+header.
+
+**A PAGE THEME IS THE MIDDLE RUNG, AND THAT WAS LEARNED BY MEASURING.** Handing
+the shared colour to all eight unconditionally was built first. Measured at 430
+on the Defect Log's Tactical theme: a navy header BLOCK — bar, nav tiles,
+REFRESH and ADVANCED ACTIONS — with the olive page starting at its bottom edge
+in a hard line across the screen, and the active nav tile still olive because
+it is keyed to the page's surface. Two apps stacked. Nobody asked for that.
+
+`resolveHeaderColor` is now a three-rung ladder:
+
+| | wins over |
+| --- | --- |
+| an override typed for this page | everything |
+| a non-default page theme | the shared colour |
+| the shared colour | the old hard-coded literals |
+
+On the default theme — every device that has not opened those panels — all
+eight match, which is the case Curtis asked about. On a theme the page stays
+whole, exactly as before this release. An override still beats both, so
+Settings can always force it.
+
+**AND THE PANEL SAYS WHICH.** A row with no override reads *"following the one
+above"*, or *"its page theme decides this"* when that page is on one, with the
+theme's colour in its swatch. A row claiming to follow a colour the page will
+not draw is the panel lying about the app.
+
+**THE TEXT COLOUR IS COMPUTED, NEVER CHOSEN.** The moment a background can be
+picked, "white on a dark header" is a trap — a light flare colour takes the
+page title with it. Whichever of white or black reads better wins. It was a
+softer `#0b1b33` first; swept over the whole colour cube at a 15 step that
+bottoms out at **4.15:1**, under AA, while `#000` floors at **4.58:1**. The
+test sweeps the cube rather than sampling eight colours.
+
+**THE GRADIENT IS 90deg, AND THAT IS NOT AN ANGLE THE APP USED** — the literals
+it replaces were 110deg and 120deg, so there was none to preserve. A tilted
+gradient is height-dependent, and the Facility Map's header bar and the phone
+nav flush beneath it are two boxes of the same width and different heights that
+have always read as one block. Measured at 110deg: a **4-to-6 per channel step**
+across that boundary, where the flat colour they shared before had none. At
+90deg it is **0**.
+
+**THE PHONE'S OWN STATUS BAR FOLLOWS IT.** `<meta name="theme-color">` is
+declared once at build time and cannot change, so saved to a home screen the
+strip above the header would have stayed `#06275c` over a header that is
+`#041d47` by default and anything at all after that. It is set from the same
+resolved colour.
+
+**`--header-bg` IS DELIBERATELY LEFT ON THE MAP'S THEME.** It is not only that
+page's header: it is the board's border, the garage grid's row and column
+labels and the scroll shadow, and on Terminal that is near-black with green
+labels. Taking those with the header would repaint half the page to change one
+bar.
+
+**THE WHOLE HEADER, NOT THE BAR BEHIND IT.** The first version converted the
+header's BACKGROUND on all eight pages and its FOREGROUND on two, which an
+independent cold read found by picking a pale yellow and measuring: the page
+title stayed pinned white on the Down Sheet and the Defect Log at **1.35:1**,
+every kicker and subtitle kept a literal picked for navy at **1.07 to 1.85:1**,
+and a third of the Incidents and Shop Talk headers was still a rust and a green
+nav block — the "two apps stacked" failure this release rejected elsewhere,
+shipped by default. Everything inside a header now derives from the header's
+colour or its computed ink: kickers, subtitles, tab bands, tab labels, the
+active tab, focus rings, REFRESH and the ADVANCED ACTIONS opener. A test reads
+the seven stylesheets and fails if any rule inside a header still names a
+colour of its own.
+
+Two page colours are deliberately NOT shared: the Down Sheet's ADVANCED
+ACTIONS toggle stays purple, because an earlier release made it purple
+precisely so it cannot be mistaken for the Defect Log's, and the Defect Log's
+inactive tabs keep their 26% blue lift, which is its own rule and untouched.
+
+### The title still moves on two pages, and it is a frame rather than a padding
+
+The same measurement that started this found FLEETSTEP's left edge at 10 to
+17px across the eight surfaces. On the narrow layout the cause was **three
+different header paddings** — `12px` on the Down Sheet, the Defect Log and
+Settings; `11px 12px` on the Facility Map, Fleet Campaigns, Incidents and Shop
+Talk; `12px 10px 10px` on Fixed Repairs. Those are now one 12px, each fixed in
+the file and the media block that actually decides it. Fixed Repairs was already on the crowd's `13px 18px` wide —
+an earlier draft of this said otherwise, from misreading a `11px 10px` rule
+that lives inside a 760px block and has never applied at any width.
+
+**Measured at 390 and at 1180, the six pages with no frame now put the title at
+exactly the same x and y** — 12/7 and 18/8 respectively.
+
+**Two pages still differ.** The Facility Map draws a 5px navy frame around the
+whole board (3px below 800) and the Down Sheet a 5px one; the other six draw
+none, and a frame pushes everything inside it in. On a phone that frame is the
+**whole** explanation. On the wide layout those two also still carry their own
+side padding — 12px on the map and 20px on the Down Sheet, against the other
+six on 18px:
+
+| | 390px | how it is made | 1180px | how it is made |
+| --- | --- | --- | --- | --- |
+| the six with no frame | **12** | 0 frame + 12 pad | **18** | 0 frame + 18 pad |
+| Facility Map | 15 | 3 frame + 12 pad | 17 | 5 frame + 12 pad |
+| Down Sheet | 17 | 5 frame + 12 pad | 25 | 5 frame + 20 pad |
+
+Two ways to close it, both Curtis's call because both are visible: **drop the
+two frames**, or **set those two headers' padding to the crowd's number minus
+their own frame width** — which means two paddings per page, since the map's
+frame is 5px on the shop computer and 3px on a phone. Neither is in this
+release.
+
+There is a third thing underneath: the eight pages switch to their phone
+layout at **three different widths** — 760, 800 and 860 — so on an iPad held in
+portrait at 820 the titles spread again, by 6px. Unifying that moves real
+layouts at those widths on several pages, so it is not a tidy-up either.
+
 ### Verified
 
 Gates re-run on **the commit this file is updated in**, which is what "this
@@ -407,7 +561,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **395 pass, 0 fail**
+- `npm test` — **402 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -418,9 +572,59 @@ then a drag lands the bus under the finger with the page unmoved; a cancelled
 drag clears the ring and gives scrolling back; a hold lifted in place shows the
 quick view; single and double tap unchanged; and the page scrolls after a drag.
 
-A **cold read of the diff from a fresh context** found six defects, every one
-real, each answered in `033cb98`. Two are worth knowing about because they were
-reintroductions of the very bug being fixed:
+**A THIRD COLD READ, on the finished change, found eleven more and all of
+them were real.** The pattern was the same one the second found and the fix
+had not finished: the header's background was converted everywhere and its
+foreground in most places, so anything that was still a literal went wrong
+only when somebody did what the panel tells them to and picked a light
+colour. Measured on a pale yellow: the Facility Map's ACTIVE phone-nav tab at
+**1.2:1** (light tile, light label — the one tab that says where you are),
+the DS BADGES and QUICK FILTERS popover headers at **1.45:1** (black ink on a
+background still keyed to the old variable), the PATH TO REPAIR heading and
+its buttons at **3.57:1** because the header's ink was also driving the
+ACCENT surfaces, and a rust and a green divider line still between nav tiles
+on two pages. All fixed and re-measured: 17.44, 17.44, and an accent ink
+computed for the accent.
+
+It also found that **the Facility Map was never fixed for the flash** — its
+fallback ran through `--header-bg`, whose own literal is the old navy, so it
+held `#06275c` for 116ms while the other seven did not move, and with
+JavaScript off the eight drew two different navies. And that **`custom` was
+being read as "this page chose its header"** when both appearance panels set
+`custom` for any colour change at all, which quietly took the map out of the
+shared setting for anybody who had ever nudged a bus status colour.
+
+**And the mutation testing it did was the most useful part.** Nineteen of
+twenty-seven deliberate breakages survived the suite, including four of the
+five header paddings, the Down Sheet's title fix, the whole of the painter's
+wiring — route following, both listeners, the route-to-surface pairings, the
+two pages' feeds — and, most pointedly, putting the Facility Map's header
+text back to a hard literal, which is the headline failure of the review
+before it. The thirteen that mattered are now caught; the tests for them are
+in `tests/settings.test.mjs`.
+
+**The second cold read, on the same change a few hours earlier, found twelve
+things and eleven were real.** Every one is answered in the commits for it. The three that
+mattered were one failure wearing three faces — the header's background was
+converted on all eight pages and its foreground on two — and they are in the
+section above. Also found and fixed: a comment claiming a test caught a bug
+when no test was named; an `/settings` 500 from reading a `const` declared
+later in the component (a render test DID catch that one, in
+`tests/storage.test.mjs`, which the reader could not find because this repo's
+helper drives the built SSR bundle rather than importing `react-dom/server`);
+a no-op CSS rule shipped with a comment that was wrong four ways; a comment
+saying the painter "writes nothing" while it sets three properties and a meta
+tag; the page frames on two pages no longer matching their own headers; and
+**six surviving mutations**, the two that mattered being that the colour-cube
+sweep measured itself — it picks the text with `contrastRatio` and then grades
+it with `contrastRatio`, so dropping the sRGB gamma keeps the sweep at 4.58
+while the real floor falls to 3.75. Four values from WCAG's own table are now
+asserted as an external anchor, and the validation, the ladder's middle rung
+and the painter's own wiring have tests they did not have.
+
+The first cold read, on the gesture work, **found six defects, every one
+real**, each answered in `033cb98`. Two are worth knowing about because they
+were reintroductions of the very bug being fixed:
 
 - **A second finger on the same bus froze the page.** Measured against the
   first commit of this fix: the page scrolled zero pixels under the second
@@ -432,6 +636,86 @@ reintroductions of the very bug being fixed:
   carrying an attribute selector, and to a keyframe animation. It is a
   pseudo-element now, measured visible in all thirteen states. On iOS there is
   no `navigator.vibrate`, so that ring was the entire confirmation.
+
+**The headers, measured in Chromium against the production build** at 360,
+390, 430, 820 and 1180:
+
+- **One header fill across all eight pages at every width.** The probe counts
+  distinct computed backgrounds on the element carrying FLEETSTEP; it reports
+  **1**. With one page overridden it reports **2**, which is how the probe is
+  known to be able to fail.
+- **Worst title contrast 16.51:1** on the default navy, **15.54:1** on a light
+  yellow shared colour (where the title flips to black), **9.90:1** on a rust
+  override. The floor over the whole colour cube at a 15 step is **4.58:1**,
+  asserted in the suite rather than sampled.
+- **The three-rung ladder, nine cases.** Default theme → the shared colour on
+  all three themed pages; Tactical with no override → `#15180f` on all three;
+  Tactical with that page overridden → the override; default theme with a
+  crimson shared colour → crimson. Each read off the rendered header.
+- **The status bar follows.** `<meta name="theme-color">` matches the resolved
+  colour on every page, per-page override and page theme.
+- **Live in both directions.** Changing the picker repaints the Settings page
+  itself through the CustomEvent, and a second tab through the `storage`
+  event. Measured with two tabs in one browser.
+- **Every word in every header, on ten colours.** A probe walks every text
+  leaf in the header, composites it over whatever it actually sits on —
+  including translucent controls and the gradient behind them — and reports
+  the lowest ratio. On navy, pale yellow, crimson, white, black, bright green
+  and indigo the floor is **5.88:1**, which is the Defect Log's own active tab
+  and predates this release. On mid-tones it falls to around **3.6:1**, and
+  not always on the same element: on mid-brown it is the REFRESH glyph, on
+  mid-grey the kicker, and the 10px tab labels sit near 4.0. A mid tone is
+  where a two-choice ink is at its mathematical worst, and every dimmed or
+  lifted thing in the bar inherits that.
+- **The ink is chosen against BOTH ends of the gradient, and the panel quotes
+  the worse one.** It scored the picked colour alone, which is only the bar's
+  left edge; swept over the cube against the far end that bottoms out at
+  **3.37:1** while the function reported 4.58 and the panel printed it. The
+  gradient's lift also came down from 16% to 10%: measured over the cube, the
+  floor is 3.86 at 16%, **4.12 at 10%**, 4.39 at 4% and 4.58 only with no
+  gradient at all. The page title is 25px bold, which needs 3.0 for AA.
+- **One repaint per page, not two.** Polled from navigation commit on a device
+  with a shared colour AND a Tactical board: the Defect Log, Fixed Repairs,
+  the Facility Map and Incidents each change once. The map used to take two,
+  holding the wrong colour for 370ms between them.
+- **No flash on the way in, on any of the eight.** With each page's OLD
+  colour as the CSS fallback, Incidents came up rust and turned navy **37ms**
+  later and Shop Talk came up green. The five pages with no theme were moved
+  to the app default and measured 0ms — and the Facility Map was missed,
+  because its fallback ran through `--header-bg`, whose own literal is the
+  OLD navy: measured again, it held `#06275c` for **116ms** while the other
+  seven changed colour not at all, and with JavaScript off the eight drew two
+  different navies. All eight carry the same fallback now.
+- **The map's header bar and the phone nav under it are one block again.**
+  Sampled either side of their boundary at four x positions: identical at
+  90deg, against a 4-to-6 per channel step at 110deg.
+- **The Settings panel at 360, 390, 430, 820 and 1180** — no overflow, all
+  eight FOLLOW buttons on one x, every tap target 44px or more. It shipped
+  with no CSS at all and rendered as 519px of run-together inline text; that
+  was found by looking at it, not by reading it.
+- **No horizontal scroll and nothing spilling a header**, on all eight pages
+  at all five widths.
+- **Title geometry:** the six pages with no frame land on exactly 12/7 at 390
+  and 18/8 at 1180. Including the two framed pages the left spread is 5px at
+  390 and 8px at 1180, and the top spread 5px and 4px — all of it the two
+  frames and those two pages' own padding, per the section above.
+
+- **The panel keeps up with the screen it is on.** Both appearance panels are
+  further down the same Settings page, so the rows are derived from the live
+  settings rather than a snapshot read on mount — measured by picking Tactical
+  in the Defect Log's own panel and watching the Defect Log and Fixed Repairs
+  rows change from *following the one above* with a navy swatch to *its page
+  theme decides this* with an olive one, without a reload. The snapshot
+  version did not move.
+- **The themed pages stay whole.** The Defect Log and Fixed Repairs were
+  looked at on Tactical, not just measured: header, nav tiles and page body
+  are one olive, the way they were before this release. The navy-block version
+  that preceded the ladder is what that check was built to catch, and it
+  caught it.
+
+**Not verified for the header work:** a real phone or iPad, Safari, or Home
+Screen standalone mode — so the status-bar colour has been measured as a
+`<meta>` value and not as a strip of iOS chrome.
 
 **Not verified:** a real phone, Safari, or Home Screen standalone mode. Android
 Chrome's own long-press-to-drag sits around 500ms and `.token` is no longer
@@ -473,6 +757,23 @@ that refusal has not been measured on an Android device.
    should be off, and Escape in the bus editor should do nothing, as now. Turn
    it on: open a bus, press Escape — it closes with no question. Open another,
    change something, press Escape — it should ask.
+12. **Tap through all eight pages and watch the header.** FLEETSTEP should stay
+   put and the navy should not change. On the Facility Map and the Down Sheet
+   the title still sits 3-5px further in — that is the frame around those two
+   boards, and there is a section above about it. Everything else should be
+   still.
+13. **SETTINGS → THIS DEVICE → HEADER COLOUR.** Change the top colour and watch
+   every page follow — the bar, the kicker, the subtitle, the tab row and the
+   REFRESH button, plus the strip above it on a phone saved to the home
+   screen. Pick something light: the words should turn black rather than
+   vanish. Then give INCIDENTS its own colour and check only that page moved.
+   RESET ALL TO NAVY puts everything back. The note at the bottom of the
+   panel reports the WORST of the eight, and names which page it is.
+14. **If you use a theme on the Facility Map, the Defect Log or Fixed Repairs**
+   — Terminal, Black, Midnight, Tactical — that page should look exactly as it
+   did, header included, and its row in Settings should say *its page theme
+   decides this*. Give it its own colour there and the theme stops deciding;
+   press FOLLOW and it goes back.
 
 ### One open question for Curtis
 

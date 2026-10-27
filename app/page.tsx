@@ -467,6 +467,23 @@ const executeOperator=(plan:OperatorPlan):{ok:boolean;message:string}=>{
  /* The phone menu offers the same thing the command bar does, so both go
     through the one shared behaviour rather than each keeping a copy. */
  const refreshApp=async()=>{if(refreshing)return;setRefreshing(true);if(!await refreshTrackerApp())setRefreshing(false)};
+ /* THE HEADER BAR IS PAINTED BY HeaderThemeLive, NOT FROM HERE, and this hook
+    is gone from the style for a measured reason. It set `--app-header-fill`
+    inline on `main.app` at first, on top of the same value HeaderThemeLive
+    sets on <html>. Two writers of one property in two effects is two paints:
+    polled from navigation commit on a device with a shared colour AND a
+    Tactical board, this page went default navy, then the shared colour, then
+    Tactical — the middle one on screen for 370ms on a warm local server. The
+    other five pages, which have only the one writer, took a single step. One
+    writer, one paint.
+
+    `--header-bg` is deliberately left on the theme. It is not only the header:
+    it is the garage grid's row and column labels and the scroll shadow, and on
+    Terminal that is near-black with green labels. Taking those with the header
+    would repaint half the page to change one bar. The BOARD'S FRAME is the
+    exception and now follows `--app-header`: it runs flush along the header's
+    edge, the two were the same colour before this release, and leaving it
+    behind put a seam there. */
  const themeStyle=Object.fromEntries([...Object.entries(colors).map(([key,value])=>["--status-"+key,value]),["--page-bg",visuals.page],["--panel-bg",visuals.panel],["--theme-text",visuals.text],["--header-bg",visuals.header],["--header-text",visuals.headerText],["--title-color",visuals.title],["--theme-border",visuals.border],["--slot-bg",visuals.slot],["--command-bg",visuals.command],["--command-text",visuals.commandText],["--garage-special",visuals.garageSpecial],["--garage-frame",visuals.garageFrame],["--mystery-slot",visuals.mysterySlot],["--downsheet-badge",visuals.downSheetBadge],["--downsheet-badge-text",visuals.downSheetBadgeText],...Object.entries(visuals.sections).map(([key,value])=>["--section-"+key,value])]) as React.CSSProperties;return <main className={"app "+(highlight?"highlight-"+highlight:"")} data-empty-touch={singleTapEmptySpaces?"single":"double"} data-bus-display={busDisplay} style={themeStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,buses)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>  <header>{/* An h1, like the other five pages have. The text was styled to look
       like a heading without being tagged as one, so a screen reader announced
       this page unnamed and could not jump to its main heading.

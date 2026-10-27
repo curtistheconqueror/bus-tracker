@@ -133,8 +133,17 @@ test("the Mystery list renders on the Down Sheet, and the Defect Log packs its c
      #ffffffff: invisible, and an opaque light surface. Those are precisely the
      two failures the rule exists to catch, so the looser regex would have
      permitted the bug while still reading like a guard. */
-  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid #ffffff(?!00|ff)[0-9a-f]{2};[^}]*background:#ffffff(?!00|ff)[0-9a-f]{2}/,
-   "the toggle keeps the header's translucent-white pair");
+  /* IT WAS A TRANSLUCENT-WHITE PAIR, and white stopped being the header's
+     colour the moment the header's colour became a setting. On a pale header
+     that pair put white text on near-white: measured 1.02:1. It is now the
+     header's own computed ink — a border of it, and no fill at all, so the
+     label sits directly on the header and reads exactly as well as the header
+     ink does. The rule this line is for is unchanged: the toggle belongs to
+     the header and must not be the Down Sheet's purple. */
+  assert.match(css,/\.header-advanced-toggle\{[^}]*border:1px solid color-mix\(in srgb,var\(--app-header-text[^;]*;[^}]*background:transparent/,
+   "the toggle takes its edge from the header's ink and sits straight on the header");
+  assert.doesNotMatch(css,/\.header-advanced-toggle\{[^}]*(background|color):#[0-9a-f]{3,8}/,
+   "and names no colour of its own");
   assert.doesNotMatch(css,/\.header-advanced-toggle\{[^}]*background:var\(--log-surface/,
    "a light surface is invisible against navy, which is why this rule exists");
 
@@ -4938,12 +4947,26 @@ test("a text colour nobody picked follows the theme, so the dark themes are read
   /* Sizes are NOT theme-dependent and must still be emitted. */
   assert.equal(Object.keys(vars).filter(name=>name.endsWith("-size")).length,7,theme+" still carries the sizes");
  }
- /* LIGHT KEEPS ALL SEVEN. They are light-theme colours picked by hand for this
-    app on white — LIVE REPAIR FEED's #163c70 is a deeper navy than the accent
-    on purpose. Deferring on light too swapped it for the accent and dropped it
-    from 10.77:1 to 5.77:1: legible, and a change nobody asked for on the theme
-    almost everybody uses. */
- assert.equal(Object.keys(displayStyleVars(untouched,"light")).filter(name=>name.endsWith("-color")).length,7);
+ /* LIGHT KEEPS THE SIX THAT ARE DRAWN ON WHITE. They are light-theme colours
+    picked by hand for this app — LIVE REPAIR FEED's #163c70 is a deeper navy
+    than the accent on purpose. Deferring on light too swapped it for the
+    accent and dropped it from 10.77:1 to 5.77:1: legible, and a change nobody
+    asked for on the theme almost everybody uses.
+
+    pageTitle IS THE SEVENTH AND IT IS NOT DRAWN ON WHITE — it sits on the
+    header, and its #ffffff was the header's colour back when every header was
+    navy. Emitted on light like the other six it pinned the page title white
+    over whatever colour somebody picks in Settings: measured 1.35:1 on a pale
+    yellow header, beside a panel promising a light colour cannot hide the
+    title. Left out while untouched, the header's own computed text colour
+    answers. */
+ const lightColours=Object.keys(displayStyleVars(untouched,"light")).filter(name=>name.endsWith("-color"));
+ assert.equal(lightColours.length,6);
+ assert.equal(lightColours.includes("--log-page-title-color"),false,"the page title defers to the header on light too");
+ /* A title somebody HAS chosen is still emitted, on light like anywhere. */
+ const titled=normalizeDefectLogDisplay({styles:{pageTitle:{color:"#ffd400",fontSize:25}}});
+ for(const theme of ["light","dark","midnight","tactical","custom"])
+  assert.equal(displayStyleVars(titled,theme)["--log-page-title-color"],"#ffd400",theme+" keeps a chosen page title colour");
  /* A REAL CHOICE STILL WINS, on every theme. */
  const chosen=normalizeDefectLogDisplay({styles:{repairCategory:{color:"#c3262f",fontSize:9}}});
  for(const theme of ["light","dark","midnight","tactical","custom"])
