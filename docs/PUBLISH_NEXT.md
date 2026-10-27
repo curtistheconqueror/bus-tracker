@@ -11,8 +11,8 @@ where it happens; and **one HEADER COLOUR for all eight pages, set in
 Settings**, with a per-page override — replacing five stylesheets and two page
 themes that each decided one; and **ESTIMATED TIME OF REPAIR on the Defect Log
 form**, where it used to ask what was found, with DESCRIPTION renamed ADDITIONAL
-DETAILS and the estimate wired to the hours badge and the Down Sheet in both
-directions.
+DETAILS and the finding box moved into ADVANCED DETAILS. Page themes keep their
+own header ink, which this release had taken off them.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -66,10 +66,14 @@ Codex published 193 from `a009c08` mid-session, so **this range starts there**
 and 194 was rebased onto that work rather than merged over it. Release source
 is the commit this file is updated in.
 
-**EVERY COMMAND BELOW WAS RE-RUN AT THE TOP OF THE RANGE.** An earlier draft
-of this section quoted outputs from five commits in, which is how it came to
-say the service worker was untouched when it is not — see the end of this
-section. A quoted command output is a measurement and goes stale like one.
+**EVERY COMMAND BELOW WAS RE-RUN AT THE COMMIT BELOW THE ONE THIS FILE IS
+UPDATED IN**, which is as fresh as a quoted output in this file can be: the
+commit that carries these lines does not exist while they are being written. An
+earlier draft said "at the top of the range" and was then one commit stale on
+the insertion count, which a cold read caught. An earlier draft than that
+quoted outputs from five commits in, which is how it came to say the service
+worker was untouched when it is not — see the end of this section. A quoted
+command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
@@ -700,8 +704,8 @@ was guessing at.
 | the slot above WORK STATUS | WHAT WAS FOUND (OPTIONAL) + FOUND BEFORE chips | ESTIMATED TIME OF REPAIR — HOURS |
 | the box above it | DESCRIPTION | ADDITIONAL DETAILS |
 | sources of an estimate | 3: billable hours, shop ledger, catalog | 4, with this one first |
-| what the hours badge quoted for an unestimated repair | the catalog's 12h | whatever somebody typed |
-| what the Down Sheet quoted for the same repair | the catalog's 12h, always | the same number the Defect Log shows |
+| what the hours badge quoted when somebody knew better | the catalog's 12h, with nowhere to say otherwise | the number they typed |
+| what a NEW Down Sheet card starts from | the catalog's 12h, always | the estimate on the record |
 
 **IT IS A NEW FIELD AND NOT A RELABELLED ONE.** `repairHours` and
 `diagnosticHours` are time WORKED — `src/lib/reports/work-time.ts` sums them per
@@ -731,42 +735,55 @@ billable hours included, because those are not an estimate. The PATH TO REPAIR
 panel shows its own fallback the same way, and the editor is handed the same
 ledger the feed's badge reads so the two cannot disagree.
 
-**THE DOWN SHEET IS THE SAME NUMBER, IN BOTH DIRECTIONS.** A card built from an
+**THE DEFECT LOG'S BOX OWNS IT, ONE DIRECTION.** A card BUILT from an
 estimated defect is seeded from it (`estimateFromHours`) rather than from the
 catalog, at both places a card is built from a record: the entry the Defect Log
 opens when it puts a bus on the sheet, and the cards the Down Sheet builds for a
-bus that is already down. And a figure typed on the sheet comes back as the
-defect's estimate — but **only where the card differs from the catalog's
-recommendation for that repair**, because every card is seeded with a figure the
-moment a category is picked, and reading one as a claim would freeze a guess onto
-the record as something a person stood behind. That is the test `pageThemeHeader`
-makes about a header colour, for the same reason.
+bus that is already down. Nothing carries a sheet figure back onto the defect.
 
-Carried through the **unfloored** sum (`repairTimeSum`, new, and
-`repairTimeTotal` is now written in terms of it) because the thirty-minute floor
-is about what the sheet PRINTS: a quarter-hour estimate round-tripped through the
-floor would overwrite the fifteen minutes somebody typed with thirty, on every
-save, until the record claimed something nobody had said. Six values were walked
-out and back in a test for exactly that.
+**IT WAS BIDIRECTIONAL FOR ONE COMMIT AND A COLD READ MEASURED WHAT THAT DOES.**
+Type 6 in the Defect Log on a bus already on the sheet, then clear it: the card
+still holds the 360 minutes it was seeded with, so the next save of that row —
+changing the mechanic, ticking a card, anything — reads 360, finds it is not the
+catalog's 720, and writes the 6 straight back on. A cleared estimate that
+returns is the bug `workStates` and `downSheetRecommendation` are deleted rather
+than blanked to avoid, and the comment that sat beside the code claimed the
+opposite of what it did. `{...linked}` in `applyDownEntryToFleet` keeps whatever
+the record already holds, which is all that was wanted.
 
-**Taking an estimate off is done where it was put on** — clearing the box
-removes it and the ladder answers again — not by editing a card back to the
-catalog's number, which says nothing rather than withdrawing what the record
-holds. Same rule the shop's ledger and PATH TO REPAIR already follow.
+**THE LIMIT THAT LEAVES, SAID PLAINLY.** The sheet seeds only at card creation,
+so on a bus whose entry already exists the Defect Log's badge and the sheet row
+can quote different figures for the same repair — measured, 3h on the badge
+against the catalog's 12h on the row. An estimate already on the sheet is
+changed on the sheet. Three earlier drafts of this section, `CLAUDE.md`,
+`PROJECT_HANDOFF.md` and the editor's own help line all said "both directions";
+none of them were true for the normal case of a down bus.
 
-**THE FINDING FIELD IS UNTOUCHED AND STILL READS EVERYWHERE IT EVER DID.** What
-went is the Defect Log's *input* for it, and the FOUND BEFORE chips attached to
-that input. A cause is typed on the **Down Sheet row editor** and on **Fixed
-Repairs**, both of which already offered the chips, so `pace-findings-memory-v1`
-is still offered and is still learned from on a Defect Log save that carries a
-cause — the memory is read on mount there precisely so a save does not replace
-six hundred learned causes with one.
+Dropping the carry-back also drops a cap mismatch nobody had noticed: the
+sheet's buckets take up to 40 hours each while `normalizeRepairHours` caps at
+24, so a 33-hour card would have stored 24 on the defect and created a fresh
+disagreement in the act of closing one.
 
-**What that costs, and it is worth saying plainly:** a finding already on an open
-defect that is not on the sheet can no longer be edited or cleared from the
-Defect Log. It still displays through `defectLabel` wherever that defect appears.
-Moving the box into ADVANCED DETAILS instead would keep that, and is one line if
-Curtis wants it.
+**THE FINDING BOX MOVED INTO ADVANCED DETAILS**, beside DIAGNOSIS / TEST /
+VERIFICATION, which is what it answers. A record carrying a finding opens that
+section, so a cause already stored is read rather than hidden. The FOUND BEFORE
+chips moved with it, so `pace-findings-memory-v1` is offered on all three
+surfaces that collect a cause.
+
+**TAKING IT OFF THE PAGE ALTOGETHER WAS THE FIRST VERSION, AND IT BROKE THE
+OPEN-DEFECT CASE.** A cold read found it: the Down Sheet's own finding box is
+inside `{item.done && …}` and Fixed Repairs lists completed repairs only, so an
+OPEN defect had nowhere left in the app to type a cause, read one already
+stored, or clear it — with the DIAGNOSED work state still on the form above and
+nothing to say what was diagnosed. This file's earlier disclosure said the loss
+was limited to "an open defect that is not on the sheet" and that it could not
+be "edited or cleared"; both were wrong, and it could not be read either.
+
+**One thing still cannot be undone from the Defect Log, and it predates all of
+this.** `applyDownEntryToFleet` writes
+`normalizeFinding(target.finding)||linked?.finding`, so clearing a finding on a
+bus whose sheet card still carries the old wording lets the next sheet save put
+it back. Not introduced here, not changed here, and worth knowing.
 
 **The field is OUTSIDE the WORK DONE SO FAR fieldset** the finding sat inside,
 though in the same place on the screen. An estimate is not work done, and that
@@ -786,15 +803,57 @@ repair at under half an hour. The RECORD keeps the 0.25 — measured through thr
 consecutive sheet saves, it does not drift — so nothing is lost; the two screens
 just round it differently, and that floor predates this.
 
-**Not gated by LITE mode**, which is what the box it replaced did. Measured at
-390px in both modes: the same 148×48 input, the same 11px gap above WORK STATUS,
-nothing covering it in either.
+**Not gated by LITE mode.** Neither was the box it replaced — the WORK DONE SO
+FAR fieldset that box sat in carries no `hiddenInLite` gate, and an earlier
+draft of this line implied it did. Measured at 390px in both modes: the same
+148×48 input, the same 11px gap above WORK STATUS, nothing covering it in
+either.
 
 **It syncs with no schema change.** `defectRow` in `src/lib/cloud/cloud-sync.ts`
 puts everything outside its nine named columns into `detail`, and the pull
 spreads `detail` back onto the record — which is what that design is for. **No
 new LocalStorage key and no key renamed:** the estimate is a field on a record
 that already travels.
+
+### A page theme keeps its own header ink
+
+Curtis, on seeing the shipped header work: *"Why did we have to change a theme??
+The tactical theme. Themes should not be affected by default design."*
+
+We did not have to. The header ink was made a computed black-or-white so that a
+colour somebody PICKS cannot hide the page title, and it was then handed to all
+eight headers including the three a page theme decides — so Tactical's `#e7ddb2`
+and Terminal's `#61ff9d` came out white. It was written down in this file as
+something to know rather than something to fix, which was the wrong call: a page
+theme is a designed pairing of a background and an ink, and taking half of it is
+not honouring it.
+
+**`resolveHeaderInk` now walks the same ladder `resolveHeaderColor` does.** An
+override typed for this surface is computed, a non-default page theme keeps its
+own ink, the shared colour is computed. Rungs 1 and 3 are computed because those
+colours came out of a picker with no ink attached. The gate on rung 2 is the same
+`isHeaderColor(pageTheme)` expression the colour uses, and
+`pageThemeHeaderPair` returns the background and the ink as ONE value, so the
+two cannot come off different rungs — which is exactly how they came apart.
+
+A theme with no ink of its own — `custom` on a device that stored a header colour
+and no header text — falls through to the computed ink, because there is no
+pairing there to honour.
+
+**Measured at 1180 against the production build:**
+
+| | header background | ink drawn |
+| --- | --- | --- |
+| Tactical, Facility Map | `#15180f` | `#e7ddb2`, its own |
+| Tactical, Defect Log and Fixed Repairs | `#15180f` | `#f4e8b8`, their own |
+| Down Sheet (no page theme) | `#041d47` | white |
+| default theme, all eight | `#041d47` | white |
+| override `#ffd98a` on map + Defect Log | `#ffd98a` | black, computed |
+| …and Fixed Repairs, no override | `#15180f` | `#f4e8b8`, still its own |
+
+The Settings panel's contrast note is scored against the ink that will actually
+be drawn rather than the one it would have computed, or it would quote a figure
+for text those three pages are not using.
 
 ### Verified
 
@@ -994,6 +1053,46 @@ production build**, at 390, 430, 820 and 1180:
   feed, and the sheet editor's UPDATED BY — INITIALS is `required`, so an empty
   one makes the browser refuse the submit with no error and no save. Written
   down because the fourth run was about to be filed against the app.
+
+**THE COLD READ'S OWN FINDINGS, and what answering them changed.** Thirteen
+were reported and every one is answered below or in the sections above:
+
+- **The estimate came back after being cleared** — the carry-back from a Down
+  Sheet card is gone, and a test now drives a cleared estimate through two
+  consecutive sheet saves.
+- **"Both directions" was false for a bus already on the sheet** — the claim is
+  withdrawn in this file, `CLAUDE.md`, `PROJECT_HANDOFF.md` and the editor's own
+  help line, and the limit is stated instead.
+- **A finding could only be typed on a COMPLETED repair** — the box is back, in
+  ADVANCED DETAILS, and a stored finding opens that section. Measured: a cause
+  reads back, clears, and saves cleared.
+- **The help line promised a fallback the app would not use** on a part-billed
+  open job — the fallback is now exactly what clearing yields and NAMES its
+  source. Measured: catalog 12h, ledger 5h, billed 4h, each matching the badge
+  beside it.
+- **The estimate box was 15px**, under Safari's 16px auto-zoom threshold, on the
+  one control meant to be typed at while standing at the bus. Now 16px,
+  measured; a test reads the declaration and fails under 16.
+- **A >24h sheet estimate would have been capped to 24 on the defect** — moot
+  with the carry-back gone, and recorded above.
+- **Dead CSS and an orphaned comment** — the `.work-state-picker>small` rule
+  whose only direct child went with the finding box, and a comment about chips
+  left sitting above the estimate's.
+- **"ALL SEVEN inputs" was eight** — an increment instead of a re-count, which
+  is the habit this file keeps correcting; the total is now added up by the test
+  rather than written down.
+- **Three weak assertions** — a message attached to the wrong assertion, a
+  completed-record check that passes with the whole feature deleted, and a test
+  name claiming reach the code does not have. All three rewritten.
+- **This file quoted an insertion count one commit stale** under a heading
+  saying it did not; the heading now says what is actually true, and the blocks
+  are re-run each time.
+
+Two findings were answered by writing down a limit rather than changing code,
+both pre-existing: a finding cleared on a bus whose sheet card still carries the
+old wording comes back on the next sheet save, and the Down Sheet's FOUND BEFORE
+chips have no border or radius because only a `button` override of them exists in
+its stylesheet.
 
 **Not verified for the header work:** a real phone or iPad, Safari, or Home
 Screen standalone mode — so the status-bar colour has been measured as a

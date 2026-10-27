@@ -8,7 +8,7 @@ import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./defect-log.css";
-import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,lastReportAttemptAt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MAX_REPAIR_HOURS,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
+import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,normalizeFluids,lastReportAttemptAt,reportAttemptCount,normalizeReportAttempts,hasDiagLightField,normalizeDiagLight,DIAG_LIGHTS,DIAG_LIGHT_LABELS,type DiagLight,isDiagnosticDefect,MAX_REPAIR_HOURS,MINIMUM_DIAGNOSTIC_HOURS,normalizeDiagnosticHours,normalizeRepairHours,defaultDefectOperability,defectCountField,defectLabel,defectNote,defectTsb,defectWorkStates,deferredMinutesElapsed,hasDeferredHistory,brakeTestFailed,brakeTestResult,BRAKE_TEST_KEY,type BrakeTestResult,isDownSheetRecommended,isHeldDeferred,isUnresolved,normalizeFinding,normalizeDefects,REPAIR_OPTIONS,repairCategoryLabel,repairIssueDisplayLabel,setDefectWorkState,setDownSheetRecommendation,WORK_STATES,workStateStampLabel,type DefectOperability,type DefectState,type StructuredDefect,type WorkStateKey} from "@/src/lib/defects/repair-catalog";
 import {applyReportReturn,refusalHeadline,refusalMessage,reportButtonState,reportTotal,type ReportReturnResult} from "@/src/lib/defects/report-returns";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
 import {useHeaderColor} from "@/src/components/shared/header-theme-live";
@@ -21,7 +21,7 @@ import {useHeaderColor} from "@/src/components/shared/header-theme-live";
    headers and that the Settings copy says nothing about. An ink is
    computed for the surface it sits on or it is a guess. */
 import {headerTextFor} from "@/src/lib/settings/header-theme";
-import {pageThemeHeader} from "@/src/lib/settings/page-header-themes";
+import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
@@ -53,7 +53,7 @@ import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
-import {EMPTY_FINDINGS_MEMORY,learnFinding,readFindingsMemory,writeFindingsMemory,type FindingsMemory} from "@/src/lib/defects/findings-memory";
+import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
 import SaveAlert from "@/src/components/shared/save-alert";
@@ -148,7 +148,7 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
  /* WHAT THE LAST PRESS DID. Both banner buttons used to change nothing a
     person could see: OPEN IT swapped a draft under a component that ignored
@@ -173,7 +173,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     for a keystroke in DETAILS. `onBusPicked` comes from the page, which does
     not re-render while the editor is open. */
  const pickBus=useCallback((busId:string)=>{onBusPicked(busId);setValue(current=>({...current,busId}))},[onBusPicked]);
- const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined));
+ const [advancedOpen,setAdvancedOpen]=useState(()=>Boolean(draft.defect.state==="completed"||draft.defect.diagnosticNote||draft.defect.actionTaken||draft.defect.partNumber||draft.defect.completedBy||draft.defect.reportedBy||draft.defect.repairHours!==undefined||draft.defect.diagnosticHours!==undefined||draft.defect.finding));
  useEffect(()=>lockPageScroll("defect-editor-open"),[]);
  const updateDefect=<K extends keyof StructuredDefect>(key:K,next:StructuredDefect[K])=>setValue(current=>({...current,defect:{...current.defect,[key]:next}}));
  const repairs=REPAIR_OPTIONS[value.defect.category]||[];
@@ -232,23 +232,30 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
  });
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
- /* Scoped to the exact symptom on the form right now, so changing the picker
-    changes what is offered and a cause never leaks to a defect it was not
-    found under. */
+ const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
  /* WHAT THE ESTIMATE BOX IS ABOUT TO OVERRIDE, quoted inside the box.
 
-    An estimate is the top of a four-rung ladder — this number, then the shop's
-    own ledger, then the catalog — and a field that hides the rung beneath it
-    invites somebody to retype a figure the app already had, or to leave it
-    blank believing nothing has been estimated at all. The PATH TO REPAIR panel
-    shows its own fallback the same way and for the same reason.
+    An estimate is the top of a four-rung ladder — this number, then the hours
+    already billed on this job, then the shop's own ledger, then the catalog —
+    and a field that hides the rung beneath it invites somebody to retype a
+    figure the app already had, or to leave it blank believing nothing has been
+    estimated at all. The PATH TO REPAIR panel shows its own fallback the same
+    way and for the same reason.
 
-    Asked with every typed figure stripped out, the billable hours included:
-    those are time already worked, and quoting them would answer "what would
-    this say if I left it blank" with something that is not an estimate. */
+    IT IS EXACTLY WHAT CLEARING THE BOX WOULD YIELD, which took a correction:
+    the billed hours were stripped out as well, on the reasoning that time
+    worked is not an estimate. True, and beside the point — the sentence under
+    the box says what happens if you clear it, and on a part-billed open job
+    what happens is rung 2 answers. Measured: with 4 billed hours and a 5h
+    ledger it promised 5h and delivered 4h. So only the estimate comes out,
+    and the source is NAMED rather than assumed to be the catalog. */
  const estimateIssue=value.quickIssue||value.defect.issue;
  const shopEstimate=findRepairMinutes(shopHours,value.defect.category,estimateIssue);
- const estimateFallback=defectEstimateMinutes({...value.defect,issue:estimateIssue,estimateHours:undefined,repairHours:undefined,diagnosticHours:undefined},shopHours);
+ const billedHours=(value.defect.repairHours||0)+(value.defect.diagnosticHours||0);
+ const estimateFallback=defectEstimateMinutes({...value.defect,issue:estimateIssue,estimateHours:undefined},shopHours);
+ const estimateFallbackSource=billedHours>0?"the hours already billed on this job"
+  :shopEstimate?"the shop's own time for this repair"
+  :"the catalog, which has never stood in this garage";
  /* Ticking a state stamps who and when. The name comes from whatever is typed
     into FIXED BY or the device default, so the common case takes one tap; where
     initials are required and none are set, the tick is refused rather than
@@ -602,10 +609,8 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <label className="wide repair-estimate-field">ESTIMATED TIME OF REPAIR — HOURS
      <HoursField value={value.defect.estimateHours} max={MAX_REPAIR_HOURS} placeholder={String(Math.round(estimateFallback/60*100)/100)} ariaLabel="Estimated time of repair, in hours" onChange={hours=>updateDefect("estimateHours",normalizeRepairHours(hours===undefined?"":String(hours)))}/>
      <small>{value.defect.estimateHours!==undefined
-      ?"Estimating "+formatRepairTime(Math.round(value.defect.estimateHours*60))+" for this bus. The hours badge on the feed and the Down Sheet both read it. Clear the box to go back to "+formatRepairTime(estimateFallback)+"."
-      :shopEstimate
-       ?"Estimating "+formatRepairTime(estimateFallback)+" — the shop's own time for this repair. Type a number to change it for this bus only."
-       :"Estimating "+formatRepairTime(estimateFallback)+" from the catalog, which has never stood in this garage. Type what this one will really take."}</small>
+      ?"Estimating "+formatRepairTime(Math.round(value.defect.estimateHours*60))+" for this bus, which is what the hours badge on the feed reads. Clear the box to go back to "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+"."
+      :"Estimating "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+". Type what this one will really take."}</small>
     </label>
     <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
     <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
@@ -617,6 +622,41 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     </div>
     {!hiddenInLite(editorMode,"diagnosisFields")&&<details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
+    {/* WHAT WAS FOUND, here rather than up beside the description.
+
+        Curtis took it off the main form — "We have " description above, so it
+        kind of redundant" — and ESTIMATED TIME OF REPAIR has that slot now.
+        Removing it from the page altogether is what the first version of this
+        change did, and a cold read measured the cost: the Down Sheet's own
+        finding box lives inside `{item.done && …}` and Fixed Repairs lists
+        completed repairs only, so on an OPEN defect there was nowhere left in
+        the app to type a cause, read one already stored, or clear it. The
+        DIAGNOSED work state is still on the form above with nothing to say
+        what was diagnosed.
+
+        So it sits beside the diagnosis, which is what it answers, inside a
+        section that is collapsed until somebody wants it. */}
+    <label className="advanced-finding">WHAT WAS FOUND (OPTIONAL)
+     <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
+    </label>
+    {/* Causes found under this exact symptom before. Scoped to the symptom on
+        the form right now, so changing the picker changes what is offered and
+        a cause never leaks to a defect it was not found under. Tapping one
+        fills the box; typing something new is always allowed. Offering them is
+        what stops the same fault being written five ways, which is the whole
+        reason a year of history is readable. */}
+    {learnedFindings.length>0&&<div className="learned-findings" aria-label="Causes found before on this defect">
+     <small>FOUND BEFORE ON {(repairIssueDisplayLabel(value.quickIssue||value.defect.issue)||"THIS DEFECT").toUpperCase()}</small>
+     <div>{learnedFindings.map(entry=>{
+      const picked=findingMatchKey(entry.finding)===findingMatchKey(value.defect.finding);
+      return <span className={"learned-finding"+(picked?" selected":"")} key={entry.finding}>
+       <button type="button" onClick={()=>updateDefect("finding",picked?"":entry.finding)} aria-pressed={picked}>
+        {entry.finding}{entry.uses>1?<i>×{entry.uses}</i>:null}
+       </button>
+       <button type="button" className="forget-finding" title={"Forget "+entry.finding} aria-label={"Forget "+entry.finding} onClick={()=>forgetLearnedFinding(entry)}>×</button>
+      </span>;
+     })}</div>
+    </div>}
     <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
     <div className="parts-used-block">
      <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
@@ -822,14 +862,9 @@ export default function DefectLog(){
   setPtrProblem("");
  };
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
- /* STILL READ, THOUGH NOTHING ON THIS SCREEN DRAWS IT ANY MORE. The FOUND
-    BEFORE chips went with the finding box, and so did the × that forgot one —
-    both still live on the Down Sheet row editor and on Fixed Repairs, which is
-    where a cause gets written now. What the shop has learned is merged onto on
-    every save that carries a finding, and a save that started from an empty
-    memory would replace six hundred learned causes with one. */
- const [,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
+ const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
+ const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
  const [statsOpen,setStatsOpen]=useState(false);
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
@@ -1593,7 +1628,11 @@ export default function DefectLog(){
     theme preset, so all eight surfaces match by default and this one can
     still be overridden on its own. Everything keyed to --log-header -- the
     ADVANCED drawer, the focus panel -- follows without a rule changing. */
- const headerSkin=useHeaderColor("log",pageThemeHeader("page",settings.theme,settings.appearance.header));
+ /* Its own theme's ink travels with its own theme's colour, so a page on
+    Tactical keeps Tactical's header text instead of the computed white the
+    shared colour gets. */
+ const logHeaderTheme=pageThemeHeaderPair("page",settings.theme,settings.appearance.header,settings.appearance.headerText);
+ const headerSkin=useHeaderColor("log",logHeaderTheme?.header,logHeaderTheme?.text);
  const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":headerSkin.color,"--log-header-text":headerSkin.text,"--log-accent-text":headerTextFor(settings.appearance.accent),"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
@@ -2066,7 +2105,7 @@ export default function DefectLog(){
     </div>
    </section>
   </div>}
-  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
+  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}

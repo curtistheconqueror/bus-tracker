@@ -39,7 +39,7 @@ import "./settings.css";
 import MapSettingsPanel from "./_components/map-settings-panel";
 import CloudSyncControl from "./_components/cloud-sync-control";
 import {DEFAULT_FEEDBACK,type FeedbackSettings,loadFeedbackSettings,saveFeedbackSettings} from "@/src/lib/settings/feedback-settings";
-import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor,saveHeaderTheme} from "@/src/lib/settings/header-theme";
+import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerGradient,headerTextFor,loadHeaderTheme,resolveHeaderColor,resolveHeaderInk,saveHeaderTheme} from "@/src/lib/settings/header-theme";
 import {pageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
@@ -552,7 +552,7 @@ export default function SettingsPage(){
         const page=pageThemes[surface.key];
         /* The same function the pages resolve through, so this row shows what
            that page draws rather than a second opinion about it. */
-        const effective=resolveHeaderColor(headerTheme,surface.key,page);
+        const effective=resolveHeaderColor(headerTheme,surface.key,page?.header);
         return <div className="hc-row" key={surface.key}>
          <b>{surface.label}</b>
          {own?<i>own</i>:page?<i>page theme</i>:null}
@@ -572,11 +572,18 @@ export default function SettingsPage(){
            everybody else has. Shown rather than enforced. */}
        <small>{(() => {
         const worst=HEADER_SURFACES.map(surface=>{
-         const colour=resolveHeaderColor(headerTheme,surface.key,pageThemes[surface.key]);
+         const page=pageThemes[surface.key];
+         const colour=resolveHeaderColor(headerTheme,surface.key,page?.header);
          /* `headerContrast`, which scores BOTH ends of the bar. The flat
             colour is only its left edge, and quoting that printed 4.58 for a
-            header whose right end was 3.37. */
-         return {label:surface.label,ratio:headerContrast(colour)};
+            header whose right end was 3.37.
+            AGAINST THE INK THAT WILL ACTUALLY BE DRAWN, which on a page its
+            own theme decides is the THEME'S ink and not the computed one.
+            Scored against the computed one it would quote a number for black
+            or white text that page is not using — the same species of
+            wrongness as quoting the shared colour for a page carrying an
+            override, which is what this note did before. */
+         return {label:surface.label,ratio:headerContrast(colour,resolveHeaderInk(headerTheme,surface.key,page?.header,page?.text))};
         }).reduce((low,row)=>row.ratio<low.ratio?row:low);
         return Math.round(worst.ratio*100)/100+":1 on "+worst.label;
        })()}</small>

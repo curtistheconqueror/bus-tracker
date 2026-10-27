@@ -148,10 +148,10 @@ export function resetCoreRepairEstimate(current:RepairTimeEstimate,category:stri
 
    `repairTimeTotal` below is what the sheet PRINTS, and it never prints less
    than half an hour. This is what the sheet was TOLD, which is a different
-   question and the only honest one to ask when a number is being carried back
-   onto a defect: a fifteen-minute estimate floored to thirty on the way out
-   and read back in would overwrite the fifteen somebody typed, every time the
-   sheet was saved, until the record said something nobody had ever claimed. */
+   question: a card seeded with a fifteen-minute estimate holds fifteen
+   minutes and displays thirty, and anything reading the number back has to
+   know which of the two it is looking at. Kept apart so `repairTimeTotal` has
+   one definition rather than two that can drift. */
 export function repairTimeSum(estimate:RepairTimeEstimate){
  return estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
 }

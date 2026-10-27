@@ -73,28 +73,63 @@ export function pageThemeHeader(kind:PageThemeKind,themeName:unknown,storedHeade
    here without a second list to keep in step. */
 const MAP_HEADERS:Record<string,string>=Object.fromEntries(Object.entries(MAP_THEMES).map(([key,theme])=>[key,theme.visuals.header]));
 const PAGE_HEADERS:Record<string,string>=Object.fromEntries(Object.entries(LOG_THEMES).map(([key,theme])=>[key,theme.appearance.header]));
+const MAP_INKS:Record<string,string>=Object.fromEntries(Object.entries(MAP_THEMES).map(([key,theme])=>[key,theme.visuals.headerText]));
+const PAGE_INKS:Record<string,string>=Object.fromEntries(Object.entries(LOG_THEMES).map(([key,theme])=>[key,theme.appearance.headerText]));
+
+/* THE BACKGROUND AND THE INK THAT WAS DESIGNED WITH IT, together.
+
+   Curtis: *"Themes should not be affected by default design."* Tactical's
+   header is `#15180f` with `#e7ddb2` on it, and that pairing is the theme.
+   Returned as one value because a caller that asks for the colour here and
+   computes the ink somewhere else is how the khaki became white in the first
+   place.
+
+   The ink is read table-first and stored-second, which is the rule the colour
+   above already follows and for the same reason: the palette on disk is a
+   DERIVED copy written beside the theme name, so a record carrying
+   `theme:"tactical"` and no palette is an ordinary thing for an older build
+   to hold. `custom` has no table entry, and there the stored colours ARE the
+   decision.
+
+   `null` means this page's theme is not deciding its header at all — the
+   default theme, or a colour equal to the default — and the shared app colour
+   answers, ink included. */
+export type PageHeaderTheme={header:string;text:string};
+export function pageThemeHeaderPair(kind:PageThemeKind,themeName:unknown,storedHeader:unknown,storedText:unknown):PageHeaderTheme|null{
+ const header=pageThemeHeader(kind,themeName,storedHeader);
+ if(!header)return null;
+ const named=(kind==="map"?MAP_INKS:PAGE_INKS)[String(themeName)];
+ const ink=isHeaderColor(named)?named:(isHeaderColor(storedText)?storedText:"");
+ return {header,text:ink?normalizeHeaderColor(ink):""};
+}
 
 function parse(raw:string|null){
  try{return JSON.parse(raw||"null") as unknown}catch{return null}
 }
-function field(saved:unknown,read:(record:Record<string,unknown>)=>unknown){
- if(!saved||typeof saved!=="object")return {theme:undefined as unknown,header:undefined as unknown};
+function field(saved:unknown,read:(record:Record<string,unknown>)=>unknown,readText:(record:Record<string,unknown>)=>unknown){
+ if(!saved||typeof saved!=="object")return {theme:undefined as unknown,header:undefined as unknown,text:undefined as unknown};
  const record=saved as Record<string,unknown>;
- return {theme:record.theme,header:read(record)};
+ return {theme:record.theme,header:read(record),text:readText(record)};
 }
 
-export function pageHeaderThemes(board:unknown,log:unknown):Partial<Record<HeaderSurface,string>>{
- const out:Partial<Record<HeaderSurface,string>>={};
+export function pageHeaderThemes(board:unknown,log:unknown):Partial<Record<HeaderSurface,PageHeaderTheme>>{
+ const out:Partial<Record<HeaderSurface,PageHeaderTheme>>={};
  const board0=field(board,record=>{
   const visuals=record.visuals;
   return visuals&&typeof visuals==="object"?(visuals as Record<string,unknown>).header:undefined;
+ },record=>{
+  const visuals=record.visuals;
+  return visuals&&typeof visuals==="object"?(visuals as Record<string,unknown>).headerText:undefined;
  });
  const log0=field(log,record=>{
   const appearance=record.appearance;
   return appearance&&typeof appearance==="object"?(appearance as Record<string,unknown>).header:undefined;
+ },record=>{
+  const appearance=record.appearance;
+  return appearance&&typeof appearance==="object"?(appearance as Record<string,unknown>).headerText:undefined;
  });
- const map=pageThemeHeader("map",board0.theme,board0.header);
- const page=pageThemeHeader("page",log0.theme,log0.header);
+ const map=pageThemeHeaderPair("map",board0.theme,board0.header,board0.text);
+ const page=pageThemeHeaderPair("page",log0.theme,log0.header,log0.text);
  /* Written only when there is one, the absence spelling `setBusHold` and the
     ledger's `gap` use, so `"log" in themes` answers the question directly. */
  if(map)out.map=map;

@@ -373,13 +373,31 @@ of it, and a record can carry the name without the palette), the palette
 answers for `custom`, and a colour equal to that page's own default answers
 nothing at all.
 
-**The page theme does not carry the page theme's INK.** Only the background.
-`--header-text`, `--log-header-text` and `--fixed-header-text` are the
-computed black-or-white now, so Terminal's green `#61ff9d` header text and
-Tactical's `#e7ddb2` become white. Contrast improves in every case and the
-header stops being able to hide its own title; what is lost is that Terminal's
-header is no longer green on black. Worth knowing before somebody reports it
-as a bug.
+**THE INK COMES OFF THE SAME RUNG AS THE COLOUR**, and that is a correction.
+It shipped computing black-or-white for all eight headers, so Terminal's green
+`#61ff9d` and Tactical's `#e7ddb2` came out white on the three pages a theme
+decides. Curtis: *"Why did we have to change a theme?? The tactical theme.
+Themes should not be affected by default design."* He is right — a page theme
+is a designed pairing of a background and an ink, and taking half of it is not
+honouring it.
+
+So `resolveHeaderInk` walks the same ladder `resolveHeaderColor` does: an
+override typed for this surface is **computed**, a non-default page theme keeps
+**its own ink**, and the shared colour is **computed**. Rungs 1 and 3 are
+computed because those colours came out of a picker with no ink attached, and
+"white on a dark header" stops being true the moment somebody picks a pale one.
+The gate on rung 2 is the same `isHeaderColor(pageTheme)` expression the colour
+uses, so the two cannot come off different rungs; `pageThemeHeaderPair` returns
+the background and the ink as ONE value for the same reason. A theme with no
+ink of its own — `custom` on a device that stored a header colour and no header
+text — falls through to the computed one, because there is no pairing there.
+
+Measured at 1180: on Tactical the map header draws `#e7ddb2` and the Defect Log
+and Fixed Repairs `#f4e8b8`, their own; on the default theme all eight are white
+on navy; and with an override typed for the map and the Defect Log those two
+take the picked colour with BLACK computed on it while Fixed Repairs keeps
+Tactical's khaki. The Settings panel's contrast note is scored against the ink
+that will actually be drawn, not the one it would have computed.
 
 **An accent is not a header.** `--log-accent-text` exists because
 `--log-header-text` was doing both jobs: harmless while it came from the page's
@@ -651,27 +669,45 @@ it is the only one of the four that answers the question being asked; the two
 only ever meet on a job that is part-billed and still open, since a completed
 repair adds nothing to the badge at all.
 
-**It and the Down Sheet's own estimate are one number, in both directions.**
-A card built from an estimated defect is seeded from it through
-`estimateFromHours` rather than from the catalog, and a figure typed on the
-sheet comes back as the defect's estimate — but only when the card differs from
-the catalog's recommendation for that repair, because every card carries a
-seeded figure and reading one as a claim would freeze a guess onto the record.
-Same test `pageThemeHeader` makes about a header colour. Carried through the
-UNFLOORED sum (`repairTimeSum`), because `repairTimeTotal`'s thirty-minute floor
-is about what the sheet PRINTS: a quarter-hour estimate round-tripped through
-the floor would overwrite the fifteen minutes somebody typed with thirty, on
-every save. Taking an estimate off is done by clearing the box in the Defect
-Log, never by editing a card back to the catalog's number.
+**THE DEFECT LOG'S BOX OWNS IT, AND THE SHEET'S BOXES OWN THE SHEET'S.** One
+direction: a Down Sheet card BUILT from an estimated defect is seeded from it
+through `estimateFromHours` rather than from the catalog, at both places a card
+is built from a record. Nothing carries a sheet figure back onto the defect.
 
-**The Defect Log's WHAT WAS FOUND box went where this came from.** Curtis:
+**It was bidirectional for one commit, and a cold read measured what that
+does.** Type 6 in the Defect Log on a bus already on the sheet, then clear it:
+the card still holds the 360 minutes it was seeded with, so the next save of
+that row — changing the mechanic, ticking a card, anything — reads 360, finds it
+is not the catalog's 720, and writes the 6 straight back on. A cleared estimate
+that returns is the bug `workStates` and `downSheetRecommendation` are deleted
+rather than blanked to avoid. `{...linked}` in `applyDownEntryToFleet` keeps
+whatever the record holds, which is all that is wanted.
+
+**So an estimate already on the sheet is changed on the sheet.** The Defect
+Log's badge and a sheet row can therefore quote different figures for the same
+repair when the entry already existed — the sheet seeds only at creation. That
+is a known limit, not a claim to the contrary.
+
+**The Defect Log's WHAT WAS FOUND box MOVED to ADVANCED DETAILS.** Curtis:
 *"where it says optional what was found replace this with estimated time of
-repair ... We have description above, so it kind of redundant."* The `finding`
-field itself is untouched and still reads everywhere it ever did; it is typed on
-the **Down Sheet row editor** and on **Fixed Repairs** now, and the FOUND BEFORE
-chips went with the box, so `pace-findings-memory-v1` is offered on those two
-surfaces and is still learned from on a Defect Log save that carries a cause.
-That form's DESCRIPTION is **ADDITIONAL DETAILS**.
+repair ... We have " description above, so it kind of redundant."* The estimate
+has that slot; the finding box sits beside DIAGNOSIS / TEST / VERIFICATION,
+which is what it answers, and a record carrying a finding opens that section so
+it can be read. That form's DESCRIPTION is **ADDITIONAL DETAILS**.
+
+**Taking it off the page altogether was the first version, and it broke the
+open-defect case.** The Down Sheet's own finding box is inside
+`{item.done && …}` and Fixed Repairs lists completed repairs only, so an OPEN
+defect had nowhere left in the app to type a cause, read one already stored, or
+clear it — with the DIAGNOSED work state still on the form and nothing to say
+what was diagnosed. The FOUND BEFORE chips moved with the box, so
+`pace-findings-memory-v1` is offered on all three surfaces again.
+
+**A finding cleared on an open defect can still come back from the sheet**, and
+that one predates all of this: `applyDownEntryToFleet` writes
+`normalizeFinding(target.finding)||linked?.finding`, so a card still carrying
+the old wording restores it on the next save. Not introduced here and not fixed
+here.
 
 **Keyed per SPECIFIC REPAIR, not per category**, through the same
 `repairIdentityKey` PATH TO REPAIR uses — one function, so a writeup and a time
