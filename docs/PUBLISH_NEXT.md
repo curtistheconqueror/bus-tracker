@@ -77,6 +77,8 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+6f3cf22 Give a page theme its own header ink back, and answer the cold read
+ac254f1 Queue the estimate field in 194, and correct what the handoff claimed
 52609f2 Ask how long the repair takes where the form asked what was found
 9c83c37 Re-run the handoff's own commands, and the service worker is not untouched
 a1a42bd Answer the cold read: minimal is not the same as unmeasured
@@ -126,7 +128,6 @@ src/lib/defects/defect-log-sync.ts
 src/lib/defects/duplicate-defects.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
-src/lib/down-sheet/down-sheet-repair-items.ts
 src/lib/down-sheet/down-sheet-sync.ts
 src/lib/down-sheet/repair-time-estimates.ts
 src/lib/settings/feedback-settings.ts
@@ -137,7 +138,7 @@ src/lib/settings/page-header-themes.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 44 files changed, 4860 insertions(+), 261 deletions(-)
+ 43 files changed, 5389 insertions(+), 247 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
