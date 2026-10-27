@@ -1755,3 +1755,67 @@ test("the Down Sheet's page title defers to the header, like the Defect Log's", 
  assert.match(css,/\.down-header h1\{color:var\(--down-page-title-color,var\(--app-header-text,#fff\)\)/,
    "and the fallback is the header's computed ink");
 });
+
+test("the header panel draws one control per row and nothing that does nothing", async () => {
+ /* Curtis: "Just make it as much of a minimalist design as you can. Even
+    though we have more settings controls."
+
+    Counted before: 57 elements, 18 controls, 112 words, 630px — a quarter of
+    the Settings page for one setting — of which SEVEN were disabled FOLLOW
+    buttons and eight were a second swatch showing a colour the picker beside
+    it already showed. After: 27 words, 11 controls, no disabled anything.
+    These assertions are the shape, not the pixels: a row carries a name and
+    one swatch, and a qualifier or a clear ONLY when there is something to
+    qualify or clear. */
+ const page=await readFile(new URL("../app/settings/page.tsx", import.meta.url), "utf8");
+ const css=await readFile(new URL("../app/settings/settings.css", import.meta.url), "utf8");
+
+ /* The swatch IS the input: one element per row, not a chip plus a picker. */
+ assert.match(page,/function HeaderSwatch\(/);
+ assert.match(page,/<label className="hc-swatch"[^>]*>\s*<span aria-hidden="true">Aa<\/span>\s*<input type="color"/,
+   "the swatch wraps the real input rather than sitting beside one");
+ assert.match(css,/\.hc-swatch input\{position:absolute;inset:0;width:100%;height:100%;[^}]*opacity:0/,
+   "the input fills the swatch and is the thing that is clicked");
+ assert.match(css,/\.hc-swatch:focus-within\{outline:/,"and the focus ring moves to the box");
+ /* One swatch component, used for the shared colour and for all eight rows. */
+ assert.equal((page.match(/<HeaderSwatch /g)||[]).length,2,"one component, two call sites");
+
+ /* NOTHING DISABLED. The clear is rendered only on a row that has an
+    override; seven greyed-out buttons is the absence of news drawn eight
+    times. */
+ const panel=page.slice(page.indexOf('<section className="settings-header-colour">'),
+                        page.indexOf("</section>",page.indexOf('className="hc-foot"')));
+ assert.equal(/disabled/.test(panel),false,"no control in this panel is ever drawn disabled");
+ assert.match(panel,/\{own\?<button type="button" className="hc-clear"/,"the clear exists only with an override");
+ assert.match(panel,/\{own\?<i>own<\/i>:page\?<i>page theme<\/i>:null\}/,
+   "and a row says what decides it only when something other than the shared colour does");
+
+ /* The column is reserved on every row, so one row having a clear does not
+    push its swatch out of line with the seven that do not. */
+ assert.match(css,/\.hc-list>\.hc-row\{grid-template-columns:minmax\(0,1fr\) auto 44px 44px\}/);
+ /* 44px: this app's tap target, and the panel's own measurement. */
+ assert.match(css,/\.hc-swatch\{[^}]*width:44px;height:44px/);
+ assert.match(css,/\.hc-clear\{width:44px;height:44px/);
+ assert.match(css,/\.hc-row\{min-height:44px/);
+
+ /* NO CARD. The drawer is already a box; every section inside THIS DEVICE is
+    separated by a rule instead, and the four of them agree. */
+ for (const name of ["settings-lite-switch","settings-header-colour","settings-feedback","settings-welcome-again"]) {
+  const rule=css.match(new RegExp("\\."+name+"\\{([^}]*)\\}"));
+  assert.ok(rule,name+" must have a layout rule");
+  assert.equal(/border:1px|background:#fff|border-radius/.test(rule[1]),false,
+    name+" must not draw a card inside the drawer");
+ }
+ assert.match(css,/\.settings-drawer-body>\.settings-lite-switch[^{]*\{border-top:1px solid/,
+   "a hairline between them instead");
+ assert.match(css,/\.settings-drawer-body>\.settings-lite-switch:first-child\{border-top:0\}/,
+   "and none above the first");
+
+ /* The LITE MODE switch is styled at all, which it was not: `.settings-check`
+    is scoped to two other pages, so on this one it computed `display:inline`
+    and rendered as `LITE MODE ON THIS DEVICEDraws less of the app…`, one
+    run-together paragraph with the checkbox inside the first word. The
+    comment above the rule used to claim it "looks fine". */
+ assert.match(css,/\.settings-lite-switch \.settings-check\{display:flex/);
+ assert.match(css,/\.settings-lite-switch \.settings-check>span\{display:grid/);
+});

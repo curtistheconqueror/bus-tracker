@@ -513,6 +513,45 @@ ACTIONS toggle stays purple, because an earlier release made it purple
 precisely so it cannot be mistaken for the Defect Log's, and the Defect Log's
 inactive tabs keep their 26% blue lift, which is its own rule and untouched.
 
+### The Settings panel, as little as it can be drawn as
+
+Curtis, seeing the first version: *"Just make it as much of a minimalist
+design as you can. Even though we have more settings controls."*
+
+Counted before: **57 elements, 18 controls, 112 words and 630px — a quarter of
+the whole Settings page for one setting.** Of the 18 controls, **seven were
+disabled FOLLOW buttons**, and eight of the elements were a second swatch
+showing the colour the picker beside it already showed. Seven rows said
+*"following the one above"*, which is the absence of news written out seven
+times. After: **27 words, 11 controls, none of them disabled, 469px.**
+
+- **The swatch IS the picker.** `<input type="color">` cannot be given
+  content, so showing a colour AND what its text will look like took two
+  elements per row. The real input now fills a 44px box at opacity 0: the box
+  draws the colour and the computed ink, the input takes the click, the focus
+  and the keyboard, and `:focus-within` puts the ring back on the box.
+- **A row with nothing to say says nothing.** The qualifier appears only when
+  something other than the shared colour decides that page — `OWN` or
+  `PAGE THEME` — and the clear `×` only when there is an override to clear.
+  Its column is reserved on every row, so the swatches stay in one line.
+- **No card.** Every other section on this page is a bordered white card
+  inside a drawer that is itself a card inside a section that is another one.
+  THIS DEVICE is the drawer this release touched, so its four sections are now
+  separated by a hairline instead: LITE MODE, HEADER COLOUR, SOUND &
+  VIBRATION, FIRST-TIME WELCOME, one ruled list. **The rest of the page is
+  unchanged** — taking the cards off the other twenty sections is a bigger
+  change than this one and is Curtis's to ask for.
+- **RESET ALL TO NAVY and SHOW IT are quiet now**, text rather than filled
+  buttons, because neither is the thing you came to that row to do.
+
+**And the LITE MODE switch has never been styled.** `.settings-check` is
+scoped to the Down Sheet's and the Defect Log's own settings bodies, so on
+this page it computed `display:inline` and rendered as
+`LITE MODE ON THIS DEVICEDraws less of the app…` — one run-together
+paragraph with the checkbox inside the first word. It predates this release;
+the comment in `settings.css` claimed that one such label "gets away with it",
+which was never measured. Fixed in the same rule as its neighbour.
+
 ### The title still moves on two pages, and it is a frame rather than a padding
 
 The same measurement that started this found FLEETSTEP's left edge at 10 to
@@ -561,7 +600,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **402 pass, 0 fail**
+- `npm test` — **403 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -689,10 +728,15 @@ were reintroductions of the very bug being fixed:
 - **The map's header bar and the phone nav under it are one block again.**
   Sampled either side of their boundary at four x positions: identical at
   90deg, against a 4-to-6 per channel step at 110deg.
-- **The Settings panel at 360, 390, 430, 820 and 1180** — no overflow, all
-  eight FOLLOW buttons on one x, every tap target 44px or more. It shipped
-  with no CSS at all and rendered as 519px of run-together inline text; that
-  was found by looking at it, not by reading it.
+- **The Settings panel at 360, 390, 430, 820 and 1180** — no overflow, no
+  page scroll, all nine swatches 44x44 and on one x within each width, every
+  tap target 44px. It shipped with no CSS at all and rendered as 519px of
+  run-together inline text, then as 630px of cards and disabled buttons;
+  both were found by looking at it, not by reading it.
+- **Every control driven end to end**: the shared swatch repaints all eight
+  and the status bar; a row swatch writes an override and grows that row's
+  `OWN` tag and its `×`; the `×` removes it; RESET ALL puts the record back
+  to `{shared:"#041d47",overrides:{}}`.
 - **No horizontal scroll and nothing spilling a header**, on all eight pages
   at all five widths.
 - **Title geometry:** the six pages with no frame land on exactly 12/7 at 390
