@@ -518,12 +518,27 @@ inactive tabs keep their 26% blue lift, which is its own rule and untouched.
 Curtis, seeing the first version: *"Just make it as much of a minimalist
 design as you can. Even though we have more settings controls."*
 
-Counted before: **57 elements, 18 controls, 112 words and 630px — a quarter of
-the whole Settings page for one setting.** Of the 18 controls, **seven were
-disabled FOLLOW buttons**, and eight of the elements were a second swatch
-showing the colour the picker beside it already showed. Seven rows said
-*"following the one above"*, which is the absence of news written out seven
-times. After: **27 words, 11 controls, none of them disabled, 469px.**
+Measured at 390, from `innerText` and the rendered box, before and after:
+
+| | before | after |
+| --- | --- | --- |
+| words | 149 | **53** |
+| controls | 18 | **10** |
+| of those, disabled | 8 | **0** |
+| elements | 57 | **51** |
+| height | 643px | **490px** |
+
+A quarter of the whole Settings page, for one setting. **Every one of the
+eight rows carried a disabled FOLLOW button** out of the box, and a second
+swatch showing the colour the picker beside it already showed. Seven rows
+said *"following the one above"*, which is the absence of news written out
+seven times.
+
+(An earlier draft of this section said 112 words and 469px. 112 counted the
+heading, the paragraph and the repeated status lines and left out the row
+names, the swatch letters and the FOLLOW labels; 469 was not reproducible at
+any width. The table is both ends measured the same way, which is the only
+thing that makes the two columns comparable.)
 
 - **The swatch IS the picker.** `<input type="color">` cannot be given
   content, so showing a colour AND what its text will look like took two
@@ -541,16 +556,32 @@ times. After: **27 words, 11 controls, none of them disabled, 469px.**
   VIBRATION, FIRST-TIME WELCOME, one ruled list. **The rest of the page is
   unchanged** — taking the cards off the other twenty sections is a bigger
   change than this one and is Curtis's to ask for.
-- **RESET ALL TO NAVY and SHOW IT are quiet now**, text rather than filled
-  buttons, because neither is the thing you came to that row to do.
+- **Reset all to navy and SHOW IT are quiet now**, text rather than filled
+  buttons, because neither is the thing you came to that row to do. The reset
+  keeps the words "to navy": shortened to "Reset all" it lost the only thing
+  the label was carrying.
+- **The one sentence says the override wins.** It read *"a page on its own
+  theme keeps that"*, which is the opposite — a colour typed on a themed row
+  beats the theme, and clearing it falls back to the theme rather than to the
+  shared colour. That was the one thing the six-line paragraph carried that
+  the rows do not teach by themselves.
+- **The `OWN` / `PAGE THEME` tag is `#5a6b84`**, the colour of the `<small>`
+  it replaced: 5.37:1. Drawn in a fainter grey it measured **3.04:1**, under
+  AA at 8px, on what is now the only thing telling you a page is not
+  following.
 
-**And the LITE MODE switch has never been styled.** `.settings-check` is
+**And the LITE MODE switch has never been styled, at any width.** `.settings-check` is
 scoped to the Down Sheet's and the Defect Log's own settings bodies, so on
 this page it computed `display:inline` and rendered as
 `LITE MODE ON THIS DEVICEDraws less of the app…` — one run-together
 paragraph with the checkbox inside the first word. It predates this release;
 the comment in `settings.css` claimed that one such label "gets away with it",
-which was never measured. Fixed in the same rule as its neighbour.
+which was never measured. Fixed in the same rule as its neighbour — **and in
+the same media query**, which the first attempt missed: the base rules were
+widened and the 760px block one line below was not, so on every phone width
+the lite switch sat a size smaller and a tap target shorter than the
+structurally identical row directly beneath it, 9px/8px/44px against
+10px/9px/48px.
 
 ### The title still moves on two pages, and it is a frame rather than a padding
 

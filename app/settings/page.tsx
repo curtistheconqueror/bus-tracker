@@ -521,11 +521,13 @@ export default function SettingsPage(){
          "Just make it as much of a minimalist design as you can. Even though
          we have more settings controls."
 
-         Counted before this: 57 elements, 18 controls, 112 words and 630px —
-         a quarter of the whole Settings page for one setting. Two swatches on
-         every row showing the same colour, "following the one above" written
-         out seven times to say that nothing is happening, SEVEN GREYED-OUT
-         FOLLOW BUTTONS, and six lines of paragraph before the first control.
+         Measured at 390, before and after, both from `innerText` and the
+         rendered box: 57 elements, 18 controls, 149 words and 643px at 390 became
+         51 elements, 10 controls, 53 words and 490px. Two swatches on every row showing the
+         same colour, "following the one above" written out seven times to say
+         that nothing is happening, EIGHT GREYED-OUT FOLLOW BUTTONS — one per
+         row, out of the box — and six lines of paragraph before the first
+         control.
 
          What went, and why each was safe to lose:
          - The second swatch. The colour well IS the swatch now: a real
@@ -540,7 +542,7 @@ export default function SettingsPage(){
            that page, and the swatch beside it shows the result. */}
      <section className="settings-header-colour">
       <div className="hc-head">
-       <div><b>HEADER COLOUR</b><small>Every page uses this. Give one its own below; a page on its own theme keeps that.</small></div>
+       <div><b>HEADER COLOUR</b><small>Every page uses this. Give one its own below — that wins, even on a page with its own theme.</small></div>
        <HeaderSwatch colour={headerTheme.shared} label="Header colour for every page"
         onPick={value=>setHeaderTheme({...headerTheme,shared:value})}/>
       </div>
@@ -562,7 +564,7 @@ export default function SettingsPage(){
        })}
       </div>
       <div className="hc-foot">
-       <button type="button" className="hc-reset" onClick={()=>setHeaderTheme({shared:DEFAULT_HEADER_COLOR,overrides:{}})}>Reset all</button>
+       <button type="button" className="hc-reset" onClick={()=>setHeaderTheme({shared:DEFAULT_HEADER_COLOR,overrides:{}})}>Reset all to navy</button>
        {/* THE WORST OF THE EIGHT, against the text that will actually be
            drawn. It quoted the SHARED colour against WHITE: wrong twice over,
            because the title switches to black on a light colour, and because
