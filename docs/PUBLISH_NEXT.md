@@ -61,10 +61,31 @@ What follows is the pending work.
 
 Codex published 193 from `a009c08` mid-session, so **this range starts there**
 and 194 was rebased onto that work rather than merged over it. Release source
-is the commit this file is updated in, on top of `033cb98`.
+is the commit this file is updated in.
+
+**EVERY COMMAND BELOW WAS RE-RUN AT THE TOP OF THE RANGE.** An earlier draft
+of this section quoted outputs from five commits in, which is how it came to
+say the service worker was untouched when it is not — see the end of this
+section. A quoted command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+a1a42bd Answer the cold read: minimal is not the same as unmeasured
+564ed82 Draw the header panel as little as it can be drawn as
+6a5aa09 Answer the cold read: the headers' backgrounds moved and their ink did not
+2df13f5 Say what the header fallbacks actually do
+ab99278 One header colour for the whole app, set in Settings
+5f2c66e Answer the cold read: the contrast fix broke three of the four themes
+e91cf84 Answer the cold read: the cancel button marked the repair complete
+821fd7e Make a re-report visible, and fix the OPEN IT that never opened anything
+2f04c6a Answer the cold read: the dirty check was promising what it did not do
+2bc575c One sound switch, and Escape in the bus editor as an option that starts off
+9f2b516 Answer the cold read: a layout that was broken, and a gate that overclaimed
+b29fb4b Sound and vibration off by default, and a gate they cannot be added around
+8f96400 Correct the claims a third read found false
+2b0af96 Answer the cold read: revert the service worker, narrow Escape
+70ce29d Give the map an Escape, and stop one bad fetch losing the offline shell
+725b494 Queue application release 194 on top of Codex's published 193
 033cb98 Every finding from the cold read, and five of six were mine
 b44f370 Make a bus wait for a held finger before it follows one
 8280d61 Record application release 193 live as Sites version 189
@@ -72,53 +93,70 @@ b44f370 Make a bus wait for a held finger before it follows one
 b387c33 Queue application release 193 from the reviewed PR41 merge
 ```
 
-**Three of those five carry no application change.** `8280d61` is Codex's own
-193 release record, `b387c33` was 193's queue entry, and `6681407` added the
-cold-read gate to `CLAUDE.md`, `docs/NEXT_SESSION.md` and
-`.claude/skills/fresh-context-review/` — process, not product.
-
-```
-$ git diff --name-only a009c08..HEAD
-.claude/skills/fresh-context-review/SKILL.md
-CLAUDE.md
-PROJECT_HANDOFF.md
-README.md
-app/globals.css
-app/page.tsx
-docs/NEXT_SESSION.md
-docs/PUBLISH_NEXT.md
-docs/RELEASES.md
-docs/archive/PUBLISH_RELEASE_193.md
-tests/app-shell.test.mjs
-tests/fleet.test.mjs
-```
-
 ```
 $ git diff --name-only a009c08..HEAD -- app src
+app/defect-log/defect-log.css
+app/defect-log/page.tsx
+app/down-sheet/down-sheet.css
+app/down-sheet/page.tsx
+app/fixed-repairs/fixed-repairs.css
+app/fixed-repairs/page.tsx
 app/globals.css
+app/incidents/incidents.css
+app/layout.tsx
+app/lists/lists.css
 app/page.tsx
+app/settings/_components/map-settings-panel.tsx
+app/settings/page.tsx
+app/settings/settings.css
+app/shop-talk/shop-talk.css
+src/components/shared/header-theme-live.tsx
+src/lib/defects/defect-log-display-settings.ts
+src/lib/defects/repair-catalog.ts
+src/lib/defects/report-returns.ts
+src/lib/settings/feedback-settings.ts
+src/lib/settings/header-theme.ts
+src/lib/settings/map-settings.ts
+src/lib/settings/page-header-themes.ts
 ```
-
-**The application change is two files.** One stylesheet, one component.
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 12 files changed, 545 insertions(+), 50 deletions(-)
+ 38 files changed, 4408 insertions(+), 189 deletions(-)
 ```
+
+### What this release touches outside `app/` and `src/`
 
 ```
 $ git diff --name-only a009c08..HEAD -- supabase package.json package-lock.json .github public worker
-(nothing)
+public/sw.js
 ```
 
-**The no-infra-change check comes back empty.** `public/sw.js` is untouched, so
-there is no service-worker cache bump and no app shell re-download.
+**It does NOT come back empty, and an earlier draft said it did.** No schema,
+no dependency, no workflow, no worker — but `public/sw.js` is in the range.
+
+**The change to it is 22 lines and every one is inside a comment block.**
+Verified by stripping comments and whitespace from both versions and
+comparing: the code is byte-identical, `CACHE_NAME` is unchanged, and the
+comment is the record of why the `Promise.all` in `install` must stay
+all-or-nothing (a softened version was built, measured and reverted — see
+*The service worker is unchanged, and that is the finding* below).
+
+**A service worker reinstalls on ANY byte change to its script, comments
+included.** 4023 bytes to 5454. So on the first load after this publishes,
+every device will re-run `install`, re-fetch the core pages into the SAME
+`CACHE_NAME`, and activate. That is the normal path, it is atomic, and
+`activate` keeps the cache rather than clearing it — nothing is lost and the
+app works offline throughout. But it IS one shell re-download per device on
+publish day, and the previous wording promised the opposite.
 
 ### Migrations
 
 **None.** No schema change, no policy change, nothing executed against the live
-project. **No key renamed, and nothing in the fleet's records is read or
-written** — the gesture, Escape and re-report work touches no settings file at
+project. The one file outside `app/` and `src/` in this range is
+`public/sw.js`, changed by 22 lines of comment and no code — see **Source**
+for what that does and does not mean. **No key renamed, and nothing in the
+fleet's records is read or written** — the gesture, Escape and re-report work touches no settings file at
 all, and the three settings this release adds are per-device preferences.
 
 **ONE NEW LOCALSTORAGE KEY: `pace-header-theme-v1`**, holding the app's header
@@ -799,6 +837,10 @@ that refusal has not been measured on an Android device.
 
 ### What to check once it is live
 
+0. **Expect one slow first load per device.** The service worker's script
+   changed (comment only), so every phone re-fetches the offline shell once on
+   the first load after this goes out, then behaves as before. If a device
+   looks stale, close it fully and reopen rather than pulling to refresh.
 1. **On your phone, open the Facility Map and scroll up and down through the
    garage with your thumb landing on buses.** Nothing should move. This is the
    whole release.
