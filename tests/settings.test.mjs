@@ -1433,8 +1433,9 @@ test("one header colour for the whole app, with a page theme and an override abo
 
 test("the header panel can see which pages their own theme is deciding", async () => {
  const {readPageHeaderThemes,pageHeaderThemes,pageThemeHeader,pageThemeHeaderPair,DEFAULT_MAP_HEADER,DEFAULT_PAGE_HEADER,
-  BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes}
+  BOARD_SETTINGS_KEY,LOG_SETTINGS_KEY,loadPageHeaderThemes,MINIMUM_PAGE_INK_CONTRAST}
   =await import("../src/lib/settings/page-header-themes.ts");
+ const {headerContrast}=await import("../src/lib/settings/header-theme.ts");
  /* THE COLOUR AND THE INK DESIGNED WITH IT, as one value. Curtis: "Why did we
     have to change a theme?? The tactical theme. Themes should not be affected
     by default design." They are returned together because a caller that takes
@@ -1497,6 +1498,24 @@ test("the header panel can see which pages their own theme is deciding", async (
  assert.deepEqual(pageThemeHeaderPair("page","tactical","#ff0000","#00ff00"),TACTICAL_PAGE,"the table outranks a palette that disagrees");
  assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","#f0e0a0"),{header:"#3b0f52",text:"#f0e0a0"});
  assert.deepEqual(pageThemeHeaderPair("page","custom","#3b0f52","not a colour"),{header:"#3b0f52",text:""});
+
+ /* A PAIRING THAT HIDES ITS OWN WORDS IS NOT HONOURED. Measured by a cold
+    read: `{theme:"custom",visuals:{header:"#ffffff",headerText:"#ffffff"}}` is
+    reachable from the Facility Map's own appearance panel, which offers both
+    colours and writes `custom` on any change — and it drew a white title on a
+    white header at 1:1, where before the ink followed the theme the same
+    record computed black. */
+ assert.deepEqual(pageThemeHeaderPair("map","custom","#ffffff","#ffffff"),{header:"#ffffff",text:""},"white on white falls back");
+ assert.deepEqual(pageThemeHeaderPair("map","custom","#15180f","#1a1d14"),{header:"#15180f",text:""},"and so does olive on olive");
+ /* It never bites a DESIGNED pairing. Every theme in both tables clears the
+    floor, the lowest being Tactical's khaki, so this catches the palette
+    nobody designed and leaves the ones somebody did. */
+ for(const [kind,name,ink] of [["map","tactical","#e7ddb2"],["map","terminal","#61ff9d"],["page","tactical","#f4e8b8"]]){
+  const pair=pageThemeHeaderPair(kind,name,undefined,undefined);
+  assert.equal(pair.text,ink,kind+" "+name+" keeps its own ink");
+  assert.ok(headerContrast(pair.header,pair.text)>=MINIMUM_PAGE_INK_CONTRAST,kind+" "+name+" clears the floor");
+ }
+ assert.equal(MINIMUM_PAGE_INK_CONTRAST,4.5,"AA for normal text, because a header carries its kicker and nav labels at 8 to 10px");
 
  /* THE THEME NAME IS THE FACT AND THE STORED PALETTE IS A COPY OF IT, so a
     record naming a theme resolves from the table even with the palette
@@ -1769,6 +1788,19 @@ test("the wiring between the colour and the pixels, which nothing used to exerci
     picking a theme changes both halves of the pairing at once. */
  assert.match(live,/\},\[surface,pageTheme,pageInk\]\);/);
 
+ /* THE HALF OF THE INK FIX THAT PAINTS THE DEFECT LOG'S TITLE, which had no
+    assertion at all. A second cold read deleted the `setInk` line, built it,
+    and measured `--log-header-text:#ffffff` on Tactical olive — a white 25px
+    title and white nav tiles, exactly the complaint this change answers —
+    with all 405 tests still green. It then replaced the returned `text` with
+    `headerTextFor(colour)` to the same effect. Both are named here. */
+ assert.match(live,/setInk\(resolveHeaderInk\(theme,surface,pageTheme,pageInk\)\)/,
+  "the hook must resolve the ink through the ladder, not compute it");
+ assert.match(live,/return \{color:colour,text:ink\|\|headerTextFor\(colour\),fill:headerGradient\(colour\)\}/,
+  "and must return the resolved ink, with the computed one only as the pre-effect fallback");
+ assert.equal(/text:headerTextFor\(colour\)[,}]/.test(live),false,
+  "returning the computed ink unconditionally is the mutation that put white on Tactical");
+
  /* THE TWO THEMED PAGES FEED THEIR OWN VARIABLE FROM THE RESOLVED COLOUR,
     and pass their page theme in, which is the ladder's middle rung. Unplug
     either and that page keeps its own theme's header while the other seven
@@ -1788,6 +1820,20 @@ test("the wiring between the colour and the pixels, which nothing used to exerci
  /* THE PANEL READS THE LIVE SETTINGS, so its rows cannot describe a theme the
     person changed two rows further down the same screen. */
  assert.match(settings,/const pageThemes=pageHeaderThemes\(board,log\);/);
+
+ /* AND IT ASKS FOR THE HEADER OUT OF THE PAIR, not the pair. Passing `page`
+    straight to `resolveHeaderColor` makes every page-theme row show navy, and
+    reverting the contrast note to `headerContrast(colour)` makes it quote a
+    figure for ink those pages are not using. Both stayed green through a cold
+    read's mutations. */
+ /* Anchored to the ROW's own line. Matched loosely it also found the contrast
+    note's identical call, so breaking the row survived — measured. */
+ assert.match(settings,/const effective=resolveHeaderColor\(headerTheme,surface\.key,page\?\.header\);/);
+ assert.match(settings,/headerContrast\(colour,resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\)/);
+ assert.equal(/ratio:headerContrast\(colour\)/.test(settings),false,"the note must not score against an ink the page is not drawing");
+ /* The swatch beside it draws the same ink it quotes, or the panel measures
+    one thing and shows another. */
+ assert.match(settings,/ink=\{resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\}/);
 
  /* SAVED BEFORE THE STATE MOVES. The other order leaves the swatches showing
     a colour no header took and no repaint was asked for. */
@@ -1871,13 +1917,18 @@ test("the header panel draws one control per row and nothing that does nothing",
  assert.match(page,/<input type="color" value=\{colour\} onChange=\{event=>onPick\(event\.target\.value\)\} aria-label=\{label\}/,
    "the swatch input must carry the page's name");
  assert.match(page,/colour=\{headerTheme\.shared\} label="Header colour for every page"/);
- assert.match(page,/colour=\{effective\} label=\{surface\.label\+" header colour"\}/);
+ /* The row swatch shows the colour AND the ink that row will draw: a computed
+    white "Aa" over Tactical's olive, beside a note quoting the khaki's ratio,
+    is the panel measuring one thing and showing another. */
+ assert.match(page,/colour=\{effective\} ink=\{resolveHeaderInk\(headerTheme,surface\.key,page\?\.header,page\?\.text\)\} label=\{surface\.label\+" header colour"\}/);
  assert.match(page,/className="hc-clear" aria-label=\{"Clear "\+surface\.label\+"'s own header colour"\}/);
 
  /* The swatch draws the ink the header will be WRITTEN in, which is the only
     reason it is a box with letters in it rather than a square of colour.
     Hard-coding it white passed everything else. */
- assert.match(page,/className="hc-swatch" style=\{\{background:headerGradient\(colour\),color:headerTextFor\(colour\)\}\}/);
+ /* The ink is the row's, with the computed one as the fallback for the shared
+    swatch, which has no theme behind it. */
+ assert.match(page,/className="hc-swatch" style=\{\{background:headerGradient\(colour\),color:ink\|\|headerTextFor\(colour\)\}\}/);
  /* One swatch component, used for the shared colour and for all eight rows. */
  assert.ok((page.match(/<HeaderSwatch /g)||[]).length>=2,"one component, used for the shared colour and for the rows");
 

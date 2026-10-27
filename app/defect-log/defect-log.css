@@ -301,8 +301,13 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    and would have zoomed the whole editor on the one control the paragraph
    above calls the most important. Found by a cold read computing the style
    rather than reading this comment. */
-.log-form label.advanced-finding{gap:4px}
-.log-form .advanced-finding input{min-height:44px;font-size:16px}
+/* The finding box and its chips as one cell. No size of its own: it is an
+   ordinary text input and `.log-form input` already decides what one looks
+   like at each width — 38px/10px here, 44px/16px inside the phone block. The
+   first version gave it 44px/16px at EVERY width, which put a 16px input
+   beside a 10px textarea on the shop computer, unannounced and for no reason
+   that applied above 760px. */
+.advanced-finding-block{display:grid;gap:6px}
 .log-form label.repair-estimate-field{gap:5px}
 .log-form .repair-estimate-field input{max-width:148px;min-height:48px;font-size:16px;font-weight:800}
 .log-form .repair-estimate-field small{color:var(--log-muted,#62748d);font-size:8px;font-weight:800;line-height:1.45;overflow-wrap:anywhere}

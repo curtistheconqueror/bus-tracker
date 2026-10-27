@@ -148,10 +148,11 @@ export function resetCoreRepairEstimate(current:RepairTimeEstimate,category:stri
 
    `repairTimeTotal` below is what the sheet PRINTS, and it never prints less
    than half an hour. This is what the sheet was TOLD, which is a different
-   question: a card seeded with a fifteen-minute estimate holds fifteen
-   minutes and displays thirty, and anything reading the number back has to
-   know which of the two it is looking at. Kept apart so `repairTimeTotal` has
-   one definition rather than two that can drift. */
+   question: a card seeded with a fifteen-minute estimate holds fifteen minutes
+   and displays thirty. Nothing in the app reads it on its own any more — the
+   carry-back onto a defect that needed it is gone — so this is
+   `repairTimeTotal`'s body, kept named because the floored and unfloored
+   answers are different facts and the tests ask for both. */
 export function repairTimeSum(estimate:RepairTimeEstimate){
  return estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
 }

@@ -17,7 +17,7 @@
    is not a mistake and not new: their appearance panels were built as one
    shape on purpose. One lookup answers for both. */
 
-import {isHeaderColor,normalizeHeaderColor,type HeaderSurface} from "./header-theme.ts";
+import {headerContrast,isHeaderColor,normalizeHeaderColor,type HeaderSurface} from "./header-theme.ts";
 import {THEMES as MAP_THEMES} from "./map-settings.ts";
 import {LOG_THEMES} from "../defects/defect-log-settings.ts";
 
@@ -95,12 +95,38 @@ const PAGE_INKS:Record<string,string>=Object.fromEntries(Object.entries(LOG_THEM
    default theme, or a colour equal to the default — and the shared app colour
    answers, ink included. */
 export type PageHeaderTheme={header:string;text:string};
+
+/* AND A PAIRING THAT HIDES ITS OWN WORDS IS NOT HONOURED.
+
+   `headerTextFor` exists so that no background the picker hands out can take
+   the page title with it — floored at 4.12:1 over the whole colour cube. Giving
+   a page theme its ink back puts a hole in that guarantee, because the ink is
+   then whatever is on the record rather than whatever reads.
+
+   MEASURED: `{theme:"custom",visuals:{header:"#ffffff",headerText:"#ffffff"}}`
+   is reachable from the Facility Map's own appearance panel — it offers Header
+   Background and Header Text side by side and writes `theme:"custom"` on any
+   change — and it drew a white title on a white header at 1:1, with the
+   Settings note dutifully printing `1:1 on Facility Map`. Before the ink
+   followed the theme that same record computed black.
+
+   So the stored pairing wins only while it is legible. The floor is AA for
+   normal text rather than for the 25px title, because a header also carries
+   its kicker, its subtitle and its nav labels at 8 to 10px. Every named theme
+   clears it by a wide margin — the lowest is Tactical's khaki at 9.97:1 — so
+   this never bites a designed pairing; it catches the palette nobody designed.
+
+   Applied to the table's own inks as well, not just stored ones. A theme added
+   in six months with a bad pairing should fall back rather than ship it. */
+export const MINIMUM_PAGE_INK_CONTRAST=4.5;
 export function pageThemeHeaderPair(kind:PageThemeKind,themeName:unknown,storedHeader:unknown,storedText:unknown):PageHeaderTheme|null{
  const header=pageThemeHeader(kind,themeName,storedHeader);
  if(!header)return null;
  const named=(kind==="map"?MAP_INKS:PAGE_INKS)[String(themeName)];
  const ink=isHeaderColor(named)?named:(isHeaderColor(storedText)?storedText:"");
- return {header,text:ink?normalizeHeaderColor(ink):""};
+ if(!ink)return {header,text:""};
+ const colour=normalizeHeaderColor(ink);
+ return {header,text:headerContrast(header,colour)>=MINIMUM_PAGE_INK_CONTRAST?colour:""};
 }
 
 function parse(raw:string|null){
@@ -141,7 +167,7 @@ export function readPageHeaderThemes(board:string|null,log:string|null){
  return pageHeaderThemes(parse(board),parse(log));
 }
 
-export function loadPageHeaderThemes(storage:StorageReader):Partial<Record<HeaderSurface,string>>{
+export function loadPageHeaderThemes(storage:StorageReader):Partial<Record<HeaderSurface,PageHeaderTheme>>{
  try{return readPageHeaderThemes(storage.getItem(BOARD_SETTINGS_KEY),storage.getItem(LOG_SETTINGS_KEY))}
  catch{return {}}
 }
