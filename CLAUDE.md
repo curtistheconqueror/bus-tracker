@@ -327,17 +327,24 @@ one override away. `src/lib/settings/header-theme.ts` owns it and
 root layout and following the route — the alternative is threading one value
 through eight pages that have nothing else in common, where a page that forgot
 to thread it keeps its old hard-coded colour silently, which is the bug this
-exists to remove. Every header rule reads `--app-header-fill` with a fallback,
-and on the five pages with no theme of their own that fallback is the APP'S
-DEFAULT, not that page's old colour. It WAS the old colour, on the reasoning
-that a render before this component has run should look like the app did —
-and this paints from an effect, so the browser has already drawn the server's
-HTML by then. Measured: Incidents came up rust and turned navy 37ms later,
-Shop Talk came up green. Both are meant to be navy now, so the honest
-fallback is the colour the page will settle on; measured again, 0ms. The
-three pages WITH a theme fall back to their own page variable instead, which
-React writes inline — not "correct without JavaScript", since the server
-cannot read LocalStorage, but on their theme's family rather than on navy.
+exists to remove. **Every header rule reads `--app-header-fill` with the APP'S
+DEFAULT as the fallback**, not that page's old colour. It WAS the old colour,
+on the reasoning that a render before this component has run should look like
+the app did — and this paints from an effect, so the browser has already drawn
+the server's HTML by then. Measured: Incidents came up rust and turned navy
+37ms later, Shop Talk came up green. Both are meant to be navy now, so the
+honest fallback is the colour the page will settle on.
+
+The Facility Map was missed by that first pass, because its fallback ran
+through `--header-bg`, whose own literal is the OLD `#06275c`: measured, it
+held that for 116ms while the other seven changed colour not at all, and with
+JavaScript off the eight drew two different navies. The lesson is the one this
+project keeps relearning — a fallback through a variable is a fallback to
+whatever that variable's literal is, and nobody looks at it. The Defect Log
+and Fixed Repairs still name their own page variable, which React writes
+inline; that is NOT "correct without JavaScript", because the server cannot
+read LocalStorage and writes the hook's default, which is the app default
+again. All eight open on one colour.
 
 **A PAGE THEME IS THE MIDDLE RUNG, and that was learned by measuring.** The
 Facility Map, the Defect Log and Fixed Repairs each offer Terminal, Black,
@@ -352,21 +359,64 @@ is every device that has not opened those panels, all eight match; on a theme
 the page stays whole; and an override still wins over both, so Settings is
 never describing something a page will not do.
 
+**It asks whether the header COLOUR differs, not whether the theme NAME does**,
+and that distinction is the whole usefulness of the rung. `custom` is not a
+look somebody picked: both appearance panels set it when ANY colour in them
+changes, including one bus status colour or one section background. Read as a
+name, it took the Facility Map out of the shared setting on every device that
+had ever nudged a status colour — with the Settings row reporting *"its page
+theme decides this"* about a header nobody had chosen. `pageThemeHeader` in
+`src/lib/settings/page-header-themes.ts` is the one function all three callers
+use, so the module and the two pages cannot read one record and disagree: the
+theme TABLE answers first (the name is the fact, the stored palette is a copy
+of it, and a record can carry the name without the palette), the palette
+answers for `custom`, and a colour equal to that page's own default answers
+nothing at all.
+
+**The page theme does not carry the page theme's INK.** Only the background.
+`--header-text`, `--log-header-text` and `--fixed-header-text` are the
+computed black-or-white now, so Terminal's green `#61ff9d` header text and
+Tactical's `#e7ddb2` become white. Contrast improves in every case and the
+header stops being able to hide its own title; what is lost is that Terminal's
+header is no longer green on black. Worth knowing before somebody reports it
+as a bug.
+
+**An accent is not a header.** `--log-accent-text` exists because
+`--log-header-text` was doing both jobs: harmless while it came from the page's
+theme, and not harmless once it became the HEADER's computed ink — picking a
+pale header colour turned PATH TO REPAIR's heading, its buttons and the
+time-window chip black on the accent blue, measured 3.57:1, on surfaces that
+are not headers. An ink is computed for the surface it sits on or it is a
+guess.
+
 **The text colour is COMPUTED, never stored, and it is pure black or white.**
 The moment a background can be picked, "white on a dark header" is a trap: a
 light flare colour takes the page title with it. Whichever of the two reads
 better wins. It was a softer `#0b1b33` first; swept over the whole colour cube
 that bottoms out at 4.15:1, under AA on backgrounds the picker hands out,
 while `#000` floors at 4.58:1 because the two options bracket every background
-between them. A test sweeps the cube rather than sampling.
+between them.
+
+**It is scored against BOTH ENDS OF THE GRADIENT**, which the first version
+did not do: the picked colour is only the bar's LEFT edge, and against the far
+end the cube floor was 3.37:1 while the function reported 4.58 and the Settings
+panel printed it. `headerContrast` is what the panel quotes and what the test
+sweeps. A gradient costs contrast at its far end and no lift avoids it — over
+the cube the floor is 3.86 at a 16% lift, **4.12 at 10%**, 4.39 at 4%, and
+4.58 only with no gradient at all — so the lift is 10% and the floor is
+written down rather than rounded up to a promise. The page title is 25px bold,
+which needs 3.0 for AA.
 
 **The gradient is 90deg, and that is not an angle the app used** — the
-literals it replaces were 110deg and 120deg, so there was none to preserve. A
-tilted gradient is height-dependent, and the Facility Map's header bar and the
-phone nav flush beneath it are two boxes of the same width and different
+literals it replaces were 110deg on two pages, 120deg on one and a vertical
+`linear-gradient(#0a326e,#041d47)` on the map, so there was none to preserve.
+A tilted gradient is height-dependent, and the Facility Map's header bar and
+the phone nav flush beneath it are two boxes of the same width and different
 heights that have always read as one block. Measured at 110deg: a 4-to-6 per
 channel step across that boundary, where the flat colour they shared before
-had none. At 90deg it is zero.
+had none. At 90deg it is zero. **Both stops are plain hex**, computed in
+`headerStops` rather than left to CSS `color-mix`, so the colour the browser
+paints is the colour `headerTextFor` scored.
 
 Per device and never synced, like every appearance setting here: it describes
 what one person likes looking at, and a synced colour scheme repaints somebody

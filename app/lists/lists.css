@@ -9,7 +9,7 @@ button,input,select,textarea{font:inherit}
 .lists-index,.lists-layout{position:static;top:auto;right:auto;width:auto;border:0;border-radius:0;background:none;padding:0;box-shadow:none;z-index:auto;font-size:inherit}
 /* globals.css styles bare <header> as a dark banner, so this page's header
    carries a class and sets what it needs explicitly. */
-.lists-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,color-mix(in srgb,#ffffff 16%,#041d47)));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00152d55}
+.lists-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,#1d3459));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00152d55}
 .lists-app{min-height:100vh;padding-bottom:20px;background:linear-gradient(180deg,#e9eef6,#f8fafc);color:#172b4d;font-family:Arial,Helvetica,sans-serif}
 .lists-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,#fff) 84%,transparent)}
 .lists-header h1{margin:2px 0 1px;font-size:25px;line-height:1}

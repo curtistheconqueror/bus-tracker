@@ -1,6 +1,7 @@
 "use client";
 
 import {useHeaderColor} from "@/src/components/shared/header-theme-live";
+import {pageThemeHeader} from "@/src/lib/settings/page-header-themes";
 import {useEffect,useMemo,useState} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
@@ -162,7 +163,7 @@ export default function FixedRepairs(){
     all eight surfaces match by default and everything keyed to follow this
     page's header follows it. Merged OVER the appearance style, which still
     owns every other colour on the page. */
- const headerSkin=useHeaderColor("fixed",fixedAppearance.theme==="light"?undefined:fixedAppearance.appearance.header);
+ const headerSkin=useHeaderColor("fixed",pageThemeHeader("page",fixedAppearance.theme,fixedAppearance.appearance.header));
  const pageStyle={...appearanceStyle,"--fixed-header":headerSkin.color,"--fixed-header-text":headerSkin.text};
  useEffect(()=>{setFleet(readFleet(localStorage.getItem(FLEET_KEY)))},[]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);

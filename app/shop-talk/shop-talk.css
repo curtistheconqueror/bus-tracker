@@ -6,7 +6,7 @@
 
 /* globals.css gives every bare <header> a fixed height:38px that min-height
    cannot undo. See the cascade-check skill. */
-.talk-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,color-mix(in srgb,#ffffff 16%,#041d47)));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #03200f55}
+.talk-header{height:auto;min-height:0;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,#1d3459));color:var(--app-header-text,#fff);box-shadow:0 3px 14px #00000055}
 .talk-app{min-height:100vh;padding-bottom:28px;background:linear-gradient(180deg,#eef5f0,#fafcfa);color:#1d2b22;font-family:Arial,Helvetica,sans-serif}
 .talk-header>div{min-width:0}
 .talk-header>div>span{font-size:8px;font-weight:900;letter-spacing:2px;color:color-mix(in srgb,var(--app-header-text,#fff) 84%,transparent)}
@@ -15,7 +15,7 @@
 .talk-header nav{flex:1 1 auto;height:auto;min-height:0;display:flex;flex-wrap:wrap;overflow:hidden;border:1px solid color-mix(in srgb,var(--app-header-text,#fff) 42%,transparent);border-radius:6px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff))}
 .talk-header nav a{min-width:104px;padding:10px 12px;background:color-mix(in srgb,var(--app-header,#041d47) 90%,var(--app-header-text,#fff));color:var(--app-header-text,#fff);font-size:8px;font-weight:900;text-align:center;text-decoration:none}
 .talk-header nav a.active{background:var(--app-header-text,#fff);color:var(--app-header,#0d5c34)}
-.talk-header nav a+a{border-left:1px solid #46805f}
+.talk-header nav a+a{border-left:1px solid color-mix(in srgb,var(--app-header-text,#fff) 28%,transparent)}
 
 .talk-scope{margin:0;padding:9px 18px;background:#eaf5ee;border-bottom:1px solid #bcdcc8;font-size:10px;font-weight:700;color:#2c6442}
 /* Open hazards get a line of their own above the form. A count buried in a

@@ -13,7 +13,7 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 /* The header, in the shape every other page's header has. globals.css styles
    the bare header and nav elements for the map, so each property the map sets
    is set again here. */
-.settings-header{position:relative;z-index:2;height:auto;min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,color-mix(in srgb,#ffffff 16%,#041d47)));color:var(--app-header-text,#fff);font-size:inherit;font-weight:400;text-shadow:none}
+.settings-header{position:relative;z-index:2;height:auto;min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;background:var(--app-header-fill,linear-gradient(90deg,#041d47,#1d3459));color:var(--app-header-text,#fff);font-size:inherit;font-weight:400;text-shadow:none}
 .settings-header>div>span{font-size:7px;font-weight:900;letter-spacing:1.5px}
 .settings-header h1{margin:2px 0;font-size:28px;font-weight:900}
 .settings-header p{margin:0;font-size:9px;opacity:.82}
@@ -229,7 +229,7 @@ html,body{margin:0;min-height:100%;background:#e8edf6;color:#112657;font-family:
 .header-colour-shared>label>span{display:grid;gap:3px;min-width:0}
 /* 44px: this is a colour swatch a thumb has to hit, not a form field. */
 .settings-header-colour input[type=color]{flex:none;width:52px;height:44px;border:1px solid #b9c6da;border-radius:7px;background:#fff;padding:3px;cursor:pointer}
-.header-colour-reset{justify-self:start;min-height:40px;border:1px solid #b9c6da;border-radius:7px;background:#eef3fb;color:#173e73;padding:0 14px;font-size:9px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.header-colour-reset{justify-self:start;min-height:44px;border:1px solid #b9c6da;border-radius:7px;background:#eef3fb;color:#173e73;padding:0 14px;font-size:9px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 .header-colour-reset:hover{background:#e0e9f7}
 .header-colour-list{display:grid;gap:7px;border-top:1px solid #e1e8f3;padding-top:10px}
 /* swatch · name and status · picker · button. The name column is the only

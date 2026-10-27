@@ -12,6 +12,16 @@ import {CHECK_ENGINE_SYMPTOMS,isCheckEngineIssue,isFluidTopUp,FLUID_TOP_UPS,norm
 import {applyReportReturn,refusalHeadline,refusalMessage,reportButtonState,reportTotal,type ReportReturnResult} from "@/src/lib/defects/report-returns";
 import {RECENT_DUPLICATE_WINDOW_LABEL,defectLogRecords,downSheetEntryLabel,groupDefectLogRecords,hideDefectLogRecords,isDefectLogCleanupCandidate,recentDefectDuplicate,returnDefectLogBusToService,saveDefectLogRecord,unexplainedDownSheetEntries,type DefectLogDownEntry,type DefectLogFleetBus,type DefectLogRecord,locationLabel} from "@/src/lib/defects/defect-log-sync";
 import {useHeaderColor} from "@/src/components/shared/header-theme-live";
+/* THE ACCENT HAS ITS OWN INK, computed for the accent. `--log-header-text`
+   was doing both jobs, which was harmless while it came from this page's
+   theme and stopped being harmless when it became the HEADER's computed
+   ink: picking a pale header colour turned PATH TO REPAIR's heading and
+   its buttons, the focus share buttons and the time-window chip black on
+   the accent blue — measured 3.57:1, under AA, on surfaces that are not
+   headers and that the Settings copy says nothing about. An ink is
+   computed for the surface it sits on or it is a guess. */
+import {headerTextFor} from "@/src/lib/settings/header-theme";
+import {pageThemeHeader} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
@@ -1563,8 +1573,8 @@ export default function DefectLog(){
     theme preset, so all eight surfaces match by default and this one can
     still be overridden on its own. Everything keyed to --log-header -- the
     ADVANCED drawer, the focus panel -- follows without a rule changing. */
- const headerSkin=useHeaderColor("log",settings.theme==="light"?undefined:settings.appearance.header);
- const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":headerSkin.color,"--log-header-text":headerSkin.text,"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
+ const headerSkin=useHeaderColor("log",pageThemeHeader("page",settings.theme,settings.appearance.header));
+ const appStyle={...(settings.groupBorder?{"--log-card-border":settings.groupBorder}:{}),"--log-page":settings.appearance.page,"--log-surface":settings.appearance.surface,"--log-text":settings.appearance.text,"--log-muted":settings.appearance.muted,"--log-header":headerSkin.color,"--log-header-text":headerSkin.text,"--log-accent-text":headerTextFor(settings.appearance.accent),"--log-accent":settings.appearance.accent,"--mystery-slot":mysterySlot,"--downsheet-badge":downSheetBadgeColors.badge,"--downsheet-badge-text":downSheetBadgeColors.text,"--log-font":FONT_STACKS[settings.fontFamily],...displayStyleVars(settings.display,settings.theme)} as React.CSSProperties;
 
  return <main className="defect-log-app" style={appStyle} data-font-size={settings.fontSize} data-group-contrast={settings.groupContrast} data-status-color={settings.statusColor?"on":"off"}
   /* Three view options, each "off" | "phone" | "always". They are attributes

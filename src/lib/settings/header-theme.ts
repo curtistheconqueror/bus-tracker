@@ -188,9 +188,48 @@ export function contrastRatio(a:string,b:string){
    on a mid tone that nobody is likely to pick, so the measurement wins. */
 export const HEADER_TEXT_LIGHT="#ffffff";
 export const HEADER_TEXT_DARK="#000000";
+
+/* THE HEADER IS A GRADIENT, SO THE INK IS CHOSEN AGAINST BOTH ENDS OF IT.
+
+   This compared the ink with the picked colour alone — and the picked colour
+   is only the LEFT edge. The right edge is 16% lighter, and a title that runs
+   across the bar sits on both. Swept over the colour cube against the far
+   end, white-or-black picked from the base alone bottoms out at 3.37:1 on a
+   mid sage (#727863, whose far end is #898e7c): under AA, while the function
+   reported 4.58 and the Settings panel printed it. Scoring each candidate by
+   its WORST end and taking the better of the two is the only reading that
+   makes the panel's sentence mean anything.
+
+   AND THE LIFT CAME DOWN FROM 16% TO 10% FOR THE SAME REASON. A gradient
+   costs contrast at its far end and there is no lift that does not: swept
+   over the cube, the floor is 3.86:1 at 16%, 4.12:1 at 10%, 4.39:1 at 4% and
+   4.58:1 only at none at all. 10% is where the band is still plainly a band
+   and the worst square in the cube is still legible — the page title is 25px
+   bold, which clears AA for large text more than twice over at 4.12. The
+   exact floor is written down rather than rounded up to a promise. */
+export const HEADER_LIFT=0.10;
+function mix(hex:string,toward:string,amount:number){
+ const [r,g,b]=channels(hex),[tr,tg,tb]=channels(toward);
+ const blend=(from:number,to:number)=>Math.round(from+(to-from)*amount);
+ return "#"+[blend(r,tr),blend(g,tg),blend(b,tb)].map(part=>part.toString(16).padStart(2,"0")).join("");
+}
+/* The two stops the header actually paints. Computed here rather than left to
+   CSS `color-mix` so that what this function scores and what the browser
+   draws are the same two colours. */
+export function headerStops(background:string){
+ const base=isHeaderColor(background)?normalizeHeaderColor(background):DEFAULT_HEADER_COLOR;
+ return [base,mix(base,relativeLuminance(base)<0.3?"#ffffff":"#000000",HEADER_LIFT)] as const;
+}
 export function headerTextFor(background:string){
- const base=isHeaderColor(background)?background:DEFAULT_HEADER_COLOR;
- return contrastRatio(base,HEADER_TEXT_LIGHT)>=contrastRatio(base,HEADER_TEXT_DARK)?HEADER_TEXT_LIGHT:HEADER_TEXT_DARK;
+ const stops=headerStops(background);
+ const worst=(ink:string)=>Math.min(...stops.map(stop=>contrastRatio(stop,ink)));
+ return worst(HEADER_TEXT_LIGHT)>=worst(HEADER_TEXT_DARK)?HEADER_TEXT_LIGHT:HEADER_TEXT_DARK;
+}
+/* What the panel should quote, and what the cube sweep should assert: the
+   worst place in the bar, not the left edge. */
+export function headerContrast(background:string){
+ const ink=headerTextFor(background);
+ return Math.min(...headerStops(background).map(stop=>contrastRatio(stop,ink)));
 }
 
 /* The second stop of the gradient every header already drew, derived rather
@@ -210,7 +249,8 @@ export function headerTextFor(background:string){
    the same width paint the same colour at the same x whatever their height,
    and the step is exactly zero. */
 export function headerGradient(background:string){
- const base=isHeaderColor(background)?background.trim():DEFAULT_HEADER_COLOR;
- const toward=relativeLuminance(base)<0.3?"#ffffff":"#000000";
- return "linear-gradient(90deg,"+base+",color-mix(in srgb,"+toward+" 16%,"+base+"))";
+ /* Both stops as plain hex rather than a CSS `color-mix`, so the colour this
+    paints is literally the colour `headerTextFor` scored. */
+ const [base,far]=headerStops(background);
+ return "linear-gradient(90deg,"+base+","+far+")";
 }

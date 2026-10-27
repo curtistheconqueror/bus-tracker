@@ -429,10 +429,13 @@ between all day.
 So this is the missing thing rather than a ninth special case.
 `src/lib/settings/header-theme.ts` owns the colour,
 `src/components/shared/header-theme-live.tsx` paints it, mounted ONCE in the
-root layout and following the route. Every header rule now reads
-`var(--app-header-fill, <its own old literal>)`, so a device that has never
-opened Settings, and the render before hydration, both draw what the app drew
-before.
+root layout and following the route. Every header rule now reads `var(--app-header-fill, …)`, and the
+fallback is the APP'S DEFAULT rather than that page's old colour — because
+this paints from an effect, so the browser has already drawn the server's HTML
+by the time it runs. With the old literals that was a measured flash:
+Incidents came up rust and turned navy 37ms later, Shop Talk came up green,
+and the Facility Map held the old `#06275c` for 116ms. All eight now open on
+the colour they settle on.
 
 **WHAT IT LOOKS LIKE IN SETTINGS → THIS DEVICE.** One HEADER COLOUR picker,
 a RESET ALL TO NAVY, then eight rows — swatch, page name, what is deciding it,
@@ -517,9 +520,9 @@ The same measurement that started this found FLEETSTEP's left edge at 10 to
 different header paddings** — `12px` on the Down Sheet, the Defect Log and
 Settings; `11px 12px` on the Facility Map, Fleet Campaigns, Incidents and Shop
 Talk; `12px 10px 10px` on Fixed Repairs. Those are now one 12px, each fixed in
-the file and the media block that actually decides it. Fixed Repairs also
-rejoined `13px 18px` on the wide layout, where it had been sitting on
-`11px 10px`.
+the file and the media block that actually decides it. Fixed Repairs was already on the crowd's `13px 18px` wide —
+an earlier draft of this said otherwise, from misreading a `11px 10px` rule
+that lives inside a 760px block and has never applied at any width.
 
 **Measured at 390 and at 1180, the six pages with no frame now put the title at
 exactly the same x and y** — 12/7 and 18/8 respectively.
@@ -558,7 +561,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **399 pass, 0 fail**
+- `npm test` — **402 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -569,8 +572,39 @@ then a drag lands the bus under the finger with the page unmoved; a cancelled
 drag clears the ring and gives scrolling back; a hold lifted in place shows the
 quick view; single and double tap unchanged; and the page scrolls after a drag.
 
-**A SECOND COLD READ, on the header change, found twelve things and eleven
-were real.** Every one is answered in the commits for it. The three that
+**A THIRD COLD READ, on the finished change, found eleven more and all of
+them were real.** The pattern was the same one the second found and the fix
+had not finished: the header's background was converted everywhere and its
+foreground in most places, so anything that was still a literal went wrong
+only when somebody did what the panel tells them to and picked a light
+colour. Measured on a pale yellow: the Facility Map's ACTIVE phone-nav tab at
+**1.2:1** (light tile, light label — the one tab that says where you are),
+the DS BADGES and QUICK FILTERS popover headers at **1.45:1** (black ink on a
+background still keyed to the old variable), the PATH TO REPAIR heading and
+its buttons at **3.57:1** because the header's ink was also driving the
+ACCENT surfaces, and a rust and a green divider line still between nav tiles
+on two pages. All fixed and re-measured: 17.44, 17.44, and an accent ink
+computed for the accent.
+
+It also found that **the Facility Map was never fixed for the flash** — its
+fallback ran through `--header-bg`, whose own literal is the old navy, so it
+held `#06275c` for 116ms while the other seven did not move, and with
+JavaScript off the eight drew two different navies. And that **`custom` was
+being read as "this page chose its header"** when both appearance panels set
+`custom` for any colour change at all, which quietly took the map out of the
+shared setting for anybody who had ever nudged a bus status colour.
+
+**And the mutation testing it did was the most useful part.** Nineteen of
+twenty-seven deliberate breakages survived the suite, including four of the
+five header paddings, the Down Sheet's title fix, the whole of the painter's
+wiring — route following, both listeners, the route-to-surface pairings, the
+two pages' feeds — and, most pointedly, putting the Facility Map's header
+text back to a hard literal, which is the headline failure of the review
+before it. The thirteen that mattered are now caught; the tests for them are
+in `tests/settings.test.mjs`.
+
+**The second cold read, on the same change a few hours earlier, found twelve
+things and eleven were real.** Every one is answered in the commits for it. The three that
 mattered were one failure wearing three faces — the header's background was
 converted on all eight pages and its foreground on two — and they are in the
 section above. Also found and fixed: a comment claiming a test caught a bug
@@ -584,7 +618,7 @@ tag; the page frames on two pages no longer matching their own headers; and
 **six surviving mutations**, the two that mattered being that the colour-cube
 sweep measured itself — it picks the text with `contrastRatio` and then grades
 it with `contrastRatio`, so dropping the sRGB gamma keeps the sweep at 4.58
-while the real floor falls to 3.75. Three published WCAG pairs are now
+while the real floor falls to 3.75. Four values from WCAG's own table are now
 asserted as an external anchor, and the validation, the ladder's middle rung
 and the painter's own wiring have tests they did not have.
 
@@ -624,26 +658,34 @@ were reintroductions of the very bug being fixed:
   itself through the CustomEvent, and a second tab through the `storage`
   event. Measured with two tabs in one browser.
 - **Every word in every header, on ten colours.** A probe walks every text
-  leaf in the header, composites it over whatever it actually sits on, and
-  reports the lowest ratio. On navy, pale yellow, crimson, white, black,
-  bright green, indigo: **5.88:1**, which is the Defect Log's own active tab
-  and predates this release. On three mid-tones — mid grey, mid green, mid
-  brown — the floor is **3.66 to 4.32:1**, and in every case it is the 8px
-  KICKER, which is a deliberate 84% tint of the ink: at a mid tone the ink
-  itself floors at 4.58, so any dimming at all lands under AA there. The page
-  TITLE, which is what the Settings panel makes a promise about, is **5.88:1
-  or better on every colour tried**.
+  leaf in the header, composites it over whatever it actually sits on —
+  including translucent controls and the gradient behind them — and reports
+  the lowest ratio. On navy, pale yellow, crimson, white, black, bright green
+  and indigo the floor is **5.88:1**, which is the Defect Log's own active tab
+  and predates this release. On mid-tones it falls to around **3.6:1**, and
+  not always on the same element: on mid-brown it is the REFRESH glyph, on
+  mid-grey the kicker, and the 10px tab labels sit near 4.0. A mid tone is
+  where a two-choice ink is at its mathematical worst, and every dimmed or
+  lifted thing in the bar inherits that.
+- **The ink is chosen against BOTH ends of the gradient, and the panel quotes
+  the worse one.** It scored the picked colour alone, which is only the bar's
+  left edge; swept over the cube against the far end that bottoms out at
+  **3.37:1** while the function reported 4.58 and the panel printed it. The
+  gradient's lift also came down from 16% to 10%: measured over the cube, the
+  floor is 3.86 at 16%, **4.12 at 10%**, 4.39 at 4% and 4.58 only with no
+  gradient at all. The page title is 25px bold, which needs 3.0 for AA.
 - **One repaint per page, not two.** Polled from navigation commit on a device
   with a shared colour AND a Tactical board: the Defect Log, Fixed Repairs,
   the Facility Map and Incidents each change once. The map used to take two,
   holding the wrong colour for 370ms between them.
-- **No flash on the way in.** This paints from an effect, so the browser has
-  already drawn the server's HTML by the time it runs; with each page's OLD
+- **No flash on the way in, on any of the eight.** With each page's OLD
   colour as the CSS fallback, Incidents came up rust and turned navy **37ms**
-  later and Shop Talk came up green, measured frame by frame on a warm
-  desktop. The five pages with no theme now fall back to the app default, and
-  the same probe measures **0ms**. With JavaScript disabled entirely all eight
-  headers draw the one navy.
+  later and Shop Talk came up green. The five pages with no theme were moved
+  to the app default and measured 0ms — and the Facility Map was missed,
+  because its fallback ran through `--header-bg`, whose own literal is the
+  OLD navy: measured again, it held `#06275c` for **116ms** while the other
+  seven changed colour not at all, and with JavaScript off the eight drew two
+  different navies. All eight carry the same fallback now.
 - **The map's header bar and the phone nav under it are one block again.**
   Sampled either side of their boundary at four x positions: identical at
   90deg, against a 4-to-6 per channel step at 110deg.

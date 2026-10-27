@@ -39,7 +39,7 @@ import "./settings.css";
 import MapSettingsPanel from "./_components/map-settings-panel";
 import CloudSyncControl from "./_components/cloud-sync-control";
 import {DEFAULT_FEEDBACK,type FeedbackSettings,loadFeedbackSettings,saveFeedbackSettings} from "@/src/lib/settings/feedback-settings";
-import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,contrastRatio,headerTextFor,loadHeaderTheme,resolveHeaderColor,saveHeaderTheme} from "@/src/lib/settings/header-theme";
+import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_KEY,type HeaderTheme,headerContrast,headerTextFor,loadHeaderTheme,resolveHeaderColor,saveHeaderTheme} from "@/src/lib/settings/header-theme";
 import {pageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
@@ -530,7 +530,10 @@ export default function SettingsPage(){
       <small className="header-colour-note">Lowest header contrast: {(() => {
        const worst=HEADER_SURFACES.map(surface=>{
         const colour=resolveHeaderColor(headerTheme,surface.key,pageThemes[surface.key]);
-        return {label:surface.label,ratio:contrastRatio(colour,headerTextFor(colour))};
+        /* `headerContrast`, which scores BOTH ends of the bar. The flat
+           colour is only its left edge, and quoting that printed 4.58 for a
+           header whose right end was 3.37. */
+        return {label:surface.label,ratio:headerContrast(colour)};
        }).reduce((low,row)=>row.ratio<low.ratio?row:low);
        return Math.round(worst.ratio*100)/100+":1 on "+worst.label;
       })()}</small>
