@@ -9,7 +9,10 @@ anything audible being added later without going through it; an optional
 **ESCAPE CLOSES THE BUS EDITOR**, also off; a re-report counted and SHOWN
 where it happens; and **one HEADER COLOUR for all eight pages, set in
 Settings**, with a per-page override — replacing five stylesheets and two page
-themes that each decided one.
+themes that each decided one; and **ESTIMATED TIME OF REPAIR on the Defect Log
+form**, where it used to ask what was found, with DESCRIPTION renamed ADDITIONAL
+DETAILS and the estimate wired to the hours badge and the Down Sheet in both
+directions.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -70,6 +73,8 @@ section. A quoted command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+52609f2 Ask how long the repair takes where the form asked what was found
+9c83c37 Re-run the handoff's own commands, and the service worker is not untouched
 a1a42bd Answer the cold read: minimal is not the same as unmeasured
 564ed82 Draw the header panel as little as it can be drawn as
 6a5aa09 Answer the cold read: the headers' backgrounds moved and their ink did not
@@ -111,9 +116,15 @@ app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
 src/components/shared/header-theme-live.tsx
+src/lib/defects/defect-estimates.ts
 src/lib/defects/defect-log-display-settings.ts
+src/lib/defects/defect-log-sync.ts
+src/lib/defects/duplicate-defects.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
+src/lib/down-sheet/down-sheet-repair-items.ts
+src/lib/down-sheet/down-sheet-sync.ts
+src/lib/down-sheet/repair-time-estimates.ts
 src/lib/settings/feedback-settings.ts
 src/lib/settings/header-theme.ts
 src/lib/settings/map-settings.ts
@@ -122,7 +133,7 @@ src/lib/settings/page-header-themes.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 38 files changed, 4408 insertions(+), 189 deletions(-)
+ 44 files changed, 4860 insertions(+), 261 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -155,9 +166,21 @@ publish day, and the previous wording promised the opposite.
 **None.** No schema change, no policy change, nothing executed against the live
 project. The one file outside `app/` and `src/` in this range is
 `public/sw.js`, changed by 22 lines of comment and no code — see **Source**
-for what that does and does not mean. **No key renamed, and nothing in the
-fleet's records is read or written** — the gesture, Escape and re-report work touches no settings file at
-all, and the three settings this release adds are per-device preferences.
+for what that does and does not mean. **No key renamed** — the gesture, Escape
+and re-report work touches no settings file at all, and the three settings this
+release adds are per-device preferences.
+
+**ONE FIELD IS ADDED TO THE FLEET'S OWN RECORDS**, and an earlier draft of this
+section said nothing in them was written. `estimateHours` is a new optional
+field on a defect in `pace-board-v1` — ESTIMATED TIME OF REPAIR, written only
+where somebody types one. **No migration and no schema change**: a record
+written before this release has no such field and reads exactly as it did, and
+the Shop Cloud carries it without a database change because `defectRow` puts
+everything outside its nine named columns into `detail` and the pull spreads
+`detail` back. Nothing on disk is rewritten, nothing is renamed and no existing
+field changes meaning — in particular `repairHours` and `diagnosticHours` stay
+what they were, billable time that `work-time.ts` sums, which is why the
+estimate is not one of them.
 
 **ONE NEW LOCALSTORAGE KEY: `pace-header-theme-v1`**, holding the app's header
 colour and any per-page override. Added, never renamed, and documented in
@@ -659,6 +682,120 @@ layout at **three different widths** — 760, 800 and 860 — so on an iPad held
 portrait at 820 the titles spread again, by 6px. Unifying that moves real
 layouts at those widths on several pages, so it is not a tidy-up either.
 
+### How long the repair takes, where the form used to ask what was found
+
+Curtis, with a screenshot of the Defect Log's defect editor: *"where it says
+optional what was found replace this with estimated time of repair. Make sure
+it's wired to all other related inputs. We have " description above, so it kind
+of redundant. Also change description to additional details. Capitalize the A &
+the D."*
+
+Two free-text boxes were asking nearly the same question on one screen —
+DESCRIPTION and WHAT WAS FOUND (OPTIONAL) — while **how long the job runs was
+nowhere on that form at all**, and that figure is the one every other surface
+was guessing at.
+
+| | before | now |
+| --- | --- | --- |
+| the slot above WORK STATUS | WHAT WAS FOUND (OPTIONAL) + FOUND BEFORE chips | ESTIMATED TIME OF REPAIR — HOURS |
+| the box above it | DESCRIPTION | ADDITIONAL DETAILS |
+| sources of an estimate | 3: billable hours, shop ledger, catalog | 4, with this one first |
+| what the hours badge quoted for an unestimated repair | the catalog's 12h | whatever somebody typed |
+| what the Down Sheet quoted for the same repair | the catalog's 12h, always | the same number the Defect Log shows |
+
+**IT IS A NEW FIELD AND NOT A RELABELLED ONE.** `repairHours` and
+`diagnosticHours` are time WORKED — `src/lib/reports/work-time.ts` sums them per
+person per day — so an estimate written into either would arrive on somebody's
+work ledger as hours they never spent. `estimateHours` is its own optional field
+on the defect, normalised through the same `normalizeRepairHours` every hours
+box in the app uses, so junk on disk reads as no estimate and 900 reads as the
+24-hour cap. **A record written before this release has none and reads exactly
+as it did.** A test asserts `work-time.ts` never names the new field.
+
+**IT SITS ABOVE THE BILLED HOURS IN THE LADDER**, because it is the only one of
+the four that answers the question being asked. The two only ever meet on a job
+that is part-billed and still open, since a completed repair contributes nothing
+to the badge at all — and on that job the billed figure is time already spent
+while the estimate is the whole repair, which is what "how much work is standing
+on this board" means. It is not floored: `.25` is somebody saying fifteen
+minutes, and rounding that to the Down Sheet's half-hour minimum would overstate
+the board.
+
+**THE BOX QUOTES THE RUNG BENEATH IT.** The placeholder is what the app would
+otherwise estimate and the line under it says where that came from — the shop's
+own repair-time ledger, or the catalog, named as a guess by somebody who has
+never stood in this garage. A field that hides what it is overriding invites
+somebody to retype a figure the app already had, or to leave it blank believing
+nothing has been estimated at all. Asked with every typed figure stripped out,
+billable hours included, because those are not an estimate. The PATH TO REPAIR
+panel shows its own fallback the same way, and the editor is handed the same
+ledger the feed's badge reads so the two cannot disagree.
+
+**THE DOWN SHEET IS THE SAME NUMBER, IN BOTH DIRECTIONS.** A card built from an
+estimated defect is seeded from it (`estimateFromHours`) rather than from the
+catalog, at both places a card is built from a record: the entry the Defect Log
+opens when it puts a bus on the sheet, and the cards the Down Sheet builds for a
+bus that is already down. And a figure typed on the sheet comes back as the
+defect's estimate — but **only where the card differs from the catalog's
+recommendation for that repair**, because every card is seeded with a figure the
+moment a category is picked, and reading one as a claim would freeze a guess onto
+the record as something a person stood behind. That is the test `pageThemeHeader`
+makes about a header colour, for the same reason.
+
+Carried through the **unfloored** sum (`repairTimeSum`, new, and
+`repairTimeTotal` is now written in terms of it) because the thirty-minute floor
+is about what the sheet PRINTS: a quarter-hour estimate round-tripped through the
+floor would overwrite the fifteen minutes somebody typed with thirty, on every
+save, until the record claimed something nobody had said. Six values were walked
+out and back in a test for exactly that.
+
+**Taking an estimate off is done where it was put on** — clearing the box
+removes it and the ladder answers again — not by editing a card back to the
+catalog's number, which says nothing rather than withdrawing what the record
+holds. Same rule the shop's ledger and PATH TO REPAIR already follow.
+
+**THE FINDING FIELD IS UNTOUCHED AND STILL READS EVERYWHERE IT EVER DID.** What
+went is the Defect Log's *input* for it, and the FOUND BEFORE chips attached to
+that input. A cause is typed on the **Down Sheet row editor** and on **Fixed
+Repairs**, both of which already offered the chips, so `pace-findings-memory-v1`
+is still offered and is still learned from on a Defect Log save that carries a
+cause — the memory is read on mount there precisely so a save does not replace
+six hundred learned causes with one.
+
+**What that costs, and it is worth saying plainly:** a finding already on an open
+defect that is not on the sheet can no longer be edited or cleared from the
+Defect Log. It still displays through `defectLabel` wherever that defect appears.
+Moving the box into ADVANCED DETAILS instead would keep that, and is one line if
+Curtis wants it.
+
+**The field is OUTSIDE the WORK DONE SO FAR fieldset** the finding sat inside,
+though in the same place on the screen. An estimate is not work done, and that
+legend would be wrong about the one field under it that looks forward. Still
+above WORK STATUS and outside ADVANCED DETAILS, because this is typed by somebody
+standing at the bus and a control behind a disclosure here goes unused.
+
+The two stylesheet rules for the removed box and the eight for its chips are gone
+from `defect-log.css` rather than left as dead weight; `fixed-repairs.css` keeps
+its own copies, which is why the chips still draw there. A test now asserts the
+Defect Log's stylesheet carries no rule for a chip it does not draw.
+
+**One edge worth knowing before somebody reports it.** A quarter-hour estimate
+reads as `15m` on the Defect Log's badge and as `30m` on the Down Sheet, whose
+card also shows `0.5` in its own box, because the sheet has never printed a
+repair at under half an hour. The RECORD keeps the 0.25 — measured through three
+consecutive sheet saves, it does not drift — so nothing is lost; the two screens
+just round it differently, and that floor predates this.
+
+**Not gated by LITE mode**, which is what the box it replaced did. Measured at
+390px in both modes: the same 148×48 input, the same 11px gap above WORK STATUS,
+nothing covering it in either.
+
+**It syncs with no schema change.** `defectRow` in `src/lib/cloud/cloud-sync.ts`
+puts everything outside its nine named columns into `detail`, and the pull
+spreads `detail` back onto the record — which is what that design is for. **No
+new LocalStorage key and no key renamed:** the estimate is a field on a record
+that already travels.
+
 ### Verified
 
 Gates re-run on **the commit this file is updated in**, which is what "this
@@ -669,7 +806,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **403 pass, 0 fail**
+- `npm test` — **405 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -825,6 +962,38 @@ were reintroductions of the very bug being fixed:
   are one olive, the way they were before this release. The navy-block version
   that preceded the ladder is what that check was built to catch, and it
   caught it.
+
+**ESTIMATED TIME OF REPAIR, driven end to end in Chromium against the
+production build**, at 390, 430, 820 and 1180:
+
+- **The badge moves.** An unestimated Brakes — Rear shoes and drums read
+  `12h ESTIMATED` on the feed, the catalog's figure; typing `1.5` and saving
+  made it `1h 30m`; clearing the box put `12h` back and left no `estimateHours`
+  on the record. With a shop time of 5h in the ledger and nothing typed, the
+  feed read `5h` and the box said *"the shop's own time for this repair"* with
+  `5` as its placeholder — the rung beneath it, named.
+- **The Down Sheet quotes the same number.** Putting that bus on the sheet with
+  2h typed printed `2h ESTIMATED` on the row; the catalog's `12h` appeared
+  nowhere on the page.
+- **And so does the Defect Log, when the sheet is where it was typed.** Opening
+  the sheet's row editor on a bus whose defect had no estimate, typing 7 into
+  ESTIMATED HOURS and saving wrote `estimateHours:7` onto the record the entry
+  ADOPTED — one defect, its id, category and details intact, not a second copy —
+  the row then printed `7h` and the Defect Log's badge read `7h` where it had
+  read `12h`.
+- **A quarter-hour estimate does not drift.** 0.25 on the record, through three
+  consecutive sheet saves: still 0.25 each time, while the sheet went on
+  printing `30m` and showing `0.5` in its own box, which is its floor and not a
+  write.
+- **The field itself**, measured rather than read: 148x48 input at every width,
+  a 48px target in FULL and LITE alike, 11px above WORK STATUS, after the WORK
+  DONE SO FAR fieldset closes, nothing covering it, no page errors, and `1.5`
+  typeable one keystroke at a time.
+- **Four probe runs reported "nothing changed" before any of this was true**,
+  and all four were the fixture: a defect with no `source` renders an empty
+  feed, and the sheet editor's UPDATED BY — INITIALS is `required`, so an empty
+  one makes the browser refuse the submit with no error and no save. Written
+  down because the fourth run was about to be filed against the app.
 
 **Not verified for the header work:** a real phone or iPad, Safari, or Home
 Screen standalone mode — so the status-bar colour has been measured as a
