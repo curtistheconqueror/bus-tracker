@@ -77,6 +77,7 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+606c8e9 Re-run the handoff's command blocks, two commits after they were quoted
 6f3cf22 Give a page theme its own header ink back, and answer the cold read
 ac254f1 Queue the estimate field in 194, and correct what the handoff claimed
 52609f2 Ask how long the repair takes where the form asked what was found
@@ -138,7 +139,7 @@ src/lib/settings/page-header-themes.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 43 files changed, 5389 insertions(+), 247 deletions(-)
+ 43 files changed, 5390 insertions(+), 247 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -1055,8 +1056,12 @@ production build**, at 390, 430, 820 and 1180:
   one makes the browser refuse the submit with no error and no save. Written
   down because the fourth run was about to be filed against the app.
 
-**THE COLD READ'S OWN FINDINGS, and what answering them changed.** Thirteen
-were reported and every one is answered below or in the sections above:
+**THE FIRST COLD READ'S FINDINGS, and what answering them changed.** Every one
+is answered here or in the sections above — some of them together, which is why
+no count is quoted: a second read pointed out that "thirteen were reported"
+could not be reconciled with the bullets beneath it however they were counted,
+and a number that does not survive its own list is the species of claim this
+file keeps correcting.
 
 - **The estimate came back after being cleared** — the carry-back from a Down
   Sheet card is gone, and a test now drives a cleared estimate through two
@@ -1094,6 +1099,66 @@ both pre-existing: a finding cleared on a bus whose sheet card still carries the
 old wording comes back on the next sheet save, and the Down Sheet's FOUND BEFORE
 chips have no border or radius because only a `button` override of them exists in
 its stylesheet.
+
+
+**AND A SECOND COLD READ, of the ink fix and of those answers.** It found one
+thing the fix had introduced and several the suite was not holding:
+
+- **A white-on-white header became reachable.** Giving a page theme its ink back
+  honoured whatever was stored, and the Facility Map's own appearance panel
+  offers Header Background and Header Text side by side and writes
+  `theme:"custom"` on any change — so `#ffffff` on `#ffffff` drew a white title
+  at 1:1, where the computed ink had drawn black. The stored pairing now wins
+  only while it is legible: `MINIMUM_PAGE_INK_CONTRAST` is 4.5, AA for normal
+  text rather than for the 25px title, because a header also carries its
+  kicker and its nav labels at 8 to 10px. Every named theme clears it by a wide
+  margin — the lowest is Tactical's khaki at 9.97:1 — so it never bites a
+  designed pairing; it catches the palette nobody designed. Measured after the
+  fix: white on white computes black, a legible custom pairing is kept, and
+  Tactical is unchanged.
+- **The half of the ink fix that paints the Defect Log's title had no test.**
+  The read deleted one line from `useHeaderColor`, built it, and measured
+  `--log-header-text:#ffffff` on Tactical olive — Curtis's exact complaint,
+  reintroduced — with all 405 tests green. Two assertions now name that line
+  and the hook's return, and both mutations fail.
+- **Four new TypeScript errors.** `loadPageHeaderThemes` still declared the old
+  `string` return while returning pairs, so the only typed contract for what
+  `HeaderThemeLive` consumes described the wrong shape. `npm run build` does not
+  typecheck and `eslint` has no type-aware rules, so no gate saw it.
+- **The FOUND BEFORE chips landed in the wrong grid column at every width above
+  760px** — measured at 1180: the box in column 2 beside DIAGNOSIS and its chips
+  in column 1 of the next row, under a textarea they have nothing to do with.
+  Fixed Repairs and the Down Sheet editor both mark that row `wide`; this copy
+  did not. The box and its chips are one `wide` cell now, placed after FIX so
+  the two textareas stay paired: measured at 1180, box and chips share x=229
+  with the chips directly beneath, and at 390 the order reads the same.
+- **The finding box was 16px/44px at every width**, which put a 16px input
+  beside a 10px textarea on the shop computer, unannounced and for a reason
+  (Safari's phone zoom) that only applies below 760px. It has no size of its
+  own now: measured 10px/38px at 1180 beside its neighbour's 10px, and
+  16px/44px at 390.
+- **Four more assertions that passed with the behaviour removed** — a
+  read-only finding box, the whole finding block wrapped in a
+  completed-only guard (the regression this release exists to fix), the
+  contrast note reverted, and the row swatch's ink. All four now fail, verified
+  by mutation.
+- **An orphaned comment and a stale one**: the estimate's paragraph had come to
+  sit above two rules it does not describe, and `repairTimeSum` still claimed a
+  reader that the dropped carry-back took with it.
+- **The help line told a completed defect its estimate feeds the hours badge.**
+  The badge counts outstanding work, so it does not.
+
+Recorded rather than fixed, both measured and both pre-existing: the Settings
+row's raw-versus-normalised theme name can still diverge for a theme name
+`readSettings` rejects (not reachable through the UI), and clearing a finding
+stores `""` rather than deleting the key — harmless, since `normalizeFinding`
+reads it as absent.
+
+**Moving WHAT WAS FOUND into ADVANCED DETAILS is a control moving on a form,
+and Curtis was told after rather than before.** It is a repair of a regression
+introduced in this same release — an open defect had nowhere to type, read or
+clear a cause — and the alternative was leaving the app in that state while
+asking. Recorded here because the rule is his call first, and this was not.
 
 **Not verified for the header work:** a real phone or iPad, Safari, or Home
 Screen standalone mode — so the status-bar colour has been measured as a

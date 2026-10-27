@@ -1959,13 +1959,42 @@ test("a diagnosed cause is learned under the symptom it was found beneath",async
  // is inside `{item.done && …}` and Fixed Repairs lists completed repairs only.
  // So it is in ADVANCED DETAILS, beside the diagnosis it answers.
  assert.match(page,/className="advanced-finding">WHAT WAS FOUND \(OPTIONAL\)/);
- assert.match(page,/updateDefect\("finding",event\.target\.value\)/,"and it is typeable");
+ /* TYPEABLE, and asserted on the input rather than on the handler beside it.
+    A cold read added `readOnly` to that input and every assertion here stayed
+    true, because the `onChange` it was matching is still in the source. */
+ /* `[^>]*` cannot cross the `>` inside `event=>`, which this project has been
+    bitten by before — the capture came back null. */
+ const findingInput=page.match(/<label className="advanced-finding">[\s\S]*?<input([\s\S]*?)\/>/)[1];
+ assert.match(findingInput,/onChange=\{event=>updateDefect\("finding",event\.target\.value\)\}/);
+ assert.equal(/readOnly|disabled/.test(findingInput),false,"and not read-only");
+
+ /* AND IT IS DRAWN FOR AN OPEN DEFECT, which is the regression this exists to
+    answer. The same read wrapped this whole block in
+    `{value.defect.state==="completed"&& …}` — reintroducing "a finding can
+    only be typed on a COMPLETED repair" exactly — and every other assertion
+    in this test stayed green, because each one only looks for a substring.
+    Nothing between the section opening and the box may ask about the state. */
+ const gridAt=page.indexOf("advanced-defect-grid");
+ /* Comments stripped first, or this reads the paragraph above the box — which
+    says the word "completed" four times explaining why the box is here. The
+    question is about CODE between the section opening and the box. */
+ const beforeFinding=page.slice(gridAt,page.indexOf('className="wide advanced-finding-block"')).replace(/\/\*[\s\S]*?\*\//g,"");
+ assert.equal(/completed/.test(beforeFinding),false,"no completion guard stands between ADVANCED DETAILS and the finding box");
+ assert.equal(/state===|\.done/.test(beforeFinding),false,"nor any other state guard");
  assert.match(page,/recallFindings\(findingsMemory,value\.defect\.category,value\.quickIssue\|\|value\.defect\.issue\)/);
  assert.match(page,/learned-findings/);
  assert.match(page,/forgetLearnedFinding\(entry\)/,"forgettable from where they are shown");
+ const findingAt=page.indexOf('className="wide advanced-finding-block"');
+ /* THE BOX AND ITS CHIPS ARE ONE CELL. The grid is two columns above 760px,
+    and as two bare children the box landed in column 2 beside DIAGNOSIS while
+    its chips landed in column 1 of the next row — under a textarea they have
+    nothing to do with, measured at 1180. Fixed Repairs and the Down Sheet
+    editor both mark that row `wide`; this copy did not. */
+ const block=page.slice(findingAt,page.indexOf("</div>",page.indexOf("learned-findings",findingAt)));
+ assert.ok(block.includes('className="advanced-finding"'),"the box is inside the wide block");
+ assert.ok(block.includes("learned-findings"),"and so are its chips");
  // Not in the work-state fieldset it used to sit in, and not above WORK STATUS:
  // that slot is the estimate's now.
- const findingAt=page.indexOf('className="advanced-finding"');
  assert.ok(findingAt>page.indexOf("advanced-defect-grid"),"inside ADVANCED DETAILS");
  assert.ok(findingAt>page.indexOf('className="wide repair-estimate-field"'),"below the estimate that replaced it");
  // AND A STORED ONE OPENS THAT SECTION, or a cause already on the record is

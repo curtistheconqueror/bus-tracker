@@ -175,8 +175,13 @@ function SectionBody({id,open,children}:{id:string;open:boolean;children:ReactNo
 
    44px, because it is a swatch a thumb has to hit and this app's floor for
    that is 44 everywhere else. */
-function HeaderSwatch({colour,label,onPick}:{colour:string;label:string;onPick:(value:string)=>void}){
- return <label className="hc-swatch" style={{background:headerGradient(colour),color:headerTextFor(colour)}}>
+/* `ink` is for a row whose page theme decides its header text, so the Aa shows
+   the colour that page actually draws. Without it the swatch drew a computed
+   white over Tactical's olive while the note beside it quoted the khaki's
+   9.97:1 — the panel describing one thing and measuring another, which is the
+   bug the note itself was fixed for one commit earlier. */
+function HeaderSwatch({colour,ink,label,onPick}:{colour:string;ink?:string;label:string;onPick:(value:string)=>void}){
+ return <label className="hc-swatch" style={{background:headerGradient(colour),color:ink||headerTextFor(colour)}}>
   <span aria-hidden="true">Aa</span>
   <input type="color" value={colour} onChange={event=>onPick(event.target.value)} aria-label={label}/>
  </label>;
@@ -558,7 +563,7 @@ export default function SettingsPage(){
          {own?<i>own</i>:page?<i>page theme</i>:null}
          {own?<button type="button" className="hc-clear" aria-label={"Clear "+surface.label+"'s own header colour"}
           onClick={()=>{const next={...headerTheme.overrides};delete next[surface.key];setHeaderTheme({...headerTheme,overrides:next})}}>&#215;</button>:null}
-         <HeaderSwatch colour={effective} label={surface.label+" header colour"}
+         <HeaderSwatch colour={effective} ink={resolveHeaderInk(headerTheme,surface.key,page?.header,page?.text)} label={surface.label+" header colour"}
           onPick={value=>setHeaderTheme({...headerTheme,overrides:{...headerTheme.overrides,[surface.key]:value}})}/>
         </div>;
        })}

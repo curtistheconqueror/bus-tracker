@@ -609,7 +609,9 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     <label className="wide repair-estimate-field">ESTIMATED TIME OF REPAIR — HOURS
      <HoursField value={value.defect.estimateHours} max={MAX_REPAIR_HOURS} placeholder={String(Math.round(estimateFallback/60*100)/100)} ariaLabel="Estimated time of repair, in hours" onChange={hours=>updateDefect("estimateHours",normalizeRepairHours(hours===undefined?"":String(hours)))}/>
      <small>{value.defect.estimateHours!==undefined
-      ?"Estimating "+formatRepairTime(Math.round(value.defect.estimateHours*60))+" for this bus, which is what the hours badge on the feed reads. Clear the box to go back to "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+"."
+      /* The badge counts OUTSTANDING work, so a completed repair contributes
+         nothing to it and must not be told it does. */
+      ?"Estimating "+formatRepairTime(Math.round(value.defect.estimateHours*60))+" for this bus"+(value.defect.state==="completed"?"":", which is what the hours badge on the feed reads")+". Clear the box to go back to "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+"."
       :"Estimating "+formatRepairTime(estimateFallback)+" from "+estimateFallbackSource+". Type what this one will really take."}</small>
     </label>
     <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
@@ -622,7 +624,8 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     </div>
     {!hiddenInLite(editorMode,"diagnosisFields")&&<details className="advanced-defect-details" open={advancedOpen} onToggle={event=>setAdvancedOpen(event.currentTarget.open)}><summary><span><b>ADVANCED DETAILS</b><small>Diagnosis, repair, parts and initials</small></span><em>{advancedOpen?"COLLAPSE":"TAP TO EXPAND"}</em></summary><div className="advanced-defect-grid">
     <label>DIAGNOSIS / TEST / VERIFICATION<textarea value={value.defect.diagnosticNote||""} onChange={event=>updateDefect("diagnosticNote",event.target.value)} placeholder="Tests, codes, findings, or verification"/></label>
-    {/* WHAT WAS FOUND, here rather than up beside the description.
+    <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
+    {/* WHAT WAS FOUND, with the chips that fill it, as ONE full-width cell.
 
         Curtis took it off the main form — "We have " description above, so it
         kind of redundant" — and ESTIMATED TIME OF REPAIR has that slot now.
@@ -634,30 +637,38 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         DIAGNOSED work state is still on the form above with nothing to say
         what was diagnosed.
 
-        So it sits beside the diagnosis, which is what it answers, inside a
-        section that is collapsed until somebody wants it. */}
-    <label className="advanced-finding">WHAT WAS FOUND (OPTIONAL)
-     <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
-    </label>
-    {/* Causes found under this exact symptom before. Scoped to the symptom on
-        the form right now, so changing the picker changes what is offered and
-        a cause never leaks to a defect it was not found under. Tapping one
-        fills the box; typing something new is always allowed. Offering them is
-        what stops the same fault being written five ways, which is the whole
-        reason a year of history is readable. */}
-    {learnedFindings.length>0&&<div className="learned-findings" aria-label="Causes found before on this defect">
-     <small>FOUND BEFORE ON {(repairIssueDisplayLabel(value.quickIssue||value.defect.issue)||"THIS DEFECT").toUpperCase()}</small>
-     <div>{learnedFindings.map(entry=>{
-      const picked=findingMatchKey(entry.finding)===findingMatchKey(value.defect.finding);
-      return <span className={"learned-finding"+(picked?" selected":"")} key={entry.finding}>
-       <button type="button" onClick={()=>updateDefect("finding",picked?"":entry.finding)} aria-pressed={picked}>
-        {entry.finding}{entry.uses>1?<i>×{entry.uses}</i>:null}
-       </button>
-       <button type="button" className="forget-finding" title={"Forget "+entry.finding} aria-label={"Forget "+entry.finding} onClick={()=>forgetLearnedFinding(entry)}>×</button>
-      </span>;
-     })}</div>
-    </div>}
-    <label>FIX / STEPS TAKEN<textarea value={value.defect.actionTaken||""} onChange={event=>updateDefect("actionTaken",event.target.value)} placeholder="Repair, adjustment, replacement, or temporary action"/></label>
+        WIDE, AND BELOW BOTH TEXTAREAS, which a second cold read measured. The
+        grid is two columns at 761px and up, and a bare label plus a bare chip
+        row took one cell each: the box landed in column 2 beside DIAGNOSIS and
+        its chips in column 1 of the next row, directly under a textarea they
+        have nothing to do with and a column away from the field they fill.
+        Fixed Repairs and the Down Sheet editor both mark that row `wide`; this
+        copy did not. One cell holding both cannot come apart that way, and
+        placing it after FIX rather than between the two textareas is what
+        keeps those two paired instead of leaving a hole beside DIAGNOSIS. */}
+    <div className="wide advanced-finding-block">
+     <label className="advanced-finding">WHAT WAS FOUND (OPTIONAL)
+      <input maxLength={180} value={value.defect.finding||""} onChange={event=>updateDefect("finding",event.target.value)} placeholder="Throttle pedal reference circuit"/>
+     </label>
+     {/* Causes found under this exact symptom before. Scoped to the symptom on
+         the form right now, so changing the picker changes what is offered and
+         a cause never leaks to a defect it was not found under. Tapping one
+         fills the box; typing something new is always allowed. Offering them is
+         what stops the same fault being written five ways, which is the whole
+         reason a year of history is readable. */}
+     {learnedFindings.length>0&&<div className="learned-findings" aria-label="Causes found before on this defect">
+      <small>FOUND BEFORE ON {(repairIssueDisplayLabel(value.quickIssue||value.defect.issue)||"THIS DEFECT").toUpperCase()}</small>
+      <div>{learnedFindings.map(entry=>{
+       const picked=findingMatchKey(entry.finding)===findingMatchKey(value.defect.finding);
+       return <span className={"learned-finding"+(picked?" selected":"")} key={entry.finding}>
+        <button type="button" onClick={()=>updateDefect("finding",picked?"":entry.finding)} aria-pressed={picked}>
+         {entry.finding}{entry.uses>1?<i>×{entry.uses}</i>:null}
+        </button>
+        <button type="button" className="forget-finding" title={"Forget "+entry.finding} aria-label={"Forget "+entry.finding} onClick={()=>forgetLearnedFinding(entry)}>×</button>
+       </span>;
+      })}</div>
+     </div>}
+    </div>
     <div className="parts-used-block">
      <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
      {partsUsed&&<div className="parts-used-fields">
