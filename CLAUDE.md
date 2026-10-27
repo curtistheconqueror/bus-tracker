@@ -327,9 +327,17 @@ one override away. `src/lib/settings/header-theme.ts` owns it and
 root layout and following the route — the alternative is threading one value
 through eight pages that have nothing else in common, where a page that forgot
 to thread it keeps its old hard-coded colour silently, which is the bug this
-exists to remove. Every header rule reads `--app-header-fill` with its own old
-literal as the fallback, so a device that has never opened Settings and a
-render before hydration both draw what the app drew before.
+exists to remove. Every header rule reads `--app-header-fill` with a fallback,
+and on the five pages with no theme of their own that fallback is the APP'S
+DEFAULT, not that page's old colour. It WAS the old colour, on the reasoning
+that a render before this component has run should look like the app did —
+and this paints from an effect, so the browser has already drawn the server's
+HTML by then. Measured: Incidents came up rust and turned navy 37ms later,
+Shop Talk came up green. Both are meant to be navy now, so the honest
+fallback is the colour the page will settle on; measured again, 0ms. The
+three pages WITH a theme fall back to their own page variable instead, which
+React writes inline — not "correct without JavaScript", since the server
+cannot read LocalStorage, but on their theme's family rather than on navy.
 
 **A PAGE THEME IS THE MIDDLE RUNG, and that was learned by measuring.** The
 Facility Map, the Defect Log and Fixed Repairs each offer Terminal, Black,
