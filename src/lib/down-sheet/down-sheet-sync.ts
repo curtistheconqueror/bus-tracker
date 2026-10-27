@@ -3,6 +3,7 @@ import {stampOperationalChange} from "../shared/operational-time.ts";
 import {hasRequiredInteriorCleaning,hasUnresolvedDefects} from "../fleet/smart-status.ts";
 import {moveBusToArea,RELOCATION_AREAS} from "../fleet/facility-areas.ts";
 import {adoptableDefect} from "../defects/defect-identity.ts";
+import {repairItemEstimateHours} from "./down-sheet-repair-items.ts";
 
 export type SyncFleetStatus="service"|"defect"|"shop"|"out"|"decommissioned"|"unknown";
 
@@ -30,6 +31,13 @@ export type SyncRepairItem={
  quantity?:number;
  repairHours?:number;
  diagnosticHours?:number;
+ /* The card's own time estimate, read rather than written here: a card that
+    still carries the catalog's figure has claimed nothing, and only one that
+    differs becomes the defect's ESTIMATED TIME OF REPAIR. `timeEstimate` is
+    the sheet's seven-field structure and is normalised by the one function
+    that owns it — see `repairItemEstimateHours`. */
+ estimateEnabled?:boolean;
+ timeEstimate?:unknown;
 };
 
 export type SyncDownEntry={
@@ -148,7 +156,7 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
  if(!items.length){
   const adopted=legacy?undefined:adopt(entry.category,entry.repair,entry.customReason);
   const id=legacy?.id||adopted?.id||legacyIds[0];
-  return [{id,category:entry.category,repair:entry.repair,details:adopted?adopted.details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined}];
+  return [{id,category:entry.category,repair:entry.repair,details:adopted?adopted.details:entry.customReason,done:entry.workflow==="Completed",actionTaken:"",finding:undefined,quantity:undefined,repairHours:undefined,diagnosticHours:undefined,estimateHours:undefined}];
  }
  return items.map((item,index)=>{
   const own="downsheet-"+entryKey(entry)+"-"+item.id;
@@ -158,7 +166,8 @@ function defectTargets(entry:SyncDownEntry,current:StructuredDefect[]){
   const id=adopts?legacy.id:mine?own:adopted?.id||own;
   taken.add(id);
   return {id,category:item.category,repair:item.repair,details:adopted?adopted.details:item.details,done:item.done===true,
-   actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours};
+   actionTaken:item.actionTaken,finding:item.finding,quantity:item.quantity,repairHours:item.repairHours,diagnosticHours:item.diagnosticHours,
+   estimateHours:repairItemEstimateHours(item)};
  });
 }
 
@@ -225,6 +234,18 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
     unit:defectCountField(target.category,target.repair)?.unit||linked?.unit,
     repairHours:normalizeRepairHours(target.repairHours)??linked?.repairHours,
     diagnosticHours:normalizeRepairHours(target.diagnosticHours)??linked?.diagnosticHours,
+    /* AN ESTIMATE TYPED ON THE SHEET IS THE SAME CLAIM as one typed in the
+       Defect Log, so the record takes it and the hours badge stops disagreeing
+       with the sheet it is sitting next to.
+
+       One direction only. A card is always carrying a figure, so writing one
+       back unconditionally would turn the catalog's guess into a claim on
+       every save; `repairItemEstimateHours` is what decides a card has
+       actually said something. And a card edited back to exactly the catalog's
+       number says nothing rather than withdrawing what the record holds —
+       taking an estimate off is done where it was put on, by clearing the box
+       in the editor, which is the rule the shop's own ledger follows. */
+    estimateHours:normalizeRepairHours(target.estimateHours)??linked?.estimateHours,
     source:linked?.source||"down-sheet"};
    const at=defects.findIndex(defect=>defect.id===target.id);
    if(at>=0)defects[at]=nextDefect;else defects.push(nextDefect);

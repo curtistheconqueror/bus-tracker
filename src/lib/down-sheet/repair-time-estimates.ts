@@ -1,3 +1,4 @@
+import {normalizeRepairHours} from "../defects/repair-catalog.ts";
 export type RepairTimeEstimate={
  repairMinutes:number;
  diagnosticMinutes:number;
@@ -143,9 +144,41 @@ export function resetCoreRepairEstimate(current:RepairTimeEstimate,category:stri
  return {...current,repairMinutes:recommended.repairMinutes,diagnosticMinutes:recommended.diagnosticMinutes,accessMinutes:recommended.accessMinutes};
 }
 
+/* The seven boxes added up, with no floor under them.
+
+   `repairTimeTotal` below is what the sheet PRINTS, and it never prints less
+   than half an hour. This is what the sheet was TOLD, which is a different
+   question and the only honest one to ask when a number is being carried back
+   onto a defect: a fifteen-minute estimate floored to thirty on the way out
+   and read back in would overwrite the fifteen somebody typed, every time the
+   sheet was saved, until the record said something nobody had ever claimed. */
+export function repairTimeSum(estimate:RepairTimeEstimate){
+ return estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
+}
+
 export function repairTimeTotal(estimate:RepairTimeEstimate){
- const total=estimate.repairMinutes+estimate.diagnosticMinutes+estimate.accessMinutes+estimate.complicationMinutes+estimate.heatMinutes+estimate.interruptionMinutes+estimate.otherMinutes;
- return Math.max(MINIMUM_REPAIR_MINUTES,total);
+ return Math.max(MINIMUM_REPAIR_MINUTES,repairTimeSum(estimate));
+}
+
+/* AN ESTIMATE SOMEBODY TYPED, IN THE SHAPE THE SHEET KEEPS ONE.
+
+   The Defect Log collects ESTIMATED TIME OF REPAIR as a single number of
+   hours; the Down Sheet keeps an estimate broken into repair, diagnostic,
+   access and four conditions. A card built from a defect that carries an
+   estimate has to print THAT number and not the catalog's guess, or the two
+   screens quote different figures for the same repair on the same bus — the
+   disagreement `defect-estimates.ts` and `tech-services.ts` both exist to
+   stop.
+
+   The whole figure goes into `repairMinutes`, which is where the sheet's own
+   simple ESTIMATED HOURS box puts a total it is handed, so opening the card
+   and breaking the estimate down starts from the same number rather than from
+   a split nobody chose. No estimate on the defect means the catalog's, exactly
+   as before this existed. */
+export function estimateFromHours(hours:unknown,category:string,repair:string):RepairTimeEstimate{
+ const typed=normalizeRepairHours(hours);
+ if(typed===undefined)return normalizeRepairTimeEstimate(undefined,category,repair);
+ return {repairMinutes:Math.round(typed*60),diagnosticMinutes:0,accessMinutes:0,complicationMinutes:0,heatMinutes:0,interruptionMinutes:0,otherMinutes:0,notes:""};
 }
 
 export function formatRepairTime(minutes:number){

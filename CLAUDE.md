@@ -637,10 +637,41 @@ nothing decays, and when a figure looks wrong there is one place it came from
 and one person who put it there. The adaptive version stays parked by his
 decision, and this is the thing it would have to beat.
 
-**Three sources, most specific first**, in `src/lib/defects/defect-estimates.ts`:
-the hours typed on THIS defect, then this ledger, then the catalog's own
-estimate. The catalog is last because it is a guess made by somebody who has
-never stood in this garage.
+**Four sources, most specific first**, in `src/lib/defects/defect-estimates.ts`:
+**ESTIMATED TIME OF REPAIR** typed on this defect, then the billable hours typed
+on it, then this ledger, then the catalog's own estimate. The catalog is last
+because it is a guess made by somebody who has never stood in this garage.
+
+**`estimateHours` ON THE DEFECT IS NOT ONE OF THE BILLABLE HOURS BESIDE IT**, and
+that is why it is its own field rather than a relabelled one. `repairHours` and
+`diagnosticHours` are time WORKED — `src/lib/reports/work-time.ts` sums them per
+person per day — so an estimate written into either would land on somebody's
+work ledger as hours they never spent. It sits ABOVE them in the ladder because
+it is the only one of the four that answers the question being asked; the two
+only ever meet on a job that is part-billed and still open, since a completed
+repair adds nothing to the badge at all.
+
+**It and the Down Sheet's own estimate are one number, in both directions.**
+A card built from an estimated defect is seeded from it through
+`estimateFromHours` rather than from the catalog, and a figure typed on the
+sheet comes back as the defect's estimate — but only when the card differs from
+the catalog's recommendation for that repair, because every card carries a
+seeded figure and reading one as a claim would freeze a guess onto the record.
+Same test `pageThemeHeader` makes about a header colour. Carried through the
+UNFLOORED sum (`repairTimeSum`), because `repairTimeTotal`'s thirty-minute floor
+is about what the sheet PRINTS: a quarter-hour estimate round-tripped through
+the floor would overwrite the fifteen minutes somebody typed with thirty, on
+every save. Taking an estimate off is done by clearing the box in the Defect
+Log, never by editing a card back to the catalog's number.
+
+**The Defect Log's WHAT WAS FOUND box went where this came from.** Curtis:
+*"where it says optional what was found replace this with estimated time of
+repair ... We have description above, so it kind of redundant."* The `finding`
+field itself is untouched and still reads everywhere it ever did; it is typed on
+the **Down Sheet row editor** and on **Fixed Repairs** now, and the FOUND BEFORE
+chips went with the box, so `pace-findings-memory-v1` is offered on those two
+surfaces and is still learned from on a Defect Log save that carries a cause.
+That form's DESCRIPTION is **ADDITIONAL DETAILS**.
 
 **Keyed per SPECIFIC REPAIR, not per category**, through the same
 `repairIdentityKey` PATH TO REPAIR uses — one function, so a writeup and a time

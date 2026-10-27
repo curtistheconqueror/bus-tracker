@@ -108,6 +108,19 @@ export type StructuredDefect={
     recorded rather than none spent. */
  repairHours?:number;
  diagnosticHours?:number;
+ /* HOW LONG THIS REPAIR IS EXPECTED TO TAKE, in the same decimal hours, and
+    deliberately NOT one of the two above. Those record time that has been
+    worked and is being billed — `work-time.ts` sums them per person per day —
+    so a figure written there before anybody turns a wrench would arrive on
+    somebody's work ledger as hours they never spent.
+
+    This is the estimate for THIS bus on THIS day, and it is the most specific
+    answer there is: `defect-estimates.ts` asks it before the shop's own ledger
+    and before the catalog's guess, and a card built for the Down Sheet is
+    seeded from it rather than from the catalog. Blank means nobody has
+    estimated this one, which is the normal state of a defect read off a
+    photographed sheet. */
+ estimateHours?:number;
  /* An absent key means not ticked. The stamp carries who and when, filled in
     where the settings ask for initials and left empty where they do not. */
  workStates?:Partial<Record<WorkStateKey,WorkStateStamp>>;
@@ -1209,7 +1222,7 @@ export function normalizeDefects(value:unknown,legacyText="",identity="bus"):Str
      a number on its own has nothing to belong to and would sit in storage where
      no screen ever displays it. */
   const diagLight=hasDiagLightField(category)?normalizeDiagLight(defect.diagLight):undefined;
-  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
+  return {...defect,id:defect.id||identity+"-defect-"+index,category,issue,details:typeof defect.details==="string"?defect.details:defect.details==null?"":String(defect.details),operability:defect.operability==="down"?"down":"service",state,conditionNotDuplicated:Boolean(defect.conditionNotDuplicated),symptoms:normalizedSymptoms(defect.symptoms),...fluidsPatch(defect,category,issue),...reportAttemptsPatch(defect),quantity:typeof defect.quantity==="number"?defect.quantity:undefined,repairHours:normalizeRepairHours(defect.repairHours),diagnosticHours:normalizeRepairHours(defect.diagnosticHours),estimateHours:normalizeRepairHours(defect.estimateHours),workStates:normalizeWorkStates(defect.workStates),downSheetRecommendation:normalizeWorkStateStamp(defect.downSheetRecommendation),finding:normalizeFinding(defect.finding),diagLight:diagLight,alarmCode:diagLight?normalizeAlarmCode(defect.alarmCode)||undefined:undefined} as StructuredDefect;
  });
  const legacy=legacyText.trim();
  return legacy?[{id:identity+"-legacy-defect",category:"Miscellaneous",issue:"Driver-reported defect",details:legacy,operability:"service",state:"open"}]:[];

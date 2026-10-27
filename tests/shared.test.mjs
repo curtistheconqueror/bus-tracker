@@ -352,11 +352,11 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  assert.match(fieldCode,/inputMode="decimal"/,"but still a numeric keypad on a phone");
  assert.match(field,/onBlur=\{\(\)=>setDraft\(null\)\}/,"the draft is dropped on blur so the stored value takes over");
 
- /* ALL SIX inputs go through it. The decimal fault existed on BOTH surfaces, so
-    fixing the Down Sheet alone would have left the Defect Log turning 1.5 into
-    15. */
+ /* ALL SEVEN inputs go through it. The decimal fault existed on BOTH surfaces,
+    so fixing the Down Sheet alone would have left the Defect Log turning 1.5
+    into 15. */
  assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
- assert.equal((log.match(/<HoursField /g)||[]).length,3,"Defect Log: repair, diagnostic, and the shop's time for the repair on the PATH TO REPAIR screen");
+ assert.equal((log.match(/<HoursField /g)||[]).length,4,"Defect Log: repair, diagnostic, ESTIMATED TIME OF REPAIR, and the shop's time for the repair on the PATH TO REPAIR screen");
  /* Scoped to HOURS. The Defect Log's quantity box is also type=number and is
     left alone on purpose: it counts quarts, not time, so a trailing decimal
     point is not the thing people type into it. (It has a smaller relative of
