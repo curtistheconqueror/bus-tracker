@@ -3,6 +3,8 @@ import {defectLabel,type StructuredDefect} from "./repair-catalog.ts";
    "offsite-3" reads as a typo to somebody who does not have the app open.
    Unknown slots stay blank rather than printing the raw id. */
 import {knownLocationLabel as shareAreaLabel} from "../fleet/location-label.ts";
+/* One string for whose garage this is — it was typed into four share modules. */
+import {SITE_ORGANIZATION,SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 
 /* WHAT GOT FIXED, AS A LIST SOMEBODY CAN SEND.
 
@@ -118,7 +120,7 @@ export function fixedShareHtml(repairs:FixedShareRepair[],window:string,stamp:st
  }).join(""):"<p class=\"empty\">No repairs match this view.</p>";
  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"+
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"+
-  "<title>Fixed Repairs — Pace South</title><style>"+
+  "<title>Fixed Repairs — "+SITE_ORGANIZATION+"</title><style>"+
   "*{box-sizing:border-box}body{margin:0;background:#eef2f9;color:#12244a;"+
   "font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;padding:14px}"+
   "h1{margin:0;font-size:30px;font-weight:800}"+
@@ -136,7 +138,7 @@ export function fixedShareHtml(repairs:FixedShareRepair[],window:string,stamp:st
   ".t{margin:4px 0 0;font-size:11px;color:#5b6883}"+
   ".empty{background:#fff;border-radius:8px;padding:16px;text-align:center;color:#5b6883}"+
   "footer{margin-top:16px;font-size:11px;color:#5b6883;text-align:center}"+
-  "</style></head><body><header class=\"top\"><small>PACE SOUTH · FIXED REPAIRS</small>"+
+  "</style></head><body><header class=\"top\"><small>"+SITE_ORGANIZATION_CAPS+" · FIXED REPAIRS</small>"+
   "<h1>Fixed Repairs</h1>"+
   "<b>"+escapeHtml([window,countLine(repairs)].filter(Boolean).join("  ·  "))+"</b>"+
   (stamp?"<b>"+escapeHtml(stamp)+"</b>":"")+"</header>"+cards+

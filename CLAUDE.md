@@ -42,6 +42,76 @@ Claude pushes to `main` and mirrors the same tree to `claude-contributions`:
 git checkout claude-contributions && git read-tree --reset -u main
 ```
 
+## Two things every new feature has to keep true
+
+Curtis, as a standing design spec rather than a task: *"as we add new features
+to this, to the site overall, we need it to be constructed in such a manner
+where our MCP integration will work fine, and also when we're ready to ship
+this app — if we're ready to give it to like Pace or any other organization
+where they can seamlessly plug it into their own infrastructure, whether
+they're beyond their private servers or otherwise — we have to always keep that
+design spec in mind."*
+
+Neither is a feature to build. Both are constraints a change either respects or
+quietly breaks, and the second one the app does not satisfy today.
+
+### 1. THE MCP READS THE APP'S OWN FUNCTIONS, so the rule is where logic lives
+
+**PR39** (`POST /api/mcp`, open and unmerged, five read-only tools) answers
+questions by calling the same functions the buttons call — `mysteryBusIds`,
+`locationLabel`, `buildFleetStatusReport`, `normalizeDefects`, and the cloud's
+own three payload and three merge functions in the same order a device's pull
+uses. Its own words: *"a tool that did its own arithmetic would be a second
+implementation of a rule, and the five copies of the location table are what
+that costs."*
+
+So the MCP constraint is already written in `docs/ARCHITECTURE.md` and is worth
+restating with its consequence: **a rule that lives in a page component is
+invisible to the MCP.** Put the decision in `src/lib/<area>/` as a `.ts` with no
+JSX and storage passed in; let the page call it. A window, a filter, a count or
+a label computed inline in a `page.tsx` has to be reimplemented in the route to
+be answerable, and then there are two of it.
+
+Two more, both already true and both cheap to break:
+
+- **A bus is addressed by FLEET NUMBER.** A bus id is device-local, so an id
+  means nothing to an agent. Anything an agent might ask for keys on the number.
+- **Every answer carries `asOf` beside `fetchedAt`.** The records live in each
+  device's LocalStorage and the cloud is a copy, so a feature that reports fleet
+  state needs to be able to say when it was last heard. What never travels stays
+  invisible: a HOLD, FULL SWEEP, the roles, the shift hours, PATH TO REPAIR, the
+  repair-hours ledger, the undo ledgers.
+
+Its security position is recorded, open, and not to be tidied away:
+`docs/MCP_SECURITY_FOLLOWUP.md` and `docs/AGENT_MCP.md`.
+
+### 2. ANOTHER GARAGE PLUGGING IT IN — what blocks it, measured
+
+The honest state: **the app is single-site today, and the obstacle is not
+branding.** Counted at this commit —
+
+| | what it is | where |
+| --- | --- | --- |
+| the yard's geometry | six independent descriptions of one building that must agree, plus ~71 slot-prefix literals across 16 files, some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
+| 60 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
+| the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
+
+What is already portable and shows the shape of the answer: the **shift hours
+and pullouts** are device-editable because a contract is not a property of the
+software; the **site's own sections** come from `site-config.ts`; **`APP_NAME`**
+is one line; and the organisation's name is now **`src/lib/settings/site-identity.ts`**
+— it had been typed into four share modules and a fifth was added the day that
+file was written, which is how a string becomes unfindable.
+
+**So the rule for a new feature is narrow and checkable:** do not add a seventh
+description of the building, do not hard-code the organisation's name or the
+site's geometry where a constant or `site-config.ts` can answer, and do not
+assume one shop, one cloud project or one token in anything that would have to
+be rewritten per customer. The big unbuilt piece stays
+`docs/roadmap/facility-config.md`, and pulling the site out of the code is the
+release that makes "seamlessly plug it in" true rather than aspirational.
+
 ## Agent budget
 
 **Never run more than 10 subagents at a time, on any model, under any effort
