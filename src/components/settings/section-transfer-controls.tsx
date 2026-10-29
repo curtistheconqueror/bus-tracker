@@ -1,5 +1,7 @@
 "use client";
 import {useRef,useState} from "react";
+/* The share sheet's title names the garage; one string for it. */
+import {SITE_ORGANIZATION} from "@/src/lib/settings/site-identity";
 import {shareOrDownloadFile,shareOutcomeLabel} from "@/src/lib/shared/share-file";
 import {readTransferPayload,transferFilename,TRANSFER_KINDS,type TransferKind,type TransferPayload} from "@/src/lib/storage/section-transfer";
 
@@ -22,7 +24,7 @@ export default function SectionTransferControls({kind,buildPayload,applyPayload}
   /* The share sheet is the whole point on a phone: it puts the file straight
      into a message or AirDrop rather than into a Downloads folder somebody then
      has to go find, and on iOS a download link is not a download at all. */
-  setStatus(shareOutcomeLabel(await shareOrDownloadFile(blob,filename,"Pace South "+label),filename));
+  setStatus(shareOutcomeLabel(await shareOrDownloadFile(blob,filename,SITE_ORGANIZATION+" "+label),filename));
  };
 
  const importSection=async(event:React.ChangeEvent<HTMLInputElement>)=>{

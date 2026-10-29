@@ -12,6 +12,8 @@
    sheet sends them, and neither one gets to decide what a downed bus is. */
 
 import {downSheetAvailability,isSoftDownEntry,isEntryInService} from "../down-sheet/down-sheet-availability.ts";
+/* The report takes its heading as an option; this is only the fallback. */
+import {SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 import {mysteryBusIds} from "../fleet/mystery-buses.ts";
 import {standingRoadCalls} from "../fleet/road-calls.ts";
 import {defectLabel,type StructuredDefect} from "../defects/repair-catalog.ts";
@@ -349,7 +351,7 @@ export function statusReportText(
     reader should be able to see which block is set apart without reading it. */
  const band="=".repeat(STATUS_REPORT_WIDTH-8);
  const rule="-".repeat(STATUS_REPORT_WIDTH-8);
- lines.push(clean(options.title)||"PACE SOUTH");
+ lines.push(clean(options.title)||SITE_ORGANIZATION_CAPS);
  const stamp=statusReportStamp(board.at);
  if(stamp)lines.push(stamp);
  /* THE NUMBERS THAT ARE NOT LIKE THE OTHERS, fenced off so nobody has to be

@@ -1,4 +1,6 @@
 import {downSheetEntryAgeDays,downSheetFilterLabel,type DownSheetFilterEntry,type DownSheetFilterKey} from "./down-sheet-filters.ts";
+/* One string for whose garage this is — it was typed into four share modules. */
+import {SITE_ORGANIZATION,SITE_ORGANIZATION_CAPS} from "../settings/site-identity.ts";
 import {downSheetGroup,downSheetGroupLabel} from "./down-sheet-view.ts";
 /* The same words the app says, from the same table. A shared list that invents
    its own name for Trouble Bay 12 is a list that sends somebody to the wrong
@@ -75,7 +77,7 @@ export function downSheetShareHtml(key:DownSheetFilterKey,entries:DownSheetShare
  }).join(""):"<p class=\"empty\">No buses on the sheet match this filter.</p>";
  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"+
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"+
-  "<title>"+escapeHtml(label)+" — Pace South Down Sheet</title><style>"+
+  "<title>"+escapeHtml(label)+" — "+SITE_ORGANIZATION+" Down Sheet</title><style>"+
   "*{box-sizing:border-box}body{margin:0;background:#eef2f9;color:#12244a;"+
   "font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;padding:14px}"+
   "h1{margin:0;font-size:19px}header.top{background:#4a2a8c;color:#fff;margin:-14px -14px 14px;padding:16px 14px}"+
@@ -89,7 +91,7 @@ export function downSheetShareHtml(key:DownSheetFilterKey,entries:DownSheetShare
   "ul{margin:0;padding-left:18px}li{margin:3px 0}"+
   ".empty{background:#fff;border-radius:8px;padding:16px;text-align:center;color:#5b6883}"+
   "footer{margin-top:16px;font-size:11px;color:#5b6883;text-align:center}"+
-  "</style></head><body><header class=\"top\"><small>PACE SOUTH · DOWN SHEET</small>"+
+  "</style></head><body><header class=\"top\"><small>"+SITE_ORGANIZATION_CAPS+" · DOWN SHEET</small>"+
   "<h1>"+escapeHtml(label)+" — "+entries.length+" bus"+(entries.length===1?"":"es")+"</h1>"+
   "<b>"+escapeHtml(stamp)+"</b></header>"+cards+
   "<footer>Snapshot taken when this was shared. It does not update.</footer></body></html>";
