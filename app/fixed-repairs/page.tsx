@@ -17,7 +17,10 @@ import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFin
 import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
-import {shareOrDownloadFile} from "@/src/lib/shared/share-file";
+import {copyText,shareOrDownloadFile,shareOutcomeLabel,type ShareOutcome} from "@/src/lib/shared/share-file";
+import {FIXED_REPAIR_WINDOWS,feedWindowLabel,feedWindowMinutes,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {fixedShareFilename,fixedShareHtml,fixedShareText,type FixedShareRepair} from "@/src/lib/defects/fixed-share";
+import {DEFAULT_SHIFT_SETTINGS,readShiftSettings} from "@/src/lib/settings/shift-clock";
 import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
 import {FLEET_STORAGE_KEY as FLEET_KEY,readDownSheetStorage,readFleetPayload,writeDownSheetStorageResult,writeFleetStorageResult,type FleetWriteReason} from "@/src/lib/storage/storage";
 import SaveAlert from "@/src/components/shared/save-alert";
@@ -152,6 +155,15 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
 
 export default function FixedRepairs(){
  const [fleet,setFleet]=useState<DefectLogFleetBus[]>([]),[search,setSearch]=useState(""),[category,setCategory]=useState("all"),[editing,setEditing]=useState<FixedRecord|null>(null),[newRepair,setNewRepair]=useState<FixedRecord|null>(null),[saveProblem,setSaveProblem]=useState<FleetWriteReason|"">(""),[undoSnapshot,setUndoSnapshot]=useState<UndoSnapshot|null>(null),[busQuery,setBusQuery]=useState("");
+ /* WHEN IT WAS FIXED, not when it was logged. Curtis: "any repairs I fixed in
+    the past day or two, or, you know, just like you got the other section
+    wired up." The Defect Log's feed window around the opposite stamp.
+
+    NOT PERSISTED, exactly like the Defect Log's. A window is what somebody is
+    looking at for the next minute, not a preference, and a remembered one is
+    how you come back tomorrow to a history that silently starts at TODAY. */
+ const [fixedWindow,setFixedWindow]=useState<FeedWindowKey>("all");
+ const [shareStatus,setShareStatus]=useState<ShareOutcome|"copied"|"error"|"">("");
  const [partsMemory,setPartsMemory]=useState<PartsMemory>(EMPTY_PARTS_MEMORY);
  useEffect(()=>setPartsMemory(readPartsMemory(localStorage)),[]);
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
@@ -170,15 +182,41 @@ export default function FixedRepairs(){
  const pageStyle={...appearanceStyle,"--fixed-header":headerSkin.color,"--fixed-header-text":headerSkin.text};
  useEffect(()=>{setFleet(readFleet(localStorage.getItem(FLEET_KEY)))},[]);
  useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ /* ONE CLOCK READ, SHARED, AND IT ADVANCES ON ITS OWN — the Defect Log's rule
+    and for its reason. The limit and the label are the pair `feed-window.ts`
+    says must never disagree, so they are handed the same instant; and this page
+    sits open on a shop computer all day, so an instant read once in the render
+    body would freeze THIS SHIFT at whatever o'clock the page was opened.
+    Idle while the window is ALL, because then there is nothing to age. */
+ const [windowNow,setWindowNow]=useState(()=>new Date());
+ useEffect(()=>{
+  if(fixedWindow==="all")return;
+  setWindowNow(new Date());
+  const tick=setInterval(()=>setWindowNow(new Date()),30000);
+  return()=>clearInterval(tick);
+ },[fixedWindow]);
+ const [shiftSettings,setShiftSettings]=useState(DEFAULT_SHIFT_SETTINGS);
+ useEffect(()=>setShiftSettings(readShiftSettings(localStorage)),[]);
+ /* A SEARCH STANDS THE WINDOW DOWN, which was Curtis's own condition on the
+    Defect Log: he wants to reach a bus "no matter what time" it was logged.
+    A history that hides the bus number somebody has just typed is lying about
+    the one question it is being asked directly. Nothing is forgotten — clear
+    the search and the window he picked is still in force. */
+ const windowLimit=search.trim()?null:feedWindowMinutes(fixedWindow,windowNow,shiftSettings);
+ const windowWords=search.trim()?"":feedWindowLabel(fixedWindow,windowNow,shiftSettings);
  const records=useMemo(()=>fleet.flatMap(bus=>normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id).filter(defect=>defect.state==="completed").map(defect=>({bus,defect}))).sort((a,b)=>(b.defect.completedAt||b.defect.updatedAt||"").localeCompare(a.defect.completedAt||a.defect.updatedAt||"")),[fleet]);
  const categories=useMemo(()=>[...new Set(records.map(record=>record.defect.category))].sort(),[records]);
- const visible=useMemo(()=>{const query=search.trim().toLowerCase();return records.filter(record=>(category==="all"||record.defect.category===category)&&(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.finding,record.defect.shopNotes,record.defect.partNumber,record.defect.reportedBy,record.defect.completedBy,record.defect.conditionNotDuplicated?"defect condition not duplicated":""].some(value=>String(value||"").toLowerCase().includes(query))))},[records,search,category]);
+ /* Three stages, narrowest last, so each count can name what IT is holding
+    back: the category, then when it was fixed, then the search. */
+ const inCategory=useMemo(()=>records.filter(record=>category==="all"||record.defect.category===category),[records,category]);
+ const inWindow=useMemo(()=>inCategory.filter(record=>fixedWithinFeedWindow(record.defect,windowLimit,windowNow)),[inCategory,windowLimit,windowNow]);
+ const visible=useMemo(()=>{const query=search.trim().toLowerCase();return inWindow.filter(record=>(!query||[record.bus.n,record.defect.category,record.defect.issue,record.defect.details,record.defect.actionTaken,record.defect.diagnosticNote,record.defect.finding,record.defect.shopNotes,record.defect.partNumber,record.defect.reportedBy,record.defect.completedBy,record.defect.conditionNotDuplicated?"defect condition not duplicated":""].some(value=>String(value||"").toLowerCase().includes(query))))},[inWindow,search]);
  /* Collapses back to the first page on a new search or category, rather than
     staying wherever SHOW ALL last left it. A person narrowing the list wants
     the top of the new result, not five hundred rows in from an unrelated
     browse. */
  const [visibleCount,setVisibleCount]=useState(PAGE_SIZE);
- useEffect(()=>setVisibleCount(PAGE_SIZE),[search,category]);
+ useEffect(()=>setVisibleCount(PAGE_SIZE),[search,category,fixedWindow]);
  const windowed=useMemo(()=>visible.slice(0,visibleCount),[visible,visibleCount]);
  const hiddenCount=visible.length-windowed.length;
  /* Returns whether the board was actually written. It used to return nothing,
@@ -304,6 +342,37 @@ if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fix
   return "Use a full fleet number or exactly two ending digits.";
  })();
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null);setNewRepair(null)};
+ /* THE LIST AS IT IS ON SCREEN, which is the whole contract of a share here.
+    `visible` is after the category, the window and the search, so what gets
+    sent is what is being looked at. A filter that tidies the screen and then
+    pastes everything anyway is worse than no filter, because it lies at the
+    only moment that matters — `time-window.ts` argues that at length and this
+    is the same promise. */
+ const shareRepairs=():FixedShareRepair[]=>visible.map(({bus,defect})=>({
+  defect,busNumber:bus.n,location:defect.reportedLocation||bus.l,
+  /* The card's own two dates, handed over formatted. A second date format in
+     the share module would drift from the cards the moment either changed. */
+  fixed:timeLabel(defect.completedAt||defect.updatedAt||""),
+  logged:timeLabel(defect.createdAt||""),
+ }));
+ const shareWindowWords=()=>windowWords||(search.trim()?"MATCHING \""+search.trim()+"\"":"");
+ const copyFixedList=async()=>{
+  try{await copyText(fixedShareText(shareRepairs(),shareWindowWords(),new Date().toLocaleString()));setShareStatus("copied")}
+  catch{setShareStatus("error")}
+ };
+ const shareFixedList=async()=>{
+  const words=shareWindowWords();
+  const blob=new Blob([fixedShareText(shareRepairs(),words,new Date().toLocaleString())],{type:"text/plain"});
+  setShareStatus(await shareOrDownloadFile(blob,fixedShareFilename(words,"txt"),"Fixed repairs")||"error");
+ };
+ const shareFixedPage=async()=>{
+  const words=shareWindowWords();
+  const blob=new Blob([fixedShareHtml(shareRepairs(),words,new Date().toLocaleString())],{type:"text/html"});
+  /* A DOWNLOAD IS NOT A COPY, which the Defect Log learned the hard way: folding
+     "saved" into "copied" made SHARE PAGE light up the COPY button with COPIED!
+     over a file that had been downloaded and nothing put on the clipboard. */
+  setShareStatus(await shareOrDownloadFile(blob,fixedShareFilename(words,"html"),"Fixed repairs")||"error");
+ };
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
 /* Where a completed repair came from, said plainly.
 
@@ -336,7 +405,36 @@ function repairOrigin(source:string|undefined){
  return <main className="fixed-repairs-app" style={pageStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><TrackerNav active="/fixed-repairs"/><RefreshButton/></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
-  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>
+  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><label><span>WHEN IT WAS FIXED</span><select value={fixedWindow} onChange={event=>setFixedWindow(event.target.value as FeedWindowKey)} aria-label="Narrow the history by when the repair was finished">{FIXED_REPAIR_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>
+  {/* WHAT THE LIST IS AND WHAT IT IS NOT, above the list rather than beside the
+      drop-down, because the question it answers is "is this everything?" and
+      that gets asked while reading the cards.
+
+      The counts are the stages in order — how many the window holds back, then
+      the search — so each number names its own cause rather than leaving
+      somebody to guess which control hid the other sixty repairs. */}
+  {(windowWords||search.trim()||inWindow.length!==records.length)&&<p className="fixed-scope" role="status" aria-live="polite">
+   {windowWords?<b>{windowWords}</b>:null}
+   <span>{visible.length} OF {records.length} REPAIR{records.length===1?"":"S"}</span>
+   {records.length-inWindow.length>0?<small>{records.length-inWindow.length} OUTSIDE THIS WINDOW</small>:null}
+   {inWindow.length-visible.length>0?<small>{inWindow.length-visible.length} HIDDEN BY THE SEARCH</small>:null}
+   {search.trim()&&windowWords===""&&fixedWindow!=="all"?<small>WINDOW STOOD DOWN WHILE SEARCHING</small>:null}
+  </p>}
+  {/* COPY, SHARE and SHARE PAGE — the same three the Defect Log offers, in the
+      same order, because they are the same errand on a different list. */}
+  <div className="fixed-share" role="group" aria-label="Share this repair history">
+   <button type="button" onClick={copyFixedList} aria-label="Copy this repair history">{shareStatus==="copied"?"COPIED!":"COPY"}</button>
+   <button type="button" onClick={shareFixedList} aria-label="Share this repair history as text">SHARE</button>
+   <button type="button" onClick={shareFixedPage} aria-label="Share this repair history as a page">SHARE PAGE</button>
+   {/* All four outcomes, COPY included: on a copy the only signal anything
+       happened is the button's own COPIED!, and a share that fell back to a
+       download has to say which it did. */}
+   <small role="status" aria-live="polite">{
+    shareStatus==="copied"?"COPIED TO THE CLIPBOARD":
+    shareStatus==="error"?"COULD NOT SHARE — TRY COPY":
+    shareStatus?shareOutcomeLabel(shareStatus,fixedShareFilename(windowWords)):""
+   }</small>
+  </div>
   <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{hiddenCount?windowed.length+" OF "+visible.length+" SHOWN":visible.length+" REPAIR"+(visible.length===1?"":"S")+" SHOWN"}</small></span><button className="log-repair-button" type="button" onClick={logRepair} disabled={!fleet.length} title="Record a repair that was done without a defect being logged first">+ LOG A REPAIR</button>{hiddenCount>0&&<div className="fixed-load-more"><button type="button" onClick={()=>setVisibleCount(current=>current+PAGE_SIZE)}>SHOW {Math.min(PAGE_SIZE,hiddenCount)} MORE</button><button type="button" onClick={()=>setVisibleCount(visible.length)}>SHOW ALL {visible.length}</button></div>}</header>{visible.length?<div className="fixed-list">{windowed.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
    {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}

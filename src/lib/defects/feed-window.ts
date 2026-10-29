@@ -1,5 +1,5 @@
 import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
-import {loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {completedMinutesElapsed,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
 
@@ -20,7 +20,7 @@ import {loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
    three to one number means the filter itself is a single comparison and there
    is no second code path for a clock-based window to be wrong in. */
 
-export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d";
+export type FeedWindowKey="all"|"shift"|"today"|"24h"|"3d"|"7d"|"30d";
 
 /* DELIBERATELY NOT `TIME_WINDOWS`, and not added to it.
 
@@ -43,7 +43,23 @@ export const FEED_WINDOWS:{key:FeedWindowKey;label:string}[]=[
  {key:"7d",label:"LAST 7 DAYS"},
 ];
 
-const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24*60,"7d":7*24*60};
+const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24*60,"7d":7*24*60,"30d":30*24*60};
+
+/* A MONTH, AND ONLY FIXED REPAIRS DRAWS IT.
+
+   Curtis asked for "the day and the past week, the past month, or the past 24
+   hours" on the completed list. A month is a reasonable span to ask a HISTORY
+   for and a strange one to ask a live board — the feed above answers "what is
+   on the board now", where thirty days is every record it has.
+
+   So it travels in its own list rather than being appended to `FEED_WINDOWS`,
+   which is the rule `SHIFT_TIME_WINDOW` already follows in `time-window.ts`
+   and this file's own header repeats: a screen opts into the chip it can
+   justify. The Defect Log's drop-down is unchanged by this file.
+
+   `FIXED_MINUTES` carries the key regardless, because `feedWindowMinutes` is
+   the one resolver and a key it cannot answer would be a second code path. */
+export const FIXED_REPAIR_WINDOWS:{key:FeedWindowKey;label:string}[]=[...FEED_WINDOWS,{key:"30d",label:"LAST 30 DAYS"}];
 
 export function isFeedWindowKey(value:unknown):value is FeedWindowKey{
  return FEED_WINDOWS.some(item=>item.key===value);
@@ -112,6 +128,21 @@ export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null
  return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
 }
 
+/* AND FIXED REPAIRS ASKS WHEN IT WAS FINISHED, which is the same window around
+   the opposite stamp.
+
+   Curtis: "any repairs I fixed in the past day or two." A repair reported on
+   Monday and finished this morning belongs in TODAY, so this cannot be
+   `defectWithinFeedWindow` — that one deliberately refuses to follow an edit,
+   and a completion is the one edit that IS the event being asked about.
+
+   The comparison itself is `withinFeedWindow`, shared, so there is one place
+   that decides what a limit means and one place that decides what an undated
+   record does. Only the stamp differs. */
+export function fixedWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+ return withinFeedWindow(completedMinutesElapsed(defect,now),limit);
+}
+
 /* What the bar above the feed says it is showing. "" for ALL, because a board
    with no window is just the board.
 
@@ -128,5 +159,11 @@ export function feedWindowLabel(key:FeedWindowKey,now:Date=new Date(),settings:S
  /* Checked the same way the limit is, so the pair cannot disagree about whether
     there is a window at all. */
  if(key==="today")return Number.isNaN(now.getTime())?"":"TODAY";
- return FEED_WINDOWS.find(item=>item.key===key)?.label||"";
+ /* LOOKED UP IN THE SUPERSET, or a window one screen offers and the other does
+    not would narrow its list under a heading claiming no window at all. Caught
+    by a test rather than by reading: `30d` resolved to 1440*30 minutes through
+    `FIXED_MINUTES` and to "" here, which is the precise pairing this file's own
+    header calls the one outcome worth writing code to prevent. The limit and
+    the label have to see the same table. */
+ return FIXED_REPAIR_WINDOWS.find(item=>item.key===key)?.label||"";
 }

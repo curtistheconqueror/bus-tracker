@@ -396,7 +396,9 @@ test("Fixed Repairs windows the render instead of drawing every completed repair
  // A new search or category collapses back to the first page rather than
  // staying wherever a previous SHOW ALL left it — a person narrowing the list
  // wants the top of the new result, not five hundred rows into an old browse.
- assert.match(fixedPage,/useEffect\(\(\)=>setVisibleCount\(PAGE_SIZE\),\[search,category\]\)/);
+ /* And the WINDOW joins them, or picking LAST 24H leaves somebody five hundred
+    rows into a browse that no longer exists. */
+ assert.match(fixedPage,/useEffect\(\(\)=>setVisibleCount\(PAGE_SIZE\),\[search,category,fixedWindow\]\)/);
 
  // The count line is honest about what is capped and what is not: it says
  // "OF" only once something is actually hidden, and reads as a plain count

@@ -717,6 +717,28 @@ export function loggedMinutesElapsed(defect:StructuredDefect,now=new Date()){
  const started=Date.parse(String(defect.createdAt||""));
  return Number.isNaN(started)?null:(now.getTime()-started)/60000;
 }
+/* HOW LONG AGO THIS REPAIR WAS FINISHED.
+
+   The sibling of `loggedMinutesElapsed`, and it asks the opposite question.
+   Curtis, on Fixed Repairs: "any repairs I fixed in the past day or two." A
+   repair reported on Monday and finished this morning was FINISHED this
+   morning, so a history window keyed off `createdAt` would hide exactly the
+   work somebody is trying to show.
+
+   `completedAt` first, `updatedAt` second, and the fallback is not laziness:
+   this page already sorts and dates its cards that way, because a completed
+   record written before the field existed — or cleared from the Down Sheet,
+   where the entry stamps the save rather than the completion — carries only
+   `updatedAt`. A card that prints one date and filters on another is the kind
+   of disagreement that makes somebody stop trusting the filter. One rule, used
+   by the sort, the card and the window.
+
+   A record thin enough to carry neither has no age, reads as null, and falls
+   out of every narrowed window exactly like an undated deferral. */
+export function completedMinutesElapsed(defect:StructuredDefect,now=new Date()){
+ const finished=Date.parse(String(defect.completedAt||defect.updatedAt||""));
+ return Number.isNaN(finished)?null:(now.getTime()-finished)/60000;
+}
 export function setDownSheetRecommendation(defect:StructuredDefect,on:boolean,at:string,by=""):StructuredDefect{
  const stamp=stampFor(on,at,by),next={...defect,downSheetRecommendation:stamp};
  if(!stamp)delete next.downSheetRecommendation;

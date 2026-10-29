@@ -6602,3 +6602,144 @@ test("the Defect Log editor asks how long the repair takes where it used to ask 
  const size=Number((estimateRule.match(/font-size:(\d+(?:\.\d+)?)px/)||[])[1]);
  assert.ok(size>=16,"the estimate box must not be under 16px, got "+size);
 });
+
+test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it shows",async()=>{
+ /* Curtis: "the quick filter functions, like for the day and the past week, the
+    past month, or the past 24 hours, the same way you got it wired up for
+    defects, I want you to wire up the actually fixed catalog the same way...
+    Also where I can share it, the same share ways as we do defects." */
+ const {FEED_WINDOWS,FIXED_REPAIR_WINDOWS,feedWindowMinutes,feedWindowLabel,
+  defectWithinFeedWindow,fixedWithinFeedWindow}=await import("../src/lib/defects/feed-window.ts");
+ const {completedMinutesElapsed}=await import("../src/lib/defects/repair-catalog.ts");
+ const {fixedShareText,fixedShareHtml,fixedShareFilename}=await import("../src/lib/defects/fixed-share.ts");
+
+ const NOW=new Date("2026-10-29T15:00:00.000Z");
+ const fixed=(completedAt,extra={})=>({id:"d",category:"Pneumatic System",issue:"Air leak",details:"",
+  operability:"service",state:"completed",createdAt:"2026-10-20T09:00:00.000Z",completedAt,
+  updatedAt:completedAt,...extra});
+
+ /* THE OPPOSITE STAMP, which is the whole point. A repair reported last week
+    and finished an hour ago belongs in TODAY; the feed's own window refuses to
+    follow an edit, and a completion is the one edit that IS the event. */
+ const hourAgo=fixed("2026-10-29T14:00:00.000Z");
+ assert.equal(Math.round(completedMinutesElapsed(hourAgo,NOW)),60);
+ assert.equal(fixedWithinFeedWindow(hourAgo,feedWindowMinutes("24h",NOW),NOW),true);
+ assert.equal(defectWithinFeedWindow(hourAgo,feedWindowMinutes("24h",NOW),NOW),false,
+  "logged nine days ago, so the feed's own window correctly excludes it");
+
+ /* `completedAt` first, `updatedAt` second — a record cleared from the Down
+    Sheet stamps the save rather than the completion, and the page already
+    sorts and dates its cards that way. One rule for the sort, the card and the
+    window, or the card prints one date and filters on another. */
+ assert.equal(Math.round(completedMinutesElapsed({...fixed(""),updatedAt:"2026-10-29T13:00:00.000Z"},NOW)),120);
+ assert.equal(completedMinutesElapsed({...fixed(""),updatedAt:""},NOW),null,"and neither is no age at all");
+ assert.equal(fixedWithinFeedWindow({...fixed(""),updatedAt:""},feedWindowMinutes("24h",NOW),NOW),false,
+  "an undated repair falls out of every narrowed window");
+ assert.equal(fixedWithinFeedWindow({...fixed(""),updatedAt:""},null,NOW),true,"and stays in ALL");
+
+ /* A MONTH, WHICH HE ASKED FOR, AND ONLY THIS LIST DRAWS IT. Appending it to
+    FEED_WINDOWS would have put thirty days on the Defect Log's live board,
+    which is every record it has and is not what was asked for. */
+ assert.deepEqual(FIXED_REPAIR_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d"],
+  "the Defect Log's drop-down is untouched");
+ assert.equal(feedWindowMinutes("30d",NOW),30*24*60);
+ assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","and the label resolves, or the heading would claim no window");
+ const monthBack=fixed("2026-10-04T15:00:00.000Z");
+ assert.equal(fixedWithinFeedWindow(monthBack,feedWindowMinutes("30d",NOW),NOW),true);
+ assert.equal(fixedWithinFeedWindow(monthBack,feedWindowMinutes("7d",NOW),NOW),false);
+
+ /* THE SHARE CARRIES THE WINDOW IN ITS HEADING, which is `time-window.ts`'s
+    rule: a bare list of three repairs is not the same message as "three
+    repairs in the last 24 hours", and the heading is the only part of a pasted
+    list its reader can check. */
+ const repairs=[{defect:fixed("2026-10-29T14:00:00.000Z",{actionTaken:"Replaced R-12 relay valve",completedBy:"CJ"}),
+  busNumber:"6301",location:"garage-1",fixed:"Oct 29, 2:00 PM",logged:"Oct 20, 9:00 AM"}];
+ const text=fixedShareText(repairs,"LAST 24H","Oct 29, 3:00 PM");
+ assert.match(text,/^Fixed Repairs — LAST 24H — 1 repair/);
+ assert.match(text,/Bus 6301/);
+ assert.match(text,/Replaced R-12 relay valve/);
+ assert.match(text,/Fixed by CJ/);
+ /* The location is the words a person says, through the one table that knows
+    trouble bays — never the raw slot id, which reads as a typo to somebody who
+    does not have the app open. */
+ assert.match(text,/Main Garage/);
+ assert.equal(/garage-1/.test(text),false);
+
+ /* A REPAIR WITH NO FIX DETAILS SAYS SO. The page badges those cards; a share
+    that quietly dropped the line would read as a complete record to somebody
+    who cannot see the badge. */
+ const bare=fixedShareText([{...repairs[0],defect:fixed("2026-10-29T14:00:00.000Z")}],"","");
+ assert.match(bare,/No fix details recorded\./);
+ assert.match(bare,/^Fixed Repairs — 1 repair/,"and with no window the heading claims none");
+
+ /* An empty list is a sentence, not a heading with nothing under it. */
+ assert.match(fixedShareText([],"TODAY","now"),/No repairs match this view\./);
+ assert.match(fixedShareHtml([],"TODAY","now"),/No repairs match this view\./);
+
+ /* The page is self-contained — this gets opened from a text message on a phone
+    in a garage with no signal, so a page that fetches anything shows nothing. */
+ const html=fixedShareHtml(repairs,"LAST 24H","Oct 29, 3:00 PM");
+ assert.match(html,/^<!doctype html>/);
+ assert.equal(/<script|src=|@import|https?:\/\//.test(html),false,"nothing fetched, nothing scripted");
+ assert.match(html,/Replaced R-12 relay valve/);
+ /* Escaped, because a mechanic's own words reach this file. */
+ assert.match(fixedShareHtml([{...repairs[0],defect:fixed("2026-10-29T14:00:00.000Z",{actionTaken:"<script>x</script>"})}],"",""),/&lt;script&gt;/);
+
+ /* THE WALL CLOCK'S DATE, NOT UTC, and the window in the name — these get sent
+    repeatedly and a folder of files all called the same thing is unusable. */
+ const evening=new Date(2026,9,29,19,30);
+ assert.equal(fixedShareFilename("LAST 24H","html",evening),"pace-fixed-repairs-last-24h-2026-10-29.html");
+ assert.equal(fixedShareFilename("","txt",evening),"pace-fixed-repairs-2026-10-29.txt");
+
+ /* AND THE PAGE SENDS WHAT IT SHOWS. `visible` is after the category, the
+    window and the search, so the three stages narrow the share too. A filter
+    that tidies the screen and pastes everything anyway lies at the only moment
+    that matters. */
+ const page=await readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/const shareRepairs=\(\):FixedShareRepair\[\]=>visible\.map/);
+ assert.match(page,/const inWindow=useMemo\(\(\)=>inCategory\.filter\(record=>fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow\)\)/);
+ assert.equal(/fixedWithinFeedWindow\(record\.defect,windowLimit,windowNow\)\)[\s\S]{0,200}records\.filter/.test(page),false);
+
+ /* ONE CLOCK, SHARED BY THE LIMIT AND THE LABEL, and it advances on its own —
+    this page sits open on a shop computer all day, and a frozen instant leaves
+    THIS SHIFT meaning whatever o'clock the page was opened at. */
+ assert.match(page,/const windowLimit=search\.trim\(\)\?null:feedWindowMinutes\(fixedWindow,windowNow,shiftSettings\)/);
+ assert.match(page,/const windowWords=search\.trim\(\)\?"":feedWindowLabel\(fixedWindow,windowNow,shiftSettings\)/);
+ assert.match(page,/setInterval\(\(\)=>setWindowNow\(new Date\(\)\),30000\)/);
+ assert.match(page,/if\(fixedWindow==="all"\)return;/,"and idles when there is nothing to age");
+
+ /* A SEARCH STANDS THE WINDOW DOWN — Curtis's own condition on the Defect Log,
+    that he reach a bus "no matter what time" it was logged — and the bar says
+    so rather than leaving somebody to wonder. */
+ assert.match(page,/WINDOW STOOD DOWN WHILE SEARCHING/);
+
+ /* The three controls, the four outcomes, and a download reported as a
+    download: folding "saved" into "copied" is how the Defect Log once lit up
+    COPY with COPIED! over a file it had written to disk. */
+ assert.match(page,/shareStatus==="copied"\?"COPIED!":"COPY"/,"COPY, which says COPIED! when it has");
+ assert.match(page,/onClick=\{shareFixedList\}[^>]*>SHARE</);
+ assert.match(page,/onClick=\{shareFixedPage\}[^>]*>SHARE PAGE</);
+ assert.match(page,/shareStatus==="copied"\?"COPIED TO THE CLIPBOARD"/);
+ assert.match(page,/shareStatus==="error"\?"COULD NOT SHARE — TRY COPY"/);
+ assert.match(page,/shareOutcomeLabel\(shareStatus,fixedShareFilename\(windowWords\)\)/);
+ assert.equal(/setShareStatus\("copied"\)[\s\S]{0,80}shareOrDownloadFile/.test(page),false,
+  "a download must never report itself as a copy");
+
+ /* The window is NOT remembered, the way the Defect Log's is not: a window is
+    what somebody is looking at for the next minute, and a remembered one is how
+    you come back tomorrow to a history that silently starts at TODAY. */
+ assert.match(page,/useState<FeedWindowKey>\("all"\)/);
+ assert.equal(/pace-fixed-window|localStorage\.setItem\([^)]*[Ww]indow/.test(page),false,"and nothing writes it to storage");
+
+ /* The stylesheet draws both new rows, and both are thumb-sized. */
+ const css=await readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8");
+ assert.match(css,/\.fixed-share button\{[^}]*min-height:44px/);
+ assert.match(css,/\.fixed-scope\{/);
+ /* FIVE children in the controls row now, so the column list has to say five
+    or the fifth hangs under the others with `align-items:end`. */
+ const columns=css.match(/\.fixed-controls\{display:grid;grid-template-columns:([^;]*);/)[1];
+ assert.equal(columns.split(" ").length,4,"the base row declares four and the wide override five");
+ const wide=css.match(/\n\.fixed-controls\{grid-template-columns:([^}]*)\}/)[1];
+ assert.equal(wide.split(" ").length,5,"got "+wide);
+});
