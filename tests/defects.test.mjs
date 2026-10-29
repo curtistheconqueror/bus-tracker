@@ -6608,7 +6608,7 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     past month, or the past 24 hours, the same way you got it wired up for
     defects, I want you to wire up the actually fixed catalog the same way...
     Also where I can share it, the same share ways as we do defects." */
- const {FEED_WINDOWS,FIXED_REPAIR_WINDOWS,feedWindowMinutes,feedWindowLabel,
+ const {FEED_WINDOWS,FIXED_REPAIR_WINDOWS,feedWindowMinutes,feedWindowLabel,isFeedWindowKey,
   defectWithinFeedWindow,fixedWithinFeedWindow}=await import("../src/lib/defects/feed-window.ts");
  const {completedMinutesElapsed}=await import("../src/lib/defects/repair-catalog.ts");
  const {fixedShareText,fixedShareHtml,fixedShareFilename}=await import("../src/lib/defects/fixed-share.ts");
@@ -6632,6 +6632,13 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     sorts and dates its cards that way. One rule for the sort, the card and the
     window, or the card prints one date and filters on another. */
  assert.equal(Math.round(completedMinutesElapsed({...fixed(""),updatedAt:"2026-10-29T13:00:00.000Z"},NOW)),120);
+ /* THE ORDER, which nothing gated: every fixture above has the two stamps equal
+    or `completedAt` empty, so a cold read inverted the expression to
+    `updatedAt||completedAt` — the precise inversion three comments say matters —
+    and all 407 tests passed. A record whose stamps DISAGREE is the only fixture
+    that can tell them apart. */
+ const disagreeing={...fixed("2026-10-29T14:00:00.000Z"),updatedAt:"2026-10-29T10:00:00.000Z"};
+ assert.equal(Math.round(completedMinutesElapsed(disagreeing,NOW)),60,"completedAt wins, not updatedAt");
  assert.equal(completedMinutesElapsed({...fixed(""),updatedAt:""},NOW),null,"and neither is no age at all");
  assert.equal(fixedWithinFeedWindow({...fixed(""),updatedAt:""},feedWindowMinutes("24h",NOW),NOW),false,
   "an undated repair falls out of every narrowed window");
@@ -6644,6 +6651,13 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d"],
   "the Defect Log's drop-down is untouched");
  assert.equal(feedWindowMinutes("30d",NOW),30*24*60);
+ /* AND THE GUARD ACCEPTS IT. A key the exported type and the resolver both take,
+    refused by `isFeedWindowKey`, is the second code path this file says it
+    avoids — latent today because nothing in `app/` calls it, and wrong the
+    moment something persisting or URL-parsing a window does. */
+ assert.equal(isFeedWindowKey("30d"),true);
+ for(const key of ["all","shift","today","24h","3d","7d"])assert.equal(isFeedWindowKey(key),true,key);
+ for(const junk of ["30D","month","",null,7,undefined])assert.equal(isFeedWindowKey(junk),false,String(junk));
  assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","and the label resolves, or the heading would claim no window");
  const monthBack=fixed("2026-10-04T15:00:00.000Z");
  assert.equal(fixedWithinFeedWindow(monthBack,feedWindowMinutes("30d",NOW),NOW),true);
@@ -6669,6 +6683,17 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  /* A REPAIR WITH NO FIX DETAILS SAYS SO. The page badges those cards; a share
     that quietly dropped the line would read as a complete record to somebody
     who cannot see the badge. */
+ /* A FIX NOTE CANNOT MINT AN ENTRY. `actionTaken` is a free-text textarea and
+    goes into the message raw; with only its first line indented, a note holding
+    its own numbered list produced a convincing extra entry — measured by a cold
+    read as 62 lines matching `^N. Bus ` under a heading saying 61, including a
+    bus that does not exist. Counted here rather than reasoned about. */
+ const forged=fixedShareText([{...repairs[0],defect:fixed("2026-10-29T14:00:00.000Z",
+  {actionTaken:"Line 1 of the fix\n\n99. Bus 9999  ·  Main Garage\n   Totally invented repair",completedBy:"CJ"})}],"","");
+ assert.equal((forged.match(/^\d+\. Bus /gm)||[]).length,1,"one entry, whatever the note contains");
+ assert.match(forged,/^   99\. Bus 9999/m,"the note's own numbering stays indented inside its entry");
+ assert.match(forged,/Fixed Repairs — 1 repair/,"and the heading still counts one");
+
  const bare=fixedShareText([{...repairs[0],defect:fixed("2026-10-29T14:00:00.000Z")}],"","");
  assert.match(bare,/No fix details recorded\./);
  assert.match(bare,/^Fixed Repairs — 1 repair/,"and with no window the heading claims none");
@@ -6712,7 +6737,9 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  /* A SEARCH STANDS THE WINDOW DOWN — Curtis's own condition on the Defect Log,
     that he reach a bus "no matter what time" it was logged — and the bar says
     so rather than leaving somebody to wonder. */
- assert.match(page,/WINDOW STOOD DOWN WHILE SEARCHING/);
+ /* Drawn on the condition, not merely present in the file: a search active and
+    a window chosen. The first version asserted only that the string existed. */
+ assert.match(page,/\{search\.trim\(\)&&fixedWindow!=="all"\?<small>WINDOW STOOD DOWN WHILE SEARCHING<\/small>:null\}/);
 
  /* The three controls, the four outcomes, and a download reported as a
     download: folding "saved" into "copied" is how the Defect Log once lit up
@@ -6722,9 +6749,42 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  assert.match(page,/onClick=\{shareFixedPage\}[^>]*>SHARE PAGE</);
  assert.match(page,/shareStatus==="copied"\?"COPIED TO THE CLIPBOARD"/);
  assert.match(page,/shareStatus==="error"\?"COULD NOT SHARE — TRY COPY"/);
- assert.match(page,/shareOutcomeLabel\(shareStatus,fixedShareFilename\(windowWords\)\)/);
- assert.equal(/setShareStatus\("copied"\)[\s\S]{0,80}shareOrDownloadFile/.test(page),false,
-  "a download must never report itself as a copy");
+ /* THE NAME OF THE FILE THAT WAS WRITTEN, not one recomputed from live state.
+    Rebuilt from `windowWords` and the default extension it told somebody to
+    look for a `.html` after SHARE had written a `.txt`, and named a slug the
+    file never had while a search was active — measured. */
+ assert.match(page,/shareOutcomeLabel\(shareStatus,sharedFile\)/);
+ assert.match(page,/const filename=fixedShareFilename\(words,"html"\);[\s\S]{0,200}setSharedFile\(filename\)/);
+ /* And the heading admits every filter, not only the window: with a category
+    chosen it read "Fixed Repairs — 2 repairs" over a five-repair history. */
+ assert.match(page,/const shareScopeWords=\(\)=>\[\n\s*windowWords,/);
+ assert.match(page,/category==="all"\?"":repairCategoryLabel\(category\)\.toUpperCase\(\)/);
+ /* SHARE is the share sheet with the clipboard behind it, as on the Defect Log
+    — not a `.txt` download under a word that means "put it in a message". */
+ assert.match(page,/if\(typeof navigator\.share!=="function"\)\{await copyFixedList\(\);return\}/);
+ assert.match(page,/navigator\.share\(\{title:"Fixed repairs",text\}\)/);
+ /* A status that outlives the list it described is a lie. */
+ assert.match(page,/useEffect\(\(\)=>\{setShareStatus\(""\);setSharedFile\(""\)\},\[fixedWindow,category,search\]\)/);
+ /* And the share carries every match, which past fifty is more than the page
+    draws — said in a row rather than left to be discovered by counting. */
+ assert.match(page,/SHARES ALL \{visible\.length\} — \{hiddenCount\} NOT YET DRAWN/);
+ /* Each count against the stage before it, and zero when there is no window. */
+ assert.match(page,/const windowHeld=windowLimit===null\?0:inCategory\.length-inWindow\.length;/);
+ assert.match(page,/const searchHeld=inWindow\.length-visible\.length;/);
+ assert.equal(/records\.length-inWindow\.length/.test(page),false,"a count must not span two stages");
+ /* A completion cannot be typed into the future: a negative age clears every
+    limit, so a card printing next Tuesday sat under a heading reading TODAY. */
+ assert.match(page,/type="datetime-local" max=\{localDateTime\(new Date\(\)\.toISOString\(\)\)\}/);
+ /* THE REGRESSION IS A COPY REPORTED **AFTER** A DOWNLOAD, and the first
+    version of this looked for one BEFORE it — so a cold read rewrote
+    shareFixedPage to `await shareOrDownloadFile(...); setShareStatus("copied")`,
+    lighting COPY up with COPIED! over a downloaded file, and both tests passed.
+    Matched on the function's own body instead. */
+ const sharePage=page.slice(page.indexOf("const shareFixedPage="),page.indexOf("const shareFixedList=")>page.indexOf("const shareFixedPage=")?page.indexOf("const shareFixedList="):page.indexOf("useEffect(()=>{setShareStatus"));
+ assert.ok(sharePage.includes("shareOrDownloadFile"),"SHARE PAGE writes a file");
+ assert.equal(/setShareStatus\("copied"\)/.test(sharePage),false,"and never calls itself a copy");
+ assert.match(sharePage,/setShareStatus\(await shareOrDownloadFile\(blob,filename,"Fixed repairs"\)\)/,
+  "it reports the outcome the file write actually returned");
 
  /* The window is NOT remembered, the way the Defect Log's is not: a window is
     what somebody is looking at for the next minute, and a remembered one is how
@@ -6737,9 +6797,21 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  assert.match(css,/\.fixed-share button\{[^}]*min-height:44px/);
  assert.match(css,/\.fixed-scope\{/);
  /* FIVE children in the controls row now, so the column list has to say five
-    or the fifth hangs under the others with `align-items:end`. */
- const columns=css.match(/\.fixed-controls\{display:grid;grid-template-columns:([^;]*);/)[1];
- assert.equal(columns.split(" ").length,4,"the base row declares four and the wide override five");
- const wide=css.match(/\n\.fixed-controls\{grid-template-columns:([^}]*)\}/)[1];
- assert.equal(wide.split(" ").length,5,"got "+wide);
+    or the fifth hangs under the others with `align-items:end`.
+
+    ASSERTED ON THE RULE THAT RENDERS. A cold read found the base declaration's
+    count being checked as if a media query gated the later rule: both are
+    top-level and equal specificity, so the LAST one wins at every width and the
+    base's list never paints. The one that matters is the later one. */
+ /* Media blocks stripped first — the phone block legitimately declares one
+    column — then the LAST top-level `.fixed-controls` rule, which is the one
+    that paints above 760px. A loose match over the whole file picked up a rule
+    belonging to another selector entirely. */
+ const topLevel=css.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g,"");
+ const rules=[...topLevel.matchAll(/([^{}]*)\{([^{}]*)\}/g)]
+  .filter(rule=>/(^|,)\s*\.fixed-controls\s*(,|$)/.test(rule[1].replace(/\/\*[\s\S]*?\*\//g,"")))
+  .map(rule=>rule[2]);
+ assert.ok(rules.length>=1,"the controls row must be styled at all");
+ const winning=[...rules.join(";").matchAll(/grid-template-columns:([^;}]*)/g)].pop()[1];
+ assert.equal(winning.trim().split(/\s+/).length,5,"the rule that wins must declare five columns, got "+winning);
 });

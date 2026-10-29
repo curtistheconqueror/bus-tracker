@@ -63,6 +63,10 @@ function repairMeta(repair:FixedShareRepair){
   .filter(Boolean).join("  ·  ");
 }
 
+function indent(value:string){
+ return value.split("\n").map(line=>"   "+line.trimEnd()).join("\n");
+}
+
 function countLine(repairs:FixedShareRepair[]){
  return repairs.length+" repair"+(repairs.length===1?"":"s");
 }
@@ -71,8 +75,12 @@ function countLine(repairs:FixedShareRepair[]){
    do not describe the same list two different ways. `window` is "" for ALL,
    which is how every window module in this app spells "no window": a list with
    no window is just the list, and saying so would be noise. */
-function heading(window:string,repairs:FixedShareRepair[]){
- return ["Fixed Repairs",window,countLine(repairs)].filter(Boolean).join(" — ");
+/* `scope` is EVERY filter that narrowed the list — the window, the category,
+   the search — because the heading is the only part of a pasted list its reader
+   can check, and one that names a window while a category silently halved the
+   list is the failure this argues against. "" when nothing narrowed it. */
+function heading(scope:string,repairs:FixedShareRepair[]){
+ return ["Fixed Repairs",scope,countLine(repairs)].filter(Boolean).join(" — ");
 }
 
 /* Plain text, for pasting into a message. Numbered so somebody reading the
@@ -86,7 +94,14 @@ export function fixedShareText(repairs:FixedShareRepair[],window:string,stamp:st
   return [
    index+1+". "+repairHeading(repair),
    "   "+defectLabel(repair.defect),
-   "   "+(String(repair.defect.actionTaken||"").trim()||NO_DETAILS),
+   /* EVERY LINE INDENTED, not just the first. `actionTaken` is a free-text
+      textarea and goes in raw; indenting only the first line let a note
+      containing its own numbered list mint a convincing entry. Measured by a
+      cold read: a note holding "99. Bus 9999 ..." produced 62 entries under a
+      heading saying 61, with a bus that does not exist. Malice is unlikely; a
+      mechanic pasting a numbered list into the box is not, and this text goes
+      to a superintendent. */
+   indent(String(repair.defect.actionTaken||"").trim()||NO_DETAILS),
    ...(meta?["   "+meta]:[]),
   ].join("\n");
  })].join("\n\n");
@@ -105,10 +120,13 @@ function escapeHtml(value:string){
    nothing. A file rather than a link for the reason the other two shares are
    files: nobody has to be given an account, and it still reads a year from now.
 
-   Deliberately `bus-share.ts`'s stylesheet, down to the colours, so three
-   shares arriving in one message thread look like they came from the same app.
-   The left border is green rather than blue, because this list is finished work
-   and that is the one distinction worth carrying into the paint. */
+   `bus-share.ts`'s stylesheet, so three shares arriving in one message thread
+   look like they came from the same app — with four deliberate differences, not
+   the one an earlier version of this paragraph claimed: the left border and the
+   number badge go green because this list is finished work, `.f` carries the
+   fix text at 14px rather than bus-share's 11px green flag line, and `.b` is
+   new because a repair needs its bus named where a bus share already has it in
+   the title. */
 export function fixedShareHtml(repairs:FixedShareRepair[],window:string,stamp:string){
  const cards=repairs.length?repairs.map((repair,index)=>{
   const meta=repairMeta(repair);

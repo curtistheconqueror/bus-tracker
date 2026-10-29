@@ -725,13 +725,17 @@ export function loggedMinutesElapsed(defect:StructuredDefect,now=new Date()){
    morning, so a history window keyed off `createdAt` would hide exactly the
    work somebody is trying to show.
 
-   `completedAt` first, `updatedAt` second, and the fallback is not laziness:
-   this page already sorts and dates its cards that way, because a completed
-   record written before the field existed — or cleared from the Down Sheet,
-   where the entry stamps the save rather than the completion — carries only
-   `updatedAt`. A card that prints one date and filters on another is the kind
-   of disagreement that makes somebody stop trusting the filter. One rule, used
-   by the sort, the card and the window.
+   `completedAt` first, `updatedAt` second, and the fallback exists because
+   this page already sorts and dates its cards that way — one rule for the sort,
+   the card and the window, or a card prints one date and filters on another.
+
+   WHAT THE FALLBACK IS ACTUALLY FOR, corrected: a LEGACY or imported record
+   written before the field was filled in. An earlier version of this comment
+   said a record cleared from the Down Sheet carries only `updatedAt`, and a
+   cold read checked — `down-sheet-sync.ts` writes
+   `completedAt:completed?(linked?.completedAt||now):""` and `defect-log-sync.ts`
+   does the same, so every current path that completes a repair stamps it. No
+   live path produces `state:"completed"` without a `completedAt`.
 
    A record thin enough to carry neither has no age, reads as null, and falls
    out of every narrowed window exactly like an undated deferral. */

@@ -45,7 +45,13 @@
 .fixed-repairs-app .fixed-card-actions button{width:100%}
 /* FIVE CHILDREN, FIVE COLUMNS. The row carries search, category, the window,
    EXPORT and UNDO; declared at four, the fifth wrapped to a second line with
-   `align-items:end` leaving it hanging under the others. */
+   `align-items:end` leaving it hanging under the others.
+
+   AND THIS RULE IS THE ONE THAT RENDERS. It is a later top-level rule of equal
+   specificity to the base declaration further up this file, so it wins at every
+   width — the base's own column list never paints above the 760px block. A cold
+   read found a test asserting the base's count as if a media query gated this
+   one; the count that matters is here. */
 .fixed-controls{grid-template-columns:minmax(200px,1fr) minmax(150px,210px) minmax(150px,210px) auto auto}
 .fixed-controls .fixed-undo-control{border:1px solid #afbed1;background:#eef3f8;color:#354b68}
 .fixed-controls .fixed-undo-control:not(:disabled){border-color:#7e94b0;background:#dfe8f3;color:#173b69}
@@ -271,6 +277,9 @@
 .fixed-share button{min-height:44px;border:1px solid var(--fixed-border);border-radius:7px;background:#fff;color:var(--fixed-ink);padding:0 14px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .fixed-share button:hover,.fixed-share button:focus-visible{border-color:var(--fixed-blue);color:var(--fixed-blue);outline:none}
 .fixed-share small{min-width:0;font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted);overflow-wrap:anywhere}
+/* The row that admits the share carries more than the page draws. Its own line
+   on every width, because it is read against the feed header above it. */
+.fixed-share .fixed-share-scope{flex-basis:100%;color:#7a5a00}
 @media(max-width:760px){
  .fixed-scope{margin:0 8px 8px}
  .fixed-share{margin:0 8px 9px}
