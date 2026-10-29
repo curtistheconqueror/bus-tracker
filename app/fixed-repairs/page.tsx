@@ -147,7 +147,14 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
      :"Decimal hours: .5 is half an hour. Leave blank if no time is being billed."}</small>
    </fieldset>
    <label>FIXED BY<input maxLength={12} autoCapitalize="characters" value={draft.completedBy} onChange={event=>update("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
-   <label className="wide">FIXED DATE &amp; TIME<input type="datetime-local" value={draft.completedAt} onChange={event=>update("completedAt",event.target.value)}/></label>
+   {/* NOT IN THE FUTURE. A bare datetime-local took a year typo, and a repair
+       stamped three days out passed every narrowed window — `withinFeedWindow`
+       is `minutes<=limit` and a negative age clears every limit — so a card
+       printing next Tuesday sat under a heading reading TODAY, with the FIXED
+       TODAY tile and the bar disagreeing about today on one screen. Measured by
+       a cold read. `max` is the root fix: the Defect Log's own window reads
+       `createdAt`, which the app writes and nobody can type. */}
+   <label className="wide">FIXED DATE &amp; TIME<input type="datetime-local" max={localDateTime(new Date().toISOString())} value={draft.completedAt} onChange={event=>update("completedAt",event.target.value)}/><small>Not in the future — a repair is finished when it is finished.</small></label>
   </div>
   <footer><button type="button" onClick={close}>CLOSE</button><button className="save-fixed-repair">SAVE FIX DETAILS</button></footer>
  </form></div>
@@ -219,6 +226,10 @@ export default function FixedRepairs(){
  useEffect(()=>setVisibleCount(PAGE_SIZE),[search,category,fixedWindow]);
  const windowed=useMemo(()=>visible.slice(0,visibleCount),[visible,visibleCount]);
  const hiddenCount=visible.length-windowed.length;
+ /* Each stage against the one before it, and the window's own count is zero
+    when there is no window — see the bar below. */
+ const windowHeld=windowLimit===null?0:inCategory.length-inWindow.length;
+ const searchHeld=inWindow.length-visible.length;
  /* Returns whether the board was actually written. It used to return nothing,
     so every caller carried on as if the save had happened. */
  const persistFleet=(next:DefectLogFleetBus[])=>{
@@ -342,37 +353,83 @@ if(changeFleet(next,(isNewRecord?"Logged Bus ":"Edited Bus ")+record.bus.n+" fix
   return "Use a full fleet number or exactly two ending digits.";
  })();
  const undoLastChange=()=>{if(!undoSnapshot)return;persistFleet(undoSnapshot.fleet);setUndoSnapshot(null);setEditing(null);setNewRepair(null)};
- /* THE LIST AS IT IS ON SCREEN, which is the whole contract of a share here.
-    `visible` is after the category, the window and the search, so what gets
-    sent is what is being looked at. A filter that tidies the screen and then
-    pastes everything anyway is worse than no filter, because it lies at the
-    only moment that matters — `time-window.ts` argues that at length and this
-    is the same promise. */
+ /* EVERYTHING THE FILTERS MATCHED, not the fifty the page has drawn.
+
+    `visible` is after the category, the window and the search; `windowed` is
+    the first fifty of it. The share takes `visible`, which is the Defect Log's
+    own answer — its focus share deliberately sends the whole bus rather than
+    the filtered view — but that page then DRAWS A ROW saying so
+    (`focusHiddenByBoard`), and the first version of this did not. A cold read
+    measured 61 matches sharing 61 under a header reading "50 OF 61 SHOWN",
+    with a comment above it claiming the share was "the list as it is on
+    screen". The row below the buttons says it now; the claim is withdrawn. */
  const shareRepairs=():FixedShareRepair[]=>visible.map(({bus,defect})=>({
   defect,busNumber:bus.n,location:defect.reportedLocation||bus.l,
   /* The card's own two dates, handed over formatted. A second date format in
-     the share module would drift from the cards the moment either changed. */
+     the share module would drift from the cards the moment either changed.
+     An absent `createdAt` passes "" rather than `timeLabel`'s own "Not
+     recorded" sentinel, which a cold read found printing as
+     "Logged Not recorded" in a shared list. */
   fixed:timeLabel(defect.completedAt||defect.updatedAt||""),
-  logged:timeLabel(defect.createdAt||""),
+  logged:defect.createdAt?timeLabel(defect.createdAt):"",
  }));
- const shareWindowWords=()=>windowWords||(search.trim()?"MATCHING \""+search.trim()+"\"":"");
+
+ /* WHAT THE HEADING OF A SHARED LIST HAS TO ADMIT, which is every filter that
+    narrowed it — not just the window.
+
+    Measured by a cold read: with CATEGORY on Brakes and the window on ALL the
+    heading read "Fixed Repairs — 2 repairs" over a five-repair history. To the
+    reader there is no filter and no way to know there was one, which is the
+    failure the Defect Log wrote up at length and the one thing the heading
+    exists to prevent. */
+ const shareScopeWords=()=>[
+  windowWords,
+  category==="all"?"":repairCategoryLabel(category).toUpperCase(),
+  search.trim()?"MATCHING \""+search.trim()+"\"":"",
+ ].filter(Boolean).join(" · ");
+
+ /* THE NAME OF THE FILE THAT WAS ACTUALLY WRITTEN, kept rather than recomputed.
+
+    The status line used to rebuild it from `windowWords` and the default
+    extension, so SHARE wrote `…-last-24h-….txt` and then told somebody to look
+    for `….html`; with a search active it named a slug the file never had. One
+    instruction the panel gives — go find this file — pointing at a name that is
+    not in the folder. It also re-described a file after the 30s tick crossed a
+    shift boundary, because it was derived from live state. */
+ const [sharedFile,setSharedFile]=useState("");
+ const stamp=()=>new Date().toLocaleString();
  const copyFixedList=async()=>{
-  try{await copyText(fixedShareText(shareRepairs(),shareWindowWords(),new Date().toLocaleString()));setShareStatus("copied")}
+  setSharedFile("");
+  try{await copyText(fixedShareText(shareRepairs(),shareScopeWords(),stamp()));setShareStatus("copied")}
   catch{setShareStatus("error")}
  };
+ /* SHARE IS THE SHARE SHEET, with the clipboard behind it — which is what the
+    Defect Log's SHARE does and what the word means everywhere else in this app.
+    The first version built a `.txt` blob through `shareOrDownloadFile`, so on
+    the shop computer, where there is no share sheet, SHARE silently DOWNLOADED
+    a file under a label that elsewhere means "put it in a message". */
  const shareFixedList=async()=>{
-  const words=shareWindowWords();
-  const blob=new Blob([fixedShareText(shareRepairs(),words,new Date().toLocaleString())],{type:"text/plain"});
-  setShareStatus(await shareOrDownloadFile(blob,fixedShareFilename(words,"txt"),"Fixed repairs")||"error");
+  setSharedFile("");
+  const text=fixedShareText(shareRepairs(),shareScopeWords(),stamp());
+  if(typeof navigator.share!=="function"){await copyFixedList();return}
+  try{await navigator.share({title:"Fixed repairs",text});setShareStatus("shared")}
+  catch(error){if((error as Error).name!=="AbortError")setShareStatus("error")}
  };
  const shareFixedPage=async()=>{
-  const words=shareWindowWords();
-  const blob=new Blob([fixedShareHtml(shareRepairs(),words,new Date().toLocaleString())],{type:"text/html"});
+  const words=shareScopeWords();
+  const filename=fixedShareFilename(words,"html");
+  const blob=new Blob([fixedShareHtml(shareRepairs(),words,stamp())],{type:"text/html"});
+  setSharedFile(filename);
   /* A DOWNLOAD IS NOT A COPY, which the Defect Log learned the hard way: folding
      "saved" into "copied" made SHARE PAGE light up the COPY button with COPIED!
      over a file that had been downloaded and nothing put on the clipboard. */
-  setShareStatus(await shareOrDownloadFile(blob,fixedShareFilename(words,"html"),"Fixed repairs")||"error");
+  setShareStatus(await shareOrDownloadFile(blob,filename,"Fixed repairs"));
  };
+ /* A STATUS THAT OUTLIVES THE LIST IT DESCRIBED IS A LIE. Measured: COPY under
+    LAST 24H, then switch to ALL, and the button still read COPIED! over a
+    clipboard holding a different list. The Defect Log clears its own on the bus
+    changing, for the same reason. */
+ useEffect(()=>{setShareStatus("");setSharedFile("")},[fixedWindow,category,search]);
  const exportHistory=()=>{const payload={kind:"fleet-fixed-repair-history",version:1,exportedAt:new Date().toISOString(),records:records.map(({bus,defect})=>({busNumber:bus.n,currentLocation:locationLabel(bus.l),...defect}))},blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),filename="fleet-fixed-repairs-"+new Date().toISOString().slice(0,10)+".json";void shareOrDownloadFile(blob,filename,"Fixed repair history report")};
 /* Where a completed repair came from, said plainly.
 
@@ -413,15 +470,26 @@ function repairOrigin(source:string|undefined){
       The counts are the stages in order — how many the window holds back, then
       the search — so each number names its own cause rather than leaving
       somebody to guess which control hid the other sixty repairs. */}
-  {(windowWords||search.trim()||inWindow.length!==records.length)&&<p className="fixed-scope" role="status" aria-live="polite">
+  {/* MEASURED AGAINST THE PREVIOUS STAGE, which is the whole arithmetic. The
+      first version subtracted `inWindow` from `records`, spanning the category
+      AND the window, and labelled the total as the window's doing — so with
+      two of five repairs in a category and no window chosen at all the bar read
+      "3 OUTSIDE THIS WINDOW". The Defect Log already carries that fix and the
+      reason beside it: a count answers "what did this control cost me" or it
+      double-counts what the one above it had already set aside.
+
+      And zero when there IS no window, rather than attributing the category's
+      work to a drop-down reading ALL. */}
+  {(windowWords||search.trim()||windowHeld>0)&&<p className="fixed-scope">
    {windowWords?<b>{windowWords}</b>:null}
    <span>{visible.length} OF {records.length} REPAIR{records.length===1?"":"S"}</span>
-   {records.length-inWindow.length>0?<small>{records.length-inWindow.length} OUTSIDE THIS WINDOW</small>:null}
-   {inWindow.length-visible.length>0?<small>{inWindow.length-visible.length} HIDDEN BY THE SEARCH</small>:null}
-   {search.trim()&&windowWords===""&&fixedWindow!=="all"?<small>WINDOW STOOD DOWN WHILE SEARCHING</small>:null}
+   {windowHeld>0?<small>{windowHeld} OUTSIDE THIS WINDOW</small>:null}
+   {searchHeld>0?<small>{searchHeld} HIDDEN BY THE SEARCH</small>:null}
+   {search.trim()&&fixedWindow!=="all"?<small>WINDOW STOOD DOWN WHILE SEARCHING</small>:null}
   </p>}
   {/* COPY, SHARE and SHARE PAGE — the same three the Defect Log offers, in the
-      same order, because they are the same errand on a different list. */}
+      same order and now by the same means: COPY to the clipboard, SHARE through
+      the share sheet with the clipboard behind it, SHARE PAGE as a file. */}
   <div className="fixed-share" role="group" aria-label="Share this repair history">
    <button type="button" onClick={copyFixedList} aria-label="Copy this repair history">{shareStatus==="copied"?"COPIED!":"COPY"}</button>
    <button type="button" onClick={shareFixedList} aria-label="Share this repair history as text">SHARE</button>
@@ -432,8 +500,12 @@ function repairOrigin(source:string|undefined){
    <small role="status" aria-live="polite">{
     shareStatus==="copied"?"COPIED TO THE CLIPBOARD":
     shareStatus==="error"?"COULD NOT SHARE — TRY COPY":
-    shareStatus?shareOutcomeLabel(shareStatus,fixedShareFilename(windowWords)):""
+    shareStatus?shareOutcomeLabel(shareStatus,sharedFile):""
    }</small>
+   {/* The share carries every match, which is more than the page draws past
+       fifty. Said here rather than left for somebody to discover by counting
+       what arrived — the row the Defect Log's focus share already has. */}
+   {hiddenCount>0&&<small className="fixed-share-scope">SHARES ALL {visible.length} — {hiddenCount} NOT YET DRAWN</small>}
   </div>
   <section className="fixed-feed"><header><span><b>COMPLETED REPAIR HISTORY</b><small>{hiddenCount?windowed.length+" OF "+visible.length+" SHOWN":visible.length+" REPAIR"+(visible.length===1?"":"S")+" SHOWN"}</small></span><button className="log-repair-button" type="button" onClick={logRepair} disabled={!fleet.length} title="Record a repair that was done without a defect being logged first">+ LOG A REPAIR</button>{hiddenCount>0&&<div className="fixed-load-more"><button type="button" onClick={()=>setVisibleCount(current=>current+PAGE_SIZE)}>SHOW {Math.min(PAGE_SIZE,hiddenCount)} MORE</button><button type="button" onClick={()=>setVisibleCount(visible.length)}>SHOW ALL {visible.length}</button></div>}</header>{visible.length?<div className="fixed-list">{windowed.map(record=><article className={"fixed-card"+(!record.defect.actionTaken?.trim()?" needs-notes":"")} key={record.bus.id+"-"+record.defect.id}>
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>

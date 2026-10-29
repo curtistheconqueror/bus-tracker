@@ -79,6 +79,8 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+8dc00f8 Write down the two constraints, and stop hard-coding whose garage this is
+926537f Record the Fixed Repairs window and the PATH TO REPAIR gap
 fd960ad Window and share the Fixed Repairs history, the way the Defect Log does
 5a530f1 Answer the second cold read: the ink fix made white on white reachable
 606c8e9 Re-run the handoff's command blocks, two commits after they were quoted
@@ -126,26 +128,33 @@ app/settings/_components/map-settings-panel.tsx
 app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
+src/components/settings/section-transfer-controls.tsx
 src/components/shared/header-theme-live.tsx
+src/lib/defects/bus-share.ts
 src/lib/defects/defect-estimates.ts
 src/lib/defects/defect-log-display-settings.ts
 src/lib/defects/defect-log-sync.ts
 src/lib/defects/duplicate-defects.ts
 src/lib/defects/feed-window.ts
 src/lib/defects/fixed-share.ts
+src/lib/defects/quick-filter-share.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
+src/lib/down-sheet/down-sheet-share.ts
 src/lib/down-sheet/down-sheet-sync.ts
 src/lib/down-sheet/repair-time-estimates.ts
+src/lib/reports/fleet-status-report-print.ts
+src/lib/reports/fleet-status-report.ts
 src/lib/settings/feedback-settings.ts
 src/lib/settings/header-theme.ts
 src/lib/settings/map-settings.ts
 src/lib/settings/page-header-themes.ts
+src/lib/settings/site-identity.ts
 ```
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 45 files changed, 6085 insertions(+), 254 deletions(-)
+ 53 files changed, 6357 insertions(+), 263 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -1242,6 +1251,69 @@ and Curtis was told after rather than before.** It is a repair of a regression
 introduced in this same release — an open defect had nowhere to type, read or
 clear a cause — and the alternative was leaving the app in that state while
 asking. Recorded here because the rule is his call first, and this was not.
+
+
+**AND A COLD READ OF THE FIXED REPAIRS WORK, which found four things a person
+would have hit.** All measured against the production build before and after:
+
+- **The scope bar blamed the CATEGORY on the window, and fired with no window
+  set.** It subtracted `inWindow` from `records`, spanning two stages, so two of
+  five repairs in a category and the drop-down on ALL read *"3 OUTSIDE THIS
+  WINDOW"*. The Defect Log already carries this fix and the reason beside it;
+  each count is measured against the stage before it now, and is zero when there
+  is no window. Measured after: category alone draws no bar at all, and
+  LAST 7 DAYS with every match inside it reads *"LAST 7 DAYS · 2 OF 5 REPAIRS"*
+  with no window count.
+- **The share heading never named the category.** With Brakes chosen it read
+  *"Fixed Repairs — 2 repairs"* over a five-repair history — to the reader, no
+  filter and no way to know there was one, which is the one thing a heading
+  exists to prevent. It carries every filter now: *"Fixed Repairs — 🛑 BRAKES —
+  2 repairs"*.
+- **The status line named a file that was never written.** It recomputed the
+  name from live state with the default extension, so SHARE wrote a `.txt` and
+  told somebody to look for a `.html`, and with a search active it named a slug
+  the file never had. The name written is kept and quoted; measured, the two now
+  match exactly.
+- **COPIED! outlived the list it described.** Copy under LAST 24H, switch to
+  ALL, and the button still said COPIED! over a clipboard holding a different
+  list. Cleared on the window, the category and the search.
+
+Three more, each real and each smaller:
+
+- **SHARE downloaded a file instead of sharing.** The Defect Log's SHARE calls
+  `navigator.share({text})` with the clipboard behind it; this built a `.txt`
+  blob, so on the shop computer the word meant something different on two
+  screens. Same means now.
+- **A fix note could forge an entry in the shared text.** `actionTaken` is a
+  textarea and only its first line was indented, so a note containing its own
+  numbered list minted a convincing extra repair — measured as 62 entries under
+  a heading saying 61, including a bus that does not exist. Every line is
+  indented; a test counts entries rather than reasoning about them.
+- **A completion could be typed into the future.** `withinFeedWindow` is
+  `minutes<=limit`, so a negative age clears every limit: a card printing next
+  Tuesday sat under a heading reading TODAY, with the FIXED TODAY tile and the
+  bar disagreeing about today on one screen. The input is bounded at now.
+
+**Two false statements of mine, corrected rather than argued:** the share sends
+every match, which past the fifty the page draws is MORE than the screen shows
+— a row below the buttons says so now, and the comment claiming otherwise is
+gone; and `completedMinutesElapsed`'s fallback was justified by a Down Sheet
+clearance carrying only `updatedAt`, which the read checked and disproved —
+every live completion path stamps `completedAt`, so the fallback is for legacy
+and imported records and now says that.
+
+**Four assertions were not gates, and two of my own mutations proved it:** the
+download-is-not-a-copy regex required the wrong ORDER and could not catch the
+regression it named; the `completedAt`-before-`updatedAt` rule was never pinned
+because every fixture had the two stamps equal; the controls-row column count
+was read off a declaration that never paints; and the stood-down row was checked
+as a string rather than on its condition. All four repaired, and thirteen
+mutations run against the result with thirteen caught.
+
+**Noted, not changed:** the bar still says nothing about what the CATEGORY held
+back — the drop-down shows its own value and the share heading names it — and
+THIS SHIFT on unresolvable shift hours still degrades silently to the whole
+history, which is the documented behaviour the Defect Log shares.
 
 **Not verified for the header work:** a real phone or iPad, Safari, or Home
 Screen standalone mode — so the status-bar colour has been measured as a

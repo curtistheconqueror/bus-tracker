@@ -61,8 +61,13 @@ const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24
    the one resolver and a key it cannot answer would be a second code path. */
 export const FIXED_REPAIR_WINDOWS:{key:FeedWindowKey;label:string}[]=[...FEED_WINDOWS,{key:"30d",label:"LAST 30 DAYS"}];
 
+/* THE SUPERSET, for the reason `feedWindowLabel` reads it: a key the exported
+   type and `FIXED_MINUTES` both accept, refused by the exported guard, is the
+   second code path the comment above says this file avoids. Nothing calls this
+   from `app/` today — which is exactly why it would be wrong when something
+   persisting or URL-parsing a window finally does. */
 export function isFeedWindowKey(value:unknown):value is FeedWindowKey{
- return FEED_WINDOWS.some(item=>item.key===value);
+ return FIXED_REPAIR_WINDOWS.some(item=>item.key===value);
 }
 
 /* HOW FAR BACK THIS WINDOW REACHES, in minutes, or null for "no limit".
