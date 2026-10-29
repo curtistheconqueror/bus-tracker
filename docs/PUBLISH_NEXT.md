@@ -12,7 +12,9 @@ Settings**, with a per-page override — replacing five stylesheets and two page
 themes that each decided one; and **ESTIMATED TIME OF REPAIR on the Defect Log
 form**, where it used to ask what was found, with DESCRIPTION renamed ADDITIONAL
 DETAILS and the finding box moved into ADVANCED DETAILS. Page themes keep their
-own header ink, which this release had taken off them.
+own header ink, which this release had taken off them. **Fixed Repairs narrows
+by WHEN IT WAS FIXED** — ALL, THIS SHIFT, TODAY, 24H, 3 DAYS, 7 DAYS, 30 DAYS —
+and offers COPY, SHARE and SHARE PAGE over exactly the repairs on screen.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -77,6 +79,8 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+fd960ad Window and share the Fixed Repairs history, the way the Defect Log does
+5a530f1 Answer the second cold read: the ink fix made white on white reachable
 606c8e9 Re-run the handoff's command blocks, two commits after they were quoted
 6f3cf22 Give a page theme its own header ink back, and answer the cold read
 ac254f1 Queue the estimate field in 194, and correct what the handoff claimed
@@ -127,6 +131,8 @@ src/lib/defects/defect-estimates.ts
 src/lib/defects/defect-log-display-settings.ts
 src/lib/defects/defect-log-sync.ts
 src/lib/defects/duplicate-defects.ts
+src/lib/defects/feed-window.ts
+src/lib/defects/fixed-share.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
 src/lib/down-sheet/down-sheet-sync.ts
@@ -139,7 +145,7 @@ src/lib/settings/page-header-themes.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 43 files changed, 5390 insertions(+), 247 deletions(-)
+ 45 files changed, 6085 insertions(+), 254 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -856,6 +862,83 @@ pairing there to honour.
 The Settings panel's contrast note is scored against the ink that will actually
 be drawn rather than the one it would have computed, or it would quote a figure
 for text those three pages are not using.
+
+### Fixed Repairs gets the Defect Log's window, and a share
+
+Curtis: *"the quick filter functions, like for the day and the past week, the
+past month, or the past 24 hours, the same way you got it wired up for defects,
+I want you to wire up the actually fixed catalog the same way... Also where I
+can share it, the same share ways as we do defects."*
+
+| | before | now |
+| --- | --- | --- |
+| narrowing the history | search + category | + WHEN IT WAS FIXED: ALL, THIS SHIFT, TODAY, 24H, 3 DAYS, 7 DAYS, **30 DAYS** |
+| sending it | EXPORT HISTORY REPORT (a JSON file) | + COPY, SHARE, SHARE PAGE |
+| what a share carried | — | the window in its heading, and only the repairs on screen |
+
+**WHEN IT WAS FIXED, NOT WHEN IT WAS LOGGED**, and that is the whole reason
+this is not `defectWithinFeedWindow`. A repair reported on Monday and finished
+this morning belongs in TODAY; the feed's window deliberately refuses to follow
+an edit, and a completion is the one edit that IS the event being asked about.
+`completedMinutesElapsed` reads `completedAt` then `updatedAt`, because a record
+cleared from the Down Sheet stamps the save rather than the completion and this
+page already sorts and dates its cards that way. One rule for the sort, the card
+and the window — a card that prints one date and filters on another is how
+somebody stops trusting a filter.
+
+**A MONTH, AND ONLY THIS LIST DRAWS IT.** `FIXED_REPAIR_WINDOWS` is
+`FEED_WINDOWS` plus thirty days, in its own list the way `SHIFT_TIME_WINDOW`
+already is. Thirty days on the Defect Log's live board is every record it has,
+which is not what was asked for; the Defect Log's drop-down is untouched and a
+test says so.
+
+**`feedWindowLabel` now looks its key up in the superset**, and that was a test
+finding rather than a reading one: `30d` resolved to a limit through
+`FIXED_MINUTES` and to `""` as a label, which is a list narrowed under a heading
+claiming no window — the one outcome both window modules say is worth writing
+code to prevent.
+
+**THE SHARE SENDS WHAT THE SCREEN SHOWS.** It reads `visible`, which is after
+the category, the window and the search. A filter that tidies the screen and
+then pastes everything anyway lies at the only moment that matters, which
+`time-window.ts` argues at length. The window's words lead the heading, because
+that is the only part of a pasted list its reader can check. A repair with no
+fix details prints *"No fix details recorded."* rather than an empty line — the
+page badges those cards and a share that dropped the line would read as a
+complete record to somebody who cannot see the badge.
+
+**A SEARCH STANDS THE WINDOW DOWN**, Curtis's own condition on the Defect Log —
+reach a bus "no matter what time" it was logged — and a new bar above the list
+says so, alongside how many records the window holds back and how many the
+search does, so each number names its own cause.
+
+**One clock, shared by the limit and the label**, ticking every 30s while a
+window is chosen and idle on ALL: this page sits open on a shop computer all
+day, and an instant read once in the render body leaves THIS SHIFT meaning
+whatever o'clock the page was opened at.
+
+**The four summary tiles stay absolute** — TOTAL FIXED, FIXED TODAY, BUSES IN
+HISTORY, NEED FIX DETAILS are counts of the whole history and two of them are
+already time statements. The window belongs to the list and the share, and the
+bar between them is what reconciles the two numbers. Worth knowing before
+somebody reads 1,400 TOTAL FIXED above three cards.
+
+### PATH TO REPAIR is reachable from exactly one screen, and that is the gap
+
+Curtis: *"The path to repair should be for everything. Well, you know, to
+everything that's appropriate for it, such as this."*
+
+It already is KEYED for every repair — `repairIdentityKey`, so a writeup
+written once shows on every bus that ever gets that fault. What it is not is
+REACHABLE: the only entry point in the app is the `PTR` button on a defect card
+inside the Defect Log's FOCUS view, so writing one means Defect Log → tap a bus
+→ FOCUS → tap PTR on that defect. Nothing offers it on the Defect Log's own
+feed cards, in the defect editor, on the Down Sheet, or on **Fixed Repairs** —
+which is where somebody is standing the moment after they finish the job, and
+the moment the writeup is worth capturing.
+
+Adding those buttons is a UI change and therefore Curtis's call before it
+exists. Not in this release; recorded so it is not rediscovered.
 
 ### Verified
 
