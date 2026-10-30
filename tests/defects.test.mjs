@@ -5661,7 +5661,7 @@ test("the LIVE REPAIR FEED can be narrowed to a shift or a day without touching 
  /* Curtis: "filter everything that's being put down ... by the day and by the
     shift, so in the last 24 hours, or by the shift". ALL first, because it is
     the way out of every window and the board's own behaviour until now. */
- assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d"]);
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
  assert.equal(FEED_WINDOWS[0].key,"all","ALL has to stay first: it is the way back to the whole board");
  assert.equal(isFeedWindowKey("today"),true);
  assert.equal(isFeedWindowKey("8h"),false,"a key only the shared chip row has must not resolve here");
@@ -6608,7 +6608,7 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
     past month, or the past 24 hours, the same way you got it wired up for
     defects, I want you to wire up the actually fixed catalog the same way...
     Also where I can share it, the same share ways as we do defects." */
- const {FEED_WINDOWS,FIXED_REPAIR_WINDOWS,feedWindowMinutes,feedWindowLabel,isFeedWindowKey,
+ const {FEED_WINDOWS,feedWindowMinutes,feedWindowLabel,isFeedWindowKey,
   defectWithinFeedWindow,fixedWithinFeedWindow}=await import("../src/lib/defects/feed-window.ts");
  const {completedMinutesElapsed}=await import("../src/lib/defects/repair-catalog.ts");
  const {fixedShareText,fixedShareHtml,fixedShareFilename}=await import("../src/lib/defects/fixed-share.ts");
@@ -6644,19 +6644,20 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
   "an undated repair falls out of every narrowed window");
  assert.equal(fixedWithinFeedWindow({...fixed(""),updatedAt:""},null,NOW),true,"and stays in ALL");
 
- /* A MONTH, WHICH HE ASKED FOR, AND ONLY THIS LIST DRAWS IT. Appending it to
-    FEED_WINDOWS would have put thirty days on the Defect Log's live board,
-    which is every record it has and is not what was asked for. */
- assert.deepEqual(FIXED_REPAIR_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
- assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d"],
-  "the Defect Log's drop-down is untouched");
+ /* A MONTH, ON BOTH SCREENS. It shipped as a second list only Fixed Repairs
+    drew, on the argument that thirty days is every record a live board has.
+    Curtis asked for it on the feed too — and a DEFERRED defect sits on that
+    board for as long as it takes, so the argument was wrong on the facts. One
+    table now, because the limit and the label have to come off the same one. */
+ assert.deepEqual(FEED_WINDOWS.map(item=>item.key),["all","shift","today","24h","3d","7d","30d"]);
  assert.equal(feedWindowMinutes("30d",NOW),30*24*60);
+ assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","the label and the limit read one table");
  /* AND THE GUARD ACCEPTS IT. A key the exported type and the resolver both take,
     refused by `isFeedWindowKey`, is the second code path this file says it
     avoids — latent today because nothing in `app/` calls it, and wrong the
     moment something persisting or URL-parsing a window does. */
  assert.equal(isFeedWindowKey("30d"),true);
- for(const key of ["all","shift","today","24h","3d","7d"])assert.equal(isFeedWindowKey(key),true,key);
+ for(const key of ["all","shift","today","24h","3d","7d","30d"])assert.equal(isFeedWindowKey(key),true,key);
  for(const junk of ["30D","month","",null,7,undefined])assert.equal(isFeedWindowKey(junk),false,String(junk));
  assert.equal(feedWindowLabel("30d",NOW),"LAST 30 DAYS","and the label resolves, or the heading would claim no window");
  const monthBack=fixed("2026-10-04T15:00:00.000Z");
@@ -6879,4 +6880,108 @@ test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it withou
  assert.equal(repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Tech Services",ISSUE)),
   repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Tech Services","IBS Screen - Screen black")),
   "the same allowance as the entry beside it");
+});
+
+test("a window that cannot be resolved says so, rather than silently showing every date",async()=>{
+ /* Both screens offer THIS SHIFT, and the limit and the label degrade TOGETHER
+    to "no window" when the clock cannot answer — which is the right failure,
+    argued at length in feed-window.ts: a narrowed board under a heading saying
+    THIS SHIFT is the one outcome that file exists to prevent.
+
+    What it left behind was a quieter lie. The drop-down still read THIS SHIFT,
+    the list was the WHOLE history, and the bar that would have explained it
+    hangs off the label — so the explanation vanished in exactly the case that
+    needed explaining. */
+ const {feedWindowMinutes,feedWindowLabel,feedWindowUnresolved,feedWindowUnresolvedNote}=
+  await import("../src/lib/defects/feed-window.ts");
+ const NOW=new Date("2026-10-29T15:00:00.000Z");
+ /* ALL THREE WINDOWS NARROWED, not one. `normalizeShiftSettings` fills any
+    shift the stored record does not carry from the defaults, so a record with
+    one odd window still has the other two covering most of the day — a
+    one-shift fixture here would be a shape no device can actually hold, and
+    this is meant to be the reachable case: somebody edits the hours in
+    Settings and leaves a gap. */
+ const HOUR=[{key:"1st",start:"03:00",end:"04:00"},{key:"2nd",start:"03:00",end:"04:00"},
+  {key:"3rd",start:"03:00",end:"04:00"}];
+ const NARROW={shifts:HOUR,pullouts:[]};
+ assert.equal(feedWindowMinutes("shift",new Date("2026-10-29T03:30:00.000Z"),NARROW)===null,
+  new Date("2026-10-29T03:30:00.000Z").getHours()!==3,
+  "the fixture has to MISS now to be testing anything — it covers 03:00-04:00 local only");
+
+ /* The degradation itself, both halves, so this test fails if somebody ever
+    "fixes" the pairing by making one of them guess. */
+ assert.equal(feedWindowMinutes("shift",NOW,NARROW),null);
+ assert.equal(feedWindowLabel("shift",NOW,NARROW),"");
+ assert.equal(feedWindowUnresolved("shift",NOW,NARROW),true);
+ assert.equal(feedWindowUnresolvedNote("shift"),"SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE");
+
+ /* ALL IS NOT A FAILURE TO RESOLVE A WINDOW, it is the absence of one. Warning
+    on the whole board, which is every device that has not narrowed anything,
+    would be the kind of permanent banner people stop seeing. */
+ assert.equal(feedWindowUnresolved("all",NOW,NARROW),false);
+ assert.equal(feedWindowUnresolved("all",new Date(NaN),NARROW),false);
+
+ /* And a shift that DOES resolve is not warned about. 15:00Z is inside the
+    default 2nd shift in this container's local time; assert through the
+    resolver rather than against a wall-clock guess, so this cannot start
+    failing on a machine in another zone. */
+ const resolvable=feedWindowMinutes("shift",NOW)!==null;
+ assert.equal(feedWindowUnresolved("shift",NOW),!resolvable,
+  "the warning is exactly the cases where the limit came back null");
+ for(const key of ["24h","3d","7d","30d"]){
+  assert.equal(feedWindowUnresolved(key,NOW,NARROW),false,key+" is a fixed span and cannot fail to resolve");
+  assert.equal(feedWindowUnresolved(key,new Date(NaN),NARROW),false,key+" does not need the clock either");
+ }
+
+ /* A BROKEN CLOCK IS A DIFFERENT SENTENCE, because it sends somebody to a
+    different place — the phone, not Settings. TODAY is the only other key that
+    can degrade at all. */
+ assert.equal(feedWindowMinutes("today",new Date(NaN)),null);
+ assert.equal(feedWindowLabel("today",new Date(NaN)),"");
+ assert.equal(feedWindowUnresolved("today",new Date(NaN)),true);
+ assert.equal(feedWindowUnresolvedNote("today"),"THIS DEVICE'S CLOCK CANNOT ANSWER — SHOWING EVERY DATE");
+ assert.notEqual(feedWindowUnresolvedNote("today"),feedWindowUnresolvedNote("shift"),
+  "one sentence covering both causes would be wrong half the time");
+ assert.equal(feedWindowUnresolved("today",NOW),false,"a readable clock always resolves TODAY");
+
+ /* BOTH SCREENS DRAW IT, and from this one function — two pages each
+    re-deriving "not ALL and the limit came back null" are two pages that will
+    eventually disagree about when to warn. */
+ const {readFileSync}=await import("node:fs");
+ for(const page of ["app/fixed-repairs/page.tsx","app/defect-log/page.tsx"]){
+  const source=readFileSync(new URL("../"+page,import.meta.url),"utf8");
+  assert.match(source,/feedWindowUnresolved\(/,page+" must ask the module, not re-derive it");
+  assert.match(source,/feedWindowUnresolvedNote\(/,page+" must draw the module's own wording");
+ }
+});
+
+test("the Fixed Repairs scope bar names the category too, not only the window and the search",async()=>{
+ /* The bar counted what the window held back and what the search hid, and said
+    nothing at all about the CATEGORY above them — so a history narrowed to
+    Brakes read as the whole history with a smaller number in it. The share
+    HEADING had the same hole and was fixed first; this is the one somebody is
+    actually looking at. */
+ const {readFileSync}=await import("node:fs");
+ const source=readFileSync(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8");
+
+ /* MEASURED AGAINST `records`, because the category is the FIRST stage and has
+    nothing above it to subtract from. Against `inWindow` or `visible` it would
+    double-count whatever the window and the search had already set aside —
+    the precise arithmetic bug the window's own count carries a comment about. */
+ assert.match(source,/const categoryHeld=records\.length-inCategory\.length;/,
+  "the category's count is records minus inCategory, or it double-counts");
+ assert.match(source,/\{categoryHeld>0\?<small>\{categoryHeld\} IN OTHER CATEGORIES<\/small>:null\}/);
+
+ /* AND THE BAR HAS TO BE ABLE TO APPEAR FOR IT. The visibility gate listed the
+    window, the search and the window's own count; a category narrowing with no
+    window and no search left the whole bar hidden, which is the same silence
+    with an extra step. */
+ /* Read as the ONE LINE that opens the bar rather than with a regex spanning
+    the condition: the gate holds `search.trim()`, so an `[^)]*` capture stops
+    at the first bracket inside it and a non-greedy one can start at an earlier
+    `{(` elsewhere in the file. The line is unambiguous. */
+ const gate=source.split("\n").find(line=>line.includes('&&<p className="fixed-scope">'));
+ assert.ok(gate,"the scope bar's visibility gate must be findable");
+ for(const term of ["categoryHeld>0","windowUnresolved"])
+  assert.ok(gate.includes(term),"the bar must be able to appear for "+term+" — gate reads "+gate.trim());
 });

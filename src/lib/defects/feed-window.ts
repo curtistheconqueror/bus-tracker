@@ -41,33 +41,33 @@ export const FEED_WINDOWS:{key:FeedWindowKey;label:string}[]=[
  {key:"24h",label:"LAST 24H"},
  {key:"3d",label:"LAST 3 DAYS"},
  {key:"7d",label:"LAST 7 DAYS"},
+ /* A MONTH, ON BOTH SCREENS, and this used to be a second list.
+
+    It shipped as `FIXED_REPAIR_WINDOWS` — a superset only Fixed Repairs drew —
+    on the argument that a month is a reasonable span to ask a HISTORY for and
+    a strange one to ask a live board, "where thirty days is every record it
+    has". Curtis asked for it on the feed as well, and the argument was wrong
+    on the facts anyway: a DEFERRED defect sits on this board for as long as it
+    takes, so a board carrying months of held-back work is exactly where this
+    narrows something.
+
+    So the two lists collapsed back into one. Two tables that must agree about
+    what a window key means are two tables that will eventually disagree — and
+    they already had, once: `30d` resolved to a limit through `FIXED_MINUTES`
+    and to "" through `feedWindowLabel`, which is a narrowed list under a
+    heading claiming no window at all. One table cannot do that. */
+ {key:"30d",label:"LAST 30 DAYS"},
 ];
 
 const FIXED_MINUTES:Partial<Record<FeedWindowKey,number>>={"24h":24*60,"3d":3*24*60,"7d":7*24*60,"30d":30*24*60};
 
-/* A MONTH, AND ONLY FIXED REPAIRS DRAWS IT.
-
-   Curtis asked for "the day and the past week, the past month, or the past 24
-   hours" on the completed list. A month is a reasonable span to ask a HISTORY
-   for and a strange one to ask a live board — the feed above answers "what is
-   on the board now", where thirty days is every record it has.
-
-   So it travels in its own list rather than being appended to `FEED_WINDOWS`,
-   which is the rule `SHIFT_TIME_WINDOW` already follows in `time-window.ts`
-   and this file's own header repeats: a screen opts into the chip it can
-   justify. The Defect Log's drop-down is unchanged by this file.
-
-   `FIXED_MINUTES` carries the key regardless, because `feedWindowMinutes` is
-   the one resolver and a key it cannot answer would be a second code path. */
-export const FIXED_REPAIR_WINDOWS:{key:FeedWindowKey;label:string}[]=[...FEED_WINDOWS,{key:"30d",label:"LAST 30 DAYS"}];
-
-/* THE SUPERSET, for the reason `feedWindowLabel` reads it: a key the exported
-   type and `FIXED_MINUTES` both accept, refused by the exported guard, is the
-   second code path the comment above says this file avoids. Nothing calls this
-   from `app/` today — which is exactly why it would be wrong when something
-   persisting or URL-parsing a window finally does. */
+/* THE ONE LIST, for the reason `feedWindowLabel` reads it too: a key the
+   exported type and `FIXED_MINUTES` both accept, refused by the exported
+   guard, is the second code path the comment above says this file avoids.
+   Nothing calls this from `app/` today — which is exactly why it would be
+   wrong when something persisting or URL-parsing a window finally does. */
 export function isFeedWindowKey(value:unknown):value is FeedWindowKey{
- return FIXED_REPAIR_WINDOWS.some(item=>item.key===value);
+ return FEED_WINDOWS.some(item=>item.key===value);
 }
 
 /* HOW FAR BACK THIS WINDOW REACHES, in minutes, or null for "no limit".
@@ -108,6 +108,42 @@ export function feedWindowMinutes(key:FeedWindowKey,now:Date=new Date(),settings
   return (at-new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime())/60000;
  }
  return null;
+}
+
+/* AND WHETHER THE WINDOW SOMEBODY PICKED IS ACTUALLY IN FORCE.
+
+   `feedWindowMinutes` and `feedWindowLabel` degrade TOGETHER to "no window"
+   when the clock cannot answer — a shift somebody has edited into a shape with
+   no window covering now, or a `now` that cannot be read at all. That pairing
+   is deliberate and is the right failure: a narrowed board under a heading
+   saying THIS SHIFT is the one outcome this file exists to prevent.
+
+   But it leaves the drop-down reading THIS SHIFT over the WHOLE history with
+   nothing on screen saying why, which is its own small lie — the control
+   claims a state the list does not have. So the degradation is made askable
+   rather than silent, in one function both screens read, because two pages
+   each re-deriving "the key is not ALL and the limit came back null" are two
+   pages that will eventually disagree about when to warn.
+
+   ALL is never unresolved: it is the absence of a window, not a failure to
+   resolve one. */
+export function feedWindowUnresolved(key:FeedWindowKey,now:Date=new Date(),settings:ShiftSettings=DEFAULT_SHIFT_SETTINGS){
+ return key!=="all"&&feedWindowMinutes(key,now,settings)===null;
+}
+
+/* AND WHAT TO SAY ABOUT IT, here rather than on each screen, for the reason
+   `feedWindowLabel` is here: two pages wording the same degradation differently
+   is how somebody learns the message is decoration.
+
+   TWO CAUSES AND TWO SENTENCES, because "the shift hours cover no window that
+   includes now" and "this device's clock cannot be read" send a person to
+   different places — Settings in the first case, the phone itself in the
+   second. A single sentence covering both would be wrong half the time, which
+   is how a warning stops being read. Only `shift` can reach the first; `today`
+   is the only other key that can degrade at all, and only on a broken clock. */
+export function feedWindowUnresolvedNote(key:FeedWindowKey){
+ if(key==="shift")return "SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE";
+ return "THIS DEVICE'S CLOCK CANNOT ANSWER — SHOWING EVERY DATE";
 }
 
 /* Zero is a real limit. Standing at 14:00 exactly, the shift is zero minutes
@@ -164,11 +200,10 @@ export function feedWindowLabel(key:FeedWindowKey,now:Date=new Date(),settings:S
  /* Checked the same way the limit is, so the pair cannot disagree about whether
     there is a window at all. */
  if(key==="today")return Number.isNaN(now.getTime())?"":"TODAY";
- /* LOOKED UP IN THE SUPERSET, or a window one screen offers and the other does
-    not would narrow its list under a heading claiming no window at all. Caught
-    by a test rather than by reading: `30d` resolved to 1440*30 minutes through
-    `FIXED_MINUTES` and to "" here, which is the precise pairing this file's own
-    header calls the one outcome worth writing code to prevent. The limit and
-    the label have to see the same table. */
- return FIXED_REPAIR_WINDOWS.find(item=>item.key===key)?.label||"";
+ /* THE SAME TABLE THE LIMIT COMES OFF, which is why there is only one of them
+    now. Caught by a test rather than by reading, back when there were two:
+    `30d` resolved to 1440*30 minutes through `FIXED_MINUTES` and to "" here,
+    which is the precise pairing this file's own header calls the one outcome
+    worth writing code to prevent. */
+ return FEED_WINDOWS.find(item=>item.key===key)?.label||"";
 }
