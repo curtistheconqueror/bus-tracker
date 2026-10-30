@@ -2946,3 +2946,59 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
  assert.match(html,/Snapshot taken when this was shared/);
  assert.equal(downSheetShareFilename("waiting-parts",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
 });
+
+test("a finding cleared on an open defect does not come back from the next sheet save",async()=>{
+ /* Two surfaces write one field. The sheet's WHAT WAS FOUND box lives inside
+    `{item.done && …}` and the Defect Log's lives in ADVANCED DETAILS, so an
+    OPEN defect has a box in one place and a stale card copy in the other — and
+    the copy with no box on screen was winning every save.
+
+    Reachable like this: finish the card and type a finding, reopen the repair,
+    then clear the finding in the Defect Log. The card still holds the string,
+    so changing the mechanic on that row wrote it straight back on. Same bug as
+    the estimate carry-back removed earlier in this release. */
+ const {applyDownEntryToFleet}=await import("../src/lib/down-sheet/down-sheet-sync.ts");
+ const NOW="2026-10-30T12:00:00.000Z";
+ const bus=finding=>({id:"b1",n:"17559",l:"garage-1",s:"defect",pendingRepair:"",defects:[
+  {id:"d1",category:"Brakes",issue:"ABS warning",details:"",operability:"service",
+   state:"open",createdAt:"2026-10-20T09:00:00.000Z",updatedAt:"2026-10-20T09:00:00.000Z",
+   ...(finding===undefined?{}:{finding})},
+ ]});
+ const entry=(done,finding)=>({id:"e1",defectId:"d1",busId:"b1",busNumber:"17559",
+  category:"Brakes",repair:"ABS warning",customReason:"",assignmentType:"Mechanic",
+  assignedTo:"CJ",section:"Pending",shift:"1st",workflow:done?"Completed":"Pending",
+  operationalStatus:"defect",priority:"Routine",createdAt:NOW,updatedAt:NOW,updatedBy:"CJ",
+  completedAt:"",history:[],repairItems:[{id:"i1",category:"Brakes",repair:"ABS warning",
+   details:"",estimateEnabled:true,done,actionTaken:"",finding}]});
+ const after=(busFinding,done,cardFinding)=>
+  applyDownEntryToFleet([bus(busFinding)],entry(done,cardFinding),NOW)[0].defects[0];
+
+ /* THE BUG. The record's finding is cleared; the card still holds the old
+    wording; the card is not finished, so the sheet is not asking. */
+ /* `||""` because a cleared finding normalises OFF the record rather than to an
+    empty string — `normalizeDefects` drops it, the spelling `setBusHold` and
+    the ledger's `gap` follow. Both spellings mean "nothing found"; what matters
+    is that the card's wording is not what comes back. */
+ assert.equal(after("",false,"Corroded connector").finding||"","",
+  "an unfinished card must not restore a finding the Defect Log cleared");
+ assert.equal(after(undefined,false,"Corroded connector").finding||"","",
+  "and the same where the record never had one");
+
+ /* A FINISHED CARD STILL SPEAKS, which is the half that must not break — a
+    finding typed on the sheet is how most of them get recorded at all. */
+ assert.equal(after("",true,"Corroded connector").finding,"Corroded connector");
+ assert.equal(after(undefined,true,"Corroded connector").finding,"Corroded connector");
+
+ /* AND THE RECORD'S OWN FINDING SURVIVES A SAVE from either kind of card. */
+ assert.equal(after("Chafed harness",false,undefined).finding,"Chafed harness");
+ assert.equal(after("Chafed harness",false,"").finding,"Chafed harness");
+ assert.equal(after("Chafed harness",true,undefined).finding,"Chafed harness",
+  "a finished card with an empty box falls back rather than wiping it");
+ assert.equal(after("Chafed harness",true,"Corroded connector").finding,"Corroded connector",
+  "and a finished card that has one wins, which is what completing a repair means");
+
+ /* THE CARD KEEPS ITS OWN COPY. Re-ticking it speaks for the sheet again, which
+    is deliberate: that is the sheet's record of what that mechanic found. */
+ assert.equal(after("",true,"Corroded connector").finding,"Corroded connector",
+  "re-ticking the card restores the sheet's own finding");
+});

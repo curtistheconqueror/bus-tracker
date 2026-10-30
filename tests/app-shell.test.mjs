@@ -1162,3 +1162,92 @@ test("Escape closes the map layer that locked the page behind it", async () => {
  assert.match(mapPage,/const closeEditor=\(\)=>\{if\(edit&&draftNewId===edit\.id\)setBuses\(v=>v\.filter\(bus=>bus\.id!==edit\.id\)\);setDraftNewId\(null\);setEdit\(null\)\}/);
  assert.match(mapPage,/close=\{closeEditor\}/,"the editor's X calls it");
 });
+
+test("PATH TO REPAIR is one component two pages draw, and it carries its own colours", async () => {
+ /* Curtis: "The path to repair should be for everything. Well, you know, to
+    everything that's appropriate for it." It was reachable from ONE control in
+    the whole app — the Defect Log's FOCUS view — and a completed repair is
+    where the knowledge actually exists, because somebody has just done the job.
+
+    So the panel moved out of `app/defect-log/page.tsx` into
+    `src/components/defects/`, which `docs/ARCHITECTURE.md` reserves for React
+    two or more pages draw. Nothing moved on the Defect Log. */
+ const read = async path => readFile(new URL("../" + path, import.meta.url), "utf8");
+ const panel = await read("src/components/defects/path-to-repair-panel.tsx");
+ const panelCss = await read("src/components/defects/path-to-repair-panel.css");
+ const log = await read("app/defect-log/page.tsx");
+ const logCss = await read("app/defect-log/defect-log.css");
+ const fixed = await read("app/fixed-repairs/page.tsx");
+ const fixedCss = await read("app/fixed-repairs/fixed-repairs.css");
+
+ /* BOTH PAGES DRAW THE SAME ONE. A second copy on Fixed Repairs is the thing
+    this project removes everywhere else — five location tables, two theme
+    systems, the organisation's name in four share modules. */
+ for (const [name, source] of [["the Defect Log", log], ["Fixed Repairs", fixed]])
+  assert.match(source, /import PathToRepairPanel from "@\/src\/components\/defects\/path-to-repair-panel"/,
+   name + " must draw the shared panel");
+ assert.equal((log.match(/<PathToRepairPanel/g) || []).length, 1);
+ assert.equal((fixed.match(/<PathToRepairPanel/g) || []).length, 1);
+ /* And the Defect Log kept its own entry point — this is an additional door,
+    not a move. */
+ assert.match(log, /className="ptr-log-focus-defect"/, "the Defect Log's own PTR button must stay where it was");
+
+ /* THE PANEL DOES NOT READ THE LIBRARIES. Both are props, because each host's
+    own PTR button reads the writeups to decide between "PTR" and "PTR +" — a
+    panel holding its own copy would save one while the button behind it still
+    said there was none. */
+ for (const forbidden of ["readPathToRepairs", "readRepairHoursLedger"])
+  assert.ok(!panel.includes(forbidden),
+   "the panel must take the libraries as props, not read " + forbidden);
+ for (const [name, source] of [["the Defect Log", log], ["Fixed Repairs", fixed]]) {
+  assert.match(source, /readPathToRepairs\(/, name + " holds the writeups");
+  assert.match(source, /findPathToRepair\(/, name + "'s own button reads them");
+ }
+
+ /* ITS COLOURS ARE ITS OWN NAMES, mapped by each host. Reading `--log-*`
+    directly was fine while one route loaded that stylesheet; Fixed Repairs does
+    not load it at all, so every variable would resolve to nothing. */
+ /* `var(--log-` rather than `--log-`: the file's own comment explains that it
+    used to read those, and a scan blunt enough to trip on prose about a rule is
+    the mistake the feedback-settings tripwire made twice. */
+ assert.ok(!panelCss.includes("var(--log-"), "the component must not reach for another page's variables");
+ const names = ["--ptr-text", "--ptr-muted", "--ptr-border", "--ptr-surface", "--ptr-accent", "--ptr-accent-text"];
+ for (const name of names) {
+  assert.ok(panelCss.includes(name + ":"), "the component must declare a default for " + name);
+  assert.ok(logCss.includes(name + ":"), "defect-log.css must map " + name);
+  assert.ok(fixedCss.includes(name + ":"), "fixed-repairs.css must map " + name);
+ }
+ /* Each host's map is scoped under its app root, so it outranks the
+    component's defaults by SPECIFICITY rather than by import order — which
+    nothing in this project controls. */
+ assert.match(logCss, /\.defect-log-app \.ptr-shade\{/);
+ assert.match(fixedCss, /\.fixed-repairs-app \.ptr-shade\{/);
+ /* The rules themselves left defect-log.css. A copy there would win on both
+    pages and quietly undo the point. */
+ for (const moved of [".ptr-panel{", ".ptr-head{", ".ptr-body{", ".ptr-hours{", ".ptr-actions{"]) {
+  assert.ok(panelCss.includes(moved), "the component's stylesheet must own " + moved);
+  assert.ok(!logCss.includes(moved), "defect-log.css must no longer own " + moved);
+ }
+
+ /* FOUR BUTTONS, FOUR COLUMNS. The row was declared at three and adding PTR
+    left DELETE hanging on a second line at the left under a row aligned right.
+    Counted from the source rather than remembered, because the next button
+    added here will have the same problem. */
+ const row = fixed.slice(fixed.indexOf('<div className="fixed-card-actions">'));
+ const buttons = (row.slice(0, row.indexOf("</div></footer>")).match(/<button /g) || []).length;
+ assert.equal(buttons, 4, "the action row draws four buttons");
+ const grid = fixedCss.match(/\.fixed-repairs-app \.fixed-card-actions\{[^}]*grid-template-columns:([^;}]*)/);
+ assert.ok(grid, "the action row's column list must be findable");
+ assert.equal((grid[1].match(/minmax\(/g) || []).length, buttons,
+  "the row declares " + (grid[1].match(/minmax\(/g) || []).length + " columns for " + buttons + " buttons");
+ /* DELETE is pinned to the last one, because UNDO FIX is absent on a repair
+    logged straight onto this page and the row otherwise stopped short of the
+    right edge on those cards while reaching it on the ones above. */
+ assert.match(fixedCss, /\.fixed-card-actions \.delete-repair\{grid-column:4\}/);
+
+ /* AND FIXED REPAIRS DOES NOT MINT A SECOND INITIALS KEY. One person, one
+    phone; a second copy means typing them twice and the two drifting, and
+    CLAUDE.md forbids renaming a key, so there would be two forever. */
+ assert.match(fixed, /readSettings as readDefectLogSettings/);
+ assert.ok(!/pace-fixed[a-z-]*initials/.test(fixed), "no second initials key");
+});

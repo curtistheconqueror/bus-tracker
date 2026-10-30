@@ -5452,6 +5452,12 @@ test("PATH TO REPAIR is written once per repair and survives a catalog rename",a
 
 test("the PTR button sits on the defect card and opens the repair's own writeup",async()=>{
  const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* THE PANEL ITSELF NOW LIVES IN A COMPONENT, because Fixed Repairs opens it
+    too. The button and which repair is open stayed on this page; the screen,
+    the editor and the two checked writes moved to
+    `src/components/defects/path-to-repair-panel.tsx`. So this test reads both
+    halves, which is the honest shape of the claim now. */
+ const panel=await readFile(new URL("../src/components/defects/path-to-repair-panel.tsx",import.meta.url),"utf8");
  /* ON THE DEFECT CARD, which is where Curtis put it after thinking aloud about
     the FOCUS row: "somewhere on each of the defect cards so that way it's
     specified to that defect". */
@@ -5460,13 +5466,16 @@ test("the PTR button sits on the defect card and opens the repair's own writeup"
     serve every bus with the fault. */
  assert.equal(/openPathToRepair\(record\.defect\.id/.test(page),false);
  /* The screen is titled the way he named it. */
- assert.match(page,/<small>PATH TO REPAIR<\/small>/);
+ assert.match(panel,/<small>PATH TO REPAIR<\/small>/);
  /* A repair with nothing written opens straight into the editor rather than
-    onto a blank page with an EDIT button on it. */
- assert.match(page,/setPtrEditing\(!existing\)/);
+    onto a blank page with an EDIT button on it. Derived from the library inside
+    the panel now, rather than seeded by each caller — two callers each seeding
+    it is two chances to open in the wrong mode. */
+ assert.match(panel,/const \[editing,setEditing\]=useState\(!saved\)/);
  /* The write is checked. A full device must not show text it did not store. */
- assert.match(page,/if\(!writePathToRepairs\(localStorage,next\)\)\{setPtrProblem\(/);
- const css=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
+ assert.match(panel,/if\(!writePathToRepairs\(localStorage,next\)\)\{setProblem\(/);
+ const css=await readFile(new URL("../src/components/defects/path-to-repair-panel.css",import.meta.url),"utf8");
+ const logCss=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
  /* IT STACKS ABOVE THE FOCUS VIEW, and the first version of this assertion had
     the mechanism backwards - it checked that the panel came BEFORE the focus
     shade in source and called that "so it paints above it". Later paints above,
@@ -5474,18 +5483,22 @@ test("the PTR button sits on the defect card and opens the repair's own writeup"
     focus shade sat on top of a panel that looked perfectly normal and ate every
     tap on it. Caught by clicking SAVE in a browser; the source assertion had
     passed. The z-index is the real mechanism, so the z-index is the assertion. */
- assert.match(css,/\.ptr-shade\{z-index:2147483001\}/);
- assert.match(css,/\.log-shade\{position:fixed;z-index:2147483000/,"one higher than the shade it opens over");
+ /* The shade is the component's own now, backdrop and all — it used to lean on
+    `.log-shade`, which Fixed Repairs does not load. */
+ const shadeRule=css.slice(css.indexOf(".ptr-shade{"),css.indexOf("}",css.indexOf(".ptr-shade{")));
+ assert.match(shadeRule,/z-index:2147483001/,"the panel's own shade carries the z-index now");
+ assert.match(shadeRule,/position:fixed/,"and the backdrop, which used to come from .log-shade");
+ assert.match(logCss,/\.log-shade\{position:fixed;z-index:2147483000/,"one higher than the shade it opens over");
  /* And it says, on the screen that writes it, who will see it. */
- assert.match(page,/shows on every bus with that repair/);
- assert.match(page,/does not travel to the Shop Cloud yet/);
+ assert.match(panel,/shows on every bus with that repair/);
+ assert.match(panel,/does not travel to the Shop Cloud yet/);
 
  /* The button takes only a background: `.log-focus-record-foot button` already
     gives every button in that row its 44px target and face, and restating any
     of it would be a second opinion waiting to drift. */
- assert.match(css,/\.ptr-log-focus-defect\{background:#3f4a63\}/);
- assert.equal(/\.ptr-log-focus-defect\{[^}]*min-height/.test(css),false,"the row already sets the touch target");
- assert.match(css,/\.log-focus-record-foot button\{min-height:44px/,"which is the rule it is leaning on");
+ assert.match(logCss,/\.ptr-log-focus-defect\{background:#3f4a63\}/);
+ assert.equal(/\.ptr-log-focus-defect\{[^}]*min-height/.test(logCss),false,"the row already sets the touch target");
+ assert.match(logCss,/\.log-focus-record-foot button\{min-height:44px/,"which is the rule it is leaning on");
  /* The line breaks somebody typed ARE the steps. */
  assert.match(css,/\.ptr-steps\{[^}]*white-space:pre-wrap/);
 });
@@ -5613,16 +5626,19 @@ test("the shop's own repair time is a ledger somebody sets, not something that d
 });
 
 test("SHOP TIME sits on the PATH TO REPAIR screen and feeds the hours badge",async()=>{
- const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ /* Moved with the panel into `src/components/defects/`, so both screens that
+    open it offer the same box — and the ledger it writes is the same one the
+    Defect Log's hours badge reads. */
+ const page=await readFile(new URL("../src/components/defects/path-to-repair-panel.tsx",import.meta.url),"utf8");
  /* One screen per repair for what this garage knows about it: how to approach
     it, and how long it takes here. */
  assert.match(page,/SHOP TIME FOR THIS REPAIR<HoursField/);
  /* Saved on its own, not folded into the steps — a time and a writeup are two
     different claims and correcting one must not require re-saving the other. */
- assert.match(page,/const saveShopHours=\(hours:string\)=>\{/);
- assert.equal(/saveShopHours[\s\S]{0,200}savePathToRepair/.test(page),false,"the two saves are separate");
- /* The write is checked, like every other write on this page. */
- assert.match(page,/if\(!writeRepairHoursLedger\(localStorage,next\)\)\{setPtrProblem\(/);
+ assert.match(page,/const saveHours=\(hours:string\)=>\{/);
+ assert.equal(/const saveHours[\s\S]{0,200}savePathToRepair/.test(page),false,"the two saves are separate");
+ /* The write is checked, like every other write in this app. */
+ assert.match(page,/if\(!writeRepairHoursLedger\(localStorage,next\)\)\{setProblem\(/);
  /* It says what is in force when nothing is set, naming the catalog figure it
     is about to be measured against rather than showing an empty box. */
  assert.match(page,/NOT SET — ESTIMATING "\+formatRepairTime\(fallback\)\+" FROM THE CATALOG/);
@@ -5647,10 +5663,12 @@ test("focus repair actions share one full-width row above the date, with PTR las
  assert.match(css,/\.log-focus-record-foot\{display:flex;flex-direction:column;align-items:stretch/);
  assert.match(css,/\.log-focus-record-actions>button\{[^}]*width:100%;min-width:0;align-self:stretch;padding:8px 6px;line-height:1\.2;text-align:center;white-space:normal;overflow-wrap:anywhere\}/);
  assert.equal(/\.log-focus-record-actions\{[^}]*flex-wrap/.test(css),false);
- assert.match(page,/placeholder="Add the first checks and useful references to help someone start this repair\."/);
- assert.equal(page.includes('Check the oil level first.'),false,"example instructions are not shown as repair advice");
- assert.match(page,/<textarea value=\{ptrDraft\}/,"saved notes stay in the editor value, separate from help text");
- assert.match(page,/<p className="ptr-steps">\{saved.steps\}<\/p>/,"reading still shows the user's saved writeup");
+ /* The editor's own text moved into the component with it. */
+ const panel=await readFile(new URL("../src/components/defects/path-to-repair-panel.tsx",import.meta.url),"utf8");
+ assert.match(panel,/placeholder="Add the first checks and useful references to help someone start this repair\."/);
+ assert.equal(panel.includes('Check the oil level first.'),false,"example instructions are not shown as repair advice");
+ assert.match(panel,/<textarea value=\{draft\}/,"saved notes stay in the editor value, separate from help text");
+ assert.match(panel,/<p className="ptr-steps">\{saved.steps\}<\/p>/,"reading still shows the user's saved writeup");
 });
 
 test("the LIVE REPAIR FEED can be narrowed to a shift or a day without touching the four chip rows",async()=>{
