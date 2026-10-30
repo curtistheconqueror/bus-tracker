@@ -1363,48 +1363,30 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    be a second opinion waiting to drift. Slate rather than purple or green —
    the DS badge owns purple and MARK FIXED owns green, and a third action in
    either colour reads as a variant of one of them. */
-/* ABOVE THE FOCUS VIEW, and this is not cosmetic. Both shades are `.log-shade`,
-   which sets one z-index for all of them, and the focus shade renders LATER in
-   the tree - so with equal z-indexes it painted on top of the PTR panel and
-   swallowed every tap on it. The panel looked perfectly normal while being
-   completely dead; found by clicking SAVE in a browser, not by reading. One
-   higher than `.log-shade`, named rather than nudged. */
-.ptr-shade{z-index:2147483001}
+/* THE PANEL'S COLOURS, mapped onto the ones this page already has.
+
+   `src/components/defects/path-to-repair-panel.css` owns the panel's shape and
+   declares `--ptr-*` with light-surface defaults; this is the Defect Log saying
+   what they are here, so the panel follows Terminal, Black, Midnight and
+   Tactical with the rest of the page instead of staying navy on an olive
+   board. Scoped under `.defect-log-app` so it outranks the component's own
+   defaults by specificity rather than by import order, which nothing here
+   controls.
+
+   ABOVE THE FOCUS VIEW, and that is not cosmetic: the panel's own z-index is
+   one above `.log-shade`'s, named rather than nudged, because it opens on top
+   of the focus view it was reached from and that view is deliberately left open
+   underneath. */
+.defect-log-app .ptr-shade{
+ --ptr-text:var(--log-text,#172b4d);
+ --ptr-muted:var(--log-muted,#60728c);
+ --ptr-border:var(--log-border,#c4cedd);
+ --ptr-surface:var(--log-surface,#fff);
+ --ptr-accent:var(--log-accent,#0b64bd);
+ --ptr-accent-text:var(--log-accent-text,#fff);
+}
 .ptr-log-focus-defect{background:#3f4a63}
 .ptr-log-focus-defect:focus-visible{filter:brightness(1.15)}
-
-/* The panel is shaped off .log-focus deliberately: it opens on top of the
-   focus view and a different frame would read as a different part of the app.
-   `.log-shade` already supplies the backdrop, the centring, and the bottom
-   alignment it switches to on a phone. */
-.ptr-panel{display:flex;width:100%;max-width:620px;max-height:88vh;flex-direction:column;
- border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
-.ptr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
- padding:13px 15px;border-bottom:1px solid var(--log-border);background:var(--log-accent);color:var(--log-accent-text,#fff)}
-.ptr-head>span{display:flex;min-width:0;flex-direction:column;gap:3px}
-.ptr-head small{font-size:9px;font-weight:900;letter-spacing:1.4px;opacity:.85}
-.ptr-head b{font-size:16px;font-weight:900;line-height:1.2}
-.ptr-head i{font-size:12px;font-style:normal;font-weight:700;opacity:.9;line-height:1.3}
-.ptr-close{flex:none;min-width:44px;min-height:44px;border:0;border-radius:8px;background:#ffffff26;
- color:inherit;font-size:20px;font-weight:900;cursor:pointer}
-.ptr-body{display:flex;flex-direction:column;gap:11px;padding:15px;overflow-y:auto}
-/* The written steps, read on a phone in a garage: a real reading size, and
-   `pre-wrap` because the line breaks somebody typed ARE the steps. */
-.ptr-steps{margin:0;white-space:pre-wrap;color:var(--log-text);font-size:14px;line-height:1.55}
-.ptr-edit{display:flex;flex-direction:column;gap:6px;color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
-.ptr-edit textarea{width:100%;min-height:150px;border:1px solid var(--log-border);border-radius:8px;
- background:var(--log-surface);color:var(--log-text);padding:10px;font-size:14px;line-height:1.5;resize:vertical}
-.ptr-count{align-self:flex-end;color:var(--log-muted);font-size:9px;font-weight:900}
-.ptr-problem{margin:0;border:1px solid #c02b2b;border-radius:8px;background:#c02b2b14;color:#c02b2b;
- padding:9px 11px;font-size:11px;font-weight:900}
-.ptr-empty{display:flex;margin:0;flex-direction:column;gap:5px;color:var(--log-muted);font-size:12px;line-height:1.5}
-.ptr-empty b{color:var(--log-text);font-size:14px}
-.ptr-actions{display:flex;flex-wrap:wrap;gap:8px}
-.ptr-actions button{min-height:44px;flex:1;border:0;border-radius:8px;background:var(--log-accent);
- color:var(--log-accent-text,#fff);padding:0 16px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer}
-.ptr-actions .ptr-cancel{background:var(--log-surface);border:1px solid var(--log-border);color:var(--log-text)}
-.ptr-note{margin:0;color:var(--log-muted);font-size:10px;font-weight:700;line-height:1.5}
-.ptr-note b{color:var(--log-text)}
 
 /* BULLET, beside the DESCRIPTION label. Small on purpose: it is a typing aid,
    not an action, and it must never read as the thing that saves the defect. */
@@ -1415,13 +1397,3 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  font-size:9px;font-weight:900;letter-spacing:.4px;cursor:pointer;touch-action:manipulation}
 .insert-bullet:hover,.insert-bullet:focus-visible{border-color:var(--log-accent);outline:none}
 
-/* SHOP TIME, at the top of the PATH TO REPAIR screen. Boxed rather than loose
-   so it reads as a stored setting instead of another line of the writeup — it
-   is the one thing on that screen the feed's hours badge reads back. */
-.ptr-hours{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--log-border);
- background:color-mix(in srgb,var(--log-accent,#0b64bd) 5%,var(--log-surface,#fff));padding:12px 15px}
-.ptr-hours label{display:flex;align-items:center;justify-content:space-between;gap:10px;
- color:var(--log-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
-.ptr-hours input{width:92px;min-height:44px;border:1px solid var(--log-border);border-radius:8px;
- background:var(--log-surface);color:var(--log-text);padding:0 10px;font-size:16px;font-weight:900;text-align:center}
-.ptr-hours small{color:var(--log-muted);font-size:9px;font-weight:800;line-height:1.45}

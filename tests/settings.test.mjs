@@ -162,7 +162,11 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-editor>footer\{[^}]*position:static[^}]*transform:none[^}]*white-space:normal/);
   assert.match(fixedCss,/@media\(max-width:760px\)\{[\s\S]*?\.fixed-repairs-app>\.fixed-header nav\{grid-template-columns:repeat\(3/,"six links, two full rows on a phone");
-  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\) minmax\(0,\.8fr\)/);
+  /* TWO BY TWO ON A PHONE since PTR joined the row. Four in one line at 360
+     put DELETE in a 60px box beside a 41px PTR — four crowded targets with the
+     destructive one on the end. Measured: 2x2 gives each of them ~151px at 360
+     and ~165px at 390, at the same 48px height. */
+  assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions\{width:100%;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(fixedCss,/\.fixed-repairs-app \.fixed-card-actions button:first-child\{grid-column:auto\}/);
   assert.match(worker,/CORE_PAGES = \["\/", "\/down-sheet", "\/defect-log", "\/fixed-repairs", "\/lists", "\/incidents", "\/shop-talk", "\/settings"\]/);
   /* Checked against the real route list rather than a second copy of it, so

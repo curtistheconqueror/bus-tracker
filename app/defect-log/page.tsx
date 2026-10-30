@@ -2,6 +2,7 @@
 
 import BusSelector from "@/src/components/shared/bus-selector";
 import HoursField from "@/src/components/shared/hours-field";
+import PathToRepairPanel from "@/src/components/defects/path-to-repair-panel";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {DEFAULT_SETTINGS,FONT_STACKS,type Filter,type LogSettings,SETTINGS_KEY,readSettings} from "@/src/lib/defects/defect-log-settings";
 import {displayStyleVars} from "@/src/lib/defects/defect-log-display-settings";
@@ -34,8 +35,8 @@ import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/d
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
-import {MAX_PATH_TO_REPAIR,findPathToRepair,readPathToRepairs,savePathToRepair,writePathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
-import {findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,writeRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {findPathToRepair,readPathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
+import {readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
 import {defectEstimateMinutes,openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
 import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
@@ -836,42 +837,19 @@ export default function DefectLog(){
     repair times then and then it updates. That's all that matters really." */
  const [repairHours,setRepairHours]=useState<RepairHoursLedger>({entries:[]});
  useEffect(()=>setRepairHours(readRepairHoursLedger(localStorage)),[]);
+ /* ONLY WHICH REPAIR IS OPEN LIVES HERE NOW. The panel moved to
+    `src/components/defects/path-to-repair-panel.tsx` because Fixed Repairs
+    opens it too, and it owns the draft, whether it is editing, and the two
+    checked writes — none of which this page has any other use for. Nothing
+    moved on this screen: the PTR button is still on the card and still in the
+    focus view.
+
+    The LIBRARIES stay here, because the feed reads them: the button says
+    "PTR +" when nothing is written and the hours badge reads the ledger, so a
+    panel holding its own copy would save a writeup while the button behind it
+    still said there was none. */
  const [ptrFor,setPtrFor]=useState<{category:string;issue:string}|null>(null);
- const [ptrDraft,setPtrDraft]=useState("");
- const [ptrEditing,setPtrEditing]=useState(false);
- const [ptrProblem,setPtrProblem]=useState("");
- const openPathToRepair=(category:string,issue:string)=>{
-  const existing=findPathToRepair(pathToRepairs,category,issue);
-  setPtrFor({category,issue});
-  setPtrDraft(existing?existing.steps:"");
-  /* A repair with nothing written opens straight into the editor: the empty
-     screen's only purpose is to be filled in, and making somebody press EDIT
-     to reach a blank page is a tap that teaches nothing. */
-  setPtrEditing(!existing);
-  setPtrProblem("");
- };
- const savePtr=()=>{
-  if(!ptrFor)return;
-  const next=savePathToRepair(pathToRepairs,{category:ptrFor.category,issue:ptrFor.issue,steps:ptrDraft,by:settings.defaultInitials});
-  /* The write is checked rather than assumed. A full device would otherwise
-     show the new text, having stored nothing, and the person would find out
-     when it was gone. */
-  if(!writePathToRepairs(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
-  setPathToRepairs(next);
-  setPtrEditing(false);
-  setPtrProblem("");
- };
- /* Saved on its own, not folded into the steps: a time and a writeup are two
-    different claims, and somebody correcting one must not have to re-save the
-    other. An empty box removes the shop's figure and the catalog estimate
-    comes back — withdrawing a claim is the same gesture as never making it. */
- const saveShopHours=(hours:string)=>{
-  if(!ptrFor)return;
-  const next=saveRepairMinutes(repairHours,{category:ptrFor.category,issue:ptrFor.issue,hours,by:settings.defaultInitials});
-  if(!writeRepairHoursLedger(localStorage,next)){setPtrProblem("Could not save — this device's storage is full.");return}
-  setRepairHours(next);
-  setPtrProblem("");
- };
+ const openPathToRepair=(category:string,issue:string)=>setPtrFor({category,issue});
  const forgetLearnedPart=(entry:PartMemoryEntry)=>setPartsMemory(current=>{const next=forgetPart(current,entry.scope,entry.category,entry.issue);writePartsMemory(localStorage,next);return next});
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
@@ -1985,50 +1963,15 @@ export default function DefectLog(){
   {/* PATH TO REPAIR. Rendered AFTER the focus shade so it stacks above the
       view it was opened from, and the focus view is deliberately left open
       underneath: closing this returns somebody to the bus they were reading
-      rather than to the top of the feed. */}
-  {ptrFor&&<div className="log-shade ptr-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setPtrFor(null)}}>
-   <section className="ptr-panel" role="dialog" aria-modal="true" aria-label="Path to repair">
-    <div className="ptr-head"><span><small>PATH TO REPAIR</small><b>{repairCategoryLabel(ptrFor.category)}</b><i>{ptrFor.issue}</i></span><button className="ptr-close" type="button" onClick={()=>setPtrFor(null)} aria-label="Close path to repair">×</button></div>
-    {/* THE SHOP'S TIME, above the steps and always present. It is the one number
-        on this screen that the hours badge on the feed reads, so it is shown
-        whether or not anybody has written steps — a repair can have a time and
-        no writeup, or a writeup and no time. */}
-    {(()=>{
-     const shop=findRepairMinutes(repairHours,ptrFor.category,ptrFor.issue);
-     const fallback=defectEstimateMinutes({id:"ptr",category:ptrFor.category,issue:ptrFor.issue,details:"",operability:"service",state:"open"} as StructuredDefect);
-     return <div className="ptr-hours">
-      <label>SHOP TIME FOR THIS REPAIR<HoursField value={shop?Math.round(shop.minutes/60*100)/100:undefined} placeholder={String(Math.round(fallback/60*100)/100)} ariaLabel="Shop time for this repair, in hours" onChange={hours=>saveShopHours(hours===undefined?"":String(hours))}/></label>
-      <small>{shop
-       ?"SET BY "+(shop.updatedBy||"SOMEONE")+" · USED FOR EVERY BUS WITH THIS REPAIR"
-       :"NOT SET — ESTIMATING "+formatRepairTime(fallback)+" FROM THE CATALOG. TYPE A NUMBER TO REPLACE IT."}</small>
-     </div>;
-    })()}
-    {(()=>{
-     const saved=findPathToRepair(pathToRepairs,ptrFor.category,ptrFor.issue);
-     if(ptrEditing)return <div className="ptr-body">
-      <label className="ptr-edit">STEPS — GENERAL DIRECTION, NOT A PROCEDURE
-       <textarea value={ptrDraft} maxLength={MAX_PATH_TO_REPAIR} rows={9} autoFocus
-        placeholder="Add the first checks and useful references to help someone start this repair."
-        onChange={event=>setPtrDraft(event.target.value)}/></label>
-      <small className="ptr-count">{ptrDraft.trim().length} / {MAX_PATH_TO_REPAIR}</small>
-      {ptrProblem&&<p className="ptr-problem">{ptrProblem}</p>}
-      <div className="ptr-actions">
-       <button type="button" className="ptr-save" onClick={savePtr}>{ptrDraft.trim()?"SAVE":"CLEAR IT"}</button>
-       <button type="button" className="ptr-cancel" onClick={()=>{if(saved){setPtrDraft(saved.steps);setPtrEditing(false);setPtrProblem("")}else setPtrFor(null)}}>CANCEL</button>
-      </div>
-      {/* Said on the screen that writes it, because somebody filling this in is
-          entitled to know who will see it. */}
-      <p className="ptr-note">This is written once for <b>{repairCategoryLabel(ptrFor.category)} — {ptrFor.issue}</b> and shows on every bus with that repair. It stays on this device; it does not travel to the Shop Cloud yet.</p>
-     </div>;
-     if(!saved)return <div className="ptr-body"><p className="ptr-empty"><b>Nothing written yet for this repair.</b><span>Add the first checks and useful references to help someone start this repair.</span></p><div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>setPtrEditing(true)}>WRITE IT</button></div></div>;
-     return <div className="ptr-body">
-      <p className="ptr-steps">{saved.steps}</p>
-      <div className="ptr-actions"><button type="button" className="ptr-save" onClick={()=>{setPtrDraft(saved.steps);setPtrEditing(true)}}>EDIT</button></div>
-      <p className="ptr-note">{saved.updatedBy?"Written by "+saved.updatedBy+", ":"Written "}{saved.updatedAt?timeLabel(saved.updatedAt):"earlier"} · shows on every bus with this repair</p>
-     </div>;
-    })()}
-   </section>
-  </div>}
+      rather than to the top of the feed. The `key` remounts the panel when the
+      repair changes, which is what re-seeds its draft and its edit mode from
+      the library — the same thing `openPathToRepair` used to do by hand, and
+      now in one place rather than once per caller. */}
+  {ptrFor&&<PathToRepairPanel key={ptrFor.category+"|"+ptrFor.issue}
+   category={ptrFor.category} issue={ptrFor.issue} initials={settings.defaultInitials}
+   pathToRepairs={pathToRepairs} repairHours={repairHours}
+   onPathToRepairs={setPathToRepairs} onRepairHours={setRepairHours}
+   onClose={()=>setPtrFor(null)}/>}
   {focusedGroup&&<div className="log-shade log-focus-shade" onMouseDown={event=>{if(event.target===event.currentTarget)setFocusedBusId("")}}>
    <section className="log-focus" role="dialog" aria-modal="true" aria-label={"Bus "+focusedGroup.bus.n+" defects"}>
     <div className="log-focus-head"><span className="log-focus-bus"><small>BUS</small><strong>{focusedGroup.bus.n}</strong></span><span className="log-focus-where"><b>{locationLabel(focusedGroup.bus.l)}</b><small>{STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s}</small></span><button className="add-log-focus-defect" type="button" onClick={()=>{const busId=focusedGroup.bus.id;setFocusedBusId("");setEditing({...newDraft(),busId})}} aria-label={"Add a defect to bus "+focusedGroup.bus.n}>+ ADD DEFECT</button><button className="close-log-focus" type="button" onClick={()=>setFocusedBusId("")} aria-label="Close focus view">×</button></div>

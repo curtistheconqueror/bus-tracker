@@ -41,7 +41,22 @@
 .fixed-repairs-app .fixed-editor>header{height:auto}
 .fixed-repairs-app .fixed-card>footer{position:static;left:auto;bottom:auto;transform:none;width:auto;border-radius:0;background:#fff;color:var(--fixed-ink);box-shadow:none;white-space:normal;z-index:auto;font-size:inherit;letter-spacing:normal}
 .fixed-repairs-app .fixed-editor>footer{position:static;left:auto;bottom:auto;transform:none;width:auto;border-radius:0;color:var(--fixed-ink);box-shadow:none;white-space:normal;z-index:auto;letter-spacing:normal}
-.fixed-repairs-app .fixed-card-actions{width:min(100%,430px);display:grid;grid-template-columns:minmax(130px,1.5fr) minmax(90px,1fr) minmax(76px,.8fr)}
+/* FOUR CHILDREN, FOUR COLUMNS, which is the same lesson the controls row above
+   carries: this was declared at three for EDIT / UNDO FIX / DELETE, and adding
+   PTR left DELETE hanging on a second line at the LEFT under a row aligned
+   right. Measured at 1180, 820, 430, 390 and 360 before the column was added.
+
+   PTR gets the narrowest share because it is the shortest label, and a floor of
+   56px so it stays a target rather than a sliver. */
+.fixed-repairs-app .fixed-card-actions{width:min(100%,560px);display:grid;
+ grid-template-columns:minmax(120px,1.5fr) minmax(56px,.55fr) minmax(84px,1fr) minmax(72px,.8fr)}
+/* DELETE IS PINNED TO THE LAST COLUMN, because UNDO FIX is not offered on a
+   repair logged straight onto this page — those were never open anywhere, so
+   there is nothing to undo. Left to flow, DELETE took column three on those
+   cards and the row stopped 119px short of the right edge while the card above
+   it reached the edge. Measured: two cards in one list with their action rows
+   ending at different x. */
+.fixed-repairs-app .fixed-card-actions .delete-repair{grid-column:4}
 .fixed-repairs-app .fixed-card-actions button{width:100%}
 /* FIVE CHILDREN, FIVE COLUMNS. The row carries search, category, the window,
    EXPORT and UNDO; declared at four, the fifth wrapped to a second line with
@@ -66,8 +81,17 @@
  .fixed-controls>button{width:100%;min-width:0;padding:0 6px}
  .fixed-repairs-app .fixed-card>footer{align-items:stretch;flex-direction:column;gap:7px;padding:8px}
  .fixed-repairs-app .fixed-card>footer>b{width:max-content;max-width:100%;margin:0;border-radius:999px;background:#fff1cf;padding:5px 8px}
- .fixed-repairs-app .fixed-card-actions{width:100%;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr) minmax(0,.8fr);gap:6px}
+ /* TWO BY TWO ON A PHONE, and that is a change to the three buttons that were
+    already here. Four in one row at 360 puts DELETE in a 60px box beside a
+    41px PTR — four crowded targets with the destructive one on the end, which
+    is how somebody deletes a repair reaching for UNDO FIX with a glove on.
+    Measured: 2x2 gives every one of them about 150px at 390 and 138px at 360,
+    at the same 48px height. */
+ .fixed-repairs-app .fixed-card-actions{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
  .fixed-repairs-app .fixed-card-actions button:first-child{grid-column:auto}
+ /* The pin is a four-column idea. At two it would leave a hole on the left of
+    the second row on the three-button cards; flow order reads better there. */
+ .fixed-repairs-app .fixed-card-actions .delete-repair{grid-column:auto}
  .fixed-repairs-app .fixed-card>footer button{min-height:48px;padding:0 4px;font-size:clamp(7px,2.25vw,9px);line-height:1.15}
  .fixed-repairs-app .fixed-editor>footer{position:sticky;left:auto;bottom:0;transform:none;width:auto}
 }
@@ -274,6 +298,32 @@
    and the amber the Defect Log's own window bar uses, rather than sitting at
    7px grey among the arithmetic where nobody would read it. */
 .fixed-scope .fixed-scope-warn{flex-basis:100%;border-top:1px solid #e0c08f;margin-top:2px;padding-top:6px;font-size:9px;letter-spacing:.4px;color:#8a5a06}
+
+/* PATH TO REPAIR, on this page's own colours. The panel declares `--ptr-*` with
+   light-surface defaults beside itself in
+   `src/components/defects/path-to-repair-panel.css`; this is Fixed Repairs
+   saying what they are here, the same way `defect-log.css` maps them onto its
+   page theme. Scoped under the app root so it outranks the component's own
+   defaults by specificity rather than by import order, which nothing controls.
+
+   The accent is this page's GREEN rather than the Defect Log's blue, because
+   that is what every finished thing on this screen is drawn in — the card's
+   left border, the number badge, SAVE FIX DETAILS. A navy panel here would read
+   as a piece of another app, which is the complaint the header colours already
+   answered once. */
+.fixed-repairs-app .ptr-shade{
+ --ptr-text:var(--fixed-ink,#172b4d);
+ --ptr-muted:var(--fixed-muted,#60728c);
+ --ptr-border:var(--fixed-border,#bac7da);
+ --ptr-surface:#fff;
+ --ptr-accent:var(--fixed-green,#087347);
+ --ptr-accent-text:#fff;
+}
+/* Mid-grey rather than green or red: it is neither the finished thing nor a
+   destructive one, and it must not compete with the first button on the card.
+   The same colour the Defect Log's own PTR button uses. */
+.fixed-card-actions .ptr-fixed-repair{background:#3f4a63}
+.fixed-card-actions .ptr-fixed-repair:focus-visible{filter:brightness(1.15)}
 
 /* COPY, SHARE, SHARE PAGE. The same three controls the Defect Log draws, at the
    same 44px the rest of this app gives a thumb, and the status line takes the

@@ -352,19 +352,29 @@ test("an hours box can be typed in and emptied, on both surfaces",async()=>{
  assert.match(fieldCode,/inputMode="decimal"/,"but still a numeric keypad on a phone");
  assert.match(field,/onBlur=\{\(\)=>setDraft\(null\)\}/,"the draft is dropped on blur so the stored value takes over");
 
- /* ALL EIGHT inputs go through it — the two assertions below add to eight, and
-    this line said SEVEN against 4+4 because the old SIX was incremented rather
-    than re-counted, which is the habit `fresh-context-review` exists for. The
-    decimal fault existed on BOTH surfaces, so fixing the Down Sheet alone would
-    have left the Defect Log turning 1.5 into 15. */
+ /* ALL EIGHT inputs go through it — the three assertions below add to eight,
+    and this line said SEVEN against 4+4 because the old SIX was incremented
+    rather than re-counted, which is the habit `fresh-context-review` exists
+    for. The decimal fault existed on BOTH surfaces, so fixing the Down Sheet
+    alone would have left the Defect Log turning 1.5 into 15.
+
+    THREE FILES NOW, not two: the PATH TO REPAIR screen moved out of the Defect
+    Log into `src/components/defects/path-to-repair-panel.tsx` when Fixed
+    Repairs started opening it too, and its SHOP TIME box went with it. The
+    total is the same eight — which is the point of re-counting rather than
+    adjusting a number. */
+ const panel=await readFile(new URL("../src/components/defects/path-to-repair-panel.tsx",import.meta.url),"utf8");
  assert.equal((editor.match(/<HoursField /g)||[]).length,4,"Down Sheet: repair, diagnostic, estimate total, and the buckets");
- assert.equal((log.match(/<HoursField /g)||[]).length,4,"Defect Log: repair, diagnostic, ESTIMATED TIME OF REPAIR, and the shop's time for the repair on the PATH TO REPAIR screen");
- /* AND THE SENTENCE IS READ, not restated. A sum of the two numbers above is
+ assert.equal((log.match(/<HoursField /g)||[]).length,3,"Defect Log: repair, diagnostic, and ESTIMATED TIME OF REPAIR");
+ assert.equal((panel.match(/<HoursField /g)||[]).length,1,"the PATH TO REPAIR panel: the shop's own time for the repair, on both screens that open it");
+ /* AND THE SENTENCE IS READ, not restated. A sum of the numbers above is
     implied by them and can never fail on its own — a cold read pointed out
-    that changing the two assertions to 5 and 3 keeps it green. What can drift
-    is the WORD in the comment, which is what drifted: SIX was incremented to
-    SEVEN against a real 4+4. So the word is parsed out and compared. */
- const total=(editor.match(/<HoursField /g)||[]).length+(log.match(/<HoursField /g)||[]).length;
+    that changing two of the assertions to 5 and 3 keeps it green. What can
+    drift is the WORD in the comment, which is what drifted: SIX was
+    incremented to SEVEN against a real 4+4. So the word is parsed out and
+    compared. */
+ const total=(editor.match(/<HoursField /g)||[]).length+(log.match(/<HoursField /g)||[]).length
+  +(panel.match(/<HoursField /g)||[]).length;
  const WORDS={SIX:6,SEVEN:7,EIGHT:8,NINE:9,TEN:10,ELEVEN:11,TWELVE:12};
  const self=await readFile(new URL(import.meta.url),"utf8");
  const claimed=self.match(/ALL ([A-Z]+) inputs go through it/)[1];

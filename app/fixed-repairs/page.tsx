@@ -19,6 +19,10 @@ import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/def
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {copyText,shareOrDownloadFile,shareOutcomeLabel,type ShareOutcome} from "@/src/lib/shared/share-file";
 import {FEED_WINDOWS,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import PathToRepairPanel from "@/src/components/defects/path-to-repair-panel";
+import {findPathToRepair,readPathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
+import {readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {SETTINGS_KEY as DEFECT_LOG_SETTINGS_KEY,readSettings as readDefectLogSettings} from "@/src/lib/defects/defect-log-settings";
 import {fixedShareFilename,fixedShareHtml,fixedShareText,type FixedShareRepair} from "@/src/lib/defects/fixed-share";
 import {DEFAULT_SHIFT_SETTINGS,readShiftSettings} from "@/src/lib/settings/shift-clock";
 import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
@@ -204,6 +208,33 @@ export default function FixedRepairs(){
  },[fixedWindow]);
  const [shiftSettings,setShiftSettings]=useState(DEFAULT_SHIFT_SETTINGS);
  useEffect(()=>setShiftSettings(readShiftSettings(localStorage)),[]);
+ /* PATH TO REPAIR, REACHABLE FROM HERE TOO. Curtis: "The path to repair should
+    be for everything. Well, you know, to everything that's appropriate for it."
+    It was reachable from ONE control in the whole app — the Defect Log's FOCUS
+    view — and a COMPLETED repair is where the knowledge actually exists,
+    because somebody has just done the job. Nothing on the Defect Log moved;
+    this is a second door into the same room, drawing
+    `src/components/defects/path-to-repair-panel.tsx`.
+
+    Both libraries live here rather than inside the panel because the card's
+    own button reads the writeups — PTR vs PTR + — so a panel holding its own
+    copy would save a writeup while the button behind it still said there was
+    none. The ledger is passed for the same reason the Defect Log passes it: the
+    panel's SHOP TIME box writes into it. */
+ const [pathToRepairs,setPathToRepairs]=useState<PathToRepairLibrary>({entries:[]});
+ const [repairHours,setRepairHours]=useState<RepairHoursLedger>({entries:[]});
+ const [ptrFor,setPtrFor]=useState<{category:string;issue:string}|null>(null);
+ useEffect(()=>{
+  setPathToRepairs(readPathToRepairs(localStorage));
+  setRepairHours(readRepairHoursLedger(localStorage));
+ },[]);
+ /* THE INITIALS COME OFF THE DEFECT LOG'S SETTINGS, which is where this device
+    already keeps them — one person, one phone. Writing a second copy under a
+    Fixed Repairs key would mean somebody typing their initials twice and the
+    two drifting, and `CLAUDE.md` forbids renaming a key, so there would be two
+    forever. "" is fine: the library records "SET BY SOMEONE". */
+ const [myInitials,setMyInitials]=useState("");
+ useEffect(()=>setMyInitials(readDefectLogSettings(localStorage.getItem(DEFECT_LOG_SETTINGS_KEY)).defaultInitials),[]);
  /* A SEARCH STANDS THE WINDOW DOWN, which was Curtis's own condition on the
     Defect Log: he wants to reach a bus "no matter what time" it was logged.
     A history that hides the bus number somebody has just typed is lying about
@@ -526,11 +557,22 @@ function repairOrigin(source:string|undefined){
    <div className="fixed-card-head"><span><small>BUS</small><strong>{record.bus.n}</strong></span><div><b>{repairCategoryLabel(record.defect.category)}</b><h2>{record.defect.issue}</h2></div><time>{timeLabel(record.defect.completedAt||record.defect.updatedAt||"")}</time></div>
    {repairOrigin(record.defect.source)&&<p className={"fixed-origin "+repairOrigin(record.defect.source)!.className}><b>{repairOrigin(record.defect.source)!.label}</b></p>}
    <div className="fixed-card-body"><section><b>ORIGINAL REPORT</b><p>{defectLabel(record.defect)}</p><small>Logged {timeLabel(record.defect.createdAt||"")} · {locationLabel(record.defect.reportedLocation||record.bus.l)}{record.defect.reportedBy?" · By "+record.defect.reportedBy:""}</small>{record.defect.conditionNotDuplicated&&<em className="not-duplicated-note">DEFECT / CONDITION NOT DUPLICATED</em>}{record.defect.shopNotes&&<em>SHOP NOTES: {record.defect.shopNotes}</em>}</section><section className="repair-result"><b>FIX / STEPS TAKEN</b><p>{record.defect.actionTaken||"Fix details have not been entered yet."}</p>{record.defect.diagnosticNote&&<small><b>DIAG / VERIFY:</b> {record.defect.diagnosticNote}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}{record.defect.completedBy&&<small><b>FIXED BY:</b> {record.defect.completedBy}</small>}</section></div>
-   <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}{partNumberMissing(record.defect)&&<b className="missing-part-number" title="A part was used on this repair and its number has not been entered yet">MISSING PART #</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button>{/* Not offered on a repair logged straight onto this page. Those are created
+   <footer>{!record.defect.actionTaken?.trim()&&<b>NEEDS FIX DETAILS</b>}{partNumberMissing(record.defect)&&<b className="missing-part-number" title="A part was used on this repair and its number has not been entered yet">MISSING PART #</b>}<div className="fixed-card-actions"><button type="button" onClick={()=>setEditing(record)}>{record.defect.actionTaken?.trim()?"EDIT FULL RECORD":"ADD FIX DETAILS"}</button>{/* PTR, with the Defect Log's own "+" when nothing is written for this
+    repair yet — the same affordance on both screens, because it is the same
+    library. Second rather than first: the record itself is what somebody came
+    to this card for, and this is a note about the repair in general. */}
+   <button type="button" className="ptr-fixed-repair" onClick={()=>setPtrFor({category:record.defect.category,issue:record.defect.issue})} aria-label={"Path to repair for "+defectLabel(record.defect)}>PTR{findPathToRepair(pathToRepairs,record.defect.category,record.defect.issue)?"":" +"}</button>{/* Not offered on a repair logged straight onto this page. Those are created
     completed — somebody writing down a job already done — so they were never
     open anywhere and there is nothing to undo. DELETE covers a mistaken one. */}
     {record.defect.source!=="fixed-log"&&<button type="button" className="reopen-repair" onClick={()=>reopenRepair(record)}>UNDO FIX</button>}<button type="button" className="delete-repair" onClick={()=>deleteRepair(record)}>DELETE</button></div></footer>
   </article>)}</div>:<div className="fixed-empty"><b>No fixed repairs match this view.</b><span>Completed repairs will flow here automatically from the Defect Log, Down Sheet, and Fleet Tracker.</span></div>}</section>
+  {/* The `key` remounts the panel when the repair changes, which is what
+      re-seeds its draft and its edit mode from the library. */}
+  {ptrFor&&<PathToRepairPanel key={ptrFor.category+"|"+ptrFor.issue}
+   category={ptrFor.category} issue={ptrFor.issue} initials={myInitials}
+   pathToRepairs={pathToRepairs} repairHours={repairHours}
+   onPathToRepairs={setPathToRepairs} onRepairHours={setRepairHours}
+   onClose={()=>setPtrFor(null)}/>}
   {editing&&<CompletionEditor record={editing} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} save={saveCompletion} close={()=>setEditing(null)}/>}
   {/* No key on the bus id: it would remount the editor on every bus change and
       reset the whole form, so a mechanic who picked the bus last lost the

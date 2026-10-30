@@ -1,0 +1,83 @@
+/* PATH TO REPAIR, styled beside the component that draws it, which is the
+   convention `combo-field.css` and `bus-selector.css` already set for shared
+   React here.
+
+   IT USED TO LIVE IN `defect-log.css` AND READ `--log-*` DIRECTLY, which was
+   fine while the Defect Log was the only page that drew it. Two pages later
+   that is a panel whose colours only exist on one route: Fixed Repairs does not
+   load `defect-log.css` at all, so every one of those variables would resolve
+   to nothing and the panel would open as black text on a transparent card.
+
+   SO IT HAS ITS OWN NAMES, with literal defaults, and a host page maps them to
+   whatever it calls its own colours. One name for the thing, overridable at the
+   edge — the shape `--app-header-fill` settled on for the same reason, and the
+   reason a third page can draw this panel without touching this file.
+
+   The defaults are the app's ordinary light surface. A host that does nothing
+   gets a readable panel rather than an invisible one, which is the failure mode
+   worth designing for. */
+.ptr-shade{
+ --ptr-text:#172b4d;
+ --ptr-muted:#60728c;
+ --ptr-border:#bac7da;
+ --ptr-surface:#fff;
+ --ptr-accent:#0b64bd;
+ --ptr-accent-text:#fff;
+ /* THE BACKDROP IS THE COMPONENT'S OWN NOW. It used to come from `.log-shade`,
+    which supplied the fixed position, the centring, the padding and the phone's
+    bottom alignment — all of it on the Defect Log's stylesheet, which the other
+    host does not load.
+
+    2147483001 IS ONE ABOVE `.log-shade`, AND THAT NUMBER IS LOAD-BEARING. The
+    panel opens on top of the Defect Log's focus view, which is deliberately
+    left open underneath so closing this returns somebody to the bus they were
+    reading. Every Defect Log shade shares `.log-shade`'s single z-index, and
+    the focus shade renders LATER in the tree — so at equal z-indexes it painted
+    over this panel and swallowed every tap on it. The panel looked perfectly
+    normal while being completely dead. Found by clicking SAVE in a browser, not
+    by reading, which is why the number is named here rather than nudged. */
+ position:fixed;z-index:2147483001;inset:0;display:flex;align-items:center;
+ justify-content:center;padding:14px;background:#03132dcc;
+}
+@media(max-width:760px){.ptr-shade{align-items:flex-end;padding:0;height:100dvh}}
+
+.ptr-panel{display:flex;width:100%;max-width:620px;max-height:88vh;flex-direction:column;
+ border:1px solid var(--ptr-border);border-radius:12px;background:var(--ptr-surface);overflow:hidden}
+@media(max-width:760px){.ptr-panel{max-width:none;max-height:100dvh;border-radius:12px 12px 0 0}}
+.ptr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+ padding:13px 15px;border-bottom:1px solid var(--ptr-border);background:var(--ptr-accent);color:var(--ptr-accent-text)}
+.ptr-head>span{display:flex;min-width:0;flex-direction:column;gap:3px}
+.ptr-head small{font-size:9px;font-weight:900;letter-spacing:1.4px;opacity:.85}
+.ptr-head b{font-size:16px;font-weight:900;line-height:1.2}
+.ptr-head i{font-size:12px;font-style:normal;font-weight:700;opacity:.9;line-height:1.3}
+.ptr-close{flex:none;min-width:44px;min-height:44px;border:0;border-radius:8px;background:#ffffff26;
+ color:inherit;font-size:20px;font-weight:900;cursor:pointer}
+.ptr-body{display:flex;flex-direction:column;gap:11px;padding:15px;overflow-y:auto}
+/* The written steps, read on a phone in a garage: a real reading size, and
+   `pre-wrap` because the line breaks somebody typed ARE the steps. */
+.ptr-steps{margin:0;white-space:pre-wrap;color:var(--ptr-text);font-size:14px;line-height:1.55}
+.ptr-edit{display:flex;flex-direction:column;gap:6px;color:var(--ptr-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.ptr-edit textarea{width:100%;min-height:150px;border:1px solid var(--ptr-border);border-radius:8px;
+ background:var(--ptr-surface);color:var(--ptr-text);padding:10px;font-size:14px;line-height:1.5;resize:vertical}
+.ptr-count{align-self:flex-end;color:var(--ptr-muted);font-size:9px;font-weight:900}
+.ptr-problem{margin:0;border:1px solid #c02b2b;border-radius:8px;background:#c02b2b14;color:#c02b2b;
+ padding:9px 11px;font-size:11px;font-weight:900}
+.ptr-empty{display:flex;margin:0;flex-direction:column;gap:5px;color:var(--ptr-muted);font-size:12px;line-height:1.5}
+.ptr-empty b{color:var(--ptr-text);font-size:14px}
+.ptr-actions{display:flex;flex-wrap:wrap;gap:8px}
+.ptr-actions button{min-height:44px;flex:1;border:0;border-radius:8px;background:var(--ptr-accent);
+ color:var(--ptr-accent-text);padding:0 16px;font-family:inherit;font-size:11px;font-weight:900;cursor:pointer}
+.ptr-actions .ptr-cancel{background:var(--ptr-surface);border:1px solid var(--ptr-border);color:var(--ptr-text)}
+.ptr-note{margin:0;color:var(--ptr-muted);font-size:10px;font-weight:700;line-height:1.5}
+.ptr-note b{color:var(--ptr-text)}
+
+/* SHOP TIME, at the top of the screen. Boxed rather than loose so it reads as a
+   stored setting instead of another line of the writeup — it is the one thing
+   here the Defect Log's hours badge reads back. */
+.ptr-hours{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid var(--ptr-border);
+ background:color-mix(in srgb,var(--ptr-accent) 5%,var(--ptr-surface));padding:12px 15px}
+.ptr-hours label{display:flex;align-items:center;justify-content:space-between;gap:10px;
+ color:var(--ptr-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
+.ptr-hours input{width:92px;min-height:44px;border:1px solid var(--ptr-border);border-radius:8px;
+ background:var(--ptr-surface);color:var(--ptr-text);padding:0 10px;font-size:16px;font-weight:900;text-align:center}
+.ptr-hours small{color:var(--ptr-muted);font-size:9px;font-weight:800;line-height:1.45}
