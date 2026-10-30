@@ -91,6 +91,8 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+3c5c59b Answer the cold read: a themed ink on a white card, and a phone layout I said was unchanged
+eda9740 Queue the PATH TO REPAIR door and the finding fix in 194
 ec679d2 PATH TO REPAIR is one component now, and Fixed Repairs opens it too
 bf3b03f An unfinished Down Sheet card has no opinion about what was found
 5dfd929 Queue today's three changes in 194, and correct what the handoff claimed
@@ -151,6 +153,7 @@ app/settings/settings.css
 app/shop-talk/shop-talk.css
 src/components/defects/path-to-repair-panel.css
 src/components/defects/path-to-repair-panel.tsx
+src/components/settings/fixed-repairs-settings.tsx
 src/components/settings/section-transfer-controls.tsx
 src/components/shared/combo-field.tsx
 src/components/shared/header-theme-live.tsx
@@ -179,7 +182,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 59 files changed, 7862 insertions(+), 428 deletions(-)
+ 60 files changed, 8193 insertions(+), 433 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -1021,6 +1024,46 @@ in the tree, so at equal z-indexes it painted over this panel and ate every tap
 on it. The panel looked perfectly normal while being completely dead. That is
 what "SAVE reachable" in the table above is checking.
 
+**TWO THINGS A COLD READ FOUND IN THAT FIRST VERSION, both mine.**
+
+The panel was **unreadable on Fixed Repairs on Dark, Midnight and Tactical.**
+The map set `--ptr-text` from the themed `--fixed-ink` and left `--ptr-surface`
+as a literal `#fff`, so it painted a white card and wrote the theme's light ink
+on it — the writeup measured at 1.08:1, 1.17:1 and 1.19:1, and the SHOP TIME box
+somebody types into the same. Invisible, not merely low, and it is the bug the
+block twenty lines above it in that stylesheet was written to fix across the
+whole page. Fixed; re-measured on all four themes and both pages, the writeup
+now runs 9.28 to 14.74 and the hours band's text 4.57 to 7.77. A new gate
+refuses a themed ink on an unthemed surface in either direction, with "themed"
+read out of the two files that emit those names — that gate's absence is why it
+shipped, and it was the one mutation of seven that survived the first pass.
+
+And **the Defect Log's phone layout did change**, which the first version said
+it did not. `.log-shade` carried three `@media(max-width:760px)` rules and the
+LAST one, `align-items:stretch`, won; the new stylesheet took `flex-end` from
+the first rule it found. So at every width at or under 760 the panel moved from
+the top of the screen to the bottom, went from a fixed 88vh box to a
+content-height one, and lost its bottom corner radius. Restored, and measured on
+both pages at 360, 390, 620, 760, 761 and 1180 — identical geometry throughout.
+
+**A BOTTOM SHEET IS PROBABLY THE BETTER SHAPE and is Curtis's call.** The
+restored layout is an 88vh box pinned to the top, so a short writeup leaves
+roughly 190px of dead space inside the panel. The bottom-sheet version is one
+value — `align-items:flex-end` — plus a content-height panel and square bottom
+corners. Not taken, because it is a screen he already uses.
+
+**The page behind it no longer scrolls.** A wheel over the backdrop scrolled the
+feed 600px at 390, measured. It uses `lockPageScroll`, the same helper the
+Defect Log's editor and the part-number prompt use. Pre-existing on the Defect
+Log and fixed here, because a second host is where "it only happens on one
+screen" stops being true.
+
+**Still open on this panel, both pre-existing and both Curtis's call:** Escape
+does not close it, and opening it in read mode leaves focus on the button
+outside the dialog. Escape on a panel holding unsaved text is a flow decision
+rather than a fix, which is why this release shipped the map's Escape as an
+opt-in setting.
+
 **No storage key.** It writes the two that already existed, from a second
 screen.
 
@@ -1041,13 +1084,32 @@ the Defect Log's own finding box, restored to ADVANCED DETAILS this release, is
 what finally gave somebody a way to clear the record's half on an open defect.
 Two surfaces, one field, and the one with no box on screen was winning.
 
-So the card writes a finding only where the sheet actually asked for one.
-Nothing is lost in either direction: a finding typed on a finished card still
-reaches the record Fixed Repairs reads, `{...linked}` keeps whatever the record
-holds including a deliberate clear, and **the card keeps its own copy** — that
-is the sheet's record of what that mechanic found, and re-ticking it speaks
-again. Three mutations, three caught, one of which also trips a pre-existing
-test, as it should.
+So the card writes these only where the sheet actually asked for them. Nothing
+is lost in either direction: anything typed on a finished card still reaches the
+record Fixed Repairs reads, `{...linked}` keeps whatever the record holds
+including a deliberate clear, and **the card keeps its own copies** — that is
+the sheet's record of what that mechanic did, and re-ticking it speaks again.
+
+**ALL FOUR FIELDS, and the first version fixed one.** That block holds FIX /
+STEPS TAKEN, WHAT WAS FOUND, REPAIR HOURS and DIAGNOSTIC HOURS, and the
+reasoning above applies word for word to the other three — REPAIR HOURS and
+DIAGNOSTIC HOURS are editable on an open defect in the Defect Log, so clearing
+them there and saving the sheet row wrote them straight back. Measured through
+the function: record cleared, unfinished card holding 2 and 1.5, result 2 and
+1.5. Found by a cold read. Three of four fixed by comment and one by code is
+worse than neither.
+
+**One hole left, asserted rather than claimed away.** The gate is
+`target.done||entryCompleted`, which is wider than the box: setting the whole
+ENTRY to Completed without ticking a card still writes that card's stored
+values. Deliberate — marking the entry complete is a statement that the work is
+done, and the card's text is the only account of it there is — and the
+alternative loses fix details on every entry somebody completes without ticking
+each card first, which is the commoner gesture.
+
+`CLAUDE.md` said this was "not fixed here" and quoted code that no longer
+exists; `PROJECT_HANDOFF.md` said PATH TO REPAIR was reachable from one screen
+and that Fixed Repairs was Curtis's call. Both rewritten in `3c5c59b`.
 
 ### One new repair: RUN BOX NO DISPLAY
 
@@ -1649,7 +1711,10 @@ that refusal has not been measured on an Android device.
 16. **FIXED REPAIRS on your phone.** The action row is now two by two —
    EDIT / PTR on the first line, UNDO FIX / DELETE on the second. That is the
    one UI change in this release on a screen you already use; if you would
-   rather have four across, say so, it is one line of CSS.
+   rather have four across, say so, it is one line of CSS. The PATH TO REPAIR
+   screen itself opens as a tall panel from the TOP of a phone, which is what
+   it has always done on the Defect Log; if you would rather it came up from
+   the bottom like a sheet, that is also one value.
 17. **WHEN IT WAS FIXED** on Fixed Repairs and **WHEN LOGGED** on the Defect
    Log should both offer LAST 30 DAYS now. Pick a category on Fixed Repairs
    with the window on ALL: the bar above the list should say how many are in
