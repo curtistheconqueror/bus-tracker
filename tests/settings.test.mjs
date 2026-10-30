@@ -142,7 +142,14 @@ test("Fixed Repairs is a fourth offline workflow with carried defect data and ed
   assert.match(fixedPage,/className="fixed-undo-control"[\s\S]*disabled=\{!undoSnapshot\}[\s\S]*UNDO LAST/);
   assert.equal(/fixed-settings-button/.test(fixedPage),false,"the gear left this page for the shared Settings page");
   assert.equal(/<FixedAppearanceModal/.test(fixedPage),false,"the appearance panel renders on the shared Settings page now");
-  assert.match(fixedSettings,/pace-defect-log-settings-v1/);
+  /* The appearance panel shares the Defect Log's settings record, and it held
+     its own literal for that key — one of two copies reachable from the same
+     page once Fixed Repairs started reading the initials out of it. CLAUDE.md
+     forbids renaming a key, so two literals is two forever and the one that
+     drifts is silent. It imports the name now, so this asserts the import and
+     tests/storage.test.mjs still pins the string itself. */
+  assert.match(fixedSettings,/import \{SETTINGS_KEY\} from "@\/src\/lib\/defects\/defect-log-settings"/);
+  assert.equal(/const SETTINGS_KEY="pace-/.test(fixedSettings),false,"no second literal for a shared key");
   assert.match(fixedSettings,/THEME[\s\S]*FONT[\s\S]*COLORS/);
   assert.match(fixedSettings,/localStorage\.setItem\(SETTINGS_KEY/);
   assert.match(fixedPage,/UNDO FIX/);

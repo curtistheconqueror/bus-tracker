@@ -39,11 +39,28 @@
  position:fixed;z-index:2147483001;inset:0;display:flex;align-items:center;
  justify-content:center;padding:14px;background:#03132dcc;
 }
-@media(max-width:760px){.ptr-shade{align-items:flex-end;padding:0;height:100dvh}}
+/* `stretch`, NOT `flex-end`, and reading the wrong rule made this a UI change
+   rather than a refactor. `.log-shade` carried THREE separate
+   `@media(max-width:760px)` rules in `defect-log.css` — `align-items:flex-end`
+   at line 96, `height:100dvh` at 238 and `align-items:stretch` at 250 — and the
+   LAST one wins, which is `cascade-check`'s own second trap. The first draft of
+   this file took `flex-end` from the first rule it found, so on every width at
+   or under 760 the panel moved from the top of the screen to the bottom, went
+   from a fixed 88vh box to a content-height one, and lost its bottom corner
+   radius. Measured at 390: y=0 h=742.7 radius 12px before, bottom-anchored
+   h=579.4 radius 12px/12px/0/0 after.
+
+   A bottom sheet is arguably the better shape — the old one leaves dead space
+   inside a short panel — but that is a decision about a screen somebody already
+   uses, so it is Curtis's and it is written down in the handoff rather than
+   taken. This restores what the app does today. */
+@media(max-width:760px){.ptr-shade{align-items:stretch;padding:0;height:100dvh}}
 
 .ptr-panel{display:flex;width:100%;max-width:620px;max-height:88vh;flex-direction:column;
  border:1px solid var(--ptr-border);border-radius:12px;background:var(--ptr-surface);overflow:hidden}
-@media(max-width:760px){.ptr-panel{max-width:none;max-height:100dvh;border-radius:12px 12px 0 0}}
+/* No phone override on the panel itself, which is also what it had: 620px is
+   already wider than every phone, and 88vh against the shade's own 100dvh is
+   what kept a tall writeup off the bottom edge. */
 .ptr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
  padding:13px 15px;border-bottom:1px solid var(--ptr-border);background:var(--ptr-accent);color:var(--ptr-accent-text)}
 .ptr-head>span{display:flex;min-width:0;flex-direction:column;gap:3px}

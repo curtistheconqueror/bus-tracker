@@ -773,11 +773,23 @@ clear it — with the DIAGNOSED work state still on the form and nothing to say
 what was diagnosed. The FOUND BEFORE chips moved with the box, so
 `pace-findings-memory-v1` is offered on all three surfaces again.
 
-**A finding cleared on an open defect can still come back from the sheet**, and
-that one predates all of this: `applyDownEntryToFleet` writes
-`normalizeFinding(target.finding)||linked?.finding`, so a card still carrying
-the old wording restores it on the next save. Not introduced here and not fixed
-here.
+**AN UNFINISHED DOWN SHEET CARD HAS NO OPINION ABOUT WHAT WAS DONE**, and that
+was a fix. `applyDownEntryToFleet` wrote `clean(target.actionTaken)||linked?.…`
+and its three neighbours for every card, finished or not, so a card still
+holding an old wording restored it onto the record on the next save of that
+row — and a finding or a figure cleared in the Defect Log came straight back.
+Everything the sheet collects about finished work sits in ONE `{item.done && …}`
+block in the editor — FIX / STEPS TAKEN, WHAT WAS FOUND, REPAIR HOURS and
+DIAGNOSTIC HOURS — so all four carry the same staleness and all four are now
+gated on the repair being completed. The card keeps its own copies; re-ticking
+it speaks for the sheet again.
+
+The gate is `target.done||entryCompleted`, which is **wider than the box**:
+setting the whole ENTRY to Completed without ticking a card still writes that
+card's stored values. Deliberate — marking the entry complete is a statement
+that the work is done, and the card's text is the only account of it there
+is — and the alternative loses fix details on every entry somebody completes
+without ticking each card first, which is the commoner gesture.
 
 **Keyed per SPECIFIC REPAIR, not per category**, through the same
 `repairIdentityKey` PATH TO REPAIR uses — one function, so a writeup and a time

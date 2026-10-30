@@ -1,7 +1,8 @@
 "use client";
 
-import {useState} from "react";
-import HoursField from "../shared/hours-field";
+import {useEffect,useState} from "react";
+import HoursField from "@/src/components/shared/hours-field";
+import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {defectEstimateMinutes} from "@/src/lib/defects/defect-estimates";
 import {findPathToRepair,savePathToRepair,writePathToRepairs,MAX_PATH_TO_REPAIR,
  type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
@@ -60,6 +61,16 @@ export default function PathToRepairPanel({category,issue,initials,pathToRepairs
  const [editing,setEditing]=useState(!saved);
  const [draft,setDraft]=useState(saved?saved.steps:"");
  const [problem,setProblem]=useState("");
+
+ /* THE PAGE BEHIND IT DOES NOT SCROLL. The inline version never locked it,
+    which was a small nuisance on one screen and is a worse one now: measured at
+    390, a wheel over the backdrop scrolled the feed behind the panel 600px
+    while the panel stayed put. `lockPageScroll` is what `PartNumberPrompt` and
+    the Defect Log's own editor already use, so this is the app's existing
+    answer rather than a new one. Pre-existing, and fixed here because a second
+    host is the point at which "it only happens on one screen" stops being
+    true. */
+ useEffect(()=>lockPageScroll("ptr-open"),[]);
 
  const savePath=()=>{
   const next=savePathToRepair(pathToRepairs,{category,issue,steps:draft,by:initials});

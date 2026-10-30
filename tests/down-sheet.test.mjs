@@ -3001,4 +3001,44 @@ test("a finding cleared on an open defect does not come back from the next sheet
     is deliberate: that is the sheet's record of what that mechanic found. */
  assert.equal(after("",true,"Corroded connector").finding,"Corroded connector",
   "re-ticking the card restores the sheet's own finding");
+
+ /* ALL FOUR FIELDS, because they share one `{item.done && …}` block in the
+    editor and therefore one staleness. The first version of this fixed
+    `finding` alone on reasoning that applies word for word to the other
+    three — and REPAIR HOURS and DIAGNOSTIC HOURS are editable on an open
+    defect in the Defect Log, so clearing them there and saving the sheet row
+    wrote them straight back. Found by a cold read measuring this function. */
+ const field=(key,busValue,done,cardValue)=>{
+  const bus={id:"b1",n:"17559",l:"garage-1",s:"defect",pendingRepair:"",defects:[
+   {id:"d1",category:"Brakes",issue:"ABS warning",details:"",operability:"service",
+    state:"open",createdAt:"2026-10-20T09:00:00.000Z",updatedAt:"2026-10-20T09:00:00.000Z",
+    ...(busValue===undefined?{}:{[key]:busValue})},
+  ]};
+  const entry={id:"e1",defectId:"d1",busId:"b1",busNumber:"17559",category:"Brakes",
+   repair:"ABS warning",customReason:"",assignmentType:"Mechanic",assignedTo:"CJ",
+   section:"Pending",shift:"1st",workflow:done?"Completed":"Pending",operationalStatus:"defect",
+   priority:"Routine",createdAt:NOW,updatedAt:NOW,updatedBy:"CJ",completedAt:"",history:[],
+   repairItems:[{id:"i1",category:"Brakes",repair:"ABS warning",details:"",
+    estimateEnabled:true,done,actionTaken:"",...(cardValue===undefined?{}:{[key]:cardValue})}]};
+  return applyDownEntryToFleet([bus],entry,NOW)[0].defects[0][key];
+ };
+ for(const [key,stale] of [["actionTaken","Replaced the module"],["repairHours",2],["diagnosticHours",1.5]]){
+  assert.equal(field(key,undefined,false,stale)??"","",
+   key+": an unfinished card must not write its stale copy onto a cleared record");
+  assert.equal(field(key,undefined,true,stale),stale,
+   key+": a finished card still speaks, which is how most of these get recorded");
+ }
+ /* And the record's own value survives an unfinished save, in every field. */
+ assert.equal(field("actionTaken","Bled the system",false,"Replaced the module"),"Bled the system");
+ assert.equal(field("repairHours",3,false,2),3);
+ assert.equal(field("diagnosticHours",0.5,false,1.5),0.5);
+
+ /* THE KNOWN HOLE, asserted rather than claimed away. `completed` is
+    `target.done||entryCompleted`, which is wider than the box: setting the
+    whole ENTRY to Completed without ticking a card writes that card's stored
+    values. Deliberate — marking the entry complete says the work is done and
+    the card's text is the only account of it — and the alternative loses fix
+    details on every entry completed without ticking each card first. */
+ assert.equal(after("",true,"Corroded connector").finding,"Corroded connector",
+  "an entry marked Completed speaks for its cards, box or no box");
 });

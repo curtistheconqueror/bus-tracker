@@ -1207,10 +1207,18 @@ test("PATH TO REPAIR is one component two pages draw, and it carries its own col
  /* ITS COLOURS ARE ITS OWN NAMES, mapped by each host. Reading `--log-*`
     directly was fine while one route loaded that stylesheet; Fixed Repairs does
     not load it at all, so every variable would resolve to nothing. */
- /* `var(--log-` rather than `--log-`: the file's own comment explains that it
+ /* BOTH PREFIXES, because the failure is symmetric and the first draft of this
+    check was not: a `--fixed-*` read breaks the panel on the Defect Log, which
+    does not load `fixed-repairs.css`, exactly as a `--log-*` read breaks it on
+    Fixed Repairs. A cold read mutated `var(--ptr-accent)` to `var(--fixed-green)`
+    and every test still passed.
+
+    `var(--log-` rather than `--log-`: the file's own comment explains that it
     used to read those, and a scan blunt enough to trip on prose about a rule is
     the mistake the feedback-settings tripwire made twice. */
- assert.ok(!panelCss.includes("var(--log-"), "the component must not reach for another page's variables");
+ for (const prefix of ["var(--log-", "var(--fixed-"])
+  assert.ok(!panelCss.includes(prefix),
+   "the component must not reach for another page's variables — found " + prefix);
  const names = ["--ptr-text", "--ptr-muted", "--ptr-border", "--ptr-surface", "--ptr-accent", "--ptr-accent-text"];
  for (const name of names) {
   assert.ok(panelCss.includes(name + ":"), "the component must declare a default for " + name);
@@ -1222,6 +1230,54 @@ test("PATH TO REPAIR is one component two pages draw, and it carries its own col
     nothing in this project controls. */
  assert.match(logCss, /\.defect-log-app \.ptr-shade\{/);
  assert.match(fixedCss, /\.fixed-repairs-app \.ptr-shade\{/);
+
+ /* A THEMED INK MAY NOT SIT ON AN UNTHEMED SURFACE, which is the one gate this
+    whole test was missing and the reason a HIGH-severity bug shipped for a
+    commit. Fixed Repairs mapped `--ptr-text` to the themed `--fixed-ink` and
+    left `--ptr-surface` as a literal `#fff`, so the panel painted a white card
+    and wrote Dark's #f3f6fa, Midnight's #e4eeff and Tactical's #f0ecd7 on it.
+    Measured: the writeup at 1.08:1, 1.17:1 and 1.19:1 — invisible, not merely
+    low — and the SHOP TIME box somebody types into the same.
+
+    The invariant is simple and symmetric: within one host's map, the ink and
+    the surface it sits on are BOTH `var()` reads or BOTH literals. Half a
+    mapping is the bug either way round, and a mutation that reverts the fix
+    now fails here. Same rule for the accent and its own ink, which is what
+    lets Fixed Repairs keep a constant green head with a provable white on it. */
+ /* "THEMED" MEANS A NAME A THEME ACTUALLY WRITES, not "a `var()` read" — the
+    first draft of this check used the latter and flagged
+    `--ptr-accent:var(--fixed-green,#087347)`, which reads a `:root` CONSTANT
+    that no theme touches and is therefore a literal in every way that matters.
+    So the themed names are read out of the two places that emit them, which
+    also means a theme gaining a colour cannot leave this check behind. */
+ const themedNames = source => new Set([...source.matchAll(/"(--(?:log|fixed)-[a-z-]+)":/g)]
+  .map(match => match[1]));
+ const themed = {
+  ".defect-log-app": themedNames(log),
+  ".fixed-repairs-app": themedNames(
+   await read("src/components/settings/fixed-repairs-settings.tsx")),
+ };
+ for (const names of Object.values(themed))
+  assert.ok(names.size >= 6, "the themed variable list must be findable, got " + names.size);
+ const mapOf = (source, root) => {
+  const start = source.indexOf(root + " .ptr-shade{");
+  assert.notEqual(start, -1, root + " must map the panel's variables");
+  const block = source.slice(start, source.indexOf("}", start));
+  return Object.fromEntries([...block.matchAll(/(--ptr-[a-z-]+)\s*:\s*([^;]+);/g)]
+   .map(match => [match[1], match[2].trim()]));
+ };
+ for (const [root, source] of [[".defect-log-app", logCss], [".fixed-repairs-app", fixedCss]]) {
+  const map = mapOf(source, root);
+  const follows = value => [...themed[root]].some(name => value.includes("var(" + name));
+  for (const [ink, ground] of [["--ptr-text", "--ptr-surface"], ["--ptr-muted", "--ptr-surface"],
+   ["--ptr-accent-text", "--ptr-accent"]]) {
+   assert.ok(map[ink] !== undefined && map[ground] !== undefined,
+    root + " must map both " + ink + " and " + ground);
+   assert.equal(follows(map[ink]), follows(map[ground]),
+    root + ": " + ink + " is " + map[ink] + " and " + ground + " is " + map[ground] +
+    " — a themed ink on an unthemed surface, or the reverse, is the invisible-text bug");
+  }
+ }
  /* The rules themselves left defect-log.css. A copy there would win on both
     pages and quietly undo the point. */
  for (const moved of [".ptr-panel{", ".ptr-head{", ".ptr-body{", ".ptr-hours{", ".ptr-actions{"]) {
@@ -1232,18 +1288,45 @@ test("PATH TO REPAIR is one component two pages draw, and it carries its own col
  /* FOUR BUTTONS, FOUR COLUMNS. The row was declared at three and adding PTR
     left DELETE hanging on a second line at the left under a row aligned right.
     Counted from the source rather than remembered, because the next button
-    added here will have the same problem. */
- const row = fixed.slice(fixed.indexOf('<div className="fixed-card-actions">'));
+    added here will have the same problem.
+
+    `countColumns` reads the TRACK count rather than counting `minmax(`, which
+    a cold read pointed out `repeat(4,minmax(0,1fr))` would defeat — a legal
+    four-column spelling that the old check scored as one. */
+ const countColumns = value => {
+  const repeat = value.match(/repeat\((\d+),/);
+  return repeat ? Number(repeat[1]) : value.trim().split(/\s+(?![^(]*\))/).filter(Boolean).length;
+ };
+ const row = fixed.slice(fixed.indexOf('className={"fixed-card-actions"'));
  const buttons = (row.slice(0, row.indexOf("</div></footer>")).match(/<button /g) || []).length;
  assert.equal(buttons, 4, "the action row draws four buttons");
  const grid = fixedCss.match(/\.fixed-repairs-app \.fixed-card-actions\{[^}]*grid-template-columns:([^;}]*)/);
  assert.ok(grid, "the action row's column list must be findable");
- assert.equal((grid[1].match(/minmax\(/g) || []).length, buttons,
-  "the row declares " + (grid[1].match(/minmax\(/g) || []).length + " columns for " + buttons + " buttons");
- /* DELETE is pinned to the last one, because UNDO FIX is absent on a repair
-    logged straight onto this page and the row otherwise stopped short of the
-    right edge on those cards while reaching it on the ones above. */
- assert.match(fixedCss, /\.fixed-card-actions \.delete-repair\{grid-column:4\}/);
+ assert.equal(countColumns(grid[1]), buttons,
+  "the row declares " + countColumns(grid[1]) + " columns for " + buttons + " buttons");
+ /* AND THREE WHEN UNDO FIX IS ABSENT, which it is on a repair logged straight
+    onto this page. Pinning DELETE to column four instead left a 140px empty
+    column in the middle of a right-aligned row — measured, and it reads as a
+    button that failed to render. */
+ assert.match(fixed, /className=\{"fixed-card-actions"\+\(record\.defect\.source==="fixed-log"\?" without-undo":""\)\}/);
+ const thin = fixedCss.match(/\.fixed-repairs-app \.fixed-card-actions\.without-undo\{\s*grid-template-columns:([^;}]*)/);
+ assert.ok(thin, "the three-button row's column list must be findable");
+ assert.equal(countColumns(thin[1]), buttons - 1, "one fewer column when UNDO FIX is not drawn");
+
+ /* THE PANEL'S PHONE LAYOUT IS PINNED, because nothing did: a cold read deleted
+    both media blocks from the component's stylesheet and 196 tests passed,
+    which is how the layout change in F2 went unnoticed. `stretch` is the value
+    `.log-shade` actually resolved to at <=760 — three rules set it and the LAST
+    one won — so this is the assertion that keeps the extraction a refactor. */
+ assert.match(panelCss, /@media\(max-width:760px\)\{\.ptr-shade\{align-items:stretch;padding:0;height:100dvh\}\}/);
+ assert.ok(!/@media\(max-width:760px\)\{\.ptr-panel\{/.test(panelCss),
+  "the panel itself had no phone override and must not gain one silently");
+ assert.match(logCss, /@media\(max-width:760px\)[^]*?\.log-shade\{align-items:stretch\}/,
+  "which is the rule it is matching");
+
+ /* AND THE PAGE BEHIND IT DOES NOT SCROLL, through the same helper the Defect
+    Log's editor and the part-number prompt use rather than a second answer. */
+ assert.match(panel, /lockPageScroll\("ptr-open"\)/);
 
  /* AND FIXED REPAIRS DOES NOT MINT A SECOND INITIALS KEY. One person, one
     phone; a second copy means typing them twice and the two drifting, and
