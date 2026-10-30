@@ -6869,11 +6869,10 @@ test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it withou
   const draft=result?.plan?.defect;return draft?draft.category+" | "+draft.issue:null};
  assert.equal(picked("bus 17559 defect run box no display"),"Tech Services | "+ISSUE);
  assert.equal(picked("bus 17559 defect ibs screen run box no display"),"Tech Services | "+ISSUE);
- /* Bare "run box" does NOT resolve — the alias is the whole tail. Recorded
-    rather than fixed: it is unique today, and an alias for it would become a
-    guess the moment a second run-box entry exists, which is the refusal this
-    catalog makes everywhere else. */
- assert.equal(picked("bus 17559 defect run box"),null);
+ /* AND BARE "RUN BOX" REACHES IT TOO, through the hand-typed shorthand Curtis
+    asked for — the alias pass only ever gets the whole tail, and a mechanic
+    standing at the bus says "the run box". */
+ assert.equal(picked("bus 17559 defect run box"),"Tech Services | "+ISSUE);
 
  /* It inherits the category's own estimate rather than needing a rule. */
  const {normalizeRepairTimeEstimate,repairTimeTotal}=await import("../src/lib/down-sheet/repair-time-estimates.ts");

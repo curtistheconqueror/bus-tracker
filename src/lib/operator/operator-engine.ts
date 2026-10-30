@@ -1,5 +1,5 @@
 import {candidateBusNumbers,resolveBusNumber} from "../fleet/bus-number-resolver.ts";
-import {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
+import {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,migrateRepairIdentity,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "../fleet/fleet-intelligence.ts";
 import type {FleetStatus} from "../fleet/smart-status.ts";
 import {describeScanBatch,scanBatches,type ScanBatch} from "../defects/scan-batches.ts";
@@ -194,6 +194,44 @@ function areaFromCommand(command:string,areas:OperatorArea[]){
    key there would pick one device out of three and send somebody to the wrong
    box. Those keep needing the full phrase, which is the same rule the rest of
    this app follows: where a record does not say which, nothing guesses. */
+/* AND A SHORT WAY TO SAY IT, where nothing derived from the catalog can reach
+   the words somebody actually uses.
+
+   Curtis, naming the run box entry: *"I'll just think of a way to a short hand
+   way to say it, I think run box no display might be the best one."* The entry
+   is called that and the alias above gets "run box no display" for free — but
+   a mechanic standing at the bus says "the run box", and that matched nothing
+   at all, which is the one outcome a spoken path cannot afford.
+
+   HAND-TYPED, AND DELIBERATELY SHORT. Everything above is derived from the
+   catalog, which is why it has never needed maintaining; this list is the
+   exception, and each row is a claim that one phrase can only mean one repair.
+   A row is DROPPED rather than trusted the moment that stops being true:
+
+   - A phrase the catalog already uses — as a full name, or as a bare item the
+     alias pass claimed, ambiguous or not — keeps its derived meaning. A
+     shorthand may never shadow a real wording, and a row that would override
+     a genuine ambiguity is a decision that needs its own reasoning here
+     rather than a quiet win on list order.
+   - The target resolves through `migrateRepairIdentity`, the same function
+     every stored defect is read through, so a catalog rename moves the phrase
+     with the repair. Keyed on raw wording it would point at a name that no
+     longer exists and simply stop matching — silently, which is the failure
+     PATH TO REPAIR's key argues at length about.
+   - A target no longer in the catalog at all drops the row, because filing a
+     defect under a retired identity is worse than not hearing the phrase.
+   - AND A PHRASE THAT REACHES TWO CATALOG WORDINGS DROPS, which is the rule
+     that keeps this list from aging into a guess. "Run box" is unique today;
+     the moment a second run-box repair exists it names two, and this stops
+     answering rather than quietly sending somebody to the older one — the
+     refusal the alias pass above already makes for "screen black".
+
+   A test asserts every row still resolves, so a retirement or a second
+   wording fails the build and somebody chooses, instead of going quiet. */
+export const SPOKEN_SHORTHAND:{category:string;issue:string;say:string}[]=[
+ {category:"Tech Services",issue:"IBS Screen - Run box no display",say:"run box"},
+];
+
 const DEFECT_CHOICES=(()=>{
  const full=Object.entries(REPAIR_OPTIONS).flatMap(([category,issues])=>
   issues.map(issue=>({category,issue,key:normalized(issue)})));
@@ -204,7 +242,17 @@ const DEFECT_CHOICES=(()=>{
    ?issues.map(issue=>({category,issue,key:normalized(issue.split(" - ").slice(1).join(" - "))}))
    :[]).filter(choice=>choice.key&&!taken.has(choice.key));
  for(const choice of aliases)counts.set(choice.key,(counts.get(choice.key)||0)+1);
- return [...full,...aliases.filter(choice=>counts.get(choice.key)===1)]
+ /* Longest key first, so a shorthand never steals the full wording: somebody
+    who says "run box no display" still gets there through the alias, and the
+    short phrase only answers when the long one is not in the sentence. */
+ const everyWording=Object.values(REPAIR_OPTIONS).flat().map(issue=>normalized(issue));
+ const shorthand=SPOKEN_SHORTHAND.map(row=>{
+  const moved=migrateRepairIdentity(row.category,row.issue);
+  return {category:moved.category,issue:moved.issue,key:normalized(row.say)};
+ }).filter(choice=>Boolean(choice.key)&&!taken.has(choice.key)&&!counts.has(choice.key)
+  &&(REPAIR_OPTIONS[choice.category]||[]).includes(choice.issue)
+  &&everyWording.filter(wording=>wording.includes(choice.key)).length===1);
+ return [...full,...aliases.filter(choice=>counts.get(choice.key)===1),...shorthand]
   .sort((a,b)=>b.key.length-a.key.length);
 })();
 
