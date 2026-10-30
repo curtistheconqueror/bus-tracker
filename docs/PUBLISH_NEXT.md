@@ -14,7 +14,8 @@ form**, where it used to ask what was found, with DESCRIPTION renamed ADDITIONAL
 DETAILS and the finding box moved into ADVANCED DETAILS. Page themes keep their
 own header ink, which this release had taken off them. **Fixed Repairs narrows
 by WHEN IT WAS FIXED** — ALL, THIS SHIFT, TODAY, 24H, 3 DAYS, 7 DAYS, 30 DAYS —
-and offers COPY, SHARE and SHARE PAGE over exactly the repairs on screen.
+and offers COPY, SHARE and SHARE PAGE over exactly the repairs on screen. One
+new repair: **Tech Services → IBS Screen → Run box no display**.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -79,6 +80,8 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+ae31482 Add RUN BOX NO DISPLAY to Tech Services, under the IBS Screen
+2a25591 Answer the cold read: the scope bar blamed the category on the window
 8dc00f8 Write down the two constraints, and stop hard-coding whose garage this is
 926537f Record the Fixed Repairs window and the PATH TO REPAIR gap
 fd960ad Window and share the Fixed Repairs history, the way the Defect Log does
@@ -154,7 +157,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 53 files changed, 6357 insertions(+), 263 deletions(-)
+ 53 files changed, 6684 insertions(+), 267 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -948,6 +951,42 @@ the moment the writeup is worth capturing.
 
 Adding those buttons is a UI change and therefore Curtis's call before it
 exists. Not in this release; recorded so it is not rediscovered.
+
+### One new repair: RUN BOX NO DISPLAY
+
+Curtis: *"we need to add a run box defect to the tech services portion and it
+will go in the fourth sub category yeah just run box... I think run box no
+display might be the best one."*
+
+**Tech Services → IBS Screen → Run box no display.** IBS Screen is the fourth
+group this category draws — Farebox, Ventra, CUBIC Screen, IBS Screen,
+Signs/Cameras/Other — which is where the operator's run number lives. Added to
+both structures `CLAUDE.md` says must stay in step: the prefixed identity in
+`REPAIR_OPTIONS` and the bare name in `REPAIR_OPTION_GROUPS`, since an entry in
+one of them alone is either an option that cannot be picked or a pick that
+cannot be stored.
+
+**NOTHING ELSE NEEDED AN EDIT, and that is what the group prefix buys.** The
+stored identity carries "IBS Screen", `tech-services.ts` reads the device off
+those words, and both readings that one table serves pick it up without being
+told: the Status Report's **IBS SCREENS** line and the `ibs-ventra` quick
+filter. Checked rather than assumed — it is not read as a farebox, it inherits
+Tech Services' own 120-minute allowance rather than wanting a rule of its own,
+and a record stored under it reads back unchanged with no rename map touching
+it.
+
+**The spoken path resolves it for free**, because the alias table is built from
+the catalog: *"bus 17559 defect run box no display"* plans the right record, and
+so does the phrase with the group in front of it. Bare **"run box"** does NOT —
+the alias is the whole tail. Left that way on purpose and recorded in the test:
+the phrase is unique today, and an alias for it becomes a guess the moment a
+second run-box entry exists, which is the refusal this catalog makes everywhere
+else ("inop general" is the tail of three devices and "screen black" of two, and
+both are refused rather than guessed).
+
+**No storage key, no migration, nothing on disk rewritten.** Adding a catalog
+option is additive by construction — the entry is the stored identity, so a
+device that has never seen this release simply never stored one.
 
 ### Verified
 
