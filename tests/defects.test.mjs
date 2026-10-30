@@ -6815,3 +6815,69 @@ test("Fixed Repairs narrows by WHEN IT WAS FIXED, and shares exactly what it sho
  const winning=[...rules.join(";").matchAll(/grid-template-columns:([^;}]*)/g)].pop()[1];
  assert.equal(winning.trim().split(/\s+/).length,5,"the rule that wins must declare five columns, got "+winning);
 });
+
+test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it without being told",async()=>{
+ /* Curtis: "we need to add a run box defect to the tech services portion and
+    it will go in the fourth sub category yeah just run box... I think run box
+    no display might be the best one." */
+ const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,normalizeDefects,repairIssueDisplayLabel}=
+  await import("../src/lib/defects/repair-catalog.ts");
+ const {techServicesGroup,isFarebox,isIbsVentra,TECH_SERVICES_LABELS}=
+  await import("../src/lib/fleet/tech-services.ts");
+ const ISSUE="IBS Screen - Run box no display";
+
+ /* THE FOURTH SUB-CATEGORY, which is what he named it by. The picker draws the
+    groups in this order, so "fourth" is a fact about this list and not a
+    guess — if a group is ever inserted above IBS Screen, this is where that
+    shows up rather than in somebody's memory of a conversation. */
+ const groups=Object.keys(REPAIR_OPTION_GROUPS["Tech Services"]);
+ assert.deepEqual(groups,["Farebox","Ventra","CUBIC Screen","IBS Screen","Signs, Cameras and Other"]);
+ assert.equal(groups[3],"IBS Screen","the fourth sub-category is where this went");
+
+ /* BOTH STRUCTURES, IN STEP. `REPAIR_OPTIONS` holds the stored identity with
+    its group prefix; `REPAIR_OPTION_GROUPS` holds the bare name the third step
+    of the picker draws. CLAUDE.md: these two must stay in step, and an entry in
+    one of them only is an option that cannot be picked or a pick that cannot
+    be stored. */
+ assert.ok(REPAIR_OPTIONS["Tech Services"].includes(ISSUE));
+ assert.ok(REPAIR_OPTION_GROUPS["Tech Services"]["IBS Screen"].includes("Run box no display"));
+ assert.equal(repairIssueDisplayLabel("Run box no display","IBS Screen"),"Run box no display");
+
+ /* AND THE COUNTERS NEED NO EDIT, which is the whole point of the prefix. The
+    stored identity carries "IBS Screen", `tech-services.ts` reads the device
+    off the words, and the Status Report's IBS SCREENS line and the `ibs-ventra`
+    quick filter both come off that one table. A farebox it is not. */
+ assert.equal(techServicesGroup(ISSUE),"ibs");
+ assert.equal(isIbsVentra(ISSUE),true,"counts with the Ventra family, as the CUBIC screens do");
+ assert.equal(isFarebox(ISSUE),false);
+ assert.equal(TECH_SERVICES_LABELS.ibs,"IBS SCREENS");
+
+ /* A record stored under it reads back unchanged — no rename map touches it,
+    and nothing normalises it into one of the two entries it sits beside. */
+ const stored=normalizeDefects([{id:"d",category:"Tech Services",issue:ISSUE,details:"",
+  operability:"service",state:"open"}])[0];
+ assert.equal(stored.issue,ISSUE);
+ assert.equal(stored.category,"Tech Services");
+
+ /* THE SPOKEN PATH PICKS IT UP FOR FREE, because the alias table is built from
+    the catalog. "Run box no display" is a tail no other device shares, so it
+    resolves rather than being refused the way "screen black" and
+    "inop general" are — those are shared by two and three devices. */
+ const {planOperatorCommand}=await import("../src/lib/operator/operator-engine.ts");
+ const fleet=[{id:"b1",n:"17559",location:"garage-1",status:"ok",defects:[]}];
+ const picked=text=>{const result=planOperatorCommand(text,fleet,[]);
+  const draft=result?.plan?.defect;return draft?draft.category+" | "+draft.issue:null};
+ assert.equal(picked("bus 17559 defect run box no display"),"Tech Services | "+ISSUE);
+ assert.equal(picked("bus 17559 defect ibs screen run box no display"),"Tech Services | "+ISSUE);
+ /* Bare "run box" does NOT resolve — the alias is the whole tail. Recorded
+    rather than fixed: it is unique today, and an alias for it would become a
+    guess the moment a second run-box entry exists, which is the refusal this
+    catalog makes everywhere else. */
+ assert.equal(picked("bus 17559 defect run box"),null);
+
+ /* It inherits the category's own estimate rather than needing a rule. */
+ const {normalizeRepairTimeEstimate,repairTimeTotal}=await import("../src/lib/down-sheet/repair-time-estimates.ts");
+ assert.equal(repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Tech Services",ISSUE)),
+  repairTimeTotal(normalizeRepairTimeEstimate(undefined,"Tech Services","IBS Screen - Screen black")),
+  "the same allowance as the entry beside it");
+});
