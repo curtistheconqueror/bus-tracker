@@ -216,8 +216,7 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        already knew who had the bus and used to drop it, so every completed
        entry arrived unattributed. */
     completedBy:completed?(clean(entry.completedBy)||linked?.completedBy||assignedMechanic(entry)):linked?.completedBy,
-    actionTaken:clean(target.actionTaken)||linked?.actionTaken,
-    /* A FINISHED CARD HAS AN OPINION ABOUT WHAT WAS FOUND. AN UNFINISHED ONE
+    /* A FINISHED CARD HAS AN OPINION ABOUT WHAT WAS DONE. AN UNFINISHED ONE
        DOES NOT, and that distinction is the fix.
 
        This read `normalizeFinding(target.finding)||linked?.finding` for every
@@ -228,28 +227,53 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        to avoid, and `workStates` and `downSheetRecommendation` are deleted
        rather than blanked to avoid.
 
-       REACHABLE, AND NEWLY SO. The sheet's WHAT WAS FOUND box lives inside
-       `{item.done && …}`, so a card only ever gets a finding while it is
-       finished — but reopening the repair leaves the card holding its copy with
-       the box gone, and the Defect Log's own finding box, restored to ADVANCED
-       DETAILS this release, is what finally gave somebody a way to clear the
-       record's half on an open defect. Two surfaces, one field, and the one
-       with no box on screen was winning.
+       REACHABLE, AND NEWLY SO. Everything the sheet collects about finished
+       work lives inside ONE `{item.done && …}` block in the editor — FIX /
+       STEPS TAKEN, WHAT WAS FOUND, REPAIR HOURS and DIAGNOSTIC HOURS — so a
+       card only ever gets any of them while it is finished. Reopening the
+       repair leaves the card holding its copies with the box gone, and the
+       Defect Log's own finding box, restored to ADVANCED DETAILS this release,
+       is what finally gave somebody a way to clear the record's half on an open
+       defect. Two surfaces, one field, and the one with no box on screen was
+       winning.
 
-       So the card writes a finding only where the sheet actually asked for
-       one. Nothing is lost in either direction: a finding typed on a finished
-       card still reaches the record Fixed Repairs reads, and `{...linked}`
-       above keeps whatever the record already holds, including a deliberate
-       clear. THE CARD KEEPS ITS OWN COPY — that is the sheet's record of what
-       that mechanic found, and re-ticking the card speaks for it again. */
+       ALL FOUR, not just the finding. The first version of this fixed `finding`
+       alone, on reasoning that applies word for word to the other three — and
+       REPAIR HOURS and DIAGNOSTIC HOURS are editable on an open defect in the
+       Defect Log, so clearing them there and saving the sheet row wrote them
+       straight back. Measured through this function, which is how it was found:
+       record cleared, unfinished card holding 2 and 1.5, result 2 and 1.5.
+       Three of four fixed by comment and one by code is worse than neither.
+
+       Nothing is lost in either direction: anything typed on a finished card
+       still reaches the record Fixed Repairs reads, and `{...linked}` above
+       keeps whatever the record already holds, including a deliberate clear.
+       THE CARD KEEPS ITS OWN COPIES — that is the sheet's record of what that
+       mechanic did, and re-ticking the card speaks for it again.
+
+       `completed` IS `target.done||entryCompleted`, which is wider than the
+       box. Setting the whole ENTRY to Completed without ticking a card writes
+       that card's stored values, box or no box — so an entry completed in one
+       press can still restore a stale finding on a record that cleared it.
+       Left that way deliberately: marking the entry complete is a statement
+       that the work is done, and the card's own text is the only account of it
+       there is. The alternative loses fix details on every entry anybody
+       completes without ticking each card first, which is the commoner gesture
+       and the worse failure. Recorded rather than claimed away. */
+    actionTaken:completed?(clean(target.actionTaken)||linked?.actionTaken):linked?.actionTaken,
     finding:completed?(normalizeFinding(target.finding)||linked?.finding):linked?.finding,
     /* The unit travels with the count. Written from the catalog rather than
        carried on the card, so the record reads "2 replaced" and never falls
        back to the quarts the oil entry taught the label. */
     quantity:normalizeRepairCount(target.quantity,target.category,target.repair)??linked?.quantity,
     unit:defectCountField(target.category,target.repair)?.unit||linked?.unit,
-    repairHours:normalizeRepairHours(target.repairHours)??linked?.repairHours,
-    diagnosticHours:normalizeRepairHours(target.diagnosticHours)??linked?.diagnosticHours,
+    /* The same gate, for the same reason — these two sit in the same block of
+       the editor as the two above, so an unfinished card's figures are stale or
+       nothing. `work-time.ts` sums them per person per day, and they only ever
+       reached the record from a save made while the card WAS finished, so this
+       stops a re-write rather than losing anybody's hours. */
+    repairHours:completed?(normalizeRepairHours(target.repairHours)??linked?.repairHours):linked?.repairHours,
+    diagnosticHours:completed?(normalizeRepairHours(target.diagnosticHours)??linked?.diagnosticHours):linked?.diagnosticHours,
     /* ESTIMATED TIME OF REPAIR IS NOT WRITTEN FROM HERE, and it was for one
        commit. The sheet's estimate boxes and the Defect Log's estimate box
        looked like the same claim, so a card differing from the catalog's

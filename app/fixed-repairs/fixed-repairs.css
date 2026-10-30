@@ -50,13 +50,17 @@
    56px so it stays a target rather than a sliver. */
 .fixed-repairs-app .fixed-card-actions{width:min(100%,560px);display:grid;
  grid-template-columns:minmax(120px,1.5fr) minmax(56px,.55fr) minmax(84px,1fr) minmax(72px,.8fr)}
-/* DELETE IS PINNED TO THE LAST COLUMN, because UNDO FIX is not offered on a
+/* THREE COLUMNS WHEN THERE ARE THREE BUTTONS. UNDO FIX is not offered on a
    repair logged straight onto this page — those were never open anywhere, so
-   there is nothing to undo. Left to flow, DELETE took column three on those
-   cards and the row stopped 119px short of the right edge while the card above
-   it reached the edge. Measured: two cards in one list with their action rows
-   ending at different x. */
-.fixed-repairs-app .fixed-card-actions .delete-repair{grid-column:4}
+   there is nothing to undo — and the row has to look right both ways.
+
+   Two wrong answers were measured before this one. Left to flow, DELETE took
+   column three and the row stopped 119px short of the right edge while the card
+   above it reached the edge. Pinned to column four, it left a 140px empty
+   column in the middle, which reads as a button that failed to render. The row
+   says how many it is drawing instead, so neither happens. */
+.fixed-repairs-app .fixed-card-actions.without-undo{
+ grid-template-columns:minmax(120px,1.5fr) minmax(56px,.55fr) minmax(72px,.8fr)}
 .fixed-repairs-app .fixed-card-actions button{width:100%}
 /* FIVE CHILDREN, FIVE COLUMNS. The row carries search, category, the window,
    EXPORT and UNDO; declared at four, the fifth wrapped to a second line with
@@ -85,13 +89,17 @@
     already here. Four in one row at 360 puts DELETE in a 60px box beside a
     41px PTR — four crowded targets with the destructive one on the end, which
     is how somebody deletes a repair reaching for UNDO FIX with a glove on.
-    Measured: 2x2 gives every one of them about 150px at 390 and 138px at 360,
-    at the same 48px height. */
+    Measured: 2x2 gives every one of them 165px at 390 and 151px at 360, at the
+    same 48px height. (This said 150 and 138 for one commit, against a test in
+    the same change that carried the real numbers — a cold read caught the two
+    disagreeing, which is the only reason either is right now. Four across at
+    360 is DELETE at 72px and PTR at 56px with the row overflowing its footer to
+    x=-9, so the conclusion held and the numbers did not.) */
  .fixed-repairs-app .fixed-card-actions{width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
  .fixed-repairs-app .fixed-card-actions button:first-child{grid-column:auto}
- /* The pin is a four-column idea. At two it would leave a hole on the left of
-    the second row on the three-button cards; flow order reads better there. */
- .fixed-repairs-app .fixed-card-actions .delete-repair{grid-column:auto}
+ /* Two columns either way on a phone — the three-button row is then EDIT|PTR
+    with DELETE under it, which is the flow order and reads fine. */
+ .fixed-repairs-app .fixed-card-actions.without-undo{grid-template-columns:repeat(2,minmax(0,1fr))}
  .fixed-repairs-app .fixed-card>footer button{min-height:48px;padding:0 4px;font-size:clamp(7px,2.25vw,9px);line-height:1.15}
  .fixed-repairs-app .fixed-editor>footer{position:sticky;left:auto;bottom:0;transform:none;width:auto}
 }
@@ -315,7 +323,26 @@
  --ptr-text:var(--fixed-ink,#172b4d);
  --ptr-muted:var(--fixed-muted,#60728c);
  --ptr-border:var(--fixed-border,#bac7da);
- --ptr-surface:#fff;
+ /* `var(--fixed-surface)`, NOT `#fff`, and the literal was a high-severity bug
+    for one commit. `--fixed-ink` above IS themed — the appearance panel sets it
+    from the theme's `text` — so a hard-coded white card carried Dark's
+    `#f3f6fa`, Midnight's `#e4eeff` and Tactical's `#f0ecd7` on it. Measured:
+    the writeup at 1.19:1 on Tactical, 1.08:1 on Dark, 1.17:1 on Midnight, and
+    the SHOP TIME box somebody types into the same. Invisible, not merely low.
+
+    Which is the bug the block twenty lines above this one was written to fix
+    across the whole page — "TWELVE elements under AA on each of Dark, Midnight
+    and Tactical, and the worst was 1.13:1". Half a mapping reintroduced it: a
+    themed ink on an unthemed surface is the same mistake either way round. */
+ --ptr-surface:var(--fixed-surface,#fff);
+ /* THE ACCENT STAYS GREEN ON PURPOSE, and `#fff` on it is therefore provable
+    rather than guessed. `--fixed-green` is a `:root` constant this page never
+    themes, which is why `+ LOG A REPAIR` is green with white text on all four
+    themes — the panel head follows that precedent rather than `--fixed-accent`,
+    because a PATH TO REPAIR screen reached from the finished-work list is part
+    of the same green. If it ever maps to `--fixed-accent`, the ink has to be
+    computed the way `--log-accent-text` is; a literal would be a guess the
+    moment somebody picks a pale accent. */
  --ptr-accent:var(--fixed-green,#087347);
  --ptr-accent-text:#fff;
 }
