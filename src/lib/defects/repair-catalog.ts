@@ -904,9 +904,12 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
   "CUBIC Screen":["BUS ER","MV ER","Screen black"],
   /* RUN BOX NO DISPLAY, Curtis's own wording: "we need to add a run box defect
      to the tech services portion and it will go in the fourth sub category...
-     I think run box no display might be the best one." IBS Screen is the
-     fourth group this category draws, which is where the operator's run number
-     lives. */
+     I think run box no display might be the best one." He named a POSITION,
+     and IBS Screen is the fourth group this category draws — measured in both
+     render paths, the native three-step select and the combo field, neither of
+     which sorts or filters the group keys. Why that group is the fourth is not
+     something he said and not something the code can show, so it is not
+     claimed here. */
   "IBS Screen":["INOP (general)","Screen black","Run box no display"],
   "Signs, Cameras and Other":["Destination Sign","Dash cam","Camera / DVR system","Other Tech Services"],
  },

@@ -6823,7 +6823,7 @@ test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it withou
     no display might be the best one." */
  const {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,normalizeDefects,repairIssueDisplayLabel}=
   await import("../src/lib/defects/repair-catalog.ts");
- const {techServicesGroup,isFarebox,isIbsVentra,TECH_SERVICES_LABELS}=
+ const {techServicesGroup,isFarebox,isIbsVentra}=
   await import("../src/lib/fleet/tech-services.ts");
  const ISSUE="IBS Screen - Run box no display";
 
@@ -6844,14 +6844,27 @@ test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it withou
  assert.ok(REPAIR_OPTION_GROUPS["Tech Services"]["IBS Screen"].includes("Run box no display"));
  assert.equal(repairIssueDisplayLabel("Run box no display","IBS Screen"),"Run box no display");
 
- /* AND THE COUNTERS NEED NO EDIT, which is the whole point of the prefix. The
-    stored identity carries "IBS Screen", `tech-services.ts` reads the device
-    off the words, and the Status Report's IBS SCREENS line and the `ibs-ventra`
-    quick filter both come off that one table. A farebox it is not. */
+ /* THE DEVICE COMES OFF THE PREFIX, which is the whole point of storing it.
+    `tech-services.ts` reads "IBS Screen" out of the words, so the `ibs-ventra`
+    quick filter picks the entry up with no edit. A farebox it is not — the
+    farebox pattern needs the literal "fare", so the `box` in "Run box" cannot
+    reach it.
+
+    AND NOT THE STATUS REPORT, which an earlier version of this comment claimed
+    twice. `techSections` prints FAREBOX, VENTRA and CUBIC SCREENS and says so
+    in its own words; `tech.ibs` is computed and rendered nowhere, so this entry
+    is invisible in both output formats with every box ticked. Measured, not
+    read. The consequence had its own bug and its own fix — see
+    tests/reports.test.mjs, "an IBS screen defect must not take a flagged bus
+    out of the status report". Whether a line should exist is Curtis's call.
+
+    `TECH_SERVICES_LABELS.ibs` was asserted here as the source of that line. It
+    is not the source of anything: the constant has no consumer in `src/` or
+    `app/` at all, and the report's headings are literals inside `techSections`.
+    A self-referential assertion gone rather than left looking like a gate. */
  assert.equal(techServicesGroup(ISSUE),"ibs");
  assert.equal(isIbsVentra(ISSUE),true,"counts with the Ventra family, as the CUBIC screens do");
  assert.equal(isFarebox(ISSUE),false);
- assert.equal(TECH_SERVICES_LABELS.ibs,"IBS SCREENS");
 
  /* A record stored under it reads back unchanged — no rename map touches it,
     and nothing normalises it into one of the two entries it sits beside. */
@@ -6863,7 +6876,14 @@ test("RUN BOX NO DISPLAY is on the IBS Screen, and every counter reads it withou
  /* THE SPOKEN PATH PICKS IT UP FOR FREE, because the alias table is built from
     the catalog. "Run box no display" is a tail no other device shares, so it
     resolves rather than being refused the way "screen black" and
-    "inop general" are — those are shared by two and three devices. */
+    "inop general" are — those are shared by two and three devices.
+
+    THE TYPED PICKER HAS ALWAYS BEEN MORE GENEROUS, which an earlier version of
+    this test called "the refusal this catalog makes everywhere else". It is
+    not: `searchCatalog` resolves bare "run box", and "no display", and even
+    "display", to this one option. The refusal was a property of the spoken
+    table's exact-tail rule alone, and for one commit the two halves of the app
+    disagreed about the same two words. */
  const {planOperatorCommand}=await import("../src/lib/operator/operator-engine.ts");
  const fleet=[{id:"b1",n:"17559",location:"garage-1",status:"ok",defects:[]}];
  const picked=text=>{const result=planOperatorCommand(text,fleet,[]);
@@ -6984,4 +7004,25 @@ test("the Fixed Repairs scope bar names the category too, not only the window an
  assert.ok(gate,"the scope bar's visibility gate must be findable");
  for(const term of ["categoryHeld>0","windowUnresolved"])
   assert.ok(gate.includes(term),"the bar must be able to appear for "+term+" — gate reads "+gate.trim());
+});
+
+test("the row count combo-field.tsx argues from is the catalog's real size",async()=>{
+ /* `combo-field.tsx` justifies recomputing its ranking on every render, and
+    not doing it while the list is shut, by quoting the catalog's size twice.
+    Both copies said 338. The catalog is 357, and was 356 before RUN BOX NO
+    DISPLAY — stale by nineteen, unnoticed, because nothing anywhere read the
+    real number.
+
+    This is prose about render cost rather than a behavioural claim, which is
+    exactly why it rotted: no gate, no reason for anybody to check. One digit
+    to update is a fair price for an argument that stays true, and if the
+    catalog ever doubles, the argument itself deserves re-reading. */
+ const {readFileSync}=await import("node:fs");
+ const {REPAIR_OPTIONS}=await import("../src/lib/defects/repair-catalog.ts");
+ const rows=Object.values(REPAIR_OPTIONS).flat().length;
+ const source=readFileSync(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8");
+ const quoted=[...source.matchAll(/catalog(?:,| is) (\d+) rows/g)].map(match=>Number(match[1]));
+ assert.equal(quoted.length,2,"both copies of the number must be findable — found "+quoted.length);
+ for(const value of quoted)assert.equal(value,rows,
+  "combo-field.tsx argues from "+value+" rows; the catalog holds "+rows);
 });
