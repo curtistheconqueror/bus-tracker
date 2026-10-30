@@ -217,7 +217,32 @@ export function applyDownEntryToFleet<T extends SyncFleetBus>(fleet:T[],entry:Sy
        entry arrived unattributed. */
     completedBy:completed?(clean(entry.completedBy)||linked?.completedBy||assignedMechanic(entry)):linked?.completedBy,
     actionTaken:clean(target.actionTaken)||linked?.actionTaken,
-    finding:normalizeFinding(target.finding)||linked?.finding,
+    /* A FINISHED CARD HAS AN OPINION ABOUT WHAT WAS FOUND. AN UNFINISHED ONE
+       DOES NOT, and that distinction is the fix.
+
+       This read `normalizeFinding(target.finding)||linked?.finding` for every
+       card, finished or not, so a card still holding an old wording restored it
+       onto the record on the next save of that row — changing the mechanic,
+       ticking a different card, anything. A finding cleared in the Defect Log
+       came straight back, which is the same bug the estimate above is dropped
+       to avoid, and `workStates` and `downSheetRecommendation` are deleted
+       rather than blanked to avoid.
+
+       REACHABLE, AND NEWLY SO. The sheet's WHAT WAS FOUND box lives inside
+       `{item.done && …}`, so a card only ever gets a finding while it is
+       finished — but reopening the repair leaves the card holding its copy with
+       the box gone, and the Defect Log's own finding box, restored to ADVANCED
+       DETAILS this release, is what finally gave somebody a way to clear the
+       record's half on an open defect. Two surfaces, one field, and the one
+       with no box on screen was winning.
+
+       So the card writes a finding only where the sheet actually asked for
+       one. Nothing is lost in either direction: a finding typed on a finished
+       card still reaches the record Fixed Repairs reads, and `{...linked}`
+       above keeps whatever the record already holds, including a deliberate
+       clear. THE CARD KEEPS ITS OWN COPY — that is the sheet's record of what
+       that mechanic found, and re-ticking the card speaks for it again. */
+    finding:completed?(normalizeFinding(target.finding)||linked?.finding):linked?.finding,
     /* The unit travels with the count. Written from the catalog rather than
        carried on the card, so the record reads "2 replaced" and never falls
        back to the quarts the oil entry taught the label. */
