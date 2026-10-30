@@ -86,7 +86,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  const boxRef=useRef<HTMLDivElement|null>(null);
  const id=useId();
 
- /* Recomputed each render rather than memoised: the whole catalog is 338 rows
+ /* Recomputed each render rather than memoised: the whole catalog is 357 rows
     of string matching against an array already in memory, which is nothing next
     to the render it is part of, and a stale memo here would show the mechanic a
     list that does not match what he just typed. */
@@ -95,7 +95,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
     This ran on every render whether the list was open or shut, which is once
     per character typed anywhere else in the same form — and once the browse
     stopped being capped at forty rows, a shut picker was building the whole
-    catalog, 338 rows, for a keystroke in the DETAILS box.
+    catalog, 357 rows, for a keystroke in the DETAILS box.
 
     Measured at 6x, 162 characters into DETAILS at phone width, it buys less
     than the row count suggests: median 33.6ms to 32.6ms, p95 50.2ms to 47.7ms,

@@ -18,7 +18,7 @@ import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
 import {exportFleetBoardBackup,REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {copyText,shareOrDownloadFile,shareOutcomeLabel,type ShareOutcome} from "@/src/lib/shared/share-file";
-import {FIXED_REPAIR_WINDOWS,feedWindowLabel,feedWindowMinutes,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,fixedWithinFeedWindow,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {fixedShareFilename,fixedShareHtml,fixedShareText,type FixedShareRepair} from "@/src/lib/defects/fixed-share";
 import {DEFAULT_SHIFT_SETTINGS,readShiftSettings} from "@/src/lib/settings/shift-clock";
 import {locationLabel as sharedLocationLabel} from "@/src/lib/fleet/location-label";
@@ -230,6 +230,19 @@ export default function FixedRepairs(){
     when there is no window — see the bar below. */
  const windowHeld=windowLimit===null?0:inCategory.length-inWindow.length;
  const searchHeld=inWindow.length-visible.length;
+ /* AND THE CATEGORY'S OWN COUNT, which the bar did not have. It counted what
+    the window and the search held back and said nothing at all about the
+    drop-down above them, so a history narrowed to Brakes read as the whole
+    history with a smaller number in it. Measured by a cold read against the
+    share heading, which had the same hole and was fixed first — the bar is
+    what somebody is actually looking at. Against `records`, because the
+    category IS the first stage and has nothing above it to measure from. */
+ const categoryHeld=records.length-inCategory.length;
+ /* The drop-down says THIS SHIFT and the list is the whole history, because
+    the hours on this device describe no window covering now. Both halves
+    degrade together on purpose — see `feedWindowUnresolved` — so the only
+    thing missing was saying so. */
+ const windowUnresolved=!search.trim()&&feedWindowUnresolved(fixedWindow,windowNow,shiftSettings);
  /* Returns whether the board was actually written. It used to return nothing,
     so every caller carried on as if the save had happened. */
  const persistFleet=(next:DefectLogFleetBus[])=>{
@@ -462,7 +475,7 @@ function repairOrigin(source:string|undefined){
  return <main className="fixed-repairs-app" style={pageStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="fixed-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fixed Repairs</h1><p>Offline repair history for faster future diagnosis</p></div><TrackerNav active="/fixed-repairs"/><RefreshButton/></header>
   <section className="fixed-summary" aria-label="Fixed repair summary"><div><strong>{stats.total}</strong><span>TOTAL FIXED</span></div><div><strong>{stats.today}</strong><span>FIXED TODAY</span></div><div><strong>{stats.buses}</strong><span>BUSES IN HISTORY</span></div><div className={stats.needsNotes?"attention":""}><strong>{stats.needsNotes}</strong><span>NEED FIX DETAILS</span></div></section>
-  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><label><span>WHEN IT WAS FIXED</span><select value={fixedWindow} onChange={event=>setFixedWindow(event.target.value as FeedWindowKey)} aria-label="Narrow the history by when the repair was finished">{FIXED_REPAIR_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>
+  <section className="fixed-controls"><label><span>SEARCH HISTORY</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Bus #, defect, fix, code, part, or note"/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="all">All categories</option>{categories.map(value=><option value={value} key={value}>{repairCategoryLabel(value)}</option>)}</select></label><label><span>WHEN IT WAS FIXED</span><select value={fixedWindow} onChange={event=>setFixedWindow(event.target.value as FeedWindowKey)} aria-label="Narrow the history by when the repair was finished">{FEED_WINDOWS.map(item=><option value={item.key} key={item.key}>{item.label}</option>)}</select></label><button type="button" onClick={exportHistory} title={REPORT_EXPORT_HINT}>EXPORT HISTORY REPORT</button><button type="button" className="fixed-undo-control" onClick={undoLastChange} disabled={!undoSnapshot} aria-label={undoSnapshot?"Undo "+undoSnapshot.label:"No recent fixed-repair change to undo"} title={undoSnapshot?.label||"Undo becomes available after a saved change"}>UNDO LAST</button></section>
   {/* WHAT THE LIST IS AND WHAT IT IS NOT, above the list rather than beside the
       drop-down, because the question it answers is "is this everything?" and
       that gets asked while reading the cards.
@@ -480,12 +493,14 @@ function repairOrigin(source:string|undefined){
 
       And zero when there IS no window, rather than attributing the category's
       work to a drop-down reading ALL. */}
-  {(windowWords||search.trim()||windowHeld>0)&&<p className="fixed-scope">
+  {(windowWords||search.trim()||windowHeld>0||categoryHeld>0||windowUnresolved)&&<p className="fixed-scope">
    {windowWords?<b>{windowWords}</b>:null}
    <span>{visible.length} OF {records.length} REPAIR{records.length===1?"":"S"}</span>
+   {categoryHeld>0?<small>{categoryHeld} IN OTHER CATEGORIES</small>:null}
    {windowHeld>0?<small>{windowHeld} OUTSIDE THIS WINDOW</small>:null}
    {searchHeld>0?<small>{searchHeld} HIDDEN BY THE SEARCH</small>:null}
    {search.trim()&&fixedWindow!=="all"?<small>WINDOW STOOD DOWN WHILE SEARCHING</small>:null}
+   {windowUnresolved?<small className="fixed-scope-warn">{feedWindowUnresolvedNote(fixedWindow)}</small>:null}
   </p>}
   {/* COPY, SHARE and SHARE PAGE — the same three the Defect Log offers, in the
       same order and now by the same means: COPY to the clipboard, SHARE through

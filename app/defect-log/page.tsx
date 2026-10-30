@@ -42,7 +42,7 @@ import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
 import {heldBusCount,isHeld,setBusHold} from "@/src/lib/fleet/bus-hold";
 import TimeWindowChips from "@/src/components/shared/time-window-chips";
 import {TIME_WINDOWS,TIME_WINDOWS_WITH_SHIFT,timeWindowLabel,timeWindowMinutes,withinTimeWindow,type TimeWindowKey} from "@/src/lib/shared/time-window";
-import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,type FeedWindowKey} from "@/src/lib/defects/feed-window";
+import {FEED_WINDOWS,defectWithinFeedWindow,feedWindowLabel,feedWindowMinutes,feedWindowUnresolved,feedWindowUnresolvedNote,type FeedWindowKey} from "@/src/lib/defects/feed-window";
 import {DEFAULT_SHIFT_SETTINGS,activeShift,readShiftSettings,shiftLabel} from "@/src/lib/settings/shift-clock";
 import {roadCallNote} from "@/src/lib/fleet/road-calls";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
@@ -1047,6 +1047,13 @@ export default function DefectLog(){
     had already set aside. Zero while a search is running, because the window is
     standing down and claiming otherwise would be the lie above. */
  const feedWindowText=search.trim()?"":feedWindowLabel(feedWindow,feedWindowNow,shiftSettings);
+ /* The drop-down reads THIS SHIFT and the feed is the whole board, because the
+    hours on this device describe no window covering now. The limit and the
+    label degrade together on purpose — see `feedWindowUnresolved` — which is
+    the right failure and was also a silent one: the bar below hangs off
+    `feedWindowText`, so the whole explanation disappeared in exactly the case
+    that needed explaining. */
+ const feedWindowBroken=!search.trim()&&feedWindowUnresolved(feedWindow,feedWindowNow,shiftSettings);
  const hiddenByFeedWindow=feedWindowLimit===null?0:groupDefectLogRecords(stateOnly).length-groupDefectLogRecords(unsearched).length;
  /* Focus reads one bus at arm's length. Editing hands off to the existing
     editor, while completion reuses the same Mark Fixed path as the main log. */
@@ -1772,6 +1779,14 @@ export default function DefectLog(){
        not been narrowed. */}
    {feedWindowText&&<div className="log-window-filtered" role="status">
     <span>LOGGED <b>{feedWindowText}</b>{hiddenByFeedWindow>0?" · "+hiddenByFeedWindow+" OLDER BUS"+(hiddenByFeedWindow===1?"":"ES")+" HIDDEN":""}</span>
+    <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
+   </div>}
+   {/* The same bar for the case where there IS no window to describe. It
+       carries the way out too, because the drop-down that set this is behind
+       ADVANCED ACTIONS and somebody looking at a board that ignored their
+       choice should not have to go find it. */}
+   {feedWindowBroken&&<div className="log-window-filtered log-window-broken" role="status">
+    <span>{feedWindowUnresolvedNote(feedWindow)}</span>
     <button type="button" className="show-all-buses" onClick={()=>setFeedWindow("all")}>SHOW ALL DATES</button>
    </div>}</div>
    {/* Stays here with QUICK FILTERS, which is where somebody looks for it — it is

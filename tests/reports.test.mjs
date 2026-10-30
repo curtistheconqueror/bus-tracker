@@ -834,3 +834,60 @@ test("the forecast adds the two queues it can see, and counts neither twice",asy
  assert.match(modalCode,/inspections:board\.inspections/);
  assert.match(modalCode,/roadCallsPending:board\.roadCallsPending\.length/);
 });
+
+test("an IBS screen defect must not take a flagged bus out of the status report",async()=>{
+ /* FOUND BY A COLD READ of the commit that added RUN BOX NO DISPLAY, which
+    claimed the Status Report picks the new entry up. It does not: `techSections`
+    prints FAREBOX, VENTRA and CUBIC SCREENS, because three is what Curtis asked
+    for — "Fairbox and Venture separate. and cubic screen" — so `tech.ibs` is
+    computed and rendered nowhere.
+
+    That by itself is a gap. What made it a bug is the IBS/VENTRA flag's
+    fallback, which added a flagged bus to VENTRA only when no repair had
+    already named a device — counting `ibs` as "already named" even though
+    nothing prints it. So writing up an IBS screen fault REMOVED the bus from
+    the report. Pre-existing for the two IBS wordings that were already there;
+    the third just made somebody look. */
+ const {buildFleetStatusReport,techSections}=await import("../src/lib/reports/fleet-status-report.ts");
+ const pick={numbers:true,locations:false,repairs:false,inspections:true,roadcalls:true,
+  mystery:true,farebox:true,ventra:true,cubic:true,forecast:false};
+ const flagged=(number,issues)=>({id:"b"+number,n:number,l:"garage-1",s:"defect",down:true,
+  onDownSheet:true,ibsVentra:true,pendingRepair:"",
+  defects:issues.map((issue,index)=>({id:"d"+number+index,category:"Tech Services",issue,
+   details:"",operability:"service",state:"open"}))});
+ const sections=fleet=>Object.fromEntries(techSections(buildFleetStatusReport(fleet,[]),pick)
+  .map(section=>[section.label,section.buses.length]));
+
+ /* THE MEASURED TABLE. Row three is the one that was wrong — VENTRA=0 with no
+    other section carrying the bus at all. */
+ assert.deepEqual(sections([flagged("17560",[])]),{FAREBOX:0,VENTRA:1,"CUBIC SCREENS":0},
+  "the flag alone puts a bus under VENTRA");
+ assert.deepEqual(sections([flagged("17561",["Ventra - INOP (general)"])]),{FAREBOX:0,VENTRA:1,"CUBIC SCREENS":0});
+ assert.deepEqual(sections([flagged("17559",["IBS Screen - Run box no display"])]),
+  {FAREBOX:0,VENTRA:1,"CUBIC SCREENS":0},
+  "an IBS defect must not drop a flagged bus out of every printed section");
+ assert.deepEqual(sections([flagged("17562",["IBS Screen - Screen black"])]),
+  {FAREBOX:0,VENTRA:1,"CUBIC SCREENS":0},"and the same for the wordings that predate it");
+ assert.deepEqual(sections([flagged("17563",["IBS Screen - Run box no display","Ventra - INOP (general)"])]),
+  {FAREBOX:0,VENTRA:1,"CUBIC SCREENS":0},"counted once, not twice");
+
+ /* AND THE DEVICE A REPAIR NAMES STILL WINS where that device IS printed, which
+    is the rule the fallback exists to keep. A CUBIC defect on a flagged bus is
+    counted under CUBIC SCREENS and not under VENTRA as well. */
+ assert.deepEqual(sections([flagged("17564",["CUBIC Screen - MV ER"])]),
+  {FAREBOX:0,VENTRA:0,"CUBIC SCREENS":1});
+
+ /* THE COUNT STILL EXISTS for the day a line is offered — this fix is about
+    where a FLAGGED bus lands, not about hiding the group. */
+ const board=buildFleetStatusReport([flagged("17559",["IBS Screen - Run box no display"])],[]);
+ assert.equal(board.tech.ibs.length,1,"tech.ibs is still computed");
+ assert.ok(!techSections(board,pick).some(section=>section.key==="ibs"),
+  "and still not printed — adding a line is Curtis's call, and `ibs` goes back into the fallback's list that day");
+
+ /* A BUS WITH AN IBS DEFECT AND NO FLAG IS STILL INVISIBLE in the report, and
+    that is the gap rather than the bug: there is no IBS section to put it in.
+    Asserted so the limit is on the record and not mistaken for this fix. */
+ const unflagged=sections([{...flagged("17565",["IBS Screen - Run box no display"]),ibsVentra:false}]);
+ assert.deepEqual(unflagged,{FAREBOX:0,VENTRA:0,"CUBIC SCREENS":0},
+  "known limit: no IBS SCREENS line exists, so an unflagged bus has nowhere to appear");
+});

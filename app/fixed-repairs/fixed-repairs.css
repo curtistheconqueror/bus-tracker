@@ -269,6 +269,11 @@
 .fixed-scope b{font-size:9px;font-weight:900;letter-spacing:.6px;color:var(--fixed-blue)}
 .fixed-scope span{font-size:9px;font-weight:900;color:var(--fixed-ink)}
 .fixed-scope small{font-size:7px;font-weight:900;letter-spacing:.5px;color:var(--fixed-muted)}
+/* THE ONE LINE IN THIS BAR THAT IS NOT A COUNT. The others say what a control
+   cost; this says a control is not in force at all, so it takes the whole width
+   and the amber the Defect Log's own window bar uses, rather than sitting at
+   7px grey among the arithmetic where nobody would read it. */
+.fixed-scope .fixed-scope-warn{flex-basis:100%;border-top:1px solid #e0c08f;margin-top:2px;padding-top:6px;font-size:9px;letter-spacing:.4px;color:#8a5a06}
 
 /* COPY, SHARE, SHARE PAGE. The same three controls the Defect Log draws, at the
    same 44px the rest of this app gives a thumb, and the status line takes the

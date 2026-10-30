@@ -14,8 +14,16 @@ form**, where it used to ask what was found, with DESCRIPTION renamed ADDITIONAL
 DETAILS and the finding box moved into ADVANCED DETAILS. Page themes keep their
 own header ink, which this release had taken off them. **Fixed Repairs narrows
 by WHEN IT WAS FIXED** — ALL, THIS SHIFT, TODAY, 24H, 3 DAYS, 7 DAYS, 30 DAYS —
-and offers COPY, SHARE and SHARE PAGE over exactly the repairs on screen. One
-new repair: **Tech Services → IBS Screen → Run box no display**.
+and offers COPY, SHARE and SHARE PAGE over exactly the repairs on screen, with
+its scope bar now naming what the CATEGORY held back as well. The Defect Log's
+own WHEN LOGGED drop-down gains **LAST 30 DAYS**, so both screens draw one
+window list, and on either screen a window the clock cannot resolve now says so
+instead of quietly showing every date. One new repair:
+**Tech Services → IBS Screen → Run box no display**, which the AI operator also
+answers to as just "run box". And one bug found by a cold read of that entry:
+writing up an IBS screen fault on a bus with the IBS/VENTRA flag ticked
+**removed that bus from the Fleet Status Report**, in every output format —
+fixed, with the measured table held by a test.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -80,6 +88,10 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+ba05e2a Answer the cold read: the Status Report never showed IBS, and an IBS defect hid the bus
+5f4f370 One window list for both screens, and a scope bar that names every filter
+5c618f9 Give bare "run box" a way in, and a rule that drops it when it stops being one repair
+3cf8f68 Queue RUN BOX NO DISPLAY in 194, and re-run the handoff's blocks
 ae31482 Add RUN BOX NO DISPLAY to Tech Services, under the IBS Screen
 2a25591 Answer the cold read: the scope bar blamed the category on the window
 8dc00f8 Write down the two constraints, and stop hard-coding whose garage this is
@@ -132,6 +144,7 @@ app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
 src/components/settings/section-transfer-controls.tsx
+src/components/shared/combo-field.tsx
 src/components/shared/header-theme-live.tsx
 src/lib/defects/bus-share.ts
 src/lib/defects/defect-estimates.ts
@@ -146,6 +159,7 @@ src/lib/defects/report-returns.ts
 src/lib/down-sheet/down-sheet-share.ts
 src/lib/down-sheet/down-sheet-sync.ts
 src/lib/down-sheet/repair-time-estimates.ts
+src/lib/operator/operator-engine.ts
 src/lib/reports/fleet-status-report-print.ts
 src/lib/reports/fleet-status-report.ts
 src/lib/settings/feedback-settings.ts
@@ -157,7 +171,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 53 files changed, 6684 insertions(+), 267 deletions(-)
+ 57 files changed, 7118 insertions(+), 273 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -958,35 +972,149 @@ Curtis: *"we need to add a run box defect to the tech services portion and it
 will go in the fourth sub category yeah just run box... I think run box no
 display might be the best one."*
 
-**Tech Services → IBS Screen → Run box no display.** IBS Screen is the fourth
-group this category draws — Farebox, Ventra, CUBIC Screen, IBS Screen,
-Signs/Cameras/Other — which is where the operator's run number lives. Added to
-both structures `CLAUDE.md` says must stay in step: the prefixed identity in
-`REPAIR_OPTIONS` and the bare name in `REPAIR_OPTION_GROUPS`, since an entry in
-one of them alone is either an option that cannot be picked or a pick that
-cannot be stored.
+**Tech Services → IBS Screen → Run box no display.** He named a POSITION —
+"it will go in the fourth sub category" — and IBS Screen is the fourth group
+this category draws: Farebox, Ventra, CUBIC Screen, IBS Screen,
+Signs/Cameras/Other. Measured in both render paths, the native three-step
+select and the combo field, neither of which sorts or filters the group keys.
+Why that group is the fourth is not something he said and not something the
+code can show, so it is not claimed. Added to both structures `CLAUDE.md` says
+must stay in step: the prefixed identity in `REPAIR_OPTIONS` and the bare name
+in `REPAIR_OPTION_GROUPS`, since an entry in one of them alone is either an
+option that cannot be picked or a pick that cannot be stored.
 
-**NOTHING ELSE NEEDED AN EDIT, and that is what the group prefix buys.** The
-stored identity carries "IBS Screen", `tech-services.ts` reads the device off
-those words, and both readings that one table serves pick it up without being
-told: the Status Report's **IBS SCREENS** line and the `ibs-ventra` quick
-filter. Checked rather than assumed — it is not read as a farebox, it inherits
-Tech Services' own 120-minute allowance rather than wanting a rule of its own,
-and a record stored under it reads back unchanged with no rename map touching
-it.
+**FOUR PICKERS GAIN THE OPTION AND NONE NEEDED AN EDIT, which is what the group
+prefix buys.** The Defect Log's and Down Sheet's combo fields, the Facility
+Map's three-step select, and the FULL SWEEP reviewer's "re-point this finding
+at" drop-down, which reads `REPAIR_OPTIONS["Tech Services"]` directly. The
+stored identity carries "IBS Screen", so `tech-services.ts` reads the device off
+the words and the `ibs-ventra` quick filter picks the entry up without being
+told. It is not read as a farebox — that pattern needs the literal "fare", so
+the `box` in "Run box" cannot reach it — it inherits Tech Services' own
+120-minute allowance rather than wanting a rule of its own, and a record stored
+under it reads back unchanged with no rename map touching it.
 
-**The spoken path resolves it for free**, because the alias table is built from
-the catalog: *"bus 17559 defect run box no display"* plans the right record, and
-so does the phrase with the group in front of it. Bare **"run box"** does NOT —
-the alias is the whole tail. Left that way on purpose and recorded in the test:
-the phrase is unique today, and an alias for it becomes a guess the moment a
-second run-box entry exists, which is the refusal this catalog makes everywhere
-else ("inop general" is the tail of three devices and "screen black" of two, and
-both are refused rather than guessed).
+**THE STATUS REPORT DOES NOT SHOW IT, and an earlier draft of this section said
+it did.** `techSections` prints FAREBOX, VENTRA and CUBIC SCREENS — three,
+because three is what was asked for: *"Fairbox and Venture separate. and cubic
+screen."* `tech.ibs` is computed and rendered nowhere, so this entry is
+invisible in the report in both output formats with every box ticked. The claim
+was stated four times and said "checked rather than assumed" each time; a cold
+read measured it false.
+
+**And the consequence was a real bug, now fixed.** The IBS/VENTRA flag's
+fallback added a flagged bus to VENTRA only where no repair had already named a
+device — counting `ibs` as "already named" though nothing prints it. So writing
+up an IBS screen fault REMOVED the bus from the report. Measured, flag ticked:
+
+| on the bus | printed sections |
+| --- | --- |
+| no tech defect | VENTRA=1 |
+| a Ventra defect | VENTRA=1 |
+| an IBS Screen defect | **none at all** — was VENTRA=0 |
+| an IBS and a Ventra one | VENTRA=1 |
+
+Pre-existing: `IBS Screen - INOP (general)` and `Screen black` do it too, and
+adding a third wording that reaches it is what made somebody look. `ibs` is out
+of that list now, with the table above held by a test — including a mutation
+that prints an IBS section without restoring the exclusion, which would
+double-count a flagged bus and now fails.
+
+**A bus with an IBS defect and NO flag is still invisible in the report**, and
+that is the remaining gap rather than a bug: there is no IBS SCREENS line for it
+to appear in. **Whether one should exist is Curtis's call** — `tech.ibs` is
+already counted, so it is a row in the include list and a line in two
+renderers, and the day it is added `ibs` goes back into the fallback above.
+
+**The spoken path resolves it**, through the alias table built from the catalog:
+*"bus 17559 defect run box no display"* plans the right record, and so does the
+phrase with the group in front of it. Bare **"run box"** now resolves too,
+through the one hand-typed shorthand list in that matcher — see the section
+above. The first draft shipped without it and called the refusal *"the refusal
+this catalog makes everywhere else"*, which overstated it: `searchCatalog`
+resolves bare "run box", "no display" and even "display" to this one option, so
+for one commit the typed picker and the spoken one disagreed about the same two
+words. The refusal was only ever a property of the spoken table's exact-tail
+rule.
 
 **No storage key, no migration, nothing on disk rewritten.** Adding a catalog
 option is additive by construction — the entry is the stored identity, so a
 device that has never seen this release simply never stored one.
+
+### A short way to say the run box
+
+**`SPOKEN_SHORTHAND` in `src/lib/operator/operator-engine.ts`** is one
+hand-typed row — `"run box"` → `IBS Screen - Run box no display` — in a matcher
+that is otherwise derived entirely from the catalog. Curtis: *"I'll just think
+of a way to a short hand way to say it."* The alias pass only ever gets the
+whole tail after the group prefix, so a mechanic standing at the bus saying
+"the run box" matched nothing at all.
+
+**Being the one hand-typed list is the risk, so each row carries its own drop
+rules** rather than being trusted: the target resolves through
+`migrateRepairIdentity`, so a catalog rename moves the phrase with the repair; a
+target no longer in the catalog drops the row, because filing under a retired
+identity is worse than not hearing the phrase; a phrase that already exists as a
+full name or a bare item keeps its derived meaning, so a shorthand can never
+shadow a real wording; and **a phrase that reaches two catalog wordings drops.**
+
+That last one is the objection the previous commit's own test had recorded
+against adding this alias at all — that it becomes a guess the moment a second
+run-box entry exists — turned into the mechanism. Measured with an
+`IBS Screen - Run box no power` planted: "run box" stops resolving and the
+operator asks which screen, while the full wording still works.
+`tests/operator.test.mjs` asserts both halves from outside, so a second run-box
+repair fails the build and somebody chooses the words.
+
+### One window list, and a scope bar that names every filter
+
+**LAST 30 DAYS is on the Defect Log's drop-down now**, which Curtis asked for,
+and the two window lists collapsed into one to do it. It had shipped as
+`FIXED_REPAIR_WINDOWS`, a superset only Fixed Repairs drew, arguing that thirty
+days is every record a live board has. **That argument was wrong on the facts:**
+a DEFERRED defect sits on that board for as long as it takes, so a board
+carrying months of held-back work is exactly where this narrows something. One
+table is also the only shape in which the limit and the label cannot
+disagree — and they already had, once, with `30d` resolving to a limit through
+`FIXED_MINUTES` and to no label at all through `feedWindowLabel`.
+
+**The Fixed Repairs scope bar names the category.** It counted what the window
+held back and what the search hid and said nothing about the drop-down above
+them, so a history narrowed to Brakes read as the whole history with a smaller
+number in it. The share HEADING had the same hole and was fixed first; this is
+the one somebody is actually looking at. Measured against `records`, because the
+category is the first stage and has nothing above it to subtract from — against
+`inWindow` it would double-count what the window had already set aside, which is
+the arithmetic bug the window's own count already carries a comment about.
+
+**And a window that cannot be resolved says so.** `feedWindowMinutes` and
+`feedWindowLabel` degrade together to "no window" when the clock cannot
+answer — the right failure, argued at length in that file, and a silent one: the
+drop-down still read THIS SHIFT, the list was the whole history, and the bar
+that would have explained it hangs off the label, so the explanation vanished in
+exactly the case that needed explaining. `feedWindowUnresolved` is one function
+both pages read, with **two sentences** because "the hours cover no window
+including now" sends somebody to Settings and "this device's clock cannot be
+read" sends them to the phone, and one sentence covering both would be wrong
+half the time.
+
+**Measured in Chromium at 1180 against the production build**, not read off the
+CSS:
+
+| | |
+| --- | --- |
+| window options | ALL · THIS SHIFT · TODAY · LAST 24H · LAST 3 DAYS · LAST 7 DAYS · LAST 30 DAYS |
+| a category + LAST 7 DAYS | `LAST 7 DAYS \| 1 OF 5 REPAIRS \| 4 IN OTHER CATEGORIES` |
+| a category, window ALL | `1 OF 5 REPAIRS \| 4 IN OTHER CATEGORIES` — the bar was silent here |
+| hours covering 08:00-08:30 at 03:xx | `5 OF 5 REPAIRS \| SHIFT HOURS DO NOT COVER NOW — SHOWING EVERY DATE`, 1128x21 at 9px `#8a5a06` |
+
+Six mutations, six caught: the category count measured from the wrong stage,
+the visibility gate dropping it, `feedWindowUnresolved` pinned false, one
+sentence for both causes, ALL counting as unresolved, and the Defect Log
+dropping the note.
+
+**No storage key.** `fixedWindow` and `feedWindow` are both component state and
+are not remembered between visits, which is what they already did.
 
 ### Verified
 
@@ -998,7 +1126,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **405 pass, 0 fail**
+- `npm test` — **413 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -1349,10 +1477,20 @@ was read off a declaration that never paints; and the stood-down row was checked
 as a string rather than on its condition. All four repaired, and thirteen
 mutations run against the result with thirteen caught.
 
-**Noted, not changed:** the bar still says nothing about what the CATEGORY held
-back — the drop-down shows its own value and the share heading names it — and
-THIS SHIFT on unresolvable shift hours still degrades silently to the whole
-history, which is the documented behaviour the Defect Log shares.
+**Both of those are now fixed** — see "One window list, and a scope bar that
+names every filter" above. The bar names the category, and an unresolvable
+window says so on both screens rather than degrading in silence.
+
+**A FOURTH COLD READ found the one real bug in this release's additions**, and
+it was in a claim rather than in code until it was traced. The Status Report
+was asserted four times — twice in commit messages, once here, once in a test
+comment, each saying "checked rather than assumed" — to show the new IBS entry.
+It shows no IBS at all, and the flag fallback that followed from that was
+hiding a flagged bus from the report entirely once an IBS defect was written up
+on it. Answered in `ba05e2a`, with the measured table held by a test. Four
+smaller findings in that read were stale numbers in this file, including a test
+count that was three releases behind while the commit beside it had the right
+one.
 
 **Not verified for the header work:** a real phone or iPad, Safari, or Home
 Screen standalone mode — so the status-bar colour has been measured as a
@@ -1420,9 +1558,19 @@ that refusal has not been measured on an Android device.
    decides this*. Give it its own colour there and the theme stops deciding;
    press FOLLOW and it goes back.
 
-### One open question for Curtis
+### Open questions for Curtis
 
 **Should a bad reply fail the shell install the way a dropped connection
 does?** See the service-worker section above — today a 503 or a captive
 portal's login page does not fail it, and the portal's page gets cached as a
 core page.
+
+**Should the Status Report offer an IBS SCREENS line?** He asked for three
+counts — *"Fairbox and Venture separate. and cubic screen"* — and three is what
+it prints. `tech.ibs` has been counted the whole time and shown nowhere, so a
+bus whose only tech fault is an IBS screen and which does not have the
+IBS/VENTRA flag ticked does not appear in the report at all. Adding it is a row
+in the include list and a line in the two renderers, plus putting `ibs` back
+into the flag fallback so a flagged bus is not counted twice. Nothing has been
+added, because the report is what his superintendent sends upward and that is
+not a section to invent for him.
