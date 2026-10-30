@@ -23,7 +23,10 @@ instead of quietly showing every date. One new repair:
 answers to as just "run box". And one bug found by a cold read of that entry:
 writing up an IBS screen fault on a bus with the IBS/VENTRA flag ticked
 **removed that bus from the Fleet Status Report**, in every output format —
-fixed, with the measured table held by a test.
+fixed, with the measured table held by a test. **PATH TO REPAIR is reachable
+from Fixed Repairs** as well as the Defect Log's focus view, which puts a fourth
+button on each history card and takes that row to 2x2 on a phone. And a finding
+cleared on an open defect no longer comes back from the next Down Sheet save.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -88,6 +91,9 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+ec679d2 PATH TO REPAIR is one component now, and Fixed Repairs opens it too
+bf3b03f An unfinished Down Sheet card has no opinion about what was found
+5dfd929 Queue today's three changes in 194, and correct what the handoff claimed
 ba05e2a Answer the cold read: the Status Report never showed IBS, and an IBS defect hid the bus
 5f4f370 One window list for both screens, and a scope bar that names every filter
 5c618f9 Give bare "run box" a way in, and a rule that drops it when it stops being one repair
@@ -143,6 +149,8 @@ app/settings/_components/map-settings-panel.tsx
 app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
+src/components/defects/path-to-repair-panel.css
+src/components/defects/path-to-repair-panel.tsx
 src/components/settings/section-transfer-controls.tsx
 src/components/shared/combo-field.tsx
 src/components/shared/header-theme-live.tsx
@@ -171,7 +179,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 57 files changed, 7118 insertions(+), 273 deletions(-)
+ 59 files changed, 7862 insertions(+), 428 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -949,22 +957,97 @@ already time statements. The window belongs to the list and the share, and the
 bar between them is what reconciles the two numbers. Worth knowing before
 somebody reads 1,400 TOTAL FIXED above three cards.
 
-### PATH TO REPAIR is reachable from exactly one screen, and that is the gap
+### PATH TO REPAIR is reachable from Fixed Repairs now
 
 Curtis: *"The path to repair should be for everything. Well, you know, to
 everything that's appropriate for it, such as this."*
 
-It already is KEYED for every repair — `repairIdentityKey`, so a writeup
-written once shows on every bus that ever gets that fault. What it is not is
-REACHABLE: the only entry point in the app is the `PTR` button on a defect card
-inside the Defect Log's FOCUS view, so writing one means Defect Log → tap a bus
-→ FOCUS → tap PTR on that defect. Nothing offers it on the Defect Log's own
-feed cards, in the defect editor, on the Down Sheet, or on **Fixed Repairs** —
-which is where somebody is standing the moment after they finish the job, and
-the moment the writeup is worth capturing.
+It was already KEYED for every repair — `repairIdentityKey`, so a writeup
+written once shows on every bus that ever gets that fault. What it was not is
+REACHABLE: the only entry point in the whole app was the `PTR` button on a
+defect card inside the Defect Log's FOCUS view, so writing one meant Defect Log
+→ tap a bus → FOCUS → tap PTR. **Fixed Repairs is where somebody is standing
+the moment after they finish the job**, which is the moment the writeup is worth
+capturing, and it had no way in.
 
-Adding those buttons is a UI change and therefore Curtis's call before it
-exists. Not in this release; recorded so it is not rediscovered.
+**NOTHING MOVED ON THE DEFECT LOG.** Its PTR button is still in the focus view,
+still carries the repair rather than the defect id, still shows `PTR +` when
+nothing is written. This is a second door into the same room.
+
+**The panel is a COMPONENT now** —
+`src/components/defects/path-to-repair-panel.tsx`, which
+`docs/ARCHITECTURE.md` reserves for React two or more pages draw. It owns the
+draft, whether it is editing, and the two checked writes; the LIBRARIES are
+props, because each host's own button reads the writeups to choose between
+`PTR` and `PTR +`, and a panel holding its own copy would save one while the
+button behind it still said there was none. Opening straight into the editor on
+an unwritten repair is derived from the library inside the panel now rather than
+seeded by each caller — two callers seeding it is two chances to open in the
+wrong mode.
+
+**Its colours are its OWN NAMES.** The rules read `--log-*` directly, which was
+fine while one route loaded that stylesheet; Fixed Repairs does not load
+`defect-log.css` at all, so every one of those would have resolved to nothing
+and the panel would have opened as black text on a transparent card. It declares
+`--ptr-*` with light-surface defaults beside itself and each host maps them
+under its app root, so the Defect Log's page themes still drive it — measured on
+Tactical: khaki header, black ink, olive panel — and Fixed Repairs gets its own
+green.
+
+**A UI CHANGE ON THE PHONE, which needs saying.** The card's action row holds
+`EDIT FULL RECORD` / `PTR` / `UNDO FIX` / `DELETE` now, and at 760 and below it
+goes **2x2** rather than one line of four. Four in a line at 360 put DELETE in a
+60px box beside a 41px PTR — four crowded targets with the destructive one on
+the end, which is how somebody deletes a repair reaching for UNDO FIX with a
+glove on. Measured: 2x2 gives each of them 151px at 360 and 165px at 390, at the
+same 48px height. On the shop computer it stays one line, 210/77/140/112, and
+DELETE is pinned to the last column so the three-button cards — a repair logged
+straight onto this page has no UNDO FIX — end at the same right edge as the
+four-button ones rather than 119px short.
+
+**Measured in Chromium against the production build**, not read off the CSS:
+
+| | |
+| --- | --- |
+| Defect Log, Tactical | head `#bca75f` on black ink, panel `#393e30` — the page theme still drives it |
+| Defect Log, light | head `#0b64bd` on white, `z-index:2147483001`, focus view still open underneath, SAVE reachable |
+| Fixed Repairs | head `#087347` on white; writes `pace-ptr-v1` and `pace-repair-hours-v1`; the button flips `PTR +` → `PTR`; reopens in read mode |
+| action row 1180 | 210/77/140/112 in one line, three-button card ending at the same 1143 |
+| action row 360 / 390 | 2x2, 151px and 165px wide, 48px tall |
+
+`z-index:2147483001` is load-bearing and travelled with the panel: every Defect
+Log shade shares `.log-shade`'s single z-index and the focus shade renders LATER
+in the tree, so at equal z-indexes it painted over this panel and ate every tap
+on it. The panel looked perfectly normal while being completely dead. That is
+what "SAVE reachable" in the table above is checking.
+
+**No storage key.** It writes the two that already existed, from a second
+screen.
+
+### An unfinished Down Sheet card has no opinion about what was found
+
+`applyDownEntryToFleet` wrote `normalizeFinding(target.finding)||linked?.finding`
+for every card, finished or not, so a card still holding an old wording restored
+it onto the record on the next save of that row — changing the mechanic, ticking
+a different card, anything. **A finding cleared in the Defect Log came straight
+back.** Same bug as the estimate carry-back removed earlier in this release, and
+the same one `workStates` and `downSheetRecommendation` are deleted rather than
+blanked to avoid.
+
+**Reachable, and newly so.** The sheet's WHAT WAS FOUND box lives inside
+`{item.done && …}`, so a card only ever gets a finding while it is finished —
+but reopening the repair leaves the card holding its copy with the box gone, and
+the Defect Log's own finding box, restored to ADVANCED DETAILS this release, is
+what finally gave somebody a way to clear the record's half on an open defect.
+Two surfaces, one field, and the one with no box on screen was winning.
+
+So the card writes a finding only where the sheet actually asked for one.
+Nothing is lost in either direction: a finding typed on a finished card still
+reaches the record Fixed Repairs reads, `{...linked}` keeps whatever the record
+holds including a deliberate clear, and **the card keeps its own copy** — that
+is the sheet's record of what that mechanic found, and re-ticking it speaks
+again. Three mutations, three caught, one of which also trips a pre-existing
+test, as it should.
 
 ### One new repair: RUN BOX NO DISPLAY
 
@@ -1126,7 +1209,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **413 pass, 0 fail**
+- `npm test` — **415 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -1557,6 +1640,24 @@ that refusal has not been measured on an Android device.
    did, header included, and its row in Settings should say *its page theme
    decides this*. Give it its own colour there and the theme stops deciding;
    press FOLLOW and it goes back.
+15. **FIXED REPAIRS → any card.** There should be a `PTR` button second in the
+   action row, with a `+` on it while nothing is written for that repair. Tap
+   it: the PATH TO REPAIR screen opens in this page's GREEN, with SHOP TIME at
+   the top and the editor already open. Write a line, SAVE, close — the button
+   should lose its `+`. Open the same repair from the DEFECT LOG's focus view
+   and the same words should be there; it is one library, keyed to the repair.
+16. **FIXED REPAIRS on your phone.** The action row is now two by two —
+   EDIT / PTR on the first line, UNDO FIX / DELETE on the second. That is the
+   one UI change in this release on a screen you already use; if you would
+   rather have four across, say so, it is one line of CSS.
+17. **WHEN IT WAS FIXED** on Fixed Repairs and **WHEN LOGGED** on the Defect
+   Log should both offer LAST 30 DAYS now. Pick a category on Fixed Repairs
+   with the window on ALL: the bar above the list should say how many are in
+   other categories, which it used to say nothing about.
+18. **DEFECT LOG, a bus already on the Down Sheet.** Type a cause in WHAT WAS
+   FOUND under ADVANCED DETAILS, save, then clear it and save again. Open that
+   bus's Down Sheet row, change the mechanic, save. The cause should stay
+   cleared — it used to come back.
 
 ### Open questions for Curtis
 
