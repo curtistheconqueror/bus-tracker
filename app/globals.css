@@ -423,7 +423,18 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
 .move-here-body p{display:grid;gap:5px;margin:0;padding:10px;border:1px solid #c6d7eb;border-radius:7px;background:#eef6ff}
 .move-here-body p b{font-size:10px;color:#174d86}.move-here-body p span{font-size:9px;line-height:1.45;color:#61718c}
 .move-here-body label{display:grid;gap:5px;color:#506080;font-size:8px;font-weight:900}
-.move-here-body input{height:42px;border:1px solid #aebbd0;border-radius:6px;padding:0 11px;background:#fff;color:#172858;font-size:12px;font-weight:900}
+/* 16px, AND THE NUMBER IS THE WHOLE POINT. iOS Safari ZOOMS THE PAGE when a
+   text field it is about to focus computes under 16px, and it does not zoom
+   back out when the field is blurred. This one is the field in his
+   screenshots: tapping BUS NUMBER at 12px zoomed the page, and the MOVE BUS
+   HERE button went off the right edge. Curtis, with screenshots: "as I transition
+   through the steps, the screen tends to get larger and a lot of times it
+   places certain controls halfway off the screen." Measured: no page in this
+   app overflows at 1x — the map, Defect Log, Down Sheet, Fixed Repairs,
+   Incidents, Shop Talk and Settings all report scrollWidth 390 against
+   clientWidth 390 — so nothing was ever laid out off the edge. It was the page
+   still sitting at the scale iOS left it at, carried from screen to screen. */
+.move-here-body input{height:42px;border:1px solid #aebbd0;border-radius:6px;padding:0 11px;background:#fff;color:#172858;font-size:16px;font-weight:900}
 .fleet-creation-control{position:relative;border-color:#79a4d2!important;background:#f2f8ff!important}
 .fleet-total{display:grid;grid-template-columns:1fr auto;align-items:center;gap:1px 12px;margin-bottom:12px;padding:10px 12px;border-radius:7px;background:#0a3b75;color:#fff}
 .fleet-total span{font-size:9px;font-weight:900;letter-spacing:.7px}.fleet-total b{grid-row:1/3;grid-column:2;font-size:28px;line-height:1}.fleet-total small{font-size:8px;color:#bed8f7}

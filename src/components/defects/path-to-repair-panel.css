@@ -75,7 +75,11 @@
 .ptr-steps{margin:0;white-space:pre-wrap;color:var(--ptr-text);font-size:14px;line-height:1.55}
 .ptr-edit{display:flex;flex-direction:column;gap:6px;color:var(--ptr-muted);font-size:9px;font-weight:900;letter-spacing:.6px}
 .ptr-edit textarea{width:100%;min-height:150px;border:1px solid var(--ptr-border);border-radius:8px;
- background:var(--ptr-surface);color:var(--ptr-text);padding:10px;font-size:14px;line-height:1.5;resize:vertical}
+/* 16px rather than 14: this is a textarea, and iOS zooms the page for any
+   text field under 16px and never zooms back. Written two days ago at 14px,
+   which is how the rule gets broken — by somebody who did not know there was
+   one. There is a test now. */
+ background:var(--ptr-surface);color:var(--ptr-text);padding:10px;font-size:16px;line-height:1.5;resize:vertical}
 .ptr-count{align-self:flex-end;color:var(--ptr-muted);font-size:9px;font-weight:900}
 .ptr-problem{margin:0;border:1px solid #c02b2b;border-radius:8px;background:#c02b2b14;color:#c02b2b;
  padding:9px 11px;font-size:11px;font-weight:900}
