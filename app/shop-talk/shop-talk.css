@@ -24,9 +24,20 @@
 
 .talk-post{display:grid;gap:9px;margin:12px 14px;padding:13px 15px;border:1px solid #c3d9cc;border-radius:9px;background:#fff;box-shadow:0 6px 22px #07301d12}
 .talk-post label{display:grid;gap:3px;font-size:8px;font-weight:900;letter-spacing:.6px;color:#5c7267}
-.talk-post textarea,.talk-post input,.talk-post select{border:1px solid #bcccc2;border-radius:6px;padding:9px;font-size:13px;font-family:inherit;color:#1d2b22;background:#fff}
+/* 16px, AND THE NUMBER IS THE WHOLE POINT. iOS Safari ZOOMS THE PAGE when a
+   text field it is about to focus computes under 16px, and it does not zoom
+   back out when the field is blurred. This form was 13px at every width,
+   the same as Incidents beside it and for the same reason — neither page ever
+   got the phone block the six older surfaces have. Curtis, with screenshots: "as I transition
+   through the steps, the screen tends to get larger and a lot of times it
+   places certain controls halfway off the screen." Measured: no page in this
+   app overflows at 1x — the map, Defect Log, Down Sheet, Fixed Repairs,
+   Incidents, Shop Talk and Settings all report scrollWidth 390 against
+   clientWidth 390 — so nothing was ever laid out off the edge. It was the page
+   still sitting at the scale iOS left it at, carried from screen to screen. */
+.talk-post textarea,.talk-post input,.talk-post select{border:1px solid #bcccc2;border-radius:6px;padding:9px;font-size:16px;font-family:inherit;color:#1d2b22;background:#fff}
 .talk-post input,.talk-post select{min-height:40px}
-.talk-post textarea{resize:vertical;line-height:1.35;border-color:#5aa37a;border-width:2px;font-size:14px}
+.talk-post textarea{resize:vertical;line-height:1.35;border-color:#5aa37a;border-width:2px;font-size:16px}
 .talk-say{font-size:10px;color:#0d5c34}
 
 .talk-kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}

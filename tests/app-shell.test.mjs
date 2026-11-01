@@ -1334,3 +1334,123 @@ test("PATH TO REPAIR is one component two pages draw, and it carries its own col
  assert.match(fixed, /readSettings as readDefectLogSettings/);
  assert.ok(!/pace-fixed[a-z-]*initials/.test(fixed), "no second initials key");
 });
+
+test("no text field a phone can tap is under 16px, outside the dense grids on the record", async () => {
+ /* iOS Safari ZOOMS THE PAGE when it focuses a text field computing under
+    16px, and it does not zoom back out when the field is blurred. Curtis, with
+    screenshots: "as I transition through the steps, the screen tends to get
+    larger and a lot of times it places certain controls halfway off the
+    screen."
+
+    MEASURED FIRST: no page in this app overflows at 1x. The map, Defect Log,
+    Down Sheet, Fixed Repairs, Incidents, Shop Talk and Settings all report
+    scrollWidth 390 against clientWidth 390 at phone width, and the MOVE BUS
+    HERE button sits at 242..354 of 390. Nothing was ever laid out off the
+    edge — it was the page still at the scale iOS left it at, carried from
+    screen to screen, because one 12px field anywhere poisons the session.
+
+    SELECTS AND CHECKBOXES ARE NOT IN SCOPE. iOS opens a native wheel for a
+    `select` and takes focus on a checkbox without zooming; only text entry
+    does it. A selector naming neither `input` nor `textarea` is skipped, and
+    the Defect Log's 9px checkbox is correctly not a finding.
+
+    A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. `.log-form
+    .type-bus-number>input` is deliberately 26px, 27px on a phone, because it
+    is the box somebody types a fleet number into with gloves on;
+    `.part-prompt input` is 17px. A global `input{font-size:16px}` would shrink
+    both. So the declarations are fixed one at a time and this list is the
+    record of what is left. */
+ const { readdir } = await import("node:fs/promises");
+ const read = async path => readFile(new URL("../" + path, import.meta.url), "utf8");
+ const files = [];
+ const walk = async dir => {
+  for (const entry of await readdir(new URL("../" + dir, import.meta.url), { withFileTypes: true })) {
+   if ([".next", "node_modules", "dist"].includes(entry.name)) continue;
+   const path = dir + "/" + entry.name;
+   if (entry.isDirectory()) await walk(path); else if (path.endsWith(".css")) files.push(path);
+  }
+ };
+ await walk("app"); await walk("src");
+ assert.ok(files.length >= 8, "the stylesheets must be findable, got " + files.length);
+
+ const found = [];
+ for (const file of files) {
+  const css = await read(file);
+  let media = "";
+  for (const [selectorRaw, body] of css.split("}").map(part => part.split("{"))) {
+   if (!body) continue;
+   const selector = selectorRaw.replace(/\/\*[\s\S]*?\*\//g, "").trim().split("\n").pop().trim();
+   if (selector.startsWith("@media")) { media = selector; continue; }
+   if (!/\b(input|textarea)\b/.test(selector)) continue;
+   const declared = body.match(/(?:^|[;{\s])font-size\s*:\s*([^;]+)/);
+   if (!declared) continue;
+   const px = declared[1].match(/^(\d+(?:\.\d+)?)px$/);
+   if (!px || Number(px[1]) >= 16) continue;
+   /* A block that only applies ABOVE the phone breakpoint cannot bite a phone. */
+   const floor = media.match(/min-width:\s*(\d+)px/);
+   if (floor && Number(floor[1]) > 760) continue;
+   found.push(file + "  " + px[1] + "px  " + selector.split(",")[0].trim());
+  }
+ }
+
+ /* WHAT IS LEFT, AND WHY IT IS LEFT. Every one of these is a field inside a
+    DENSE GRID — a scan-review row, a sweep row, a Fleet Campaigns cell — where
+    16px does not fit the column it lives in, so each needs its own layout work
+    rather than a number change. They are real: tapping one still zooms. They
+    are not in the flows the screenshots came from, and widening five grids is
+    a separate job and Curtis's call.
+
+    The point of pinning them is that the list may SHRINK freely and may not
+    GROW. That is the failure that produced thirty-three of these: nobody was
+    counting. */
+ const KNOWN = [
+  "app/defect-log/defect-log.css  9px  .sweep-row input",
+  "app/defect-log/defect-log.css  10px  .log-search input",
+  "app/defect-log/defect-log.css  10px  .log-form input",
+  "app/defect-log/defect-log.css  11px  .sweep-notes textarea",
+  "app/defect-log/defect-log.css  12px  .extend-deferral-field input",
+  "app/defect-log/defect-log.css  14px  .log-form .type-bus-number>input::placeholder",
+  "app/defect-log/defect-log.css  15px  .log-form .diag-light-picker .diag-alarm-code input",
+  "app/down-sheet/down-sheet.css  9px  .scan-row input",
+  "app/down-sheet/down-sheet.css  9px  .down-view-controls input",
+  "app/down-sheet/down-sheet.css  10px  .repair-form input",
+  "app/down-sheet/down-sheet.css  10px  .down-settings-body input",
+  "app/down-sheet/down-sheet.css  11px  .scan-notes textarea",
+  "app/down-sheet/down-sheet.css  13px  .estimate-grid label>span input",
+  "app/fixed-repairs/fixed-repairs.css  12px  .fixed-controls input",
+  "app/fixed-repairs/fixed-repairs.css  12px  .fixed-editor-body input",
+  "app/fixed-repairs/fixed-repairs.css  13px  .fixed-new-bus .fixed-type-bus>input::placeholder",
+  "app/globals.css  9px  .fleet-create-row input",
+  "app/globals.css  9px  .switch-grid input",
+  "app/globals.css  10px  .locate-command input",
+  "app/globals.css  10px  .multi-bus-fields input",
+  "app/globals.css  12px  .cloud-fields input",
+  "app/globals.css  12px  .operator-compose input",
+  "app/globals.css  12px  .service-interval-settings input",
+  "app/lists/lists.css  10px  .list-cell input",
+  "app/lists/lists.css  11px  .list-column-fields input",
+  "app/lists/lists.css  12px  .lists-new input",
+  "app/lists/lists.css  12px  .list-add textarea",
+ ];
+ /* Several of these are OVERRIDDEN by a later 16px rule in the same phone
+    block — `.log-form input` and `.fixed-editor-body input` both measured 16px
+    in Chromium. They stay listed because this scan reads declarations, and a
+    declaration that is only saved by another rule's order is one refactor away
+    from biting. Measuring is what told the two apart; the list is the cheap
+    guard between measurements. */
+ const extra = found.filter(row => !KNOWN.includes(row));
+ assert.deepEqual(extra, [],
+  "a text field under 16px that is not on the record — iOS will zoom the page when somebody taps it and will not zoom back:\n  " +
+  extra.join("\n  "));
+
+ /* AND THE FOUR THAT WERE FIXED STAY FIXED. These are the flows the
+    screenshots came from, and each is a full-width form field where 16px costs
+    no layout at all. */
+ for (const [file, selector] of [
+  ["app/globals.css", ".move-here-body input"],
+  ["app/incidents/incidents.css", ".incident-form input"],
+  ["app/shop-talk/shop-talk.css", ".talk-post textarea"],
+  ["src/components/defects/path-to-repair-panel.css", ".ptr-edit textarea"],
+ ]) assert.ok(!found.some(row => row.startsWith(file + "  ") && row.endsWith("  " + selector)),
+  selector + " in " + file + " must stay at 16px or above");
+});

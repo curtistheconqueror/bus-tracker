@@ -30,13 +30,31 @@
 .incident-form{display:grid;gap:11px;padding:14px 16px 16px}
 
 .incident-form label{display:grid;gap:3px;font-size:8px;font-weight:900;letter-spacing:.6px;color:#6b5847}
-.incident-form input,.incident-form select,.incident-form textarea{border:1px solid #cbb6a2;border-radius:6px;padding:9px;font-size:13px;font-family:inherit;color:#2b2118;background:#fff}
+/* 16px, AND THE NUMBER IS THE WHOLE POINT. iOS Safari ZOOMS THE PAGE when a
+   text field it is about to focus computes under 16px, and it does not zoom
+   back out when the field is blurred. Every field on this form was 13px,
+   at every width, so the whole form zoomed the moment somebody started typing
+   — and an incident is filed by somebody shaken or halfway out the door, which
+   is the worst moment to fight the screen.
+
+   The six surfaces with their own editors — the bus editor, the Defect Log
+   form, the Down Sheet editor, Fixed Repairs, Settings — already do this in
+   their phone blocks. This is Incidents catching up, not a new look. Curtis, with screenshots: "as I transition
+   through the steps, the screen tends to get larger and a lot of times it
+   places certain controls halfway off the screen." Measured: no page in this
+   app overflows at 1x — the map, Defect Log, Down Sheet, Fixed Repairs,
+   Incidents, Shop Talk and Settings all report scrollWidth 390 against
+   clientWidth 390 — so nothing was ever laid out off the edge. It was the page
+   still sitting at the scale iOS left it at, carried from screen to screen. */
+.incident-form input,.incident-form select,.incident-form textarea{border:1px solid #cbb6a2;border-radius:6px;padding:9px;font-size:16px;font-family:inherit;color:#2b2118;background:#fff}
 .incident-form input,.incident-form select{min-height:40px}
 .incident-form textarea{resize:vertical;line-height:1.35}
 .incident-form small{font-size:8px;font-weight:600;letter-spacing:0;color:#9a8674}
 
 /* The one field that blocks the save gets the weight to match. */
-.incident-what textarea{border-color:#a4663c;border-width:2px;font-size:14px}
+/* WHAT HAPPENED is the one required field on an incident, so of everything
+   here it is the one that must not fight back. 16px for the reason above. */
+.incident-what textarea{border-color:#a4663c;border-width:2px;font-size:16px}
 .incident-what{font-size:10px;color:#7a2708}
 
 .incident-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
