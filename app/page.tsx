@@ -3,6 +3,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from "react";
 import {BOARD_SETTINGS_KEY,type BusDisplayMode,DEFAULT_COLORS,DEFAULT_VISUALS,type S,ST,THEMES,readBoardSettings} from "@/src/lib/settings/map-settings";
 import {buzz} from "@/src/lib/settings/feedback-settings";
 import Icon from "@/src/components/fleet/status-icon";
+import {quickViewPosition} from "@/src/lib/fleet/quick-view-position";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import {otherPages} from "@/src/lib/settings/tracker-pages";
 import {createPortal} from "react-dom";
@@ -139,48 +140,44 @@ function touchDropTarget(x:number,y:number){return document.elementFromPoint(x,y
    and `!moved` never fired either: a 400ms hold that showed a ring and then
    did nothing at all, neither a move nor the quick view. */
 const HOLD_MS=400,HOLD_SLOP=8,DRAG_SLOP=7;
-/* The quick view's width cap, shared with `.quick-view` in globals.css so the
-   clamp that keeps it on screen and the rule that sizes it cannot disagree.
-   They did: the clamp assumed 200 and the stylesheet said 250. */
-export const QUICK_MAX_WIDTH=250;
 function Token({bus,edit}:{bus:B;edit:(b:B)=>void}){
- const [quick,setQuick]=useState(false),[dragArmed,setDragArmed]=useState(false),[position,setPosition]=useState({left:0,top:0,below:false}),cardRef=useRef<HTMLDivElement>(null),dragging=useRef(false),anchor=useRef<HTMLButtonElement>(null),lastTouch=useRef(0),suppressClick=useRef(0),pointerType=useRef(""),touchDrag=useRef({pointerId:-1,startX:0,startY:0,lastX:0,lastY:0,armX:0,armY:0,active:false,moved:false}),holdTimer=useRef(0),scrollBlock=useRef<((event:TouchEvent)=>void)|null>(null),touchLift=useRef<((event:TouchEvent)=>void)|null>(null);
+ const [quick,setQuick]=useState(false),[dragArmed,setDragArmed]=useState(false),[position,setPosition]=useState({left:0,top:0,below:false,placed:false}),cardRef=useRef<HTMLDivElement>(null),dragging=useRef(false),anchor=useRef<HTMLButtonElement>(null),lastTouch=useRef(0),suppressClick=useRef(0),pointerType=useRef(""),touchDrag=useRef({pointerId:-1,startX:0,startY:0,lastX:0,lastY:0,armX:0,armY:0,active:false,moved:false}),holdTimer=useRef(0),scrollBlock=useRef<((event:TouchEvent)=>void)|null>(null),touchLift=useRef<((event:TouchEvent)=>void)|null>(null);
  const acknowledgeLocate=()=>{if(bus.located)window.dispatchEvent(new CustomEvent("pace-locate-ack",{detail:bus.id}))};
- /* THE CLAMP HAS TO USE THE CARD'S REAL HALF-WIDTH. It used 100 against a card
-    that is capped at 250, so a token near the left edge put up to 25px of the
-    card off the screen — which is what cut the labels off Curtis's first
-    screenshot. QUICK_MAX_WIDTH is the same number the stylesheet caps at, and
-    a test holds the two together.
+ /* OPENING IT ONLY SAYS "OPEN", and that is the whole of the second repair.
 
-    `below` was `rect.top<150`, a guess at the card's height made before the
-    card exists. It is now measured: `useLayoutEffect` below flips the card
-    under the bus if it does not fit above, after the browser knows how tall it
-    actually is. The guess here is only the first paint. */
- const showQuick=()=>{const rect=anchor.current?.getBoundingClientRect();if(!rect)return;
-  const halfWidth=Math.min(QUICK_MAX_WIDTH/2,Math.max(60,(window.innerWidth-20)/2));
-  setPosition({left:Math.min(window.innerWidth-halfWidth-10,Math.max(halfWidth+10,rect.left+rect.width/2)),
-   top:rect.top<150?rect.bottom+12:rect.top-12,below:rect.top<150});
-  setQuick(true)};
- /* AND THEN THE BROWSER IS ASKED HOW TALL IT ACTUALLY IS. Placing a card above
-    a bus with `translateY(-100%)` puts its TOP at `top - height`, and nothing
-    knew the height until it had rendered — so a tall card simply ran off the
-    top of the screen. Measured before this: 628px of card with its top 227px
-    above a 390x844 viewport.
+    This used to place the card from a guess and then correct it in the layout
+    effect below. The correction ran on open and nothing else — so a SECOND
+    call while the card was already up wrote the guess back and nothing
+    re-measured. `onFocus` is exactly that second call: on a tap, the browser
+    fires focus after pointerup, in its own task, so the ordinary single tap
+    that opens the quick view called this twice and the card ended up placed
+    by the guess EVERY time. Measured on a touch context at 390x844: the card
+    411px tall with its top 111px above the screen, on tap one and tap two.
 
-    One layout pass, before paint, so nothing flickers: if the card does not
-    fit above the bus it flips below, and if it does not fit either way it is
-    pinned to the top edge. The card is `pointer-events:none`, so it can never
-    be scrolled — fitting is the only option it has. */
+    So there is no guess any more. `placed:false` is the request to measure,
+    the effect below answers it, and the card stays hidden for the one frame
+    in between — which the browser never paints, because a layout effect runs
+    before it does. */
+ const showQuick=()=>{
+  if(!anchor.current)return;
+  setPosition(current=>current.placed?{...current,placed:false}:current);
+  setQuick(true);
+ };
+ /* THE BROWSER IS ASKED WHERE IT GOES, once per request to measure.
+    `quickViewPosition` does the arithmetic in `src/lib/fleet/`, so the three
+    faults it has had — a hard-coded half-width, a guessed height, and a pin
+    that held the wrong edge — are things a test can drive at any viewport
+    rather than things only a phone can answer. */
  useLayoutEffect(()=>{
   if(!quick)return;
-  const card=cardRef.current,rect=anchor.current?.getBoundingClientRect();
-  if(!card||!rect)return;
-  const height=card.getBoundingClientRect().height,room=10;
-  const fitsAbove=rect.top-12-height>=room;
-  const below=!fitsAbove&&rect.bottom+12+height<=window.innerHeight-room;
-  const top=fitsAbove?rect.top-12:below?rect.bottom+12:Math.min(window.innerHeight-room,Math.max(room+height,rect.top-12));
-  setPosition(current=>current.top===top&&current.below===below?current:{...current,top,below});
- },[quick,bus.defects,bus.pendingRepair]);
+  const card=cardRef.current,element=anchor.current;
+  if(!card||!element)return;
+  const anchorBox=element.getBoundingClientRect(),cardBox=card.getBoundingClientRect();
+  const next=quickViewPosition(anchorBox,{width:cardBox.width,height:cardBox.height},
+   {width:window.innerWidth,height:window.innerHeight});
+  setPosition(current=>current.placed&&current.left===next.left&&current.top===next.top
+   &&current.below===next.below?current:{...next,placed:true});
+ },[quick,position.placed,bus.defects,bus.pendingRepair]);
 /* Scrolling belongs to the browser now, so an armed drag has to take it back,
    and only one mechanism can. A pointermove `preventDefault` does not cancel a
    scroll, and React registers `touchmove` passively at the root, so neither
@@ -227,15 +224,15 @@ function Token({bus,edit}:{bus:B;edit:(b:B)=>void}){
       before the check wiped the drop target the finger was aiming at. */
    if(pointerType.current==="touch"){event.preventDefault();cancelHold();releaseScroll();return}
    clearDragHighlights();dragging.current=true;setQuick(false);event.dataTransfer.setData("bus",bus.id)}} onDragEnd={()=>{setQuick(false);clearDragHighlights();setTimeout(()=>{dragging.current=false},0)}}
-  onClick={()=>{acknowledgeLocate();if(dragging.current||Date.now()<suppressClick.current)return;setQuick(false);edit(bus)}} aria-label={"Bus "+bus.n+", "+statusLabel+(bus.downSheetReady?", on down sheet":"")+(isHeld(bus)?", on hold":"")+(bus.deferredHeld?", deferred":"")+(bus.wasDeferred?", was deferred, returned to service, still open":"")+(bus.roadcall?", roadcall":"")+(bus.towInProgress?", tow in progress":"")+(bus.checkEngine?", check engine light":"")+(bus.checkTransmission?", check transmission light":"")+(bus.noHorn?", no horn":"")+(bus.badRampKneeler?", bad ramp or kneeler ADA":"")+(bus.farebox?", farebox":"")+(bus.ibsVentra?", IBS or Ventra":"")}><Icon s={bus.s} color={bus.roadcall&&bus.roadcallSolid?"var(--roadcall-color)":undefined}/>{bus.downSheetReady&&<span className="downsheet-ready-badge" aria-hidden="true">DS</span>}{bus.deferredHeld&&<span className="deferred-held-badge" aria-hidden="true">DEF</span>}{isHeld(bus)&&<span className="bus-hold-token-badge" aria-hidden="true">HOLD</span>}{inspection.due&&<span className="inspection-due-badge" aria-hidden="true">INSP</span>}{bus.roadcall&&!bus.roadcallSolid&&<i className="roadcall-dot" aria-hidden="true"/>}<span className="token-number">{bus.n}</span></button>{quick&&typeof document!=="undefined"&&createPortal(<div ref={cardRef} className={"quick-view "+(position.below?"below":"above")} style={{left:position.left,top:position.top}} role="tooltip"><span className="quick-bus"><Icon s={bus.s} color={bus.roadcall&&bus.roadcallSolid?"var(--roadcall-color)":undefined}/><strong>Bus {bus.n}</strong>{bus.roadcall&&<b className="roadcall-badge">ROADCALL</b>}{bus.towInProgress&&<b className="tow-badge">TOW IN PROGRESS</b>}</span><span className="quick-status"><i style={{background:"var(--status-"+bus.s+")"}}/>{statusLabel}</span>{bus.downSheetReady&&<span className="quick-detail downsheet-ready-detail"><b>DS</b>ON DOWN SHEET</span>}{isHeld(bus)&&<span className="quick-detail bus-hold-detail-row"><b>HOLD</b>ON HOLD</span>}{bus.deferredHeld&&<span className="quick-detail deferred-held-detail"><b>DEF</b>DEFERRED, HELD FROM SERVICE</span>}{bus.wasDeferred&&<span className="quick-detail was-deferred-detail"><b>HISTORY</b>WAS DEFERRED, RETURNED TO SERVICE, STILL OPEN</span>}{inspection.due&&<span className="quick-detail inspection-due-detail"><b>INSPECTION</b>DUE NOW</span>}<span className="quick-sitting"><b>SITTING</b>{sittingTime(bus.parkedAt)}</span><span className="quick-detail last-location"><b>LAST MOVED FROM</b>{movedFromLabel(bus.lastMovedFrom)}</span>{bus.roadcall&&bus.roadcallLocation.trim()&&<span className="quick-detail roadcall-location"><b>ROADCALL LOCATION</b>{bus.roadcallLocation}</span>}{bus.towInProgress&&<span className="quick-detail tow-detail"><b>TOW</b>IN PROGRESS</span>}{bus.checkEngine&&<span className="quick-detail alert-detail"><b>WARNING</b>CHECK ENGINE LIGHT</span>}{bus.checkTransmission&&<span className="quick-detail alert-detail"><b>WARNING</b>CHECK TRANSMISSION LIGHT</span>}{bus.noHorn&&<span className="quick-detail alert-detail"><b>WARNING</b>NO HORN</span>}{bus.badRampKneeler&&<span className="quick-detail ada-detail"><b>ADA ♿</b>BAD RAMP/KNEELER</span>}{bus.farebox&&<span className="quick-detail alert-detail"><b>TECH</b>FAREBOX</span>}{bus.ibsVentra&&<span className="quick-detail alert-detail"><b>TECH</b>IBS &amp; VENTRA</span>}{(()=>{
+  onClick={()=>{acknowledgeLocate();if(dragging.current||Date.now()<suppressClick.current)return;setQuick(false);edit(bus)}} aria-label={"Bus "+bus.n+", "+statusLabel+(bus.downSheetReady?", on down sheet":"")+(isHeld(bus)?", on hold":"")+(bus.deferredHeld?", deferred":"")+(bus.wasDeferred?", was deferred, returned to service, still open":"")+(bus.roadcall?", roadcall":"")+(bus.towInProgress?", tow in progress":"")+(bus.checkEngine?", check engine light":"")+(bus.checkTransmission?", check transmission light":"")+(bus.noHorn?", no horn":"")+(bus.badRampKneeler?", bad ramp or kneeler ADA":"")+(bus.farebox?", farebox":"")+(bus.ibsVentra?", IBS or Ventra":"")}><Icon s={bus.s} color={bus.roadcall&&bus.roadcallSolid?"var(--roadcall-color)":undefined}/>{bus.downSheetReady&&<span className="downsheet-ready-badge" aria-hidden="true">DS</span>}{bus.deferredHeld&&<span className="deferred-held-badge" aria-hidden="true">DEF</span>}{isHeld(bus)&&<span className="bus-hold-token-badge" aria-hidden="true">HOLD</span>}{inspection.due&&<span className="inspection-due-badge" aria-hidden="true">INSP</span>}{bus.roadcall&&!bus.roadcallSolid&&<i className="roadcall-dot" aria-hidden="true"/>}<span className="token-number">{bus.n}</span></button>{quick&&typeof document!=="undefined"&&createPortal(<div ref={cardRef} className={"quick-view "+(position.below?"below":"above")} style={{left:position.left,top:position.top,visibility:position.placed?undefined:"hidden"}} role="tooltip"><span className="quick-bus"><Icon s={bus.s} color={bus.roadcall&&bus.roadcallSolid?"var(--roadcall-color)":undefined}/><strong>Bus {bus.n}</strong>{bus.roadcall&&<b className="roadcall-badge">ROADCALL</b>}{bus.towInProgress&&<b className="tow-badge">TOW IN PROGRESS</b>}</span><span className="quick-status"><i style={{background:"var(--status-"+bus.s+")"}}/>{statusLabel}</span>{bus.downSheetReady&&<span className="quick-detail downsheet-ready-detail"><b>DS</b>ON DOWN SHEET</span>}{isHeld(bus)&&<span className="quick-detail bus-hold-detail-row"><b>HOLD</b>ON HOLD</span>}{bus.deferredHeld&&<span className="quick-detail deferred-held-detail"><b>DEF</b>DEFERRED, HELD FROM SERVICE</span>}{bus.wasDeferred&&<span className="quick-detail was-deferred-detail"><b>HISTORY</b>WAS DEFERRED, RETURNED TO SERVICE, STILL OPEN</span>}{inspection.due&&<span className="quick-detail inspection-due-detail"><b>INSPECTION</b>DUE NOW</span>}<span className="quick-sitting"><b>SITTING</b>{sittingTime(bus.parkedAt)}</span><span className="quick-detail last-location"><b>LAST MOVED FROM</b>{movedFromLabel(bus.lastMovedFrom)}</span>{bus.roadcall&&bus.roadcallLocation.trim()&&<span className="quick-detail roadcall-location"><b>ROADCALL LOCATION</b>{bus.roadcallLocation}</span>}{bus.towInProgress&&<span className="quick-detail tow-detail"><b>TOW</b>IN PROGRESS</span>}{bus.checkEngine&&<span className="quick-detail alert-detail"><b>WARNING</b>CHECK ENGINE LIGHT</span>}{bus.checkTransmission&&<span className="quick-detail alert-detail"><b>WARNING</b>CHECK TRANSMISSION LIGHT</span>}{bus.noHorn&&<span className="quick-detail alert-detail"><b>WARNING</b>NO HORN</span>}{bus.badRampKneeler&&<span className="quick-detail ada-detail"><b>ADA ♿</b>BAD RAMP/KNEELER</span>}{bus.farebox&&<span className="quick-detail alert-detail"><b>TECH</b>FAREBOX</span>}{bus.ibsVentra&&<span className="quick-detail alert-detail"><b>TECH</b>IBS &amp; VENTRA</span>}{(()=>{
  /* A COUNT, THEN THE FIRST FEW NAMES, THEN HOW MANY ARE LEFT.
 
     This printed `bus.pendingRepair` whole — every unresolved defect's full
     label, free text and all, joined with semicolons. Curtis: "it looks like a
     mess and what I come to find out is that we really don't need all of the
-    details showing like this." Measured on his bus 15519 with twelve open:
-    1,005 characters in a card 628px tall whose top sat 227px above the top of
-    a 390x844 screen.
+    details showing like this." Measured on a bus built from his 15519 with
+    twelve open: 849 characters, rendering as 128, in a card 628px tall whose
+    top sat 227px above the top of a 390x844 screen.
 
     `defectGlance` does the counting, in `src/lib/defects/` rather than here,
     because what is open on a bus is a question an agent gets asked and a rule
@@ -246,7 +243,7 @@ function Token({bus,edit}:{bus:B;edit:(b:B)=>void}){
  return <span className="quick-detail quick-repairs">
   <b>{glance.open} OPEN</b>
   <span className="quick-repair-names">
-   {glance.names.map(name=><i key={name}>{name}</i>)}
+   {glance.names.map(repair=><i key={repair.id}>{repair.name}</i>)}
    {glance.more>0&&<em>+{glance.more} more — open the bus for the rest</em>}
   </span>
  </span>;

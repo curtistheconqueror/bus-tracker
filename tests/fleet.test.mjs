@@ -2518,13 +2518,16 @@ test("a glance at a bus is a count and a few names, not a transcript", async () 
 
  /* THE SIZE OF THE WIN, held as a number so nobody quietly puts the
     transcript back. */
- const rendered = glance.open + " OPEN" + glance.names.join("") + "+" + glance.more + " more";
- assert.ok(defectSummary(twelve).length > 800, "the old blob was over 800 characters");
- assert.ok(rendered.length < 200, "the glance is under 200, and measured at 136");
+ const rendered = glance.open + " OPEN" + glance.names.map(n => n.name).join("") + "+" + glance.more + " more";
+ /* The numbers, exactly, because three different figures for this one
+    measurement were in the source at once — 829 in a test, 1,005 in two
+    stylesheet comments, and 849 actual. Equalities now, so a drift fails. */
+ assert.equal(defectSummary(twelve).length, 849, "the old blob on this fixture");
+ assert.equal(rendered.length, 128, "and what replaced it");
 
  /* NO FREE TEXT, NO FINDINGS, NO SYMPTOMS. The details are one double-tap away
     on the bus itself, which is where somebody goes when the glance says to. */
- for (const name of glance.names) {
+ for (const { name } of glance.names) {
   assert.ok(!name.includes("fishtailing") && !name.includes("ERIC") && !name.includes("false reading"),
    "a mechanic's note must not reach the glance: " + name);
   assert.ok(name.split(" — ").length === 2, "a name is category and issue, nothing else: " + name);
@@ -2555,44 +2558,113 @@ test("a glance at a bus is a count and a few names, not a transcript", async () 
  assert.deepEqual(defectGlance([]), { open: 0, names: [], more: 0 });
  /* Fewer than the limit means no "+0 more". */
  assert.deepEqual(defectGlance([open("Brakes", "ABS warning")]),
-  { open: 1, names: ["Brakes — ABS warning"], more: 0 });
+  { open: 1, names: [{ id: "BrakesABS warning", name: "Brakes — ABS warning" }], more: 0 });
+
+ /* WHERE THE ISSUE NAME CARRIES NOTHING, THE WORDS ARE THE DEFECT. "Manual
+    entry" and "Driver-reported defect" are placeholders — the second is what
+    `migrateRepairIdentity` mints for any record that lost its wording, which
+    is most of what arrives off a photographed sheet. A cold read found the
+    glance printing "Miscellaneous — Driver-reported defect" over 166
+    characters of driver report, where the card used to print the report. */
+ assert.equal(defectShortLabel(open("Miscellaneous", "Manual entry", "Rear door will not latch, slams open on left turns")),
+  "Rear door will not latch, slams open on left turns");
+ assert.equal(defectShortLabel(open("Miscellaneous", "Driver-reported defect", "Bus pulls hard right under braking")),
+  "Bus pulls hard right under braking");
+ assert.equal(defectShortLabel(open("Miscellaneous", "Driver-reported defect", "")),
+  "Miscellaneous — Driver-reported defect", "with no words there is nothing else to show");
+ const long = defectShortLabel(open("Miscellaneous", "Manual entry", "x".repeat(200)));
+ assert.ok(long.length <= 72 && long.endsWith("…"), "still a glance: " + long.length);
+ assert.equal(defectShortLabel(open("Brakes", "ABS warning", "ignored free text")), "Brakes — ABS warning",
+  "and an ordinary repair still shows no free text");
+
+ /* THE KEY IS THE DEFECT ID, not the name. This app has a merge-duplicates
+    flow because duplicates happen, and four identical ABS records rendered the
+    same React key three times. */
+ const duplicates = ["a", "b", "c", "d"].map(id => ({ ...open("Brakes", "ABS warning"), id }));
+ assert.deepEqual(defectGlance(duplicates).names.map(n => n.id), ["a", "b", "c"]);
 });
 
-test("the quick view cannot leave the screen, and its clamp matches its own width", async () => {
- /* Three separate faults, all measured on a 390x844 screen before this:
-    the card was 628px tall for twelve defects, its top sat 227px above the
-    viewport, and its horizontal clamp assumed a 200px card against a 250px
-    cap, so a bus near the left edge put up to 25px of it off that side —
-    which is what cut the labels off Curtis's first screenshot. */
- const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+test("the quick view is placed by arithmetic, and the arithmetic keeps it on screen", async () => {
+ /* THREE FAULTS IN A ROW, each measured on a phone and each fixed only after
+    a cold read found the fix for the one before it did not hold:
+
+    1. the horizontal clamp hard-coded a half-width of 100 against a 250 cap,
+       so a bus near the left edge put 25px of the card off that side;
+    2. `below` was `rect.top<150`, a guess at the height made before the card
+       existed, so a tall card ran off the top — 628px of card, 227px above a
+       390x844 viewport;
+    3. the repair for 2 pinned the card's BOTTOM to the viewport rather than
+       its top whenever the card was taller than the screen less its margins,
+       which put it off the top again on a 667-tall iPhone SE.
+
+    It is arithmetic in `src/lib/fleet/` now, so all three are things this test
+    drives at any viewport rather than things only a phone can answer. */
+ const { quickViewPosition, QUICK_MAX_WIDTH } =
+  await import("../src/lib/fleet/quick-view-position.ts");
+ /* The card's real edges, given that `top` is its BOTTOM and `left` its CENTRE
+    when it sits above the bus — the fact every one of those bugs came from. */
+ const edges = (anchor, card, view) => {
+  const at = quickViewPosition(anchor, card, view);
+  return { top: at.below ? at.top : at.top - card.height, left: at.left - card.width / 2,
+   right: at.left + card.width / 2, below: at.below };
+ };
+ const bus = { left: 120, right: 160, top: 413, bottom: 445 };
+
+ /* BLOCKER 3, the one that shipped: a card taller than the viewport must keep
+    its TOP on screen. Every one of these measured negative before. */
+ for (const [label, height, view] of [
+  ["iPhone 14, 12 defects + all badges", 512, { width: 390, height: 844 }],
+  ["iPhone 14, 14 defects + a long roadcall", 691, { width: 390, height: 844 }],
+  ["iPhone SE / 8 portrait", 691, { width: 390, height: 667 }],
+  ["iPhone 14 landscape", 586, { width: 844, height: 390 }],
+  ["iPhone SE landscape", 691, { width: 667, height: 375 }],
+ ]) {
+  const box = edges(bus, { width: 250, height }, view);
+  assert.ok(box.top >= 0, label + ": the card's top is at " + Math.round(box.top) + ", off the screen");
+  assert.ok(box.left >= 0 && box.right <= view.width,
+   label + ": " + Math.round(box.left) + ".." + Math.round(box.right) + " against " + view.width);
+ }
+
+ /* ABOVE WHEN IT FITS, BELOW WHEN THAT FITS. A short card on a tall screen
+    sits above the bus, which is where the arrow points. */
+ const roomy = quickViewPosition(bus, { width: 250, height: 200 }, { width: 390, height: 844 });
+ assert.equal(roomy.below, false);
+ assert.equal(roomy.top, 401, "12px above the bus");
+ const nearTop = quickViewPosition({ left: 120, right: 160, top: 40, bottom: 72 },
+  { width: 250, height: 200 }, { width: 390, height: 844 });
+ assert.equal(nearTop.below, true, "no room above, plenty below");
+ assert.equal(nearTop.top, 84);
+
+ /* THE CLAMP USES THE CARD'S OWN WIDTH, not the cap — `width:max-content`
+    means a short card is narrower than 250, and clamping by the cap
+    over-indents it until the arrow stops pointing at the bus. */
+ const narrowLeft = edges({ left: 0, right: 30, top: 600, bottom: 632 },
+  { width: 180, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(narrowLeft.left), 10, "a narrow card hugs the edge margin, not the cap's");
+ const wideLeft = edges({ left: 0, right: 30, top: 600, bottom: 632 },
+  { width: QUICK_MAX_WIDTH, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(wideLeft.left), 10);
+ const narrowRight = edges({ left: 360, right: 390, top: 600, bottom: 632 },
+  { width: 180, height: 200 }, { width: 390, height: 844 });
+ assert.equal(Math.round(narrowRight.right), 380);
+
+ /* ONE NUMBER FOR THE WIDTH CAP, shared with the stylesheet. */
  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+ assert.match(css, new RegExp("\\.quick-view\\{[^}]*max-width:" + QUICK_MAX_WIDTH + "px"),
+  "globals.css must cap .quick-view at the same " + QUICK_MAX_WIDTH + "px the arithmetic uses");
 
- /* ONE NUMBER FOR THE WIDTH. The clamp and the stylesheet disagreed, which is
-    the whole bug; they cannot now without this failing. */
- const declared = page.match(/export const QUICK_MAX_WIDTH=(\d+);/);
- assert.ok(declared, "the width cap must be a named constant the clamp can read");
- assert.match(css, new RegExp("\\.quick-view\\{[^}]*max-width:" + declared[1] + "px"),
-  "globals.css must cap .quick-view at the same " + declared[1] + "px the clamp uses");
- assert.match(page, /const halfWidth=Math\.min\(QUICK_MAX_WIDTH\/2/,
-  "the clamp must use half of the real cap, not a guess");
- assert.equal(/halfWidth=100/.test(page), false, "the 100px guess is what put the card off the edge");
-
- /* THE HEIGHT IS MEASURED, not guessed. `translateY(-100%)` puts the card's
-    top at `top - height`, and nothing knew the height until it had rendered. */
- assert.match(page, /useLayoutEffect\(\(\)=>\{[\s\S]{0,700}?card\.getBoundingClientRect\(\)\.height/,
-  "the card's real height must be read before it is placed");
- assert.match(page, /fitsAbove\?rect\.top-12:below\?rect\.bottom\+12:/,
-  "above if it fits, below if that fits, pinned on screen otherwise");
-
- /* AND IT CAN NEVER BE SCROLLED, so fitting is the only option it has. */
- assert.match(css, /\.quick-view\{[^}]*pointer-events:none/,
-  "the card is not interactive — a scrollbar on it would be unreachable");
-
- /* THE TRANSCRIPT IS GONE. `pendingRepair` survives only as the fallback for a
-    bus that carries the text with no structured defects behind it. */
- assert.match(page, /const glance=defectGlance\(bus\.defects\|\|\[\]\);/);
- assert.equal(/<b>PENDING REPAIR<\/b>\{bus\.pendingRepair\}<\/span>\}\s*<\/div>/.test(page), false,
-  "the unconditional full-transcript row must be gone");
- assert.match(page, /if\(!glance\.open\)return bus\.pendingRepair\.trim\(\)/,
-  "a bus with text but no structured defects still shows something");
+ /* AND THE CARD IS PLACED ONLY FROM A MEASUREMENT. The second fault's repair
+    placed it from a guess and corrected it in a layout effect that ran on open
+    and nothing else — so `onFocus`, which the browser fires AFTER pointerup on
+    an ordinary tap, called `showQuick` a second time, wrote the guess back,
+    and nothing re-measured. The card was off the top on every tap. */
+ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+ assert.match(page, /const showQuick=\(\)=>\{[\s\S]{0,260}?placed:false[\s\S]{0,80}?setQuick\(true\);/,
+  "opening the card may only request a measurement, never place it");
+ assert.equal(/top:rect\.top<150\?/.test(page), false, "the height guess must be gone");
+ assert.equal(/halfWidth/.test(page), false, "the hard-coded half-width must be gone");
+ assert.match(page, /visibility:position\.placed\?undefined:"hidden"/,
+  "the unmeasured frame must not be painted");
+ assert.match(page, /\},\[quick,position\.placed,bus\.defects,bus\.pendingRepair\]\);/,
+  "a fresh request to measure must re-run the effect, which is what onFocus needs");
 });

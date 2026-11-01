@@ -39,7 +39,12 @@
 .road .title{height:38px;color:#164b91;font-size:10px}
 .roadgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(4,1fr);gap:6px;height:174px}
 .road p{text-align:center;margin:8px 0 0;font-size:7px;font-weight:900;color:#61718e}
-.quick-view{min-width:190px;max-width:250px}
+.quick-view{min-width:190px;max-width:250px;max-height:calc(100dvh - 20px);overflow:hidden}
+/* A CARD TALLER THAN THE SCREEN ENDS AT THE SCREEN. It is `pointer-events:none`
+   and can never be scrolled, so the choice is a clean edge or a ragged bleed
+   off the bottom; `quick-view-position.ts` keeps its TOP on screen, which is
+   where the bus number, the status and the badges are. Only reachable on a
+   short viewport with every badge set at once. */
 /* THE REPAIR LIST, as a count and a few names rather than a transcript. It is
    one grid cell beside the OPEN count, so the names stack under each other
    instead of running on as one paragraph — which is how 1,005 characters of

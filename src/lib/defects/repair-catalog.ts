@@ -1325,19 +1325,41 @@ export function defectSummary(defects:StructuredDefect[]){return defects.filter(
    row and wrong anywhere somebody is glancing. */
 export function defectShortLabel(defect:StructuredDefect){
  const identity=migrateRepairIdentity(defect.category,defect.issue);
+ /* WHERE THE NAME CARRIES NOTHING, THE WORDS ARE THE DEFECT. "Manual entry"
+    and "Driver-reported defect" are both placeholders — `defectLabel` already
+    special-cases the first and returns the details instead, and
+    `migrateRepairIdentity` mints the second for any record that lost its
+    wording, which is most of what arrives off a photographed sheet.
+
+    Found by a cold read: a legacy bus with 166 characters of driver report and
+    no structured defect came out as "1 OPEN / Miscellaneous — Driver-reported
+    defect". Before the glance existed the card printed the whole thing, so the
+    change went from all of the information to none of it on exactly the
+    records where the issue name says nothing at all.
+
+    Trimmed to one line's worth, because this is still a glance and the rest is
+    a double-tap away. */
+ if(PLACEHOLDER_ISSUES.has(identity.issue.trim().toLowerCase())){
+  const words=defect.details.trim();
+  if(words)return words.length>72?words.slice(0,71).trimEnd()+"…":words;
+ }
  return [identity.category,bareIssueLabel(identity.category,identity.issue)]
   .map(value=>String(value).trim()).filter(Boolean).join(" — ");
 }
+/* The two issue names that are not the name of a repair. */
+const PLACEHOLDER_ISSUES=new Set(["manual entry","driver-reported defect"]);
 
 /* "A/C and HVAC — No cooling", not "A/C and HVAC — Cooling - No cooling". A
    grouped identity is stored as "Group - Item" and the group is usually a
    restatement of the category once the category is on the line beside it.
 
-   MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". Plenty of
-   issues carry a dash of their own — "Gauges and Dash - Fuel gauge",
-   "Outside rear view mirror - R/S", "Stop Request - Stop request INOP
-   (curbside)" — and a blind split would cut several of those in the wrong
-   place. Only a prefix that IS one of this category's groups comes off. */
+   MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". The example
+   that shows why is "Outside rear view mirror - R/S": a flat category with no
+   groups at all, where a blind split throws away the mirror and leaves "R/S".
+   (Two others named here in an earlier draft — "Gauges and Dash - Fuel gauge"
+   and "Stop Request - Stop request INOP (curbside)" — ARE group-prefixed, so
+   splitting happens to give the same answer on those; they were evidence for
+   nothing.) Only a prefix that IS one of this category's groups comes off. */
 function bareIssueLabel(category:string,issue:string){
  const groups=REPAIR_OPTION_GROUPS[category];
  if(groups)for(const group of Object.keys(groups)){
@@ -1352,9 +1374,10 @@ function bareIssueLabel(category:string,issue:string){
    Curtis, on the Facility Map's quick view: "it looks like a mess and what I
    come to find out is that we really don't need all of the details showing
    like this." It was printing `pendingRepair` whole — `defectSummary`, every
-   unresolved defect's full label joined with semicolons. Measured on his bus
-   15519 with twelve open: 1,005 characters in one blob, in a card 628px tall
-   whose top sat 227px above the top of a 390x844 screen.
+   unresolved defect's full label joined with semicolons. Measured on a bus built from his
+   15519 with twelve open — the same fixture the test ships — 849 characters in
+   one blob, rendering as 128. The card was 628px tall with its top 227px above
+   a 390x844 screen.
 
    So: how many, then the first few NAMES, then how many are left. The free
    text, the findings and the symptoms are all still one double-tap away on the
@@ -1370,5 +1393,11 @@ function bareIssueLabel(category:string,issue:string){
    left after them, so nothing is ever silently dropped. */
 export function defectGlance(defects:StructuredDefect[],limit=3){
  const open=defects.filter(isUnresolved);
- return {open:open.length,names:open.slice(0,limit).map(defectShortLabel),more:Math.max(0,open.length-limit)};
+ /* The id travels with the name because the card draws a list and React needs
+    a stable key: a bus carrying four identical `Brakes / ABS warning` records
+    — which this app has a whole merge-duplicates flow for — rendered the same
+    key three times when the name was used. */
+ return {open:open.length,
+  names:open.slice(0,limit).map(defect=>({id:defect.id,name:defectShortLabel(defect)})),
+  more:Math.max(0,open.length-limit)};
 }
