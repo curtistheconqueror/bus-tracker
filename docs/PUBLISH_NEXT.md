@@ -25,8 +25,10 @@ writing up an IBS screen fault on a bus with the IBS/VENTRA flag ticked
 **removed that bus from the Fleet Status Report**, in every output format —
 fixed, with the measured table held by a test. **PATH TO REPAIR is reachable
 from Fixed Repairs** as well as the Defect Log's focus view, which puts a fourth
-button on each history card and takes that row to 2x2 on a phone. And a finding
+button on each history card and takes that row to 2x2 on a phone. A finding
 cleared on an open defect no longer comes back from the next Down Sheet save.
+And **the screen no longer zooms itself on a phone** — four forms had text
+fields under 16px, which is what iOS zooms for and never undoes.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -91,6 +93,9 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+a9eafb7 Answer the cold read: the 16px fix clipped a control, and its gate was a split
+0526ac6 Stop iOS zooming the page: no text field under 16px in the flows that had one
+5653a27 Record what the cold read found in the PATH TO REPAIR work
 3c5c59b Answer the cold read: a themed ink on a white card, and a phone layout I said was unchanged
 eda9740 Queue the PATH TO REPAIR door and the finding fix in 194
 ec679d2 PATH TO REPAIR is one component now, and Fixed Repairs opens it too
@@ -182,7 +187,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 60 files changed, 8193 insertions(+), 433 deletions(-)
+ 61 files changed, 8738 insertions(+), 438 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -1271,7 +1276,7 @@ both quoted a test count that the next commit moved. A number copied forward is
 the thing `.claude/skills/fresh-context-review` was written about, and naming a
 hash in a section that outlives it is how it keeps happening:
 
-- `npm test` — **415 pass, 0 fail**
+- `npm test` — **417 pass, 0 fail**
 - `npm run lint` — clean, no output
 - `npm run build` — Build complete
 
@@ -1723,6 +1728,48 @@ that refusal has not been measured on an Android device.
    FOUND under ADVANCED DETAILS, save, then clear it and save again. Open that
    bus's Down Sheet row, change the mechanic, save. The cause should stay
    cleared — it used to come back.
+
+### The screen stops zooming on a phone
+
+Curtis, with screenshots: *"as I transition through the steps, the screen tends
+to get larger and a lot of times it places certain controls halfway off the
+screen... make sure that even if it's used on the phone with slightly different
+size specifications this will just adapt to that screen."*
+
+**IT WAS NOT A LAYOUT BUG.** No page overflows at 1x, and a clipped-by-ancestor
+audit of every route at 320 and 390 came back empty. iOS Safari **zooms the
+page** when it focuses a text field computing under 16px and does not zoom back
+out; his fourth screenshot is the moment it happens, on a BUS NUMBER box that
+computes 12px, and the rest are the page still at that scale. It carries within
+a flow — a dialog, an editor — but not across the nav, which is plain
+`<a href>` and so a full document load.
+
+**Raised to 16px**, measured at 360, 390 and 430 with no field under 16px and no
+overflow: Move Bus Here's BUS NUMBER, the whole Incidents form, the Shop Talk
+post form, and PATH TO REPAIR's STEPS box.
+
+**A UI CHANGE AT EVERY WIDTH, including the shop computer**, because neither
+Incidents nor Shop Talk has a phone block. The fields are about 4px taller for
+it — an input 40 → 44, WHAT HAPPENED 79 → 87, the Incidents form 910 → 946.
+Scoping it to touch devices only is one media query if he would rather the
+desktop form stayed as it was.
+
+**A cold read then found the fix had put a control half off the screen**, which
+is the thing it was written to stop. A `<select>` is as wide as its longest
+option, so WHAT KIND went 270px to 313px inside a 270px cell under an
+`overflow:hidden` shell and lost its right border and chevron at 320. Shop Talk
+escaped only because `.talk-row` has carried `min-width:0;max-width:100%` all
+along. Incidents has it now, and both audit clean at 320 through 1180.
+
+**27 fields still zoom and are pinned rather than fixed** — now 35 rows, because
+the first version of the gate could not see a `font` shorthand, a select, or
+anything after a desktop-only media block. Most are inside dense grids where
+16px does not fit the column, so each needs layout work rather than a number
+change. `tests/helpers/css-rules.mjs` is a real CSS reader with its own test —
+sixteen bypasses asserted caught — and the record may shrink but not grow.
+
+**Not verifiable from here.** Chromium does not do the iOS zoom, so what is
+proven is that no field in those flows is under 16px. The real test is a thumb.
 
 ### Open questions for Curtis
 
