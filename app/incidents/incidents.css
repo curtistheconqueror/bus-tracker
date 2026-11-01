@@ -37,15 +37,29 @@
    — and an incident is filed by somebody shaken or halfway out the door, which
    is the worst moment to fight the screen.
 
-   The six surfaces with their own editors — the bus editor, the Defect Log
-   form, the Down Sheet editor, Fixed Repairs, Settings — already do this in
-   their phone blocks. This is Incidents catching up, not a new look. Curtis, with screenshots: "as I transition
+   FOUR OTHER EDITORS ALREADY DO THIS in their phone blocks — the bus editor,
+   the Defect Log form, the Down Sheet editor and Fixed Repairs. (An earlier
+   draft said six and then listed five, one of which was Settings, which does
+   it at base rather than in a phone block.) This is Incidents catching up
+   rather than a new look, and the fields are about 4px taller for it: a text
+   input 40 -> 44, WHAT HAPPENED 79 -> 87, the form 910 -> 946. It lands at
+   every width, the shop computer included, because this page has no phone
+   block — said plainly here because an earlier draft claimed the boxes did not
+   change at all, having measured only the one input that sets its own height. Curtis, with screenshots: "as I transition
    through the steps, the screen tends to get larger and a lot of times it
    places certain controls halfway off the screen." Measured: no page in this
    app overflows at 1x — the map, Defect Log, Down Sheet, Fixed Repairs,
    Incidents, Shop Talk and Settings all report scrollWidth 390 against
    clientWidth 390 — so nothing was ever laid out off the edge. It was the page
-   still sitting at the scale iOS left it at, carried from screen to screen. */
+   still sitting at the scale iOS left it at.
+
+   NOT ACROSS THE NAV, which three copies of this comment claimed. `TrackerNav`
+   renders plain `<a href>` rather than a client link, so every tile is a full
+   document load and iOS resets the scale on a new document. The zoom carries
+   WITHIN a flow — the move dialog, an editor, a panel opening — which is what
+   "as I transition through the steps" describes, and the reason it looked like
+   it followed him everywhere is that one 12px field poisons everything until
+   the next full load. */
 .incident-form input,.incident-form select,.incident-form textarea{border:1px solid #cbb6a2;border-radius:6px;padding:9px;font-size:16px;font-family:inherit;color:#2b2118;background:#fff}
 .incident-form input,.incident-form select{min-height:40px}
 .incident-form textarea{resize:vertical;line-height:1.35}
@@ -58,6 +72,21 @@
 .incident-what{font-size:10px;color:#7a2708}
 
 .incident-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+/* THE FIELDS MAY NOT PUSH PAST THEIR COLUMN, and that is not theoretical: a
+   cold read measured WHAT KIND clipped at 320px, with no right border and no
+   chevron drawn, because `.incident-form-shell` is `overflow:hidden`.
+
+   A `<select>` is sized by its LONGEST OPTION — "Struck by or against
+   something" — so raising this form to 16px took its min-content width from
+   270px to 313px inside a 270px cell. `minmax(0,1fr)` constrains the TRACK and
+   not the label's own content, so the overflow went straight through it.
+
+   This is the rule `.talk-row` next door has carried all along, which is the
+   only reason Shop Talk escaped the same change untouched: removing it there
+   in the browser at 320 sent that select 132 -> 166 and its input 132 -> 239.
+   Incidents never had it. Applied to the label as well as the fields, because
+   the label is the grid item and the field is inside it. */
+.incident-row>label,.incident-row input,.incident-row select,.incident-row textarea{min-width:0;max-width:100%}
 .incident-more{border-top:1px dashed #e0cebc;padding-top:10px}
 .incident-more>summary{font-size:9px;font-weight:900;letter-spacing:.8px;color:#8a6a4c;cursor:pointer;padding:4px 0}
 .incident-more>div{margin-top:9px}
