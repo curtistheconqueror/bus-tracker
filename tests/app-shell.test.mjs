@@ -1335,33 +1335,116 @@ test("PATH TO REPAIR is one component two pages draw, and it carries its own col
  assert.ok(!/pace-fixed[a-z-]*initials/.test(fixed), "no second initials key");
 });
 
-test("no text field a phone can tap is under 16px, outside the dense grids on the record", async () => {
+test("the CSS reader the 16px gate stands on cannot be walked past", async () => {
+ /* The first version of that gate was `css.split("}").map(p => p.split("{"))`,
+    and a cold read found twelve ways past it in one sitting — two of them
+    already live in this repo. A guard nobody has attacked is a guard nobody
+    should trust, so the reader has its own tests before the rule does. */
+ const { cssRules, declaredFontSizePx, isTextEntrySelector, stripComments } =
+  await import("./helpers/css-rules.mjs");
+ const sizeOf = css => {
+  const rule = cssRules(css).find(r => isTextEntrySelector(r.selector));
+  return rule ? declaredFontSizePx(rule.body) : null;
+ };
+
+ /* THE SPLIT'S OWN TWO BUGS, both measured against this repo. */
+ /* `media` was set and never cleared, so a desktop-only block made the scan
+    skip every following top-level rule — 87 rules in settings.css. */
+ const after = cssRules("@media(min-width:761px){.a input{font-size:11px}}.b input{font-size:12px}");
+ assert.deepEqual(after.map(r => r.at), [["@media(min-width:761px)"], []],
+  "an at-rule must stop applying when its block closes");
+ /* The prelude and the first nested selector landed in one chunk, so the first
+    rule inside every phone block was invisible — exactly where a phone
+    font-size goes. */
+ assert.equal(sizeOf("@media(max-width:620px){.c input{font-size:9px}}"), 9,
+  "the first rule inside a block must be read");
+
+ /* EVERY BYPASS THE COLD READ FOUND. Each of these was MISSED by the split. */
+ for (const [label, css, expected] of [
+  ["the font shorthand", ".a textarea{font:700 9px/1.3 Arial}", 9],
+  ["rem", ".a input{font-size:0.8rem}", 12.8],
+  ["em", ".a input{font-size:0.9em}", 14.4],
+  ["percent", ".a input{font-size:80%}", 12.8],
+  ["pt", ".a input{font-size:9pt}", 12],
+  ["!important", ".a input{font-size:12px!important}", 12],
+  ["a trailing space before the semicolon", ".a input{font-size: 12px ;}", 12],
+  ["no final semicolon", ".a input{color:red;font-size:12px}", 12],
+  ["capitals", ".a input{FONT-SIZE:12PX}", 12],
+  ["a later, smaller size in the same body", ".a input{font-size:18px;font-size:12px}", 12],
+  ["a commented-out value", ".a input{/* font-size:18px */font-size:12px}", 12],
+  ["a brace inside an attribute string", '.a input[data-x="{"]{font-size:12px}', 12],
+  ["a comment containing a brace", "/* { */ .a input{font-size:12px}", 12],
+  ["@media inside @supports", "@supports(display:grid){@media(max-width:620px){.a input{font-size:12px}}}", 12],
+  ["input not on the last line of the list", ".a input,\n.b span{font-size:12px}", 12],
+  [":is()", ".a :is(input,textarea){font-size:12px}", 12],
+ ]) assert.equal(sizeOf(css), expected, label + " must be read, and was not by the first version");
+
+ /* AND THE ONES IT MUST NOT CLAIM TO KNOW. A value this reader cannot resolve
+    from one file comes back null and the caller treats it as unknown, rather
+    than as safe — the opposite mistake, and the worse one. */
+ for (const [label, css] of [
+  ["clamp()", ".a input{font-size:clamp(10px,2vw,14px)}"],
+  ["a var()", ".a input{font-size:var(--x,12px)}"],
+  ["a viewport unit", ".a input{font-size:3vw}"],
+ ]) assert.equal(sizeOf(css), null, label + " cannot be resolved by reading one file and must not be guessed");
+
+ /* A COMMENTED-OUT VALUE IS NOT A LIVE ONE, in either direction. The naive
+    `/\*[\s\S]*?\*\//g` this replaces is the exact regex CLAUDE.md records as a
+    two-bug mistake: a string holding "https://x/*" opened a pseudo-comment
+    that swallowed real code after it. */
+ assert.equal(sizeOf('.a input{content:"/*";font-size:12px}'), 12,
+  "a string holding a comment opener must not swallow the rest of the rule");
+ assert.equal(sizeOf(".a input{/* font-size:12px was too small */font-size:16px}"), 16,
+  "a commented-out small value must not read as live");
+ assert.ok(stripComments('a{content:"/* kept */"}').includes("/* kept */"),
+  "strings are kept — the scanner is string-aware, not regex-stripped");
+
+ /* A PSEUDO-ELEMENT IS NOT A CONTROL. `input::placeholder` styles the grey
+    text inside a field; nothing focuses it and no keyboard opens for it. The
+    first version of the record carried two such rows and called them fields
+    that still zoom. */
+ assert.equal(isTextEntrySelector(".a input::placeholder"), false);
+ assert.equal(isTextEntrySelector(".a input"), true);
+ assert.equal(isTextEntrySelector(".a select"), true, "a select is in scope — see the gate below");
+ assert.equal(isTextEntrySelector(".a button"), false);
+ assert.equal(isTextEntrySelector(".inputs-row b"), false, "a class merely containing the word is not a control");
+});
+
+test("no text field a touch device can tap is under 16px, outside the dense grids on the record", async () => {
  /* iOS Safari ZOOMS THE PAGE when it focuses a text field computing under
     16px, and it does not zoom back out when the field is blurred. Curtis, with
     screenshots: "as I transition through the steps, the screen tends to get
     larger and a lot of times it places certain controls halfway off the
     screen."
 
-    MEASURED FIRST: no page in this app overflows at 1x. The map, Defect Log,
-    Down Sheet, Fixed Repairs, Incidents, Shop Talk and Settings all report
-    scrollWidth 390 against clientWidth 390 at phone width, and the MOVE BUS
-    HERE button sits at 242..354 of 390. Nothing was ever laid out off the
-    edge — it was the page still at the scale iOS left it at, carried from
-    screen to screen, because one 12px field anywhere poisons the session.
+    MEASURED FIRST: no page in this app overflows at 1x, and a separate audit
+    of every route at 320 and 390 for controls clipped by an ancestor
+    `overflow:hidden` came back empty. That second audit matters — `scrollWidth
+    === clientWidth` cannot see a clipped control, so it was never evidence for
+    the claim the first version of this comment used it for, and raising this
+    very form to 16px then clipped WHAT KIND at 320 while the document still
+    reported 320 against 320.
 
-    SELECTS AND CHECKBOXES ARE NOT IN SCOPE. iOS opens a native wheel for a
-    `select` and takes focus on a checkbox without zooming; only text entry
-    does it. A selector naming neither `input` nor `textarea` is skipped, and
-    the Defect Log's 9px checkbox is correctly not a finding.
+    A SELECT IS IN SCOPE. The first version excluded selects, on the belief
+    that iOS opens a native wheel without zooming. No primary source was found
+    either way and the developer sources all say the canonical fix is
+    `input, select, textarea`, so the generous reading is the unsafe one here
+    and the strict one costs nothing. The change had already raised the selects
+    in Incidents and Shop Talk, so excluding them from the gate was also the
+    diff contradicting itself.
+
+    TOUCH, NOT PHONE. An iPad zooms the same way, and this garage has one, so a
+    block is only out of scope above 1180.
 
     A BLANKET RULE WAS THE OBVIOUS FIX AND IS WRONG. `.log-form
     .type-bus-number>input` is deliberately 26px, 27px on a phone, because it
-    is the box somebody types a fleet number into with gloves on;
-    `.part-prompt input` is 17px. A global `input{font-size:16px}` would shrink
-    both. So the declarations are fixed one at a time and this list is the
-    record of what is left. */
+    is the box somebody types a fleet number into with gloves on, and
+    `.part-prompt input` is 17px. A global `input{font-size:16px}` shrinks
+    both. So declarations are fixed one at a time and this list is the record
+    of what is left. */
  const { readdir } = await import("node:fs/promises");
- const read = async path => readFile(new URL("../" + path, import.meta.url), "utf8");
+ const { cssRules, declaredFontSizePx, isTextEntrySelector, splitSelector } =
+  await import("./helpers/css-rules.mjs");
  const files = [];
  const walk = async dir => {
   for (const entry of await readdir(new URL("../" + dir, import.meta.url), { withFileTypes: true })) {
@@ -1372,80 +1455,80 @@ test("no text field a phone can tap is under 16px, outside the dense grids on th
  };
  await walk("app"); await walk("src");
  assert.ok(files.length >= 8, "the stylesheets must be findable, got " + files.length);
+ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
  const found = [];
- for (const file of files) {
-  const css = await read(file);
-  let media = "";
-  for (const [selectorRaw, body] of css.split("}").map(part => part.split("{"))) {
-   if (!body) continue;
-   const selector = selectorRaw.replace(/\/\*[\s\S]*?\*\//g, "").trim().split("\n").pop().trim();
-   if (selector.startsWith("@media")) { media = selector; continue; }
-   if (!/\b(input|textarea)\b/.test(selector)) continue;
-   const declared = body.match(/(?:^|[;{\s])font-size\s*:\s*([^;]+)/);
-   if (!declared) continue;
-   const px = declared[1].match(/^(\d+(?:\.\d+)?)px$/);
-   if (!px || Number(px[1]) >= 16) continue;
-   /* A block that only applies ABOVE the phone breakpoint cannot bite a phone. */
-   const floor = media.match(/min-width:\s*(\d+)px/);
-   if (floor && Number(floor[1]) > 760) continue;
-   found.push(file + "  " + px[1] + "px  " + selector.split(",")[0].trim());
+ for (const file of files.sort()) {
+  const css = await readFile(new URL("../" + file, import.meta.url), "utf8");
+  for (const rule of cssRules(css)) {
+   if (!isTextEntrySelector(rule.selector)) continue;
+   const px = declaredFontSizePx(rule.body);
+   if (px === null || px >= 16) continue;
+   if (rule.at.some(at => { const m = at.match(/min-width:\s*(\d+)px/); return m && Number(m[1]) > 1180; })) continue;
+   found.push(file + "  " + px + "px  " + splitSelector(rule.selector).find(isTextEntrySelector));
   }
  }
 
- /* WHAT IS LEFT, AND WHY IT IS LEFT. Every one of these is a field inside a
-    DENSE GRID — a scan-review row, a sweep row, a Fleet Campaigns cell — where
-    16px does not fit the column it lives in, so each needs its own layout work
-    rather than a number change. They are real: tapping one still zooms. They
-    are not in the flows the screenshots came from, and widening five grids is
-    a separate job and Curtis's call.
+ /* WHAT IS LEFT, AND WHY IT IS LEFT. Most are fields inside a DENSE GRID — a
+    scan-review row, a sweep row, a Fleet Campaigns cell — where 16px does not
+    fit the column, so each needs layout work rather than a number change.
 
-    The point of pinning them is that the list may SHRINK freely and may not
-    GROW. That is the failure that produced thirty-three of these: nobody was
-    counting. */
+    SOME OF THESE DO NOT BITE A PHONE, and the first version of this note said
+    they all did. A later rule in the same file's phone block already lifts
+    `.log-search input`, `.log-form input`, `.sweep-notes textarea`,
+    `.repair-form input`, `.down-settings-body input`, `.scan-notes textarea`,
+    `.fixed-controls input`, `.fixed-editor-body input`, `.cloud-fields input`,
+    `.locate-command input` and `.switch-grid input` to 16px; they stay listed
+    because this reads DECLARATIONS, and a declaration saved only by another
+    rule's order is one refactor from biting. Measuring is what told the two
+    apart. `.shop-notes-column textarea` is hidden outright below 760, so it
+    bites an iPad and not a phone.
+
+    The list may SHRINK freely and may not GROW. */
  const KNOWN = [
-  "app/defect-log/defect-log.css  9px  .sweep-row input",
   "app/defect-log/defect-log.css  10px  .log-search input",
+  "app/defect-log/defect-log.css  11px  .log-feed-window select",
   "app/defect-log/defect-log.css  10px  .log-form input",
-  "app/defect-log/defect-log.css  11px  .sweep-notes textarea",
+  "app/defect-log/defect-log.css  9px  .shop-notes-column textarea",
   "app/defect-log/defect-log.css  12px  .extend-deferral-field input",
-  "app/defect-log/defect-log.css  14px  .log-form .type-bus-number>input::placeholder",
   "app/defect-log/defect-log.css  15px  .log-form .diag-light-picker .diag-alarm-code input",
-  "app/down-sheet/down-sheet.css  9px  .scan-row input",
-  "app/down-sheet/down-sheet.css  9px  .down-view-controls input",
+  "app/defect-log/defect-log.css  11px  .sweep-notes textarea",
+  "app/defect-log/defect-log.css  9px  .sweep-row input",
   "app/down-sheet/down-sheet.css  10px  .repair-form input",
   "app/down-sheet/down-sheet.css  10px  .down-settings-body input",
-  "app/down-sheet/down-sheet.css  11px  .scan-notes textarea",
   "app/down-sheet/down-sheet.css  13px  .estimate-grid label>span input",
+  "app/down-sheet/down-sheet.css  11px  .scan-notes textarea",
+  "app/down-sheet/down-sheet.css  9px  .scan-row input",
+  "app/down-sheet/down-sheet.css  9px  .down-view-controls input",
   "app/fixed-repairs/fixed-repairs.css  12px  .fixed-controls input",
   "app/fixed-repairs/fixed-repairs.css  12px  .fixed-editor-body input",
-  "app/fixed-repairs/fixed-repairs.css  13px  .fixed-new-bus .fixed-type-bus>input::placeholder",
+  "app/fixed-repairs/fixed-repairs.css  13px  .fixed-new-bus select",
+  "app/globals.css  10px  .locate-command input",
+  "app/globals.css  12px  .cloud-fields input",
+  "app/globals.css  13px  .native-repair-picker select",
+  "app/globals.css  10px  .multi-bus-fields input",
+  "app/globals.css  9px  .bulk-relocation select",
+  "app/globals.css  9px  .bulk-operability select",
   "app/globals.css  9px  .fleet-create-row input",
   "app/globals.css  9px  .switch-grid input",
-  "app/globals.css  10px  .locate-command input",
-  "app/globals.css  10px  .multi-bus-fields input",
-  "app/globals.css  12px  .cloud-fields input",
   "app/globals.css  12px  .operator-compose input",
+  "app/globals.css  9px  .quick-filter-window select",
   "app/globals.css  12px  .service-interval-settings input",
-  "app/lists/lists.css  10px  .list-cell input",
-  "app/lists/lists.css  11px  .list-column-fields input",
+  "app/lists/_components/work-time.css  12px  .work-time-head select",
   "app/lists/lists.css  12px  .lists-new input",
   "app/lists/lists.css  12px  .list-add textarea",
+  "app/lists/lists.css  10px  .list-cell input",
+  "app/lists/lists.css  11px  .list-column-fields input",
+  "app/lists/lists.css  12px  .lists-new select",
+  "app/settings/settings.css  11px  .master-font-grid select",
  ];
- /* Several of these are OVERRIDDEN by a later 16px rule in the same phone
-    block — `.log-form input` and `.fixed-editor-body input` both measured 16px
-    in Chromium. They stay listed because this scan reads declarations, and a
-    declaration that is only saved by another rule's order is one refactor away
-    from biting. Measuring is what told the two apart; the list is the cheap
-    guard between measurements. */
  const extra = found.filter(row => !KNOWN.includes(row));
  assert.deepEqual(extra, [],
   "a text field under 16px that is not on the record — iOS will zoom the page when somebody taps it and will not zoom back:\n  " +
   extra.join("\n  "));
 
  /* AND THE FOUR THAT WERE FIXED STAY FIXED. These are the flows the
-    screenshots came from, and each is a full-width form field where 16px costs
-    no layout at all. */
+    screenshots came from, and each is a full-width form field. */
  for (const [file, selector] of [
   ["app/globals.css", ".move-here-body input"],
   ["app/incidents/incidents.css", ".incident-form input"],
@@ -1453,4 +1536,22 @@ test("no text field a phone can tap is under 16px, outside the dense grids on th
   ["src/components/defects/path-to-repair-panel.css", ".ptr-edit textarea"],
  ]) assert.ok(!found.some(row => row.startsWith(file + "  ") && row.endsWith("  " + selector)),
   selector + " in " + file + " must stay at 16px or above");
+
+ /* THE TWO THAT ARE DELIBERATELY LARGER, which is why there is no blanket
+    rule. If either ever falls to 16, somebody has reached for one. */
+ const log = await read("app/defect-log/defect-log.css");
+ assert.match(log, /\.log-form \.type-bus-number>input\{[^}]*font-size:26px/);
+ assert.match(log, /\.log-form \.type-bus-number>input\{font-size:27px/);
+ assert.match(log, /\.part-prompt input\{[^}]*font-size:17px/);
+
+ /* AND NOTHING MAY BE CLIPPED BY AN ANCESTOR, which is the failure raising
+    this very form to 16px caused once: a select is sized by its longest
+    option, and WHAT KIND went 270px to 313px inside a 270px cell under an
+    `overflow:hidden` shell. Both forms carry the guard now. */
+ for (const [file, row] of [["app/incidents/incidents.css", ".incident-row"],
+  ["app/shop-talk/shop-talk.css", ".talk-row"]]) {
+  const css = await read(file);
+  assert.match(css, new RegExp("\\" + row + "[^{]*\\{[^}]*min-width:0;max-width:100%"),
+   file + " must stop a field pushing past its column — a select is as wide as its longest option");
+ }
 });

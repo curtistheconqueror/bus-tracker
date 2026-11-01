@@ -433,7 +433,15 @@ body.modal-scroll-locked .defect-entry{scroll-margin-block:64px 76px}
    app overflows at 1x — the map, Defect Log, Down Sheet, Fixed Repairs,
    Incidents, Shop Talk and Settings all report scrollWidth 390 against
    clientWidth 390 — so nothing was ever laid out off the edge. It was the page
-   still sitting at the scale iOS left it at, carried from screen to screen. */
+   still sitting at the scale iOS left it at.
+
+   NOT ACROSS THE NAV, which three copies of this comment claimed. `TrackerNav`
+   renders plain `<a href>` rather than a client link, so every tile is a full
+   document load and iOS resets the scale on a new document. The zoom carries
+   WITHIN a flow — the move dialog, an editor, a panel opening — which is what
+   "as I transition through the steps" describes, and the reason it looked like
+   it followed him everywhere is that one 12px field poisons everything until
+   the next full load. */
 .move-here-body input{height:42px;border:1px solid #aebbd0;border-radius:6px;padding:0 11px;background:#fff;color:#172858;font-size:16px;font-weight:900}
 .fleet-creation-control{position:relative;border-color:#79a4d2!important;background:#f2f8ff!important}
 .fleet-total{display:grid;grid-template-columns:1fr auto;align-items:center;gap:1px 12px;margin-bottom:12px;padding:10px 12px;border-radius:7px;background:#0a3b75;color:#fff}
