@@ -1318,3 +1318,57 @@ export function defectLabel(defect:StructuredDefect){
  return [defect.category,defect.issue,quantity,findingLabel(defect.finding),defectSupportingDetails(defect)].map(value=>String(value).trim()).filter(Boolean).join(" — ")
 }
 export function defectSummary(defects:StructuredDefect[]){return defects.filter(isUnresolved).map(defectLabel).join("; ")}
+
+/* THE SHORTEST HONEST NAME FOR A REPAIR: the category and the issue, nothing
+   else. `defectLabel` above adds the quantity, the finding, the diag light,
+   the symptoms and whatever the mechanic typed, which is right on a Down Sheet
+   row and wrong anywhere somebody is glancing. */
+export function defectShortLabel(defect:StructuredDefect){
+ const identity=migrateRepairIdentity(defect.category,defect.issue);
+ return [identity.category,bareIssueLabel(identity.category,identity.issue)]
+  .map(value=>String(value).trim()).filter(Boolean).join(" — ");
+}
+
+/* "A/C and HVAC — No cooling", not "A/C and HVAC — Cooling - No cooling". A
+   grouped identity is stored as "Group - Item" and the group is usually a
+   restatement of the category once the category is on the line beside it.
+
+   MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". Plenty of
+   issues carry a dash of their own — "Gauges and Dash - Fuel gauge",
+   "Outside rear view mirror - R/S", "Stop Request - Stop request INOP
+   (curbside)" — and a blind split would cut several of those in the wrong
+   place. Only a prefix that IS one of this category's groups comes off. */
+function bareIssueLabel(category:string,issue:string){
+ const groups=REPAIR_OPTION_GROUPS[category];
+ if(groups)for(const group of Object.keys(groups)){
+  const prefix=group+" - ";
+  if(issue.startsWith(prefix))return repairIssueDisplayLabel(issue.slice(prefix.length),group);
+ }
+ return repairIssueDisplayLabel(issue);
+}
+
+/* WHAT A GLANCE AT A BUS SHOWS, and it is a count before it is a list.
+
+   Curtis, on the Facility Map's quick view: "it looks like a mess and what I
+   come to find out is that we really don't need all of the details showing
+   like this." It was printing `pendingRepair` whole — `defectSummary`, every
+   unresolved defect's full label joined with semicolons. Measured on his bus
+   15519 with twelve open: 1,005 characters in one blob, in a card 628px tall
+   whose top sat 227px above the top of a 390x844 screen.
+
+   So: how many, then the first few NAMES, then how many are left. The free
+   text, the findings and the symptoms are all still one double-tap away on the
+   bus itself, which is where somebody goes when the glance says to.
+
+   IT LIVES HERE RATHER THAN IN THE CARD because a count shown on a screen is a
+   question an agent can be asked — "what is open on 15519" — and
+   `docs/ARCHITECTURE.md` is explicit that a rule computed inline in a
+   `page.tsx` has to be reimplemented in the MCP route to be answerable, and
+   then there are two of it.
+
+   `limit` is the number of names, not the number of defects: `more` is what is
+   left after them, so nothing is ever silently dropped. */
+export function defectGlance(defects:StructuredDefect[],limit=3){
+ const open=defects.filter(isUnresolved);
+ return {open:open.length,names:open.slice(0,limit).map(defectShortLabel),more:Math.max(0,open.length-limit)};
+}

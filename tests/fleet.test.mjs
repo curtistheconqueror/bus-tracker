@@ -2480,3 +2480,119 @@ test("site-config describes this building exactly as the five tables already do"
  assert.equal(SITE_SECTIONS.length,Object.keys(SECTION_SLOTS).length);
  assert.equal(SITE_SECTIONS.flatMap(section=>section.areas).length,Object.keys(RELOCATION_AREAS).length);
 });
+
+test("a glance at a bus is a count and a few names, not a transcript", async () => {
+ /* Curtis, on the Facility Map's quick view, with screenshots: "it looks like
+    a mess and what I come to find out is that we really don't need all of the
+    details showing like this... there has to be a better way to do this."
+
+    It printed `bus.pendingRepair` whole — `defectSummary`, which is every
+    unresolved defect's FULL label joined with semicolons, free text and all.
+    Measured on a bus built from his 15519: 829 characters, in a card 628px
+    tall whose top sat 227px above the top of a 390x844 screen. */
+ const { defectGlance, defectShortLabel, defectSummary } =
+  await import("../src/lib/defects/repair-catalog.ts");
+ const open = (category, issue, details = "") =>
+  ({ id: category + issue, category, issue, details, operability: "service", state: "open" });
+ const twelve = [
+  open("Battery, Starting and Charging", "Battery drain"),
+  open("A/C and HVAC", "Cooling - No cooling", "No A/C"),
+  open("Suspension and Steering", "Ride-height issue", "When turning bus leans"),
+  open("A/C and HVAC", "Cooling - Other A/C repair", "FLEET REVIEW-ASSIGN TO ERIC IN MORNING"),
+  open("Operator/Driver Controls", "Gauges and Dash - Fuel gauge", "INOP / false reading"),
+  open("Inspection", "B-18", "B18"),
+  open("Suspension and Steering", "Dogtracking", "Mechanic and driver reported that the bus right rear is not lined up with front when driving. Dog tracking, but was reported as fishtailing."),
+  open("Lights, Mirrors and Alarms", "Outside rear view mirror - R/S", "Falls out of housing & cracked"),
+  open("Brakes", "ABS warning"),
+  open("Engine", "Oil leak", "We had to put quart of oil in it"),
+  open("Bus Accessories", "Stop Request - Stop request INOP (curbside)", "It is stuck"),
+  open("Miscellaneous", "Noise / vibration", "Grinding Noise from Rear of Bus"),
+ ];
+
+ const glance = defectGlance(twelve);
+ assert.equal(glance.open, 12);
+ assert.equal(glance.names.length, 3, "three names, then a count of the rest");
+ assert.equal(glance.more, 9);
+ assert.equal(glance.names.length + glance.more, glance.open,
+  "nothing may be silently dropped — the names and `more` must account for every open repair");
+
+ /* THE SIZE OF THE WIN, held as a number so nobody quietly puts the
+    transcript back. */
+ const rendered = glance.open + " OPEN" + glance.names.join("") + "+" + glance.more + " more";
+ assert.ok(defectSummary(twelve).length > 800, "the old blob was over 800 characters");
+ assert.ok(rendered.length < 200, "the glance is under 200, and measured at 136");
+
+ /* NO FREE TEXT, NO FINDINGS, NO SYMPTOMS. The details are one double-tap away
+    on the bus itself, which is where somebody goes when the glance says to. */
+ for (const name of glance.names) {
+  assert.ok(!name.includes("fishtailing") && !name.includes("ERIC") && !name.includes("false reading"),
+   "a mechanic's note must not reach the glance: " + name);
+  assert.ok(name.split(" — ").length === 2, "a name is category and issue, nothing else: " + name);
+ }
+
+ /* THE GROUP PREFIX COMES OFF, because the category already says the area:
+    "A/C and HVAC — No cooling", not "A/C and HVAC — Cooling - No cooling". */
+ assert.equal(defectShortLabel(open("A/C and HVAC", "Cooling - No cooling")), "A/C and HVAC — No cooling");
+ /* MATCHED AGAINST THE GROUP TABLE, never by splitting on " - ". These three
+    carry a dash of their own and a blind split cuts each in the wrong place. */
+ assert.equal(defectShortLabel(open("Operator/Driver Controls", "Gauges and Dash - Fuel gauge")),
+  "Operator/Driver Controls — Fuel gauge");
+ assert.equal(defectShortLabel(open("Lights, Mirrors and Alarms", "Outside rear view mirror - R/S")),
+  "Lights, Mirrors and Alarms — Outside rear view mirror - R/S",
+  "not a group prefix, so the dash stays");
+ assert.equal(defectShortLabel(open("Suspension and Steering", "Ride-height issue")),
+  "Suspension and Steering — Ride-height issue");
+
+ /* A RENAMED REPAIR STILL READS, through the same `migrateRepairIdentity`
+    every stored defect goes through — a glance keyed on raw wording would go
+    blank after a catalog rename and nobody would notice. */
+ assert.equal(defectShortLabel(open("Air System", "Leak")).startsWith("Pneumatic System"), true,
+  "the glance resolves a renamed category like everything else does");
+
+ /* COMPLETED REPAIRS ARE NOT OPEN ONES. */
+ assert.deepEqual(defectGlance([{ ...open("Brakes", "ABS warning"), state: "completed" }]),
+  { open: 0, names: [], more: 0 });
+ assert.deepEqual(defectGlance([]), { open: 0, names: [], more: 0 });
+ /* Fewer than the limit means no "+0 more". */
+ assert.deepEqual(defectGlance([open("Brakes", "ABS warning")]),
+  { open: 1, names: ["Brakes — ABS warning"], more: 0 });
+});
+
+test("the quick view cannot leave the screen, and its clamp matches its own width", async () => {
+ /* Three separate faults, all measured on a 390x844 screen before this:
+    the card was 628px tall for twelve defects, its top sat 227px above the
+    viewport, and its horizontal clamp assumed a 200px card against a 250px
+    cap, so a bus near the left edge put up to 25px of it off that side —
+    which is what cut the labels off Curtis's first screenshot. */
+ const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+ const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+ /* ONE NUMBER FOR THE WIDTH. The clamp and the stylesheet disagreed, which is
+    the whole bug; they cannot now without this failing. */
+ const declared = page.match(/export const QUICK_MAX_WIDTH=(\d+);/);
+ assert.ok(declared, "the width cap must be a named constant the clamp can read");
+ assert.match(css, new RegExp("\\.quick-view\\{[^}]*max-width:" + declared[1] + "px"),
+  "globals.css must cap .quick-view at the same " + declared[1] + "px the clamp uses");
+ assert.match(page, /const halfWidth=Math\.min\(QUICK_MAX_WIDTH\/2/,
+  "the clamp must use half of the real cap, not a guess");
+ assert.equal(/halfWidth=100/.test(page), false, "the 100px guess is what put the card off the edge");
+
+ /* THE HEIGHT IS MEASURED, not guessed. `translateY(-100%)` puts the card's
+    top at `top - height`, and nothing knew the height until it had rendered. */
+ assert.match(page, /useLayoutEffect\(\(\)=>\{[\s\S]{0,700}?card\.getBoundingClientRect\(\)\.height/,
+  "the card's real height must be read before it is placed");
+ assert.match(page, /fitsAbove\?rect\.top-12:below\?rect\.bottom\+12:/,
+  "above if it fits, below if that fits, pinned on screen otherwise");
+
+ /* AND IT CAN NEVER BE SCROLLED, so fitting is the only option it has. */
+ assert.match(css, /\.quick-view\{[^}]*pointer-events:none/,
+  "the card is not interactive — a scrollbar on it would be unreachable");
+
+ /* THE TRANSCRIPT IS GONE. `pendingRepair` survives only as the fallback for a
+    bus that carries the text with no structured defects behind it. */
+ assert.match(page, /const glance=defectGlance\(bus\.defects\|\|\[\]\);/);
+ assert.equal(/<b>PENDING REPAIR<\/b>\{bus\.pendingRepair\}<\/span>\}\s*<\/div>/.test(page), false,
+  "the unconditional full-transcript row must be gone");
+ assert.match(page, /if\(!glance\.open\)return bus\.pendingRepair\.trim\(\)/,
+  "a bus with text but no structured defects still shows something");
+});
