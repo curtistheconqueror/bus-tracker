@@ -56,6 +56,16 @@ export default function FormCoachBar({step,hide}:{step:CoachStep;hide:()=>void})
   if(!anchor)return;
   anchor.setAttribute("data-coach-active","");
   return ()=>anchor.removeAttribute("data-coach-active");
+ /* THE DEPENDENCY IS THE STEP'S TARGET AND NOT THE NODE, and that is sound
+    only because every anchor holds its slot. Each is written `{cond&&<X/>}`
+    inside a stable parent, so React keeps the same element across the
+    re-renders a keystroke causes rather than re-creating it — if one were ever
+    re-mounted while the target name stayed put, the ring would be lost with no
+    recovery, since nothing re-checks and there is no observer. Driven and
+    measured rather than assumed: bus to category to group to issue to count to
+    ready and back again, switching between repairs that add and remove the
+    count anchor, 54 keystrokes into ADDITIONAL DETAILS — exactly one ring at
+    every point, the right one, and none left after the editor closes. */
  },[step.target]);
  /* `role="status"` rather than `alert`: it is a running commentary on a form
     somebody is filling in, and an assertive live region would interrupt a
