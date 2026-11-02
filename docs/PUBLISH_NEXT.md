@@ -101,6 +101,12 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+0e27216 A step-by-step helper on the defect form, off until somebody turns it on
+1269097 Size the bus generation chips for their label instead of for the box
+2df4f73 Fix the Defect Log form, which has not opened since the PATH TO REPAIR extraction
+c8f1aae Answer the cold read: the card still ran off the top on every real tap
+7dfe835 The bus quick view is a glance again, not a transcript
+97ce8f2 Queue the iOS zoom fix in 194
 a9eafb7 Answer the cold read: the 16px fix clipped a control, and its gate was a split
 0526ac6 Stop iOS zooming the page: no text field under 16px in the flows that had one
 5653a27 Record what the cold read found in the PATH TO REPAIR work
@@ -149,6 +155,7 @@ b387c33 Queue application release 193 from the reviewed PR41 merge
 
 ```
 $ git diff --name-only a009c08..HEAD -- app src
+app/defect-log/_components/form-coach-bar.tsx
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
 app/down-sheet/down-sheet.css
@@ -160,6 +167,7 @@ app/incidents/incidents.css
 app/layout.tsx
 app/lists/lists.css
 app/page.tsx
+app/settings/_components/defect-log-settings-modal.tsx
 app/settings/_components/map-settings-panel.tsx
 app/settings/page.tsx
 app/settings/settings.css
@@ -168,6 +176,8 @@ src/components/defects/path-to-repair-panel.css
 src/components/defects/path-to-repair-panel.tsx
 src/components/settings/fixed-repairs-settings.tsx
 src/components/settings/section-transfer-controls.tsx
+src/components/shared/bus-selector.css
+src/components/shared/bus-selector.tsx
 src/components/shared/combo-field.tsx
 src/components/shared/header-theme-live.tsx
 src/lib/defects/bus-share.ts
@@ -177,15 +187,18 @@ src/lib/defects/defect-log-sync.ts
 src/lib/defects/duplicate-defects.ts
 src/lib/defects/feed-window.ts
 src/lib/defects/fixed-share.ts
+src/lib/defects/form-coach.ts
 src/lib/defects/quick-filter-share.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
 src/lib/down-sheet/down-sheet-share.ts
 src/lib/down-sheet/down-sheet-sync.ts
 src/lib/down-sheet/repair-time-estimates.ts
+src/lib/fleet/quick-view-position.ts
 src/lib/operator/operator-engine.ts
 src/lib/reports/fleet-status-report-print.ts
 src/lib/reports/fleet-status-report.ts
+src/lib/settings/coach-settings.ts
 src/lib/settings/feedback-settings.ts
 src/lib/settings/header-theme.ts
 src/lib/settings/map-settings.ts
@@ -195,7 +208,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 61 files changed, 8738 insertions(+), 438 deletions(-)
+ 68 files changed, 10084 insertions(+), 458 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
