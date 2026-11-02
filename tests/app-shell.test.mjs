@@ -1555,3 +1555,46 @@ test("no text field a touch device can tap is under 16px, outside the dense grid
    file + " must stop a field pushing past its column — a select is as wide as its longest option");
  }
 });
+
+test("nothing in app/ or src/ names an identifier that does not exist", async () => {
+ /* THIS SHIPPED, AND IT TOOK THE DEFECT LOG'S MAIN FORM DOWN. Extracting the
+    PATH TO REPAIR panel narrowed an import in `app/defect-log/page.tsx` from
+    `{findRepairMinutes,readRepairHoursLedger,saveRepairMinutes,
+    writeRepairHoursLedger}` to `{readRepairHoursLedger}` — and one call to
+    `findRepairMinutes` was still there, 1,355 lines away, feeding the estimate
+    badge. Pressing + LOG DEFECT threw `ReferenceError: findRepairMinutes is
+    not defined` and the form simply did not open. Two cold reads and three
+    pushes went past it.
+
+    EVERY GATE THIS PROJECT HAS WAS GREEN. `npm test` passes because nothing
+    renders that editor; `npm run lint` passes because the TypeScript rule for
+    undefined names is off where the compiler owns it; `npm run build` passes
+    because vinext does not typecheck. And `npx tsc --noEmit` DID report it —
+    I compared the error COUNT, 214 against 214, instead of the error LIST, and
+    an unrelated error had gone away in the same change. A count against a dirty
+    baseline hides exactly the error you just added.
+
+    So this asserts the one error class that means "this will throw the moment
+    somebody opens it": TS2304, a name with no definition. Not the whole of
+    `tsc` — this repo carries 213 other errors and fixing them is its own job —
+    just the class that is a crash rather than a type quibble. */
+ const { execFile } = await import("node:child_process");
+ const { promisify } = await import("node:util");
+ const run = promisify(execFile);
+ const root = new URL("../", import.meta.url).pathname;
+ /* tsc exits non-zero whenever it reports anything, and this repo expects it
+    to, so the output is what matters rather than the exit code. */
+ const out = await run("npx", ["tsc", "--noEmit"], { cwd: root, maxBuffer: 32 * 1024 * 1024 })
+  .then(result => result.stdout + result.stderr)
+  .catch(error => (error.stdout || "") + (error.stderr || ""));
+ assert.ok(out.length, "tsc produced no output at all, so this test proves nothing");
+
+ const undefined_names = out.split("\n")
+  .filter(line => line.includes("error TS2304"))
+  /* `worker/index.ts` names Cloudflare's `Fetcher`, which is a type from an
+     ambient package this tsconfig does not pull in. It is not app code and it
+     cannot throw in a browser. */
+  .filter(line => line.startsWith("app/") || line.startsWith("src/"));
+ assert.deepEqual(undefined_names, [],
+  "a name with no definition will throw the moment that code runs:\n  " + undefined_names.join("\n  "));
+});
