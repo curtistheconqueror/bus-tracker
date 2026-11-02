@@ -18,6 +18,7 @@ import {learnFinding,readFindingsMemory,writeFindingsMemory} from "@/src/lib/def
 import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot,restoreDownSheetState} from "@/src/lib/down-sheet/down-sheet-clear";
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
+import {addMintedEntries,mintSkippedMessage} from "@/src/lib/down-sheet/sheet-mint";
 import {reconcileRoadCallsFromSheet} from "@/src/lib/fleet/road-calls";
 import {estimateFromHours,formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
@@ -83,6 +84,14 @@ type DownEntry={
 };
 
 const MAX_ENTRIES=98;
+/* ONE SET OF RULES FOR BOTH MINT PATHS. `MAX_ENTRIES` is the ACTIVE capacity —
+   that is what it means at ADD DOWN BUS, at the scan import's refusal, at PUT
+   BACK, on the button and on the capacity tile. It was applied to the sheet's
+   TOTAL in the two mint paths alone, which deleted stored repair records on a
+   page load and dropped buses that were genuinely down. See
+   `src/lib/down-sheet/sheet-mint.ts`; module scope so neither path can hold a
+   different copy of it. */
+const MINT_RULES={activeLimit:MAX_ENTRIES,isActive:(entry:DownEntry)=>isActive(entry),busIdOf:(entry:DownEntry)=>String(entry?.busId??"")};
 const SETTINGS_KEY="pace-down-sheet-settings-v1";
 const SCAN_UNDO_KEY="pace-down-sheet-scan-undo-v1";
 /* The last thing done to a single row, kept so it can be taken back. Separate
@@ -156,7 +165,12 @@ function normalizeEntry(value:Partial<DownEntry>,index:number):DownEntry{
 
 function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
  const now=new Date().toISOString();
- return fleet.filter(bus=>bus.down===true).slice(0,MAX_ENTRIES).map(bus=>({
+ /* EVERY BUS FLAGGED DOWN IS A CANDIDATE. This cut the list at 98 before
+    anything looked at it, so a 99th down bus was gone before the capacity
+    check could even report it as skipped — silently, which is the one way
+    this must not happen. `addMintedEntries` applies the ACTIVE cap and hands
+    back what it could not fit. */
+ return fleet.filter(bus=>bus.down===true).map(bus=>({
   id:"repair-"+bus.id,
   busId:bus.id,
   busNumber:bus.n,
@@ -277,6 +291,11 @@ export default function DownSheet(){
     what the device already holds. And its wording is still read from the Defect
     Log's display settings, so a foreman who renamed the panel keeps his name
     for it instead of being reset to the default by a move he did not make. */
+ /* Buses flagged down that the active cap had no room for. Shown rather than
+    dropped: three buses silently losing their row AND their map badge on a
+    sheet holding two active entries is exactly the failure the sheet exists
+    to prevent. */
+ const [mintSkipped,setMintSkipped]=useState("");
  const [mysteryCollapsed,setMysteryCollapsed]=useState(false);
  const [mysteryDisplay,setMysteryDisplay]=useState(DEFAULT_DEFECT_LOG_DISPLAY);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,MYSTERY_COLLAPSED_KEY,mysteryCollapsed?"1":"0")},[mysteryCollapsed,hydrated]);
@@ -311,11 +330,22 @@ export default function DownSheet(){
     which is the right answer: the work is done, so the bus comes off the
     sheet.
 
-    The storage-event handler further down ALREADY did it this way, over
-    `merged` rather than the active subset. Two copies of one rule and only one
-    of them wrong, which is why it survived: whichever path ran second decided
-    the outcome. */
- useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),knownBuses=new Set(restored.map((entry:DownEntry)=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!knownBuses.has(entry.busId));setEntries([...restored,...added].slice(0,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+    WHY IT SURVIVED — and the first answer written here was wrong. It said the
+    storage-event handler below already did it this way, so whichever path ran
+    second decided the outcome. A `storage` event never fires in the document
+    that WROTE the key; CLAUDE.md says so itself about `pace-header-theme-v1`,
+    "which only ever fires in the OTHER tabs". On one phone with one tab that
+    handler never runs at all, so it cannot have been the second path.
+
+    The copy that actually disagreed is on the FACILITY MAP: `app/page.tsx`
+    runs `reconcileDownSheetMembership` on its own mount, and with a bus
+    flagged down whose only entry is Completed, loading just the map clears the
+    flag. So the duplicate row appeared or not depending on WHICH PAGE was
+    opened first — not on which guard in this file ran second. Three copies,
+    one of them cited wrongly, on a project whose stated rule is that a rule in
+    two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
+    now and both paths here call it. */
+ useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  /* Road calls are reconciled here beside DS membership, and for the same
@@ -325,7 +355,7 @@ export default function DownSheet(){
     was hooking the scanner alone, which would have covered one of the three. */
  useEffect(()=>{if(!hydrated)return;setSaveProblem(writeDownSheetStorageResult(localStorage,entries).reason||"");const activeIds=entries.filter(isActive).map(entry=>entry.busId);setFleet(current=>{const membership=reconcileDownSheetMembership(current,activeIds);const roadCalled=reconcileRoadCallsFromSheet(membership,entries).fleet;if(roadCalled!==current)writeFleetStorage(localStorage,roadCalled);return roadCalled})},[entries,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify({...readStoredDownSettings(),showCompleted,defaultInitials,defaultShift,quickNotes:savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,display:displaySettings}))},[showCompleted,defaultInitials,defaultShift,savedQuickNotes,sectionOrder,extraTiles,showQuickNotes,displaySettings,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),known=new Set(merged.map(entry=>entry.busId)),added=entriesFromFleet(nextFleet).filter(entry=>!known.has(entry.busId));return [...merged,...added].slice(0,MAX_ENTRIES)})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY&&event.newValue){const payload=readFleetPayload<FleetBus>(event.newValue);if(payload.valid){const nextFleet=payload.buses;setFleet(nextFleet);setEntries(current=>{const merged=current.map(entry=>{const bus=nextFleet.find(item=>item.id===entry.busId);if(!bus)return entry;const activeDefect=bus.defects?.find(isUnresolved),incoming=bus.pendingRepair?.trim()||"",currentReason=reasonLabel(entry);if(activeDefect)return {...entry,operationalStatus:bus.s,category:activeDefect.category,repair:activeDefect.issue,customReason:activeDefect.details};return {...entry,operationalStatus:bus.s,...(incoming&&incoming!==currentReason?{category:"Miscellaneous",repair:"Driver-reported defect",customReason:incoming}:{})}}),minted=addMintedEntries(merged,entriesFromFleet(nextFleet),MINT_RULES);return minted.entries})}}if(event.key===DOWN_KEY&&event.newValue){const payload=readDownSheetPayload<DownEntry>(event.newValue);if(payload.valid)setEntries(payload.entries.map(normalizeEntry))}if(event.key===DOWN_SHEET_CLEAR_UNDO_KEY)setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(event.newValue)));if(event.key===SCAN_UNDO_KEY)setUndoScanAvailable(Boolean(event.newValue));if(event.key===ENTRY_UNDO_KEY)setRowAction(readRowAction(event.newValue));/* Settings are edited on the shared page now. This page writes its whole settings object back whenever a field changes, so it has to take the new values into its own state or its next write would put the stale copy over them. */if(event.key===SETTINGS_KEY){try{const saved=JSON.parse(event.newValue||"{}");setShowCompleted(saved.showCompleted===true);if(typeof saved.defaultInitials==="string")setDefaultInitials(saved.defaultInitials);if(saved.defaultShift==="1st"||saved.defaultShift==="2nd"||saved.defaultShift==="3rd")setDefaultShift(saved.defaultShift);setDisplaySettings(normalizeDownSheetDisplay(saved.display))}catch{}}};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const active=useMemo(()=>entries.filter(isActive),[entries]);
  /* Where each bus actually is, which is the first thing the section rules ask.
@@ -768,7 +798,7 @@ export default function DownSheet(){
  const titleColor=displaySettings.styles.pageTitle.color.toLowerCase()===DEFAULT_DOWN_SHEET_DISPLAY.styles.pageTitle.color.toLowerCase()?{}:{"--down-page-title-color":displaySettings.styles.pageTitle.color};
  const appStyle={...titleColor,"--down-page-title-size":displaySettings.styles.pageTitle.fontSize+"px","--down-summary-color":displaySettings.styles.summary.color,"--down-summary-size":displaySettings.styles.summary.fontSize+"px","--down-quick-notes-color":displaySettings.styles.quickNotes.color,"--down-quick-notes-size":displaySettings.styles.quickNotes.fontSize+"px","--down-sheet-title-color":displaySettings.styles.sheetTitle.color,"--down-sheet-title-size":displaySettings.styles.sheetTitle.fontSize+"px","--down-column-header-color":displaySettings.styles.columnHeaders.color,"--down-column-header-size":displaySettings.styles.columnHeaders.fontSize+"px","--down-reason-category-color":displaySettings.styles.reasonCategory.color,"--down-reason-category-size":displaySettings.styles.reasonCategory.fontSize+"px","--down-reason-details-color":displaySettings.styles.reasonDetails.color,"--down-reason-details-size":displaySettings.styles.reasonDetails.fontSize+"px"} as CSSProperties;
 
- return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/><WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
+ return <main className="down-app" style={appStyle}><SaveAlert reason={saveProblem} onExport={()=>exportFleetBoardBackup(localStorage,fleet)}/>{mintSkipped&&<p className="down-mint-skipped" role="alert"><b>DOWN WITH NO ROW ON THE SHEET</b><small>{mintSkipped}</small><button type="button" onClick={()=>setMintSkipped("")} aria-label="Dismiss">×</button></p>}<WelcomeGate/><ShopCloudLive/><DeferredNavBadge/><DeferredReviewPrompt/>
   <header className="down-header">
    <div><AppName/><span>FLEET MAINTENANCE</span><h1>{displaySettings.labels.pageTitle}</h1><p>{displaySettings.labels.subtitle}</p></div>
    <TrackerNav active="/down-sheet"/>
