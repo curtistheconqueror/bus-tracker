@@ -37,6 +37,11 @@ labels** — 177px each down to 64px, one row at every width, flush right. The
 extraction, past four green gates, and `tsc`'s TS2304 is now one of them. And
 an optional **STEP-BY-STEP HELPER ON THE DEFECT FORM**, off by default, which
 rings the next field and says what it wants without ever blocking a save.
+Two fixes off a sheet Curtis photographed: **a line naming several buses no
+longer loses what it says** — the scan prompt contradicted itself about IDOT
+rows, threw away the per-bus state written in brackets, and let a misread line
+number file a bus under another line's work — and **a completed repair stays
+completed** instead of re-opening under a new id on the next Down Sheet load.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -2024,6 +2029,106 @@ tight on the smallest phone there is.
 **Built for LOG DEFECT only**, which is what was asked for and looked at first.
 Carrying it to another form is another anchor set and another walk, not another
 copy of the rule.
+
+### A sheet line that names several buses
+
+Curtis, on the 11/01/2026 AM sheet: *"the way they wrote the IDOT line confused
+scanner."* Four of that sheet's lines put a word or nothing in the BUS # column
+and the buses themselves across the REASON column — 47 (`PM'S`, five buses),
+48 (`IDOT`, nine), 53 (event prep, two) and 55, handwritten, three buses
+sharing *No Power to Cameras*. His bus **20500 was written on line 55 and the
+app filed it on line 44**, which on the paper belongs to 18506 and reads A21.
+
+**THE PROMPT CONTRADICTED ITSELF**, and line 48 is where it bit. It said
+*"Ignore … IDOT summary rows"* and, four sentences later, *"A row carrying
+several bus numbers is several rows — emit one row per bus."* Line 48 is both,
+so the behaviour was undefined and could differ between scans. Run through the
+project's own functions, each horn is its own failure:
+
+| it obeys | what happens |
+| --- | --- |
+| *ignore IDOT rows* | `scannedLineGaps` reports **line 48 MISSING** on every scan of a sheet with an IDOT row, and those nine buses are silently absent |
+| *one row per bus* | nine rows all labelled **L48** — a line number that names nine buses |
+
+The first is the worse of the two: it cries wolf on the one warning whose
+stated purpose is that *"a bus that is down and not on the sheet is a bus that
+goes back out broken."* A line is not a summary just because its BUS # column
+holds a word, and the prompt now says so.
+
+**THE BRACKETS ARE THE CONTENT OF AN IDOT LINE, and they were being deleted on
+every scan.** *"REPEAT THE LINE'S WORDING ON EVERY ONE OF THOSE ROWS"* gave all
+nine buses the reason `IDOT` and threw away `15504(FAILED-READY)`,
+`18503(READY)`, `17544(PART IN STOCK)`, `17519(ABS LIGHT)` and
+`17536(ABS LIGHT)` — the difference between a bus that failed its inspection,
+one ready to go, and one waiting on a part. IDOT is only the line's heading.
+
+`src/lib/down-sheet/scan-multi-bus.ts` pulls a bus's own words back out:
+
+```
+15504 -> "IDOT — FAILED-READY"      17517 -> "IDOT"
+17544 -> "IDOT — PART IN STOCK"     20500 -> "No Power to Cameras"
+```
+
+and strips the other buses' numbers, because three buses' business on one
+bus's row is not readable at a glance. It is a **no-op on every ordinary row**:
+anything naming no five-digit bus comes back untouched, including the rows
+carrying dates, times, service codes and their own brackets. A `.ts` with
+storage-free inputs rather than logic in the route, so the MCP can answer with
+it instead of reimplementing it.
+
+**A LINE NUMBER IS NOT A NAME**, and `fillPrintedLineSiblings` was keyed on
+one. It copies wording between rows sharing a page and a printed line number,
+which holds for a line genuinely written once over several buses and is the
+damage when a number was misread: 20500 landing on line 44 with its own
+wording unreadable would have inherited A21 and been filed as an inspection,
+under a review note reading *"read from line 44, shared with the other buses on
+it"*. Two different reasons on one printed line is the signature, the paper is
+the only thing that can settle which row is wrong, so that line now shares
+nothing and is reported instead.
+
+**AND THE BUSES NOBODY CAME BACK FOR ARE NAMED ON SCREEN.** LINES NOT READ
+counts printed numbers and cannot see this — line 48 *arrived*; it arrived
+carrying nine bus numbers in its words and one row. The review screen now says
+**WRITTEN ON A ROW BUT NOT READ AS ONE** and lists them, and says nothing when
+the line was split properly, so it cannot become a warning people learn past.
+
+The prompt also now says to read the printed number off the left-hand column
+rather than count rows: the numbering runs on through blank lines and through
+heading lines such as HOLD BUSES, so counting drifts.
+
+**Not verifiable from here.** `OPENROUTER_API_KEY` is not in the container, so
+the model's actual output on his sheet is unconfirmed — what is proven is what
+the import does with the rows it is given. Worth asking him to re-scan and read
+back what line number 20500 carries.
+
+### A completed repair stays completed
+
+Found in the same trace. `entriesFromFleet` mints a Down Sheet row for every
+bus still flagged `down`, and the mount-time effect compared that against only
+the **active** entries — so a bus whose single entry was Completed looked like
+a bus with no entry, and the next load wrote a new Scheduled row under
+`repair-<busId>`. The repair re-opened itself and the sheet carried two rows
+for one bus.
+
+Measured on the built page, one bus seeded `down:true` with one Completed entry:
+
+| | sheet after loading | DS badge |
+| --- | --- | --- |
+| before | `e1:Completed` + **`repair-a:Scheduled`** | on |
+| after | `e1:Completed` | off |
+
+Nothing is minted now, no active entry exists, and
+`reconcileDownSheetMembership` clears the flag — the work is done, so the bus
+comes off. **This app does not delete repair records; inventing one is the same
+wound from the other side.** The legitimate case — a bus flagged down with no
+entry at all — still mints, verified in the same run.
+
+It survived because **there are two copies of that guard and only one was
+wrong**: the storage-event handler already compared against every entry.
+Whichever path ran second decided the outcome, which is why it looked
+intermittent. An existing test was pinning the bug's variable name,
+`assert.match(source,/knownActive/)`, with no rule written beside it — and that
+name recorded the defect. Replaced with the behaviour.
 
 ### Open questions for Curtis
 
