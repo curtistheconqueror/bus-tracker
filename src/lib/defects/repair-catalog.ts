@@ -364,6 +364,12 @@ export function repairCategoryEmoji(category:string){return REPAIR_CATEGORY_EMOJ
    language the shop already reads off the panel; every other grouped category
    (Bus Controls today) gets the plain version. Both native pickers call these,
    so the bus editor and the multi-bus tool cannot drift apart again. */
+/* Does this category ask for a system before the fault? A/C and HVAC does;
+   Brakes goes straight to the repair. Read off the table the picker draws
+   from, so nothing keeps a second list of which categories are grouped. */
+export function isGroupedCategory(category:unknown){
+ return Object.keys(REPAIR_OPTION_GROUPS[String(category??"")]||{}).length>0;
+}
 export function repairGroupStepLabel(category:string){
  return category==="Amerex"?"CHOOSE THE SYSTEM":"CHOOSE THE GROUP";
 }

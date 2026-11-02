@@ -1022,8 +1022,13 @@ test("a form redrawing around a text field does not drag the picker with it",asy
  /* A memo over an inline arrow is a comparison that can never pass. */
  assert.match(log,/const pickBus=useCallback\(\(busId:string\)=>\{onBusPicked\(busId\);setValue\(current=>\(\{\.\.\.current,busId\}\)\)\},\[onBusPicked\]\)/,
   "the callback is held still, or the memo does nothing but cost a comparison");
- assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}\/>/,
-  "and the held callback is the one passed");
+ /* Pinned to the three moving props and to STRING LITERALS beside them. The
+    step-by-step helper added `coach="bus"`, which is stable and costs the memo
+    nothing; a prop built inline — an arrow, an object, an array — is a new
+    value every render and would make the memo a comparison that can never
+    pass, so the pattern admits the former and refuses the latter. */
+ assert.match(log,/<BusSelector fleet=\{fleet\} busId=\{value\.busId\} select=\{pickBus\}(?: [a-zA-Z]+="[^"]*")*\/>/,
+  "and the held callback is the one passed, with nothing but string literals beside it");
  assert.doesNotMatch(log,/select=\{busId=>\{onBusPicked/,
   "no inline arrow remains on that prop");
 

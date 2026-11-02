@@ -7044,3 +7044,186 @@ test("the row count combo-field.tsx argues from is the catalog's real size",asyn
  for(const value of quoted)assert.equal(value,rows,
   "combo-field.tsx argues from "+value+" rows; the catalog holds "+rows);
 });
+
+test("the step-by-step helper points at the next field and never invents a requirement", async () => {
+ const {coachStep}=await import("../src/lib/defects/form-coach.ts");
+ const draft=(over={})=>({busId:"",category:"",issue:"",...over});
+ const plain={requireInitials:false};
+
+ /* THE ORDER IS CURTIS'S — "the bus number being the first thing then after
+    that the defects" — and it is the form's own document order. */
+ assert.equal(coachStep(draft(),plain).key,"bus");
+ assert.equal(coachStep(draft({busId:"b1"}),plain).key,"category");
+ assert.equal(coachStep(draft({busId:"b1",category:"Brakes"}),plain).key,"issue");
+ assert.equal(coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"}),plain).key,"ready");
+
+ /* A grouped category asks for the system first, and which categories are
+    grouped is read off the picker's own table rather than listed anywhere. */
+ const grouped=Object.keys(REPAIR_OPTION_GROUPS).filter(name=>Object.keys(REPAIR_OPTION_GROUPS[name]||{}).length);
+ assert.ok(grouped.length>1,"the catalog has grouped categories to test with");
+ for(const category of grouped){
+  const step=coachStep(draft({busId:"b1",category}),plain);
+  assert.equal(step.key,"group",category+" asks for the group first");
+  assert.equal(step.title,repairGroupStepLabel(category),category+" uses the picker's own heading");
+ }
+ for(const category of Object.keys(REPAIR_OPTIONS).filter(name=>!grouped.includes(name))){
+  assert.equal(coachStep(draft({busId:"b1",category}),plain).key,"issue",category+" goes straight to the repair");
+ }
+
+ /* WHAT IT CALLS BLOCKING IS WHAT THE FORM ACTUALLY REFUSES. `validateAndSave`
+    refuses no bus, no category, a required count out of range, FIXED BY empty
+    on a save-as-fixed, and a recent duplicate — and nothing else. A first
+    draft of this module marked the specific defect required and marked
+    REPORTED BY required too; both were false, and a helper that says a field
+    is needed when it is not is worse than no helper, because it is believed.
+
+    The form's own placeholder is the witness for the issue one: "or leave it
+    and save the category alone". */
+ assert.equal(coachStep(draft(),plain).blocking,true,"no bus blocks");
+ assert.equal(coachStep(draft({busId:"b1"}),plain).blocking,true,"no category blocks");
+ assert.equal(coachStep(draft({busId:"b1",category:"Brakes"}),plain).blocking,false,
+  "the specific defect does not block a save and must not be presented as if it did");
+ assert.match(coachStep(draft({busId:"b1",category:"Brakes"}),plain).message,/save the category on its own/);
+
+ /* REQUIRE INITIALS GATES FIXED BY ON A SAVE-AS-FIXED, never an ordinary save,
+    so it can never produce a step of its own and can only change what the
+    last message says. */
+ for(const requireInitials of [true,false])for(const initials of ["","JS"]){
+  const options={requireInitials,initials};
+  const walk=[draft(),draft({busId:"b1"}),draft({busId:"b1",category:"Brakes"}),
+   draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"})];
+  const keys=walk.map(row=>coachStep(row,options).key);
+  assert.deepEqual(keys,["bus","category","issue","ready"],
+   "require="+requireInitials+" initials="+JSON.stringify(initials)+" walks the same four steps");
+  const ready=coachStep(walk[3],options);
+  assert.equal(ready.blocking,false);
+  assert.equal(/FIXED BY/.test(ready.message),requireInitials&&!initials,
+   "the initials line is said only where it will actually stop somebody");
+ }
+
+ /* AND IT NAMES BOTH WAYS OUT, because the question asked was what happens
+    "in case a person doesn't necessarily want to save a defect and recommended
+    on the down sheet". */
+ const ready=coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"}),plain);
+ assert.match(ready.message,/RECOMMEND FOR DOWN SHEET/);
+ assert.match(ready.message,/optional/);
+
+ /* THE COUNT STEP IS THE CATALOG'S, not a list kept here: every repair the
+    catalog marks `required` stops the helper, and no other repair does. */
+ const counted=[];
+ for(const [category,issues] of Object.entries(REPAIR_OPTIONS))for(const issue of issues){
+  const field=defectCountField(category,issue);
+  const step=coachStep(draft({busId:"b1",category,issue}),plain);
+  if(field?.required){
+   counted.push(category+" / "+issue);
+   assert.equal(step.key,"count",category+" / "+issue+" asks for its count");
+   assert.equal(step.blocking,true);
+   assert.equal(step.title,field.label);
+   /* In range it stops asking; over the ceiling it asks again, which is the
+      same window `validateAndSave` refuses on. */
+   assert.equal(coachStep(draft({busId:"b1",category,issue,count:1}),plain).key,"ready");
+   assert.equal(coachStep(draft({busId:"b1",category,issue,count:field.max+1}),plain).key,"count");
+   assert.equal(coachStep(draft({busId:"b1",category,issue,count:0}),plain).key,"count");
+  }else assert.equal(step.key,"ready",category+" / "+issue+" has nothing left to ask");
+ }
+ assert.ok(counted.length>0,"the catalog has a required count to point at: "+counted.join(", "));
+});
+
+test("every field the step-by-step helper names is a field the Defect Log form actually draws", async () => {
+ const {coachStep}=await import("../src/lib/defects/form-coach.ts");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+
+ /* THE ONE GATE WITH TEETH. `form-coach.ts` names a field by a `data-coach`
+    value and the ring is put on by a DOM scan, so a renamed or removed anchor
+    fails silently — the bar still says CHOOSE THE DEFECT and nothing lights
+    up, which is exactly the kind of half-working no test catches. This reads
+    the anchors out of the form and the targets out of the module, and insists
+    they are the same set. */
+ const drawn=new Set();
+ for(const match of page.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);
+ for(const match of page.matchAll(/\bcoach="([a-z]+)"/g))drawn.add(match[1]);
+ /* Every step this module can produce, walked rather than listed. */
+ const targets=new Set();
+ const walks=[
+  [{busId:"",category:"",issue:""},{requireInitials:false}],
+  [{busId:"b1",category:"",issue:""},{requireInitials:false}],
+  [{busId:"b1",category:"Brakes",issue:""},{requireInitials:false}],
+  [{busId:"b1",category:"A/C and HVAC",issue:""},{requireInitials:false}],
+  [{busId:"b1",category:"Cooling System",issue:"Radiator fan(s) out"},{requireInitials:false}],
+  [{busId:"b1",category:"Brakes",issue:"Brake chamber leak"},{requireInitials:false}],
+ ];
+ for(const [row,options] of walks)targets.add(coachStep(row,options).target);
+ assert.deepEqual([...targets].sort(),["bus","category","count","issue","save"],
+  "the walk above reaches every step, so the anchors below are checked against all of them");
+ for(const target of targets)assert.ok(drawn.has(target),
+  "the form draws a data-coach anchor named "+target+"; it has "+[...drawn].sort().join(", "));
+
+ /* And the bar is drawn where it cannot be covered: outside the scrolling
+    form, between the header and it. Inside `.log-form` it would scroll away
+    and, on a phone, sit under the keyboard. */
+ const bar=page.indexOf("<FormCoachBar"),form=page.indexOf('<div className="log-form">');
+ assert.ok(bar>0&&form>0&&bar<form,"the helper's bar is drawn before the scrolling form, not inside it");
+});
+
+test("the step-by-step helper is off until somebody turns it on", async () => {
+ const {COACH_SETTINGS_KEY,readCoachSettings,writeCoachSettings}=await import("../src/lib/settings/coach-settings.ts");
+ assert.equal(COACH_SETTINGS_KEY,"pace-coach-v1");
+
+ /* OFF IS THE SAFE READ, the spelling `feedback-settings.ts` uses: anything
+    that is not exactly `true` is off. A helper that turned itself on because
+    a record went strange would be putting a bar over somebody's form
+    mid-shift. `app-mode.ts` inverts this deliberately and says why. */
+ for(const raw of [null,"","{}","not json","[]","0",'{"on":"yes"}','{"on":1}','{"on":null}','{"version":1}']){
+  const store={getItem:()=>raw};
+  assert.deepEqual(readCoachSettings(store),{on:false},JSON.stringify(raw)+" reads as off");
+ }
+ assert.deepEqual(readCoachSettings({getItem:()=>'{"on":true}'}),{on:true});
+ assert.deepEqual(readCoachSettings(null),{on:false},"no storage at all is off, not a throw");
+
+ /* The write says whether it wrote. A full device must not be shown a switch
+    that moved while nothing was saved. */
+ let held=null;
+ assert.equal(writeCoachSettings({setItem:(_key,value)=>{held=value}},{on:true}),true);
+ assert.deepEqual(JSON.parse(held),{on:true});
+ assert.equal(writeCoachSettings({setItem:()=>{throw new Error("quota")}},{on:true}),false,
+  "a refused write reports false rather than claiming the switch moved");
+ assert.equal(writeCoachSettings(null,{on:true}),false);
+ /* Only ever `true` or `false` on disk, never the value as handed in. */
+ writeCoachSettings({setItem:(_key,value)=>{held=value}},{on:"yes"});
+ assert.deepEqual(JSON.parse(held),{on:false},"a strange value is stored as off rather than kept");
+});
+
+test("the Settings switch and the Defect Log read one key, and the form cannot gate on the helper", async () => {
+ const modal=await readFile(new URL("../app/settings/_components/defect-log-settings-modal.tsx",import.meta.url),"utf8");
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const coach=await readFile(new URL("../src/lib/defects/form-coach.ts",import.meta.url),"utf8");
+
+ /* Neither side may name the key as a literal: the pair that drifted when a
+    string was typed into five share modules is why `site-identity.ts` exists. */
+ for(const [name,code] of [["the Settings switch",modal],["the Defect Log",page]]){
+  assert.ok(/from "@\/src\/lib\/settings\/coach-settings"/.test(code),name+" reads the switch through its module");
+  assert.ok(!/"pace-coach-v1"/.test(code),name+" does not spell the key out");
+ }
+ /* READ IN AN EFFECT, not in the initialiser. The server cannot see
+    LocalStorage, so a checkbox initialised from it renders checked on the
+    server and unchecked on the client — a hydration error. */
+ assert.match(modal,/useEffect\(\(\)=>\{setCoachOn\(readCoachSettings\(localStorage\)\.on\)\}/);
+ assert.ok(!/useState\(\(\)=>readCoachSettings/.test(modal),"the switch is not initialised from storage");
+
+ /* IT POINTS, IT DOES NOT GATE. Nothing in the helper may reach a save path,
+    and the module must not be able to refuse anything. */
+ assert.ok(!/coach/i.test(coach.slice(coach.indexOf("export function coachStep")).match(/alert\(|throw |return false/)?.[0]||""),
+  "the module has no refusal in it");
+ for(const forbidden of ["alert(","throw ","disabled="]){
+  assert.ok(!coach.includes(forbidden),"form-coach.ts does not "+forbidden);
+ }
+ /* And the save buttons' disabled condition is the duplicate check alone,
+    exactly as it was before the helper existed. */
+ for(const button of ["save-log-middle","save-fixed-middle","save-log\"","save-fixed-bottom"]){
+  const at=page.indexOf('className="'+button);
+  assert.ok(at>0,button+" is still drawn");
+  const tag=page.slice(at,page.indexOf(">",at));
+  if(tag.includes("disabled="))assert.match(tag,/disabled=\{Boolean\(recentDuplicate\)\}/,
+   button+"'s disabled condition is untouched by the helper");
+ }
+});
