@@ -1598,3 +1598,31 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
  assert.deepEqual(undefined_names, [],
   "a name with no definition will throw the moment that code runs:\n  " + undefined_names.join("\n  "));
 });
+
+test("the bus generation chips are sized for their label, not for the box", async () => {
+ /* Curtis: "I want this strip of bus drop downs to be slimmer because it's more
+    than wide enough for the bus numbers. Then move it slightly to the right."
+
+    Measured before: `repeat(4,minmax(0,1fr))` stretched each chip to fill the
+    fieldset — 177px apiece at 820 and 1180, 169px at 390 — for a label three
+    characters long ("15s"). After: 64px at every width, with the spare space on
+    the left, which is the nudge right. The chips start at 93 rather than 23 at
+    390, and at 679 rather than 47 at 1180. */
+ const css = await readFile(new URL("../src/components/shared/bus-selector.css", import.meta.url), "utf8");
+ assert.match(css, /\.bus-generations\{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px\}/,
+  "the spare width goes on the left, and the strip wraps rather than overflowing");
+ assert.match(css, /\.bus-generations button\{flex:0 0 64px\}/,
+  "64px fits the label and still clears a 44px thumb target");
+ assert.equal(/\.bus-generations\{[^}]*1fr/.test(css), false,
+  "a 1fr track is what stretched a 3-character chip to 177px");
+
+ /* FLEX RATHER THAN FOUR FIXED COLUMNS, because the count is not four: the
+    chips are the four standard generations plus any other first-two-digits
+    present in the fleet, so one 16xxx bus makes it five. Measured with five:
+    two rows at 320 and 360, one row from 390 up. */
+ const selector = await readFile(new URL("../src/components/shared/bus-selector.tsx", import.meta.url), "utf8");
+ assert.match(selector, /STANDARD_GENERATIONS,\s*\.\.\.available\.filter/,
+  "the chip list is the standard four plus whatever else the fleet holds");
+ assert.equal(/grid-template-columns:repeat\(4/.test(css), false,
+  "a four-column grid would drop the fifth chip onto a row of its own");
+});
