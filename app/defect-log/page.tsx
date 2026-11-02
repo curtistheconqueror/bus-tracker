@@ -36,7 +36,7 @@ import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
 import {answerRecommendedBus} from "@/src/lib/defects/recommended-actions";
 import {elapsedLong} from "@/src/lib/shared/elapsed-label";
 import {findPathToRepair,readPathToRepairs,type PathToRepairLibrary} from "@/src/lib/defects/path-to-repair";
-import {readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
+import {findRepairMinutes,readRepairHoursLedger,type RepairHoursLedger} from "@/src/lib/defects/repair-hours-ledger";
 import {defectEstimateMinutes,openDefectsEstimateMinutes} from "@/src/lib/defects/defect-estimates";
 import {formatRepairTime} from "@/src/lib/down-sheet/repair-time-estimates";
 import HoldBoard,{HoldBadge} from "@/src/components/fleet/hold-board";
