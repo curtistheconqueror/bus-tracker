@@ -337,8 +337,16 @@ test("renders the interactive down sheet with All as the default shift view", as
   // and the sheet, on the page whose problem was how much sits above the rows.
   assert.doesNotMatch(html, /QUICK NOTES/, "quick notes is opt-in, so a fresh device does not draw it");
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
-  assert.match(source, /knownActive/);
-  assert.match(source, /entriesFromFleet\(nextFleet\)\.filter/);
+  /* The mint is GUARDED, without pinning what the guard is called. This read
+     `/knownActive/` — a bare identifier with no stated rule behind it — and
+     that name was the bug: it narrowed the sheet to its ACTIVE entries, so a
+     bus whose only row was Completed got a second, Scheduled one invented on
+     every load. Renaming it to `knownBuses` broke this line, which is all a
+     name check can ever catch. What the guard must actually do is asserted in
+     "a completed repair is not re-opened under a new id on the next page
+     load" at the end of this file. */
+  assert.match(source, /entriesFromFleet\(nextFleet\)\.filter\(entry=>![a-zA-Z]+\.has\(entry\.busId\)\)/,
+    "a bus that already has a row on the sheet does not get a second one");
   assert.match(source, /UNDO CLEAR/);
   assert.match(source, /clearDownSheetState\(entries,fleet\)/);
 });
@@ -3152,4 +3160,43 @@ test("a misread line number no longer hands a bus another line's repair",async()
  assert.equal(borrowed.reviewNote,"","and does not claim it was read off that line");
  assert.equal(collided.find(entry=>entry.busNumber==="20500").reason,"No Power to Cameras",
   "the bus that did come back with its own words keeps them");
+});
+
+test("a completed repair is not re-opened under a new id on the next page load",async()=>{
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+
+ /* WHAT WENT WRONG. `entriesFromFleet` mints a row for every bus still flagged
+    `down`, and the mount path filtered the sheet it compared against down to
+    its ACTIVE entries. So a bus whose only entry was Completed looked to it
+    like a bus with no entry, and the next load wrote a BRAND NEW Scheduled row
+    under `repair-<busId>` — the repair re-opening itself, two rows for one bus.
+
+    Measured on the built page before the fix: seed one bus with down:true and
+    a single Completed entry, open the Down Sheet, and storage holds
+    `e1:Completed` plus `repair-a:Scheduled`. After: only `e1:Completed`, and
+    the flag cleared, because the work is done and the bus comes off.
+
+    This app does not delete repair records. Inventing one is the same wound
+    from the other side.
+
+    IT SURVIVED BECAUSE THERE ARE TWO COPIES. The storage-event handler already
+    compared against every entry; only the mount path used the active subset,
+    so whichever ran second decided the outcome and the bug looked intermittent.
+    Both guards are asserted here together — the point is not the spelling of
+    either but that neither narrows the sheet before asking. */
+ const guards=[...page.matchAll(/(?:knownBuses|known)=new Set\(([^)]*)\)/g)].map(match=>match[1]);
+ assert.equal(guards.length,2,"there are exactly two places that decide whether to mint a row");
+ for(const guard of guards){
+  assert.ok(/\.map\(/.test(guard),"each reads the bus ids off the sheet: "+guard);
+  assert.ok(!/isActive/.test(guard),
+   "neither narrows the sheet to its active entries first - a Completed row is still a row: "+guard);
+  assert.ok(!/filter\(/.test(guard),
+   "and neither filters the sheet at all before asking: "+guard);
+ }
+
+ /* AND BOTH ASK THE SAME QUESTION OF THE RESULT. */
+ const mints=[...page.matchAll(/added=entriesFromFleet\(nextFleet\)\.filter\(entry=>!(\w+)\.has\(entry\.busId\)\)/g)];
+ assert.equal(mints.length,2,"both paths mint through the same guarded filter");
+ assert.deepEqual(mints.map(match=>match[1]),["knownBuses","known"],
+  "and each uses the set built immediately above it");
 });
