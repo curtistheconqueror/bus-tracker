@@ -337,16 +337,14 @@ test("renders the interactive down sheet with All as the default shift view", as
   // and the sheet, on the page whose problem was how much sits above the rows.
   assert.doesNotMatch(html, /QUICK NOTES/, "quick notes is opt-in, so a fresh device does not draw it");
   const source = await readFile(new URL("../app/down-sheet/page.tsx", import.meta.url), "utf8");
-  /* The mint is GUARDED, without pinning what the guard is called. This read
-     `/knownActive/` — a bare identifier with no stated rule behind it — and
-     that name was the bug: it narrowed the sheet to its ACTIVE entries, so a
-     bus whose only row was Completed got a second, Scheduled one invented on
-     every load. Renaming it to `knownBuses` broke this line, which is all a
-     name check can ever catch. What the guard must actually do is asserted in
-     "a completed repair is not re-opened under a new id on the next page
-     load" at the end of this file. */
-  assert.match(source, /entriesFromFleet\(nextFleet\)\.filter\(entry=>![a-zA-Z]+\.has\(entry\.busId\)\)/,
-    "a bus that already has a row on the sheet does not get a second one");
+  /* The page MINTS THROUGH THE SHARED RULE, and what that rule does is
+     asserted against the real function at the end of this file. Two earlier
+     versions of this line were shape checks wearing correctness messages: a
+     bare `/knownActive/` that only ever caught a rename, and then a regex
+     over the page's own filter expression that matched the buggy spelling and
+     the fixed one equally well — measured green against the pre-fix source. */
+  assert.match(source, /addMintedEntries\(/,
+    "the page asks src/lib/down-sheet/sheet-mint.ts rather than deciding here");
   assert.match(source, /UNDO CLEAR/);
   assert.match(source, /clearDownSheetState\(entries,fleet\)/);
 });
@@ -3162,41 +3160,92 @@ test("a misread line number no longer hands a bus another line's repair",async()
   "the bus that did come back with its own words keeps them");
 });
 
-test("a completed repair is not re-opened under a new id on the next page load",async()=>{
+test("minting a row never deletes a stored repair and never drops a bus that is down",async()=>{
+ const {addMintedEntries,mintSkippedMessage}=await import("../src/lib/down-sheet/sheet-mint.ts");
+ const RULES={activeLimit:98,isActive:entry=>entry.workflow!=="Completed",busIdOf:entry=>String(entry.busId||"")};
+ const row=(id,busId,workflow="Scheduled")=>({id,busId,busNumber:busId.replace(/\D/g,""),workflow});
+
+ /* A COMPLETED ROW IS STILL A ROW. Comparing against the active entries alone
+    made a bus whose only entry was Completed look like a bus with no entry, so
+    the next load minted a fresh Scheduled row under a new id and the repair
+    re-opened itself. Measured on the built page before the fix: `e1:Completed`
+    came back as `e1:Completed` plus `repair-a:Scheduled`. */
+ const completed=addMintedEntries([row("e1","a","Completed")],[row("repair-a","a")],RULES);
+ assert.deepEqual(completed.added,[],"nothing is minted for a bus whose repair is already recorded");
+ assert.deepEqual(completed.entries.map(entry=>entry.id),["e1"]);
+ assert.deepEqual(completed.skipped,[],"and that is not a capacity problem");
+
+ /* The case minting exists for is untouched. */
+ const fresh=addMintedEntries([],[row("repair-b","b")],RULES);
+ assert.deepEqual(fresh.added.map(entry=>entry.id),["repair-b"]);
+ assert.deepEqual(fresh.entries.map(entry=>entry.id),["repair-b"]);
+ /* And an active entry still blocks a second row for the same bus. */
+ assert.deepEqual(addMintedEntries([row("e2","c")],[row("repair-c","c")],RULES).added,[]);
+
+ /* THE CAP IS ON ACTIVE ENTRIES, AND STORED RECORDS ARE NEVER DROPPED. It was
+    applied to the sheet's TOTAL in the mint paths alone — every other use of
+    that number in the app counts the active rows. Measured on the built page:
+    seed 100 Completed rows, open the Down Sheet, and 98 come back. `old-98`
+    and `old-99` were gone from storage with no prompt and no undo copy, which
+    is the one thing CLAUDE.md says this app never does. */
+ const history=Array.from({length:100},(unused,index)=>row("old-"+index,"h"+index,"Completed"));
+ const overCap=addMintedEntries(history,[],RULES);
+ assert.equal(overCap.entries.length,100,"a sheet over capacity on HISTORY keeps every record");
+ assert.deepEqual(overCap.entries.map(entry=>entry.id),history.map(entry=>entry.id));
+
+ /* AND A BUS THAT IS DOWN IS NOT DROPPED BECAUSE OF HISTORY. 96 completed rows
+    left two mint slots under the old rule; three of five buses flagged down
+    were dropped, and `reconcileDownSheetMembership` then cleared their `down`
+    flag, so they came off the sheet AND off the map on a sheet holding two
+    active entries. The alerts could not fire: they count active entries. */
+ const nearCap=Array.from({length:96},(unused,index)=>row("old-"+index,"h"+index,"Completed"));
+ const wanted=Array.from({length:5},(unused,index)=>row("repair-d"+index,"d"+index));
+ const roomy=addMintedEntries(nearCap,wanted,RULES);
+ assert.equal(roomy.added.length,5,"96 completed rows leave every active slot free");
+ assert.deepEqual(roomy.skipped,[]);
+ assert.equal(roomy.entries.length,101);
+
+ /* THE CAP STILL BITES ON ACTIVE ROWS, and what it leaves out is RETURNED
+    rather than discarded — silence is the failure, not the refusal. */
+ const full=Array.from({length:98},(unused,index)=>row("live-"+index,"L"+index));
+ const tight=addMintedEntries(full,[row("repair-x","x"),row("repair-y","y")],RULES);
+ assert.deepEqual(tight.added,[],"a full active sheet mints nothing");
+ assert.deepEqual(tight.skipped.map(entry=>entry.busId),["x","y"],"and says which buses it could not fit");
+ assert.equal(tight.entries.length,98,"while still dropping nothing it was given");
+ const partial=addMintedEntries(full.slice(0,97),[row("repair-x","x"),row("repair-y","y")],RULES);
+ assert.deepEqual(partial.added.map(entry=>entry.busId),["x"]);
+ assert.deepEqual(partial.skipped.map(entry=>entry.busId),["y"]);
+
+ /* The notice names the buses rather than counting them: "two buses" sends
+    nobody to the right bus. */
+ assert.equal(mintSkippedMessage([],98),"");
+ assert.match(mintSkippedMessage([{busNumber:"18505"}],98),/bus 18505 is/);
+ assert.match(mintSkippedMessage([{busNumber:"18505"},{busNumber:"17221"}],98),/buses 18505, 17221 are/);
+ assert.match(mintSkippedMessage([{busNumber:"18505"}],98),/full at 98 buses/);
+});
+
+test("the Down Sheet mints through the one rule, and no longer caps on total entries",async()=>{
  const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
 
- /* WHAT WENT WRONG. `entriesFromFleet` mints a row for every bus still flagged
-    `down`, and the mount path filtered the sheet it compared against down to
-    its ACTIVE entries. So a bus whose only entry was Completed looked to it
-    like a bus with no entry, and the next load wrote a BRAND NEW Scheduled row
-    under `repair-<busId>` — the repair re-opening itself, two rows for one bus.
+ /* The behaviour is pinned in the test above, against the real function. This
+    only holds the page to CALLING it — an earlier version of this gate was a
+    regex over the page's own expression, and a cold read showed it stayed
+    green with the bug reintroduced by hoisting the filter out of the call, and
+    went red on a rename and on extracting the rule to src/lib, which is the
+    refactor ARCHITECTURE.md asks for. A shape check cannot tell a rule from
+    its spelling. */
+ assert.match(page,/import \{addMintedEntries,mintSkippedMessage\} from "@\/src\/lib\/down-sheet\/sheet-mint"/);
+ assert.equal((page.match(/addMintedEntries\(/g)||[]).length,2,"both mint paths go through it");
+ assert.ok(!/entriesFromFleet\(nextFleet\)\.filter\(/.test(page),
+  "neither path decides for itself which candidates to keep");
 
-    Measured on the built page before the fix: seed one bus with down:true and
-    a single Completed entry, open the Down Sheet, and storage holds
-    `e1:Completed` plus `repair-a:Scheduled`. After: only `e1:Completed`, and
-    the flag cleared, because the work is done and the bus comes off.
-
-    This app does not delete repair records. Inventing one is the same wound
-    from the other side.
-
-    IT SURVIVED BECAUSE THERE ARE TWO COPIES. The storage-event handler already
-    compared against every entry; only the mount path used the active subset,
-    so whichever ran second decided the outcome and the bug looked intermittent.
-    Both guards are asserted here together — the point is not the spelling of
-    either but that neither narrows the sheet before asking. */
- const guards=[...page.matchAll(/(?:knownBuses|known)=new Set\(([^)]*)\)/g)].map(match=>match[1]);
- assert.equal(guards.length,2,"there are exactly two places that decide whether to mint a row");
- for(const guard of guards){
-  assert.ok(/\.map\(/.test(guard),"each reads the bus ids off the sheet: "+guard);
-  assert.ok(!/isActive/.test(guard),
-   "neither narrows the sheet to its active entries first - a Completed row is still a row: "+guard);
-  assert.ok(!/filter\(/.test(guard),
-   "and neither filters the sheet at all before asking: "+guard);
- }
-
- /* AND BOTH ASK THE SAME QUESTION OF THE RESULT. */
- const mints=[...page.matchAll(/added=entriesFromFleet\(nextFleet\)\.filter\(entry=>!(\w+)\.has\(entry\.busId\)\)/g)];
- assert.equal(mints.length,2,"both paths mint through the same guarded filter");
- assert.deepEqual(mints.map(match=>match[1]),["knownBuses","known"],
-  "and each uses the set built immediately above it");
+ /* THE TOTAL-ENTRY SLICE IS GONE. `.slice(0,MAX_ENTRIES)` over the whole sheet
+    is what destroyed stored repair records on a page load. */
+ assert.ok(!/\.slice\(0,MAX_ENTRIES\)/.test(page),
+  "nothing in this file caps by MAX_ENTRIES any more - not the stored sheet, which"
+  +" destroyed records, and not the candidate list, which dropped a down bus before"
+  +" the capacity check could report it");
+ /* And the cap is handed over as the ACTIVE limit, which is what it means at
+    ADD DOWN BUS, the scan import, PUT BACK, the button and the capacity tile. */
+ assert.match(page,/activeLimit:MAX_ENTRIES/);
 });

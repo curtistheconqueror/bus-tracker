@@ -36,6 +36,7 @@ export {formatRepairTime, normalizeRepairTimeEstimate, repairTimeTotal, recommen
 export {aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normalizeRepairItems, repairItemsProgress, repairItemsTotal} from "../../src/lib/down-sheet/down-sheet-repair-items.ts";
 export {mergeReviewedRows, reviewScannedRows} from "../../src/lib/down-sheet/down-sheet-scan-import.ts";
 export {busNumbersInText, perBusReason, printedLineConflicts, unreadBusNumbers} from "../../src/lib/down-sheet/scan-multi-bus.ts";
+export {addMintedEntries, mintSkippedMessage} from "../../src/lib/down-sheet/sheet-mint.ts";
 export {prepareFleetForScannedReplacement, scannedSheetRemovals} from "../../src/lib/down-sheet/down-sheet-replace.ts";
 export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
 export {downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";

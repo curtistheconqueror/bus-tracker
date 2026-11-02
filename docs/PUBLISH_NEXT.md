@@ -2123,12 +2123,52 @@ comes off. **This app does not delete repair records; inventing one is the same
 wound from the other side.** The legitimate case — a bus flagged down with no
 entry at all — still mints, verified in the same run.
 
-It survived because **there are two copies of that guard and only one was
-wrong**: the storage-event handler already compared against every entry.
-Whichever path ran second decided the outcome, which is why it looked
-intermittent. An existing test was pinning the bug's variable name,
-`assert.match(source,/knownActive/)`, with no rule written beside it — and that
-name recorded the defect. Replaced with the behaviour.
+**A cold read of that fix then found two worse bugs in the line it rewrote,
+and both were reproduced.** `MAX_ENTRIES` is the **active** capacity
+everywhere in the app — ADD DOWN BUS, the scan import's refusal, PUT BACK, the
+button, the capacity tile — and the two mint paths alone applied it to the
+sheet's **total**, history included:
+
+| seeded | before | after |
+| --- | --- | --- |
+| 100 Completed rows, nothing down | **98 come back — `old-98` and `old-99` destroyed**, no prompt, no undo | 100 |
+| 96 Completed rows + 5 buses down with no row | 2 minted; the other **3 lost their row AND their map badge**, silently | all 5 minted, all 5 keep the badge |
+
+The second is the failure the sheet exists to prevent — *a bus that is down and
+not on the sheet is a bus that goes back out broken* — and the existing
+capacity alerts could not fire, because they count active entries and there
+were two. The first is the one line CLAUDE.md is bluntest about: *"Never delete
+or merge repair records to simplify the UI."*
+
+`src/lib/down-sheet/sheet-mint.ts` owns it now — a `.ts` with no JSX, so the
+MCP route can answer with it rather than reimplementing it, which is also what
+removed the duplicated rule. **Nothing stored is ever dropped**, the cap counts
+**active** rows, and anything it cannot fit is **returned and named on screen**
+rather than discarded: *"The active down sheet is full at 98 buses, so buses
+18505, 17221 are flagged down with no row on it."* A third truncation inside
+`entriesFromFleet` went too — it cut the candidate list before the capacity
+check could even report what it dropped.
+
+**THE DIAGNOSIS IN THE FIRST FIX WAS WRONG AND IS CORRECTED.** It blamed the
+storage-event handler for the intermittency. A `storage` event never fires in
+the document that wrote the key — this file says so itself about
+`pace-header-theme-v1`, *"which only ever fires in the OTHER tabs"* — so on one
+phone that handler never runs. The copy that actually disagreed is the
+**Facility Map's** own `reconcileDownSheetMembership`: loading just the map
+clears the flag. The duplicate row appeared or not depending on **which page
+was opened first**, which is the open question below.
+
+**And the test guarding it was not a gate.** It was a regex over the page's own
+expression; the cold read showed it stayed green with the bug reintroduced by
+hoisting the filter out of the call, and went red on a rename and on extracting
+the rule to `src/lib` — the refactor `docs/ARCHITECTURE.md` asks for. It is a
+behavioural test against the real function now: four harmful mutations caught,
+including that one, and green on the rename.
+
+**This is a visible flow change, not only a bug fix.** Opening the Down Sheet
+now REMOVES a DS badge from the Facility Map and shows one fewer row where it
+used to add a row and keep the badge. It matches what the map already did on
+its own mount, but it changes what a foreman sees, so it is Curtis's to confirm.
 
 ### Open questions for Curtis
 

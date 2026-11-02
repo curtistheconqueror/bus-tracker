@@ -831,3 +831,16 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .in-service-toggle{height:auto;min-height:38px;width:100%;border:1px solid #9aa7c2;border-radius:7px;background:#fff;color:#2b3c60;padding:6px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}
 .in-service-toggle.on{border-color:#0d7a3f;background:#e6f6ec;color:#0b5c31}
 .group-count.in-service strong{color:#0d7a3f}
+
+/* A BUS FLAGGED DOWN THAT THE ACTIVE CAP HAD NO ROOM FOR. The sheet used to
+   drop these silently and `reconcileDownSheetMembership` then took their map
+   badge away too — measured: three of five buses off the sheet and off the
+   map, on a sheet holding two active entries, because the cap was counting
+   completed history. The cap counts the active rows now, and anything still
+   left out says so here. Styled as the scan's own LINES NOT READ warning,
+   which is the same kind of fact: a bus that is down and nowhere to be seen. */
+.down-mint-skipped{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;margin:0 14px 8px;padding:9px 11px;border:1px solid #d9a441;border-left:4px solid #c07a00;border-radius:6px;background:#fff8ec}
+.down-mint-skipped b{grid-column:1;font-size:9px;font-weight:900;letter-spacing:.6px;color:#7a4d05}
+.down-mint-skipped small{grid-column:1;font-size:9px;font-weight:700;line-height:1.45;color:#7a4d05}
+.down-mint-skipped button{grid-column:2;grid-row:1/-1;width:44px;height:44px;border:1px solid #d9a441;border-radius:6px;background:#fff;color:#7a4d05;font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
+@media(max-width:760px){.down-mint-skipped{margin:0 8px 8px}}
