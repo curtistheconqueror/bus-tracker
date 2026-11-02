@@ -55,7 +55,7 @@ export type ComboOption={
  category?:string;
 };
 
-export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className}:{
+export default function ComboField({label,value,display,search,onPick,placeholder,emptyText,disabled,footnote,className,coach}:{
  label:string;
  value:string;
  /* What the closed field shows. Passed in rather than looked up here, because
@@ -74,6 +74,11 @@ export default function ComboField({label,value,display,search,onPick,placeholde
  disabled?:boolean;
  footnote?:string;
  className?:string;
+ /* A name for the step-by-step helper to ring, landed on the field's own root
+    so nothing has to be wrapped in a div — a wrapper here would become the
+    grid item and the `wide` class inside it would stop spanning. Absent on
+    every caller that does not use the helper, which is all but one. */
+ coach?:string;
 }){
  const [open,setOpen]=useState(false);
  const [query,setQuery]=useState("");
@@ -268,7 +273,7 @@ export default function ComboField({label,value,display,search,onPick,placeholde
   }
  };
 
- return <label className={className?"combo-field "+className:"combo-field"}>
+ return <label className={className?"combo-field "+className:"combo-field"} data-coach={coach}>
   {label}
   <div className={open?"combo-box open":"combo-box"} ref={boxRef}>
    <input

@@ -28,7 +28,15 @@ from Fixed Repairs** as well as the Defect Log's focus view, which puts a fourth
 button on each history card and takes that row to 2x2 on a phone. A finding
 cleared on an open defect no longer comes back from the next Down Sheet save.
 And **the screen no longer zooms itself on a phone** — four forms had text
-fields under 16px, which is what iOS zooms for and never undoes.
+fields under 16px, which is what iOS zooms for and never undoes. **The bus
+quick view is a glance again**: 829 characters of free text in a card whose top
+sat 227px off the screen, now a count, three names and "+9 more", measured and
+placed rather than guessed. **The BUS GENERATIONS chips are sized for their
+labels** — 177px each down to 64px, one row at every width, flush right. The
+**+ LOG DEFECT form had stopped opening at all** since the PATH TO REPAIR
+extraction, past four green gates, and `tsc`'s TS2304 is now one of them. And
+an optional **STEP-BY-STEP HELPER ON THE DEFECT FORM**, off by default, which
+rings the next field and says what it wants without ever blocking a save.
 Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
 remains separately held and unmerged.
 
@@ -1770,6 +1778,196 @@ sixteen bypasses asserted caught — and the record may shrink but not grow.
 
 **Not verifiable from here.** Chromium does not do the iOS zoom, so what is
 proven is that no field in those flows is under 16px. The real test is a thumb.
+
+### The bus quick view is a glance again
+
+Curtis, with screenshots of bus 15519: *"it looks like a mess and what I come
+to find out is that we really don't need all of the details showing like
+this... there has to be a better way to do this."*
+
+It printed `bus.pendingRepair` whole — every unresolved defect's FULL label
+joined with semicolons, including whatever the mechanic typed. Measured on a
+bus built from his: **829 characters in one blob, in a card 628px tall whose
+top sat 227px ABOVE** the top of a 390x844 screen.
+
+**Three separate faults, and only one was the content.**
+
+| | before | now |
+| --- | --- | --- |
+| content | 829 characters of free text | **136** — "12 OPEN", three names, "+9 more — open the bus for the rest" |
+| width | the clamp assumed a 200px card against a 250px cap, so a bus near the left edge put 25px of it off that side | `QUICK_MAX_WIDTH`, one number the clamp and the stylesheet share, held together by a test |
+| height | `translateY(-100%)` with the height unknown until it had rendered | measured first, placed second; the card is `visibility:hidden` until it is placed |
+
+The findings, symptoms and typed notes are not gone — they are one double-tap
+away on the bus itself, which is where the full record already lived.
+
+**The first fix was wrong and a cold read caught it**: `onFocus` fires after
+`pointerup`, so the old placement was written back over the measured one on
+every real tap and the card still ran off the top. `showQuick` now only
+*requests* a measurement and a layout effect does all the placing.
+
+### The bus generation chips are sized for their labels
+
+Curtis: *"I want this strip of bus drop downs to be slimmer because it's more
+than wide enough for the bus numbers. Then move it slightly to the right."*
+
+`repeat(4,minmax(0,1fr))` stretched each chip to fill the fieldset — **177px
+apiece at 820 and 1180, 169px at 390**, for a label three characters long. A
+fixed 64px basis sizes them to the content and `justify-content:flex-end` puts
+the spare width on the LEFT, which is the nudge right.
+
+```
+320    chips 23..297   64px each, one row  (was 134px, two rows)
+390    chips 93..367   64px each, one row  (was 169px, two rows)
+430    chips 133..407  64px each           (was 92px)
+1180   chips 679..953  64px each           (was 177px)
+```
+
+64 keeps a thumb target: the phone block already gives these 44px of height,
+and 64 wide clears Apple's 44 while being a third of what they were. **One row
+at every width now** — it dropped to two-up below 390 before, because four
+stretched chips could not fit. On a desktop they now sit flush right with a
+gap to their left, which is a look rather than a measurement and is his call if
+he would rather they centred.
+
+### The Defect Log form, which had stopped opening
+
+**This never reached the shop** — it was introduced and fixed inside this
+unpublished release — but it is worth recording because of how it got past
+everything.
+
+Pressing **+ LOG DEFECT** threw `ReferenceError: findRepairMinutes is not
+defined` and the editor did not open at all. Extracting the PATH TO REPAIR
+panel narrowed an import in `app/defect-log/page.tsx` from four names to one,
+and a call to `findRepairMinutes` was still there 1,355 lines away, feeding the
+estimate badge. Three pushes and two cold reads went past it.
+
+**EVERY GATE WAS GREEN.** `npm test` passes because nothing in the suite
+renders that editor. `npm run lint` passes because the TypeScript rule for
+undefined names is off where the compiler owns it. `npm run build` passes
+because vinext does not typecheck. And `npx tsc --noEmit` **did** report
+it — the error COUNT was compared, 214 against 214, instead of the error LIST,
+and an unrelated error had gone away in the same change. **A count against a
+dirty baseline hides precisely the error you just added.**
+
+`tests/app-shell.test.mjs` now runs `tsc` and fails on any **TS2304** — a name
+with no definition — in `app/` or `src/`. Not the whole of `tsc`: this repo
+carries 213 other errors and clearing them is its own job. Just the class that
+is a crash rather than a complaint.
+
+### The step-by-step helper on the defect form, off by default
+
+Curtis: *"we need a little assistant highlighter... a highlight function that
+highlights each field that they need to address next so like the bus number
+being the first thing then after that the defects... and there may be a short
+message that can pop up and kind of point to the optional things that you can
+do and what would be next in case a person doesn't necessarily want to save a
+defect and recommended on the down sheet... it should be a toggle off and on
+for it."*
+
+Switched on, the LOG DEFECT form gains a bar between its header and the
+scrolling fields, and a ring on the field the bar is talking about:
+
+| step | rings | says | will the save refuse without it |
+| --- | --- | --- | --- |
+| 1 | BUS NUMBER | START WITH THE BUS | yes |
+| 2 | DEFECT CATEGORY | WHAT AREA IS IT | yes |
+| 3 | SPECIFIC DEFECT OR SYMPTOM | CHOOSE THE DEFECT, or CHOOSE THE GROUP on a grouped category | **no** |
+| 3b | the count field | FANS OUT | yes, where the catalog marks that repair counted |
+| 4 | the save row | THAT IS ENOUGH TO SAVE | — |
+
+**WHAT IT CALLS BLOCKING IS READ OFF THE FORM'S OWN REFUSALS.**
+`validateAndSave` refuses exactly five things — no bus, no category, a required
+count out of range, FIXED BY empty on a save-as-fixed where the device asks for
+initials, and a recent duplicate. So **the specific defect does not block a
+save**, which the form says in its own placeholder: *"or leave it and save the
+category alone."* The first draft of `src/lib/defects/form-coach.ts` marked it
+required, and marked REPORTED BY required too — `requireInitials` gates FIXED
+BY and has never touched REPORTED BY. Both were simply false, and a helper that
+says a field is needed when it is not is worse than no helper, because it is
+believed. The step is still the second stop on the walk, where Curtis put it;
+it just tells the truth about saving without it.
+
+**A BAR IN ONE PLACE AND A RING ON THE FIELD, rather than a pop-up beside
+each.** He asked for a message that "can pop up", and a floating tooltip is not
+what was built. Three reasons, and if he wants the tooltip the placement maths
+already exists in `quick-view-position.ts`:
+
+- a block inserted above the live field pushes everything below it down, so the
+  form jumps on every step;
+- a floating card has to be re-measured on every scroll of a box that scrolls
+  under a thumb, which is the bug the bus quick view above was fixed for twice;
+- on a phone the field being pointed at is usually the one with the keyboard
+  under it, and a tooltip anchored below it lands beneath the keyboard. At the
+  top of the editor nothing can cover it.
+
+**It does not scroll the form.** Moving the page under somebody's thumb is what
+`BusSelector` already refuses to do with `autoFocus`. The consequence is that
+on the closing step the ring sits below the fold until you scroll — measured at
+390x844, the save row's top is at y815 — so there the bar's words are doing the
+work and the sticky SAVE in the footer is the control in reach.
+
+**THE INK IS NOT THE ACCENT, AND THAT IS MEASURED.** It was built as
+`.mystery-head`'s pattern — the title in `--log-accent` on an 11% accent tint —
+and swept as ink on that ground across the four Defect Log themes:
+
+| tint | `--log-text` | `--log-muted` | `--log-accent` |
+| --- | --- | --- | --- |
+| 0% | 9.28 | 4.90 | 4.63 |
+| 4% | 8.71 | **4.63** | 4.35 |
+| 6% | 8.42 | 4.50 | 4.21 |
+| 11% | 7.69 | 4.37 | **3.84** |
+| 14% | 7.32 | 3.98 | 3.66 |
+
+(worst of light, dark, midnight and tactical at each row). The accent cannot be
+text here at any tint; `--log-muted` needs the ground near the surface. So the
+tint is **4%**, the title is `--log-text` and the message `--log-muted`. 6%
+would floor at exactly 4.50 and a floor equal to the threshold is not a
+promise. Measured on the built page afterwards: title floor **8.69:1**, message
+**4.63:1**, the × **4.90:1**, the ring against the field's own surface
+**4.63:1**.
+
+**A blocking step is marked by the stripe, not by the ground.** A stronger tint
+would have put the message back under AA, and a difference carried by colour
+alone is not a difference for everybody looking at it. The words already say
+which kind of step it is; the accent stripe on the bar's left edge goes 3px to
+6px as the quiet second signal.
+
+**THE RING IS SET IMPERATIVELY on an element the helper does not own** — each
+coachable field carries `data-coach="<name>"` and an effect puts
+`data-coach-active` on whichever the step names, the shape
+`header-theme-live.tsx` uses. Threading an `active` prop would have meant a
+prop on three shared components and one CSS rule per step name, which drifts
+the moment a step is added. **A renamed anchor would fail silently** — the bar
+still says CHOOSE THE DEFECT and nothing lights up — so `tests/defects.test.mjs`
+reads the anchors out of the form, walks every step the module can produce, and
+insists the two sets are equal. Six mutations were run against the new gates
+and all six were caught.
+
+**Off until somebody turns it on**, and off is the safe READ too: anything that
+is not exactly `true` in `pace-coach-v1` is off, the spelling
+`feedback-settings.ts` uses. The switch is **STEP-BY-STEP HELPER ON THE DEFECT
+FORM**, in Settings under DEFECT LOG → YOU & DEFAULTS. The × on the bar stops
+it for that one defect without turning it off — the editor is keyed per defect,
+so reopening gets it back.
+
+**IT POINTS, IT DOES NOT GATE.** No save path reads it, the module contains no
+`alert`, `throw` or `disabled`, and a test asserts the four save buttons'
+`disabled` condition is still the duplicate check alone.
+
+Measured on the built page: the walk advances bus → category → issue → closing
+with the right ring at each step and exactly one ring at a time; the ring
+survives 54 keystrokes of form re-rendering; clearing the bus walks it
+backwards; closing the editor leaves no ring and no bar. No clipping and no
+horizontal overflow at 320, 360, 390, 430, 820 or 1180. The shared BUS NUMBER
+picker carries nothing on the Down Sheet with the helper switched on. **The
+cost is vertical**: the bar takes 57-63px off the scrolling form, which at
+320x568 is 257px down to 194px — still scrolling, footer still reachable, but
+tight on the smallest phone there is.
+
+**Built for LOG DEFECT only**, which is what was asked for and looked at first.
+Carrying it to another form is another anchor set and another walk, not another
+copy of the rule.
 
 ### Open questions for Curtis
 

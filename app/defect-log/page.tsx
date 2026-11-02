@@ -30,6 +30,9 @@ import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,s
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
+import FormCoachBar from "./_components/form-coach-bar";
+import {coachStep} from "@/src/lib/defects/form-coach";
+import {readCoachSettings,COACH_SETTINGS_KEY} from "@/src/lib/settings/coach-settings";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,busLoggedMinutes,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
 import {busDeferredMinutes} from "@/src/lib/defects/deferred-counts";
@@ -149,7 +152,7 @@ function PartNumberPrompt({busNumber,suggestion,initial,confirm,close}:{
  </div>;
 }
 
-function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
+function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,shopHours,save,saveFixed,showExisting,countReturn,close,onBusPicked}:{draft:LogDraft;fleet:DefectLogFleetBus[];defaultInitials:string;requireInitials:boolean;coachOn:boolean;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;shopHours:RepairHoursLedger;save:(draft:LogDraft)=>void;saveFixed:(draft:LogDraft)=>void;showExisting:(busId:string,defect:StructuredDefect)=>void;countReturn:(busId:string,defect:StructuredDefect)=>ReportReturnResult;close:()=>void;onBusPicked:(busId:string)=>void}){
  const [value,setValue]=useState(draft);
  /* WHAT THE LAST PRESS DID. Both banner buttons used to change nothing a
     person could see: OPEN IT swapped a draft under a component that ignored
@@ -373,6 +376,19 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     from the catalog rather than from a category test written into this form.
     Fans were hard-coded here; air bags would have been a second copy of it. */
  const countField=defectCountField(value.defect.category,value.quickIssue);
+ /* HIDDEN FOR THIS EDITOR, not turned off. The × on the bar stops it pointing
+    at this one defect; Settings is the durable switch, and the editor is keyed
+    per defect so reopening one gets the helper back. A person who wants it
+    gone for good has one obvious place to go and one that undoes itself. */
+ const [coachHidden,setCoachHidden]=useState(false);
+ /* The step is a question about a half-filled record, so it is answered in
+    `src/lib/defects/form-coach.ts` rather than here — a rule computed inside a
+    page.tsx has to be written a second time in the MCP route to be answerable.
+    The live issue is `quickIssue`; `defect.issue` is not filled until a save. */
+ const coach=coachOn&&!coachHidden?coachStep(
+  {busId:value.busId,category:value.defect.category,issue:value.quickIssue,count:value.defect.quantity},
+  {requireInitials,initials:value.defect.completedBy||defaultInitials})
+  :null;
  /* The same test the stored record is normalized through, so what this form
     offers and what the catalog counts as a top-up cannot drift apart. */
  const fluidMode=isFluidTopUp(value.defect.category,value.quickIssue);
@@ -410,13 +426,14 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
    confirm={number=>{setPartPrompt(false);validateAndSave(true,{partsUsed:true,partNumber:number});}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
+   {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
    <div className="log-form">
-    <BusSelector fleet={fleet} busId={value.busId} select={pickBus}/>
+    <BusSelector fleet={fleet} busId={value.busId} select={pickBus} coach="bus"/>
     {/* TWO FIELDS, NOT FOUR. Curtis asked for a search beside each picker and
         named the risk in the same breath — "just try to make it look clean".
         One control per picker does both jobs: tap it and the whole list opens
         the way the <select> did, type in it and the same list narrows. */}
-    <ComboField label="DEFECT CATEGORY" className="wide"
+    <ComboField label="DEFECT CATEGORY" className="wide" coach="category"
      value={value.defect.category}
      display={value.defect.category?repairCategoryLabel(value.defect.category):""}
      placeholder="Type or tap to choose a category"
@@ -428,7 +445,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         you anything, so a mechanic had to know a wiper motor lives under Bus
         Accessories before he could log one. Now he types "wiper motor", picks
         it, and the category fills itself in behind him. */}
-    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide"
+    <ComboField label="SPECIFIC DEFECT OR SYMPTOM" className="wide" coach="issue"
      value={value.quickIssue}
      display={value.quickIssue?issueDisplay(value.quickIssue,value.defect.category):""}
      placeholder={value.defect.category?"Type or tap — or leave it and save the category alone":"Type what is wrong, or tap to browse"}
@@ -543,7 +560,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
         and the shop counts oil, not glycol. */
      extraFluids.length?"QUANTITY — "+pickedFluid.toUpperCase():"QUANTITY"
     }<input type="number" min="0.5" step="0.5" inputMode="decimal" value={value.defect.quantity||""} onChange={event=>updateDefect("quantity",event.target.value?Number(event.target.value):undefined)}/></label><label>UNIT<select value={value.defect.unit||"quarts"} onChange={event=>updateDefect("unit",event.target.value)}><option value="quarts">Quarts</option><option value="gallons">Gallons</option><option value="liters">Liters</option></select></label></>}
-    {countField&&<label className="defect-count-field">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
+    {countField&&<label className="defect-count-field" data-coach="count">{countField.label}<select value={value.defect.quantity||""} onChange={event=>setValue(current=>({...current,defect:{...current.defect,quantity:event.target.value?Number(event.target.value):undefined,unit:countField.unit}}))}><option value="">{countField.prompt}</option>{Array.from({length:countField.max},(_,index)=>index+1).map(count=><option value={count} key={count}>{count}</option>)}</select></label>}
     {/* BULLET starts a new line with a dot on it, which is the whole feature:
         the breaks somebody types are kept now, so a dot at the start of a line
         IS a bullet and nothing has to parse anything. It appends rather than
@@ -617,7 +634,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,partsMemory,f
     </label>
     <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
     <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
-    <div className="save-log-middle-actions" aria-label="Defect form actions">
+    <div className="save-log-middle-actions" aria-label="Defect form actions" data-coach="save">
      <button type="submit" className="save-log-middle" disabled={Boolean(recentDuplicate)}>{saveLabel}</button>
      <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
      <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
@@ -854,6 +871,10 @@ export default function DefectLog(){
  const [findingsMemory,setFindingsMemory]=useState<FindingsMemory>(EMPTY_FINDINGS_MEMORY);
  useEffect(()=>setFindingsMemory(readFindingsMemory(localStorage)),[]);
  const forgetLearnedFinding=(entry:FindingMemoryEntry)=>setFindingsMemory(current=>{const next=forgetFinding(current,entry.category,entry.issue,entry.finding);writeFindingsMemory(localStorage,next);return next});
+ /* THE STEP-BY-STEP HELPER, off until somebody turns it on. Read on mount
+    rather than in the initialiser because the server render cannot read
+    LocalStorage and a mismatch there is a hydration error. */
+ const [coachOn,setCoachOn]=useState(false);
  const [statsOpen,setStatsOpen]=useState(false);
  const [advancedOpen,setAdvancedOpen]=useState(false);
  const [movingMysteryBusId,setMovingMysteryBusId]=useState("");
@@ -895,11 +916,11 @@ export default function DefectLog(){
  const [batchUndo,setBatchUndo]=useState<ScanBatchUndo|null>(null);
  useEffect(()=>setBatchUndo(readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY))),[]);
 
- useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1");setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
+ useEffect(()=>{const nextFleet=readFleet(localStorage.getItem(FLEET_KEY)),nextDown=readDown(localStorage.getItem(DOWN_KEY)),nextSettings=readSettings(localStorage.getItem(SETTINGS_KEY));setFleet(nextFleet);setDownEntries(nextDown);setSettings(nextSettings);try{const visuals=JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY)||"{}").visuals;if(typeof visuals?.downSheetBadge==="string"&&typeof visuals?.downSheetBadgeText==="string")setDownSheetBadgeColors({badge:visuals.downSheetBadge,text:visuals.downSheetBadgeText})}catch{}setMysterySlot(readMysterySlot(localStorage.getItem(BOARD_SETTINGS_KEY)));setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1");setCoachOn(readCoachSettings(localStorage).on);setStatsOpen(localStorage.getItem(STATS_OPEN_KEY)==="1");setFilter(nextSettings.defaultFilter);setHydrated(true)},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,SETTINGS_KEY,JSON.stringify(settings))},[settings,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,STATS_OPEN_KEY,statsOpen?"1":"0")},[statsOpen,hydrated]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
- useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue))};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
+ useEffect(()=>{const receive=(event:StorageEvent)=>{if(event.key===FLEET_KEY)setFleet(readFleet(event.newValue));if(event.key===DOWN_KEY)setDownEntries(readDown(event.newValue));if(event.key===BOARD_SETTINGS_KEY)setMysterySlot(readMysterySlot(event.newValue));/* Settings are edited on the shared page now, so a change there has to reach a log that is already open - and it has to reach this page's own state, because this page writes the whole settings object back whenever one of its fields changes and would otherwise put the stale copy over the new one. */if(event.key===SETTINGS_KEY)setSettings(readSettings(event.newValue));if(event.key===SCAN_BATCH_UNDO_KEY)setBatchUndo(readScanBatchUndo(event.newValue));if(event.key===COACH_SETTINGS_KEY)setCoachOn(readCoachSettings(localStorage).on)};window.addEventListener("storage",receive);return()=>window.removeEventListener("storage",receive)},[]);
 
  const allRecords=useMemo(()=>defectLogRecords(fleet,downEntries),[fleet,downEntries]);
  const batches=useMemo(()=>scanBatches(fleet),[fleet]);
@@ -2074,7 +2095,7 @@ export default function DefectLog(){
     </div>
    </section>
   </div>}
-  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
+  {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
   {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}

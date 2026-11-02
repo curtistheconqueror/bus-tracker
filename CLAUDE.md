@@ -245,6 +245,7 @@ per-device settings, never synced
   pace-sweep-v1                    FULL SWEEP: when this walk began, and where from
   pace-role-v1                     the job title chosen on the home screen — COSMETIC, never a permission
   pace-feedback-settings-v1        sound and vibration on this device, both OFF
+  pace-coach-v1                    the step-by-step helper on the defect form, OFF
   pace-header-theme-v1             the app's header colour, and any per-page override
   pace-shift-settings-v1           when each shift runs, and the pullout times
   pace-sheet-ledger-v1             one compact snapshot per Down Sheet swap
@@ -376,6 +377,60 @@ off, the spelling discipline `setBusHold` and the ledger's `gap` already follow.
 buzz** rather than taking it as a prop. A flag plumbed from the page root goes
 stale, and a stale copy is a phone still buzzing just after somebody turned it
 off — which is the exact moment they are watching to see whether it worked.
+
+**`pace-coach-v1` is the step-by-step helper, and it points rather than
+gates.** Curtis: *"we need a little assistant highlighter... a highlight
+function that highlights each field that they need to address next so like the
+bus number being the first thing then after that the defects... and there may
+be a short message that can pop up and kind of point to the optional things
+that you can do and what would be next in case a person doesn't necessarily
+want to save a defect and recommended on the down sheet... it should be a
+toggle off and on for it."*
+
+**WHAT IT CALLS BLOCKING IS READ OFF THE FORM'S OWN REFUSALS**, and that is the
+whole correctness of it. `validateAndSave` refuses exactly five things — no
+bus, no category, a required count out of range, FIXED BY empty on a
+save-as-fixed where the device asks for initials, and a recent duplicate. So
+**the SPECIFIC DEFECT does not block a save**, which the form says in its own
+placeholder: *"or leave it and save the category alone"*. The first draft of
+`src/lib/defects/form-coach.ts` marked it required and marked REPORTED BY
+required too — `requireInitials` gates FIXED BY and never REPORTED BY — and
+both were simply false. A helper that says a field is needed when it is not is
+worse than no helper, because it is believed. The step is still the second stop
+on the walk, where Curtis put it; it just tells the truth about saving without
+it.
+
+**A BAR IN ONE PLACE AND A RING ON THE FIELD.** The message sits between the
+editor's header and the scrolling form, so it never moves; the ring is an
+outline on the live field. A tooltip floating beside each field in turn was not
+built, for three measured reasons: a block inserted above the live field pushes
+everything below it down, so the form jumps on every step; a floating card has
+to be re-measured on every scroll of a box that scrolls under a thumb, which is
+the bug the bus quick view was fixed for twice; and on a phone the field being
+pointed at is usually the one with the keyboard under it. **It does not scroll
+the form** — moving the page under somebody's thumb is the thing `BusSelector`
+already refuses to do with `autoFocus`.
+
+**The ring is set imperatively on an element the helper does not own.** Each
+coachable field carries `data-coach="<name>"` and an effect puts
+`data-coach-active` on whichever one the step names — the shape
+`header-theme-live.tsx` uses, and for the same reason: threading an `active`
+prop would mean a prop on three shared components and one CSS rule per step
+name, which drifts the moment a step is added. A renamed anchor would fail
+SILENTLY — the bar still says CHOOSE THE DEFECT and nothing lights up — so
+`tests/defects.test.mjs` reads the anchors out of the form, walks every step
+the module can produce, and insists the two sets are equal.
+
+**Off until somebody turns it on**, the rule every added behaviour here
+follows, and off is the safe READ as well: anything that is not exactly `true`
+is off, the spelling `feedback-settings.ts` uses. The × on the bar stops it for
+that one defect — the editor is keyed per defect, so reopening one gets it
+back — and Settings is the durable switch. Per device and never synced: it
+describes how one person wants the app to help them.
+
+Built for the Defect Log's LOG DEFECT form only, which is what was asked for
+and looked at first. Carrying it to another form means another anchor set and
+another walk, not another copy of the rule.
 
 **`pace-header-theme-v1` is the app's header colour, and it replaced five
 places that each decided one.** Curtis: *"B is fine all same color until I

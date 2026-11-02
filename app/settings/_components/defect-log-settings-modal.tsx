@@ -1,11 +1,12 @@
 "use client";
 
-import type {ReactNode} from "react";
+import {useEffect,useState,type ReactNode} from "react";
 import {safeBorderColor,DEFAULT_DEFECT_LOG_DISPLAY,DEFECT_LOG_LABEL_NAMES,DEFECT_LOG_STYLE_LABELS,followsTheme,normalizeDefectLogDisplay,type DefectLogLabels,type DefectLogStyleKey} from "@/src/lib/defects/defect-log-display-settings";
 import {REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {FLEET_BACKUP_INTERVAL_CHOICES,normalizeFleetBackupInterval} from "@/src/lib/storage/storage";
 import {COLOR_FIELDS,type Filter,LOG_THEMES,type LogAppearance,type LogFontFamily,type LogFontSize,type LogGroupContrast,type LogSettings,type LogTheme,VIEW_SCOPES,normalizeViewScope} from "@/src/lib/defects/defect-log-settings";
 import {SettingsDrawer,SettingsDrawers} from "@/src/components/settings/settings-drawer";
+import {readCoachSettings,writeCoachSettings} from "@/src/lib/settings/coach-settings";
 
 /* The Defect Log's settings panel.
 
@@ -24,6 +25,23 @@ const VIEW_OPTIONS:{key:"busRail"|"busBlueOnly"|"busEndMarker";title:string;blur
 ];
 
 export default function LogSettingsModal({settings,setSettings,close,exportLog,transfer,inline=false}:{settings:LogSettings;setSettings:(settings:LogSettings)=>void;close:()=>void;exportLog?:()=>void;transfer:ReactNode;inline?:boolean}){
+ /* THE STEP-BY-STEP HELPER'S SWITCH, held here rather than threaded through
+    the Settings page. It is not part of `LogSettings` — it has its own key
+    because Curtis asked for something "that can help you go through the app",
+    so the next form to get it should not have to be a Defect Log setting —
+    and a switch with one caller gains nothing from two more props.
+
+    READ IN AN EFFECT, never in the initialiser: the server render cannot see
+    LocalStorage, and a checkbox that renders checked on the server and
+    unchecked on the client is a hydration error. Off until the read lands,
+    which is also the honest default. */
+ const [coachOn,setCoachOn]=useState(false);
+ useEffect(()=>{setCoachOn(readCoachSettings(localStorage).on)},[]);
+ /* The state follows the write rather than leading it. `writeCoachSettings`
+    returns whether the record was actually stored, and a full device must not
+    be shown a switch that moved while nothing was saved — the discipline the
+    rest of this app's writes already follow. */
+ const setCoach=(on:boolean)=>{if(writeCoachSettings(localStorage,{on}))setCoachOn(on)};
  const applyTheme=(theme:Exclude<LogTheme,"custom">)=>setSettings({...settings,theme,appearance:{...LOG_THEMES[theme].appearance}});
  const setColor=(key:keyof LogAppearance,value:string)=>setSettings({...settings,theme:"custom",appearance:{...settings.appearance,[key]:value}});
  const setDisplayLabel=(key:keyof DefectLogLabels,value:string)=>setSettings({...settings,display:{...settings.display,labels:{...settings.display.labels,[key]:value}}});
@@ -46,6 +64,12 @@ export default function LogSettingsModal({settings,setSettings,close,exportLog,t
        you were doing, so it gets a switch. The 🚨 DEFERRED banner is not tied
        to it and stays on either way - turning this off trades an interruption
        for a badge, not for silence. */}
+   {/* Curtis asked for the helper and for its switch in the same breath: "it
+       should be a toggle off and on for it". Off by default, the rule every
+       added behaviour in this app follows — sound and vibration shipped off —
+       because somebody who has logged four hundred defects does not want a
+       bar appearing over the form they already know. */}
+   <label className="require-initials coach-setting"><input type="checkbox" checked={coachOn} onChange={event=>setCoach(event.target.checked)}/><span><b>STEP-BY-STEP HELPER ON THE DEFECT FORM</b><small>Rings the next field to fill in and says what it wants, then one note about the optional parts and the two ways to finish. It never blocks a save, and the × on it stops it for that one defect without turning this off.</small></span></label>
    <label className="require-initials deferred-review-setting"><input type="checkbox" checked={settings.deferredReviewPrompt} onChange={event=>setSettings({...settings,deferredReviewPrompt:event.target.checked})}/><span><b>ASK ABOUT DEFERRED BUSES AT NIGHT</b><small>From 8:30pm on, one prompt per bus still deferred past an hour — keep it deferred until a time you pick, put it on the Down Sheet, or send it back out. Off leaves the 🚨 DEFERRED banner to do the reminding on its own.</small></span></label>
    <label>DEFAULT VIEW<select value={settings.defaultFilter} onChange={event=>setSettings({...settings,defaultFilter:event.target.value as Filter})}><option value="all">All</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="fixed">Fixed Today</option><option value="downsheet">Down Sheet</option></select></label>
    <label className="settings-check"><input type="checkbox" checked={settings.showFixed} onChange={event=>setSettings({...settings,showFixed:event.target.checked})}/><span>SHOW FIXED</span></label>
