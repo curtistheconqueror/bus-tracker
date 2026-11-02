@@ -32,6 +32,7 @@ import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
 import FormCoachBar from "./_components/form-coach-bar";
 import {coachStep} from "@/src/lib/defects/form-coach";
+import {saveRefusal} from "@/src/lib/defects/save-refusal";
 import {readCoachSettings,COACH_SETTINGS_KEY} from "@/src/lib/settings/coach-settings";
 import {QUICK_FILTER_EVENT,QUICK_FILTER_PARAM,QUICK_FILTERS,busLoggedMinutes,quickFilterBusIds,quickFilterDefects,quickFilterFallbackLabel,quickFilterFromValue,type QuickFilterKey} from "@/src/lib/defects/quick-filters";
 import {recommendedRows,recommendedRank,busRecommendedMinutes} from "@/src/lib/defects/recommended-counts";
@@ -376,19 +377,6 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     from the catalog rather than from a category test written into this form.
     Fans were hard-coded here; air bags would have been a second copy of it. */
  const countField=defectCountField(value.defect.category,value.quickIssue);
- /* HIDDEN FOR THIS EDITOR, not turned off. The × on the bar stops it pointing
-    at this one defect; Settings is the durable switch, and the editor is keyed
-    per defect so reopening one gets the helper back. A person who wants it
-    gone for good has one obvious place to go and one that undoes itself. */
- const [coachHidden,setCoachHidden]=useState(false);
- /* The step is a question about a half-filled record, so it is answered in
-    `src/lib/defects/form-coach.ts` rather than here — a rule computed inside a
-    page.tsx has to be written a second time in the MCP route to be answerable.
-    The live issue is `quickIssue`; `defect.issue` is not filled until a save. */
- const coach=coachOn&&!coachHidden?coachStep(
-  {busId:value.busId,category:value.defect.category,issue:value.quickIssue,count:value.defect.quantity},
-  {requireInitials,initials:value.defect.completedBy||defaultInitials})
-  :null;
  /* The same test the stored record is normalized through, so what this form
     offers and what the catalog counts as a top-up cannot drift apart. */
  const fluidMode=isFluidTopUp(value.defect.category,value.quickIssue);
@@ -405,6 +393,23 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     and then changing the repair to one that duplicates defect B left B's
     banner carrying A's number. */
  const returnNoteFor=returnNote&&recentDuplicate&&returnNote.id===recentDuplicate.id?returnNote:null;
+ /* HIDDEN FOR THIS EDITOR, not turned off. The × on the bar stops it pointing
+    at this one defect; Settings is the durable switch, and the editor is keyed
+    per defect so reopening one gets the helper back. A person who wants it
+    gone for good has one obvious place to go and one that undoes itself. */
+ const [coachHidden,setCoachHidden]=useState(false);
+ /* The step is a question about a half-filled record, so it is answered in
+    `src/lib/defects/form-coach.ts` rather than here — a rule computed inside a
+    page.tsx has to be written a second time in the MCP route to be answerable.
+    The live issue is `quickIssue`; `defect.issue` is not filled until a save. */
+ const coach=coachOn&&!coachHidden?coachStep(
+  {busId:value.busId,category:value.defect.category,issue:value.quickIssue,count:value.defect.quantity,state:value.defect.state,existing:draft.defect.createdAt!==draft.defect.updatedAt},
+  {requireInitials,completedBy:value.defect.completedBy||defaultInitials,
+   savingAsFixed:false,
+   duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",
+   duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",
+   duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL})
+  :null;
  /* And it expires, the way the card's does. Without this, counting a return,
     clearing the repair field and retyping the same one brought the old
     "COUNTED · REPORTED ×3" back, still carrying the number read at press
@@ -415,7 +420,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     save the defect as it was one render ago — React has not applied the update
     yet — so the part number would be dropped on the very save that asked for
     it. Passing it through means what is validated is what is written. */
- const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={})=>{const defect={...value.defect,...patch};const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;if(!selectedBus){alert("Select a bus number.");return}if(!defect.category){alert("Select a repair category.");return}if(countField?.required&&(!count||count<1||count>countField.max)){alert("Select "+countField.label.toLowerCase()+" (1 through "+countField.max+").");return}if(completed&&requireInitials&&!completedBy){alert("Put your initials or name in FIXED BY before saving this as fixed. This is required by the Defect Log setting; turn it off there to make it optional again.");return}if(recentDuplicate){alert("This same defect was already logged "+timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")+". Use the existing defect instead. A new report can be logged after "+RECENT_DUPLICATE_WINDOW_LABEL+".");return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
+ const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={})=>{const defect={...value.defect,...patch};const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;/* ONE RULE, AND THE STEP-BY-STEP HELPER ASKS IT THE SAME QUESTION. This was five inline clauses here and a hand-written copy of the same list in form-coach.ts, and the two had already disagreed about two of them - see src/lib/defects/save-refusal.ts. The messages and their order are unchanged. */const refusal=saveRefusal({busId:value.busId,category:defect.category,issue,count,state:defect.state},{savingAsFixed:completed,requireInitials,completedBy,duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL});if(refusal){alert(refusal.message);return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
  const submit=(event:React.FormEvent)=>{event.preventDefault();validateAndSave(false)};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   {partPrompt&&<PartNumberPrompt
@@ -522,7 +527,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         every re-render, and every second look at the form. A number nobody can
         trust is worse than no number, and this one is meant to be evidence that
         a repair is not working. One press, one return. */}
-    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert">
+    {recentDuplicate&&<p className="duplicate-defect-warning" role="alert" data-coach="duplicate">
      <span><b>ALREADY LOGGED</b> {timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||"")} · Use the existing defect. A new report is allowed after {RECENT_DUPLICATE_WINDOW_LABEL}.
       {reportAttemptCount(recentDuplicate)>0&&<i className="duplicate-return-tally"> CAME BACK {reportAttemptCount(recentDuplicate)}× SINCE</i>}</span>
      <button type="button" className="open-existing-defect" onClick={()=>showExisting(value.busId,recentDuplicate)}>OPEN IT</button>
@@ -634,7 +639,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     </label>
     <label>WORK STATUS<select value={deferred?"open":value.defect.state} disabled={deferred} onChange={event=>updateDefect("state",event.target.value as DefectState)}><option value="open">Open</option><option value="in-progress">In Progress</option><option value="completed">Fixed</option></select>{deferred&&<small>Set to DEFERRED below. Uncheck it there to pick a work status.</small>}</label>
     <label>BUS AVAILABILITY<select value={value.defect.operability} onChange={event=>updateDefect("operability",event.target.value as DefectOperability)}><option value="service">May Stay In Service</option><option value="down">Remove From Service</option></select></label>
-    <div className="save-log-middle-actions" aria-label="Defect form actions" data-coach="save">
+    <div className="save-log-middle-actions" aria-label="Defect form actions">
      <button type="submit" className="save-log-middle" disabled={Boolean(recentDuplicate)}>{saveLabel}</button>
      <button type="button" className="save-fixed-middle" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button>
      <button type="button" className="save-fixed-part-middle" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button>
@@ -696,7 +701,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
       {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
      </div>}
     </div>
-    <label>FIXED BY{requireInitials?" — REQUIRED":" (OPTIONAL)"}<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
+    <label data-coach="initials">FIXED BY{requireInitials?" — REQUIRED":" (OPTIONAL)"}<input maxLength={12} autoCapitalize="characters" value={value.defect.completedBy||defaultInitials} onChange={event=>updateDefect("completedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <label>REPORTED BY (OPTIONAL)<input maxLength={12} autoCapitalize="characters" value={value.defect.reportedBy||defaultInitials} onChange={event=>updateDefect("reportedBy",event.target.value.replace(/[^a-z0-9 .-]/gi,"").toUpperCase())} placeholder="Initials or name"/></label>
     <fieldset className={"wide billable-time"+(diagnosticDefect?" diagnostic":"")}><legend>BILLABLE TIME — OPTIONAL</legend>
      <div>
@@ -739,7 +744,14 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         it read like a field somebody had to deal with; it is only a stamp. */}
     <p className="defect-date-stamp"><b>LOGGED</b> {timeLabel(value.defect.createdAt||new Date().toISOString())}{value.defect.updatedAt&&value.defect.updatedAt!==value.defect.createdAt&&<> · <b>UPDATED</b> {timeLabel(value.defect.updatedAt)}</>}</p>
    </div>
-   <footer className="log-editor-actions"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
+   {/* THE CLOSING STEP RINGS THIS ROW, not the one in the middle of the form.
+       The helper does not scroll the page — moving it under somebody's thumb
+       is what BusSelector already refuses to do with autoFocus — so a ring on
+       the mid-form action row was measured below the fold at every width
+       tested, 360 through 1180: one of five steps pointing at something
+       nobody could see. This footer sits OUTSIDE `.log-form`, so it is on
+       screen whatever the form is scrolled to. */}
+   <footer className="log-editor-actions" data-coach="save"><button className="save-log" disabled={Boolean(recentDuplicate)}>{saveLabel}</button><button type="button" className="save-fixed-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>validateAndSave(true)}>SAVE AS FIXED</button><button type="button" className="save-fixed-part-bottom" disabled={Boolean(recentDuplicate)} onClick={()=>setPartPrompt(true)}>SAVE FIXED W/ PART</button><button type="button" onClick={close}>CLOSE</button></footer>
   </form>
  </div>;
 }

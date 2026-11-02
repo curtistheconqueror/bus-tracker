@@ -2856,7 +2856,11 @@ test("saving fixed with a part asks for the number and flags it when left for la
  assert.deepEqual(order,["save-log-middle","save-fixed-middle","save-fixed-part-middle","close-log-middle"]);
  // The sticky bar at the bottom carries the same four in the same order, so a
  // person who scrolled past the middle one is not offered a different set.
- const footer=logPage.match(/<footer className="log-editor-actions">[\s\S]*?<\/footer>/)[0];
+ /* Matched on the class rather than the whole opening tag: the step-by-step
+    helper landed `data-coach="save"` on this footer, and a literal tag pin
+    broke on an attribute that changes nothing about the four buttons inside
+    it. What this test is about is their order, which is asserted below. */
+ const footer=logPage.match(/<footer className="log-editor-actions"[^>]*>[\s\S]*?<\/footer>/)[0];
  assert.ok(footer.includes("SAVE FIXED W/ PART"));
  assert.ok(footer.lastIndexOf("CLOSE")>footer.indexOf("SAVE FIXED W/ PART"),"CLOSE comes last");
 
@@ -7089,7 +7093,7 @@ test("the step-by-step helper points at the next field and never invents a requi
     so it can never produce a step of its own and can only change what the
     last message says. */
  for(const requireInitials of [true,false])for(const initials of ["","JS"]){
-  const options={requireInitials,initials};
+  const options={requireInitials,completedBy:initials};
   const walk=[draft(),draft({busId:"b1"}),draft({busId:"b1",category:"Brakes"}),
    draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"})];
   const keys=walk.map(row=>coachStep(row,options).key);
@@ -7107,6 +7111,39 @@ test("the step-by-step helper points at the next field and never invents a requi
  const ready=coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"}),plain);
  assert.match(ready.message,/RECOMMEND FOR DOWN SHEET/);
  assert.match(ready.message,/optional/);
+
+ /* A DEFECT ALREADY LOGGED DISABLES ALL FOUR SAVE BUTTONS, and the helper used
+    to say "THAT IS ENOUGH TO SAVE · Save it now" over the top of that. A cold
+    read reproduced it: the ALREADY LOGGED banner up, every save button
+    disabled, and the one moment the helper is most needed pointing the wrong
+    way. It was written in the same hour as a comment listing that refusal. */
+ const logged={requireInitials:false,duplicateAt:"2026-11-02T10:00:00.000Z",
+  duplicateWhen:"an hour ago",duplicateWindow:"4 hours"};
+ const dupe=coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"}),logged);
+ assert.equal(dupe.key,"duplicate");
+ assert.equal(dupe.blocking,true,"a duplicate stops the save, so the helper must say so");
+ assert.equal(dupe.target,"duplicate");
+ assert.match(dupe.message,/already logged an hour ago/);
+ assert.match(dupe.message,/Use the existing defect/);
+ /* And it outranks the closing message rather than appearing after it. */
+ assert.notEqual(coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak"}),logged).key,"ready");
+
+ /* WORK STATUS SET TO FIXED MAKES AN ORDINARY SUBMIT A SAVE-AS-FIXED, which
+    this file's own comment used to deny in as many words: REQUIRE INITIALS
+    "does not gate an ordinary save at all". `validateAndSave` computes
+    `completed=complete||defect.state==="completed"`, so pressing SAVE DEFECT
+    with the status on Fixed and FIXED BY empty is refused. */
+ const fixedNoInitials=coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak",state:"completed"}),
+  {requireInitials:true,completedBy:""});
+ assert.equal(fixedNoInitials.key,"initials");
+ assert.equal(fixedNoInitials.blocking,true);
+ assert.equal(fixedNoInitials.target,"initials");
+ assert.match(fixedNoInitials.message,/FIXED BY/);
+ /* With initials, or with the setting off, the same draft is ready. */
+ assert.equal(coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak",state:"completed"}),
+  {requireInitials:true,completedBy:"JS"}).key,"ready");
+ assert.equal(coachStep(draft({busId:"b1",category:"Brakes",issue:"Brake chamber leak",state:"completed"}),
+  {requireInitials:false,completedBy:""}).key,"ready");
 
  /* THE COUNT STEP IS THE CATALOG'S, not a list kept here: every repair the
     catalog marks `required` stops the helper, and no other repair does. */
@@ -7129,40 +7166,66 @@ test("the step-by-step helper points at the next field and never invents a requi
  assert.ok(counted.length>0,"the catalog has a required count to point at: "+counted.join(", "));
 });
 
-test("every field the step-by-step helper names is a field the Defect Log form actually draws", async () => {
+test("every field the step-by-step helper names is drawn, and the ring's own attribute is agreed", async () => {
  const {coachStep}=await import("../src/lib/defects/form-coach.ts");
- const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const [page,combo,picker,bar,css]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/combo-field.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/shared/bus-selector.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/_components/form-coach-bar.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
+ ]);
 
- /* THE ONE GATE WITH TEETH. `form-coach.ts` names a field by a `data-coach`
-    value and the ring is put on by a DOM scan, so a renamed or removed anchor
-    fails silently — the bar still says CHOOSE THE DEFECT and nothing lights
-    up, which is exactly the kind of half-working no test catches. This reads
-    the anchors out of the form and the targets out of the module, and insists
-    they are the same set. */
+ /* THE ONE GATE WITH TEETH, and its first version had none in the place that
+    mattered. `form-coach.ts` names a field by a `data-coach` value and the
+    ring is put on by a DOM scan, so a renamed or removed anchor fails
+    silently — the bar still says CHOOSE THE DEFECT and nothing lights up.
+    The first version read ONLY page.tsx, where three of the five anchors
+    appear merely as the `coach="…"` prop; the attribute the scan actually
+    looks for is emitted in combo-field.tsx and bus-selector.tsx. Deleting
+    `data-coach={coach}` from either left the whole suite green. A cold read
+    found that, and it is the exact failure this test exists to stop. */
+ for(const [name,code] of [["ComboField",combo],["BusSelector",picker]])
+  assert.match(code,/data-coach=\{coach\}/,name+" emits the attribute the ring is put on, not just the prop");
+
  const drawn=new Set();
- for(const match of page.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);
+ for(const code of [page,combo,picker])for(const match of code.matchAll(/data-coach="([a-z]+)"/g))drawn.add(match[1]);
+ /* A prop on a component proven above to land it as the attribute. */
  for(const match of page.matchAll(/\bcoach="([a-z]+)"/g))drawn.add(match[1]);
- /* Every step this module can produce, walked rather than listed. */
+
+ /* Every step the module can produce, walked rather than listed. */
  const targets=new Set();
- const walks=[
+ const duplicate={duplicateAt:"2026-11-02T10:00:00.000Z",duplicateWhen:"an hour ago",duplicateWindow:"4 hours"};
+ for(const [row,options] of [
   [{busId:"",category:"",issue:""},{requireInitials:false}],
   [{busId:"b1",category:"",issue:""},{requireInitials:false}],
   [{busId:"b1",category:"Brakes",issue:""},{requireInitials:false}],
   [{busId:"b1",category:"A/C and HVAC",issue:""},{requireInitials:false}],
   [{busId:"b1",category:"Cooling System",issue:"Radiator fan(s) out"},{requireInitials:false}],
+  [{busId:"b1",category:"Brakes",issue:"Brake chamber leak",state:"completed"},{requireInitials:true,completedBy:""}],
+  [{busId:"b1",category:"Brakes",issue:"Brake chamber leak"},{requireInitials:false,...duplicate}],
   [{busId:"b1",category:"Brakes",issue:"Brake chamber leak"},{requireInitials:false}],
- ];
- for(const [row,options] of walks)targets.add(coachStep(row,options).target);
- assert.deepEqual([...targets].sort(),["bus","category","count","issue","save"],
-  "the walk above reaches every step, so the anchors below are checked against all of them");
- for(const target of targets)assert.ok(drawn.has(target),
-  "the form draws a data-coach anchor named "+target+"; it has "+[...drawn].sort().join(", "));
+ ])targets.add(coachStep(row,options).target);
+
+ /* EQUALITY, not a subset, which is what the module and the handoff both
+    claim. A subset passes while the form draws anchors nothing points at. */
+ assert.deepEqual([...targets].sort(),["bus","category","count","duplicate","initials","issue","save"],
+  "the walk reaches every step this module can produce");
+ assert.deepEqual([...targets].sort(),[...drawn].sort(),
+  "every anchor the form draws is pointed at, and every step points at one the form draws");
+
+ /* AND THE ATTRIBUTE NAME ITSELF IS AGREED. The component writes it and the
+    stylesheet draws off it, by convention alone — rename either and nothing
+    failed. */
+ assert.match(bar,/setAttribute\("data-coach-active"/);
+ assert.match(bar,/removeAttribute\("data-coach-active"\)/);
+ assert.match(css,/\[data-coach-active\]\{outline:/,"the stylesheet rings the attribute the component sets");
 
  /* And the bar is drawn where it cannot be covered: outside the scrolling
     form, between the header and it. Inside `.log-form` it would scroll away
     and, on a phone, sit under the keyboard. */
- const bar=page.indexOf("<FormCoachBar"),form=page.indexOf('<div className="log-form">');
- assert.ok(bar>0&&form>0&&bar<form,"the helper's bar is drawn before the scrolling form, not inside it");
+ const at=page.indexOf("<FormCoachBar"),form=page.indexOf('<div className="log-form">');
+ assert.ok(at>0&&form>0&&at<form,"the helper's bar is drawn before the scrolling form, not inside it");
 });
 
 test("the step-by-step helper is off until somebody turns it on", async () => {
@@ -7212,18 +7275,86 @@ test("the Settings switch and the Defect Log read one key, and the form cannot g
 
  /* IT POINTS, IT DOES NOT GATE. Nothing in the helper may reach a save path,
     and the module must not be able to refuse anything. */
- assert.ok(!/coach/i.test(coach.slice(coach.indexOf("export function coachStep")).match(/alert\(|throw |return false/)?.[0]||""),
-  "the module has no refusal in it");
- for(const forbidden of ["alert(","throw ","disabled="]){
+ /* IT POINTS, IT DOES NOT GATE. An earlier version of this looked like a gate
+    and was not one: it ran /coach/i against the MATCHED TOKEN — "alert(",
+    "throw ", "return false" or "" — rather than against the code, so it was
+    always false and the assertion always passed. A cold read proved it by
+    appending a function that alerted, threw and returned false; it still
+    passed. The plain scan below is the whole check. */
+ for(const forbidden of ["alert(","throw ","disabled=","preventDefault"]){
   assert.ok(!coach.includes(forbidden),"form-coach.ts does not "+forbidden);
+ }
+ /* And the module cannot reach storage or the DOM: it answers a question about
+    a half-filled record and nothing else. */
+ for(const forbidden of ["localStorage","document.","window."]){
+  assert.ok(!coach.includes(forbidden),"form-coach.ts does not touch "+forbidden);
  }
  /* And the save buttons' disabled condition is the duplicate check alone,
     exactly as it was before the helper existed. */
- for(const button of ["save-log-middle","save-fixed-middle","save-log\"","save-fixed-bottom"]){
-  const at=page.indexOf('className="'+button);
-  assert.ok(at>0,button+" is still drawn");
+ /* THE FOUR SAVE BUTTONS' GUARD IS UNCHANGED BY THE HELPER, and this is the
+    exact assertion a cold read found toothless twice over. It matched on
+    `className="save-log-middle` as a PREFIX, so once this change added the
+    wrapper `<div className="save-log-middle-actions" … data-coach="save">`
+    the indexOf found the DIV — which carries no `disabled=` — and the
+    `if(tag.includes("disabled="))` then skipped the assertion entirely. The
+    one button not checked was the `type="submit"` one a mechanic presses.
+    That `if` also meant deleting `disabled` from all four passed. Matched on
+    the closing quote now, and every button asserted unconditionally. */
+ for(const button of ["save-log-middle","save-fixed-middle","save-fixed-part-middle","save-log","save-fixed-bottom","save-fixed-part-bottom"]){
+  const at=page.indexOf('className="'+button+'"');
+  assert.ok(at>0,button+" is still drawn under exactly that class");
   const tag=page.slice(at,page.indexOf(">",at));
-  if(tag.includes("disabled="))assert.match(tag,/disabled=\{Boolean\(recentDuplicate\)\}/,
-   button+"'s disabled condition is untouched by the helper");
+  assert.match(tag,/disabled=\{Boolean\(recentDuplicate\)\}/,
+   button+"'s disabled condition is the duplicate check alone");
  }
+});
+
+test("the defect form and its helper refuse a save from one rule, not two copies of one", async () => {
+ const [page,coach,rule]=await Promise.all([
+  readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/form-coach.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/defects/save-refusal.ts",import.meta.url),"utf8"),
+ ]);
+
+ /* WHY THIS GATE EXISTS. The refusal set lived inline in `validateAndSave` as
+    five `if(...)alert(...)` clauses, and `form-coach.ts` then RE-STATED it as
+    hand-written `blocking` flags. A cold read found both copies had already
+    diverged, in the same hour they were written:
+
+      - a RECENT DUPLICATE disables all four save buttons and the helper said
+        "THAT IS ENOUGH TO SAVE · Save it now";
+      - WORK STATUS on Fixed turns an ordinary submit into a save-as-fixed, so
+        REQUIRE INITIALS does gate it — which the helper's comment denied.
+
+    Two copies of one rule is what `docs/ARCHITECTURE.md` forbids and what the
+    MCP constraint in CLAUDE.md exists to prevent. This asserts there is one. */
+ assert.match(page,/import \{saveRefusal\} from "@\/src\/lib\/defects\/save-refusal"/,
+  "the form asks the rule");
+ assert.match(coach,/from "\.\/save-refusal\.ts"/,"and so does the helper");
+
+ /* NEITHER MAY RE-DECIDE IT. Every message the rule owns lives in the rule and
+    nowhere else, so a wording change cannot land in one copy. */
+ const owned=["Select a bus number.","Select a repair category.",
+  "Put your initials or name in FIXED BY before saving this as fixed",
+  "This same defect was already logged"];
+ for(const message of owned){
+  assert.ok(rule.includes(message),"save-refusal.ts owns: "+message);
+  assert.ok(!page.includes(message),"the form does not restate: "+message);
+  assert.ok(!coach.includes(message),"the helper does not restate: "+message);
+ }
+
+ /* AND THE HELPER DOES NOT TYPE `blocking` BY HAND. Every blocking:true in it
+    must be on a branch that already holds a refusal; the only hard-coded ones
+    left are the two false branches — the issue step, which is a stop on the
+    walk rather than a refusal, and the closing message. */
+ const trues=(coach.match(/blocking:true/g)||[]).length;
+ const falses=(coach.match(/blocking:false/g)||[]).length;
+ assert.ok(trues<=2,"blocking:true appears only on the refusal branches, not once per step");
+ assert.equal(falses,3,"and the three non-refusal steps are the group, issue and ready ones");
+
+ /* The form's save path holds no refusal of its own beyond the one call. */
+ const save=page.slice(page.indexOf("const validateAndSave="),page.indexOf("\n const submit="));
+ const alerts=(save.match(/alert\(/g)||[]).length;
+ assert.equal(alerts,1,"one alert in the save path, and it prints what the rule returned");
+ assert.match(save,/if\(refusal\)\{alert\(refusal\.message\);return\}/);
 });

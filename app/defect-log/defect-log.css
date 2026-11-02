@@ -1433,17 +1433,22 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .coach-bar-say small{font-size:9px;font-weight:700;line-height:1.45;color:var(--log-muted,#60728c)}
 .coach-bar-hide{flex:none;width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--log-border,#bac7d9);border-radius:6px;background:var(--log-surface,#fff);color:var(--log-muted,#60728c);font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
 .coach-bar-hide:hover,.coach-bar-hide:focus-visible{border-color:var(--log-accent,#0b64bd);color:var(--log-text,#172b4d);outline:none}
+/* SCOPED TO THE DEFECT LOG'S OWN ROOT. This stylesheet is imported by the
+   Settings page too, and the attribute name is generic — the only thing
+   keeping it off another surface was that nothing else sets it. CLAUDE.md
+   already foresees a second form getting a helper, and that surface would
+   have inherited this page's --log-accent with its #0b64bd literal fallback.
+   The prefix costs nothing and the specificity is still below an override. */
 /* The ring. An outline rather than a border, because a border on a field that
    already has one changes its box and moves every field below it; an outline
    is drawn outside the box and shifts nothing. Measured at 320, 360, 390, 430,
    820 and 1180: 4px clear of the field on every one, inside the editor's own
    edges, so `.log-editor`'s `overflow:hidden` never clips it. */
-[data-coach-active]{outline:3px solid var(--log-accent,#0b64bd);outline-offset:1px;border-radius:7px}
+.defect-log-app [data-coach-active]{outline:3px solid var(--log-accent,#0b64bd);outline-offset:1px;border-radius:7px}
 /* A STEP THE SAVE WILL REFUSE WITHOUT IS MARKED BY THE STRIPE, NOT BY COLOUR.
    The ground was going to be a stronger tint for these, which would have put
    the message under AA again; and a difference carried by colour alone is not
    a difference for everybody looking at it. The words already say which kind
    of step it is, and the stripe is the quiet second signal. */
 .coach-bar[data-coach-blocking]{border-left-width:6px}
-@media(prefers-reduced-motion:no-preference){[data-coach-active]{transition:outline-color .18s ease}}
-@media(max-width:760px){.coach-bar{padding:9px 12px}.coach-bar-hide{width:38px;height:38px}}
+@media(max-width:760px){.coach-bar{padding:9px 12px}.coach-bar-hide{width:44px;height:44px}}

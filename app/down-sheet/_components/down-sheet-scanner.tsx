@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {lockPageScroll} from "@/src/lib/shared/scroll-lock";
 import {REPAIR_OPTIONS,repairCategoryLabel} from "@/src/lib/defects/repair-catalog";
+import {unreadBusNumbers} from "@/src/lib/down-sheet/scan-multi-bus";
 import {describeLineGaps,isMarginRow,mergeReviewedRows,normalizedSection,reviewScannedRows,scannedLineGaps,type ReviewedScanRow,type ScanFleetBus,type ScanImportRecord,type ScannedDownSheetRow} from "@/src/lib/down-sheet/down-sheet-scan-import";
 import {knownMechanicNames} from "@/src/lib/down-sheet/scan-spelling";
 import {downSheetGroup,downSheetGroupLabel} from "@/src/lib/down-sheet/down-sheet-view";
@@ -59,6 +60,13 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     the bus goes out broken. Blank lines are normal, so this reports rather
     than blocks. */
  const lineGaps=useMemo(()=>scannedLineGaps(rows),[rows]);
+ /* THE BUSES A LINE NAMES THAT NO ROW CAME BACK FOR, which LINES NOT READ
+    above cannot see: that counts printed numbers, and this line arrived — it
+    arrived carrying nine bus numbers in its words and one row. Curtis's IDOT
+    line is the case. Eight buses down on the paper and absent from the app,
+    with nothing on screen saying so, is the exact failure the gap warning
+    beside it was written for. */
+ const unread=useMemo(()=>unreadBusNumbers(rows),[rows]);
 
  const addPhotos=(files:FileList|null)=>{
   if(!files)return;
@@ -135,6 +143,7 @@ export default function DownSheetScanner({fleet,currentEntries,defaultShift,onCl
     {rows.length>0&&<>
      <div className="scan-review-head"><div><b>REVIEW ROWS</b><span>{imports.length} bus{imports.length===1?"":"es"} ready{flagged?` · ${flagged} flagged`:""}</span></div><button type="button" onClick={()=>{setRows([]);setError("")}}>CHANGE PHOTOS</button></div>
      {lineGaps.length>0&&<p className="scan-line-gaps" role="status"><b>LINES NOT READ: {describeLineGaps(lineGaps)}</b><small>Blank lines on the sheet are normal. Check the paper for any of these that had a bus written on them &mdash; a row missed here does not reach the Down Sheet at all.</small></p>}
+     {unread.length>0&&<p className="scan-line-gaps scan-unread-buses" role="status"><b>WRITTEN ON A ROW BUT NOT READ AS ONE: {unread.map(item=>item.busNumber).join(", ")}</b><small>A line naming several buses should produce one row per bus. {unread.length===1?"This number is":"These numbers are"} written in another row&apos;s wording and {unread.length===1?"has":"have"} no row here, so {unread.length===1?"it":"they"} would not reach the Down Sheet at all. Check the paper and add {unread.length===1?"it":"them"} by hand.</small></p>}
      <div className="scan-rows">{rows.map(row=>{
       const repairs=REPAIR_OPTIONS[row.category]||REPAIR_OPTIONS.Miscellaneous;
       /* Which band of the sheet this row is about to land in, shown before the

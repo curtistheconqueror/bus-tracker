@@ -1889,11 +1889,30 @@ scrolling fields, and a ring on the field the bar is talking about:
 | 3b | the count field | FANS OUT | yes, where the catalog marks that repair counted |
 | 4 | the save row | THAT IS ENOUGH TO SAVE | — |
 
-**WHAT IT CALLS BLOCKING IS READ OFF THE FORM'S OWN REFUSALS.**
-`validateAndSave` refuses exactly five things — no bus, no category, a required
-count out of range, FIXED BY empty on a save-as-fixed where the device asks for
-initials, and a recent duplicate. So **the specific defect does not block a
-save**, which the form says in its own placeholder: *"or leave it and save the
+**ONE RULE DECIDES WHAT THE FORM REFUSES, AND BOTH SIDES ASK IT.** This is the
+correction a cold read forced, and it matters more than the feature. The
+refusal set lived inline in `validateAndSave` as five `if(…)alert(…)` clauses,
+and the helper RE-STATED it as hand-written `blocking` flags beside a comment
+listing all five. The two had already disagreed about two of them, written in
+the same hour:
+
+| | the form | the helper said |
+| --- | --- | --- |
+| a defect already logged | all four save buttons disabled | *"THAT IS ENOUGH TO SAVE · Save it now"* |
+| WORK STATUS on Fixed, no initials | an ordinary SAVE DEFECT is refused | *"REQUIRE INITIALS does not gate an ordinary save at all"* |
+
+The second is why the copy was wrong rather than merely duplicated:
+`validateAndSave` computes `completed=complete||defect.state==="completed"`, so
+setting the status to Fixed turns the plain submit into a save-as-fixed.
+`src/lib/defects/save-refusal.ts` owns it now, the form alerts with what it
+returns, the helper points with it, and `blocking` is whether that function
+returned something rather than a claim typed in a second file. Tests assert the
+save path holds exactly one `alert`, that every message the rule owns appears
+in no other file, and that the helper types `blocking:true` on no more than its
+two refusal branches.
+The rule refuses five things — no bus, no category, a required count out of
+range, FIXED BY empty on a save that is or has become a save-as-fixed, and a
+recent duplicate. **The specific defect does not block a save**, which the form says in its own placeholder: *"or leave it and save the
 category alone."* The first draft of `src/lib/defects/form-coach.ts` marked it
 required, and marked REPORTED BY required too — `requireInitials` gates FIXED
 BY and has never touched REPORTED BY. Both were simply false, and a helper that
@@ -1914,11 +1933,14 @@ already exists in `quick-view-position.ts`:
   under it, and a tooltip anchored below it lands beneath the keyboard. At the
   top of the editor nothing can cover it.
 
-**It does not scroll the form.** Moving the page under somebody's thumb is what
-`BusSelector` already refuses to do with `autoFocus`. The consequence is that
-on the closing step the ring sits below the fold until you scroll — measured at
-390x844, the save row's top is at y815 — so there the bar's words are doing the
-work and the sticky SAVE in the footer is the control in reach.
+**It does not scroll the form**, and that forced one anchor to move. Moving the
+page under somebody's thumb is what `BusSelector` already refuses to do with
+`autoFocus` — but the closing step first rang the action row in the MIDDLE of
+the form, which a cold read measured below the fold at every width from 360 to
+1180. One of five steps pointed at something nobody could see. The ring is now
+on the editor's footer, which sits OUTSIDE `.log-form` and is therefore on
+screen whatever the form is scrolled to: measured visible at 360, 390, 430, 820
+and 1180.
 
 **THE INK IS NOT THE ACCENT, AND THAT IS MEASURED.** It was built as
 `.mystery-head`'s pattern — the title in `--log-accent` on an 11% accent tint —
@@ -1954,8 +1976,17 @@ prop on three shared components and one CSS rule per step name, which drifts
 the moment a step is added. **A renamed anchor would fail silently** — the bar
 still says CHOOSE THE DEFECT and nothing lights up — so `tests/defects.test.mjs`
 reads the anchors out of the form, walks every step the module can produce, and
-insists the two sets are equal. Six mutations were run against the new gates
-and all six were caught.
+insists that set EQUALS the set of anchors the form draws.
+
+That gate's first version had no teeth where it counted, and a cold read proved
+it: it read only `page.tsx`, where three of the five anchors appear merely as
+the `coach="…"` prop — the `data-coach` attribute the ring actually scans for is
+emitted in `combo-field.tsx` and `bus-selector.tsx`. Deleting it from either
+left all 425 tests green. It reads all three files now, asserts the attribute
+NAME is agreed between the component that sets it and the stylesheet that draws
+it, and asserts set equality rather than the subset it was really checking.
+Adding the duplicate and initials steps made it fail until their anchors were
+added, which is the gate doing its job.
 
 **Off until somebody turns it on**, and off is the safe READ too: anything that
 is not exactly `true` in `pace-coach-v1` is off, the spelling
@@ -1964,9 +1995,21 @@ FORM**, in Settings under DEFECT LOG → YOU & DEFAULTS. The × on the bar stops
 it for that one defect without turning it off — the editor is keyed per defect,
 so reopening gets it back.
 
-**IT POINTS, IT DOES NOT GATE.** No save path reads it, the module contains no
-`alert`, `throw` or `disabled`, and a test asserts the four save buttons'
-`disabled` condition is still the duplicate check alone.
+**IT POINTS, IT DOES NOT GATE.** No save path reads it, and the module contains
+no `alert`, `throw`, `disabled`, `preventDefault`, `localStorage`, `document.`
+or `window.`.
+
+Two of the tests guarding that were themselves broken, both found by the same
+cold read. One ran `/coach/i` against the MATCHED TOKEN rather than the code,
+so it was always false and always passed — proven by appending a function that
+alerted, threw and returned false, which it still passed. The other matched
+`className="save-log-middle` as a PREFIX, so once this change added the wrapper
+`save-log-middle-actions` the `indexOf` found the DIV, which carries no
+`disabled=`, and an `if(tag.includes("disabled="))` skipped the assertion
+entirely — leaving the `type="submit"` button a mechanic presses as the one of
+four not checked. That `if` also meant deleting `disabled` from all four would
+have passed. Both are matched on the closing quote now and asserted
+unconditionally across all six save controls.
 
 Measured on the built page: the walk advances bus → category → issue → closing
 with the right ring at each step and exactly one ring at a time; the ring

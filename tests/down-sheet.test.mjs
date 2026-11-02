@@ -3042,3 +3042,114 @@ test("a finding cleared on an open defect does not come back from the next sheet
  assert.equal(after("",true,"Corroded connector").finding,"Corroded connector",
   "an entry marked Completed speaks for its cards, box or no box");
 });
+
+test("a line that names several buses keeps each bus's own words and loses none of them",async()=>{
+ const {busNumbersInText,perBusReason,printedLineConflicts,unreadBusNumbers}
+  =await import("../src/lib/down-sheet/scan-multi-bus.ts");
+
+ /* THE 11/01/2026 AM SHEET, as Curtis photographed it. Four of its lines put a
+    word or nothing in the BUS # column and the buses themselves across the
+    REASON column. He named the one that broke: "the way they wrote the IDOT
+    line confused scanner." */
+ const IDOT="IDOT 15504(FAILED-READY) 18503(READY) 17544(PART IN STOCK) 17524(FAILED-READY) 17519(ABS LIGHT) 17517 17521 17536(ABS LIGHT) 17570";
+ const PM="PM'S 17533,17534, 18503,20505,17527";
+ const EVENT="[ HOLD FOR EVENT PREP ] - HOLIDAY -[20502 , 20504 - USE IF NEEDED ]";
+ const CAM="15517, 17500, 20500 - No Power to Cameras";
+
+ /* THE STATE IN THE BRACKETS BELONGS TO ONE BUS. Those brackets are the whole
+    content of an IDOT line; the word IDOT is only its heading. The scan prompt
+    said to repeat the line's wording on every row, so all nine came back
+    reading "IDOT" and the difference between a bus that FAILED, one that is
+    READY and one waiting on a PART IN STOCK was thrown away every scan. */
+ assert.equal(perBusReason(IDOT,"15504"),"IDOT — FAILED-READY");
+ assert.equal(perBusReason(IDOT,"18503"),"IDOT — READY");
+ assert.equal(perBusReason(IDOT,"17544"),"IDOT — PART IN STOCK");
+ assert.equal(perBusReason(IDOT,"17519"),"IDOT — ABS LIGHT");
+ assert.equal(perBusReason(IDOT,"17536"),"IDOT — ABS LIGHT");
+ /* A bus on the line with nothing written against it keeps the heading alone,
+    rather than inheriting the bus before it. */
+ assert.equal(perBusReason(IDOT,"17517"),"IDOT");
+ assert.equal(perBusReason(IDOT,"17570"),"IDOT");
+ /* And no row carries anybody else's number: a Down Sheet row is read at a
+    glance and three buses' business on one bus's line is not readable. */
+ for(const bus of ["15504","18503","17544","17517"])
+  assert.deepEqual(busNumbersInText(perBusReason(IDOT,bus)),[],bus+" keeps no other bus's number");
+
+ assert.equal(perBusReason(PM,"17533"),"PM'S");
+ assert.equal(perBusReason(PM,"20505"),"PM'S");
+ assert.equal(perBusReason(CAM,"20500"),"No Power to Cameras");
+ assert.equal(perBusReason(CAM,"15517"),"No Power to Cameras");
+ assert.match(perBusReason(EVENT,"20502"),/HOLD FOR EVENT PREP/);
+
+ /* AN ORDINARY ROW IS NOT REWRITTEN, which is the common case and the one that
+    must not move. Dates, times, service codes and a bracket that is part of
+    the fault's own wording all survive untouched. */
+ for(const text of ["LEAKS AIR WHEN SERVICE BRAKE APPLIED","CK ENG LIGHT (INTAKE MANIFOLD AIR PRESSURE)",
+  "Returned from ips 10/30/26 - HOLD FOR IDOT PREP","A21 (8:00AM 11/2/26)","C24",
+  "TOWED - WONT GO INTO GEAR  10/30","PUT ON LIFT FOR 10-27-26","Leak at Evaporator Heater Coil Hold for Thermo King - Mon 3Pm",""])
+  assert.equal(perBusReason(text,"17528"),text,JSON.stringify(text)+" is left alone");
+
+ /* THE BUSES A LINE NAMES THAT NO ROW CAME BACK FOR. `scannedLineGaps` cannot
+    see these — it counts printed numbers, and this line arrived; it arrived
+    carrying nine buses in its words and one row. Eight buses down on paper and
+    absent from the app is the failure that module names in its own words: "a
+    bus that is down and not on the sheet is a bus that goes back out broken." */
+ const halfRead=[{busNumber:"15504",reason:IDOT},{busNumber:"17528",reason:"LEAKS AIR WHEN SERVICE BRAKE APPLIED"},{busNumber:"15517",reason:CAM}];
+ const missing=unreadBusNumbers(halfRead).map(row=>row.busNumber);
+ assert.deepEqual(missing,["18503","17544","17524","17519","17517","17521","17536","17570","17500","20500"]);
+ assert.ok(unreadBusNumbers(halfRead).every(row=>row.writtenOn),"each one says which row it was written on");
+
+ /* AND NOTHING IS REPORTED WHEN THE LINE WAS SPLIT PROPERLY, so this cannot
+    become a warning people learn to ignore. */
+ const wholeLine=["15504","18503","17544","17524","17519","17517","17521","17536","17570"]
+  .map(bus=>({busNumber:bus,reason:perBusReason(IDOT,bus)}));
+ assert.deepEqual(unreadBusNumbers(wholeLine),[]);
+ assert.deepEqual(unreadBusNumbers([{busNumber:"17528",reason:"LEAKS AIR WHEN SERVICE BRAKE APPLIED"}]),[]);
+
+ /* A PRINTED LINE WHOSE ROWS DISAGREE IS A MISREAD NUMBER, NOT A SHARED LINE.
+    Curtis's 20500 was written on line 55 and arrived on line 44, which on the
+    paper belongs to 18506 and reads A21. A real shared line — every row saying
+    PM'S — is not a conflict and must keep sharing. */
+ assert.deepEqual(printedLineConflicts([
+  {pageNumber:2,lineNumber:"44",busNumber:"18506",reason:"A21"},
+  {pageNumber:2,lineNumber:"44",busNumber:"20500",reason:"No Power to Cameras"},
+  {pageNumber:2,lineNumber:"47",busNumber:"17533",reason:"PM'S"},
+  {pageNumber:2,lineNumber:"47",busNumber:"17534",reason:"PM'S"}]),
+  [{pageNumber:2,lineNumber:44}]);
+ /* The same number on two different PAGES is two different lines. */
+ assert.deepEqual(printedLineConflicts([
+  {pageNumber:1,lineNumber:"12",reason:"ACCIDENT BUS"},
+  {pageNumber:2,lineNumber:"12",reason:"BROKEN GLASS"}]),[]);
+});
+
+test("a misread line number no longer hands a bus another line's repair",async()=>{
+ const {fillPrintedLineSiblings}=await import("../src/lib/down-sheet/down-sheet-scan-import.ts");
+ const row=(line,bus,reason,extra={})=>({pageNumber:2,lineNumber:String(line),busNumber:bus,reason,
+  assignedTo:"",category:"Miscellaneous",repair:"Driver-reported defect",section:"Pending",
+  shift:"1st",operationalStatus:"out",confidence:0.9,reviewNote:"",...extra});
+
+ /* A GENUINE SHARED LINE STILL SHARES. This is what the function was written
+    for: PM'S written once over five buses, the wording on the first row only,
+    the rest blank and about to be read as five buses down with nobody on them. */
+ const shared=fillPrintedLineSiblings([
+  row(47,"17533","PM'S",{category:"Inspection",repair:"PM inspection"}),
+  row(47,"17534",""),row(47,"18503","")]);
+ assert.equal(shared[1].reason,"PM'S","a blank sibling still takes the line's wording");
+ assert.equal(shared[2].repair,"PM inspection");
+ assert.match(shared[1].reviewNote,/shared with the other buses on it/);
+
+ /* A COLLISION DOES NOT. Line 44 on the paper is 18506 reading A21; 20500 was
+    written on line 55 and arrived here. Before this, a 20500 whose own wording
+    came back unreadable inherited A21 and was filed as an inspection — with a
+    review note that read as reassurance. */
+ const collided=fillPrintedLineSiblings([
+  row(44,"18506","A21",{category:"Inspection",repair:"A21 inspection"}),
+  row(44,"20500","No Power to Cameras"),
+  row(44,"17500","")]);
+ const borrowed=collided.find(entry=>entry.busNumber==="17500");
+ assert.equal(borrowed.reason,"","a line whose rows disagree shares nothing");
+ assert.equal(borrowed.repair,"Driver-reported defect");
+ assert.equal(borrowed.reviewNote,"","and does not claim it was read off that line");
+ assert.equal(collided.find(entry=>entry.busNumber==="20500").reason,"No Power to Cameras",
+  "the bus that did come back with its own words keeps them");
+});
