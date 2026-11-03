@@ -2130,7 +2130,7 @@ test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random o
  /* The rule is that the draft opens with NO bus. Matched through any wrapper
     around the object — `markAddedInApp` now stamps it as added in the app,
     which says nothing about which bus is chosen. */
- assert.match(page,/setEditing\((?:\w+\()?\{id:"repair-"[^}]*?busId:"",busNumber:"",/,
+ assert.match(page,/setEditing\((?:\w+(?:<\w+>)?\()?\{id:"repair-"[^}]*?busId:"",busNumber:"",/,
   "the new-entry draft opens with no bus");
  assert.equal(/busId:bus\.id,busNumber:bus\.n,/.test(page),false,
   "and never seeds one from whichever bus sorted first");
@@ -3253,68 +3253,123 @@ test("the Down Sheet mints through the one rule, and no longer caps on total ent
  assert.match(page,/activeLimit:MAX_ENTRIES/);
 });
 
-test("a row the app added is labelled, and a row off the office sheet is not",async()=>{
- const {markAddedInApp,wasAddedInApp,entryOriginLabel,ADDED_IN_APP_LABEL}
-  =await import("../src/lib/down-sheet/entry-origin.ts");
+test("every way the app puts a bus on the sheet is labelled, and the paper clears it",async()=>{
+ const {ADDED_IN_APP_LABEL,clearAddedInApp,entryOriginLabel,markAddedInApp,wasAddedInApp,
+  syncTrackerDownSheetSelection,saveDefectLogRecord}=await import("./helpers/modules.mjs");
 
- /* Curtis: "if we add it directly, it will show the badge. It probably needs
-    to be with an asterisk... a little label or something that says added from
-    app or added manually. That way, at least, we'll know that it was not on
-    the downsheet originally." */
- const row={id:"e1",busId:"a",busNumber:"18505",workflow:"Scheduled"};
- assert.equal(wasAddedInApp(markAddedInApp(row)),true);
- assert.equal(entryOriginLabel(markAddedInApp(row)),ADDED_IN_APP_LABEL);
+ /* Curtis's rule: "a bus having a downsheet badge on it is because the
+    downsheets that were scanned show the bus on the downsheet... unless we
+    decide to add the bus to the downsheet from the app directly", in which
+    case "we'll know that it was not on the downsheet originally."
 
- /* AND ABSENT CLAIMS NOTHING. Every row already on a device predates the
-    field; labelling those would assert something false about the office's own
-    sheet. A scanned row never carries the flag either, which is what makes
-    the promotion Curtis describes work on its own — "once the new sheet is
-    scanned and then it has the bus on there... now it's officially on the
-    master downsheet from the office" — the scan replaces the row with one
-    that has no flag, and the label goes with it. */
- for(const value of [row,{},{addedInApp:false},{addedInApp:"yes"},{addedInApp:1},null,undefined]){
+    ONCE SOME APP ROWS ARE TAGGED, AN UNTAGGED ROW CLAIMS THE OFFICE PRINTED
+    IT. The first version stamped two of the app's four creation paths, which
+    is worse than stamping none: the commonest gesture on the map — ticking ON
+    DOWN SHEET in the bus editor — wrote an untagged row, and the tag's own
+    absence then said the office had listed a bus it had never seen. All four
+    are asserted here together for that reason. */
+
+ /* 1. The map's ON DOWN SHEET tick, and the AI operator's downsheet command. */
+ const mapRow=syncTrackerDownSheetSelection(null,{id:"a",n:"18505",down:true,pendingRepair:"Brake chamber leak",s:"out"});
+ assert.equal(mapRow.entries.length,1);
+ assert.equal(wasAddedInApp(mapRow.entries[0]),true,"a row created from the map carries the tag");
+ /* And it does not relabel a row that already exists, whose origin is already
+    recorded — that row may have come off the office's paper. */
+ const existing=[{id:"e1",busId:"a",busNumber:"18505",workflow:"Scheduled",category:"Brakes",repair:"x",customReason:"",assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:"1st",operationalStatus:"out",priority:"Routine",createdAt:"",updatedAt:"",updatedBy:"",completedAt:"",history:[]}];
+ const unchanged=syncTrackerDownSheetSelection(JSON.stringify({version:1,entries:existing}),
+  {id:"a",n:"18505",down:true,pendingRepair:"",s:"out"},undefined,"","d-9");
+ assert.equal(wasAddedInApp(unchanged.entries[0]),false,"an existing row keeps its own origin");
+
+ /* 2. The Defect Log's DOWN SHEET tick, and the DEFERRED, RECOMMENDED and
+       evening-review paths that route through the same function. */
+ const bus={id:"b",n:"17221",l:"garage-3",s:"service",down:false,defects:[],pendingRepair:""};
+ const logged=saveDefectLogRecord([bus],[],"b",
+  {id:"d-1",category:"Brakes",issue:"Brake chamber leak",details:"",state:"open",operability:"down",reportedBy:"CR"},
+  true,"2026-11-03T10:00:00.000Z");
+ const made=logged.downEntries.find(entry=>entry.busId==="b");
+ assert.ok(made,"the Defect Log puts the bus on the sheet");
+ assert.equal(wasAddedInApp(made),true,"and tags the row it created");
+
+ /* 3 and 4 are inside the Down Sheet page: ADD DOWN BUS and the row minted
+    from the board's own `down` flag. Asserted against the source, because a
+    page component cannot be called — named precisely so a stamp that is
+    deleted fails here rather than passing silently, which is what happened to
+    the first version of this test. */
+ const page=await readFile(new URL("../app/down-sheet/page.tsx",import.meta.url),"utf8");
+ assert.match(page,/setEditing\(markAddedInApp(?:<\w+>)?\(\{id:"repair-"/,"ADD DOWN BUS stamps the draft it opens");
+ assert.match(page,/addedInApp:true as const,\s*\n?\s*id:"repair-"\+bus\.id/,
+  "a row minted from the board's down flag is stamped too");
+
+ /* THE PAPER CLEARS IT, which the first version claimed in four places and
+    did not do. A scan writes ONTO the active row rather than replacing it, so
+    the flag rode through `{...prior}` and a tagged row stayed tagged for
+    good — while the office naming the bus is exactly the moment it stops
+    being the app's own say-so. Curtis: "now it's officially on the master
+    downsheet from the office." */
+ const tagged=markAddedInApp({id:"e1",busId:"a",busNumber:"18505",workflow:"Scheduled"});
+ const promoted=clearAddedInApp(tagged);
+ assert.equal(wasAddedInApp(promoted),false);
+ assert.ok(!("addedInApp" in promoted),
+  "DELETED, not set false - the cloud fingerprints a row by walking Object.keys");
+ assert.equal(clearAddedInApp({id:"e2"}).id,"e2","a row without the key is handed back untouched");
+ assert.match(page,/clearAddedInApp\(normalizeEntry\(\{\.\.\.prior,/,
+  "the scan import clears the tag on the row the paper just named");
+
+ /* And the label itself still only speaks for rows the app knows it made. */
+ assert.equal(entryOriginLabel(tagged),ADDED_IN_APP_LABEL);
+ for(const value of [{},{addedInApp:false},{addedInApp:"yes"},null,undefined])
   assert.equal(entryOriginLabel(value),"",JSON.stringify(value)+" claims nothing");
-  assert.equal(wasAddedInApp(value),false);
- }
- /* Only ever present when true: a key holding undefined is still a key to
-    Object.keys, and rowFingerprint walks exactly that, so writing it onto
-    every row would re-push the whole sheet to say nothing. */
- assert.ok(!("addedInApp" in row),"never written onto a row that does not have it");
 
- /* MARKING A BUS FIXED IS NOT THIS MODULE'S JOB and must not become it. The
-    page's own markEntryFixed completes the bus's defect, recomputes status,
-    teaches findings and writes an undo copy; a thinner copy here would be the
-    two-spellings mistake this sheet has already been bitten by. */
+ /* MARKING A BUS FIXED IS NOT THIS MODULE'S JOB. The page's own markEntryFixed
+    completes the bus's defect, recomputes status, teaches findings and writes
+    an undo copy; a thinner copy here would be two spellings of one action. */
  const origin=await readFile(new URL("../src/lib/down-sheet/entry-origin.ts",import.meta.url),"utf8");
- assert.ok(!/export function markEntryFixed/.test(origin),
-  "entry-origin.ts does not grow a second way to close a repair out");
+ assert.ok(!/export function markEntryFixed/.test(origin));
 });
 
-test("a bus never loses its Down Sheet badge by being moved",async()=>{
- const [smart,bulk,areas,transfer]=await Promise.all([
-  readFile(new URL("../src/lib/fleet/smart-status.ts",import.meta.url),"utf8"),
-  readFile(new URL("../src/lib/fleet/bulk-relocation.ts",import.meta.url),"utf8"),
-  readFile(new URL("../src/lib/fleet/facility-areas.ts",import.meta.url),"utf8"),
-  readFile(new URL("../src/lib/storage/section-transfer.ts",import.meta.url),"utf8"),
- ]);
+test("moving a bus never writes its Down Sheet membership",async()=>{
+ const {moveOrSwapBuses,bulkRelocateBuses,moveBusToArea,reassignBusPair}=await import("./helpers/modules.mjs");
 
  /* Curtis: "there should be no way that a bus can have its badge removed from
-    the map by simply relocating it." That holds today by nobody having written
-    the line, which is not the same as it being a rule. The badge comes off the
-    scanned sheet or off somebody pressing MARK AS FIXED, and moving a bus
-    across the yard is neither.
+    the map by simply relocating it."
 
-    Asserted over the modules that move a bus: parking it somewhere cannot
-    write its sheet membership. `moveOrSwapBuses` DOES set `s` — a bus parked
-    in the CNG lots reads as out of service — and that is a different field
-    with a different meaning. */
- for(const [name,code] of [["smart-status",smart],["bulk-relocation",bulk],["facility-areas",areas]]){
-  assert.ok(!/\bdown\s*:/.test(code),name+" never writes the down flag");
-  assert.ok(!/\bdownSheetReady\b|\bonDownSheet\b/.test(code),name+" never writes sheet membership");
- }
- /* And a Fleet Map transfer still refuses to carry any of the three, which is
+    THE FIRST VERSION OF THIS TEST WAS A REGEX OVER THREE SOURCE FILES and a
+    cold read took it apart: it could not see `delete next.down`, a rebuild
+    that simply omits the field, or a call to an imported helper, and it missed
+    `pair-reassignment`, `applyDownEntryToFleet` and the map page itself.
+    Driven through the real movers now. */
+ const sheetBus=(id,n,l)=>({id,n,l,s:"service",down:true,onDownSheet:true,downSheetReady:true,defects:[],
+  parkedAt:"2026-11-01T00:00:00.000Z",lastLocationChangeAt:"2026-11-01T00:00:00.000Z",lastStatusChangeAt:"2026-11-01T00:00:00.000Z"});
+ const membership=bus=>[bus.down,bus.onDownSheet,bus.downSheetReady];
+
+ const fleet=[sheetBus("a","18505","garage-1"),sheetBus("b","17221","garage-2"),sheetBus("c","20500","east-4")];
+ const check=(result,what)=>{
+  const buses=Array.isArray(result)?result:(result.fleet||result.buses||[]);
+  assert.ok(buses.length,what+" returned a fleet");
+  for(const bus of buses)assert.deepEqual(membership(bus),[true,true,true],
+   what+" leaves bus "+bus.n+"'s sheet membership alone");
+ };
+ check(moveOrSwapBuses(fleet,"a","garage-9"),"a move");
+ /* A SWAP moves two buses at once, which the old test's three files could not
+    see at all. */
+ check(reassignBusPair(fleet,fleet[0],"b",null),"a swap");
+ /* A BULK MOVE and a MOVE TO AREA, the two gestures that touch many buses. */
+ check(bulkRelocateBuses(fleet,["a","b"],["west-1","west-2"]),"a bulk move");
+ check(moveBusToArea(fleet,"c","MAIN GARAGE (BAYS 1-12)"),"MOVE TO AREA");
+
+ /* AND A FLEET MAP TRANSFER STILL REFUSES TO CARRY ANY OF THE THREE, which is
     the same rule arriving from another device. */
- assert.match(transfer,/MAP_EXCLUDED/);
+ const transfer=await readFile(new URL("../src/lib/storage/section-transfer.ts",import.meta.url),"utf8");
  for(const field of ["down","onDownSheet","downSheetReady"])
   assert.ok(transfer.includes('"'+field+'"'),"a map transfer names "+field+" as excluded");
+
+ /* ONE HONEST EXCEPTION, recorded rather than hidden: the map's own
+    `downSheetBadgeView` setting can hide the DS badge for a bus parked on the
+    road. That is a per-device DISPLAY filter and writes no record - the row
+    and the flag are untouched - but it does mean "the badge disappeared after
+    I moved it" is reachable, and the rule above is about the DATA rather than
+    about every pixel. Named here so the next person reads it beside the rule. */
+ const badgeView=await readFile(new URL("../src/lib/down-sheet/down-sheet-badge-view.ts",import.meta.url),"utf8");
+ assert.match(badgeView,/off-road|location/,"the badge view filters on where the bus is, and writes nothing");
+ assert.ok(!/\bdown\s*:\s*(true|false)/.test(badgeView),"and it never writes membership");
 });

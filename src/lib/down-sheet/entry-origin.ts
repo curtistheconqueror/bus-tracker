@@ -26,7 +26,16 @@
    wasn't fixed, and now it's officially on the master downsheet from the
    office."
 
-   ABSENT MEANS NOTHING IS CLAIMED. Every row already on a device predates this
+   ALL FOUR CREATION PATHS STAMP, OR NONE SHOULD. The first version stamped
+   two of them — ADD DOWN BUS and the row minted from the board's `down`
+   flag — and left the map's ON DOWN SHEET tick and the Defect Log's untagged.
+   That is worse than stamping none: while absence only described records that
+   predate the field it claimed nothing, but once SOME app rows carry the tag,
+   a row WITHOUT it reads as having come off the office's sheet — and the
+   commonest gesture on the map was writing exactly that falsehood. A cold read
+   reproduced it in the browser.
+
+   ABSENT MEANS NOTHING IS CLAIMED, about records older than the field. Every row already on a device predates this
    field, and there is no way to know now whether it came off paper or was
    typed in. Labelling those would assert something false about the office's
    own sheet, so the label appears only where the app KNOWS it created the row.
@@ -40,7 +49,7 @@
    blob and survives the round trip, which is how `updatedBy` already reaches
    other devices. Nothing here needs a write to the live database. */
 
-export type OriginEntry={addedInApp?:boolean};
+export type OriginEntry={addedInApp?:true};
 
 /* Only ever `true`, and only ever present when true. A key holding `undefined`
    is still a key to `Object.keys`, and `rowFingerprint` walks exactly that —
@@ -52,8 +61,32 @@ export type OriginEntry={addedInApp?:boolean};
    excess-property-checks every other field on it, so stamping a brand new
    Down Sheet row — which is exactly the call site this exists for — failed to
    compile. The return type says what is added instead. */
-export function markAddedInApp<T>(entry:T):T&{addedInApp:true}{
+export function markAddedInApp<T extends object>(entry:T):T&{addedInApp:true}{
  return {...entry,addedInApp:true};
+}
+
+/* THE PAPER CONFIRMS THE BUS, so the row stops being the app's own say-so.
+
+   Curtis: "once the new sheet is scanned and then it has the bus on there, we
+   know it wasn't fixed, and now it's officially on the master downsheet from
+   the office."
+
+   This existed only as a claim in a comment. A scan does NOT replace a row for
+   a bus it names — `importScan` deliberately writes ONTO the active row so the
+   defect it carries is not minted twice — and `{...prior}` carried the flag
+   straight through, so a row tagged once stayed tagged for good, and the tag
+   travelled to every device saying the office had never listed a bus the
+   office had just listed.
+
+   DELETED rather than set false. `"addedInApp" in entry` has to become false:
+   the cloud fingerprints a row by walking `Object.keys`, so a key holding
+   `undefined` is still a key and would move the fingerprint of every row it
+   touched. The spelling `setBusHold` and the ledger's `gap` already use. */
+export function clearAddedInApp<T extends object>(entry:T):T{
+ if(!("addedInApp" in entry))return entry;
+ const next={...entry} as T&OriginEntry;
+ delete next.addedInApp;
+ return next;
 }
 
 export function wasAddedInApp(entry:unknown){
