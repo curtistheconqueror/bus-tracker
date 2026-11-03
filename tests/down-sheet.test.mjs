@@ -2127,7 +2127,10 @@ test("ADD DOWN BUS opens with no bus chosen, so a save cannot land on a random o
     at a real bus, the "Select bus" option was never the state anybody saw, and
     filling in a repair and pressing SAVE without touching the bus field wrote
     a live entry against a bus picked at random. */
- assert.match(page,/setEditing\(\{id:"repair-"[^}]*?busId:"",busNumber:"",/,
+ /* The rule is that the draft opens with NO bus. Matched through any wrapper
+    around the object — `markAddedInApp` now stamps it as added in the app,
+    which says nothing about which bus is chosen. */
+ assert.match(page,/setEditing\((?:\w+\()?\{id:"repair-"[^}]*?busId:"",busNumber:"",/,
   "the new-entry draft opens with no bus");
  assert.equal(/busId:bus\.id,busNumber:bus\.n,/.test(page),false,
   "and never seeds one from whichever bus sorted first");
@@ -3248,4 +3251,70 @@ test("the Down Sheet mints through the one rule, and no longer caps on total ent
  /* And the cap is handed over as the ACTIVE limit, which is what it means at
     ADD DOWN BUS, the scan import, PUT BACK, the button and the capacity tile. */
  assert.match(page,/activeLimit:MAX_ENTRIES/);
+});
+
+test("a row the app added is labelled, and a row off the office sheet is not",async()=>{
+ const {markAddedInApp,wasAddedInApp,entryOriginLabel,ADDED_IN_APP_LABEL}
+  =await import("../src/lib/down-sheet/entry-origin.ts");
+
+ /* Curtis: "if we add it directly, it will show the badge. It probably needs
+    to be with an asterisk... a little label or something that says added from
+    app or added manually. That way, at least, we'll know that it was not on
+    the downsheet originally." */
+ const row={id:"e1",busId:"a",busNumber:"18505",workflow:"Scheduled"};
+ assert.equal(wasAddedInApp(markAddedInApp(row)),true);
+ assert.equal(entryOriginLabel(markAddedInApp(row)),ADDED_IN_APP_LABEL);
+
+ /* AND ABSENT CLAIMS NOTHING. Every row already on a device predates the
+    field; labelling those would assert something false about the office's own
+    sheet. A scanned row never carries the flag either, which is what makes
+    the promotion Curtis describes work on its own — "once the new sheet is
+    scanned and then it has the bus on there... now it's officially on the
+    master downsheet from the office" — the scan replaces the row with one
+    that has no flag, and the label goes with it. */
+ for(const value of [row,{},{addedInApp:false},{addedInApp:"yes"},{addedInApp:1},null,undefined]){
+  assert.equal(entryOriginLabel(value),"",JSON.stringify(value)+" claims nothing");
+  assert.equal(wasAddedInApp(value),false);
+ }
+ /* Only ever present when true: a key holding undefined is still a key to
+    Object.keys, and rowFingerprint walks exactly that, so writing it onto
+    every row would re-push the whole sheet to say nothing. */
+ assert.ok(!("addedInApp" in row),"never written onto a row that does not have it");
+
+ /* MARKING A BUS FIXED IS NOT THIS MODULE'S JOB and must not become it. The
+    page's own markEntryFixed completes the bus's defect, recomputes status,
+    teaches findings and writes an undo copy; a thinner copy here would be the
+    two-spellings mistake this sheet has already been bitten by. */
+ const origin=await readFile(new URL("../src/lib/down-sheet/entry-origin.ts",import.meta.url),"utf8");
+ assert.ok(!/export function markEntryFixed/.test(origin),
+  "entry-origin.ts does not grow a second way to close a repair out");
+});
+
+test("a bus never loses its Down Sheet badge by being moved",async()=>{
+ const [smart,bulk,areas,transfer]=await Promise.all([
+  readFile(new URL("../src/lib/fleet/smart-status.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/bulk-relocation.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/fleet/facility-areas.ts",import.meta.url),"utf8"),
+  readFile(new URL("../src/lib/storage/section-transfer.ts",import.meta.url),"utf8"),
+ ]);
+
+ /* Curtis: "there should be no way that a bus can have its badge removed from
+    the map by simply relocating it." That holds today by nobody having written
+    the line, which is not the same as it being a rule. The badge comes off the
+    scanned sheet or off somebody pressing MARK AS FIXED, and moving a bus
+    across the yard is neither.
+
+    Asserted over the modules that move a bus: parking it somewhere cannot
+    write its sheet membership. `moveOrSwapBuses` DOES set `s` — a bus parked
+    in the CNG lots reads as out of service — and that is a different field
+    with a different meaning. */
+ for(const [name,code] of [["smart-status",smart],["bulk-relocation",bulk],["facility-areas",areas]]){
+  assert.ok(!/\bdown\s*:/.test(code),name+" never writes the down flag");
+  assert.ok(!/\bdownSheetReady\b|\bonDownSheet\b/.test(code),name+" never writes sheet membership");
+ }
+ /* And a Fleet Map transfer still refuses to carry any of the three, which is
+    the same rule arriving from another device. */
+ assert.match(transfer,/MAP_EXCLUDED/);
+ for(const field of ["down","onDownSheet","downSheetReady"])
+  assert.ok(transfer.includes('"'+field+'"'),"a map transfer names "+field+" as excluded");
 });
