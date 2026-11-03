@@ -845,8 +845,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-mint-skipped button{grid-column:2;grid-row:1/-1;width:44px;height:44px;border:1px solid #d9a441;border-radius:6px;background:#fff;color:#7a4d05;font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
 @media(max-width:760px){.down-mint-skipped{margin:0 8px 8px}}
 
-/* ADDED MANUALLY — a row typed into the app rather than read off the office's
-   scanned sheet. Curtis: "we'll know that it was not on the downsheet
+/* ADDED VIA APP — a row the app itself put on the sheet rather than one read
+   off the office's scanned sheet, whether somebody typed it into ADD DOWN BUS
+   or the board's own `down` flag minted it. Curtis: "we'll know that it was not on the downsheet
    originally." Shaped like ON ROAD beside it, since both answer "something
    else is true about this row", and amber rather than that badge's green:
    green reads as settled, and the whole point of this one is that the master
