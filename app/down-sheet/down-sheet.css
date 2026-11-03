@@ -844,3 +844,12 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-mint-skipped small{grid-column:1;font-size:9px;font-weight:700;line-height:1.45;color:#7a4d05}
 .down-mint-skipped button{grid-column:2;grid-row:1/-1;width:44px;height:44px;border:1px solid #d9a441;border-radius:6px;background:#fff;color:#7a4d05;font-size:17px;font-weight:900;line-height:1;cursor:pointer;touch-action:manipulation}
 @media(max-width:760px){.down-mint-skipped{margin:0 8px 8px}}
+
+/* ADDED MANUALLY — a row typed into the app rather than read off the office's
+   scanned sheet. Curtis: "we'll know that it was not on the downsheet
+   originally." Shaped like ON ROAD beside it, since both answer "something
+   else is true about this row", and amber rather than that badge's green:
+   green reads as settled, and the whole point of this one is that the master
+   sheet has not confirmed the bus yet. It clears itself on the next scan. */
+.added-in-app-badge{align-self:flex-start;display:inline-flex;align-items:center;flex:none;padding:3px 7px;border:1px dashed #b07d12;border-radius:9px;background:#fff6e3;color:#7a4d05;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.4px;vertical-align:middle;white-space:nowrap}
+@media(max-width:760px){.added-in-app-badge{font-size:9px;padding:4px 8px}}
