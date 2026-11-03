@@ -19,7 +19,7 @@ import {clearDownSheetState,DOWN_SHEET_CLEAR_UNDO_KEY,readDownSheetClearSnapshot
 import {defectSupportingDetails,isUnresolved,normalizeFinding,type StructuredDefect} from "@/src/lib/defects/repair-catalog";
 import {reconcileDownSheetMembership} from "@/src/lib/down-sheet/down-sheet-counter";
 import {addMintedEntries,mintSkippedMessage} from "@/src/lib/down-sheet/sheet-mint";
-import {entryOriginLabel,markAddedInApp} from "@/src/lib/down-sheet/entry-origin";
+import {clearAddedInApp,entryOriginLabel,markAddedInApp} from "@/src/lib/down-sheet/entry-origin";
 import {reconcileRoadCallsFromSheet} from "@/src/lib/fleet/road-calls";
 import {estimateFromHours,formatRepairTime,normalizeRepairTimeEstimate,repairTimeTotal,type RepairTimeEstimate} from "@/src/lib/down-sheet/repair-time-estimates";
 import {blankRepairItem,isQuarantineEntry,normalizeRepairItems,repairItemsProgress,repairItemsReason,repairItemsTotal,type DownSheetRepairItem} from "@/src/lib/down-sheet/down-sheet-repair-items";
@@ -81,14 +81,19 @@ type DownEntry={
     closing ten buses at end of shift must never be made to fill in a form to
     flip a dropdown. */
  completedBy?:string;
- /* Set only where the APP created this row — typed in through ADD DOWN BUS, or
-    minted because the board said the bus was down. Absent on a row off a
-    scanned sheet and on every row that predates the field, because the label
-    it drives claims "this was not on the office's sheet" and that is not
-    something the app can know about an old record. See
+ /* Set wherever the APP put this row on the sheet — ADD DOWN BUS, the board's
+    own `down` flag, the map's ON DOWN SHEET tick, or the Defect Log — and
+    cleared by the next scan that names the bus. Absent on a row off a scanned
+    sheet and on every row that predates the field, because the label it drives
+    claims "this was not on the office's sheet" and that is not something the
+    app can know about an old record. See
     `src/lib/down-sheet/entry-origin.ts`. Rides in the cloud row's `detail`
     blob, so it reaches other devices without a schema migration. */
- addedInApp?:boolean;
+ /* `true` rather than `boolean`: the only two legal states are present-and-true
+    and absent. `addedInApp:false` would be a key holding a falsy value, and the
+    cloud fingerprints a row by walking Object.keys — writing it would move the
+    fingerprint of a row whose content had not changed. Measured. */
+ addedInApp?:true;
  createdAt:string;updatedAt:string;updatedBy:string;completedAt:string;history:RepairHistory[];
 };
 
@@ -182,7 +187,7 @@ function entriesFromFleet(fleet:FleetBus[]):DownEntry[]{
  return fleet.filter(bus=>bus.down===true).map(bus=>({
   /* Minted because the board says this bus is down, which is the app's own
      say-so rather than the office's paper. Same label as a typed row. */
-  addedInApp:true,
+  addedInApp:true as const,
   id:"repair-"+bus.id,
   busId:bus.id,
   busNumber:bus.n,
@@ -522,7 +527,7 @@ export default function DownSheet(){
      full before they fill in a form is worth doing; it just no longer hands its
      answer to the draft. */
  const available=fleet.some(item=>!active.some(entry=>entry.busId===item.id));if(!available){alert("Every available fleet bus already has an active down-sheet entry.");return}const now=new Date().toISOString();/* ADDED IN THE APP, NOT OFF THE OFFICE SHEET. Curtis: "if we add it directly, it will show the badge... a little label or something that says added manually. That way, at least, we'll know that it was not on the downsheet originally." Cleared by the next scanned sheet, which replaces the row - at which point the bus IS on the master sheet. */
-  setEditing(markAddedInApp({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:"",busNumber:"",category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:"unknown",priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]}))};
+  setEditing(markAddedInApp<DownEntry>({id:"repair-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),busId:"",busNumber:"",category:"",repair:"",customReason:"",repairItems:[blankRepairItem()],assignmentType:"Mechanic",assignedTo:"",section:"Pending",shift:defaultShift,workflow:"Scheduled",operationalStatus:"unknown",priority:"Routine",timeEstimate:normalizeRepairTimeEstimate(undefined,"",""),createdAt:now,updatedAt:now,updatedBy:"",completedAt:"",history:[]}))};
  const saveQuickNote=()=>{setSavedQuickNotes(quickNotes);try{const current=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}");localStorage.setItem(SETTINGS_KEY,JSON.stringify({...current,showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}catch{localStorage.setItem(SETTINGS_KEY,JSON.stringify({showCompleted,defaultInitials,defaultShift,quickNotes,sectionOrder,display:displaySettings}))}};
  /* The DEFERRED board hands its answer back here rather than writing, so a
     refused write is reported by this page like every other one and the board
@@ -591,6 +596,11 @@ export default function DownSheet(){
  const importScan=(records:ScanImportRecord[])=>{
   const now=new Date().toISOString(),incomingIds=new Set(records.map(record=>record.busId)),removed=scannedSheetRemovals(entries,incomingIds),baseFleet=prepareFleetForScannedReplacement(fleet,removed,now);
   const imported=records.map((record,index)=>{
+   /* THE PAPER NAMING THE BUS IS WHAT PROMOTES THE ROW. A scan writes ONTO
+      the active row rather than replacing it, so `{...prior}` carried
+      `addedInApp` through and a row tagged once stayed tagged for ever — the
+      office listing the bus is exactly the moment that stops being true.
+      Curtis: "now it's officially on the master downsheet from the office." */
    const prior=entries.find(entry=>isActive(entry)&&entry.busId===record.busId),assignmentType:AssignmentType=record.section==="Vendor Repair"?"Vendor":"Mechanic",workflow:Workflow=record.operationalStatus==="shop"?"In Progress":"Scheduled";
    /* Write to the record the bus already has, rather than minting a second one.
 
@@ -607,7 +617,7 @@ export default function DownSheet(){
       same category, symptom and details — so a genuinely different fault on the
       same bus still becomes its own record. */
    const defectId=prior?.defectId||matchingUnresolvedDefectId(fleet.find(bus=>bus.id===record.busId),record);
-   return normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,...(defectId?{defectId}:{}),busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index);
+   return clearAddedInApp(normalizeEntry({...prior,id:prior?.id||`repair-scan-${Date.now()}-${index}`,...(defectId?{defectId}:{}),busId:record.busId,busNumber:record.busNumber,category:record.category,repair:record.repair,customReason:record.reason,assignmentType,assignedTo:record.assignedTo,section:record.section,shift:record.shift,workflow,operationalStatus:record.operationalStatus,timeEstimate:normalizeRepairTimeEstimate(undefined,record.category,record.repair),updatedAt:now,updatedBy:defaultInitials||"SCAN",history:[...(prior?.history||[]),{at:now,initials:defaultInitials||"SCAN",action:"Imported from sheet photo"}]},index));
   });
   const nextEntries=[...imported];
   if(nextEntries.filter(isActive).length>MAX_ENTRIES){alert("This import would exceed the 98-bus Down Sheet capacity. Deselect some rows and try again.");return}
@@ -1064,14 +1074,19 @@ export default function DownSheet(){
           the column is the width of a bus number and the reason arrives on
           screen. */}
       {isDownSheetRoadLocation(locations[entry.busId]||"")&&<i className="on-road-badge" title="This bus is out on the road right now, according to the Facility Map">ON ROAD</i>}
-      {/* NOT OFF THE OFFICE'S SHEET. Curtis: "if we add it directly, it will
-          show the badge... a little label or something that says added
-          manually. That way, at least, we'll know that it was not on the
-          downsheet originally." It clears itself: the next scanned sheet
-          replaces this row with one carrying no flag, which is the moment the
-          bus becomes officially down on the master sheet. Absent on every row
-          that predates the field, because the app cannot know. */}
-      {entryOriginLabel(entry)&&<i className="added-in-app-badge" title="This row was added in the app and was not on the scanned down sheet. The next scanned sheet decides whether it belongs on the master sheet.">{entryOriginLabel(entry)}</i>}</span></td>
+      {/* NOT OFF THE OFFICE'S SHEET. Curtis: "we'll know that it was not on
+          the downsheet originally." Carried by all four of the app's own
+          creation paths — ADD DOWN BUS, the board's `down` flag, the map's ON
+          DOWN SHEET tick, and the Defect Log — because once SOME app rows are
+          tagged, a row WITHOUT the tag claims the office printed it.
+
+          It clears when the paper names the bus: a scan writes onto the active
+          row and `clearAddedInApp` drops the flag there, which is the moment
+          Curtis described — "now it's officially on the master downsheet from
+          the office". That clearing was promised in four places before it
+          existed. Absent on every row that predates the field, because the app
+          cannot know. */}
+      {entryOriginLabel(entry)&&<i className="added-in-app-badge" title="This row was put on the sheet from inside the app, not read off the office's scanned sheet. It clears itself the next time a scanned sheet names this bus.">{entryOriginLabel(entry)}</i>}</span></td>
       <td><button className="reason-button" type="button" onClick={()=>setEditing(entry)} aria-label={"Edit repair details for bus "+entry.busNumber}><b>{entry.repairItems&&entry.repairItems.length>1?repairProgressLabel(entry):entry.category}</b><span>{reasonLabel(entry)}</span></button></td>
       <td><span className={"assignment "+entry.assignmentType.toLowerCase()}><small>{entry.assignmentType}</small>{entry.assignedTo||"Unassigned"}</span></td>
       <td><b className={"section-tag "+entry.section.toLowerCase().replaceAll(" ","-")}>{entry.section}</b></td>

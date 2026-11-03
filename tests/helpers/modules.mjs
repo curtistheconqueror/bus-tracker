@@ -37,7 +37,7 @@ export {aggregateRepairItemEstimates, blankRepairItem, isQuarantineEntry, normal
 export {mergeReviewedRows, reviewScannedRows} from "../../src/lib/down-sheet/down-sheet-scan-import.ts";
 export {busNumbersInText, perBusReason, printedLineConflicts, unreadBusNumbers} from "../../src/lib/down-sheet/scan-multi-bus.ts";
 export {addMintedEntries, mintSkippedMessage} from "../../src/lib/down-sheet/sheet-mint.ts";
-export {ADDED_IN_APP_LABEL, entryOriginLabel, markAddedInApp, wasAddedInApp} from "../../src/lib/down-sheet/entry-origin.ts";
+export {ADDED_IN_APP_LABEL, clearAddedInApp, entryOriginLabel, markAddedInApp, wasAddedInApp} from "../../src/lib/down-sheet/entry-origin.ts";
 export {prepareFleetForScannedReplacement, scannedSheetRemovals} from "../../src/lib/down-sheet/down-sheet-replace.ts";
 export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
 export {downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";

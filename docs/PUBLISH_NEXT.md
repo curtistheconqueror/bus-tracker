@@ -2170,6 +2170,69 @@ now REMOVES a DS badge from the Facility Map and shows one fewer row where it
 used to add a row and keep the badge. It matches what the map already did on
 its own mount, but it changes what a foreman sees, so it is Curtis's to confirm.
 
+### A Down Sheet row the app added says so, and the paper clears it
+
+Curtis set the predicate: *"a bus having a downsheet badge on it is because
+the downsheets that were scanned show the bus on the downsheet. If I upload
+the new sheets, the badge goes away. Simple. We have to assume that it was
+fixed, unless we decide to add the bus to the downsheet from the app
+directly."* And for that case: *"a little label or something that says added
+from app or added manually. That way, at least, we'll know that it was not on
+the downsheet originally."*
+
+So a row the app put on the sheet carries **ADDED VIA APP** — a dashed amber
+tag beside the bus number, 6.76:1 ink, measured at 390 and 1180 with no
+horizontal overflow and the REASON column untouched.
+
+**It shipped wrong twice and a cold read caught both.** Worth recording
+because both are the same mistake in different clothes.
+
+**ONE: THE LABEL NEVER CLEARED.** The first version claimed — in the commit,
+the module header, the CSS and the badge's own tooltip — that a new scan
+replaces the row so the tag goes. It does not. `importScan` deliberately
+writes ONTO the active row rather than minting a second defect record, so
+`{...prior}` carried the flag straight through and a row tagged once stayed
+tagged for good, with the wrong tag propagating to every device. The reviewer
+reproduced it end to end through the real import. `clearAddedInApp` drops the
+flag on the row the paper just named — with `delete`, not `false`, because
+the cloud fingerprints a row by walking `Object.keys`.
+
+**TWO: ONLY TWO OF THE APP'S FOUR CREATION PATHS STAMPED.** ADD DOWN BUS and
+the row minted from the board's `down` flag did; the map's **ON DOWN SHEET**
+tick (and the AI operator) and the **Defect Log** (and DEFERRED, RECOMMENDED,
+the evening review) did not. That is worse than stamping none, and the reason
+is the interesting part: while absence only described records older than the
+field it claimed nothing — but once SOME app rows carry the tag, a row
+**without** it reads as *"the office printed this"*, and the commonest gesture
+on the map was writing exactly that falsehood. All four stamp now.
+
+**And the tests had no teeth at all.** The reviewer deleted both stamp sites
+in a clean checkout and all 432 tests still passed. They are behavioural now,
+over the real creation functions, and six mutations were run against them —
+each of the four stamps removed, the scan's clearing removed, and the clear
+setting `false` instead of deleting — all six caught.
+
+**The relocation rule is tested by moving buses, not by grepping for a word.**
+Curtis: *"there should be no way that a bus can have its badge removed from
+the map by simply relocating it."* The first version was a regex over three
+source files that could not see `delete next.down`, a rebuild that omits the
+field, or a call to an imported helper — and it missed the swap, MOVE TO AREA
+and the map page itself. It drives `moveOrSwapBuses`, `reassignBusPair`,
+`bulkRelocateBuses` and `moveBusToArea` now and asserts all three membership
+fields survive.
+
+**One honest exception, recorded rather than hidden:** the map's own
+`downSheetBadgeView` setting can HIDE the DS badge for a bus parked on the
+road. It is a per-device display filter that writes no record — the row and
+the flag are untouched — but it does mean "the badge disappeared after I moved
+it" is reachable on a device with that setting on, and Curtis should know the
+rule is about the data rather than about every pixel.
+
+**Known and not fixed:** a push from a device on an older release drops the
+flag, because `mergeDownSheet` replaces a matched row wholesale. The tag
+reappears the next time that row is created in the app and is cleared by the
+paper either way, so it degrades to "no claim" rather than to a false one.
+
 ### Open questions for Curtis
 
 **Should a bad reply fail the shell install the way a dropped connection
