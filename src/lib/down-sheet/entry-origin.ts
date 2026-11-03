@@ -63,7 +63,14 @@ export function wasAddedInApp(entry:unknown){
 /* What the row says about itself. Empty for a row off a scanned sheet and for
    every row that predates the field — the label's whole job is to say "this
    was NOT on the office's sheet", so saying nothing is the honest default. */
-export const ADDED_IN_APP_LABEL="ADDED MANUALLY";
+/* "VIA APP" RATHER THAN "MANUALLY", and Curtis chose between the two wordings
+   he had offered once the reason was put to him. The tag goes on two kinds of
+   row: one a person typed into ADD DOWN BUS, and one the app MINTED by itself
+   because the board said the bus was down. Nobody typed the second, so
+   "manually" was simply false about it — while what both rows have in common,
+   which is the whole point of the tag, is that neither came off the office's
+   scanned sheet. "VIA APP" says that about both. */
+export const ADDED_IN_APP_LABEL="ADDED VIA APP";
 export function entryOriginLabel(entry:unknown){
  return wasAddedInApp(entry)?ADDED_IN_APP_LABEL:"";
 }
