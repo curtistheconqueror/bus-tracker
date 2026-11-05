@@ -32,6 +32,7 @@
       ever know which one. */
 
 import {defectLabel,isUnresolved,mergeReportAttempts,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
+import {normalizeDefectParts,withDefectParts,type DefectPart} from "./defect-parts.ts";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "../down-sheet/down-sheet-sync.ts";
 /* The identity rule lives on its own so the Down Sheet can ask the same
    question before it writes without these two files importing each other. */
@@ -103,7 +104,36 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     nothing. Deduplicated by timestamp, so two copies of the same return that
     both travelled through the cloud count once. */
  const reportAttempts=mergeReportAttempts(ordered.flatMap(defect=>defect.reportAttempts||[]),[]);
- return {
+ /* EVERY PART ANYONE RECORDED, KEPT, for the reason the return tally is kept:
+    a merge that quietly halves it makes the number evidence of nothing. This
+    was missed when a repair grew a `parts` array - only the survivor's array
+    came through `...survivor`, and a merged-away copy contributed nothing but
+    its mirrored FIRST part, so a two-part duplicate lost its second one. A cold
+    read drove it: `parts:[BB-2,CC-3]` merged away left `AA-1` alone on the
+    record. Losing a part number off a repair's history is losing the history
+    this app exists to keep.
+
+    READ THROUGH `normalizeDefectParts`, so a copy saved under the old
+    single-part shape contributes the part it describes rather than nothing.
+    Deduplicated on the NUMBER where there is one and on the NAME where there is
+    not, because two copies of the same repair name the same part and it must
+    not be counted twice; a name-only row - "the long bolt behind the
+    alternator" - is still a part somebody recorded.
+
+    ASSEMBLED, not spread, so the mirrored pair cannot end up describing a
+    different part from the array's first row. `withDefectParts` runs last for
+    that reason, and it takes `partsUsed` so a ticked-with-nothing-typed copy
+    keeps its MISSING PART # through the merge. */
+ const mergedParts:DefectPart[]=[];
+ const seenParts=new Set<string>();
+ for(const defect of ordered)
+  for(const part of normalizeDefectParts(defect.parts,defect)){
+   const key=(part.partNumber||"").trim().toLowerCase()||"name:"+(part.partName||"").trim().toLowerCase();
+   if(key==="name:"||seenParts.has(key))continue;
+   seenParts.add(key);
+   mergedParts.push(part);
+  }
+ return withDefectParts({
   ...survivor,
   createdAt,
   updatedAt:now,
@@ -128,7 +158,16 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
   estimateHours:firstNumber(defect=>defect.estimateHours),
   conditionNotDuplicated:anyTrue(defect=>defect.conditionNotDuplicated),
   partsUsed:anyTrue(defect=>defect.partsUsed),
- };
+ /* `true` OR NOTHING AT ALL, never an explicit `false`. An explicit false is a
+     person UNTICKING the box and it beats any row still in the list - which is
+     right on a form and wrong here, because a merge is nobody unticking
+     anything. Passed as false, a copy carrying `partNumber:"HX-99"` with no
+     `partsUsed` flag at all (the shape a pre-flag record has) had its part
+     wiped by the merge. Caught by the Down Sheet's own merge test, which has
+     asserted that number survives since long before parts were a list.
+     Undefined lets the rows decide, which is the same answer
+     `normalizeDefectParts` gives when it reads that record. */
+ },mergedParts,anyTrue(defect=>defect.partsUsed)===true?true:undefined);
 }
 
 /* Which copy survives.

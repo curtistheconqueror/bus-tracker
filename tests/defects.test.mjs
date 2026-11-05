@@ -2403,7 +2403,7 @@ test("both repair workflows offer a remembered part without imposing or blocking
     with an EMPTY number, which the assembler read as "no parts were used", so
     the repair saved completed with no flag and the promise on screen was
     false. A reviewer reproduced it in a browser against this branch. */
- assert.match(log,/\.\.\.rows\.slice\(1\)\],true\)\);/,
+ assert.match(log,/validateAndSave\(true,\{\},\{rows:\[[\s\S]{0,220}?\],used:true\}\)/,
   "ENTER LATER has to store partsUsed:true or its own promise is a lie");
  {
   /* DRIVEN END TO END: the state ENTER LATER writes must be the state the
@@ -3133,19 +3133,46 @@ test("saving fixed with a part asks for the number and flags it when left for la
  // ENTER LATER records that a part went on with no number, which is a different
  // fact from no part at all.
  assert.match(logPage,/confirm\(""\)/);
- /* THROUGH THE ASSEMBLER. The prompt patched `{partsUsed:true,partNumber}`
-    straight onto the record, so on a repair already holding a `parts` array
-    the mirrored pair and the array disagreed - and the number typed here was
-    never learned, because the save reads the array. It becomes the first row
-    now, which is the row the memory takes. */
- assert.match(logPage,/validateAndSave\(true,withDefectParts\(value\.defect,\[\{id:first\?first\.id:"part-0",partNumber:number/);
+ /* THROUGH THE ASSEMBLER, AND THE ASSEMBLER RUNS LAST.
+
+    The prompt first patched `{partsUsed:true,partNumber}` straight onto the
+    record, so on a repair already holding a `parts` array the mirrored pair and
+    the array disagreed. Passing the ASSEMBLED record in as the patch was the
+    next attempt, and a cold read showed it does not work either:
+    `{...value.defect,...patch}` CANNOT CARRY A DELETION, and the assembler's
+    whole job is to `delete parts`. The key is absent from the patch, so the
+    stored array came back through the first spread - measured on a repair
+    holding [AA-1,BB-2] as `partNumber:"BB-2"` beside `parts:[AA-1,BB-2]`, the
+    exact disagreement the first fix was for. Same `{...existing,...incoming}`
+    trap `saveDefectLogRecord` keeps an explicit field list for.
+
+    So the parts go in as PARTS and the assembler runs after the spread, where
+    nothing can spread over it. */
+ assert.match(logPage,/validateAndSave\(true,\{\},\{rows:\[\{id:first\?first\.id:"part-0",partNumber:number/);
  assert.doesNotMatch(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/,
   "the prompt must not write the mirrored pair without the array");
+ assert.doesNotMatch(logPage,/validateAndSave\(true,withDefectParts\(/,
+  "and must not hand the assembled record in as a patch, which undoes the delete");
 
  // The patch is passed INTO the save rather than set on state first. Setting it
  // and then saving would write the defect as it was a render earlier, dropping
  // the number on the very save that asked for it.
- assert.match(logPage,/const validateAndSave=\(complete:boolean,patch:Partial<StructuredDefect>=\{\}\)=>\{const defect=\{\.\.\.value\.defect,\.\.\.patch\}/);
+ assert.match(logPage,/const validateAndSave=\(complete:boolean,patch:Partial<StructuredDefect>=\{\},parts\?:\{rows:DefectPart\[\];used:boolean\}\)=>\{const patched=\{\.\.\.value\.defect,\.\.\.patch\};const defect=parts\?withDefectParts\(patched,parts\.rows,parts\.used\):patched/,
+  "the spread happens first and the assembler last, so a deleted key stays deleted");
+ /* DRIVEN, because the gate above is a shape and this is the behaviour: the
+    assembled record spread over the stored one brings the array back. */
+ {
+  const held={id:"d1",partsUsed:true,partNumber:"AA-1",partName:"Chamber",
+   parts:[{id:"a",partNumber:"AA-1",partName:"Chamber"},{id:"b",partNumber:"BB-2"}]};
+  const rows=normalizeDefectParts(held.parts,held);
+  const assembled=withDefectParts(held,[{id:rows[0].id,partNumber:""},...rows.slice(1)],true);
+  assert.ok(!("parts" in assembled),"the assembler deletes the key");
+  const asAPatch={...held,...assembled};
+  assert.deepEqual(normalizeDefectParts(asAPatch.parts,asAPatch).map(part=>part.partNumber),["AA-1","BB-2"],
+   "spreading the assembled record over the stored one brings the array back - which is why it is not a patch");
+  assert.deepEqual(normalizeDefectParts(assembled.parts,assembled).map(part=>part.partNumber),["BB-2"],
+   "and running the assembler last is what the record should hold");
+ }
 
  // It renders OUTSIDE the form. Inside it, Enter in the part field would submit
  // the defect behind the prompt.
@@ -6521,6 +6548,32 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     where somebody needs an instruction. */
  assert.match(focusShareScopeNote(focusShareScope([row("x")],[row("x")],["x"])),
   /^NOTHING LEFT TO SHARE — 1 YOU SWIPED AWAY$/);
+ /* THE HANDLERS HAVE TO BE WIRED TO THE ROW THEY WERE GIVEN, and these two
+    gates exist because a cold read got two mutations past the suite: hiding
+    THE FIRST ON-SCREEN ROW instead of the one swiped or pressed, and PUT BACK
+    calling `setFocusExcluded([])` so it restored everything. Both were
+    invisible, because everything around them drives `excludeFromFocusShare`
+    and `putBackLastExclusion` as pure functions and then only greps the
+    handlers for a name.
+
+    A RENDER WOULD BE THE RIGHT GATE AND THIS SUITE CANNOT RENDER THIS: the
+    helper runs the production worker SERVER-SIDE, where there is no
+    LocalStorage and therefore no board. So these are source gates, deliberately
+    about the two specific shapes, and the browser run is the witness for the
+    wiring. Said plainly rather than left looking like a behavioural test. */
+ {
+  const hide=bodyOfSource(page,"focusHideRecord");
+  assert.ok(/excludeFromFocusShare\(current,record\.defect\.id\)/.test(hide),
+   "the hide excludes the row it was handed, by id");
+  assert.ok(!/\[0\]|\.find\(|rows\[/.test(hide),
+   "and never reaches for a row of its own choosing: "+hide.slice(0,160));
+  const back=bodyOfSource(page,"focusPutBack");
+  assert.ok(/putBackLastExclusion\(/.test(back),"PUT BACK asks the lib which one comes back");
+  assert.ok(!/setFocusExcluded\(\[\]\)/.test(back),
+   "and never clears the whole list - that is what changing bus does");
+  assert.ok(/if\(!restored\)return/.test(back),
+   "a press that restores nothing returns rather than re-rendering");
+ }
  /* AND THE SCOPE IS COMPUTED IN THE LIB, not on the page. The reason is the
     general one and it is enough: a decision inside a `page.tsx` is reachable by
     that page and nothing else. An earlier version of this comment said the MCP
@@ -6610,6 +6663,36 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.deepEqual(excludeFromFocusShare(excluded,"a"),["a","b"],"the same row twice is still one exclusion");
  assert.deepEqual(putBackLastExclusion(excluded),{excluded:["a"],restored:"b"});
  assert.deepEqual(putBackLastExclusion([]),{excluded:[],restored:null});
+ /* AND AN EXCLUSION THAT HAS LEFT THE SCREEN IS NEITHER RESTORED NOR THROWN
+    AWAY. Two different bugs, one after the other.
+
+    First, `focusExcluded` is only cleared when the BUS changes, so a defect
+    swiped away and then taken off screen by the window, the filter or a sync
+    left an id the counts no longer see - and PUT BACK popped THAT one,
+    restoring nothing while the button still read PUT BACK.
+
+    The fix for that filtered the list and then STORED the filtered result, so
+    one press silently dropped every off-screen exclusion: swipe A and B away,
+    let A leave the view, press PUT BACK for B, and A came back into the share
+    on its own the next time the window widened, with `hiddenByHand` reading 0.
+    A cold read found the second one. */
+ assert.deepEqual(putBackLastExclusion(["a","b"],["b"]),{excluded:["a"],restored:"b"},
+  "the off-screen exclusion is kept, not swept up with the press");
+ assert.deepEqual(putBackLastExclusion(["a","b"],["a"]),{excluded:["b"],restored:"a"},
+  "and the LAST VISIBLE one is what comes back, not simply the last one");
+ assert.deepEqual(putBackLastExclusion(["a","b"],["z"]),{excluded:["a","b"],restored:null},
+  "nothing on screen is hidden, so nothing is put back and nothing is lost");
+ {
+  const held=["a","b"];
+  assert.equal(putBackLastExclusion(held,["z"]).excluded,held,
+   "and that press returns the same array, so it is not a re-render that does nothing");
+ }
+ assert.deepEqual(putBackLastExclusion([],["a"]),{excluded:[],restored:null});
+ /* The page passes what is on screen; without it the rule is the plain one. */
+ assert.match(page,/putBackLastExclusion\(focusExcluded,live\)/,
+  "the page hands PUT BACK the on-screen ids rather than filtering the list itself");
+ assert.doesNotMatch(page,/putBackLastExclusion\(focusExcluded\.filter/,
+  "filtering before the call is what threw the off-screen ones away");
 
  /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
     vertically under the same thumb. The Facility Map paid for the naive
@@ -6654,6 +6737,13 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     page can hand it "", and four buttons reading "Hide" is what a screen
     reader then gets. */
  assert.match(swipeRow,/className="focus-hide-defect"/);
+ /* AND IT COMES BEFORE THE CONTENT, because it is DRAWN above it. The button
+    is `position:absolute` in the row's top-right corner and was the LAST child,
+    so a keyboard reached it after EDIT DEFECT, MARK FIXED and PTR - four stops
+    below where it visibly sits (WCAG 2.4.3, found by a cold read). Absolute
+    positioning means the markup order costs nothing on screen. */
+ assert.ok(swipeRow.indexOf('className="focus-hide-defect"')<swipeRow.indexOf("{children}"),
+  "tab order has to follow the eye: HIDE is drawn first, so it comes first");
  assert.match(swipeRow,/onClick=\{\s*\(\)\s*=>\s*onHide\("button"\)\s*\}/,
   "the HIDE control has to work without a gesture");
  assert.match(swipeRow,/aria-label=\{\s*hideLabel\s*\}/);
@@ -7142,6 +7232,64 @@ test("ESTIMATED TIME OF REPAIR is a claim about this bus, and the Defect Log own
  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
  assert.equal(merged.length,1,"the two copies merged");
  assert.equal(merged[0].estimateHours,4,"and the merge keeps the one estimate either of them held");
+
+ /* AND EVERY PART ANYONE RECORDED SURVIVES THE MERGE, which it did not. Only
+    the survivor's `parts` came through `...survivor`; a merged-away copy
+    contributed nothing but its mirrored FIRST part, so a two-part duplicate
+    lost its second one outright. A cold read drove it. Losing a part number off
+    a repair's history is losing the history this app exists to keep - the same
+    reasoning the module already applies to the return tally, which it unions
+    for exactly this reason. */
+ {
+  const parted=(id,day,parts,mirror)=>({...defect,id,details:"same parts",
+   createdAt:"2026-09-0"+day+"T00:00:00.000Z",updatedAt:"2026-09-0"+day+"T00:00:00.000Z",
+   partsUsed:true,partNumber:mirror,parts});
+  const out=mergeDuplicateDefects([{id:"bus-8",n:"6302",l:"bay-2",s:"defect",defects:[
+   parted("p1",1,[{id:"a",partNumber:"AA-1",partName:"Chamber"}],"AA-1"),
+   parted("p2",2,[{id:"b",partNumber:"BB-2"},{id:"c",partNumber:"CC-3",partName:"Sensor"}],"BB-2"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.equal(out.length,1,"the two copies merged");
+  assert.deepEqual(normalizeDefectParts(out[0].parts,out[0]).map(part=>part.partNumber),
+   ["AA-1","BB-2","CC-3"],"every part on either copy has to survive the merge");
+  /* AND THE MIRRORED PAIR DESCRIBES THE ARRAY'S FIRST ROW, because the merge
+     runs through the one assembler rather than spreading fields. */
+  assert.equal(out[0].partNumber,"AA-1");
+  assert.equal(out[0].partsUsed,true);
+  /* THE SAME PART TYPED ON BOTH COPIES IS ONE PART, not two: two records of one
+     repair name the same part, and a doubled row would read as two fitted. */
+  const same=mergeDuplicateDefects([{id:"bus-7",n:"6303",l:"bay-3",s:"defect",defects:[
+   parted("q1",1,[{id:"a",partNumber:"AA-1"}],"AA-1"),
+   parted("q2",2,[{id:"b",partNumber:"aa-1"}],"aa-1"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.deepEqual(normalizeDefectParts(same[0].parts,same[0]).map(part=>part.partNumber),["AA-1"],
+   "the same number on both copies is one part, whatever its case");
+  /* A COPY SAVED UNDER THE OLD SINGLE-PART SHAPE still contributes its part:
+     the merge reads through `normalizeDefectParts`, not off `parts` alone. */
+  const legacy=mergeDuplicateDefects([{id:"bus-6",n:"6304",l:"bay-4",s:"defect",defects:[
+   /* The SAME `details` as the copy below, or these are not duplicates at all
+      and nothing merges - which is how this fixture first "failed". */
+   {...defect,id:"r1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z",
+    partsUsed:true,partNumber:"ZZ-9",partName:"Belt"},
+   parted("r2",2,[{id:"b",partNumber:"YY-8"}],"YY-8"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.deepEqual(normalizeDefectParts(legacy[0].parts,legacy[0]).map(part=>part.partNumber),["ZZ-9","YY-8"],
+   "a one-part record saved before the array existed still brings its part");
+  /* AND A COPY WITH A PART NUMBER AND NO `partsUsed` FLAG KEEPS ITS PART. The
+     first version of this merge passed `anyTrue(...)===true` straight through,
+     so when NO copy carried the flag it handed the assembler an explicit
+     `false` - which means "somebody unticked the box" and beats every row in
+     the list. A pre-flag record carrying `partNumber:"HX-99"` alone had its
+     part wiped. The Down Sheet's merge test caught it, having asserted that
+     exact number survives since long before parts were a list. */
+  const unflagged=mergeDuplicateDefects([{id:"bus-5",n:"6305",l:"bay-5",s:"defect",defects:[
+   {...defect,id:"s1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
+   {...defect,id:"s2",details:"same parts",createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z",
+    partNumber:"HX-99"},
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.equal(unflagged[0].partNumber,"HX-99",
+   "a part number with no partsUsed flag is still a part somebody recorded");
+  assert.equal(unflagged[0].partsUsed,true,"and the flag follows the part, not the other way round");
+ }
 
  /* Both seeding sites ask the defect rather than the catalog: the entry the
     Defect Log opens when it puts a bus on the sheet, and the cards the Down

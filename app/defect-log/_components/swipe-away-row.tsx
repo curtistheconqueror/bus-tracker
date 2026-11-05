@@ -111,19 +111,34 @@ export default function SwipeAwayRow({
          half-moved if the browser takes the pointer away. */
       onLostPointerCapture={() => { if (start.current) end(false); }}
     >
-      {children}
+      {/* BEFORE THE CONTENT, BECAUSE IT IS DRAWN ABOVE IT. The button is
+          `position:absolute` in the row's TOP-RIGHT corner, and it used to be
+          the last child - so a keyboard reached it after EDIT DEFECT, MARK
+          FIXED and PTR, four stops below where it visibly sits. Tab order has
+          to follow the eye (WCAG 2.4.3); absolute positioning means moving it
+          in the markup costs nothing on screen. */}
       <button
         type="button"
         className="focus-hide-defect"
         onClick={() => onHide("button")}
-        /* The gesture is named in the accessible label so somebody using a
-           screen reader learns it exists, and so speech input can say it. */
+        /* THE LABEL NAMES THE DEFECT; THE GESTURE RIDES THE TITLE, and the
+           comment here used to claim otherwise - that the gesture was "named in
+           the accessible label ... so speech input can say it". It is not: a
+           `title` beside an `aria-label` becomes the accessible DESCRIPTION,
+           and speech input (Voice Control, Dragon) matches the accessible NAME.
+           Measured through CDP: name "Hide Brakes from this share",
+           description "… — or swipe the row left". A screen reader does reach
+           the hint, so the swipe is still discoverable; it is not SAYABLE, and
+           the label stays short because four rows of "Hide X from this share —
+           or swipe the row left" is what a screen reader would then read on
+           every one. */
         aria-label={hideLabel}
         title={hideLabel + " — or swipe the row left"}
       >
         <span aria-hidden="true">&times;</span>
         <b>HIDE</b>
       </button>
+      {children}
     </article>
   );
 }
