@@ -48,7 +48,11 @@ read of the first part so nothing on disk is rewritten and an older phone still
 shows something. And **the FOCUS panel's share follows the window now**, with a
 **swipe left** (or a HIDE button, for the shop computer) to drop one defect from
 it and **PUT BACK** to return it; the share refuses to send an empty bus, which
-would have read as a clean one. Queued by Claude Code; not published, not
+would have read as a clean one. Two fixes found while checking those in a
+browser: **ADVANCED DETAILS on the LOG DEFECT form was a 2px line** and could
+not be opened by a tap at all — taking PARTS USED, the estimate and the hours
+with it — and **ENTER LATER had stopped marking a repair MISSING PART #**,
+which is the one thing that button promises. Queued by Claude Code; not published, not
 tagged, not deployed. PR39 MCP remains separately held and unmerged.
 
 Application release 193 is live as Sites version 189 from
@@ -2671,16 +2675,42 @@ shop computer; REMOVE 318x44 and 78.5x36; the row separator **0px on the first
 row and 1px dashed on the second**, so a one-part repair looks exactly as it did;
 nothing clipped, no page overflow, no page errors.
 
-**One thing NOT established, and not introduced here.** Every control in that
-form's ADVANCED DETAILS section — including the **PARTS USED checkbox that
-predates this change** — could not be reached by a synthetic pointer event at
-any scroll position: the form's own sticky action bar
-(`.save-log-middle-actions`) reports as the topmost element over that region. It
-behaves identically for controls that have shipped for releases, so it is either
-a harness artifact or a pre-existing reachability problem with that section on a
-narrow screen. Either way it is **not** something this change caused, and it
-wants its own look rather than being bundled in here. Everything above was read
-off the live DOM instead.
+**AND THE THING THAT WAS "NOT ESTABLISHED" TURNED OUT TO BE A REAL BUG, OLDER
+THAN THIS CHANGE.** This paragraph used to say that every control in ADVANCED
+DETAILS was unreachable by a synthetic pointer event, guess that the form's own
+sticky action bar was the topmost element over that region, and conclude it was
+"either a harness artifact or a pre-existing reachability problem". It was
+neither of those things, and the guess was wrong.
+
+**ADVANCED DETAILS was a 2px line.** The `<details>` box measured **2px** — its
+two borders and no content at all — with a correct **48px** `<summary>` clipped
+away inside it. So the entire section (DIAGNOSIS / TEST / VERIFICATION, WHAT WAS
+FOUND, PARTS USED, ESTIMATED TIME OF REPAIR, REPAIR HOURS, DIAGNOSTIC HOURS)
+could not be opened by a tap or a click on any screen. A **keyboard** still
+opened it — focus the summary, press Enter — which is exactly why nothing
+errored and no test ever caught it: the element was present, it was `open`-able,
+and only its box was gone.
+
+`overflow:hidden` on `.advanced-defect-details` is the cause, bisected live
+rather than reasoned about: `hidden` gives 2px; `clip` and `visible` give 50px
+at 390 and 48px at 1180. The summary's `display:flex` is **not** it — a bare
+`<details>` with a flex `<summary>` on the same page measures 48px — and nothing
+anywhere sets a height. The fix is **`overflow:clip`**, which still keeps the
+inner grid inside the 8px rounded frame, which is what the rule was there for;
+measured with the section open, the grid does not overflow the frame at either
+width.
+
+Measured after the fix, in the built page: a real tap opens the section at 390
+and 1180, a real tap ticks PARTS USED, and the parts rows appear. **UI change,
+and a visible one**: ADVANCED DETAILS goes from a 2px line to the 48px bar it
+was always meant to be.
+
+Two caveats, both on the record rather than buried. It is **older than this
+release's work** — `git log -S` over `advanced-defect-details` against `main` is
+empty, so nothing here ever touched that rule — and it is a **Chromium**
+measurement. Whether the same engine behaviour reaches an iPhone or the shop
+computer's browser is not established here, and is worth one look on a real
+device.
 
 ### The button reads MARK FIXED, the same as the Defect Log's
 
