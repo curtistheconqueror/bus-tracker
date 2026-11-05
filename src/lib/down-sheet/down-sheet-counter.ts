@@ -37,8 +37,15 @@ export function downSheetBadgeBusIds<T extends {id:string}>(buses:T[],activeDown
    So the rule lives here, where a test can hand it a fleet, move every bus and
    insist the answer does not change - and where the MCP route can ask the same
    question the map asks rather than reimplementing it. MEMBERSHIP AND THE SHOW
-   SWITCH ARE THE ONLY TWO INPUTS, and `bus.l` is deliberately not one of them:
-   this function cannot see where a bus is parked. */
+   SWITCH ARE THE ONLY TWO INPUTS, and `bus.l` is deliberately not one of them.
+
+   THE TYPE DOES NOT STOP IT, THE TEST DOES, and the first version of this note
+   claimed otherwise - "this function cannot see where a bus is parked".
+   `<T extends {id:string}>` is a lower bound: whole bus objects arrive here, and
+   a reviewer's `(bus as {l?:string}).l` inside this body compiled, linted and
+   built clean. Only the behavioural assertion - the same fleet relocated, the
+   same answer - caught it. Worth knowing which of the two is actually holding
+   the line. */
 export function mapDownSheetBadgeBusIds<T extends {id:string}>(buses:T[],activeDownSheetBusIds:Iterable<string>,showBadges:boolean){
  return showBadges?downSheetBadgeBusIds(buses,activeDownSheetBusIds):[];
 }

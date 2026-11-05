@@ -73,8 +73,15 @@ test("confirmation prompts are per-device settings that default to on", async ()
      which is what map-settings.ts has always claimed happens. */
   const written=page.match(/writeBoardSettings\(localStorage,\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/);
   assert.ok(written,"the map still persists its board settings");
-  assert.doesNotMatch(page,/JSON\.stringify\(\{statusVersion:3/,
-   "and it must not go back to replacing the whole record");
+  /* ORDER-INDEPENDENT. This forbade the literal `JSON.stringify({statusVersion:3`
+     and a reviewer moved the stamp to the END of the object: the map replaced
+     the whole record again, a device lost its stale field, its `futureField`
+     and its legacy `dark` on the first render, and 433 tests stayed green. A
+     blacklist of one spelling is not a gate - which is what this change's own
+     notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
+     writer of this key outside map-settings.ts. */
+  assert.ok(!/writeSetting\((?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|"pace-board-settings-v1")/.test(page),
+   "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
   /* DERIVED FROM BoardSettings, not hand-listed. A hand-written list cannot
      know it is complete: add a setting to the type and to readBoardSettings,
      forget the map's own write, and a hand-listed assertion passes while the

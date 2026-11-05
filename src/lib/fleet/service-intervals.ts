@@ -39,7 +39,7 @@ export const DEFAULT_SERVICE_INTERVALS:ServiceIntervals={sparkPlugs:1500,valveAd
    engine hours after the service model changed.
 
    v2 marks the release where the limits gained defaults. It is needed because
-   the board rewrites its whole settings blob on almost every change, so a
+   the board writes this key on almost every change (it MERGES now rather than rewriting the whole blob, which it did when this was written), so a
    device that never had the limits typed in is not holding an empty record but
    an explicit four nulls, and those nulls would beat any default that shipped
    later. Under v1 a blank meant "never set" and takes the default; under v2 a

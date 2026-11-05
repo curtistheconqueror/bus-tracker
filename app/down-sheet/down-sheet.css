@@ -692,9 +692,14 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    and "six more pixels buys the slack", which was wrong twice over. The six
    pixels of COLUMN width cannot affect the button's internal fit at all — the
    first track is a fixed width however wide the cell is, and what gives the
-   label room is that track stretching the button. At the 96px MARK FIXED needs
-   that is a 94px content box against the 87.23px the tick, the gap and the
-   label occupy — 93.47px forced to DejaVu Sans, so it fits in both. (The
+   label room is that track stretching the button. Measured at the 96px MARK
+   FIXED needs: the button's BORDER box is 96.00px and its contents — tick
+   11.50 + gap 5 + label 54.78 — are 71.28px, so 87.28px with the padding and
+   border, leaving 8.7px clear. (An earlier version of this line read "a 94px
+   content box against 87.23px": 94 is the PADDING box and 87.23 a border-box
+   figure, two frames 2px apart, which a reviewer caught. The conclusion was
+   right and the comparison was not.) Forced to DejaVu Sans the label is
+   61.02px, so 93.52px in the border box and it still fits. (The
    "3.34px over in DejaVu Sans" this comment used to carry belonged to the old
    auto-width button, not to a stretched one.)
 

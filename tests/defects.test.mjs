@@ -3,9 +3,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
-import { stripComments } from "./helpers/css-rules.mjs";
+import { stripCodeComments } from "./helpers/css-rules.mjs";
 
 test("defect normalization preserves future odometer and parts fields",()=>{
  const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
@@ -2297,12 +2297,15 @@ test("both repair workflows offer a remembered part without imposing or blocking
   assert.match(page,/import PartsUsedList from "@\/src\/components\/defects\/parts-used-list"/,name);
   assert.match(page,/<PartsUsedList parts=\{/,name);
   // learning happens on save and is never a precondition of saving
-  assert.match(page,/learnPart\(memory,\{category:/,name);
-  /* EVERY PART WITH A NUMBER IS LEARNED, not just the first. This read
-     `draft.partNumber` alone, which was the whole of a repair when a repair
-     could only have one part; on a two-part repair it taught the shop about
-     the gasket and forgot the sensor. */
-  assert.match(page,/partsToLearn\(/,name);
+  assert.match(page,/learnPart\(current,\{category:/,name);
+  /* ONE PART IS LEARNED, AND IT IS THE FIRST, which corrects a claim this
+     change first made. Both forms reduced `learnPart` over every numbered part
+     and called it "learns every part"; a reviewer disproved it. `learnPart`
+     keeps ONE entry per scope+category+issue and REPLACES it, so reducing over
+     [HX-99, ZZ-1] left a single entry holding ZZ-1 with `uses:2` - the shop
+     taught the LAST part, with an inflated count. Driven below rather than
+     asserted. */
+  assert.match(page,/partToLearn\(/,name);
   // a legacy record with a part number still shows it
   assert.match(page,/partsUsed\?\?Boolean\(String\(/,name);
   /* AND A SUGGESTION STILL NEVER OVERWRITES TYPING. It seeds the FIRST row and
@@ -2331,11 +2334,85 @@ test("both repair workflows offer a remembered part without imposing or blocking
  assert.match(catalog,/partsUsed\?:boolean;/);
  assert.match(catalog,/partName\?:string;/);
  assert.match(catalog,/parts\?:DefectPart\[\];/,"the record has to be able to hold more than one part");
- /* WRITTEN THROUGH THE ONE ASSEMBLER, so a form cannot save the array and the
-    mirrored pair out of step. Fixed Repairs used to write the three fields by
-    hand. */
- assert.match(fixed,/\.\.\.defectPartFields\(draft\.partsUsed\?draft\.parts:\[\]\)/);
+ /* WRITTEN THROUGH THE ONE ASSEMBLER, AND THE ASSEMBLER DELETES THE KEY.
+
+    This asserted the exact `...defectPartFields(draft.partsUsed?draft.parts:[])`
+    spread - and a reviewer showed that spread was itself the bug, so the test
+    was locking it in. `defectPartFields` OMITS `parts` for a 0- or 1-part list
+    by design, and a missing key does not override the one the stored record
+    still carries: a repair that had held two parts kept both after a REMOVE,
+    and after unticking PARTS USED entirely. Only `withDefectParts`, which
+    `delete`s the key first, can say "this field is gone".
+
+    DRIVEN, not matched, for the same reason. */
+ assert.match(fixed,/withDefectParts\(\{\.\.\.defect,category:draft\.category/,
+  "Fixed Repairs has to build the saved record through the assembler");
+ assert.match(fixed,/partsUsed:draft\.partsUsed\}\)/,
+  "and keep the checkbox's own answer, or an ENTER LATER record loses its flag");
  assert.match(log,/withDefectParts\(current\.defect,next\)/);
+ /* AND THE DEFECT LOG'S MERGE HAS TO NAME IT. `{...existing,...incoming}`
+    cannot express "this field is gone", which is why `workStates` and
+    `downSheetRecommendation` are already listed explicitly there; that file's
+    own comment says anything deleting its key belongs on the line, and this
+    change had to be told twice. */
+ const sync=await readFile(new URL("../src/lib/defects/defect-log-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/\.\.\.existing,\.\.\.incoming,[^}]*parts:incoming\.parts/,
+  "a cleared parts array has to survive the save merge");
+
+ /* THE TRANSITIONS, driven over the real assembler: two parts down to one,
+    and two parts down to none. Both used to read back as two. */
+ const held={partsUsed:true,partNumber:"HX-99",partName:"Gasket",
+  parts:[{id:"a",partNumber:"HX-99",partName:"Gasket"},{id:"b",partNumber:"ZZ-1"}]};
+ const downToOne=withDefectParts(held,[{id:"a",partNumber:"HX-99",partName:"Gasket"}]);
+ assert.deepEqual(normalizeDefectParts(downToOne.parts,downToOne).map(part=>part.partNumber),["HX-99"],
+  "removing a part has to stick");
+ const downToNone=withDefectParts(held,[]);
+ assert.deepEqual(normalizeDefectParts(downToNone.parts,downToNone),[],
+  "unticking PARTS USED has to stick");
+ assert.equal(downToNone.partsUsed,false);
+ /* AND AN ENTER LATER RECORD - ticked, no number yet - keeps its flag through a
+    save that touches nothing, or MISSING PART # silently disappears off its
+    card. The regression a reviewer found against main. */
+ assert.equal(defectPartsMissing({partsUsed:true,partNumber:"",partName:""}),true);
+
+ /* PARTS USED IS THE CHECKBOX'S OWN STATE, NOT A READING OF THE RECORD. It was
+    derived, and `defectPartFields` reports `partsUsed:false` the moment every
+    row is blank - so pressing ADD ANOTHER PART on an empty row unticked the box
+    and unmounted the whole section mid-edit: a reviewer measured -256px of
+    content shift on a phone with focus dropped to the body. Only the checkbox
+    means "no parts were used"; a blank row means somebody is typing. */
+ assert.match(log,/const \[partsUsed,setPartsUsed\]=useState\(\(\)=>value\.defect\.partsUsed\?\?/,
+  "the checkbox has to hold its own state, seeded from the record");
+ assert.doesNotMatch(log,/const partsUsed=value\.defect\.partsUsed\?\?/,
+  "deriving it from the record collapses the section while somebody is typing");
+ assert.match(log,/setPartsUsed\(checked\)/,"and the toggle has to drive it");
+
+ /* A DIFFERENT REPAIR TAKES DIFFERENT PARTS. Both pickers cleared the mirrored
+    pair and left the array, so re-ticking PARTS USED after a category change
+    brought the PREVIOUS repair's rows back and blocked the new suggestion. */
+ for(const picker of [/category,issue:"",symptoms:\[\][\s\S]{0,160}?parts:undefined/,/category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined/])
+  assert.match(log,picker,"a Defect Log picker has to clear the parts array");
+ for(const picker of [/category:event\.target\.value,issue:"",quantity:"",parts:\[\]/,/issue:event\.target\.value,quantity:"",parts:\[\]/])
+  assert.match(fixed,picker,"a Fixed Repairs picker has to clear the parts array");
+
+ /* THE PART THE MEMORY TAKES IS THE FIRST NUMBERED ONE, not simply the first
+    row: a name-only row carries nothing the memory could suggest. */
+ assert.equal(partToLearn([{id:"a",partName:"long bolt"},{id:"b",partNumber:"ZZ-1"}])?.partNumber,"ZZ-1",
+  "a name-only first row must not be what gets learned");
+ assert.equal(partToLearn([{id:"a",partNumber:"HX-99"},{id:"b",partNumber:"ZZ-1"}])?.partNumber,"HX-99");
+ assert.equal(partToLearn([{id:"a",partName:"bolt"}]),null);
+
+ /* EVERY PART IS SHOWN AND SEARCHABLE. A second part was stored and rendered
+    nowhere in the app, which made the list pointless from a mechanic's side -
+    `defectPartsText` existed and nothing called it. */
+ for(const [name,page] of [["defect log",log],["fixed repairs",fixed]]){
+  assert.match(page,/defectPartsText\(normalizeDefectParts\(record\.defect\.parts,record\.defect\)\)/,
+   name+" has to render every part, not just the first");
+  assert.ok(!/\{record\.defect\.partNumber&&</.test(page),
+   name+" still renders the first part alone");
+ }
+ assert.match(fixed,/shopNotes,defectPartsText\(normalizeDefectParts\(record\.defect\.parts,record\.defect\)\),/,
+  "and a second part has to be findable by the search");
 
  /* THE BEHAVIOUR, driven rather than read. A record saved with one part reads
     back as a one-part list and nothing on disk is rewritten; a second part is
@@ -2951,7 +3028,14 @@ test("saving fixed with a part asks for the number and flags it when left for la
  // ENTER LATER records that a part went on with no number, which is a different
  // fact from no part at all.
  assert.match(logPage,/confirm\(""\)/);
- assert.match(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/);
+ /* THROUGH THE ASSEMBLER. The prompt patched `{partsUsed:true,partNumber}`
+    straight onto the record, so on a repair already holding a `parts` array
+    the mirrored pair and the array disagreed - and the number typed here was
+    never learned, because the save reads the array. It becomes the first row
+    now, which is the row the memory takes. */
+ assert.match(logPage,/validateAndSave\(true,withDefectParts\(value\.defect,\[\{id:first\?first\.id:"part-0",partNumber:number/);
+ assert.doesNotMatch(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/,
+  "the prompt must not write the mirrored pair without the array");
 
  // The patch is passed INTO the save rather than set on state first. Setting it
  // and then saving would write the defect as it was a render earlier, dropping
@@ -2975,7 +3059,14 @@ test("saving fixed with a part asks for the number and flags it when left for la
 
  // THE FLAG on Fixed Repairs, in its own colour, beside the amber one it can
  // appear next to.
- assert.ok(fixedPage.includes("partNumberMissing(record.defect)&&"));
+ /* OFF THE WHOLE LIST. `partNumberMissing` reads the FIRST part only, so a
+    name-only first row beside a numbered second one showed MISSING PART # with
+    a number recorded - reproduced by a reviewer. */
+ assert.ok(fixedPage.includes("defectPartsMissing(record.defect)&&"));
+ assert.ok(!fixedPage.includes("partNumberMissing("),"the card must not flag off the first part alone");
+ assert.equal(defectPartsMissing({partsUsed:true,parts:[{id:"a",partName:"long bolt"},{id:"b",partNumber:"ZZ-1"}],partNumber:"",partName:"long bolt"}),false,
+  "a numbered second part means the number is not missing");
+ assert.equal(defectPartsMissing({partsUsed:true}),true,"and ENTER LATER still flags");
  assert.ok(fixedPage.includes("MISSING PART #"));
  // Filled orange, not another pale pill: NEEDS FIX DETAILS sits beside it on
  // #fff1e0 already, and the first attempt used that same background, which made
@@ -6350,7 +6441,7 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  /* COMMENTS STRIPPED FIRST, with the project's own string-aware stripper: the
     file EXPLAINS that it uses none of these, and a gate that reads prose as
     code fails on an accurate comment. The same trap the DS badge gate hit. */
- const swipeCode=stripComments(swipeRow);
+ const swipeCode=stripCodeComments(swipeRow);
  for(const blocker of ["touch-action","preventDefault","passive:false","touchmove"])
   assert.ok(!swipeCode.includes(blocker),"the swipe row names "+blocker+", which is how a panel stops scrolling");
  /* A GESTURE IS NOT REACHABLE WITH A MOUSE OR A KEYBOARD, and Curtis reads

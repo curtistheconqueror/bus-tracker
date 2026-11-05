@@ -58,7 +58,7 @@ import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
-import {normalizeDefectParts,partsToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
+import {defectPartsText,normalizeDefectParts,partToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
 import PartsUsedList from "@/src/components/defects/parts-used-list";
 import {excludeFromFocusShare,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
 import SwipeAwayRow from "./_components/swipe-away-row";
@@ -200,14 +200,14 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     (symptoms, quantity, unit, operability, the part fields) is reset for the
     same reasons it always was. */
  const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
-  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
+  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:"",parts:undefined}}));
 
  const chooseIssue=(issue:string,switchTo:string)=>{
   const category=switchTo||value.defect.category;
   const picked=defectCountField(category,issue);
   const oilIssue=isFluidTopUp(category,issue);
   setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
-   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
+   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined,
     symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
     /* Switching between the three top-ups keeps what is still true: pick oil
        with glycol ticked, change your mind and pick glycol, and the tick that
@@ -226,9 +226,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
   CATALOG_OPTIONS.find(row=>row.value===issue&&(!category||row.category===category))?.label
   ||CATALOG_OPTIONS.find(row=>row.value===issue)?.label
   ||issue;
- /* A record saved before Stage 6 has a part number but no flag, so treat an
-    existing number as parts used rather than hiding it behind an empty box. */
- const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
+ /* PARTS USED IS THE CHECKBOX'S OWN STATE, not a reading of the record, and
+    that is a fix. It was `value.defect.partsUsed??Boolean(partNumber)` - which
+    is right for a record arriving from storage and wrong for a form being
+    typed into, because `defectPartFields` reports `partsUsed:false` the moment
+    every row is blank. So pressing ADD ANOTHER PART on an empty row, or
+    clearing the only number, unticked the box and unmounted the whole section
+    mid-edit: measured by a reviewer at -256px of content shift on a phone and
+    -234px on the shop computer, with focus dropped to the body.
+
+    ONLY THE CHECKBOX MEANS "no parts were used". A blank row means somebody is
+    typing. What gets STORED still comes from the rows, so a blank list saves
+    as `partsUsed:false` - the record stays honest while the form stays still.
+
+    Seeded from the record, including the pre-Stage-6 shape that has a part
+    number and no flag. */
+ const [partsUsed,setPartsUsed]=useState(()=>value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim()));
  /* THE ROWS BEING TYPED INTO, held here rather than derived from the record on
     every render. `defectPartFields` drops a row with nothing in it - which is
     right for what gets STORED - so a derived list would make ADD ANOTHER PART
@@ -243,6 +256,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  /* Checking the box offers the remembered part; it never fills anything in
     while a defect is merely being logged, and never overwrites typing. */
  const togglePartsUsed=(checked:boolean)=>{
+  setPartsUsed(checked);
   if(!checked){
    /* Unticking is the one gesture that means "no parts were used", so it
       clears the whole list rather than leaving a row behind. */
@@ -454,7 +468,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    suggestion={remembered?.partNumber||""}
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
-   confirm={number=>{setPartPrompt(false);validateAndSave(true,{partsUsed:true,partNumber:number});}}/>}
+   confirm={number=>{setPartPrompt(false);/* THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];validateAndSave(true,withDefectParts(value.defect,[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]));}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
@@ -1342,7 +1356,7 @@ export default function DefectLog(){
   if(!matchesSearch({bus,defect,createdAt:"",updatedAt:"",onDownSheet:false}))setSearch("");
  };
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";/* EVERY PART WITH A NUMBER IS LEARNED, not just the first. This read `draft.defect.partNumber` alone, which was the whole of a repair when a repair could only have one part; on a two-part repair it would teach the shop about the gasket and forget the sensor. A part with only a name teaches nothing the memory can suggest later, so `partsToLearn` drops those. */const learnable=draft.defect.partsUsed?partsToLearn(normalizeDefectParts(draft.defect.parts,draft.defect)):[];if(learnable.length)setPartsMemory(current=>{const next=learnable.reduce((memory,part)=>learnPart(memory,{category:draft.defect.category,issue:draft.defect.issue,partNumber:part.partNumber,partName:part.partName,scope:draft.rememberScope},now),current);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";/* THE FIRST NUMBERED PART IS LEARNED, and only one. This reduced `learnPart` over every numbered part and the change called that "learns every part" - which a reviewer disproved: the memory keeps ONE entry per scope+category+issue and replaces it, so reducing over two parts taught the shop the LAST one with `uses:2`. Teaching it more than one needs more than one slot per key, which is a change to `pace-parts-memory-v1` itself. A part with only a name teaches nothing the memory could suggest, so `partToLearn` skips it. */const learnable=draft.defect.partsUsed?partToLearn(normalizeDefectParts(draft.defect.parts,draft.defect)):null;if(learnable)setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:learnable.partNumber,partName:learnable.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[{busId:record.bus.id,defectId:record.defect.id}],now),result.downEntries)};
@@ -1973,7 +1987,7 @@ export default function DefectLog(){
          of these is the one. */}
      {unexplainedDownSheetEntries(group.records,group.bus.id,downEntries).map(entry=><p className="down-sheet-banner elsewhere" key={entry.id}><b>ON THE DOWN SHEET</b><span>{[entry.category,entry.repair,entry.customReason].map(part=>String(part||"").trim()).filter(Boolean).join(" — ")||"Repair required"} — not one of the defects below</span></p>)}{group.records.map((record,index)=><section className={"grouped-defect-row"+(record.onDownSheet?" on-down-sheet":"")} key={record.defect.id}>
      {record.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET</b><span>{downSheetEntryLabel(record.downSheetEntry)}</span></p>}
-     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"Reported "+reportTotal(record.defect)+" times: the original report plus "+reportAttemptCount(record.defect)+" return"+(reportAttemptCount(record.defect)===1?"":"s")}>REPORTED &times;{reportTotal(record.defect)}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
+     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{/* EVERY PART. The second of two sites in this file that read `partNumber` alone; a reviewer named both, and the first pass fixed one. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<small><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}:</b> {defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"Reported "+reportTotal(record.defect)+" times: the original report plus "+reportAttemptCount(record.defect)+" return"+(reportAttemptCount(record.defect)===1?"":"s")}>REPORTED &times;{reportTotal(record.defect)}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
      <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark fixed: bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
       ?<span className="extend-deferral-field"><input type="time" value={extendUntil} autoFocus
@@ -2108,7 +2122,7 @@ export default function DefectLog(){
      {record.defect.conditionNotDuplicated&&<p><b>RESULT</b>Defect / condition not duplicated</p>}
      {record.defect.diagnosticNote&&<p><b>DIAG</b>{record.defect.diagnosticNote}</p>}
      {record.defect.actionTaken&&<p><b>ACTION</b>{record.defect.actionTaken}</p>}
-     {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
+     {/* EVERY PART. This read `partNumber`, so a second part was invisible here too. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<p><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}</b>{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
      <div className="log-focus-record-foot">
