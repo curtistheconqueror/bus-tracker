@@ -199,10 +199,22 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     old onChange bodies, moved rather than rewritten — everything they reset
     (symptoms, quantity, unit, operability, the part fields) is reset for the
     same reasons it always was. */
- const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
-  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:"",parts:undefined}}));
+ /* AND THEY CLEAR THE PART ON SCREEN AS WELL AS ON THE RECORD. They always
+    cleared the record's part fields - a part number belongs to a REPAIR, and
+    the parts memory is keyed on category+issue, so HX-99 typed for a coolant
+    leak and saved under a door fault would teach the shop the wrong thing. But
+    the form now draws the box and the rows from local state, so clearing only
+    the record left the tick on screen and HX-99 still in the input over a
+    record holding nothing: press SAVE and the part was dropped with nothing
+    saying so. Shown and silently discarded is worse than the stale-part bug
+    this replaced. Both now say the same thing, which is also what the form did
+    before the rows became local state. */
+ const clearPartsOnScreen=()=>{setPartsUsed(false);setPartRows([])};
+ const chooseCategory=(category:string)=>{clearPartsOnScreen();setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
+  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:"",parts:undefined}}))};
 
  const chooseIssue=(issue:string,switchTo:string)=>{
+  clearPartsOnScreen();
   const category=switchTo||value.defect.category;
   const picked=defectCountField(category,issue);
   const oilIssue=isFluidTopUp(category,issue);
@@ -248,9 +260,15 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     appear to do nothing at all. The editor is keyed per defect, so opening
     another bus starts from that record's own parts. */
  const [partRows,setPartRows]=useState<DefectPart[]>(()=>normalizeDefectParts(value.defect.parts,value.defect));
+ /* THE CHECKBOX GOES THROUGH THE ASSEMBLER, as its third argument, rather than
+    being patched on after. Without it a ticked box with the number not typed
+    yet stored `partsUsed:false` - so a repair saved in that state lost MISSING
+    PART # off its Fixed Repairs card, which is the one thing that state exists
+    to say. A blank row means somebody is mid-sentence; only the checkbox means
+    no parts were used. */
  const setParts=(next:DefectPart[])=>{
   setPartRows(next);
-  setValue(current=>({...current,defect:withDefectParts(current.defect,next)}));
+  setValue(current=>({...current,defect:withDefectParts(current.defect,next,partsUsed)}));
  };
  const remembered=recallPart(partsMemory,value.defect.category,value.defect.issue);
  /* Checking the box offers the remembered part; it never fills anything in
@@ -261,7 +279,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    /* Unticking is the one gesture that means "no parts were used", so it
       clears the whole list rather than leaving a row behind. */
    setPartRows([]);
-   setValue(current=>({...current,defect:withDefectParts(current.defect,[])}));
+   setValue(current=>({...current,defect:withDefectParts(current.defect,[],false)}));
    return;
   }
   const suggestion=recallPart(partsMemory,value.defect.category,value.defect.issue);
@@ -274,7 +292,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    :current;
   const rows=seeded.length?seeded:[{id:"part-0",partNumber:""}];
   setPartRows(rows);
-  setValue(cur=>({...cur,rememberScope:cur.rememberScope||"issue",defect:{...withDefectParts(cur.defect,rows),partsUsed:true}}));
+  setValue(cur=>({...cur,rememberScope:cur.rememberScope||"issue",defect:withDefectParts(cur.defect,rows,true)}));
  };
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
  const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
@@ -468,7 +486,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    suggestion={remembered?.partNumber||""}
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
-   confirm={number=>{setPartPrompt(false);/* THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];validateAndSave(true,withDefectParts(value.defect,[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]));}}/>}
+   confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];validateAndSave(true,withDefectParts(value.defect,[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)],true));}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}

@@ -7,6 +7,25 @@ import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMP
 import { render } from "./helpers/setup.mjs";
 import { effectiveStyle, stripCodeComments } from "./helpers/css-rules.mjs";
 
+/* ONE FUNCTION'S BODY, BY BALANCED BRACES.
+
+   Every gate in this file that wants to assert something about a single handler
+   used to slice a fixed number of characters from its name, and a reviewer
+   defeated that: 700 characters from `const copyFocusBus=` runs clean through
+   the four-line handler into `shareFocusBusText` below it, so an assertion
+   about the first was satisfied by the second. One name, one body. */
+const bodyOfSource=(source,name)=>{
+ const at=source.indexOf("const "+name+"=");
+ assert.notEqual(at,-1,name+" is gone from the source");
+ const open=source.indexOf("{",at);
+ let depth=0;
+ for(let i=open;i<source.length;i++){
+  if(source[i]==="{")depth++;
+  else if(source[i]==="}"&&!--depth)return source.slice(open,i+1);
+ }
+ throw new Error(name+" has no balanced body");
+};
+
 test("defect normalization preserves future odometer and parts fields",()=>{
  const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
  assert.equal(defect.odometerMiles,123456);
@@ -2364,9 +2383,50 @@ test("both repair workflows offer a remembered part without imposing or blocking
     DRIVEN, not matched, for the same reason. */
  assert.match(fixed,/withDefectParts\(\{\.\.\.defect,category:draft\.category/,
   "Fixed Repairs has to build the saved record through the assembler");
- assert.match(fixed,/partsUsed:draft\.partsUsed\}\)/,
-  "and keep the checkbox's own answer, or an ENTER LATER record loses its flag");
- assert.match(log,/withDefectParts\(current\.defect,next\)/);
+ /* AND THE CHECKBOX GOES THROUGH THE ASSEMBLER AS ITS THIRD ARGUMENT, not
+    patched on after it. Fixed Repairs appended `partsUsed:draft.partsUsed`,
+    which fixed this page and left the Defect Log broken in exactly the same
+    way - two places deciding one thing, which is what that function exists to
+    stop. Every call site that has a checkbox passes it. */
+ assert.match(fixed,/draft\.partsUsed\?draft\.parts:\[\],draft\.partsUsed\)/,
+  "Fixed Repairs hands the checkbox to the assembler");
+ assert.doesNotMatch(fixed,/partsUsed:draft\.partsUsed\}\)/,
+  "and does not then overrule it from outside");
+ assert.match(log,/withDefectParts\(current\.defect,next,partsUsed\)/,
+  "the Defect Log's rows carry the checkbox too");
+ assert.match(log,/withDefectParts\(current\.defect,\[\],false\)/,
+  "unticking says so explicitly rather than relying on the rows being empty");
+ assert.match(log,/withDefectParts\(cur\.defect,rows,true\)/);
+ /* ENTER LATER IS SOMEBODY SAYING A PART WAS USED, so it passes `true`. The
+    prompt promises in as many words that the repair "is marked MISSING PART #
+    on the Fixed Repairs page until the number is added" - and it arrives here
+    with an EMPTY number, which the assembler read as "no parts were used", so
+    the repair saved completed with no flag and the promise on screen was
+    false. A reviewer reproduced it in a browser against this branch. */
+ assert.match(log,/\.\.\.rows\.slice\(1\)\],true\)\);/,
+  "ENTER LATER has to store partsUsed:true or its own promise is a lie");
+ {
+  /* DRIVEN END TO END: the state ENTER LATER writes must be the state the
+     Fixed Repairs card flags. */
+  const later=withDefectParts({id:"d1",partsUsed:false,partNumber:"",partName:""},
+   [{id:"part-0",partNumber:""}],true);
+  assert.equal(later.partsUsed,true,"a ticked box with nothing typed is still a part used");
+  assert.equal(later.partNumber,"");
+  assert.ok(!("parts" in later),"and it stores the legacy shape, not an array of blanks");
+  assert.equal(defectPartsMissing(later),true,"so the card says MISSING PART #");
+  assert.deepEqual(normalizeDefectParts(later.parts,later),[{id:"part-0",partNumber:""}],
+   "and it reads back as one blank row to type into");
+  /* UNTICKING STILL WINS OVER A ROW LEFT IN THE LIST. */
+  const off=withDefectParts({id:"d1",parts:[{id:"a",partNumber:"HX-99"}]},
+   [{id:"a",partNumber:"HX-99"}],false);
+  assert.equal(off.partsUsed,false);
+  assert.ok(!("parts" in off),"unticking clears the array whatever the rows hold");
+  assert.equal(defectPartsMissing(off),false,"no parts used is not a missing part");
+  /* AND OMITTING THE ARGUMENT CHANGES NOTHING for a caller without a checkbox,
+     which is every read-side caller. */
+  assert.equal(withDefectParts({},[{id:"part-0",partNumber:""}]).partsUsed,false);
+  assert.equal(withDefectParts({},[{id:"a",partNumber:"HX-99"}]).partsUsed,true);
+ }
  /* AND THE DEFECT LOG'S MERGE HAS TO NAME IT. `{...existing,...incoming}`
     cannot express "this field is gone", which is why `workStates` and
     `downSheetRecommendation` are already listed explicitly there; that file's
@@ -2409,6 +2469,18 @@ test("both repair workflows offer a remembered part without imposing or blocking
     brought the PREVIOUS repair's rows back and blocked the new suggestion. */
  for(const picker of [/category,issue:"",symptoms:\[\][\s\S]{0,160}?parts:undefined/,/category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined/])
   assert.match(log,picker,"a Defect Log picker has to clear the parts array");
+ /* AND THE SCREEN HAS TO AGREE WITH THE RECORD. Once the box and the rows
+    became local state, clearing only the record left the tick on screen with
+    HX-99 still in the input over a record holding no part: SAVE dropped it
+    with nothing saying so. Shown and silently discarded is worse than the
+    stale-part bug it replaced, and a reviewer reproduced both. */
+ assert.match(log,/const clearPartsOnScreen=\(\)=>\{setPartsUsed\(false\);setPartRows\(\[\]\)\}/,
+  "there is one way to clear the part on screen");
+ for(const handler of ["chooseCategory","chooseIssue"]){
+  const body=bodyOfSource(log,handler);
+  assert.ok(body.includes("clearPartsOnScreen()"),
+   handler+" has to clear the part on screen as well as on the record");
+ }
  for(const picker of [/category:event\.target\.value,issue:"",quantity:"",parts:\[\]/,/issue:event\.target\.value,quantity:"",parts:\[\]/])
   assert.match(fixed,picker,"a Fixed Repairs picker has to clear the parts array");
 
@@ -6404,17 +6476,7 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     deleting the call from `copyFocusBus` left this green. A cold read found it
     by mutation. One handler, one body. */
  const row=id=>({defect:{id}});
- const bodyOf=(source,name)=>{
-  const at=source.indexOf("const "+name+"=");
-  assert.notEqual(at,-1,name+" is gone from the page");
-  const open=source.indexOf("{",at);
-  let depth=0;
-  for(let i=open;i<source.length;i++){
-   if(source[i]==="{")depth++;
-   else if(source[i]==="}"&&!--depth)return source.slice(open,i+1);
-  }
-  throw new Error(name+" has no balanced body");
- };
+ const bodyOf=(source,name)=>bodyOfSource(source,name);
  /* And the slicer itself is checked, because a broken extractor is a gate that
     passes everything: a body that ran on would carry the NEXT handler's name. */
  assert.ok(!bodyOf(page,"copyFocusBus").includes("shareFocusBusText"),

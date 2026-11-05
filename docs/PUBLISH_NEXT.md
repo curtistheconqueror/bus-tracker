@@ -2638,13 +2638,22 @@ decision about what a part is and what gets stored is in
 `src/lib/defects/defect-parts.ts`, so the MCP route can ask the same question
 instead of reimplementing it. A test asserts the component names no rule.
 
-**The shop's parts memory now learns every part, not the first.** That code read
-`partNumber` alone, which was the whole of a repair when a repair could only
-have one; on a two-part repair it taught the shop about the gasket and forgot
-the sensor. A part with only a **name** is kept on the record — *"the long bolt
-behind the alternator"* is how a part gets recorded when nobody can find its
-number — but teaches the memory nothing it could suggest, so it is not learned
-and is **not** counted as a missing number either.
+**The shop's parts memory learns the FIRST NUMBERED part of a repair, and this
+paragraph used to claim it learns every one.** It does not, and it cannot as
+built: `learnPart` keeps **one entry per scope+category+issue and replaces it**,
+so reducing over `[HX-99, ZZ-1]` leaves a single entry holding **ZZ-1** with
+`uses:2` — the shop taught the LAST part with an inflated count, which is worse
+than teaching it one. A reviewer disproved the claim; it is corrected at :2396
+as well, and both say the same thing now. Teaching it more than one part per
+repair means giving it more than one slot per key, which changes what
+`pace-parts-memory-v1` holds and what `recallPart` can return — somebody's own
+data, and a separate change.
+
+The first row is the one learned because it is the one the suggestion offers
+back. A part with only a **name** is kept on the record — *"the long bolt behind
+the alternator"* is how a part gets recorded when nobody can find its number —
+but teaches the memory nothing it could suggest, so it is skipped when choosing
+what to learn and is **not** counted as a missing number either.
 
 Decisions worth having on the record: **each part carries an id**, because
 keying rows by array index makes the row under somebody's finger change identity
