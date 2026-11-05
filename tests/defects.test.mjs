@@ -6735,25 +6735,49 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     coverage of the RULE; this is the coverage of the WIRING, and the wiring is
     the half a render would check if this suite could render it. */
  {
+  /* THIS GATE PINS AN EXACT SHAPE. IT DOES NOT UNDERSTAND THE CODE, and saying
+     so is the point of this comment, because the two versions before it each
+     claimed more than they did.
+
+     The first banned `.filter(` after the call. A reviewer got three
+     respellings past it. The second counted the `setFocusExcluded` calls and
+     claimed "every prune after the lib needs a second write"; that was FALSE,
+     and five one-write mutants proved it - rebinding the lib's answer before
+     storing it (a `for` loop, `filter?.()`, `Array.prototype.filter.call`,
+     `toSpliced`) or mutating the stored array afterwards with `.pop()`.
+
+     Each round of that is an arms race a text gate loses, because the thing
+     being checked is WIRING and this suite cannot render this surface: the
+     helper runs the production worker server-side, where there is no
+     LocalStorage and so no board. So the gate stops pretending to reason and
+     pins the three statements as one string instead.
+
+     THAT MEANS A LEGITIMATE REFACTOR WILL FAIL THIS, and that is correct rather
+     than unfortunate. Renaming `excluded`, inserting a line, reordering the
+     two - any of them breaks a pin that only ever meant "this exact code, which
+     was verified in a browser, is still the code". Failing sends the next
+     person to re-verify it there, which is where the wiring was always checked.
+     The browser run is the witness; this is the tripwire that says the witness
+     is stale. */
   const back=bodyOfSource(page,"focusPutBack");
-  /* WHITESPACE STRIPPED FIRST, because `current.filter (id=>…)` with one space
-     walked past the version of this that banned `.filter(`. */
   const flat=back.replace(/\s+/g,"");
-  /* EXACTLY ONE `setFocusExcluded` CALL, which is the load-bearing half of this
-     gate and the only part that is not a spelling ban. Every way of pruning
-     AFTER the lib has answered needs a second write - a second call, or a
-     wrapper round the first - so counting the calls catches the SHAPE rather
-     than chasing the names. A reviewer got three respellings past the earlier
-     version (`.filter (`, `if(0)` plus `.flatMap`, and `["filter"]`); all three
-     need two calls, and all three fail here. */
+  assert.ok(flat.includes("const{excluded,restored}=putBackLastExclusion(focusExcluded,live);if(!restored)return;setFocusExcluded(excluded);"),
+   "PUT BACK stores exactly what the lib handed back, with nothing in between: "+back.slice(0,160));
+  /* AND THE LIB'S LIST IS NAMED TWICE AND NO MORE - once where it is received
+     and once where it is stored. A third mention is a rebind, a rebuild or a
+     mutation, which is every one of the five one-write ways round the old
+     count. */
+  assert.equal((flat.match(/\bexcluded\b/g)||[]).length,2,
+   "the lib's list is named once and stored once, never rebuilt or mutated: "+back.slice(0,160));
+  /* AND STILL EXACTLY ONE WRITE, which the pin alone does NOT give. Dropping
+     this for the pin let two mutants back in: a second `setFocusExcluded` call
+     APPENDED after the pinned three statements leaves that substring intact and
+     names `excluded` only twice, so both of the other assertions pass while the
+     off-screen ids are pruned on the second write. Measured, not reasoned - the
+     two came back the moment this line went. Three assertions, three different
+     ways round, none of them enough alone. */
   assert.deepEqual(flat.match(/setFocusExcluded\(/g),["setFocusExcluded("],
-   "PUT BACK writes the excluded list exactly once: "+back.slice(0,140));
-  assert.ok(flat.includes("setFocusExcluded(excluded);"),
-   "PUT BACK stores exactly what the lib handed back");
-  /* And the named prunes, as a second line rather than the first: this one IS
-     a spelling ban and cannot be exhaustive, which is why it is not alone. */
-  assert.ok(!/\.(filter|flatMap|reduce|slice|splice)\(|\[["'`](filter|flatMap|reduce|slice|splice)["'`]\]|if\(0\)/.test(flat),
-   "and prunes nothing on either side of the call: "+back.slice(0,140));
+   "PUT BACK writes the excluded list exactly once: "+back.slice(0,160));
  }
 
  /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
