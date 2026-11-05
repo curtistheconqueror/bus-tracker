@@ -2871,11 +2871,22 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     and 52->74 at 1180 and pushed everything below it down ~22px. They share
     the hint's line now, so the bar's height does not depend on whether
     anything has been pressed. */
- assert.doesNotMatch(shareBar,/<small role="status">(SENT|SAVED)/,
+ /* EVERY status message, not two of them, and whatever the JSX spelling.
+    The first version of this ban named SENT and SAVED only - leaving the two
+    ERROR messages, which are the longest and the exact failure path F1 was
+    about, free to mount as rows again - and matched one quote spelling. */
+ const barTight=shareBar.replace(/\s+/g,"");
+ assert.doesNotMatch(barTight,/<smallrole=\{?"status"\}?>(SENT|SAVED|COULDNOT)/,
   "no status message mounts as a row of its own under the bar");
  assert.match(shareBar,/<small role="status" className=\{shareNote\.said\?"said":undefined\}>\{shareNote\.text\}<\/small>/,
   "the hint and the result share one line, and only that line announces");
- assert.doesNotMatch(css,/\.down-quick-filter-note>small\{[^}]*flex-basis:100%/,
+ /* EVERY outcome reaches that line, COPY LIST included. The button changing
+    to COPIED! is the only thing a sighted person needs; a live region is how
+    anybody else hears it, and `copied` was the one status with no branch. */
+ for(const state of ["copied","shared","saved","share-error","copy-error"])
+  assert.match(pageCode,new RegExp('shareStatus==="'+state+'"\\?\\{said:true'),
+   state+" puts its own word on the status line");
+ assert.doesNotMatch(css.replace(/\s+/g,""),/\.down-quick-filter-note>small\{[^}]*flex-basis:100%/,
   "the full-width status row is gone from the stylesheet, not just from the markup");
  /* A failed COPY LIST used to be reported as "COULD NOT SHARE — TRY COPY LIST",
     which sends somebody to press the button that had just failed. */
