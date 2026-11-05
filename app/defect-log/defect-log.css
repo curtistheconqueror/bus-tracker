@@ -427,7 +427,28 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-card-group>.log-group-header{padding-right:64px}
 
 /* Focus view itself: a windowed dialog on large screens, full screen on phones. */
+/* PINNED TO THE TOP ON A BIG SCREEN, and that is the rest of F11.
+
+   `.log-shade` centres its dialog and `.log-focus` is auto-height up to 92vh.
+   So on any bus whose list is shorter than that cap - 2 to 7 defects, which is
+   the ordinary case - hiding a row made the panel shorter and the whole dialog
+   re-centred: measured +61px on HIDE and -61px on PUT BACK at 1180 with three
+   defects, moving every remaining row and the control under the cursor.
+
+   The always-mounted slot was the other half of this and it works: the share
+   bar measures 103px before and after. But the slot cannot hold a CENTRED
+   dialog still, because the thing moving is the dialog's own box. I called the
+   61px a fixture artefact after measuring it with eight defects, where the
+   panel is already at its cap and cannot shrink. A reviewer measured it again
+   with three and was right: the common case is the one that moves.
+
+   Top-aligned above the phone breakpoint, where the dialog is windowed. Below
+   it the panel is already full-screen (`align-items:stretch`, height:100%) and
+   there is nothing to re-centre. */
 .log-focus-shade{padding:24px}
+@media(min-width:761px){
+ .log-focus-shade{align-items:flex-start}
+}
 .log-focus{display:flex;width:100%;max-width:760px;max-height:92vh;flex-direction:column;border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
 .log-focus-head{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:2px solid var(--log-accent);background:var(--log-page)}
 /* SHARING ONE BUS. Three controls in a row under the head, drawn from the same

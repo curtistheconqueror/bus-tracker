@@ -1,7 +1,16 @@
 # Pull the site out of the code
 
-Issue #21. **Scoped, not built.** Every number here was measured at `64bd8ad`,
-not estimated; the commands are in each section so they can be re-run.
+Issue #21. **Scoped, not built.** The commands are in each section so every
+number can be re-run.
+
+**WHICH COMMIT EACH NUMBER COMES FROM IS NOW SAID WHERE IT IS QUOTED, rather
+than once up here.** This line used to claim every number was measured at
+`64bd8ad`, while the prefix-literal section below it said "re-run at this
+commit" about a different one — two provenances for one document, which is how
+a figure nobody could reproduce survived two corrections. Anything that says
+"at this commit" was measured at the commit that changed it; anything still
+carrying `64bd8ad` says so beside itself. A number without a command and a
+commit beside it is a number to re-run before quoting.
 
 ## What "the site is baked in" actually means
 

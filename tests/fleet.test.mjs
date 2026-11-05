@@ -122,7 +122,17 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      blacklist of one spelling is not a gate - which is what this change's own
      notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
      writer of this key outside map-settings.ts. */
-  assert.ok(!/writeSetting\((?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|"pace-board-settings-v1")/.test(page),
+  /* THREE SHAPES, NOT ONE. This checked a double-quoted `writeSetting` call
+     only, so a single-quoted key, a backtick, or a plain
+     `localStorage.setItem("pace-board-settings-v1", …)` could sit beside
+     `writeBoardSettings` and replace the merged record without failing here.
+     The rule is "the map never writes this key itself"; the spelling is not
+     the rule. */
+  const raw=[
+   /writeSetting\(\s*(?:window\.)?(?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+   /(?:window\.)?(?:localStorage|storage)\.setItem\(\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+  ];
+  assert.ok(!raw.some(shape=>shape.test(page)),
    "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
   const boardWriter=await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
   assert.match(boardWriter, /statusVersion:3/);

@@ -2242,9 +2242,13 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
     `user-select` guard has to ask and cannot ask with a width. So widths are
     still pinned to the one breakpoint, and the capability queries are listed
     rather than waved through - an invented one still fails here. */
- const byWidth=[...new Set(conditions.filter(one=>one.includes("width")))];
+ /* ONE BREAKPOINT, AND ITS COMPLEMENT. `(min-width:761px)` is not a second
+    invented width - it is exactly "not the phone", which is how a rule that
+    must apply to the WINDOWED dialog and not the full-screen one is written.
+    Any other width still fails. */
+ const byWidth=[...new Set(conditions.filter(one=>one.includes("width")))].sort();
  const byCapability=[...new Set(conditions.filter(one=>!one.includes("width")))];
- assert.deepEqual(byWidth,["(max-width:760px)"]);
+ assert.deepEqual(byWidth,["(max-width:760px)","(min-width:761px)"]);
  assert.deepEqual(byCapability,["(hover:none) and (pointer:coarse)"],
   "the only non-width query the focus view may use is the touch one the swipe needs");
 });
@@ -2390,7 +2394,10 @@ test("both repair workflows offer a remembered part without imposing or blocking
     stop. Every call site that has a checkbox passes it. */
  assert.match(fixed,/draft\.partsUsed\?draft\.parts:\[\],draft\.partsUsed\)/,
   "Fixed Repairs hands the checkbox to the assembler");
- assert.doesNotMatch(fixed,/partsUsed:draft\.partsUsed\}\)/,
+ /* THE ASSIGNMENT, not one closing layout. This required `})` after it, so an
+    override followed by another field - `partsUsed:draft.partsUsed,completedBy:…`
+    - walked past. Matched to a comma or a brace instead. */
+ assert.doesNotMatch(fixed,/partsUsed\s*:\s*draft\.partsUsed\s*[,}]/,
   "and does not then overrule it from outside");
  assert.match(log,/withDefectParts\(current\.defect,next,partsUsed\)/,
   "the Defect Log's rows carry the checkbox too");
@@ -2403,8 +2410,31 @@ test("both repair workflows offer a remembered part without imposing or blocking
     with an EMPTY number, which the assembler read as "no parts were used", so
     the repair saved completed with no flag and the promise on screen was
     false. A reviewer reproduced it in a browser against this branch. */
- assert.match(log,/validateAndSave\(true,\{\},\{rows:\[[\s\S]{0,220}?\],used:true\}\)/,
+ assert.match(log,/validateAndSave\(true,\{\},\{rows:next,used:true\}\)/,
   "ENTER LATER has to store partsUsed:true or its own promise is a lie");
+ /* AND IT MUST NOT ERASE A NUMBER ALREADY TYPED. ENTER LATER arrives with an
+    EMPTY number, and writing that over the first row wiped a part the mechanic
+    had entered on the form a moment earlier - the prompt even opens prefilled
+    with it. Only a number given here replaces the row. */
+ assert.match(log,/const next=number\?\[\{id:first\?first\.id:"part-0",partNumber:number/,
+  "a number given at the prompt replaces the first row");
+ assert.match(log,/\.\.\.rows\.slice\(1\)\]:rows;/,
+  "and an empty one keeps what the form already holds");
+ {
+  /* DRIVEN over the real assembler, the three cases that matter. */
+  const held={id:"d1",partsUsed:true,partNumber:"HX-99"};
+  const rows=normalizeDefectParts(held.parts,held),first=rows[0];
+  const enterLater=number=>withDefectParts(held,
+   number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows,true);
+  assert.equal(enterLater("").partNumber,"HX-99","ENTER LATER keeps a number already on the record");
+  assert.equal(defectPartsMissing(enterLater("")),false,"so it is not flagged as missing");
+  assert.equal(enterLater("ZZ-1").partNumber,"ZZ-1","a number typed at the prompt replaces it");
+  const empty={id:"d2",partsUsed:true,partNumber:""};
+  const emptyRows=normalizeDefectParts(empty.parts,empty);
+  const nothingYet=withDefectParts(empty,emptyRows,true);
+  assert.equal(nothingYet.partsUsed,true);
+  assert.equal(defectPartsMissing(nothingYet),true,"and with no number anywhere it still flags");
+ }
  {
   /* DRIVEN END TO END: the state ENTER LATER writes must be the state the
      Fixed Repairs card flags. */
@@ -2492,10 +2522,15 @@ test("both repair workflows offer a remembered part without imposing or blocking
   "the disclosure clips without collapsing to its own border");
  assert.doesNotMatch(logCss,/\.advanced-defect-details\{[^}]*overflow:hidden/,
   "overflow:hidden flattens this <details> to 2px and takes PARTS USED with it");
+ /* THE FIRST STATEMENT, not merely present somewhere. `body.includes(...)` is
+    satisfied by a call that never runs: `if(0)clearPartsOnScreen();` passed the
+    whole suite. A reviewer found it. It has to be the thing the handler does
+    before anything else, which is also the only ordering that cannot race the
+    `setValue` beside it. */
  for(const handler of ["chooseCategory","chooseIssue"]){
   const body=bodyOfSource(log,handler);
-  assert.ok(body.includes("clearPartsOnScreen()"),
-   handler+" has to clear the part on screen as well as on the record");
+  assert.match(body,/^\{\s*clearPartsOnScreen\(\);/,
+   handler+" has to clear the part on screen first, not somewhere: "+body.slice(0,90));
  }
  for(const picker of [/category:event\.target\.value,issue:"",quantity:"",parts:\[\]/,/issue:event\.target\.value,quantity:"",parts:\[\]/])
   assert.match(fixed,picker,"a Fixed Repairs picker has to clear the parts array");
@@ -3148,7 +3183,8 @@ test("saving fixed with a part asks for the number and flags it when left for la
 
     So the parts go in as PARTS and the assembler runs after the spread, where
     nothing can spread over it. */
- assert.match(logPage,/validateAndSave\(true,\{\},\{rows:\[\{id:first\?first\.id:"part-0",partNumber:number/);
+ assert.match(logPage,/const next=number\?\[\{id:first\?first\.id:"part-0",partNumber:number/);
+ assert.match(logPage,/validateAndSave\(true,\{\},\{rows:next,used:true\}\)/);
  assert.doesNotMatch(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/,
   "the prompt must not write the mirrored pair without the array");
  assert.doesNotMatch(logPage,/validateAndSave\(true,withDefectParts\(/,
@@ -6860,6 +6896,30 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
    ancestors:[{tag:"div",classes:["log-focus-body"]}]},width);
   assert.equal(record["touch-action"],"pan-y",
    "the swipe row needs pan-y at "+width+"px: auto cancels the gesture, none kills the scroll");
+ }
+ /* AND THE DIALOG DOES NOT RE-CENTRE WHEN THE LIST GETS SHORTER. `.log-shade`
+    centres its dialog and `.log-focus` is auto-height up to 92vh, so on any bus
+    whose list is under that cap - 2 to 7 defects, the ordinary case - hiding a
+    row made the panel shorter and the whole dialog moved: measured +61px on
+    HIDE and -61px on PUT BACK at 1180 with three defects, carrying every
+    remaining row and the control under the cursor with it.
+
+    The always-mounted slot is the other half of this and it works (the share
+    bar measures 103px before and after), but a slot cannot hold a CENTRED
+    dialog still - the thing moving is the dialog's own box. This was first
+    dismissed as a fixture artefact, measured with eight defects where the panel
+    is already at its cap and cannot shrink; a reviewer measured three and was
+    right.
+
+    Only above the phone breakpoint: below it the panel is already full-screen
+    and there is nothing to re-centre. */
+ assert.match(css,/@media\(min-width:761px\)\{\s*\.log-focus-shade\{align-items:flex-start\}/,
+  "a windowed focus dialog has to be pinned to the top, or it re-centres on every hide");
+ {
+  const shade=effectiveStyle(css,{tag:"div",classes:["log-shade","log-focus-shade"]},1180);
+  assert.equal(shade["align-items"],"flex-start","at 1180 the dialog hangs from the top");
+  const phone=effectiveStyle(css,{tag:"div",classes:["log-shade","log-focus-shade"]},390);
+  assert.equal(phone["align-items"],"stretch","and on a phone it is full-screen, as it was");
  }
  /* AND A SELECTION ALREADY SITTING ON THE ROW EATS THE NEXT SWIPE. Long-press a
     defect's text and the browser hands the following drag to the selection
