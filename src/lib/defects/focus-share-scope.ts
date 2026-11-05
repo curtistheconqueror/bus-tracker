@@ -75,10 +75,36 @@ export function excludeFromFocusShare(excluded: string[], id: string): string[] 
 
 /* PUT BACK TAKES THE LAST ONE OFF, and reports which it was so the page can
    say so. An empty list returns itself rather than a new array, so a stray
-   press cannot cause a re-render that does nothing. */
-export function putBackLastExclusion(excluded: string[]): { excluded: string[]; restored: string | null } {
+   press cannot cause a re-render that does nothing.
+
+   `visibleIds` IS WHAT IS ON SCREEN RIGHT NOW, and passing it does two
+   different jobs that a cold read showed are not the same job.
+
+   The first is the one it was added for: a defect swiped away and then taken
+   off screen by the window, the filter or a sync leaves an id in the list that
+   `hiddenByHand` no longer counts, and popping THAT one restores nothing while
+   the button still reads PUT BACK. The press looks broken.
+
+   The second is the one the first fix got wrong. The page did the filtering
+   itself and stored the FILTERED list, so pressing PUT BACK threw away every
+   off-screen exclusion as a side effect: swipe A and B away, let A leave the
+   view, press PUT BACK to restore B, and A is silently un-excluded too - widen
+   the window again and A is back in the share although nobody put it back.
+   The off-screen ids are kept here; only the last VISIBLE one is removed. */
+export function putBackLastExclusion(
+  excluded: string[],
+  visibleIds?: Iterable<string>,
+): { excluded: string[]; restored: string | null } {
   if (!excluded.length) return { excluded, restored: null };
-  return { excluded: excluded.slice(0, -1), restored: excluded[excluded.length - 1] };
+  if (visibleIds === undefined) return { excluded: excluded.slice(0, -1), restored: excluded[excluded.length - 1] };
+  const visible = new Set([...visibleIds].map(String));
+  for (let at = excluded.length - 1; at >= 0; at--) {
+    if (!visible.has(excluded[at])) continue;
+    return { excluded: excluded.filter((_, index) => index !== at), restored: excluded[at] };
+  }
+  /* Nothing on screen is hidden, so there is nothing to put back - and the same
+     array comes back, so a stray press is not a re-render. */
+  return { excluded, restored: null };
 }
 
 /* IS THERE ANYTHING TO SEND?

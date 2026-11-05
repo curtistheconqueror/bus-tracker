@@ -2428,11 +2428,29 @@ which now says plainly what the gates hold and what only a render-level test
 could.
 
 Three measurements this release had published were also wrong and are corrected
-where they appeared: the prefix-literal count (derived by arithmetic from a
-stale table; re-run, it is **16 files and 51 occurrences**), a claim that the
-command bar had no gap in any row (rows 3 and 4 still do, and they are older
-than this change), and a stylesheet comment comparing a padding box against a
-border box.
+where they appeared: the prefix-literal count, a claim that the command bar had
+no gap in any row (rows 3 and 4 still do, and they are older than this change),
+and a stylesheet comment comparing a padding box against a border box.
+
+**The prefix-literal count took TWO corrections, which is worth saying out
+loud.** It was first derived by arithmetic from a stale table; the re-run that
+replaced it said "16 files and 51 occurrences", and a second reviewer could not
+reproduce that either. Nor can I. Two causes, both in the command the roadmap
+prints: `grep -rcoE` has `-c` silently overriding `-o`, so it counts matching
+LINES rather than matches, and it searches `app` alone while the prose says
+`app src`. Measured at this commit, all three ways:
+
+| | over `app src` |
+| --- | --- |
+| occurrences (`grep -rhoE … \| wc -l`) | **179** |
+| matching lines (`grep -rE`) | 65 |
+| files (`grep -rlE`) | 17 |
+
+The printed command as written — `-rcoE` over `app` alone — gives **2 files, 19
+lines**, which is how a figure this far out survived two passes. **179 across 17
+files** is the number, it is in `CLAUDE.md` and the roadmap with the command
+beside it, and the lesson is the one this project keeps paying: a count quoted
+without the command that produced it is a number nobody can check.
 
 ### DEFECTS LOGGED, the focus share, and swiping a defect out of it
 
@@ -2712,6 +2730,70 @@ measurement. Whether the same engine behaviour reaches an iPhone or the shop
 computer's browser is not established here, and is worth one look on a real
 device.
 
+### Three more, all found by a cold read of the finished branch
+
+None of these was visible from the tests, and two of them lose data.
+
+**MERGE DUPLICATES was dropping every part past the first.** `mergedRecord`
+returned `{...survivor, …, partNumber:firstText(…), partName:firstText(…)}`, so
+only the SURVIVOR's `parts` array came through and a merged-away copy
+contributed nothing but its mirrored first part. Driven: a duplicate holding
+`[BB-2, CC-3]` merged into a survivor holding `[AA-1]` left **AA-1 alone**. The
+module already unions `symptoms`, `fluids` and `reportAttempts` on the stated
+reasoning that *"a merge that quietly halved it would make the number evidence
+of nothing"* — `parts` was simply never added to that list when it was created.
+It is unioned now, read through `normalizeDefectParts` so a copy saved under the
+old single-part shape still contributes, deduplicated on the number (or the name
+where there is none) so the same part typed on both copies is one part, and
+assembled through `withDefectParts` so the mirrored pair cannot describe a
+different part from the array's first row.
+
+One trap inside the fix, caught by the Down Sheet's own merge test: passing the
+assembler an explicit `partsUsed:false` means *somebody unticked the box*, and
+that beats every row in the list. A copy carrying `partNumber:"HX-99"` with no
+flag at all — the shape a pre-flag record has — had its part wiped. It passes
+`true` or nothing now, never `false`.
+
+**The part prompt's own fix did not take.** `validateAndSave` does
+`{...value.defect,...patch}`, and the prompt was handing it the fully assembled
+record as that patch. A spread **cannot carry a deletion**, and deleting `parts`
+is the whole job of the assembler — so on a repair already holding
+`parts:[AA-1,BB-2]`, ENTER LATER left the array untouched while the mirrored
+pair said BB-2. The exact disagreement the prompt's comment claimed to have
+fixed, and the same `{...existing,...incoming}` trap `saveDefectLogRecord` keeps
+an explicit field list for. The parts go in as **parts** now, and the assembler
+runs after the spread where nothing can spread over it.
+
+**PUT BACK was throwing away exclusions that had left the screen.** The first
+fix for "PUT BACK restores nothing" filtered the list to what is on screen and
+then stored the **filtered** result, so one press silently dropped every
+off-screen exclusion: swipe A and B away, let A leave the view, press PUT BACK
+for B, and A came back into the share on its own the next time the window
+widened — with the count reading 0. The ordering and the keeping are one rule in
+the lib now: the off-screen ids stay, and only the last visible one is removed.
+
+**And two smaller ones.** The HIDE control is drawn in the row's top-right
+corner but was the LAST child, so a keyboard reached it after EDIT DEFECT, MARK
+FIXED and PTR — four stops below where it visibly sits (WCAG 2.4.3). It is
+`position:absolute`, so moving it first in the markup costs nothing on screen.
+And the comment over its `aria-label` claimed the swipe was named in the
+accessible label *"so speech input can say it"*: a `title` beside an
+`aria-label` becomes the accessible DESCRIPTION, and speech input matches the
+NAME. Measured through CDP — name `"Hide Brakes from this share"`, description
+`"… — or swipe the row left"`. A screen reader does reach the hint, so the
+gesture is still discoverable; it is not sayable, and the comment says so now
+rather than the opposite.
+
+**Two toothless gates went with them.** The suite drove
+`excludeFromFocusShare` and `putBackLastExclusion` as pure functions and then
+only *greped* the handlers for a name — so a mutation hiding **the first
+on-screen row** instead of the one pressed, and another making PUT BACK restore
+**everything**, both passed. A render would be the right gate and this suite
+cannot render this surface: the helper runs the production worker server-side,
+where there is no LocalStorage and therefore no board. So they are source gates
+aimed at those two shapes, the browser run is the witness for the wiring, and
+the test says that in as many words rather than looking like a behavioural one.
+
 ### The button reads MARK FIXED, the same as the Defect Log's
 
 Curtis asked for *"its own Mark as fixed button, just like the defect sheet
@@ -2757,8 +2839,9 @@ design.** Turning every badge off is a decision about the display; losing one
 bus's badge by driving it to the road is the app lying about the sheet.
 
 Removed: `src/lib/down-sheet/down-sheet-badge-view.ts` (including
-`isReadyRoadLocation`, one more prefix matcher gone — the count in
-`docs/roadmap/facility-config.md` is 15 files and ~69 occurrences now), the
+`isReadyRoadLocation`, one more prefix matcher gone — see the corrected count
+above; the "15 files and ~69 occurrences" this line used to quote was a third
+figure that matched neither of the other two and nothing measurable), the
 `app/_components/down-sheet-badge-menu.tsx` menu, its styles, and the field
 from `BoardSettings`.
 

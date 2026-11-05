@@ -36,10 +36,26 @@ contradicted the list printed above it. A reviewer caught that, and re-running
 the grep found the table wrong in both directions besides (`location-label` 3
 not 7, `facility-areas` 0 not 4, and three files missing from it entirely).
 
-**Re-run over `app src` at this commit: 16 files, 51 occurrences.** That is the
-number to work from; the itemisation above is kept only as a record of which
-files carried behaviour rather than labels, and it needs rebuilding before it
-is quoted again.
+**AND THE RE-RUN THAT REPLACED IT WAS ALSO WRONG.** It said "16 files, 51
+occurrences", which a second reviewer could not reproduce by any reading - and
+nor can I. Two causes, both in the command printed above: `grep -rcoE` has `-c`
+silently overriding `-o`, so it counts matching LINES rather than matches, and
+it searches `app` alone while the prose says `app src`.
+
+**Measured at this commit, all three ways, so the next person can pick the one
+they mean:**
+
+```
+grep -rhoE '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
+grep -rE   '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
+```
+
+For reference, the printed command as written - `-rcoE` over `app` alone -
+gives **2 files, 19 lines**, which is how a figure this far out survived.
+**179 across 17 files** is the number to work from. The itemisation above is
+kept only as a record of which files carried behaviour rather than labels, and
+it needs rebuilding before it is quoted again.
 
 Not all are equal. Most are labels. These carry BEHAVIOUR:
 
