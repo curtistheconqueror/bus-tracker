@@ -6727,8 +6727,20 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  /* The page passes what is on screen; without it the rule is the plain one. */
  assert.match(page,/putBackLastExclusion\(focusExcluded,live\)/,
   "the page hands PUT BACK the on-screen ids rather than filtering the list itself");
- assert.doesNotMatch(page,/putBackLastExclusion\(focusExcluded\.filter/,
-  "filtering before the call is what threw the off-screen ones away");
+ /* AND IT STORES EXACTLY WHAT THE LIB RETURNED. Checking only HOW THE CALL IS
+    SPELLED left the F22 bug a way back in AFTER it:
+    `setFocusExcluded(excluded.filter(id=>live.includes(id)))` is the same
+    permanent loss of off-screen exclusions, one line lower, and it passed the
+    whole suite. A reviewer ran that mutant. The lib tests above are the real
+    coverage of the RULE; this is the coverage of the WIRING, and the wiring is
+    the half a render would check if this suite could render it. */
+ {
+  const back=bodyOfSource(page,"focusPutBack");
+  assert.match(back,/setFocusExcluded\(excluded\);/,
+   "PUT BACK stores exactly what the lib handed back");
+  assert.ok(!/\.filter\(/.test(back),
+   "and prunes nothing on either side of the call: "+back.slice(0,140));
+ }
 
  /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
     vertically under the same thumb. The Facility Map paid for the naive

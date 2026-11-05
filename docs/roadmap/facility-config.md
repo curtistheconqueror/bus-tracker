@@ -224,15 +224,30 @@ still splitting "bays 11 and 12" into two mentions.
 **Phase 1 is complete.** The decision gate is now: Phase 2 is the CSS, and it
 only pays if a second garage is real.
 
-The gate, and it is not negotiable: **`npm test` reports 325 with zero edits to
-any test file.** The suite carries 431 slot-name literals and 71 section-name
-mentions — it is already the regression net for exactly this, so any change that
-needs a test edited is a change that moved behaviour.
+The gate, and it is not negotiable: **`npm test` reports its current count with
+zero edits to any test file.** The suite is already the regression net for
+exactly this, so any change that needs a test edited is a change that moved
+behaviour.
+
+**THE NUMBERS THAT USED TO BE PINNED HERE WERE STALE** — "must read 325" and
+"431 slot-name literals" — and the new header rule at the top of this file
+condemns exactly that: a number without a command and a commit beside it has to
+be re-run before it is quoted. A reviewer caught these two surviving the rule
+that was written to catch them. Re-run at `5326143`:
 
 ```
-grep -rcoE '"(garage|road|west|east|bay|...)-' tests/   # 431
-npm test | grep '^# tests'                                                    # must read 325
+npm test | grep '^# tests'                             # 434
+grep -rE  '"(garage|road|…|offsite)-' tests/ | wc -l   # 476 matching lines
+grep -rhoE '"(garage|road|…|offsite)-' tests/ | wc -l  # 638 occurrences
+grep -rlE '"(garage|road|…|offsite)-' tests/ | wc -l   #  10 files
 ```
+
+**The test COUNT is the wrong thing to pin anyway**, which is why it is not
+pinned now: it moves with every test added for any reason, so a stale figure
+here fails a refactor that changed nothing. What the gate actually means is
+*zero edits to any test file* — `git diff --stat tests/` is empty — and that is
+checkable without a number going out of date. The literal counts stay as a
+sense of scale, with the commit and the command beside them.
 
 Plus: seed a real exported board into LocalStorage, render the map before and
 after, and diff the HTML. Byte-identical or it is not a pure refactor.
