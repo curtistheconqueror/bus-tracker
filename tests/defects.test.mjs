@@ -6593,7 +6593,7 @@ test("the Defect Log editor asks how long the repair takes where it used to ask 
  /* IN THE SAME PLACE ON THE SCREEN, directly above WORK STATUS and OUTSIDE
     ADVANCED DETAILS: this is typed by somebody standing at the bus, and a
     control behind a disclosure here goes unused, the way the campaign paste box
-    did. But outside the WORK DONE SO FAR fieldset the finding sat inside —
+    did. But outside the PRELIMS fieldset the finding sat inside —
     an estimate is not work done, and that legend would be wrong about the one
     field under it that looks forward. */
  const estimateAt=page.indexOf('className="wide repair-estimate-field"');
