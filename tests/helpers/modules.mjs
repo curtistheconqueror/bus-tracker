@@ -8,6 +8,7 @@ export {noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgains
 export {busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig} from "../../src/lib/cloud/cloud-sync.ts";
 export {hasBusNumberConflict, hasLocationConflict, validateBusUpdate} from "../../src/lib/fleet/fleet-validation.ts";
 export {applyDownEntryToFleet} from "../../src/lib/down-sheet/down-sheet-sync.ts";
+export {addDefectPart, blankDefectPart, defectPartFields, defectPartsMissing, defectPartsText, normalizeDefectParts, partsToLearn, partsWithoutNumbers, removeDefectPart, updateDefectPart, withDefectParts} from "../../src/lib/defects/defect-parts.ts";
 export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, mapDownSheetBadgeBusIds, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
 export {syncTrackerDownSheetSelection} from "../../src/lib/down-sheet/tracker-membership-sync.ts";
 export {clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState} from "../../src/lib/down-sheet/down-sheet-clear.ts";

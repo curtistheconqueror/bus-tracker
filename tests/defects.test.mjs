@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, fluidsLabel, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, fluidsLabel, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partsToLearn, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
 
 test("defect normalization preserves future odometer and parts fields",()=>{
@@ -2276,39 +2276,107 @@ test("parts memory survives storage that is blocked or corrupt",()=>{
 });
 
 test("both repair workflows offer a remembered part without imposing or blocking one",async()=>{
- const [log,fixed,catalog,logCss,fixedCss]=await Promise.all([
+ const [log,fixed,catalog,logCss,fixedCss,list]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/defects/parts-used-list.tsx",import.meta.url),"utf8"),
  ]);
 
  for(const [name,page] of [["defect log",log],["fixed repairs",fixed]]){
   assert.match(page,/PARTS USED/,name);
-  assert.match(page,/PART NAME \(OPTIONAL\)/,name);
   assert.match(page,/REMEMBER FOR EVERY /,name);
-  assert.match(page,/Leave blank if the number is unknown/,name);
   assert.match(page,/REMEMBERED/,name);
   assert.match(page,/>FORGET<\/button>/,name);
+  /* THE BOXES THEMSELVES MOVED into the shared list component - two routes draw
+     it, so a copy in each page would drift. Each page has to DRAW it; importing
+     it and never rendering it is the failure this pair catches. */
+  assert.match(page,/import PartsUsedList from "@\/src\/components\/defects\/parts-used-list"/,name);
+  assert.match(page,/<PartsUsedList parts=\{/,name);
   // learning happens on save and is never a precondition of saving
-  assert.match(page,/learnPart\(current,\{category:/,name);
+  assert.match(page,/learnPart\(memory,\{category:/,name);
+  /* EVERY PART WITH A NUMBER IS LEARNED, not just the first. This read
+     `draft.partNumber` alone, which was the whole of a repair when a repair
+     could only have one part; on a two-part repair it taught the shop about
+     the gasket and forgot the sensor. */
+  assert.match(page,/partsToLearn\(/,name);
   // a legacy record with a part number still shows it
   assert.match(page,/partsUsed\?\?Boolean\(String\(/,name);
+  /* AND A SUGGESTION STILL NEVER OVERWRITES TYPING. It seeds the FIRST row and
+     only an empty one, which is what it did when there was one pair of boxes. */
+  assert.match(page,/suggestion&&!?[\s\S]{0,60}?String\((?:first|current\[0\])[\s\S]{0,40}?partNumber/,name);
  }
+
+ /* THE LIST'S OWN LABELS live in the component now. Asserted there rather than
+    in the pages, because that is where they are - and the component is where a
+    rename would happen. */
+ assert.match(list,/PART NUMBER/);
+ assert.match(list,/PART NAME \(OPTIONAL\)/);
+ assert.match(list,/Leave blank if the number is unknown/);
+ assert.match(list,/ADD_PART_LABEL\s*=\s*"ADD ANOTHER PART"/,"the way to add a second part has to say so");
+ assert.match(list,/<b>REMOVE<\/b>/);
+ /* REMOVE IS NOT OFFERED ON A LONE ROW, because removing it cannot empty the
+    list - unticking PARTS USED is the one gesture that means no parts. */
+ assert.match(list,/\{\s*many\s*&&\s*\([\s\S]{0,400}?className="remove-part"/,"a lone row must not offer REMOVE");
+ /* AND THE LIST HOLDS NO RULES: every decision about what a part is and what
+    gets stored is in the lib, so the MCP route can ask the same question
+    rather than reimplementing it. */
+ for(const rule of ["partsUsed:","localStorage","learnPart","partNumber.trim()"])
+  assert.ok(!list.includes(rule),"the parts list is deciding "+rule+" instead of drawing rows");
 
  // the record keeps its own snapshot, separate from the learned mapping
  assert.match(catalog,/partsUsed\?:boolean;/);
  assert.match(catalog,/partName\?:string;/);
- assert.match(fixed,/partsUsed:draft\.partsUsed,partName:draft\.partName\.trim\(\)/);
- // suggestions never overwrite something already typed
- assert.match(log,/hasNumber\|\|!suggestion\?current\.defect\.partNumber\|\|"":suggestion\.partNumber/);
- assert.match(fixed,/hasNumber\|\|!suggestion\?current\.partNumber:suggestion\.partNumber/);
+ assert.match(catalog,/parts\?:DefectPart\[\];/,"the record has to be able to hold more than one part");
+ /* WRITTEN THROUGH THE ONE ASSEMBLER, so a form cannot save the array and the
+    mirrored pair out of step. Fixed Repairs used to write the three fields by
+    hand. */
+ assert.match(fixed,/\.\.\.defectPartFields\(draft\.partsUsed\?draft\.parts:\[\]\)/);
+ assert.match(log,/withDefectParts\(current\.defect,next\)/);
+
+ /* THE BEHAVIOUR, driven rather than read. A record saved with one part reads
+    back as a one-part list and nothing on disk is rewritten; a second part is
+    stored as an array; going back to one removes the array again. */
+ const legacy={partsUsed:true,partNumber:"HX-99",partName:"Gasket"};
+ assert.deepEqual(normalizeDefectParts(legacy.parts,legacy).map(part=>[part.partNumber,part.partName]),
+  [["HX-99","Gasket"]],"a one-part record read as a list");
+ const two=addDefectPart(normalizeDefectParts(legacy.parts,legacy));
+ const typed=updateDefectPart(two,two[1].id,{partNumber:"ZZ-1",partName:"Sensor"});
+ const saved=withDefectParts(legacy,typed);
+ assert.equal(saved.partNumber,"HX-99","the first part stays mirrored for a device on an older release");
+ assert.equal(saved.parts.length,2,"and the second part is stored");
+ assert.deepEqual(normalizeDefectParts(saved.parts,saved).map(part=>part.partNumber),["HX-99","ZZ-1"]);
+ /* BACK DOWN TO ONE DELETES THE ARRAY rather than leaving it as `undefined`:
+    `rowFingerprint` walks `Object.keys`, so a key holding undefined moves a
+    row's cloud fingerprint on a push carrying nothing new. */
+ assert.ok(!("parts" in withDefectParts(saved,[typed[0]])),"one part must store no array at all");
+ /* A BLANK ROW IS NEVER STORED - somebody pressing ADD ANOTHER PART and
+    changing their mind must not leave an empty part on a repair's history. */
+ assert.ok(!("parts" in withDefectParts(legacy,addDefectPart(normalizeDefectParts(legacy.parts,legacy)))));
+ /* A ROW WITH ONLY A NAME IS KEPT - "the long bolt behind the alternator" is
+    how a part gets recorded when nobody can find its number - and it is not
+    counted as missing, but it teaches the memory nothing it could suggest. */
+ const named=withDefectParts({},[{id:"a",partName:"long bolt"}]);
+ assert.equal(named.partsUsed,true);
+ assert.equal(defectPartsMissing(named),false,"a named part is not a missing one");
+ assert.equal(partsToLearn(normalizeDefectParts(named.parts,named)).length,0);
+ /* AND THE OLD FLAG KEEPS ITS MEANING: PARTS USED ticked with nothing typed is
+    still what the Fixed Repairs card flags. */
+ assert.equal(defectPartsMissing({partsUsed:true}),true);
+ assert.equal(defectPartsMissing({partsUsed:false}),false);
 
  for(const [name,css] of [["defect log",logCss],["fixed repairs",fixedCss]]){
   assert.match(css,/\.parts-used-block\{/,name);
   assert.match(css,/\.parts-remembered button\{min-height:36px/,name);
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-remembered button\{min-height:44px;width:100%\}/,name);
+  /* THE TWO NEW CONTROLS REACH A THUMB TARGET on the device these forms are
+     used on, and the separator fires only BETWEEN rows so a one-part repair
+     looks exactly as it did. */
+  assert.match(css,/\.parts-row\+\.parts-row\{border-top/,name+" needs a separator between rows, not on every row");
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-row \.remove-part\{min-height:44px/,name);
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-list \.add-part\{min-height:44px/,name);
  }
 });
 

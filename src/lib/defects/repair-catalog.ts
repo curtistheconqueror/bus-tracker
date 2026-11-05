@@ -1,3 +1,4 @@
+import type {DefectPart} from "./defect-parts.ts";
 export type DefectState="open"|"in-progress"|"deferred"|"completed";
 export type DefectOperability="service"|"down";
 export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
@@ -100,6 +101,13 @@ export type StructuredDefect={
     PartUsage in domain.ts for Stage 7. */
  partsUsed?:boolean;
  partName?:string;
+ /* MORE THAN ONE PART. `partNumber` and `partName` above are the FIRST part,
+    kept and still written so a device on an older release shows one instead of
+    none - the Shop Cloud carries every field it has no column for through the
+    row's `detail` blob, and an older build cannot read this array. A one-part
+    repair stores no `parts` at all. The read, the write and the rules are in
+    src/lib/defects/defect-parts.ts; nothing here decides anything about them. */
+ parts?:DefectPart[];
  /* Billable time on this repair, in decimal hours: .5 is half an hour.
     Diagnostic time is kept apart from repair time because they are different
     work and often different visits. A bus can be diagnosed on one shift and

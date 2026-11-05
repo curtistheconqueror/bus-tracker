@@ -107,6 +107,19 @@ export function defectPartFields(parts: DefectPart[]): LegacyPartFields & { part
   return fields;
 }
 
+/* THE RECORD, WITH THESE PARTS ON IT - the one place a defect's part fields are
+   assembled, so a form cannot write the array and the mirrored pair out of step.
+   `parts` is DELETED rather than set to undefined when a repair is back down to
+   one, the spelling `setBusHold` and the swap ledger's `gap` already use: it is
+   the only way `"parts" in defect` reads false, and `rowFingerprint` walks
+   `Object.keys`, so a key holding undefined would still move the row's
+   fingerprint on a push carrying nothing new. */
+export function withDefectParts<T extends LegacyPartFields & {parts?:unknown}>(defect:T,parts:DefectPart[]):T{
+ const next={...defect} as T & {parts?:DefectPart[]};
+ delete next.parts;
+ return Object.assign(next,defectPartFields(parts)) as T;
+}
+
 /* Does this repair claim parts and fail to name any of them?
    Replaces the single-part `partNumberMissing`, and keeps its answer for a
    one-part record: PARTS USED ticked with nothing typed is still the thing
