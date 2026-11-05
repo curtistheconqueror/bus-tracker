@@ -6736,9 +6736,23 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
     the half a render would check if this suite could render it. */
  {
   const back=bodyOfSource(page,"focusPutBack");
-  assert.match(back,/setFocusExcluded\(excluded\);/,
+  /* WHITESPACE STRIPPED FIRST, because `current.filter (id=>…)` with one space
+     walked past the version of this that banned `.filter(`. */
+  const flat=back.replace(/\s+/g,"");
+  /* EXACTLY ONE `setFocusExcluded` CALL, which is the load-bearing half of this
+     gate and the only part that is not a spelling ban. Every way of pruning
+     AFTER the lib has answered needs a second write - a second call, or a
+     wrapper round the first - so counting the calls catches the SHAPE rather
+     than chasing the names. A reviewer got three respellings past the earlier
+     version (`.filter (`, `if(0)` plus `.flatMap`, and `["filter"]`); all three
+     need two calls, and all three fail here. */
+  assert.deepEqual(flat.match(/setFocusExcluded\(/g),["setFocusExcluded("],
+   "PUT BACK writes the excluded list exactly once: "+back.slice(0,140));
+  assert.ok(flat.includes("setFocusExcluded(excluded);"),
    "PUT BACK stores exactly what the lib handed back");
-  assert.ok(!/\.filter\(/.test(back),
+  /* And the named prunes, as a second line rather than the first: this one IS
+     a spelling ban and cannot be exhaustive, which is why it is not alone. */
+  assert.ok(!/\.(filter|flatMap|reduce|slice|splice)\(|\[["'`](filter|flatMap|reduce|slice|splice)["'`]\]|if\(0\)/.test(flat),
    "and prunes nothing on either side of the call: "+back.slice(0,140));
  }
 
