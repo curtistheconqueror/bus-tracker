@@ -1399,7 +1399,18 @@ test("the heating half of HVAC is its own group, and every repair in it builds t
     another category" — which is right: IntelligAIRE III runs the heat and the
     cooling off one panel. */
  const heating=REPAIR_OPTION_GROUPS["A/C and HVAC"]["Heating"];
- assert.deepEqual(heating,["No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"]);
+ /* NO HEAT LEADS THE GROUP, added later and on purpose. Curtis: "I cannot
+    always confirm why there is not heat on the spot, but I can confirm the
+    heat doesn't work immediately. This is for convenience." Every other entry
+    here names a place or a part, so a foreman who could only say the heat was
+    dead had to guess at a cause or reach for "Other heating repair", which
+    says nothing. Cooling has had "No cooling" in that slot since the catalog
+    was written; this is its heating twin and sits first for the same reason. */
+ assert.deepEqual(heating,["No heat","No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"]);
+ /* And the No Heat Buses filter picks it up without being told: it matches the
+    group prefix rather than a list of wordings. */
+ assert.ok(quickFilterMatch({id:"h",defects:[{id:"d",category:"A/C and HVAC",issue:"Heating - No heat",details:"",state:"open"}]},"no-cabin-heat"),
+  "a bus logged with the plain symptom joins the heat list");
 
  /* Both structures, for every one of them. The picker draws
     REPAIR_OPTION_GROUPS and the stored identity comes from REPAIR_OPTIONS, so
@@ -7357,4 +7368,55 @@ test("the defect form and its helper refuse a save from one rule, not two copies
  const alerts=(save.match(/alert\(/g)||[]).length;
  assert.equal(alerts,1,"one alert in the save path, and it prints what the rule returned");
  assert.match(save,/if\(refusal\)\{alert\(refusal\.message\);return\}/);
+});
+
+test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brought in",async()=>{
+ const {loggedByHand}=await import("../src/lib/defects/quick-filters.ts");
+ const now="2026-11-05T20:04:00.000Z";
+ const ago=hours=>new Date(Date.parse(now)-hours*3600e3).toISOString();
+ const defect=(id,source,issue)=>({id,category:"Inspection",issue,details:"",state:"open",
+  operability:"down",source,createdAt:ago(3),updatedAt:ago(3)});
+
+ /* Curtis, looking at a DEFECTS LOGGED share that had picked up rows off a
+    scanned sheet: "I have no reason to share something off the down sheet
+    because the down sheet is already coming from the source — the down sheet
+    is located in an office, so I'm not gonna send them something that they
+    already have written down... for this particular function, no, just things
+    that were logged by hand."
+
+    A scanned row becomes a real defect, correctly stamped `down-sheet`, and
+    its createdAt is WHEN THE SCAN RAN — so importing yesterday's paper at
+    20:00 dropped the whole sheet into "the last 8 hours" at once. */
+ const bus={id:"b",n:"18505",defects:[
+  defect("d1","defect-log","Crank no start"),
+  defect("d2","tracker","Doors - Front door"),
+  defect("d3","down-sheet","C-24"),
+  defect("d4","down-sheet","Driver-reported defect"),
+ ]};
+ const logged=quickFilterDefects(bus,"logged",now,{maxAgeMinutes:480});
+ assert.deepEqual(logged.map(row=>row.id).sort(),["d1","d2"],
+  "the two somebody logged, and neither of the two the paper brought in");
+
+ /* ONLY THE PAPER IS EXCLUDED. Typing into the Defect Log, into the map's bus
+    editor, or speaking to the AI operator is all somebody logging it, and a
+    defect with no source at all reads as the app's default rather than as the
+    sheet's. */
+ for(const source of ["defect-log","tracker","operator","scan",undefined,""])
+  assert.equal(loggedByHand({source}),true,JSON.stringify(source)+" is somebody logging it");
+ assert.equal(loggedByHand({source:"down-sheet"}),false);
+
+ /* AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. applyDownEntryToFleet
+    writes `linked?.source||"down-sheet"`, so a defect logged by hand that
+    LATER lands on a sheet stays in this list. Somebody logged it; the paper
+    catching up does not take that away. */
+ const sync=await readFile(new URL("../src/lib/down-sheet/down-sheet-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/source:linked\?\.source\|\|"down-sheet"/,
+  "a sheet row never overwrites a source a defect already had");
+
+ /* The drawer says so, above the share buttons, which is the last place
+    anybody looks before sending the list on. */
+ const page=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const note=page.indexOf("LOGGED BY HAND ONLY");
+ assert.ok(note>0,"the drawer states its scope");
+ assert.ok(note<page.indexOf('className="quick-filter-share-actions"'),"before the share buttons");
 });

@@ -1452,3 +1452,10 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    of step it is, and the stripe is the quiet second signal. */
 .coach-bar[data-coach-blocking]{border-left-width:6px}
 @media(max-width:760px){.coach-bar{padding:9px 12px}.coach-bar-hide{width:44px;height:44px}}
+
+/* LOGGED BY HAND ONLY. The amber of the initials note beside it says "read
+   this before you trust the list"; this one is a statement of scope rather
+   than a warning, so it borrows the shape and drops to the accent's quieter
+   tint. Both sit above the share buttons, which is the last place somebody
+   looks before sending the list on. */
+.quick-filter-source-note{background:color-mix(in srgb,var(--log-accent,#0b64bd) 10%,var(--log-surface,#fff));color:var(--log-muted,#60728c)}
