@@ -861,7 +861,8 @@ this.** `applyDownEntryToFleet` writes
 bus whose sheet card still carries the old wording lets the next sheet save put
 it back. Not introduced here, not changed here, and worth knowing.
 
-**The field is OUTSIDE the WORK DONE SO FAR fieldset** the finding sat inside,
+**The field is OUTSIDE the PRELIMS fieldset** (named WORK DONE SO FAR when this
+was written) the finding sat inside,
 though in the same place on the screen. An estimate is not work done, and that
 legend would be wrong about the one field under it that looks forward. Still
 above WORK STATUS and outside ADVANCED DETAILS, because this is typed by somebody

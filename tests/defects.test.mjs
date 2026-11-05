@@ -1229,6 +1229,24 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("advanced-defect-details"),"above ADVANCED DETAILS");
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("WORK STATUS<select"),"and above WORK STATUS");
 
+ /* THE LEGEND'S OWN WORDS, which nothing above pins. Everything else in this
+    suite checks the picker's STRUCTURE - its class, its checkboxes, where it
+    sits - so the visible text could be reverted or mistyped and the whole file
+    would stay green. Curtis renamed it from WORK DONE SO FAR to PRELIMS, and a
+    rename nobody can see break is a rename that comes back.
+
+    Two assertions because they fail differently: the first catches a changed or
+    mistyped legend, the second catches the old name surviving ANYWHERE in this
+    file - a half-done rename that left the legend right and a comment wrong.
+
+    It reads the SOURCE, not a render, so it cannot say the legend is visible or
+    unwrapped; that was measured in a browser (one line, 108px, at 360/390/430/
+    1180) and this only says the text is still the text that was measured. */
+ assert.match(page,/<fieldset className="wide work-state-picker"><legend>PRELIMS — OPTIONAL<\/legend>/,
+  "the picker's legend still reads PRELIMS — OPTIONAL");
+ assert.equal(page.includes("WORK DONE SO FAR"),false,
+  "the old legend name is gone from the Defect Log page, comments included");
+
  // Three across at phone width. Stacked, the block was tall enough to push
  // itself off the bottom of the open editor.
  const styles=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
@@ -6593,7 +6611,7 @@ test("the Defect Log editor asks how long the repair takes where it used to ask 
  /* IN THE SAME PLACE ON THE SCREEN, directly above WORK STATUS and OUTSIDE
     ADVANCED DETAILS: this is typed by somebody standing at the bus, and a
     control behind a disclosure here goes unused, the way the campaign paste box
-    did. But outside the WORK DONE SO FAR fieldset the finding sat inside —
+    did. But outside the PRELIMS fieldset the finding sat inside —
     an estimate is not work done, and that legend would be wrong about the one
     field under it that looks forward. */
  const estimateAt=page.indexOf('className="wide repair-estimate-field"');
