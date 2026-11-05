@@ -166,22 +166,35 @@ export function withinFeedWindow(minutes:number|null,limit:number|null){
    logged on Monday, and a window keyed off the edit would quietly refill
    TODAY with last week's work every time somebody touched a record. */
 export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
- /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW and stays in
-    ALL - the same rule `withinFeedWindow` above already applies to an undated
-    record, and for the same reason: its `createdAt` is WHEN THE SCAN RAN, not
-    when anybody logged anything. Importing yesterday's paper at 20:00 dropped
-    that whole sheet into TODAY, LAST 24H and THIS SHIFT at once, which is what
-    put ninety rows behind a SHOW ALL on a list whose entire claim is "this is
+ /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW, because its
+    `createdAt` is WHEN THE SCAN RAN rather than when anybody logged anything.
+    Importing yesterday's paper at 20:00 would drop that whole sheet into TODAY,
+    LAST 24H and THIS SHIFT at once, on a list whose entire claim is "this is
     what got logged".
 
     Curtis, choosing this over marking them: "I have no reason to share
     something off the down sheet because the down sheet is already coming from
     the source... for this particular function, no, just things that were
-    logged by hand." The DEFECTS LOGGED quick filter already worked this way;
-    this drop-down was missed when that was fixed.
+    logged by hand."
 
-    ALL still shows them, so nothing is hidden outright - only the timed
-    windows, which are the ones making a claim about when. */
+    AND AT THE ONE CALLER THIS FILE HAS TODAY, THE GUARD NEVER FIRES. A cold
+    read caught the claim this comment used to make. The Defect Log's feed is
+    built by `defectLogRecords`, which filters `defect.source==="defect-log"`
+    before anything here sees a record, and `loggedByHand` is `source !==
+    "down-sheet"` - so every record reaching this function already satisfies it.
+    The line that was removed from here said "ALL still shows them", which was
+    the opposite of true: on that screen a scanned row is not in ALL either,
+    because it never enters the list at all. The wrong account was more
+    dangerous than the dead line, since it described a behaviour somebody could
+    go looking for.
+
+    IT STAYS, as a property of the question rather than of today's caller. This
+    is the function that answers "is this defect inside this window", for the
+    feed and for anything that asks later off a list assembled some other way -
+    a whole-fleet read, an export, a route. The filter that currently makes it
+    moot lives in a different module and is not this function's to rely on. The
+    place the same rule is LIVE is the DEFECTS LOGGED quick filter, which runs
+    over the board's own defects. */
  if(limit!==null&&!loggedByHand(defect))return false;
  return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
 }

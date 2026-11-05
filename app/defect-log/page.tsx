@@ -60,7 +60,7 @@ import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {defectPartsText,normalizeDefectParts,partToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
 import PartsUsedList from "@/src/components/defects/parts-used-list";
-import {excludeFromFocusShare,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
+import {excludeFromFocusShare,focusShareIsEmpty,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
 import SwipeAwayRow from "./_components/swipe-away-row";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
@@ -1134,7 +1134,57 @@ export default function DefectLog(){
     this one" flag stored on the record would hide it for the whole shop. */
  const [focusExcluded,setFocusExcluded]=useState<string[]>([]);
  const focusScope=focusShareScope(focusedGroup?focusedGroup.records:[],focusedAllRecords,focusExcluded);
- const focusPutBack=()=>setFocusExcluded(current=>putBackLastExclusion(current).excluded);
+ /* NOTHING LEFT TO SEND IS A REFUSAL, NOT A SHARE, and it was reachable the
+    moment the swipe existed. Hiding all three defects on a bus and pressing
+    COPY put "0 defects - shared ..." and then "No defects on this bus." on the
+    clipboard, which a recipient reads as the bus being CLEAN - the most
+    damaging sentence this app could say about a vehicle. The three outputs
+    refuse, and the buttons go dead so nobody presses one and wonders. */
+ const focusShareEmpty=focusShareIsEmpty(focusScope);
+ /* WHAT JUST HAPPENED, FOR SOMEBODY WHO CANNOT SEE THE ROW GO. A row vanishing
+    and a button appearing are both silent to a screen reader, and the HIDE
+    control that was just pressed is gone with its row - so without this a hide
+    is a press with no outcome at all. Its own region rather than the share
+    status beside it: a hide must not wipe COPIED, and a share outcome must not
+    wipe the hide. */
+ const [focusHideNote,setFocusHideNote]=useState("");
+ useEffect(()=>{setFocusHideNote("")},[focusedBusId]);
+ /* AND FOCUS HAS TO LAND SOMEWHERE. The pressed HIDE button unmounts with its
+    row, which drops focus to the document BODY: a keyboard is then at the top
+    of the page, outside a dialog it never left. PUT BACK is where the press
+    leads next, so that is where focus goes - and when PUT BACK itself empties,
+    COPY takes it, because PUT BACK is about to become unfocusable.
+    Only on a BUTTON press: a swipe holds no focus, and scrolling the panel up
+    to a control a thumb never asked for is its own bug. */
+ const focusCopyRef=useRef<HTMLButtonElement|null>(null);
+ const focusPutBackRef=useRef<HTMLButtonElement|null>(null);
+ const focusAfterCommit=(target:React.RefObject<HTMLButtonElement|null>)=>{
+  /* After the commit, not during it: the element being focused is one this
+     render is about to make focusable. */
+  if(typeof requestAnimationFrame==="function")requestAnimationFrame(()=>target.current?.focus());
+ };
+ const focusHideRecord=(record:DefectLogRecord,via:"button"|"swipe")=>{
+  setFocusExcluded(current=>excludeFromFocusShare(current,record.defect.id));
+  setFocusHideNote("HIDDEN FROM THIS SHARE — "+repairCategoryLabel(record.defect.category));
+  if(via==="button")focusAfterCommit(focusPutBackRef);
+ };
+ /* PRUNED TO WHAT IS ON SCREEN BEFORE POPPING, and it names what came back.
+    `focusExcluded` is only cleared when the BUS changes, so a defect swiped
+    away and then taken off screen by the window, the filter or a sync left an
+    id in the list that `hiddenByHand` no longer counts - and PUT BACK popped
+    that one, restoring nothing while the button still read PUT BACK. The press
+    looked broken. */
+ const focusPutBack=()=>{
+  const onScreen=focusedGroup?focusedGroup.records:[];
+  const live=new Set(onScreen.map(record=>String(record.defect.id)));
+  const {excluded,restored}=putBackLastExclusion(focusExcluded.filter(id=>live.has(id)));
+  if(!restored)return;
+  setFocusExcluded(excluded);
+  const back=onScreen.find(record=>String(record.defect.id)===restored);
+  setFocusHideNote("PUT BACK — "+(back?repairCategoryLabel(back.defect.category):"1 DEFECT"));
+  /* The last one back takes PUT BACK off the row with it. */
+  if(focusScope.hiddenByHand<=1)focusAfterCommit(focusCopyRef);
+ };
  /* EVERY CHANGE OF BUS, not only the close, and the first cut only cleared on
     close — while its own comment claimed what this line now actually does. The
     focus dialog does not trap the keyboard, so a tab can reach another card's
@@ -1658,7 +1708,14 @@ export default function DefectLog(){
  /* ALL THREE OUTPUTS READ THE SAME LIST. COPY, SHARE and SHARE PAGE are one
     function away from each other on purpose - a page that honoured a swipe
     while the text ignored it would be two different answers to one question,
-    and Curtis would have no way to tell which he had sent. */
+    and Curtis would have no way to tell which he had sent.
+
+    AND ALL THREE ASK `focusShareIsEmpty` FIRST, each in its own body rather
+    than through one wrapper, because each is also reachable from somewhere
+    else: SHARE falls back to COPY, and a guard on the wrapper only would be a
+    guard on the path somebody happened to take. An empty share sends
+    "0 defects" and "No defects on this bus." about a bus with three open
+    defects, which reads as a clean vehicle. */
  const focusShareRows=():BusShareDefect[]=>focusScope.rows.map(record=>({
   defect:record.defect,
   state:STATE_LABELS[record.defect.state]||record.defect.state,
@@ -1668,7 +1725,7 @@ export default function DefectLog(){
  }));
  const focusShareBus=()=>({n:focusedGroup?.bus.n||"",l:focusedGroup?.bus.l,status:focusedGroup?(STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s):""});
  const copyFocusBus=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   try{await copyText(busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString()));setFocusShareStatus("copied")}
   catch{setFocusShareStatus("error")}
  };
@@ -1676,14 +1733,14 @@ export default function DefectLog(){
     the same order the drawer settled on, so a browser without one never leaves
     somebody pressing a button that does nothing. */
  const shareFocusBusText=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const text=busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   if(typeof navigator.share!=="function"){await copyFocusBus();return}
   try{await navigator.share({title:"Bus "+focusedGroup.bus.n+" defects",text});setFocusShareStatus("shared")}
   catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFocusShareStatus("error")}
  };
  const shareFocusBusPage=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const html=busShareHtml(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),busShareFilename(focusedGroup.bus.n),"Bus "+focusedGroup.bus.n+" defects");
   /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when there
@@ -2072,9 +2129,13 @@ export default function DefectLog(){
         at the bottom is a scroll away from the thing somebody opened this to
         send. */}
     <div className="log-focus-share" role="group" aria-label={"Share bus "+focusedGroup.bus.n+" defects"}>
-     <button type="button" onClick={copyFocusBus} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
-     <button type="button" onClick={shareFocusBusText} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
-     <button type="button" onClick={shareFocusBusPage} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
+     {/* DEAD WHEN THERE IS NOTHING LEFT TO SEND, rather than sending an empty
+         bus. `disabled` as well as the refusal inside each handler: the handler
+         is what makes it true, and this is what stops a mechanic pressing a
+         live-looking button and getting nothing. The slot below says why. */}
+     <button ref={focusCopyRef} type="button" onClick={copyFocusBus} disabled={focusShareEmpty} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
+     <button type="button" onClick={shareFocusBusText} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
+     <button type="button" onClick={shareFocusBusPage} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
      {/* MOUNTED WHETHER OR NOT IT HAS ANYTHING TO SAY. A live region only
          announces what changes INSIDE it; one that appears at the same moment
          as its text is a new element to a screen reader, not an update, and is
@@ -2096,21 +2157,47 @@ export default function DefectLog(){
        focusShareStatus==="saved"?"SAVED TO THIS DEVICE":
        focusShareStatus==="error"?"COULD NOT SHARE — TRY COPY":""}
      </small>
+     {/* AND WHAT A HIDE DID, announced and never drawn. A row leaving the list
+         and a button arriving are both silent, and the HIDE control that was
+         pressed is gone with its row, so without this a hide is a press with no
+         outcome. Always visually hidden rather than hidden-when-empty: the
+         visible answer is the row going, and a second line of 7px text in this
+         bar would be competing with the one that says what will be sent. */}
+     <small className="log-focus-share-live" role="status" aria-live="polite">{focusHideNote}</small>
      {/* WHAT WILL ACTUALLY GO, when the board is hiding some of it. Pressing
          SHARE on a screen showing two and sending six is a surprise worth one
          line; with no filter on, the two numbers agree and this says nothing. */}
-     {/* TWO REASONS, COUNTED APART. A defect the view held back is still on
+     {/* ONE SLOT, ALWAYS MOUNTED. Both of these appear and disappear, and they
+         sit ABOVE the rows - so mounting them moved the whole list by 70px on
+         a phone and 115px on the shop computer on every hide and every undo,
+         putting a different row under the thumb that was about to swipe. The
+         slot holds its height; only its contents change.
+
+         IT CARRIED AN `aria-hidden` WHEN EMPTY AND THAT CLAIM WAS EMPTY TOO.
+         The comment said it kept an announced blank out of the tree - but this
+         slot is not a live region, so nothing announces it either way, and the
+         two things inside it are already silent when there is nothing to say:
+         an empty `<small>` reads as nothing, and PUT BACK is
+         `visibility:hidden`, which takes it out of the tree on its own. One
+         fewer condition on the markup, and one fewer sentence that is not true.
+
+         TWO REASONS, COUNTED APART. A defect the view held back is still on
          the bus; one swiped away is somebody saying "not this one". Silent
-         when the share is the whole bus. */}
-     {focusShareScopeNote(focusScope)&&<small className="log-focus-share-scope">{focusShareScopeNote(focusScope)}</small>}
-     {/* THE WAY BACK IS ON THE PAGE, not behind a menu - the same rule the
-         Down Sheet's PUT BACK follows, because an accidental swipe is exactly
+         when the share is the whole bus.
+
+         AND THE WAY BACK IS ON THE PAGE, not behind a menu - the rule the Down
+         Sheet's own PUT BACK follows, because an accidental swipe is exactly
          when nobody goes looking for an undo. It takes the LAST one back, so
          pressing it repeatedly walks the swipes off in reverse. */}
-     {focusScope.hiddenByHand>0&&<button type="button" className="focus-put-back" onClick={focusPutBack}><span aria-hidden="true">&#8629;</span><b>PUT BACK{focusScope.hiddenByHand>1?" ("+focusScope.hiddenByHand+")":""}</b></button>}
+     <div className="log-focus-share-slot">
+      <small className="log-focus-share-scope">{focusShareScopeNote(focusScope)}</small>
+      <button ref={focusPutBackRef} type="button" className="focus-put-back" onClick={focusPutBack}
+       style={focusScope.hiddenByHand>0?undefined:{visibility:"hidden"}}
+       tabIndex={focusScope.hiddenByHand>0?0:-1}><span aria-hidden="true">&#8629;</span><b>PUT BACK{focusScope.hiddenByHand>1?" ("+focusScope.hiddenByHand+")":""}</b></button>
+     </div>
     </div>
-    <div className="log-focus-body">{focusScope.rows.map((record,index)=><SwipeAwayRow className={"log-focus-record "+record.defect.state} key={record.defect.id} hideLabel={"Hide "+repairCategoryLabel(record.defect.category)+" from this share"} onHide={()=>setFocusExcluded(current=>excludeFromFocusShare(current,record.defect.id))}>
-     <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
+    <div className="log-focus-body">{focusScope.rows.map((record,index)=><SwipeAwayRow className={"log-focus-record "+record.defect.state} key={record.defect.id} hideLabel={"Hide "+repairCategoryLabel(record.defect.category)+" from this share"} onHide={via=>focusHideRecord(record,via)}>
+     <div className="log-focus-record-head"><b>{focusScope.rows.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
      {/* Spelled out here rather than abbreviated: the focus view is the one a
          foreman reads standing next to somebody, and "DIAGNOSED — CJ, Aug 27"

@@ -81,15 +81,42 @@ export function putBackLastExclusion(excluded: string[]): { excluded: string[]; 
   return { excluded: excluded.slice(0, -1), restored: excluded[excluded.length - 1] };
 }
 
+/* IS THERE ANYTHING TO SEND?
+
+   Hiding every row and pressing COPY sent, for a bus with three open defects:
+   "0 defects — shared …" and then "No defects on this bus." A recipient reads
+   that as the bus being clean, which is the most damaging thing this app could
+   say about a vehicle. It was unreachable before the share followed the
+   window - the share was always the whole bus - and the swipe made it
+   reachable.
+
+   The three outputs ask this and refuse rather than send an empty bus. */
+export function focusShareIsEmpty(scope: FocusShareScope<FocusShareCandidate>): boolean {
+  return scope.rows.length === 0;
+}
+
 /* WHAT THE PANEL SAYS ABOVE THE SHARE BUTTONS. Written here rather than in the
-   page because it is the one sentence that has to stay true to the two counts,
-   and because the MCP route answers the same question about a bus. Silent when
-   the share is the whole bus: a row saying "sharing 3 of 3" is noise. */
+   page because it is the one sentence that has to stay true to the two counts
+   above, and the two counts are computed here.
+
+   AN EARLIER VERSION OF THIS LINE CLAIMED THE MCP ROUTE ASKS THE SAME QUESTION
+   ABOUT A BUS. It does not: PR39's five tools are read-only and none of them
+   has a share, a window or an exclusion list. The rule for where this lives is
+   the general one and it is enough on its own - a decision written inside a
+   `page.tsx` is reachable by that page and nothing else, so the moment anything
+   wants it there are two of it. Claiming a caller that does not exist is how a
+   reader stops trusting the rest of the comment.
+
+   Silent when the share is the whole bus: a row saying "sharing 3 of 3" is
+   noise. */
 export function focusShareScopeNote(scope: FocusShareScope<FocusShareCandidate>): string {
   const held: string[] = [];
   if (scope.hiddenByBoard) held.push(scope.hiddenByBoard + " OUTSIDE THIS VIEW");
   if (scope.hiddenByHand) held.push(scope.hiddenByHand + " YOU SWIPED AWAY");
   if (!held.length) return "";
+  /* WITH NOTHING LEFT, SAY SO RATHER THAN COUNT. "SHARING 0 OF 3" is a number
+     where a person needs an instruction. */
+  if (!scope.rows.length) return "NOTHING LEFT TO SHARE — " + held.join(", ");
   return "SHARING " + scope.rows.length + " OF " + scope.total + " — " + held.join(", ");
 }
 

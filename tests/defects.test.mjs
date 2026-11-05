@@ -3,9 +3,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareIsEmpty, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, swipeOffsetPx, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
-import { stripCodeComments } from "./helpers/css-rules.mjs";
+import { effectiveStyle, stripCodeComments } from "./helpers/css-rules.mjs";
 
 test("defect normalization preserves future odometer and parts fields",()=>{
  const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
@@ -2180,7 +2180,11 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  // phone rules stay in the established phone breakpoint
  const conditions=[];
  for(let index=css.indexOf("@media(");index>=0;index=css.indexOf("@media(",index+1)){
-  const conditionEnd=css.indexOf(")",index),open=css.indexOf("{",conditionEnd);
+  /* THE WHOLE PRELUDE, not up to the first ")". `@media(hover:none) and
+     (pointer:coarse)` was being reported as "hover:none", which is a condition
+     this stylesheet does not contain - and a gate that compares a truncated
+     string is comparing something nobody wrote. */
+  const open=css.indexOf("{",index);
   let depth=0,end=open;
   for(;end<css.length;end++){
    if(css[end]==="{")depth++;
@@ -2202,7 +2206,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
     that this would then never check. A future .log-focus-button rule dropped
     into the wrong breakpoint would have passed silently. */
  const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}");
- if(body.includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
+ if(body.includes(".log-focus"))conditions.push(css.slice(index+6,open).trim());
  }
  /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
     what the line above says, and what matters. Comparing the list itself also
@@ -2210,7 +2214,20 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
     correct breakpoint failed this. Deduplicated, it tests the rule; the length
     check below keeps it from passing vacuously if the rules ever move out. */
  assert.ok(conditions.length>0,"the focus view must still have phone rules");
- assert.deepEqual([...new Set(conditions)],["max-width:760px"]);
+ /* WIDTH CONDITIONS AND CAPABILITY CONDITIONS ARE DIFFERENT QUESTIONS, and
+    lumping them together is what this split fixes. The rule being enforced is
+    that the focus view has ONE breakpoint - a second invented width is how a
+    panel comes right at 390 and wrong at 430. A `(hover:none) and
+    (pointer:coarse)` block is not a breakpoint: it asks whether the device has
+    a thumb instead of a pointer, which is exactly the question the swipe's
+    `user-select` guard has to ask and cannot ask with a width. So widths are
+    still pinned to the one breakpoint, and the capability queries are listed
+    rather than waved through - an invented one still fails here. */
+ const byWidth=[...new Set(conditions.filter(one=>one.includes("width")))];
+ const byCapability=[...new Set(conditions.filter(one=>!one.includes("width")))];
+ assert.deepEqual(byWidth,["(max-width:760px)"]);
+ assert.deepEqual(byCapability,["(hover:none) and (pointer:coarse)"],
+  "the only non-width query the focus view may use is the touch one the swipe needs");
 });
 
 test("parts memory learns per defect issue and lets a category default be chosen deliberately",()=>{
@@ -6378,26 +6395,117 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
   "the whole-bus list is still needed, to count what the view held back");
  assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusScope\.rows\.map/,
   "the share is built from the scope, not from the unfiltered records");
- /* ALL THREE OUTPUTS READ ONE LIST. A page honouring a swipe while the text
-    ignored it would be two answers to one question, with no way to tell which
-    had been sent. */
+ /* ALL THREE OUTPUTS READ ONE LIST, AND ALL THREE REFUSE AN EMPTY ONE.
+
+    BALANCED BRACES, NOT A 700-CHARACTER WINDOW, and that is a fix. The first
+    version of this loop sliced 700 characters from each handler's name, which
+    on `copyFocusBus` - four lines long - ran straight into `shareFocusBusText`
+    below it. Its `focusShareRows()` satisfied the assertion for BOTH, so
+    deleting the call from `copyFocusBus` left this green. A cold read found it
+    by mutation. One handler, one body. */
+ const row=id=>({defect:{id}});
+ const bodyOf=(source,name)=>{
+  const at=source.indexOf("const "+name+"=");
+  assert.notEqual(at,-1,name+" is gone from the page");
+  const open=source.indexOf("{",at);
+  let depth=0;
+  for(let i=open;i<source.length;i++){
+   if(source[i]==="{")depth++;
+   else if(source[i]==="}"&&!--depth)return source.slice(open,i+1);
+  }
+  throw new Error(name+" has no balanced body");
+ };
+ /* And the slicer itself is checked, because a broken extractor is a gate that
+    passes everything: a body that ran on would carry the NEXT handler's name. */
+ assert.ok(!bodyOf(page,"copyFocusBus").includes("shareFocusBusText"),
+  "the extractor has to stop at the end of the handler it was asked for");
  for(const output of ["copyFocusBus","shareFocusBusText","shareFocusBusPage"]){
-  const body=page.slice(page.indexOf("const "+output+"="),page.indexOf("const "+output+"=")+700);
+  const body=bodyOf(page,output);
   assert.ok(body.includes("focusShareRows()"),output+" has to share the same list as the others");
+  /* NOTHING LEFT TO SEND IS A REFUSAL. Hiding all three defects on a bus and
+     pressing COPY put "0 defects - shared ..." and "No defects on this bus." on
+     the clipboard for a bus with three open defects, which reads as a CLEAN
+     vehicle - the most damaging thing this app could say about one. Asked in
+     each body rather than once in a wrapper, because SHARE falls back to COPY
+     and a guard on one path is a guard on the path somebody happened to take. */
+  assert.ok(body.includes("focusShareIsEmpty(focusScope)"),
+   output+" has to refuse an empty share rather than send a clean bus");
  }
- /* AND THE SCOPE IS COMPUTED IN THE LIB, not on the page: the MCP route asks
-    the same question about a bus, and a rule written in a page component would
-    have to be reimplemented there. */
+ /* AND THE BUTTONS GO DEAD, so nobody presses a live-looking one and wonders.
+    Three of them, each carrying the flag. */
+ assert.equal((page.match(/disabled=\{focusShareEmpty\}/g)||[]).length,3,
+  "COPY, SHARE and SHARE PAGE all have to go dead on an empty share");
+ assert.match(page,/const focusShareEmpty=focusShareIsEmpty\(focusScope\)/);
+ /* THE REFUSAL ITSELF, DRIVEN. */
+ assert.equal(focusShareIsEmpty(focusShareScope([row("x")],[row("x")],[])),false);
+ assert.equal(focusShareIsEmpty(focusShareScope([row("x")],[row("x")],["x"])),true);
+ /* AND IT SAYS SO IN WORDS RATHER THAN IN A NUMBER: "SHARING 0 OF 3" is a count
+    where somebody needs an instruction. */
+ assert.match(focusShareScopeNote(focusShareScope([row("x")],[row("x")],["x"])),
+  /^NOTHING LEFT TO SHARE — 1 YOU SWIPED AWAY$/);
+ /* AND THE SCOPE IS COMPUTED IN THE LIB, not on the page. The reason is the
+    general one and it is enough: a decision inside a `page.tsx` is reachable by
+    that page and nothing else. An earlier version of this comment said the MCP
+    route asks the same question about a bus - it does not, PR39's five tools
+    are read-only and none of them has a share or a window, and naming a caller
+    that does not exist is how a reader stops believing the rest. */
  assert.match(page,/focusShareScope\(focusedGroup\?focusedGroup\.records:\[\],focusedAllRecords,focusExcluded\)/);
- assert.match(page,/focusShareScopeNote\(focusScope\)&&<small className="log-focus-share-scope">/,
+ /* AND THE PANEL SAYS WHAT IT IS ABOUT TO SEND - from an ALWAYS-MOUNTED slot.
+    This used to assert the conditional `note && <small>`, which was the shape
+    that moved the whole list by 70px on a phone and 115px on the shop computer
+    on every hide and every undo: the note and PUT BACK sit ABOVE the rows, so
+    mounting them put a different row under the thumb that was about to swipe
+    next. The slot holds its height; only its contents change. */
+ assert.match(page,/<div className="log-focus-share-slot"/);
+ assert.match(page,/<small className="log-focus-share-scope">\{focusShareScopeNote\(focusScope\)\}<\/small>/,
   "and the panel has to say what it is about to send");
+ /* AND UNCONDITIONALLY. Matching the `<small>` alone was not enough: wrapping
+    the same markup back up in `note && …` left that substring intact and this
+    gate green, which is the mutation that put the 70px jump back. The absence
+    of the conditional is the thing to assert. */
+ assert.doesNotMatch(page,/focusShareScopeNote\(focusScope\)&&/,
+  "the note is mounted whatever it says, or the list jumps on every hide");
+ assert.match(css,/\.log-focus-share \.log-focus-share-slot\{grid-column:1\/-1;min-height:44px/,
+  "the slot keeps its height whether it holds anything or not");
  /* THE SWIPED-AWAY LIST IS NEVER A FIELD ON A DEFECT. The cloud ships unknown
     defect fields to every other phone and a merge replaces a defect wholesale,
     so one person's "don't send this one" would hide it for the whole shop -
     the reason a HOLD and a FULL SWEEP do not travel either. */
  assert.match(page,/const \[focusExcluded,setFocusExcluded\]=useState<string\[\]>\(\[\]\)/);
- for(const leak of ["defect.excludedFromShare","excludedFromShare:","pace-focus-share"])
-  assert.ok(!page.includes(leak),"a swipe must not be stored on a record or in a key: found "+leak);
+ /* THREE LITERAL STRINGS WAS NOT A GATE, and a cold read said so: the first
+    version of this listed "defect.excludedFromShare", "excludedFromShare:" and
+    "pace-focus-share", so storing the same thing as `defect.hiddenFromShare`
+    or under `pace-focus-hidden-v1` walked straight past it. The shape of the
+    mistake is what has to be caught, not one spelling of it. */
+ assert.doesNotMatch(page,/"pace-[a-z0-9-]*(focus|swipe|hid|exclud|share)[a-z0-9-]*"/,
+  "the swiped-away list is React state for this one look at this one bus - never a storage key");
+ /* AND NEVER A FIELD WRITTEN ONTO A DEFECT. Anchoring this on `defect.` was
+    not enough either: `(record.defect as {hiddenFromShare?:boolean})
+    .hiddenFromShare=true` has `).` in front of the dot and walked past it. The
+    HANDLER's whole body is the thing to read - it may set React state and
+    nothing else. */
+ {
+  const hide=bodyOf(page,"focusHideRecord");
+  assert.ok(/setFocusExcluded\(/.test(hide)&&/setFocusHideNote\(/.test(hide),
+   "the hide handler sets the two pieces of state it owns");
+  assert.ok(!/[)\]a-zA-Z]\.[A-Za-z]+\s*=[^=>]/.test(hide),
+   "and assigns to nothing at all: a hide is a property of this look at this bus");
+  assert.ok(!/localStorage|writeJSON|saveDefectLogRecord|applyDefectToBuses|setFleet|setDownEntries/.test(hide),
+   "a hide must not reach storage, a record or the board");
+ }
+ assert.doesNotMatch(page,/\.[A-Za-z]*(xclud|idden)[A-Za-z]*\s*=[^=>]/,
+  "nothing anywhere on this page writes an exclusion onto an object");
+ /* AND THE SCOPE ITSELF WRITES NOTHING ONTO A RECORD, which is the property
+    those two gates are circling. The cloud ships every defect field it has no
+    column for inside `detail` and a merge replaces a defect wholesale by id, so
+    a flag on the record would hide the defect on every other phone in the shop
+    - the same reason a HOLD and a FULL SWEEP never travel. */
+ {
+  const records=[row("1"),row("2"),row("3")];
+  const before=JSON.stringify(records);
+  focusShareScope(records.slice(0,2),records,["1"]);
+  assert.equal(JSON.stringify(records),before,"focusShareScope must not touch a record");
+ }
  /* AND IT GOES WITH THE BUS, like the SHARED status beside it: tabbing from
     bus A's FOCUS to bus B's never passes through empty. */
  assert.match(page,/useEffect\(\(\)=>\{setFocusExcluded\(\[\]\)\},\[focusedBusId\]\)/);
@@ -6407,7 +6515,6 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(page,/className="focus-put-back"[\s\S]{0,200}?onClick=\{focusPutBack\}/);
 
  /* THE SCOPE'S BEHAVIOUR, driven rather than read. */
- const row=id=>({defect:{id}});
  const all=[row("1"),row("2"),row("3"),row("4")],onScreen=[row("1"),row("2")];
  let scope=focusShareScope(onScreen,all,[]);
  assert.deepEqual([scope.rows.length,scope.total,scope.hiddenByBoard,scope.hiddenByHand],[2,4,2,0]);
@@ -6435,24 +6542,88 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.equal(swipeHidesRow(-30,2),false,"a short drag is not a decision");
  assert.equal(swipeHidesRow(80,2),false,"rightward does nothing - one direction destroys, not both");
  assert.equal(swipeHidesRow(Number.NaN,0),false);
- /* AND IT MUST NOT BLOCK SCROLLING: no touch-action, no non-passive listener,
-    no preventDefault anywhere in the row. */
+ assert.equal(swipeHidesRow(0,Number.NaN),false);
+ /* THE THRESHOLDS ARE THE EXPORTED ONES, so a gate cannot pass while the
+    constant moves out from under it. 56px commits; a pixel short does not. */
+ assert.equal(swipeHidesRow(-SWIPE_COMMIT_PX,0),true,"exactly the commit distance is a swipe");
+ assert.equal(swipeHidesRow(-(SWIPE_COMMIT_PX-1),0),false,"a pixel short is not");
+ /* AND THE AXIS LOCK IS THE RATIO, not a feeling about it: at the boundary the
+    sideways travel has to BEAT the vertical by the margin, not tie it. */
+ assert.equal(swipeHidesRow(-90,90/SWIPE_AXIS_RATIO),false,"a tie on the axis ratio is a scroll");
+ assert.equal(swipeHidesRow(-90,90/SWIPE_AXIS_RATIO-1),true);
+ /* HOW FAR THE ROW FOLLOWS THE FINGER, capped so a long drag cannot pull a row
+    off its own panel, and zero to the right because there is nothing there. */
+ assert.equal(swipeOffsetPx(-10),-10);
+ assert.equal(swipeOffsetPx(-500),-(SWIPE_COMMIT_PX+24),"a long drag is capped");
+ assert.equal(swipeOffsetPx(40),0,"rightward reads as zero, not as a positive offset");
+ assert.equal(swipeOffsetPx(0),0);
+ assert.equal(swipeOffsetPx(Number.NaN),0);
+
  const swipeRow=await readFile(new URL("../app/defect-log/_components/swipe-away-row.tsx",import.meta.url),"utf8");
  /* COMMENTS STRIPPED FIRST, with the project's own string-aware stripper: the
-    file EXPLAINS that it uses none of these, and a gate that reads prose as
-    code fails on an accurate comment. The same trap the DS badge gate hit. */
+    file EXPLAINS the rules it follows, and a gate that reads prose as code
+    fails on an accurate comment. The same trap the DS badge gate hit. */
  const swipeCode=stripCodeComments(swipeRow);
- for(const blocker of ["touch-action","preventDefault","passive:false","touchmove"])
+ /* IT MUST NOT BLOCK SCROLLING: no non-passive listener and no preventDefault
+    anywhere in the row. `touch-action` IS NO LONGER ON THIS LIST, and taking it
+    off is a fix rather than a relaxation - see the CSS gate below. */
+ for(const blocker of ["preventDefault","passive:false","touchmove"])
   assert.ok(!swipeCode.includes(blocker),"the swipe row names "+blocker+", which is how a panel stops scrolling");
  /* A GESTURE IS NOT REACHABLE WITH A MOUSE OR A KEYBOARD, and Curtis reads
     this app on the shop computer too, so every row carries a real control
-    that does the same thing. */
+    that does the same thing - and the control has to SAY which defect it
+    drops. `hideLabel` reaching the aria-label is not enough on its own: the
+    page can hand it "", and four buttons reading "Hide" is what a screen
+    reader then gets. */
  assert.match(swipeRow,/className="focus-hide-defect"/);
- assert.match(swipeRow,/onClick=\{\s*onHide\s*\}/,"the HIDE control has to work without a gesture");
+ assert.match(swipeRow,/onClick=\{\s*\(\)\s*=>\s*onHide\("button"\)\s*\}/,
+  "the HIDE control has to work without a gesture");
  assert.match(swipeRow,/aria-label=\{\s*hideLabel\s*\}/);
+ {
+  const label=page.match(/hideLabel=\{([^}]*)\}/);
+  assert.ok(label,"the page has to pass a hide label");
+  assert.ok(label[1].includes("repairCategoryLabel(record.defect.category)"),
+   "and the label has to name the defect it drops: got "+label[1]);
+ }
+ /* AND THE CONTROL STAYS VISIBLE AND REACHABLE. Resolved through the cascade
+    rather than read off one rule, because that is how this project has been
+    bitten: a broader selector elsewhere setting display:none would leave the
+    swipe as the only way to hide a row, on the one device that cannot swipe. */
+ for(const width of [390,1180]){
+  const hide=effectiveStyle(css,{tag:"button",classes:["focus-hide-defect"],
+   ancestors:[{tag:"div",classes:["log-focus-body"]},{tag:"article",classes:["log-focus-record","open"]}]},width);
+  assert.notEqual(hide.display,"none","HIDE is the desktop route and cannot be display:none at "+width);
+  assert.notEqual(hide.visibility,"hidden");
+  assert.equal(hide["min-height"],width<=760?"44px":"36px","HIDE has to stay a target at "+width);
+ }
+ assert.doesNotMatch(swipeRow,/<button[^>]*\shidden\b/,"a hidden HIDE button is no control at all");
+ assert.doesNotMatch(swipeRow,/aria-hidden="true"[\s\S]{0,80}focus-hide-defect/);
  /* A CANCELLED POINTER IS THE BROWSER SAYING "this was a scroll", so it can
     never count as a decision to hide something. */
  assert.match(swipeRow,/onPointerCancel=\{\s*\(\s*\)\s*=>\s*end\(false\)\s*\}/);
+ /* AND THE RELEASE ASKS `swipeHidesRow` RATHER THAN COMMITTING. `end(true)` on
+    pointerup passed every assertion above it, because every one of them was
+    about the decision function and none about whether the component called it.
+    Found by mutation in a cold read. */
+ assert.match(swipeCode,/end\(\s*swipeHidesRow\(\s*event\.clientX\s*-\s*from\.x\s*,\s*event\.clientY\s*-\s*from\.y\s*\)\s*\)/,
+  "the release has to ask the decision function, not assume the answer");
+ assert.ok(!/end\(\s*true\s*\)/.test(swipeCode),"nothing may commit a hide without asking");
+ /* THE ROW STOPS FOLLOWING A FINGER THAT IS CLEARLY SCROLLING, or it creeps
+    sideways through a diagonal scroll and snaps back, which looks like a bug
+    even though nothing was hidden. Deleting this line changed no assertion. */
+ assert.match(swipeCode,/onPointerMove[\s\S]{0,400}?Math\.abs\(dy\)\s*>\s*Math\.abs\(dx\)/,
+  "the drag has to stop following a vertical finger");
+ /* AND A SECOND FINGER OR A MOUSE NEVER STARTS ONE. A second finger landing
+    mid-drag restarts the measurement from its own position, which reads as a
+    jump back; a leftward mouse drag is text selection and would otherwise
+    satisfy all three conditions and silently drop that defect. */
+ assert.match(swipeCode,/if\s*\(\s*!event\.isPrimary\s*\|\|\s*event\.pointerType\s*===\s*"mouse"\s*\)\s*return/,
+  "a non-primary pointer and a mouse must not arm the gesture");
+ /* A DRAG THAT ENDS OFF THE ROW STILL ENDS. Without the capture a gesture
+    finishing outside the element never reached `onPointerUp` and left the row
+    stuck mid-swipe with its start point still armed. */
+ assert.match(swipeCode,/setPointerCapture\(event\.pointerId\)/);
+ assert.match(swipeCode,/onLostPointerCapture=\{/);
 
  /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when it fell
     back to downloading; folding that into "copied" lit the COPY button with
@@ -6497,6 +6668,99 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(css,/\.log-focus-share button\{min-height:36px/);
  assert.match(css,/\.log-focus-share button\{min-height:44px;font-size:10px\}/);
  assert.match(css,/\.log-focus-share\{position:relative;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+
+ /* `touch-action:pan-y` IS REQUIRED, AND THIS GATE USED TO BAN IT.
+
+    That inversion is the worst thing in this file's history, because it did not
+    merely miss a bug - it locked one in. The row's own comment claimed no
+    `touch-action` was needed, "a horizontal drag inside a vertical scroller
+    does not scroll it anyway, so there is nothing to suppress", and this test
+    enforced the claim. The browser does not work that way: with
+    `touch-action:auto` it claims the gesture as soon as a finger moves and
+    sends `pointercancel`, which the row correctly treats as "not a swipe" - so
+    on a phone the swipe NEVER FIRED. Reproduced with a real CDP touch drag at
+    390px: pointerdown > pointermove > pointercancel, three rows still there. It
+    worked with a mouse, which is why it looked fine on the shop computer.
+
+    So the gate is the other way round now, and it is resolved THROUGH THE
+    CASCADE rather than matched as a string, because `none` arriving from a
+    broader selector would read identically to this rule being right. `pan-y`
+    keeps vertical panning with the browser and hands horizontal movement to the
+    component; `none` would take the panel's own scroll away. */
+ for(const width of [390,620,1180]){
+  const record=effectiveStyle(css,{tag:"article",classes:["log-focus-record","open"],
+   ancestors:[{tag:"div",classes:["log-focus-body"]}]},width);
+  assert.equal(record["touch-action"],"pan-y",
+   "the swipe row needs pan-y at "+width+"px: auto cancels the gesture, none kills the scroll");
+ }
+ /* AND A SELECTION ALREADY SITTING ON THE ROW EATS THE NEXT SWIPE. Long-press a
+    defect's text and the browser hands the following drag to the selection
+    handles. Scoped to touch on purpose: selecting a defect with a mouse to
+    paste it is ordinary on the shop computer, and a mouse never starts a swipe,
+    so there is nothing to protect there. Matched as text rather than resolved,
+    because the resolver answers width questions and this one is not about
+    width. */
+ assert.match(css,/@media\(hover:none\) and \(pointer:coarse\)\{\s*\.log-focus-record\{-webkit-user-select:none;user-select:none\}/,
+  "a touch-only user-select guard, so the desktop keeps its text");
+ assert.doesNotMatch(css,/^\.log-focus-record\{[^}]*user-select:none/m,
+  "and it is not applied unconditionally - that would take text selection off the shop computer");
+
+ /* THE SCOPE NOTE MOVED INSIDE THE SLOT AND ITS RULE DID NOT FOLLOW IT. The
+    selector was `.log-focus-share>.log-focus-share-scope`, written when the
+    note was a direct child of the bar; inside the always-mounted slot it
+    matched nothing, and neither did `.log-focus-share>small` beside it, so the
+    note drew at the browser's default `small` size in inherited ink inside a
+    bar built for 7px. A `>` is a claim about the markup, and moving an element
+    is how the claim stops being true - silently. Resolved, so the next move
+    fails here. */
+ for(const [width,size] of [[390,9],[1180,7]]){
+  const note=effectiveStyle(css,{tag:"small",classes:["log-focus-share-scope"],
+   ancestors:[{tag:"div",classes:["log-focus-share"]},{tag:"div",classes:["log-focus-share-slot"]}]},width);
+  assert.equal(note.fontSizePx,size,"the scope note has to be bar-sized at "+width+"px");
+  assert.ok(note.color&&note.color.includes("--log-accent"),"and coloured as a notice");
+ }
+ /* AND THE HIDE ANNOUNCEMENT IS NEVER DRAWN, in or out of the slot: the visible
+    answer to a hide is the row going. */
+ assert.match(css,/\.log-focus-share \.log-focus-share-live\{position:absolute;width:1px;height:1px;[^}]*clip-path:inset\(50%\)/);
+ /* A REFUSED BUTTON LOOKS REFUSED. */
+ assert.match(css,/\.log-focus-share button:disabled\{[^}]*cursor:not-allowed/);
+
+ /* THE SLOT'S TWO CHILDREN SHARE ONE ROW. `width:100%` on PUT BACK was left
+    over from the build where it spanned the grid; inside the slot it is a flex
+    item beside the note, and 100% squeezed the sentence saying what will be
+    sent down to a word a line. */
+ assert.doesNotMatch(css,/\.focus-put-back\{[^}]*width:100%/,
+  "PUT BACK shares the slot with the note rather than taking the whole row");
+ for(const width of [390,1180]){
+  const back=effectiveStyle(css,{tag:"button",classes:["focus-put-back"],
+   ancestors:[{tag:"div",classes:["log-focus-share"]},{tag:"div",classes:["log-focus-share-slot"]}]},width);
+  assert.equal(back["min-height"],width<=760?"44px":"36px");
+  assert.equal(back.flex,"0 0 auto","and it does not shrink out from under a thumb");
+ }
+
+ /* WHAT HAPPENS TO FOCUS WHEN THE PRESSED CONTROL UNMOUNTS. A HIDE button goes
+    with its row, which drops focus to the document BODY - a keyboard then sits
+    at the top of the page, outside a dialog it never left. Only on a BUTTON
+    press: a swipe holds no focus, and scrolling the panel up to a control a
+    thumb never asked for is its own bug, which is why the row reports WHICH
+    WAY it was hidden rather than the page guessing. */
+ assert.match(page,/onHide=\{via=>focusHideRecord\(record,via\)\}/);
+ assert.match(swipeRow,/onHide: \(via: "button" \| "swipe"\) => void;/);
+ assert.match(page,/if\(via==="button"\)focusAfterCommit\(focusPutBackRef\)/);
+ assert.match(page,/if\(focusScope\.hiddenByHand<=1\)focusAfterCommit\(focusCopyRef\)/,
+  "the last PUT BACK takes the button away with it, so focus has to move on");
+ assert.match(page,/<button ref=\{focusCopyRef\}/);
+ assert.match(page,/<button ref=\{focusPutBackRef\}/);
+ /* AND A HIDE SAYS SO OUT LOUD, in its own region. A row leaving the list and a
+    button arriving are both silent, and the control that was pressed is gone
+    with its row - so without this a hide is a press with no outcome at all. Its
+    own region rather than the share status beside it, so a hide cannot wipe
+    COPIED and a share cannot wipe the hide. */
+ assert.match(page,/<small className="log-focus-share-live" role="status" aria-live="polite">\{focusHideNote\}<\/small>/);
+ assert.match(page,/setFocusHideNote\("HIDDEN FROM THIS SHARE — "\+repairCategoryLabel\(record\.defect\.category\)\)/);
+ assert.match(page,/setFocusHideNote\("PUT BACK — "/);
+ assert.match(page,/useEffect\(\(\)=>\{setFocusHideNote\(""\)\},\[focusedBusId\]\)/,
+  "and it goes with the bus, like the share status and the swiped-away list");
 });
 
 test("a re-report is visible where it happens, and the count it claims is one it made", async () => {
@@ -7660,4 +7924,34 @@ test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brough
  const note=page.indexOf("LOGGED BY HAND ONLY");
  assert.ok(note>0,"the drawer states its scope");
  assert.ok(note<page.indexOf('className="quick-filter-share-actions"'),"before the share buttons");
+
+ /* AND `defectWithinFeedWindow` ASKS THE SAME QUESTION - with one honest
+    correction about where the answer matters.
+
+    The WHEN LOGGED drop-down over the feed carries the same guard, and at its
+    one caller today the guard never fires: `defectLogRecords` filters
+    `source==="defect-log"` before the page sees a record, and `loggedByHand`
+    is `source!=="down-sheet"`, so everything reaching it already passes. The
+    code comment that shipped with it claimed "ALL still shows them", which was
+    the opposite of true on that screen - a scanned row is not in ALL either,
+    because it never enters the list at all. A cold read caught the claim.
+
+    The guard stays as a property of the question rather than of today's
+    caller, so this drives it directly: the function is what a route, an export
+    or a whole-fleet read would ask, and the filter that currently makes it moot
+    lives in another module. */
+ const {defectWithinFeedWindow:inWindow}=await import("../src/lib/defects/feed-window.ts");
+ const at=new Date("2026-01-02T12:00:00.000Z");
+ const scanned={...defect("s1","down-sheet","C-24"),createdAt:"2026-01-02T11:30:00.000Z"};
+ const typed={...defect("t1","defect-log","Crank no start"),createdAt:"2026-01-02T11:30:00.000Z"};
+ assert.equal(inWindow(typed,1440,at),true,"something logged half an hour ago is in the window");
+ assert.equal(inWindow(scanned,1440,at),false,
+  "a scanned row is out of every narrowed window: its createdAt is when the scan ran");
+ assert.equal(inWindow(scanned,null,at),true,
+  "and ALL is the absence of a window, so it keeps everything handed to it");
+ /* AND THE FILTER THAT MAKES IT MOOT AT THE FEED IS STILL THERE, named here so
+    the dead-code account above cannot quietly stop being true. */
+ const sheetBus={id:"b2",n:"18506",pendingRepair:"",defects:[typed,scanned]};
+ assert.deepEqual(defectLogRecords([sheetBus],[]).map(record=>record.defect.id),["t1"],
+  "the Defect Log's own list never carries a scanned row in the first place");
 });

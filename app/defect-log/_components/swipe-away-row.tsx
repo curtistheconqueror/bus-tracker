@@ -23,12 +23,31 @@
    scrolled the page zero pixels". So a drag has to be clearly more sideways
    than vertical before it counts.
 
-   AND IT DOES NOT BLOCK SCROLLING. No `touch-action:none`, no non-passive
-   `touchmove`, no `preventDefault`: a vertical drag is left entirely to the
-   browser, which is what keeps the panel scrollable. A horizontal drag inside
-   a vertical scroller does not scroll it anyway, so there is nothing to
-   suppress - the map needed to block scroll because its gesture was vertical
-   too, and this one never is. */
+   IT NEEDS `touch-action:pan-y` ON THE ROW, AND THE FIRST VERSION OF THIS NOTE
+   HAD THAT EXACTLY BACKWARDS. It claimed no `touch-action` was needed because
+   "a horizontal drag inside a vertical scroller does not scroll it anyway, so
+   there is nothing to suppress". That is not how the browser works: with
+   `touch-action:auto` it claims the gesture as soon as a finger moves and
+   sends `pointercancel`, which `onPointerCancel` below correctly treats as "not
+   a swipe" - so on a phone the swipe NEVER fired. Reproduced with a real CDP
+   touch drag at 390px: `pointerdown > pointermove > pointercancel`, three rows
+   still there. It worked with a mouse, which is why it looked fine on the shop
+   computer. `pan-y` keeps VERTICAL panning with the browser and hands
+   horizontal movement to this code; `none` would take the scroll away and is
+   what the test bans.
+
+   A MOUSE NEVER STARTS A SWIPE. Selecting the text of a defect with a leftward
+   drag is an ordinary thing to do with a mouse, and it would otherwise satisfy
+   the same three conditions and silently drop that defect from the share.
+   Desktop hides with the button.
+
+   AND IT SAYS WHICH WAY IT WAS HIDDEN. `onHide` is handed "button" or "swipe"
+   because the page does different things with them: a press came FROM a control
+   that is about to be unmounted, so focus has to be put somewhere or it falls
+   to the document body, while a swipe came from a thumb that holds no focus and
+   whose panel must not scroll itself to a control nobody asked for. One
+   parameter rather than two props, so a caller cannot wire one and forget the
+   other. */
 
 import { useRef, useState } from "react";
 import { swipeHidesRow, swipeOffsetPx } from "@/src/lib/defects/focus-share-scope";
@@ -40,7 +59,7 @@ export default function SwipeAwayRow({
   children,
 }: {
   className?: string;
-  onHide: () => void;
+  onHide: (via: "button" | "swipe") => void;
   hideLabel: string;
   children: React.ReactNode;
 }) {
@@ -50,7 +69,7 @@ export default function SwipeAwayRow({
   const end = (commit: boolean) => {
     start.current = null;
     setOffset(0);
-    if (commit) onHide();
+    if (commit) onHide("swipe");
   };
 
   return (
@@ -58,10 +77,15 @@ export default function SwipeAwayRow({
       className={className}
       style={offset ? { transform: "translateX(" + offset + "px)" } : undefined}
       onPointerDown={event => {
-        /* A PRIMARY POINTER ONLY. A second finger landing mid-drag would
-           otherwise restart the measurement from its own position, which reads
-           as a sudden jump back. */
-        if (!event.isPrimary) return;
+        /* A PRIMARY TOUCH ONLY. A second finger landing mid-drag would restart
+           the measurement from its own position, which reads as a jump back;
+           and a mouse drag is text selection, not a gesture. */
+        if (!event.isPrimary || event.pointerType === "mouse") return;
+        /* CAPTURED, so a drag that leaves the row still reports its end here.
+           Without it a gesture ending outside the element never reached
+           `onPointerUp` and left the row stuck mid-swipe with its start point
+           still armed for the next move. */
+        try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* not fatal */ }
         start.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
       }}
       onPointerMove={event => {
@@ -83,12 +107,15 @@ export default function SwipeAwayRow({
          the gesture belongs to a scroll, which is exactly the case this must
          not treat as a decision to hide something. */
       onPointerCancel={() => end(false)}
+      /* AND LOSING THE CAPTURE ENDS IT TOO, so nothing is left armed or
+         half-moved if the browser takes the pointer away. */
+      onLostPointerCapture={() => { if (start.current) end(false); }}
     >
       {children}
       <button
         type="button"
         className="focus-hide-defect"
-        onClick={onHide}
+        onClick={() => onHide("button")}
         /* The gesture is named in the accessible label so somebody using a
            screen reader learns it exists, and so speech input can say it. */
         aria-label={hideLabel}
