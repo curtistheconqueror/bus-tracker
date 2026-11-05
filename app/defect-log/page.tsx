@@ -657,7 +657,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         the bus, and burying them behind a disclosure is how they would go
         unused. Placed further down the form it opened below the fold on a
         phone, which is the same way the campaign paste box got missed. */}
-    <fieldset className="wide work-state-picker"><legend>WORK DONE SO FAR — OPTIONAL</legend>
+    <fieldset className="wide work-state-picker"><legend>PRELIMS — OPTIONAL</legend>
      <div>{WORK_STATES.map(state=>{
       const stamp=value.defect.workStates?.[state.key],on=Boolean(stamp),who=workStateStampLabel(stamp);
       return <label className={on?"selected":""} key={state.key}>
@@ -691,7 +691,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         the same screen, while how long the job runs was nowhere on this form at
         all — and that figure is the one every other surface was guessing at.
 
-        OUTSIDE the WORK DONE SO FAR fieldset rather than inside it, which is
+        OUTSIDE the PRELIMS fieldset rather than inside it, which is
         where the finding sat. An estimate is not work done, and a legend saying
         it is would be wrong about the one field under it that looks forward. It
         is the same place on the screen: directly above WORK STATUS and outside
