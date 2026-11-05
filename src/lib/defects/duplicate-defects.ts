@@ -33,6 +33,8 @@
 
 import {defectLabel,isUnresolved,mergeReportAttempts,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
 import {normalizeDefectParts,withDefectParts,type DefectPart} from "./defect-parts.ts";
+
+const clean=(value:unknown)=>typeof value==="string"?value.trim():"";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "../down-sheet/down-sheet-sync.ts";
 /* The identity rule lives on its own so the Down Sheet can ask the same
    question before it writes without these two files importing each other. */
@@ -125,12 +127,25 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     that reason, and it takes `partsUsed` so a ticked-with-nothing-typed copy
     keeps its MISSING PART # through the merge. */
  const mergedParts:DefectPart[]=[];
- const seenParts=new Set<string>();
+ const seenParts=new Map<string,number>();
  for(const defect of ordered)
   for(const part of normalizeDefectParts(defect.parts,defect)){
    const key=(part.partNumber||"").trim().toLowerCase()||"name:"+(part.partName||"").trim().toLowerCase();
-   if(key==="name:"||seenParts.has(key))continue;
-   seenParts.add(key);
+   if(key==="name:")continue;
+   const already=seenParts.get(key);
+   if(already!==undefined){
+    /* THE SAME NUMBER TWICE IS ONE PART, BUT A NAME IS STILL SOMETHING SOMEBODY
+       RECORDED. The first version skipped a repeat outright, so a survivor
+       holding `AA-1` with no name and a duplicate holding `AA-1 (Chamber)` kept
+       the number and threw the name away - the same kind of loss this whole
+       union exists to prevent, one field smaller. The first entry keeps its
+       place; a later copy only ever FILLS a gap in it, never overwrites. */
+    const held=mergedParts[already];
+    if(!clean(held.partName)&&clean(part.partName))
+     mergedParts[already]={...held,partName:clean(part.partName)};
+    continue;
+   }
+   seenParts.set(key,mergedParts.length);
    mergedParts.push(part);
   }
  return withDefectParts({
