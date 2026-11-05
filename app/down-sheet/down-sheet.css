@@ -55,7 +55,7 @@ button,input,select,textarea{font:inherit}
    widening that one column takes nothing away from the others: the table is
    inside a horizontal scroller and simply gets longer. 40px for the ON ROAD
    badge, then 90px more for the DELETE button beside it. */
-.down-table{width:100%;min-width:1280px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.down-table{width:100%;min-width:1297px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
 .down-table th:nth-child(1){width:48px;text-align:center}/* 108px fitted the number and its status label exactly, so the ON ROAD badge
    beside it overflowed into the reason column and was clipped by 21px —
@@ -480,7 +480,12 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 /* IT SAYS WHAT IT IS. This was a bare green tick and nothing else, which is
    why Curtis asked for "its own Mark as fixed button, just like the defect
    sheet has" about a button that already existed and had done the whole job
-   since it was built. A tick is not a word. */
+   since it was built. A tick is not a word.
+
+   `min-width:26px` here is INERT and kept only as a floor: the grid track
+   below stretches this button to 62px on the shop computer and the phone
+   block sets `width:44px`, so 26px can never bind. It used to be described as
+   the reason the pair lines up, which it is not — the two FIXED TRACKS are. */
 .fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;gap:5px;width:auto;min-width:26px;height:26px;padding:0 7px;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
 .fix-entry:hover,.fix-entry:focus-visible{background:#1f6b37;color:#fff;outline:none}
 .fix-entry b{font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1}
@@ -531,10 +536,22 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
     gap already fill it, so the button came out 45px wide with scrollWidth 46
     against clientWidth 43 and the word's right edge past the button's. Widening
     the cell instead would have squeezed REASON, which is the bug the comment
-    further up this file was written for. Stacked, the target stays 44px wide,
-    the column does not move, and the only cost is row height. */
+    further up this file was written for. Stacked, the target stays 44px wide
+    and the column does not move.
+
+    AND IT COSTS NO ROW HEIGHT, which this comment used to claim it did. The
+    stacked button is 44px and `.down-table td{height:55px}` above already
+    floors an entry row higher than that, so the word changes nothing: measured
+    identical with the word and with it hidden, 55px on a row whose REASON fits
+    one line and 75.59px on one that wraps to three, at 360, 390, 430, 760 and
+    1180. The height is the REASON's, not the button's. */
  .fix-entry{flex-direction:column;justify-content:center;gap:1px;width:44px;min-width:44px;height:auto;min-height:44px;font-size:17px;padding:4px 0;line-height:1}
- .fix-entry b{font-size:7px;letter-spacing:.3px}
+ /* UP a point on a phone, not down. Five lines from here this file says "the
+    status label and the badge are both a point larger here", and `.on-road-badge`
+    does go 8px to 9px. 7px was the smallest text on the sheet, on the device
+    the sheet is actually used on. Read through `declaredFontSizePx` by the
+    test, so a `font:` shorthand or a `%` here is seen rather than guessed. */
+ .fix-entry b{font-size:9px;letter-spacing:.3px}
  /* The status label and the badge are both a point larger here, and the target
     is 44px, so the tab stops move out to match rather than letting anything
     spill into the reason column. */
@@ -666,10 +683,47 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
    Out here they cost a deliberate scroll, which is the point, and both now ask
    before they act. */
-.down-table th.row-actions-head{width:104px}
+/* 121px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
+   and "six more pixels buys the slack", which was wrong twice over. The six
+   pixels of COLUMN width cannot affect the button's internal fit at all — the
+   first track is a fixed 62px however wide the cell is, and what gives the
+   word room is the track stretching the button to a 46px content box against
+   the 42.56px it needs. (The "3.34px over in DejaVu Sans" this comment used to
+   carry belongs to the old auto-width button; forced to DejaVu the stretched
+   one needs 45.13 of 46 and fits.)
+
+   What the column width decides is whether the GRID fits. It is 62 + 8 + 36 =
+   106px; `*{box-sizing:border-box}` at the top of this file means a `th` width
+   is the border box, so the cell also owes 14px of `td` padding and a 1px
+   border — 121px. At 110px it was 11px short of its own contents and only
+   looked right because `min-width` below is deliberately larger than the sum
+   of the columns and Chrome spreads the surplus, leaving 0.45px of DELETE in
+   the cell's own right padding. Anyone who later made `min-width` match the
+   columns, which this file reads as if it were the rule, would have pushed
+   DELETE 3px past the table's right edge on the spot. Declared honestly now,
+   and a test checks the declaration rather than the render. */
+.down-table th.row-actions-head{width:121px}
 .down-table td.row-actions{text-align:center}
-.row-actions-slots{display:inline-grid;grid-template-columns:auto 36px;justify-content:center;gap:8px;align-items:center}
-@media(max-width:760px){.row-actions-slots{grid-template-columns:auto 44px;gap:10px}}
+/* FIXED TRACKS, NOT `auto`. With `auto` the first track took MARK FIXED's
+   full width on an open row and collapsed to the button's min-width on a
+   completed one, so the grid was 99.03px on one row and 70px on the next and
+   DELETE sat 48.5px apart between neighbours — measured. Worse, every DELETE
+   on the shop computer moved when the word was added, including on completed
+   rows that never draw a MARK FIXED at all. A destructive control is not
+   something to let wander.
+
+   `justify-content:center` is INERT for the same reason: with both tracks
+   fixed the inline-grid is exactly 106px, so there is nothing inside it to
+   distribute. What centres the pair in the cell is `text-align:center` on the
+   line above. Kept so that a future `auto` track does not also lose the
+   centring, and recorded rather than left to be rediscovered. */
+.row-actions-slots{display:inline-grid;grid-template-columns:62px 36px;justify-content:center;gap:8px;align-items:center}
+/* AND DELETE STAYS IN ITS OWN TRACK. A lone child auto-places into column 1,
+   so on a completed row DELETE slid into the slot MARK FIXED normally holds
+   and left the reserved track empty beside it. That predates the word and is
+   why the two rows never lined up. */
+.delete-entry{grid-column:2}
+@media(max-width:760px){.row-actions-slots{grid-template-columns:44px 44px;gap:10px}}
 /* THE STATUS REPORT. Shares .shade with the other Down Sheet modals so the
    backdrop and the scroll lock behave identically; everything below is its
    own, because it is a report rather than a form. */

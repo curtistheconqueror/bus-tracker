@@ -2253,16 +2253,110 @@ beside it.
 | | phone | desktop |
 | --- | --- | --- |
 | button | 44x44, ✓ over FIXED | 55x26, ✓ FIXED |
-| row height | 38px — **unchanged** | 34px — **unchanged** |
+| row height | **unchanged** | **unchanged** |
 
-Contrast 7.76:1, no horizontal overflow at 320 / 360 / 390 / 430 / 820 / 1180,
-and REASON's right edge does not move.
+Contrast 7.76:1, no horizontal page overflow at 320 / 360 / 390 / 430 / 620 /
+760 / 761 / 820 / 1180 / 1440.
 
-**Two of three mutations were not caught until the gates were fixed.** Taking
-the word out of the markup passed, because styling `.fix-entry b` says nothing
-about whether a `<b>` is rendered. Shrinking the phone target 44px → 30px
-passed, because `[^}]*width:44px` also matches `min-width:44px`. Both anchored
-now.
+**THREE FIGURES IN THIS SECTION WERE WRONG AND ARE CORRECTED BELOW**, along
+with one defect the cold read found underneath them. None of this was known
+when the section was first written, and it should not be published as it
+stood.
+
+**ONE: the row-height numbers measured the wrong element.** This section said
+*"38px / 34px — unchanged"*. 34px is `.down-table .down-group-row td` — the
+group divider, a `colSpan` cell holding no buttons at all, which could not have
+changed either way. An **entry** row is floored at 55px by
+`.down-table td{height:55px}` and grows with how far REASON wraps: measured
+identical with the word and with the word hidden, 55px on a one-line reason and
+75.59px on one that wraps to three, at 360 / 390 / 430 / 760 / 1180. The row
+height is REASON's, not the button's, and the conclusion — unchanged — holds.
+The stylesheet's own comment claiming *"the only cost is row height"* was wrong
+in the other direction and is fixed too.
+
+**TWO: “the column does not move” was false on the shop computer.**
+`.row-actions-slots` was `grid-template-columns:auto 36px`, so the first track
+took MARK FIXED's full width on an open row and collapsed to the button's
+`min-width` on a completed one — 99.03px against 70px, which left DELETE
+**48.5px apart between neighbouring rows** on the shop computer and 54px on a
+phone. Adding the word also moved **every desktop DELETE**: 9.52px on open
+rows and 5.00px on completed rows, which never draw a MARK FIXED at all. A
+destructive control that wanders between rows is worse than an unlabelled one.
+
+**Both tracks are fixed now** — `62px 36px` — and `.delete-entry{grid-column:2}`
+pins DELETE to its own. A lone grid child auto-places into column 1, so on a
+completed row DELETE had been sliding into the slot MARK FIXED holds and
+leaving the reserved track empty beside it — which predates the word and is why
+the two row types never lined up. Measured after, open and completed rows side
+by side: DELETE's left edge **identical on both** at every width from 320 to
+1440. The phone's word also went **up** a point, 7px → 9px, matching the badge
+beside it: 7px was the smallest text on the sheet, on the device the sheet is
+actually used on.
+
+**THREE: “six more pixels buys the slack” described a mechanism that does not
+exist, and the column was 11px too narrow underneath it.** Widening ACTIONS
+cannot affect the button's internal fit at all — the first track is a fixed
+62px however wide the cell is, and what gives the word room is that track
+stretching the button to a 46px content box against the 42.56px it needs.
+(Forced to DejaVu Sans it needs 45.13 of 46 and still fits, so the *"3.34px
+over in DejaVu"* this section used to quote belonged to the old auto-width
+button, not this one.)
+
+What the column width actually decides is whether the **grid** fits. It is
+62 + 8 + 36 = **106px**, and with `*{box-sizing:border-box}` a `th` width is
+the border box, so the cell also owes 14px of padding and a 1px border —
+**121px**. It was declared **110px**. It looked right only because the table's
+`min-width` is deliberately larger than the sum of its columns, and Chrome
+spreads that surplus: measured, 0.45px of DELETE was sitting in the cell's own
+right padding at every width from 761px to about 1300px. Anyone who later made
+`min-width` match the columns — which that stylesheet reads as if it were the
+rule — would have pushed DELETE 3px past the table's right edge on the spot.
+
+**ACTIONS is 121px now and `min-width` 1297px**, which keeps the surplus
+exactly as it was so no other column moves. Measured before and after, one
+render apart: **REASON 284.80px → 284.56px** (0.24px, and its right edge with
+it), the table's scroll width 1286 → 1297, DELETE's overflow past the cell's
+content box **+0.45px → −11.50px**, and no page overflow at any width. The
+test checks the **declaration** rather than the render for that reason.
+
+**And that surplus had been written into a test as a column total.** The
+existing gate asserted `min-width === 1052 + busCol + actionsCol` and called
+1052 *"the other seven columns"*. They total **940px**. The 112px difference is
+the real surplus, and hiding it inside a constant labelled as a column sum is
+what let a column 11px narrower than its own contents sit there looking
+checked. The widths are summed out of the stylesheet now, all ten of them, and
+the assertion is `min-width >= the sum` with the surplus bounded and named.
+
+**TWENTY-SEVEN mutations, all caught — and the gates as first written let
+SEVENTEEN through.** The second version of the word's gate computed "the last
+rule whose selector string is exactly this one" and called that the effective
+style. Every one of these is ordinary CSS and every one of them passed it:
+`.row-actions .fix-entry b{display:none}` (a descendant form, which also has
+*higher* specificity than the rule it beats), `display:none!important` (stored
+as the string `"none!important"`), `display:None` (CSS keywords are
+case-insensitive), `@media(max-width:900px){…}` (an at-rule dropped for not
+being spelled `max-width:760px`, in a file that already uses 900px twice),
+`font:900 1px/1 Arial` (a shorthand), `font-size:40%` (6.8px here, and
+`parseFloat` reads it as 40), `transform:scale(0)` (a guard that required a
+decimal point), `width:0`, `position:absolute;left:-9999px`,
+`color:#e4f4e8` (the button's own fill — only `transparent` was checked), and
+a plain later rule appended anywhere in the file. Two of them put the DELETE
+jitter back.
+
+**A regex over a stylesheet cannot see the cascade**, so the gate stops being
+one. `effectiveStyle` in `tests/helpers/css-rules.mjs` orders every rule that
+targets an element by `!important`, then specificity, then source position, and
+evaluates the at-rules against a real viewport width; sizes go through
+`declaredFontSizePx`, which reads the `font` shorthand and converts units. It
+is walked over **both row types** — an open row and a completed one are
+different elements, and a completed row draws no MARK FIXED at all — at phone
+and desktop widths. It is a tripwire and not a rendering engine, and what it
+cannot see is written where it is defined.
+
+One hole it found in the shared reader itself: `declaredFontSizePx` rejected a
+bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
+it stood. A unitless zero is a valid length; it reads as 0 now, and that was
+the last of the twenty-seven.
 
 ### NO HEAT, and DEFECTS LOGGED means logged by hand
 
