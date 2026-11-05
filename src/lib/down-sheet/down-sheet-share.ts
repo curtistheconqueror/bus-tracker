@@ -9,6 +9,35 @@ import {knownLocationLabel} from "../fleet/location-label.ts";
 
 export type DownSheetShareEntry=DownSheetFilterEntry&{busNumber:string};
 
+/* WHAT ONE SHARE COVERS, and why this is a union rather than a nullable key.
+
+   A quick filter names itself, so a filtered share could always say what it
+   was. Sharing the sheet WITHOUT one has no such name, and "the whole sheet"
+   is only true when nothing else is narrowing it - the search box, the shift
+   filter, the road filter and SHOW COMPLETED all change what is on screen, and
+   the share sends exactly what is on screen.
+
+   So a share with no filter is one of TWO things, and the reader is told
+   which. Calling a searched-down view "WHOLE SHEET" would put a heading on the
+   artifact that contradicts its own contents - the shape of the Defect Log bug
+   where an emptied share still read as "No defects on this bus". A person
+   forwarding this to a superintendent is making a claim about the fleet, and
+   the claim has to match what is underneath it. */
+export type DownSheetShareScope=DownSheetFilterKey|"whole-sheet"|"partial-sheet";
+
+export function downSheetShareScopeLabel(scope:DownSheetShareScope){
+ return scope==="whole-sheet"?"Whole sheet":scope==="partial-sheet"?"Part of the sheet":downSheetFilterLabel(scope);
+}
+
+/* Nothing to send reads differently in each case, and a wrong one here is a
+   false statement about the fleet rather than a cosmetic slip: "the sheet is
+   empty" on a view a search had narrowed would report a clear garage. */
+export function downSheetShareEmptyNote(scope:DownSheetShareScope){
+ return scope==="whole-sheet"?"The sheet is empty."
+  :scope==="partial-sheet"?"No buses in this view of the sheet."
+  :"No buses on the sheet match this filter.";
+}
+
 /* What is written about the bus, one line per repair.
 
    Exact duplicates are collapsed. A sheet photographed on three mornings mints
@@ -45,10 +74,10 @@ export function downSheetShareContext(entry:DownSheetShareEntry,location:string,
 /* Plain text, for pasting into a message. A blank line between buses, because
    this is read on a phone as a wall of text and the eye needs somewhere to
    land. */
-export function downSheetShareText(key:DownSheetFilterKey,entries:DownSheetShareEntry[],locations:Record<string,string>={},now=new Date().toISOString()){
- const label=downSheetFilterLabel(key);
+export function downSheetShareText(scope:DownSheetShareScope,entries:DownSheetShareEntry[],locations:Record<string,string>={},now=new Date().toISOString()){
+ const label=downSheetShareScopeLabel(scope);
  const heading="DOWN SHEET — "+label.toUpperCase()+"  ("+entries.length+" bus"+(entries.length===1?"":"es")+")";
- if(!entries.length)return heading+"\n\nNo buses on the sheet match this filter.";
+ if(!entries.length)return heading+"\n\n"+downSheetShareEmptyNote(scope);
  return [heading,...entries.map(entry=>{
   const context=downSheetShareContext(entry,locations[entry.busId||""]||"",now);
   return ["Bus "+entry.busNumber+(context?"\n   "+context:""),...downSheetShareLines(entry).map(line=>"   • "+line)].join("\n");
@@ -67,14 +96,14 @@ function escapeHtml(value:string){
    Everything is inlined: no fonts, no scripts, no network. This is opened from
    a text message on a phone that may be standing in a garage with no signal,
    and a page that has to fetch something is a page that shows nothing. */
-export function downSheetShareHtml(key:DownSheetFilterKey,entries:DownSheetShareEntry[],locations:Record<string,string>,stamp:string,now=new Date().toISOString()){
- const label=downSheetFilterLabel(key);
+export function downSheetShareHtml(scope:DownSheetShareScope,entries:DownSheetShareEntry[],locations:Record<string,string>,stamp:string,now=new Date().toISOString()){
+ const label=downSheetShareScopeLabel(scope);
  const cards=entries.length?entries.map(entry=>{
   const context=downSheetShareContext(entry,locations[entry.busId||""]||"",now);
   const lines=downSheetShareLines(entry).map(line=>"<li>"+escapeHtml(line)+"</li>").join("");
   return "<article><header><span class=\"n\">"+escapeHtml(entry.busNumber)+"</span>"+
    (context?"<span class=\"a\">"+escapeHtml(context)+"</span>":"")+"</header><ul>"+lines+"</ul></article>";
- }).join(""):"<p class=\"empty\">No buses on the sheet match this filter.</p>";
+ }).join(""):"<p class=\"empty\">"+escapeHtml(downSheetShareEmptyNote(scope))+"</p>";
  return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"+
   "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"+
   "<title>"+escapeHtml(label)+" — "+SITE_ORGANIZATION+" Down Sheet</title><style>"+
@@ -97,7 +126,7 @@ export function downSheetShareHtml(key:DownSheetFilterKey,entries:DownSheetShare
   "<footer>Snapshot taken when this was shared. It does not update.</footer></body></html>";
 }
 
-export function downSheetShareFilename(key:DownSheetFilterKey,now=new Date()){
- const slug=downSheetFilterLabel(key).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"filter";
+export function downSheetShareFilename(scope:DownSheetShareScope,now=new Date()){
+ const slug=downSheetShareScopeLabel(scope).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"filter";
  return "pace-down-sheet-"+slug+"-"+now.toISOString().slice(0,10)+".html";
 }
