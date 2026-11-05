@@ -39,8 +39,8 @@ export {busNumbersInText, perBusReason, printedLineConflicts, unreadBusNumbers} 
 export {addMintedEntries, mintSkippedMessage} from "../../src/lib/down-sheet/sheet-mint.ts";
 export {ADDED_IN_APP_LABEL, clearAddedInApp, entryOriginLabel, markAddedInApp, wasAddedInApp} from "../../src/lib/down-sheet/entry-origin.ts";
 export {prepareFleetForScannedReplacement, scannedSheetRemovals} from "../../src/lib/down-sheet/down-sheet-replace.ts";
-export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
-export {downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
+export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterLabel, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
+export {downSheetShareContext, downSheetShareEmptyNote, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareScope, downSheetShareScopeLabel, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
 export {RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord} from "../../src/lib/defects/defect-log-sync.ts";
 export {bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds} from "../../src/lib/fleet/mystery-buses.ts";
 export {reconcileDownSheetMembership as reconcileDS} from "../../src/lib/down-sheet/down-sheet-counter.ts";
