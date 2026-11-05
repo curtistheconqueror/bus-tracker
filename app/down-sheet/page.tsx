@@ -521,8 +521,14 @@ export default function DownSheet(){
     same device. */
  const shareStatusKey=shareLabel+"|"+visible.map(entry=>entry.id).join(",");
  useEffect(()=>{setShareStatus("")},[shareStatusKey]);
- /* What the one line under the scope says. A press wins over the hint while
-    it stands; COPIED! is not here because it is shown on the button itself. */
+ /* What the one line under the scope says: a press wins over the hint while
+    it stands, and EVERY outcome gets a word here, COPY LIST included.
+
+    The button changing to COPIED! is the only thing a sighted person needs,
+    which is why `copied` was the one state with no branch - and it is also
+    why a screen reader heard nothing when a copy succeeded. The line is the
+    announcement; the duplication with the button is the price, measured at
+    360 and 390 and worth it. */
  const shareNote=shareStatus==="copied"?{said:true,text:"COPIED!"}
   :shareStatus==="shared"?{said:true,text:"SENT"}
   :shareStatus==="saved"?{said:true,text:"SAVED TO THIS DEVICE"}
