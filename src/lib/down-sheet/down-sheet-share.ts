@@ -9,33 +9,75 @@ import {knownLocationLabel} from "../fleet/location-label.ts";
 
 export type DownSheetShareEntry=DownSheetFilterEntry&{busNumber:string};
 
-/* WHAT ONE SHARE COVERS, and why this is a union rather than a nullable key.
+/* WHAT ONE SHARE COVERS, and why the DECISION lives here rather than in the
+   page. The bar sends exactly what is drawn, so the heading is a claim about
+   the fleet made to somebody who cannot see the screen it came from. A cold
+   read found the first version of this making that claim falsely in four
+   different ways, so the rule now has one home: a route asking "what does
+   this sheet's share cover" calls the same function the button does.
 
-   A quick filter names itself, so a filtered share could always say what it
-   was. Sharing the sheet WITHOUT one has no such name, and "the whole sheet"
-   is only true when nothing else is narrowing it - the search box, the shift
-   filter, the road filter and SHOW COMPLETED all change what is on screen, and
-   the share sends exactly what is on screen.
+   THE SHEET IS NOT THE SAME THING AS WHAT IS DRAWN, which is the trap. The
+   page hides IDOT-only rows from the bands unconditionally (`bandEntries`),
+   on top of the search box, the shift filter, the road filter and FIXED
+   TODAY. Measured before this was fixed: a sheet whose three rows were all
+   IDOT drew "WHOLE SHEET — 0 of 3" and shared "The sheet is empty." with the
+   three buses listed in the IDOT board on the same screen.
 
-   So a share with no filter is one of TWO things, and the reader is told
-   which. Calling a searched-down view "WHOLE SHEET" would put a heading on the
-   artifact that contradicts its own contents - the shape of the Defect Log bug
-   where an emptied share still read as "No defects on this bus". A person
-   forwarding this to a superintendent is making a claim about the fleet, and
-   the claim has to match what is underneath it. */
-export type DownSheetShareScope=DownSheetFilterKey|"whole-sheet"|"partial-sheet";
+   So `dropped` is a COUNT COMPARISON rather than another flag. A list of
+   inputs goes stale the moment somebody adds the next row filter; asking
+   whether fewer rows were drawn than the sheet holds cannot. */
+export type DownSheetShareScope=
+ |{kind:"whole"}
+ |{kind:"part"}
+ |{kind:"with-completed"}
+ |{kind:"filter";key:DownSheetFilterKey;narrowed:boolean};
 
-export function downSheetShareScopeLabel(scope:DownSheetShareScope){
- return scope==="whole-sheet"?"Whole sheet":scope==="partial-sheet"?"Part of the sheet":downSheetFilterLabel(scope);
+export type DownSheetShareView={
+ quickFilter:DownSheetFilterKey|null;
+ /* Narrowings the page applies by hand. These cut `shown` itself, so they
+    hold whether or not a quick filter is also on. */
+ search:string;shiftFiltered:boolean;roadFiltered:boolean;fixedToday:boolean;
+ /* SHOW COMPLETED does not hide rows, it ADDS finished ones - so it is not
+    "part of" the sheet, and it is not the plain sheet either. It gets its own
+    scope rather than being waved through: with it on, a sheet carrying one
+    down bus and two repaired ones headed "WHOLE SHEET (3 buses)", which
+    contradicts the page's own footer that the down count excludes completed
+    repairs. */
+ showCompleted:boolean;
+ /* What the page DREW, against what the sheet holds before the bands drop
+    anything. Only meaningful with no quick filter, because a filter is
+    supposed to cut rows. */
+ drawn:number;onSheet:number;
+};
+
+export function downSheetShareScope(view:DownSheetShareView):DownSheetShareScope{
+ const byHand=Boolean(view.search.trim())||view.shiftFiltered||view.roadFiltered||view.fixedToday;
+ if(view.quickFilter)return {kind:"filter",key:view.quickFilter,narrowed:byHand};
+ if(byHand||view.drawn!==view.onSheet)return {kind:"part"};
+ if(view.showCompleted)return {kind:"with-completed"};
+ return {kind:"whole"};
 }
 
-/* Nothing to send reads differently in each case, and a wrong one here is a
-   false statement about the fleet rather than a cosmetic slip: "the sheet is
-   empty" on a view a search had narrowed would report a clear garage. */
+export function downSheetShareScopeLabel(scope:DownSheetShareScope){
+ switch(scope.kind){
+  case "whole":return "Whole sheet";
+  case "part":return "Part of the sheet";
+  case "with-completed":return "Whole sheet plus completed";
+  /* "Part of X" rather than "X", because a filtered list that a search has
+     cut further still reads as the complete answer to that filter. */
+  default:return (scope.narrowed?"Part of ":"")+downSheetFilterLabel(scope.key);
+ }
+}
+
+/* Nothing to send reads differently in each case, and the wrong one here is a
+   false statement about the fleet rather than a cosmetic slip. "The sheet is
+   empty" over a view a search had narrowed would report a clear garage; "no
+   buses match this filter" is equally false when buses do match and something
+   else removed them. */
 export function downSheetShareEmptyNote(scope:DownSheetShareScope){
- return scope==="whole-sheet"?"The sheet is empty."
-  :scope==="partial-sheet"?"No buses in this view of the sheet."
-  :"No buses on the sheet match this filter.";
+ if(scope.kind==="whole"||scope.kind==="with-completed")return "The sheet is empty.";
+ if(scope.kind==="part"||scope.narrowed)return "No buses in this view of the sheet.";
+ return "No buses on the sheet match this filter.";
 }
 
 /* What is written about the bus, one line per repair.

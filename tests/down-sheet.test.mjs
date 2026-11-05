@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterLabel, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareEmptyNote, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareScopeLabel, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
+import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterLabel, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareEmptyNote, downSheetShareScope, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareScopeLabel, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
 import { effectiveStyle } from "./helpers/css-rules.mjs";
 
@@ -2707,11 +2707,24 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
   "SHOW THE WHOLE SHEET only appears when a filter is on");
  assert.match(shareBar,/\{quickFilter\?DOWN_SHEET_FILTERS\.find\(item=>item\.key===quickFilter\)\?\.hint:/,
   "the filter's hint is replaced by a plain line when no filter is on");
- /* And the scope the bar sends is decided in the lib, not spelled out here. */
- assert.match(pageCode,/const shareScope:DownSheetShareScope=quickFilter\|\|\(sheetNarrowed\?"partial-sheet":"whole-sheet"\);/,
-  "the two unfiltered scopes are chosen from whether anything is narrowing the view");
- assert.match(pageCode,/const sheetNarrowed=Boolean\(search\.trim\(\)\)\|\|filter!=="All"\|\|Boolean\(roadFilter\)\|\|fixedToday;/,
-  "every narrowing that HIDES rows counts; SHOW COMPLETED adds rows and does not");
+ /* THE SCOPE IS DECIDED IN THE LIB, which is CLAUDE.md's first rule and also
+    the only way this is testable: the decision cannot be exercised through a
+    page this suite cannot render, so it has to be reachable without one. The
+    page passes its view state and nothing else. */
+ assert.match(pageCode,/const shareScope=downSheetShareScope\(\{quickFilter,search,shiftFiltered:filter!=="All",/,
+  "the page reports its view state and the lib decides the scope");
+ assert.match(pageCode,/drawn:visible\.length,onSheet:shown\.length\}\)/,
+  "what was DRAWN is compared with what the sheet holds, which is what catches rows the bands drop on their own");
+ assert.doesNotMatch(pageCode,/const sheetNarrowed=/,"the decision is not also spelled out in the page");
+ /* The status belonged to the scope it was earned under, and the bar no
+    longer unmounts to clear it. */
+ assert.match(pageCode,/const shareStatusKey=shareLabel\+"\|"\+visible\.length;\s*useEffect\(\(\)=>\{setShareStatus\(""\)\},\[shareStatusKey\]\);/,
+  "COPIED!/SENT is cleared when the scope or the row count moves under it");
+ /* The permanently mounted line is not a live region. It used to exist only
+    while a filter was on; left as role="status" it re-announced the whole
+    scope line on every keystroke in SEARCH. */
+ assert.doesNotMatch(shareBar.slice(0,400),/<p role="status">/,
+  "the always-present scope line does not re-announce itself on every keystroke");
  /* A failed COPY LIST used to be reported as "COULD NOT SHARE — TRY COPY LIST",
     which sends somebody to press the button that had just failed. */
  assert.match(pageCode,/shareStatus==="copy-error"/);
@@ -3191,24 +3204,28 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
  // Nothing known is nothing printed, rather than a row of empty separators.
  assert.doesNotMatch(downSheetShareContext(entry({createdAt:""}),"",now),/·\s*·/);
 
- const text=downSheetShareText("waiting-parts",[sheet[1]],locations,now);
+ /* Scope shorthands, declared above their first use: these are `const`, so a
+    call placed above them is a TDZ error rather than a readable failure. */
+ const WHOLE={kind:"whole"},PART={kind:"part"},WITHDONE={kind:"with-completed"};
+ const FILTER=(key,narrowed=false)=>({kind:"filter",key,narrowed});
+ const text=downSheetShareText(FILTER("waiting-parts"),[sheet[1]],locations,now);
  assert.match(text,/DOWN SHEET — WAITING FOR PARTS {2}\(1 bus\)/);
  assert.match(text,/Bus 17514/);
  assert.match(text,/• Air dryer|No repair written/);
- assert.match(downSheetShareText("waiting-parts",[],locations,now),/No buses on the sheet match this filter/);
+ assert.match(downSheetShareText(FILTER("waiting-parts"),[],locations,now),/No buses on the sheet match this filter/);
  // Plural only when it is plural — this is read by somebody outside the shop.
- assert.match(downSheetShareText("unassigned",sheet,locations,now),/\(3 buses\)/);
+ assert.match(downSheetShareText(FILTER("unassigned"),sheet,locations,now),/\(3 buses\)/);
 
  /* The page is inlined and escaped. It is opened from a text message on a phone
     that may have no signal, so it fetches nothing; and a bus number typed off a
     paper sheet can carry anything, so nothing reaches the markup unescaped. */
- const html=downSheetShareHtml("waiting-parts",[{...sheet[1],busNumber:"<script>x</script>"}],locations,"Sep 14, 3:00 PM",now);
+ const html=downSheetShareHtml(FILTER("waiting-parts"),[{...sheet[1],busNumber:"<script>x</script>"}],locations,"Sep 14, 3:00 PM",now);
  assert.doesNotMatch(html,/<script>/);
  assert.match(html,/&lt;script&gt;/);
  assert.doesNotMatch(html,/https?:\/\//,"nothing is fetched from the network");
  assert.match(html,/PACE SOUTH · DOWN SHEET/);
  assert.match(html,/Snapshot taken when this was shared/);
- assert.equal(downSheetShareFilename("waiting-parts",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
+ assert.equal(downSheetShareFilename(FILTER("waiting-parts"),new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-waiting-for-parts-2026-09-14.html");
 
  /* SHARING THE SHEET WITH NO FILTER ON, which is what Curtis asked for and the
     one thing this bar could not do: the three actions were reachable only once
@@ -3221,25 +3238,57 @@ test("the Down Sheet's quick filters ask about the entry, and what is shared is 
     view would be a false claim about the fleet, sent to somebody who cannot
     see the screen it came from. That is the Defect Log bug where an emptied
     share still read "No defects on this bus", one surface along. */
- assert.equal(downSheetShareScopeLabel("whole-sheet"),"Whole sheet");
- assert.equal(downSheetShareScopeLabel("partial-sheet"),"Part of the sheet");
- assert.equal(downSheetShareScopeLabel("waiting-parts"),downSheetFilterLabel("waiting-parts"),
+ assert.equal(downSheetShareScopeLabel(WHOLE),"Whole sheet");
+ assert.equal(downSheetShareScopeLabel(PART),"Part of the sheet");
+ assert.equal(downSheetShareScopeLabel(WITHDONE),"Whole sheet plus completed");
+ assert.equal(downSheetShareScopeLabel(FILTER("waiting-parts")),downSheetFilterLabel("waiting-parts"),
   "a real filter still names itself, through the one table");
- assert.match(downSheetShareText("whole-sheet",sheet,locations,now),/DOWN SHEET — WHOLE SHEET {2}\(3 buses\)/);
- assert.match(downSheetShareText("partial-sheet",[sheet[1]],locations,now),/DOWN SHEET — PART OF THE SHEET {2}\(1 bus\)/);
+ assert.equal(downSheetShareScopeLabel(FILTER("waiting-parts",true)),"Part of "+downSheetFilterLabel("waiting-parts"),
+  "a filtered list a search cut further does not read as the whole answer to that filter");
+ assert.match(downSheetShareText(WHOLE,sheet,locations,now),/DOWN SHEET — WHOLE SHEET {2}\(3 buses\)/);
+ assert.match(downSheetShareText(PART,[sheet[1]],locations,now),/DOWN SHEET — PART OF THE SHEET {2}\(1 bus\)/);
+
+ /* THE DECISION ITSELF. Every one of these was a false heading in the first
+    version of this feature, found by a cold read rather than by this suite,
+    which is why the rule moved out of the page to where it can be driven. */
+ const view=extra=>downSheetShareScope({quickFilter:null,search:"",shiftFiltered:false,
+  roadFiltered:false,fixedToday:false,showCompleted:false,drawn:3,onSheet:3,...extra});
+ assert.deepEqual(view({}),WHOLE,"nothing narrowing is the whole sheet");
+ assert.deepEqual(view({search:"175"}),PART,"a search narrows it");
+ assert.deepEqual(view({search:"   "}),WHOLE,"whitespace in the box is not a search");
+ assert.deepEqual(view({shiftFiltered:true}),PART);
+ assert.deepEqual(view({roadFiltered:true}),PART);
+ assert.deepEqual(view({fixedToday:true}),PART);
+ /* The one the first version missed: the bands drop IDOT-only rows with no
+    flag anywhere to say so, so a sheet of three IDOT rows drew "WHOLE SHEET —
+    0 of 3" and shared "The sheet is empty." with the three buses listed on
+    the same screen. Comparing what was drawn against what the sheet holds
+    catches it, and catches the next row filter nobody updates this for. */
+ assert.deepEqual(view({drawn:2,onSheet:3}),PART,"rows the bands hid are still rows the sheet holds");
+ assert.deepEqual(view({drawn:0,onSheet:3}),PART,"an all-IDOT sheet is never reported as an empty whole sheet");
+ assert.deepEqual(view({showCompleted:true}),WITHDONE,"completed rows are added, so it is not the plain sheet");
+ assert.deepEqual(view({showCompleted:true,search:"175"}),PART,"a narrowing still wins over it");
+ assert.deepEqual(view({quickFilter:"waiting-parts"}),FILTER("waiting-parts",false));
+ assert.deepEqual(view({quickFilter:"waiting-parts",search:"175"}),FILTER("waiting-parts",true),
+  "a filter plus a search is part of that filter, not all of it");
+ assert.deepEqual(view({quickFilter:"waiting-parts",drawn:2,onSheet:6}),FILTER("waiting-parts",false),
+  "a filter is SUPPOSED to cut rows, so the count comparison is not applied to it");
+ assert.equal(downSheetShareEmptyNote(FILTER("waiting-parts",true)),"No buses in this view of the sheet.",
+  "buses do match the filter; something else removed them");
+ assert.equal(downSheetShareEmptyNote(WITHDONE),"The sheet is empty.");
 
  /* EMPTY READS DIFFERENTLY IN EACH SCOPE, and the wrong one reports a clear
     garage. "The sheet is empty" is only true when nothing was narrowing it. */
- assert.equal(downSheetShareEmptyNote("whole-sheet"),"The sheet is empty.");
- assert.equal(downSheetShareEmptyNote("partial-sheet"),"No buses in this view of the sheet.");
- assert.equal(downSheetShareEmptyNote("waiting-parts"),"No buses on the sheet match this filter.");
- assert.match(downSheetShareText("whole-sheet",[],locations,now),/The sheet is empty\./);
- assert.match(downSheetShareText("partial-sheet",[],locations,now),/No buses in this view of the sheet\./);
- assert.doesNotMatch(downSheetShareText("partial-sheet",[],locations,now),/The sheet is empty/,
+ assert.equal(downSheetShareEmptyNote(WHOLE),"The sheet is empty.");
+ assert.equal(downSheetShareEmptyNote(PART),"No buses in this view of the sheet.");
+ assert.equal(downSheetShareEmptyNote(FILTER("waiting-parts")),"No buses on the sheet match this filter.");
+ assert.match(downSheetShareText(WHOLE,[],locations,now),/The sheet is empty\./);
+ assert.match(downSheetShareText(PART,[],locations,now),/No buses in this view of the sheet\./);
+ assert.doesNotMatch(downSheetShareText(PART,[],locations,now),/The sheet is empty/,
   "a narrowed view that matched nothing never reports an empty sheet");
  // The page carries the same note, escaped like everything else in it.
- assert.match(downSheetShareHtml("whole-sheet",[],locations,"Sep 14, 3:00 PM",now),/The sheet is empty\./);
- assert.equal(downSheetShareFilename("whole-sheet",new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-whole-sheet-2026-09-14.html");
+ assert.match(downSheetShareHtml(WHOLE,[],locations,"Sep 14, 3:00 PM",now),/The sheet is empty\./);
+ assert.equal(downSheetShareFilename(WHOLE,new Date("2026-09-14T15:00:00.000Z")),"pace-down-sheet-whole-sheet-2026-09-14.html");
 });
 
 test("a finding cleared on an open defect does not come back from the next sheet save",async()=>{
