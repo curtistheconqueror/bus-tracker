@@ -477,8 +477,13 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .delete-entry:hover,.delete-entry:focus-visible{background:#b4321f;color:#fff;outline:none}
 /* Same shape and slot as DELETE, green because it is the good outcome. It is
    the one press that closes a bus out, so it sits before the destructive one. */
-.fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;width:26px;height:26px;padding:0;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
+/* IT SAYS WHAT IT IS. This was a bare green tick and nothing else, which is
+   why Curtis asked for "its own Mark as fixed button, just like the defect
+   sheet has" about a button that already existed and had done the whole job
+   since it was built. A tick is not a word. */
+.fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;gap:5px;width:auto;min-width:26px;height:26px;padding:0 7px;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
 .fix-entry:hover,.fix-entry:focus-visible{background:#1f6b37;color:#fff;outline:none}
+.fix-entry b{font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1}
 .down-deleted-note.fixed{border-color:#1f6b37;border-left-color:#1f6b37;background:#e9f6ec;color:#17552b}
 .down-deleted-note.fixed button{border-color:#1f6b37;color:#17552b}
 .down-deleted-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #b4321f;border-left:4px solid #b4321f;border-radius:6px;background:#fdeeeb;font-size:10px;font-weight:800;color:#7c2011}
@@ -520,7 +525,16 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-deleted-note{margin:0 8px 8px}
  .down-deleted-note button{width:100%;min-height:44px}
  /* 26px is fine under a mouse and not under a thumb. */
- .delete-entry,.fix-entry{width:44px;height:44px;font-size:18px}
+ .delete-entry{width:44px;height:44px;font-size:18px}
+ /* ON A PHONE THE WORD GOES UNDER THE TICK, not beside it. Beside it was
+    measured and clipped: this cell is 114px and two 44px thumb targets with a
+    gap already fill it, so the button came out 45px wide with scrollWidth 46
+    against clientWidth 43 and the word's right edge past the button's. Widening
+    the cell instead would have squeezed REASON, which is the bug the comment
+    further up this file was written for. Stacked, the target stays 44px wide,
+    the column does not move, and the only cost is row height. */
+ .fix-entry{flex-direction:column;justify-content:center;gap:1px;width:44px;min-width:44px;height:auto;min-height:44px;font-size:17px;padding:4px 0;line-height:1}
+ .fix-entry b{font-size:7px;letter-spacing:.3px}
  /* The status label and the badge are both a point larger here, and the target
     is 44px, so the tab stops move out to match rather than letting anything
     spill into the reason column. */
@@ -654,8 +668,8 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    before they act. */
 .down-table th.row-actions-head{width:104px}
 .down-table td.row-actions{text-align:center}
-.row-actions-slots{display:inline-grid;grid-template-columns:36px 36px;justify-content:center;gap:8px;align-items:center}
-@media(max-width:760px){.row-actions-slots{grid-template-columns:44px 44px;gap:10px}}
+.row-actions-slots{display:inline-grid;grid-template-columns:auto 36px;justify-content:center;gap:8px;align-items:center}
+@media(max-width:760px){.row-actions-slots{grid-template-columns:auto 44px;gap:10px}}
 /* THE STATUS REPORT. Shares .shade with the other Down Sheet modals so the
    backdrop and the scroll lock behave identically; everything below is its
    own, because it is a report rather than a form. */

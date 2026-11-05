@@ -1864,14 +1864,45 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
  /* 26px reads fine under a mouse and misses under a thumb. The sheet is used
     on phones, so the phone block has to give it a real target. */
  assert.match(css,/\.delete-entry\{[^}]*width:26px/);
- assert.match(css,/\.fix-entry\{[^}]*width:26px/,"MARK FIXED shares DELETE's shape so the pair reads as one group");
- assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:36px 36px/);
+ /* MARK FIXED NO LONGER SHARES DELETE'S SHAPE, and that is the point of it.
+    It was a bare green tick that said nothing, which is why Curtis asked for
+    "its own Mark as fixed button, just like the defect sheet has" about a
+    button that already existed and had done the whole job since it was built.
+    It carries the word FIXED now, so it is wider than the square beside it —
+    but it keeps 26px as its FLOOR, so the pair still lines up. */
+ assert.match(css,/\.fix-entry\{[^}]*min-width:26px/,"MARK FIXED is still at least DELETE's size");
+ assert.match(css,/\.fix-entry b\{font-size:8px/,"and the word is styled");
+ /* THE MARKUP HAS TO CARRY IT. Styling `.fix-entry b` says nothing about
+    whether a `<b>` is rendered — removing the word from the button left this
+    test green until the mutation was run. */
+ assert.match(page,/className="fix-entry"[\s\S]{0,400}?<b>FIXED<\/b><\/button>/,
+  "the button renders the word, not just a rule for it");
+ assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:auto 36px/,
+  "the first column grows for the word; the delete square does not");
+ /* AND THE THUMB TARGET SURVIVES THE WORD, which is the rule above. Measured:
+    beside the tick the word was clipped on a phone — the cell is 114px and two
+    44px targets with a gap already fill it, so the button came back 45px wide
+    with scrollWidth 46 against clientWidth 43. Widening the cell would have
+    squeezed REASON, the bug the comment further up this file exists for. The
+    word goes UNDER the tick on a phone instead: the target stays 44px, the
+    column does not move, and row height is unchanged at 38px either way. */
+ const phoneFix=css.slice(css.indexOf("@media(max-width:760px)"));
+ /* Anchored on the property boundary: `[^}]*width:44px` also matches
+    `min-width:44px`, so shrinking the real width to 30px left this green. */
+ assert.match(phoneFix,/\.fix-entry\{[^}]*[;{]width:44px/,"the phone keeps a full thumb target");
+ assert.match(phoneFix,/\.fix-entry\{[^}]*flex-direction:column/,"with the word stacked under the tick");
  /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
     the map — matched on content rather than position, since the file has many. */
  const at=css.indexOf(".down-deleted-note button{width:100%");
  assert.ok(at>0,"the phone override for the PUT BACK button is gone");
  const phone=css.slice(at);
- assert.match(phone,/\.delete-entry,\.fix-entry\{width:44px;height:44px/,"the phone block must raise both row buttons to a 44px touch target");
+ /* BOTH ROW BUTTONS STILL REACH 44px UNDER A THUMB. They shared one selector
+    while they were the same square; MARK FIXED carries a word now and stacks
+    it under the tick on a phone, so they are two rules. The rule is the
+    target, not the selector. */
+ assert.match(phone,/\.delete-entry\{width:44px;height:44px/,"DELETE keeps its thumb target");
+ assert.match(phone,/\.fix-entry\{[^}]*[;{]width:44px/,"and so does MARK FIXED");
+ assert.match(phone,/\.fix-entry\{[^}]*min-height:44px/,"stacked, so its height is a floor rather than fixed");
 });
 
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
