@@ -508,11 +508,18 @@ export default function DownSheet(){
  const shareScope=downSheetShareScope({quickFilter,search,shiftFiltered:filter!=="All",
   roadFiltered:Boolean(roadFilter),fixedToday,showCompleted,drawn:visible.length,onSheet:shown.length});
  const shareLabel=downSheetShareScopeLabel(shareScope);
- /* THE STATUS BELONGS TO A SCOPE, and the bar no longer unmounts to take it
-    away. Pressing COPY LIST then typing in SEARCH left "COPIED!" sitting
-    under a heading describing a different set of buses, with nothing in the
-    page that would ever clear it. */
- const shareStatusKey=shareLabel+"|"+visible.length;
+ /* THE STATUS BELONGS TO THE ROWS IT WAS EARNED ON, and the bar no longer
+    unmounts to take it away. Pressing COPY LIST then typing in SEARCH left
+    "COPIED!" sitting under a heading describing a different set of buses,
+    with nothing in the page that would ever clear it.
+
+    KEYED ON WHICH BUSES, not how many: a review caught that the first
+    version used `visible.length`, so swapping one matching bus for another
+    in SEARCH - same count, same label - left the old status standing over
+    rows it was never about. The ids are device-local, which does not matter
+    here because this only ever compares one render against the next on the
+    same device. */
+ const shareStatusKey=shareLabel+"|"+visible.map(entry=>entry.id).join(",");
  useEffect(()=>{setShareStatus("")},[shareStatusKey]);
  const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order

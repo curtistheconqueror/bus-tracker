@@ -2849,8 +2849,10 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.doesNotMatch(pageCode,/const sheetNarrowed=/,"the decision is not also spelled out in the page");
  /* The status belonged to the scope it was earned under, and the bar no
     longer unmounts to clear it. */
- assert.match(pageCode,/const shareStatusKey=shareLabel\+"\|"\+visible\.length;\s*useEffect\(\(\)=>\{setShareStatus\(""\)\},\[shareStatusKey\]\);/,
-  "COPIED!/SENT is cleared when the scope or the row count moves under it");
+ assert.match(pageCode,/const shareStatusKey=shareLabel\+"\|"\+visible\.map\(entry=>entry\.id\)\.join\(","\);\s*useEffect\(\(\)=>\{setShareStatus\(""\)\},\[shareStatusKey\]\);/,
+  "COPIED!/SENT is cleared when the scope or WHICH BUSES are drawn moves under it");
+ assert.doesNotMatch(pageCode,/const shareStatusKey=shareLabel\+"\|"\+visible\.length/,
+  "counting rows is not enough: swapping one bus for another in SEARCH keeps the count");
  /* The permanently mounted line is not a live region. It used to exist only
     while a filter was on; left as role="status" it re-announced the whole
     scope line on every keystroke in SEARCH. */
