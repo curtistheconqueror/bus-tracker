@@ -2360,6 +2360,75 @@ bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
 it stood. A unitless zero is a valid length; it reads as 0 now, and that was
 the last of the twenty-seven.
 
+### A repair can carry more than one part
+
+Curtis, from the floor: *"we made a blooper, we assumed that each repair only
+takes one part. I just saved a fix like a bus and I was trying to find a way to
+add a second part."*
+
+He was right and there was nowhere to put it. A defect record held `partsUsed`,
+`partNumber` and `partName` — **exactly one part** — so a repair that takes a
+gasket and the sensor behind it forced a choice between them. The pair is a
+**list** now, with **ADD ANOTHER PART** under it and a REMOVE on each row.
+
+**Nothing on disk is rewritten.** A repair saved with one part reads back as a
+one-part list, computed at read time, the way catalog renames and a Down Sheet
+entry's `repairItems` already work. The fix Curtis had just saved keeps its part
+and can take a second.
+
+**The first part stays mirrored into `partNumber`/`partName`, and a one-part
+repair stores no array at all.** Two reasons, both rules this app already
+follows: the Shop Cloud ships every field it has no column for inside the row's
+`detail` blob, so a device on an older release receives `parts` and cannot read
+it — mirrored, it shows the first part instead of none; and `rowFingerprint`
+walks `Object.keys`, so growing a `parts:[…]` on every one-part repair would
+move that row's fingerprint on a save that changed nothing a person could see.
+Going back down to one part **deletes** the key rather than setting it to
+`undefined`, the spelling `setBusHold` uses.
+
+**One component, two routes.** The Defect Log's LOG DEFECT form and Fixed
+Repairs' completion editor had the same block of JSX copied into both files; a
+list is more to get wrong than a pair of inputs, so it is
+`src/components/defects/parts-used-list.tsx`. It holds **no rules** — every
+decision about what a part is and what gets stored is in
+`src/lib/defects/defect-parts.ts`, so the MCP route can ask the same question
+instead of reimplementing it. A test asserts the component names no rule.
+
+**The shop's parts memory now learns every part, not the first.** That code read
+`partNumber` alone, which was the whole of a repair when a repair could only
+have one; on a two-part repair it taught the shop about the gasket and forgot
+the sensor. A part with only a **name** is kept on the record — *"the long bolt
+behind the alternator"* is how a part gets recorded when nobody can find its
+number — but teaches the memory nothing it could suggest, so it is not learned
+and is **not** counted as a missing number either.
+
+Decisions worth having on the record: **each part carries an id**, because
+keying rows by array index makes the row under somebody's finger change identity
+when a row above it is removed, which is how a list deletes the wrong entry;
+**removing the last row leaves one blank row** rather than an empty section,
+since unticking PARTS USED is the one gesture that means no parts were used; and
+**a blank row is never stored**, so pressing ADD ANOTHER PART and changing your
+mind leaves nothing on the repair's history.
+
+**Measured in the built page** at 390 and 1180, driving the real form: two parts
+typed and both held; removing the FIRST row leaves the second's values, which is
+the id-keying doing its job and what index-keying would have got wrong; REMOVE
+absent on a lone row and present on two; ADD 318x44 on a phone and 700x36 on the
+shop computer; REMOVE 318x44 and 78.5x36; the row separator **0px on the first
+row and 1px dashed on the second**, so a one-part repair looks exactly as it did;
+nothing clipped, no page overflow, no page errors.
+
+**One thing NOT established, and not introduced here.** Every control in that
+form's ADVANCED DETAILS section — including the **PARTS USED checkbox that
+predates this change** — could not be reached by a synthetic pointer event at
+any scroll position: the form's own sticky action bar
+(`.save-log-middle-actions`) reports as the topmost element over that region. It
+behaves identically for controls that have shipped for releases, so it is either
+a harness artifact or a pre-existing reachability problem with that section on a
+narrow screen. Either way it is **not** something this change caused, and it
+wants its own look rather than being bundled in here. Everything above was read
+off the live DOM instead.
+
 ### The button reads MARK FIXED, the same as the Defect Log's
 
 Curtis asked for *"its own Mark as fixed button, just like the defect sheet

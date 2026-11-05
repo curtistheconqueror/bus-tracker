@@ -58,6 +58,8 @@ import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
+import {normalizeDefectParts,partsToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
+import PartsUsedList from "@/src/components/defects/parts-used-list";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
@@ -225,17 +227,39 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
  /* A record saved before Stage 6 has a part number but no flag, so treat an
     existing number as parts used rather than hiding it behind an empty box. */
  const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
+ /* THE ROWS BEING TYPED INTO, held here rather than derived from the record on
+    every render. `defectPartFields` drops a row with nothing in it - which is
+    right for what gets STORED - so a derived list would make ADD ANOTHER PART
+    appear to do nothing at all. The editor is keyed per defect, so opening
+    another bus starts from that record's own parts. */
+ const [partRows,setPartRows]=useState<DefectPart[]>(()=>normalizeDefectParts(value.defect.parts,value.defect));
+ const setParts=(next:DefectPart[])=>{
+  setPartRows(next);
+  setValue(current=>({...current,defect:withDefectParts(current.defect,next)}));
+ };
  const remembered=recallPart(partsMemory,value.defect.category,value.defect.issue);
  /* Checking the box offers the remembered part; it never fills anything in
     while a defect is merely being logged, and never overwrites typing. */
- const togglePartsUsed=(checked:boolean)=>setValue(current=>{
-  if(!checked)return {...current,defect:{...current.defect,partsUsed:false,partNumber:"",partName:""}};
-  const suggestion=recallPart(partsMemory,current.defect.category,current.defect.issue);
-  const hasNumber=Boolean(String(current.defect.partNumber||"").trim());
-  return {...current,rememberScope:current.rememberScope||"issue",defect:{...current.defect,partsUsed:true,
-   partNumber:hasNumber||!suggestion?current.defect.partNumber||"":suggestion.partNumber,
-   partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
- });
+ const togglePartsUsed=(checked:boolean)=>{
+  if(!checked){
+   /* Unticking is the one gesture that means "no parts were used", so it
+      clears the whole list rather than leaving a row behind. */
+   setPartRows([]);
+   setValue(current=>({...current,defect:withDefectParts(current.defect,[])}));
+   return;
+  }
+  const suggestion=recallPart(partsMemory,value.defect.category,value.defect.issue);
+  /* THE SUGGESTION SEEDS THE FIRST ROW AND ONLY AN EMPTY ONE, which is the
+     behaviour this had with one pair of boxes: it never overwrites typing. */
+  const current=normalizeDefectParts(value.defect.parts,value.defect);
+  const first=current[0];
+  const seeded=suggestion&&(!first||!String(first.partNumber||"").trim())
+   ?[{id:first?first.id:"part-0",partNumber:suggestion.partNumber,...(suggestion.partName?{partName:suggestion.partName}:{})},...current.slice(1)]
+   :current;
+  const rows=seeded.length?seeded:[{id:"part-0",partNumber:""}];
+  setPartRows(rows);
+  setValue(cur=>({...cur,rememberScope:cur.rememberScope||"issue",defect:{...withDefectParts(cur.defect,rows),partsUsed:true}}));
+ };
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
  const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
  /* WHAT THE ESTIMATE BOX IS ABOUT TO OVERRIDE, quoted inside the box.
@@ -695,8 +719,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     <div className="parts-used-block">
      <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
      {partsUsed&&<div className="parts-used-fields">
-      <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
-      <label>PART NAME (OPTIONAL)<input value={value.defect.partName||""} onChange={event=>updateDefect("partName",event.target.value)} placeholder="Exact catalog name"/></label>
+      <PartsUsedList parts={partRows} onChange={setParts}/>
       <label className="parts-remember-scope"><input type="checkbox" checked={value.rememberScope==="category"} onChange={event=>setValue(current=>({...current,rememberScope:event.target.checked?"category":"issue"}))}/><span><b>REMEMBER FOR EVERY {repairCategoryLabel(value.defect.category||"this category").toUpperCase()} DEFECT</b><small>Off remembers the part for this exact defect only.</small></span></label>
       {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
      </div>}
@@ -1301,7 +1324,7 @@ export default function DefectLog(){
   if(!matchesSearch({bus,defect,createdAt:"",updatedAt:"",onDownSheet:false}))setSearch("");
  };
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";/* EVERY PART WITH A NUMBER IS LEARNED, not just the first. This read `draft.defect.partNumber` alone, which was the whole of a repair when a repair could only have one part; on a two-part repair it would teach the shop about the gasket and forget the sensor. A part with only a name teaches nothing the memory can suggest later, so `partsToLearn` drops those. */const learnable=draft.defect.partsUsed?partsToLearn(normalizeDefectParts(draft.defect.parts,draft.defect)):[];if(learnable.length)setPartsMemory(current=>{const next=learnable.reduce((memory,part)=>learnPart(memory,{category:draft.defect.category,issue:draft.defect.issue,partNumber:part.partNumber,partName:part.partName,scope:draft.rememberScope},now),current);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[{busId:record.bus.id,defectId:record.defect.id}],now),result.downEntries)};

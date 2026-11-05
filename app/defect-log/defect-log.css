@@ -507,6 +507,26 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-used-toggle b,.defect-log-app .parts-remember-scope b{font-size:9px;letter-spacing:.5px}
 .defect-log-app .parts-used-toggle small,.defect-log-app .parts-remember-scope small{font-size:8px;color:var(--log-muted)}
 .defect-log-app .parts-used-fields{display:grid;gap:8px}
+/* MORE THAN ONE PART PER REPAIR. The record held one `partNumber`/`partName`
+   pair; Curtis hit the wall from the floor - "I just saved a fix like a bus and
+   I was trying to find a way to add a second part" - so the pair became a list,
+   drawn by src/components/defects/parts-used-list.tsx for both this form and
+   the other one.
+
+   A SEPARATOR ONLY BETWEEN ROWS, so a one-part repair looks exactly as it did
+   and a two-part repair reads as two things. `+ .parts-row` cannot fire on a
+   lone row, which is the whole reason it is written that way rather than as a
+   border on every row.
+
+   REMOVE IS NOT DRAWN ON A LONE ROW at all - the component decides that, since
+   unticking PARTS USED is the gesture that means no parts were used. */
+.defect-log-app .parts-list{display:grid;gap:10px}
+.defect-log-app .parts-row{display:grid;gap:8px}
+.defect-log-app .parts-row+.parts-row{border-top:1px dashed var(--log-border);padding-top:10px}
+.defect-log-app .parts-row .remove-part{min-height:36px;justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.defect-log-app .parts-row .remove-part span{font-size:13px;line-height:1}
+.defect-log-app .parts-list .add-part{min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.defect-log-app .parts-list .add-part span{font-size:14px;line-height:1}
 .defect-log-app .parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));padding:8px 10px}
 .defect-log-app .parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--log-text);overflow-wrap:anywhere}
 .defect-log-app .parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--log-accent)}
@@ -514,6 +534,9 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 @media(max-width:760px){
  .defect-log-app .parts-used-fields input{font-size:16px}
+ /* Both new controls reach a thumb target on the device this form is used on. */
+ .defect-log-app .parts-row .remove-part{min-height:44px;width:100%;justify-content:center}
+ .defect-log-app .parts-list .add-part{min-height:44px;width:100%}
  .defect-log-app .parts-remembered{flex-wrap:wrap}
  .defect-log-app .parts-remembered button{min-height:44px;width:100%}
 }

@@ -13,6 +13,8 @@ import {defectCountField,defectLabel,defectWorkStates,FIXED_REPAIR_WORK_STATES,h
    the label a record was stamped with can never drift apart. */
 const PARTS_ON_ORDER_LABEL=FIXED_REPAIR_WORK_STATES[0].label;
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
+import {defectPartFields,normalizeDefectParts,partsToLearn,type DefectPart} from "@/src/lib/defects/defect-parts";
+import PartsUsedList from "@/src/components/defects/parts-used-list";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import type {DefectLogFleetBus} from "@/src/lib/defects/defect-log-sync";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
@@ -52,7 +54,7 @@ import WelcomeGate from "@/src/components/shared/welcome-gate";
 const PAGE_SIZE=50;
 
 type FixedRecord={bus:DefectLogFleetBus;defect:StructuredDefect};
-type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;partsOnOrder:boolean;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
+type CompletionDraft={category:string;issue:string;details:string;operability:DefectOperability;actionTaken:string;diagnosticNote:string;finding:string;quantity:string;repairHours:string;diagnosticHours:string;partNumber:string;partsUsed:boolean;partName:string;parts:DefectPart[];partsOnOrder:boolean;rememberScope?:PartMemoryScope;completedBy:string;completedAt:string};
 type UndoSnapshot={fleet:DefectLogFleetBus[];label:string};
 
 function readFleet(raw:string|null):DefectLogFleetBus[]{const payload=readFleetPayload<DefectLogFleetBus>(raw);return payload.valid?payload.buses.map(bus=>({...bus,defects:normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)})):[]}
@@ -67,15 +69,22 @@ function localDateTime(value:string){const date=new Date(value);if(Number.isNaN(
 const locationLabel=(location:string)=>sharedLocationLabel(location,"Location not recorded");
 
 function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsMemory,forgetFinding:forgetLearnedFinding,save,close,isNew=false,fleet=[],onBusChange,busQuery="",busFeedback="",onBusQuery}:{record:FixedRecord;partsMemory:PartsMemory;forgetPart:(entry:PartMemoryEntry)=>void;findingsMemory:FindingsMemory;forgetFinding:(entry:FindingMemoryEntry)=>void;save:(record:FixedRecord,draft:CompletionDraft)=>void;close:()=>void;isNew?:boolean;fleet?:DefectLogFleetBus[];onBusChange?:(busId:string)=>void;busQuery?:string;busFeedback?:string;onBusQuery?:(value:string)=>void}){
- const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
+ const [draft,setDraft]=useState<CompletionDraft>({category:record.defect.category,issue:record.defect.issue,details:record.defect.details||"",operability:record.defect.operability,actionTaken:record.defect.actionTaken||"",diagnosticNote:record.defect.diagnosticNote||"",finding:record.defect.finding||"",quantity:record.defect.quantity===undefined?"":String(record.defect.quantity),repairHours:record.defect.repairHours===undefined?"":String(record.defect.repairHours),diagnosticHours:record.defect.diagnosticHours===undefined?"":String(record.defect.diagnosticHours),partNumber:record.defect.partNumber||"",partsUsed:record.defect.partsUsed??Boolean(String(record.defect.partNumber||"").trim()),partName:record.defect.partName||"",parts:normalizeDefectParts(record.defect.parts,record.defect),partsOnOrder:hasWorkState(record.defect,PARTS_ON_ORDER_KEY),rememberScope:"issue",completedBy:record.defect.completedBy||"",completedAt:localDateTime(record.defect.completedAt||record.defect.updatedAt||new Date().toISOString())});
  const remembered=recallPart(partsMemory,draft.category,draft.issue);
  /* Checking the box offers the remembered part and never overwrites typing. */
  const togglePartsUsed=(checked:boolean)=>setDraft(current=>{
-  if(!checked)return {...current,partsUsed:false,partNumber:"",partName:""};
-  const suggestion=recallPart(partsMemory,current.category,current.issue),hasNumber=Boolean(current.partNumber.trim());
-  return {...current,partsUsed:true,rememberScope:current.rememberScope||"issue",
-   partNumber:hasNumber||!suggestion?current.partNumber:suggestion.partNumber,
-   partName:hasNumber||!suggestion?current.partName:suggestion.partName||""};
+  /* Unticking means "no parts were used", so it clears the whole list rather
+     than leaving a row behind. */
+  if(!checked)return {...current,partsUsed:false,partNumber:"",partName:"",parts:[]};
+  const suggestion=recallPart(partsMemory,current.category,current.issue);
+  const rows=current.parts.length?current.parts:[{id:"part-0",partNumber:""}];
+  const first=rows[0];
+  /* THE SUGGESTION SEEDS THE FIRST ROW AND ONLY AN EMPTY ONE, which is what
+     this did when a repair had one pair of boxes: it never overwrites typing. */
+  const seeded=suggestion&&!String(first.partNumber||"").trim()
+   ?[{id:first.id,partNumber:suggestion.partNumber,...(suggestion.partName?{partName:suggestion.partName}:{})},...rows.slice(1)]
+   :rows;
+  return {...current,partsUsed:true,rememberScope:current.rememberScope||"issue",parts:seeded};
  });
  const update=<K extends keyof CompletionDraft>(key:K,value:CompletionDraft[K])=>setDraft(current=>({...current,[key]:value}));
  const issues=REPAIR_OPTIONS[draft.category]||[],countField=defectCountField(draft.category,draft.issue);
@@ -135,8 +144,7 @@ function CompletionEditor({record,partsMemory,forgetPart:forgetLearned,findingsM
         show it here. */}
     <label className="parts-used-toggle parts-on-order-toggle"><input type="checkbox" checked={draft.partsOnOrder} onChange={event=>update("partsOnOrder",event.target.checked)}/><span><b>{PARTS_ON_ORDER_LABEL}</b><small>Waiting on a part to arrive. Stays on the record with who ticked it and when.</small></span></label>
     {draft.partsUsed&&<div className="parts-used-fields">
-     <label>PART NUMBER<input value={draft.partNumber} onChange={event=>update("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
-     <label>PART NAME (OPTIONAL)<input value={draft.partName} onChange={event=>update("partName",event.target.value)} placeholder="Exact catalog name"/></label>
+     <PartsUsedList parts={draft.parts} onChange={next=>update("parts",next)}/>
      <label className="parts-remember-scope"><input type="checkbox" checked={draft.rememberScope==="category"} onChange={event=>setDraft(current=>({...current,rememberScope:event.target.checked?"category":"issue"}))}/><span><b>REMEMBER FOR EVERY {(draft.category||"THIS CATEGORY").toUpperCase()} DEFECT</b><small>Off remembers the part for this exact defect only.</small></span></label>
      {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
     </div>}
@@ -294,7 +302,7 @@ export default function FixedRepairs(){
   if(!persistFleet(next))return false;
   setUndoSnapshot({fleet:before,label});setEditing(null);return true;
  };
- const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{/* A cause typed here has to be learned too. This is often where a fault gets its proper name, once the bus is apart, and a finding recorded on this page teaching nothing would be a gap nobody would notice. */if(normalizeFinding(draft.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.category,issue:draft.issue,finding:draft.finding});writeFindingsMemory(localStorage,next);return next});if(draft.partsUsed&&draft.partNumber.trim())setPartsMemory(current=>{const learned=learnPart(current,{category:draft.category,issue:draft.issue,partNumber:draft.partNumber,partName:draft.partName,scope:draft.rememberScope});writePartsMemory(localStorage,learned);return learned});/* A count is only this page's business where the repair declares one. Retyping
+ const saveCompletion=(record:FixedRecord,draft:CompletionDraft)=>{/* A cause typed here has to be learned too. This is often where a fault gets its proper name, once the bus is apart, and a finding recorded on this page teaching nothing would be a gap nobody would notice. */if(normalizeFinding(draft.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.category,issue:draft.issue,finding:draft.finding});writeFindingsMemory(localStorage,next);return next});/* EVERY part with a number, not just the first: a two-part repair would otherwise teach the shop about one and forget the other. */const learnable=draft.partsUsed?partsToLearn(draft.parts):[];if(learnable.length)setPartsMemory(current=>{const learned=learnable.reduce((memory,part)=>learnPart(memory,{category:draft.category,issue:draft.issue,partNumber:part.partNumber,partName:part.partName,scope:draft.rememberScope}),current);writePartsMemory(localStorage,learned);return learned});/* A count is only this page's business where the repair declares one. Retyping
    a fan record as something uncounted clears the count, because "3 fans" left
    on a radiator swap is a lie; an oil quantity, which no count field governs,
    is left exactly as the Defect Log wrote it. */
@@ -304,7 +312,7 @@ const countUnit=countField?countField.unit:hadCount?undefined:record.defect.unit
 const parsed=new Date(draft.completedAt),completedAt=Number.isNaN(parsed.getTime())?(record.defect.completedAt||new Date().toISOString()):parsed.toISOString(),now=new Date().toISOString();
 /* The saved shape, applied whether this record already exists on the bus or
    is being created here by LOG A REPAIR. */
-const savedFields=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),partNumber:draft.partNumber.trim(),partsUsed:draft.partsUsed,partName:draft.partName.trim(),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
+const savedFields=(defect:StructuredDefect):StructuredDefect=>({...defect,category:draft.category,issue:draft.issue||"Unspecified issue",details:draft.details.trim(),operability:draft.operability,state:"completed",actionTaken:draft.actionTaken.trim(),diagnosticNote:draft.diagnosticNote.trim(),finding:normalizeFinding(draft.finding),quantity:countValue,unit:countUnit,repairHours:normalizeRepairHours(draft.repairHours),diagnosticHours:normalizeDiagnosticHours(draft.diagnosticHours),/* THROUGH THE ONE ASSEMBLER, so the array and the mirrored pair cannot be written out of step. `parts` is absent on a one-part repair by design - see src/lib/defects/defect-parts.ts. */...defectPartFields(draft.partsUsed?draft.parts:[]),completedBy:draft.completedBy.trim().toUpperCase(),completedAt,updatedAt:now});
 /* PARTS ON ORDER rides through the same stamping every work state uses, so it
    carries who ticked it and when, and unticking clears the stamp outright
    rather than leaving a false behind. */
