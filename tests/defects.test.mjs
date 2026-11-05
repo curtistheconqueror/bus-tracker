@@ -6769,15 +6769,26 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
      count. */
   assert.equal((flat.match(/\bexcluded\b/g)||[]).length,2,
    "the lib's list is named once and stored once, never rebuilt or mutated: "+back.slice(0,160));
-  /* AND STILL EXACTLY ONE WRITE, which the pin alone does NOT give. Dropping
-     this for the pin let two mutants back in: a second `setFocusExcluded` call
-     APPENDED after the pinned three statements leaves that substring intact and
-     names `excluded` only twice, so both of the other assertions pass while the
-     off-screen ids are pruned on the second write. Measured, not reasoned - the
-     two came back the moment this line went. Three assertions, three different
-     ways round, none of them enough alone. */
-  assert.deepEqual(flat.match(/setFocusExcluded\(/g),["setFocusExcluded("],
-   "PUT BACK writes the excluded list exactly once: "+back.slice(0,160));
+  /* AND THE SETTER IS NAMED ONCE IN THIS BODY, which the pin alone does NOT
+     give. Dropping this for the pin let two mutants back in: a second
+     `setFocusExcluded` call APPENDED after the pinned three statements leaves
+     that substring intact and names `excluded` only twice, so both of the other
+     assertions pass while the off-screen ids are pruned on the second write.
+     Measured, not reasoned - the two came back the moment this line went.
+
+     IT COUNTS THE IDENTIFIER, NOT CALLS, and that wording is the THIRD
+     correction to this one comment. It read "exactly one write" while the regex
+     matched the spelling `setFocusExcluded(` - so `.call(null,...)`,
+     `.apply(null,[...])` and `const write=setFocusExcluded;write(...)` each
+     appended a second write and passed all three assertions. Reproduced, all
+     three, and all three die on counting the bare identifier instead.
+
+     WHAT IT STILL CANNOT SEE is a write through a helper defined OUTSIDE this
+     function, and no text check on this body can - which is the same ceiling
+     the pin above admits to. Three assertions, three different ways round, none
+     of them enough alone, and the browser run is still the witness. */
+  assert.equal((flat.match(/\bsetFocusExcluded\b/g)||[]).length,1,
+   "PUT BACK names the setter once in this body: "+back.slice(0,160));
  }
 
  /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
