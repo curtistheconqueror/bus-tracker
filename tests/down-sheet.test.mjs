@@ -2803,7 +2803,7 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     the build and this whole suite all passed over it. It failed only in a
     browser, where the thrown ReferenceError was swallowed by the handler's own
     catch and reported to the mechanic as "could not share". */
- for(const name of ["copyText","shareOrDownloadFile","downSheetShareText","downSheetShareHtml","downSheetShareFilename","downSheetShareScopeLabel","downSheetFilterEntries","downSheetFilterCounts","DOWN_SHEET_FILTERS"])
+ for(const name of ["copyText","shareOrDownloadFile","downSheetShareText","downSheetShareHtml","downSheetShareFilename","downSheetShareScope","downSheetShareScopeLabel","downSheetFilterEntries","downSheetFilterCounts","DOWN_SHEET_FILTERS"])
   assert.match(pageCode,new RegExp("import \\{[^}]*\\b"+name+"\\b[^}]*\\} from"),name+" is imported, not assumed");
 
  /* THE SHARE BAR IS NOT BEHIND A QUICK FILTER, which is the whole of what
@@ -2820,24 +2820,31 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  const barAt=pageCode.indexOf('className={"down-quick-filter-note"');
  assert.ok(barAt>0,"the share bar's section is still found by its class");
  const shareBar=pageCode.slice(barAt);
- /* The section itself, not a wrapper: `{quickFilter&&<section` immediately
-    before it is the gating this feature removed. */
- assert.doesNotMatch(pageCode.slice(0,barAt).slice(-40),/\{quickFilter&&<section\s*$/,
-  "the share bar is drawn whether or not a quick filter is on");
+ /* WHITESPACE COLLAPSED BEFORE ASKING, because the first version of these two
+    gates matched one spelling each and a review walked `if (!quickFilter)
+    return;` and `{quickFilter && <section` straight past them. Formatting is
+    not the thing being checked. */
+ const tight=pageCode.replace(/\s+/g,"");
+ const beforeBar=tight.slice(0,tight.indexOf('className={"down-quick-filter-note"'));
+ assert.doesNotMatch(beforeBar.slice(-60),/(\{|&&)[A-Za-z(]*quickFilter\)?&&<section$/,
+  "nothing gates the share bar's section on a quick filter, however it is spelled");
  /* Only the UNFILTERED bar gets the three-across class, so the filtered bar's
     two-column grid and its fourth button are left alone. Measured at 360 and
     390: unfiltered 3 columns and 101px, filtered 2 columns and 201px. */
  assert.match(pageCode,/className=\{"down-quick-filter-note"\+\(quickFilter\?"":" sheet-share"\)\}/,
   "the narrow three-across layout is scoped to the bar with no filter on");
- for(const handler of ["copyFilteredList","shareFilteredList","shareFilteredPage"])
-  assert.doesNotMatch(pageCode,new RegExp("const "+handler+"=async\\(\\)=>\\{(?:\\s|/\\*[^]*?\\*/)*if\\(!quickFilter\\)return;"),
-   handler+" no longer refuses to run without a quick filter");
+ for(const handler of ["copyFilteredList","shareFilteredList","shareFilteredPage"]){
+  const at=tight.indexOf("const"+handler+"=async()=>{");
+  assert.ok(at>0,handler+" is still found in the page");
+  assert.doesNotMatch(tight.slice(at,at+220),/if\(!quickFilter\)\{?return/,
+   handler+" no longer refuses to run without a quick filter, however the refusal is spelled");
+ }
  /* What STAYS filter-only: the clear button and the filter's own hint, because
     neither means anything with no filter set. */
  assert.match(shareBar,/\{quickFilter&&<button type="button" className="down-quick-filter-clear"/,
   "SHOW THE WHOLE SHEET only appears when a filter is on");
- assert.match(shareBar,/\{quickFilter\?DOWN_SHEET_FILTERS\.find\(item=>item\.key===quickFilter\)\?\.hint:/,
-  "the filter's hint is replaced by a plain line when no filter is on");
+ assert.match(pageCode,/:\{said:false,text:quickFilter\?DOWN_SHEET_FILTERS\.find\(item=>item\.key===quickFilter\)\?\.hint\|\|"":"Sends the buses on the screen right now/,
+  "the filter's hint is replaced by a plain line when no filter is on, and both share the status line");
  /* THE SCOPE IS DECIDED IN THE LIB, which is CLAUDE.md's first rule and also
     the only way this is testable: the decision cannot be exercised through a
     page this suite cannot render, so it has to be reachable without one. The
@@ -2858,6 +2865,18 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     scope line on every keystroke in SEARCH. */
  assert.doesNotMatch(shareBar.slice(0,400),/<p role="status">/,
   "the always-present scope line does not re-announce itself on every keystroke");
+ /* A RESULT MUST NOT MOVE THE SHEET. The four status messages used to mount
+    as siblings of that <p>, which `.down-quick-filter-note>small` gives a row
+    of its own: measured, SHARE TEXT succeeding grew the bar 101->123 at 390
+    and 52->74 at 1180 and pushed everything below it down ~22px. They share
+    the hint's line now, so the bar's height does not depend on whether
+    anything has been pressed. */
+ assert.doesNotMatch(shareBar,/<small role="status">(SENT|SAVED)/,
+  "no status message mounts as a row of its own under the bar");
+ assert.match(shareBar,/<small role="status" className=\{shareNote\.said\?"said":undefined\}>\{shareNote\.text\}<\/small>/,
+  "the hint and the result share one line, and only that line announces");
+ assert.doesNotMatch(css,/\.down-quick-filter-note>small\{[^}]*flex-basis:100%/,
+  "the full-width status row is gone from the stylesheet, not just from the markup");
  /* A failed COPY LIST used to be reported as "COULD NOT SHARE — TRY COPY LIST",
     which sends somebody to press the button that had just failed. */
  assert.match(pageCode,/shareStatus==="copy-error"/);

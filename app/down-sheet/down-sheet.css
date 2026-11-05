@@ -852,7 +852,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-quick-filter-actions{display:flex;flex-wrap:wrap;gap:6px}
 .down-quick-filter-actions button{min-height:32px;border:1px solid #6b3fc4;border-radius:5px;background:#6b3fc4;color:#fff;padding:0 11px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .down-quick-filter-actions button+button{background:#fff;color:#4a2a8c}
-.down-quick-filter-note>small{flex-basis:100%;color:#4a2a8c;font-size:9px;font-weight:900}
+/* The share's own word sits in the hint's line rather than claiming a row of
+   its own, so a result never moves the sheet underneath it. */
+.down-quick-filter-note>p>small.said{color:#4a2a8c;font-weight:900}
 /* The trigger takes this page's own control styling. Bare, it inherits nothing
    but display:inline-flex from globals.css and renders as unstyled text. */
 .down-view-controls .quick-filter-trigger{height:32px;border:1px solid #aebbd0;border-radius:5px;background:#f2f5f9;color:#294264;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
