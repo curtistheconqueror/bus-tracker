@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetBadgeViewBusIds, downSheetBadgeViewCounts, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, isReadyRoadLocation, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
+import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
 import { effectiveStyle } from "./helpers/css-rules.mjs";
 
@@ -21,8 +21,6 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /downSheetReady&&<span className="downsheet-ready-badge"/);
   assert.match(page, /ON DOWN SHEET/);
   assert.doesNotMatch(page, /ON DOWN SHEET · READY LOCATION/);
-  assert.match(page, /showDownSheetBadges\?downSheetBadgeViewBusIds/);
-  assert.match(page, /<DownSheetBadgeMenu[\s\S]*?<PageMenu pages=\{otherPages\(/);
   /* The badge's own settings render on the shared Settings page now, from the
      map's panel module; the map still draws what they say. */
   const panel = await readFile(new URL("../app/settings/_components/map-settings-panel.tsx", import.meta.url), "utf8");
@@ -36,7 +34,18 @@ test("DS badge marks every active Down Sheet bus regardless of location", async 
   assert.match(page, /Not recorded yet/);
 });
 
-test("DS badge view filters display without changing Down Sheet membership", async () => {
+test("the DS badge is blind to where a bus is parked, and the view that was not is gone", async () => {
+  /* THE THREE-WAY DS BADGE VIEW IS REMOVED. It offered All / Road-Ready /
+     Off Road on the map and hid the badge for every bus outside the chosen
+     group - a per-device display filter that wrote no record, which is why it
+     survived the first pass. Curtis killed it on the rule he had already
+     given: "there should be no way that a bus can have its badge removed from
+     the map by simply relocating it." A filter keyed on `bus.l` does exactly
+     that, record or no record, because the thing a foreman sees is the badge.
+
+     SHOW BADGE in Settings is the one switch now, and it is all-or-nothing:
+     turning every badge off is a decision about the display, while losing one
+     bus's badge by driving it to the road is the app lying about the sheet. */
   const fleet = [
     { id: "road", l: "road-4" },
     { id: "garage", l: "garage-71" },
@@ -45,18 +54,41 @@ test("DS badge view filters display without changing Down Sheet membership", asy
     { id: "clear", l: "garage-11" },
   ];
   const active = ["road", "garage", "shop", "cng"];
-  assert.equal(isReadyRoadLocation("garage-71"), true);
-  assert.equal(isReadyRoadLocation("road-4"), true);
-  assert.equal(isReadyRoadLocation("bay-9"), false);
-  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "all"), active);
-  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "ready-road"), ["road", "garage"]);
-  assert.deepEqual(downSheetBadgeViewBusIds(fleet, active, "off-road"), ["shop", "cng"]);
-  assert.deepEqual(downSheetBadgeViewCounts(fleet, active), {all:4,"ready-road":2,"off-road":2});
-  const menu = await readFile(new URL("../app/_components/down-sheet-badge-menu.tsx", import.meta.url), "utf8");
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(menu, /DS BADGES/);
-  assert.match(menu, /Badge view never changes Down Sheet membership/);
-  assert.match(css, /\.ds-badge-view-popover\{position:fixed/);
+  /* EVERY active bus keeps its badge, wherever it is parked - the road, a
+     garage space, a bay and a CNG spot are all in this fleet on purpose. */
+  assert.deepEqual(downSheetBadgeBusIds(fleet, active), active);
+  /* AND MOVING ONE CHANGES NOTHING, which is the rule stated as a measurement
+     rather than as an absence: the same bus ids come back after every bus has
+     been given a different location. */
+  const moved = fleet.map(bus => ({ ...bus, l: bus.l.startsWith("road-") ? "bay-3" : "road-9" }));
+  assert.deepEqual(downSheetBadgeBusIds(moved, active), active);
+
+  /* THE MODULE, THE MENU AND THE STYLES ARE ALL GONE. Asserted as absence
+     across the whole app rather than by one missing file, because a filter
+     like this one comes back as a convenience. */
+  const [map, globals, mapSettings, modules] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8"),
+    readFile(new URL("./helpers/modules.mjs", import.meta.url), "utf8"),
+  ]);
+  for (const [what, text] of [["the map", map], ["the stylesheet", globals], ["the test module list", modules]])
+    for (const gone of ["downSheetBadgeView", "DownSheetBadgeMenu", "ds-badge-view", "isReadyRoadLocation"])
+      assert.ok(!text.includes(gone), what + " still names " + gone);
+  /* map-settings.ts may only NAME the field in the note explaining why it is
+     gone - it must not read it, type it or write it. */
+  assert.ok(!/downSheetBadgeView\s*[:=]/.test(mapSettings),
+    "the board settings still read or write downSheetBadgeView");
+  assert.match(mapSettings, /relocating/,
+    "and the reason it went has to stay on the record beside the key it used to live in");
+  /* THE MAP DRAWS THE BADGE OFF MEMBERSHIP AND THE SHOW SWITCH, nothing else. */
+  assert.match(map, /showDownSheetBadges\?downSheetBadgeBusIds\(buses,actualDownSet\)/,
+    "the badge set is every active bus, filtered only by the SHOW switch");
+  /* AND THE PHONE COMMAND BAR DOES NOT HAVE A HOLE WHERE IT SAT. It was a
+     four-column grid with the DS control pinned to column 3; removing it
+     without widening its neighbour would have left an empty cell. */
+  assert.match(globals, /\.ai-operator-command\{grid-column:3\/5/,
+    "AI OPERATOR has to take the columns the DS control used to hold");
 });
 
 test("Down Sheet supports search, bus ordering, work groups, and explicit note saving", async () => {
@@ -1930,7 +1962,7 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
       destructive control that wanders between rows is worse than an
       unlabelled one. Asserted per ROW, so a rule that only reaches one of
       them fails here. */
-   assert.equal(slots["grid-template-columns"],width<=760?"44px 44px":"62px 36px",
+   assert.equal(slots["grid-template-columns"],width<=760?"44px 44px":"96px 36px",
     "both tracks have to be fixed, or the grid changes width between rows - on "+where);
    /* AND DELETE KEEPS ITS OWN TRACK. A lone grid child auto-places into
       column 1, so on a completed row DELETE slid into the slot MARK FIXED
@@ -1981,6 +2013,10 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
       `.down-group-row`, a colSpan divider holding no buttons at all, measured
       by mistake. */
    if(width<=760){
+    /* TWO LINES INSIDE THE 44px TARGET rather than a wider button: the widest
+       line is FIXED at 31.56px in DejaVu Sans against a 42px content box. A
+       `nowrap` here would push the label out of the target instead. */
+    assert.notEqual(word["white-space"],"nowrap","the label cannot wrap inside the target on "+where);
     assert.equal(fix.width,"44px","MARK FIXED loses its thumb target on "+where);
     assert.equal(fix["min-height"],"44px","and its height has to be a floor, since the word stacks");
     assert.equal(fix["flex-direction"],"column","with the word under the tick on "+where);
@@ -2007,8 +2043,17 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
  /* THE MARKUP HAS TO CARRY IT. Styling `.fix-entry b` says nothing about
     whether a `<b>` is rendered - removing the word from the button left this
     test green until the mutation was run. */
- assert.match(page,/className="fix-entry"[\s\S]{0,400}?<b>FIXED<\/b><\/button>/,
-  "the button renders the word, not just a rule for it");
+ assert.match(page,/className="fix-entry"[\s\S]{0,400}?<b>MARK FIXED<\/b><\/button>/,
+  "the button renders the words, not just a rule for them");
+ /* THE SAME LABEL THE DEFECT LOG USES. Curtis asked for "its own Mark as
+    fixed button, just like the defect sheet has", and that one reads MARK
+    FIXED - so the two surfaces saying different things is the bug, not a
+    style choice. Read out of the Defect Log rather than typed here, so a
+    rename there fails this instead of quietly splitting the pair. */
+ const defectLog=await readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8");
+ const theirs=defectLog.match(/className="quick-fix"[\s\S]{0,400}?<b>([A-Z ]+)<\/b>/)?.[1];
+ assert.equal(theirs,"MARK FIXED","the Defect Log's own button label moved; this one has to follow");
+ assert.ok(page.includes("<b>"+theirs+"</b></button>"),"the Down Sheet's button has to read the same as the Defect Log's");
  /* AND ITS COLUMN IS DECLARED WIDE ENOUGH FOR IT. The grid is 106px; the cell
     adds 14px of padding and a 1px border, so ACTIONS has to be at least 121px
     or the grid does not fit the column it is in. It was 110px and rendered
@@ -3535,13 +3580,10 @@ test("moving a bus never writes its Down Sheet membership",async()=>{
  for(const field of ["down","onDownSheet","downSheetReady"])
   assert.ok(transfer.includes('"'+field+'"'),"a map transfer names "+field+" as excluded");
 
- /* ONE HONEST EXCEPTION, recorded rather than hidden: the map's own
-    `downSheetBadgeView` setting can hide the DS badge for a bus parked on the
-    road. That is a per-device DISPLAY filter and writes no record - the row
-    and the flag are untouched - but it does mean "the badge disappeared after
-    I moved it" is reachable, and the rule above is about the DATA rather than
-    about every pixel. Named here so the next person reads it beside the rule. */
- const badgeView=await readFile(new URL("../src/lib/down-sheet/down-sheet-badge-view.ts",import.meta.url),"utf8");
- assert.match(badgeView,/off-road|location/,"the badge view filters on where the bus is, and writes nothing");
- assert.ok(!/\bdown\s*:\s*(true|false)/.test(badgeView),"and it never writes membership");
+ /* AND THERE IS NO LONGER AN EXCEPTION TO IT. This block used to record one:
+    the map's `downSheetBadgeView` setting could hide the DS badge for a bus
+    parked on the road. It wrote no record, which is why it was written down as
+    honest rather than removed - but "the badge disappeared after I moved it"
+    was reachable, and Curtis's rule is about what a foreman sees, not only
+    about what is stored. It is gone; the test above holds that. */
 });

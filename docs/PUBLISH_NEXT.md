@@ -2358,6 +2358,80 @@ bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
 it stood. A unitless zero is a valid length; it reads as 0 now, and that was
 the last of the twenty-seven.
 
+### The button reads MARK FIXED, the same as the Defect Log's
+
+Curtis asked for *"its own Mark as fixed button, just like the defect sheet
+has"*, and the Defect Log's `.quick-fix` reads **MARK FIXED**. The Down Sheet's
+shipped reading just **FIXED**, so the two surfaces said different things about
+the same gesture. It reads MARK FIXED now, and the gate takes the expected
+label out of `app/defect-log/page.tsx` rather than typing it here, so renaming
+one without the other fails the build.
+
+It cost room, and the room came out of horizontal scroll rather than out of
+REASON. Measured inline at 8px: tick 11.45 + gap 5 + word 56 + padding 14 +
+border 2 = **88.45px**, and 93.47px forced to DejaVu Sans, so the first grid
+track is **96px**, ACTIONS **155px** and the table's `min-width` **1331px**.
+The table is `table-layout:fixed` inside `.sheet-scroll`, so it gets longer:
+measured, the sheet's scroll width went 1297 → 1331 (+34px) and REASON
+284.56px → 283.88px (0.68px).
+
+**On a phone the two words wrap inside the 44px target**, rather than widening
+it — the widest line is FIXED at 31.56px in DejaVu Sans against a 42px content
+box, and the button comes out 44x48.69 with nothing clipped. **It costs no row
+height**, and that was measured by isolation rather than by comparing two
+different rows: the same open row with the label and with the label's box
+removed is the same height at 360 / 390 / 430 / 760 / 1180. The tallest cell in
+a row is the line number, not the button.
+
+DELETE's left edge is identical on open and completed rows at 320 / 360 / 390 /
+430 / 620 / 760 / 761 / 820 / 1180 / 1440, and there is no page overflow at any
+of them.
+
+### The DS badge no longer cares where a bus is parked
+
+**`downSheetBadgeView` is gone.** It was a three-way filter on the Facility
+Map — All / Road-Ready / Off Road — that hid the DS badge for every bus outside
+the chosen group. It wrote no record, which is why the last release recorded it
+as an honest exception rather than removing it. Curtis killed it on the rule he
+had already given: *"there should be no way that a bus can have its badge
+removed from the map by simply relocating it."* A filter keyed on `bus.l` does
+exactly that, record or no record, because the badge is the thing a foreman
+sees.
+
+**SHOW BADGE in Settings is the one switch now, and it is all-or-nothing by
+design.** Turning every badge off is a decision about the display; losing one
+bus's badge by driving it to the road is the app lying about the sheet.
+
+Removed: `src/lib/down-sheet/down-sheet-badge-view.ts` (including
+`isReadyRoadLocation`, one more prefix matcher gone), the
+`app/_components/down-sheet-badge-menu.tsx` menu, its styles, and the field
+from `BoardSettings`. The map draws the badge from `downSheetBadgeBusIds` and
+the SHOW switch, nothing else.
+
+**A device that already holds `downSheetBadgeView:"off-road"` is not touched.**
+`writeBoardSettings` merges over whatever the key holds and no longer names the
+field, so a stored value sits there inert rather than being scrubbed by a
+settings write — the same treatment `futureField` gets in that test. Verified in
+the browser on exactly such a device: three buses on the sheet, one on the road,
+one in a garage space and one in CNG West, **all three keep their badge** where
+the old filter hid two of them.
+
+**And the control's removal left no hole.** It was pinned to column 3 of the
+command bar's four-column phone grid, so AI OPERATOR now takes columns 3-5.
+Measured before and after, one render apart: the bar is **208px tall over 4
+rows at 621 / 700 / 760 / 800 and 53px over 1 row at 801 / 1180 — identical
+either way** — with no gap wider than the gutter inside any row and no page
+overflow. It is also gone from the phone's FILTERS sheet, which drew it too.
+
+**One unrelated thing found while measuring, not fixed:** `app/page.tsx:204`
+reads `ST[bus.s][0]` with no fallback, so a board holding a bus status outside
+`service|defect|shop|out|decommissioned|unknown` white-screens the Facility Map
+into the crash guard. It took a hand-written fixture to produce one, and no
+code path in the app writes such a value today — but `migrateBuses` does not
+normalise it either, so a corrupt or hand-edited record would. Recorded rather
+than fixed, because it is nothing Curtis asked for and the fix is in the map's
+hydration path.
+
 ### NO HEAT, and DEFECTS LOGGED means logged by hand
 
 **A plain NO HEAT under Heating.** Curtis: *"I cannot always confirm why there

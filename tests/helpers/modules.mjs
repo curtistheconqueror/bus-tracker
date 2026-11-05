@@ -49,7 +49,6 @@ export {QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, QUICK_FILTERS, quickFilterBusIds
 export {deferredBadgeCounts, heldDeferredBuses} from "../../src/lib/defects/deferred-counts.ts";
 export {readSettings} from "../../src/lib/defects/defect-log-settings.ts";
 export {EMPTY_FINDINGS_MEMORY, forgetFinding, learnFinding, normalizeFindingsMemory, recallFindings} from "../../src/lib/defects/findings-memory.ts";
-export {downSheetBadgeViewBusIds, downSheetBadgeViewCounts, isReadyRoadLocation} from "../../src/lib/down-sheet/down-sheet-badge-view.ts";
 export {DOWN_SHEET_GROUPS, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetWorkGroup, groupDownSheetEntries, matchesDownSheetSearch, orderDownSheetEntries} from "../../src/lib/down-sheet/down-sheet-view.ts";
 export {DEFAULT_DOWN_SHEET_DISPLAY, normalizeDownSheetDisplay} from "../../src/lib/down-sheet/down-sheet-display-settings.ts";
 export {DEFAULT_DEFECT_LOG_DISPLAY, normalizeDefectLogDisplay} from "../../src/lib/defects/defect-log-display-settings.ts";

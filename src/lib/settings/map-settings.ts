@@ -26,10 +26,19 @@ export const THEMES:Record<string,{label:string;visuals:Visuals;colors:Record<S,
 /* The board settings as one value, read the way the Facility Map has always
    read them and written back over whatever else the key holds.
 
-   The key also carries downSheetBadgeView, which the DS badge menu on the map
-   sets, and a statusVersion, and anything a later release adds - so a writer
-   that replaces the whole object would quietly drop those. Every write here
-   merges over the stored copy. */
+   The key also carries a statusVersion, and anything a later release adds -
+   so a writer that replaces the whole object would quietly drop those. Every
+   write here merges over the stored copy.
+
+   IT USED TO CARRY downSheetBadgeView, a three-way DS badge filter on the map
+   that could hide the badge for a bus parked on the road. Curtis killed it:
+   "there should be no way that a bus can have its badge removed from the map
+   by simply relocating it", and a display filter that did exactly that, even
+   writing no record, was against the rule. The field is NOT scrubbed from
+   devices that hold it - the merge above preserves what it does not name, and
+   nothing reads it any more, so a stored "off-road" is inert rather than
+   dangerous. SHOW BADGE in Settings remains the one switch, and it is
+   all-or-nothing by design. */
 export type BoardSettings={
  colors:Record<S,string>;
  visuals:Visuals;
@@ -44,7 +53,6 @@ export type BoardSettings={
  escapeClosesEditor:boolean;
  busDisplay:BusDisplayMode;
  showDownSheetBadges:boolean;
- downSheetBadgeView:"all"|"ready-road"|"off-road";
  confirmMoves:boolean;
  confirmDefects:boolean;
  serviceIntervals:ServiceIntervals;
@@ -61,7 +69,6 @@ export function readBoardSettings(raw:string|null):BoardSettings{
  const preset=THEMES[savedTheme]||THEMES.default;
  const saved=ui.visuals&&typeof ui.visuals==="object"?ui.visuals as Partial<Visuals>:null;
  const visuals=saved?{...DEFAULT_VISUALS,...saved,sections:{...DEFAULT_VISUALS.sections,...(saved.sections||{})}}:(ui.dark?THEMES.black.visuals:DEFAULT_VISUALS);
- const view=ui.downSheetBadgeView;
  return {
   colors:ui.statusVersion===3&&ui.colors&&typeof ui.colors==="object"?{...DEFAULT_COLORS,...(ui.colors as Record<S,string>)}:{...preset.colors},
   visuals,
@@ -70,7 +77,6 @@ export function readBoardSettings(raw:string|null):BoardSettings{
   escapeClosesEditor:ui.escapeClosesEditor===true,
   busDisplay:ui.busDisplay==="number"?"number":"icon",
   showDownSheetBadges:ui.showDownSheetBadges!==false,
-  downSheetBadgeView:view==="ready-road"||view==="off-road"?view:"all",
   confirmMoves:confirmationPreference(ui.confirmMoves),
   confirmDefects:confirmationPreference(ui.confirmDefects),
   serviceIntervals:readSavedServiceIntervals(ui.serviceIntervalsUnit,ui.serviceIntervals),
@@ -82,7 +88,7 @@ export function writeBoardSettings(storage:Storage,next:BoardSettings){
  try{current=JSON.parse(storage.getItem(BOARD_SETTINGS_KEY)||"{}")||{}}catch{current={}}
  return writeSetting(storage,BOARD_SETTINGS_KEY,JSON.stringify({...current,statusVersion:3,
   colors:next.colors,visuals:next.visuals,theme:next.theme,singleTapEmptySpaces:next.singleTapEmptySpaces,escapeClosesEditor:next.escapeClosesEditor,
-  busDisplay:next.busDisplay,showDownSheetBadges:next.showDownSheetBadges,downSheetBadgeView:next.downSheetBadgeView,
+  busDisplay:next.busDisplay,showDownSheetBadges:next.showDownSheetBadges,
   confirmMoves:next.confirmMoves,confirmDefects:next.confirmDefects,
   serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals:next.serviceIntervals}));
 }

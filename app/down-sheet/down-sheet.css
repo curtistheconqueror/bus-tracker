@@ -55,7 +55,7 @@ button,input,select,textarea{font:inherit}
    widening that one column takes nothing away from the others: the table is
    inside a horizontal scroller and simply gets longer. 40px for the ON ROAD
    badge, then 90px more for the DELETE button beside it. */
-.down-table{width:100%;min-width:1297px;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.down-table{width:100%;min-width:1331px;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .down-table th{position:sticky;top:0;z-index:2;height:29px;padding:4px 7px;border-right:1px solid #d2d9e5;border-bottom:1px solid #8999b4;background:#e8eef7;color:#21395f;font-size:8px;letter-spacing:.4px;text-align:left}
 .down-table th:nth-child(1){width:48px;text-align:center}/* 108px fitted the number and its status label exactly, so the ON ROAD badge
    beside it overflowed into the reason column and was clipped by 21px —
@@ -488,7 +488,7 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    the reason the pair lines up, which it is not — the two FIXED TRACKS are. */
 .fix-entry{display:inline-flex;align-items:center;justify-content:center;flex:none;gap:5px;width:auto;min-width:26px;height:26px;padding:0 7px;border:1px solid #1f6b37;border-radius:6px;background:#e4f4e8;color:#17552b;font-size:13px;font-weight:900;line-height:1;vertical-align:middle;cursor:pointer;touch-action:manipulation}
 .fix-entry:hover,.fix-entry:focus-visible{background:#1f6b37;color:#fff;outline:none}
-.fix-entry b{font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1}
+.fix-entry b{font-size:8px;font-weight:900;letter-spacing:.5px;line-height:1;text-align:center}
 .down-deleted-note.fixed{border-color:#1f6b37;border-left-color:#1f6b37;background:#e9f6ec;color:#17552b}
 .down-deleted-note.fixed button{border-color:#1f6b37;color:#17552b}
 .down-deleted-note{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 14px 9px;padding:8px 11px;border:1px solid #b4321f;border-left:4px solid #b4321f;border-radius:6px;background:#fdeeeb;font-size:10px;font-weight:800;color:#7c2011}
@@ -551,7 +551,12 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
     does go 8px to 9px. 7px was the smallest text on the sheet, on the device
     the sheet is actually used on. Read through `declaredFontSizePx` by the
     test, so a `font:` shorthand or a `%` here is seen rather than guessed. */
- .fix-entry b{font-size:9px;letter-spacing:.3px}
+ /* TWO LINES ON A PHONE, inside the 44px target rather than widening it.
+    Measured: the widest line is FIXED at 31.56px in DejaVu Sans against a
+    42px content box, and the button comes out 48px tall - under the 55px the
+    `.down-table td` floor already gives an entry row, so two lines cost no
+    row height either. */
+ .fix-entry b{font-size:9px;letter-spacing:.3px;line-height:1.15;white-space:normal}
  /* The status label and the badge are both a point larger here, and the target
     is 44px, so the tab stops move out to match rather than letting anything
     spill into the reason column. */
@@ -692,17 +697,18 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    carry belongs to the old auto-width button; forced to DejaVu the stretched
    one needs 45.13 of 46 and fits.)
 
-   What the column width decides is whether the GRID fits. It is 62 + 8 + 36 =
-   106px; `*{box-sizing:border-box}` at the top of this file means a `th` width
+   What the column width decides is whether the GRID fits. It is 96 + 8 + 36 =
+   140px; `*{box-sizing:border-box}` at the top of this file means a `th` width
    is the border box, so the cell also owes 14px of `td` padding and a 1px
-   border — 121px. At 110px it was 11px short of its own contents and only
+   border — 155px. The phone's two 44px targets and their 10px gap need 113px,
+   so the desktop figure covers both. At 110px it was 11px short of its own contents and only
    looked right because `min-width` below is deliberately larger than the sum
    of the columns and Chrome spreads the surplus, leaving 0.45px of DELETE in
    the cell's own right padding. Anyone who later made `min-width` match the
    columns, which this file reads as if it were the rule, would have pushed
    DELETE 3px past the table's right edge on the spot. Declared honestly now,
    and a test checks the declaration rather than the render. */
-.down-table th.row-actions-head{width:121px}
+.down-table th.row-actions-head{width:155px}
 .down-table td.row-actions{text-align:center}
 /* FIXED TRACKS, NOT `auto`. With `auto` the first track took MARK FIXED's
    full width on an open row and collapsed to the button's min-width on a
@@ -712,12 +718,18 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    rows that never draw a MARK FIXED at all. A destructive control is not
    something to let wander.
 
+   96px, NOT 62px, because the label is MARK FIXED now rather than FIXED -
+   Curtis asked for "its own Mark as fixed button, just like the defect sheet
+   has", and the Defect Log's `.quick-fix` reads MARK FIXED. Measured inline at
+   8px/.5px: tick 11.45 + gap 5 + word 56 + padding 14 + border 2 = 88.45px,
+   and 93.47px forced to DejaVu Sans, so 96px clears both.
+
    `justify-content:center` is INERT for the same reason: with both tracks
    fixed the inline-grid is exactly 106px, so there is nothing inside it to
    distribute. What centres the pair in the cell is `text-align:center` on the
    line above. Kept so that a future `auto` track does not also lose the
    centring, and recorded rather than left to be rediscovered. */
-.row-actions-slots{display:inline-grid;grid-template-columns:62px 36px;justify-content:center;gap:8px;align-items:center}
+.row-actions-slots{display:inline-grid;grid-template-columns:96px 36px;justify-content:center;gap:8px;align-items:center}
 /* AND DELETE STAYS IN ITS OWN TRACK. A lone child auto-places into column 1,
    so on a completed row DELETE slid into the slot MARK FIXED normally holds
    and left the reserved track empty beside it. That predates the word and is

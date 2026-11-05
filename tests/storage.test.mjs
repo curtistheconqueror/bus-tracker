@@ -196,11 +196,19 @@ test("every setting in the app lives on one page, behind the gear in the nav",as
  storage.setItem(BOARD_SETTINGS_KEY,JSON.stringify({theme:"midnight",downSheetBadgeView:"off-road",futureField:"keep"}));
  const board=readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY));
  assert.equal(board.theme,"midnight");
- assert.equal(board.downSheetBadgeView,"off-road");
+ /* downSheetBadgeView IS NO LONGER READ. It was a three-way DS badge filter on
+    the map that hid the badge for a bus parked outside the chosen group, and
+    Curtis killed it on his own rule - "there should be no way that a bus can
+    have its badge removed from the map by simply relocating it". */
+ assert.equal(board.downSheetBadgeView,undefined,"the DS badge view must not come back through the settings reader");
  assert.ok(writeBoardSettings(storage,{...board,busDisplay:"number"}).ok);
  const storedBoard=JSON.parse(storage.getItem(BOARD_SETTINGS_KEY));
  assert.equal(storedBoard.busDisplay,"number");
- assert.equal(storedBoard.downSheetBadgeView,"off-road","the DS badge menu's field survives a Settings-page write");
+ /* AND IT IS NOT SCRUBBED EITHER, which is the point of the merge this test is
+    about: a device that holds "off-road" keeps holding it, inert, rather than
+    having a settings write reach in and edit a field nothing reads. The same
+    sentence covers `futureField` below - anything a later release adds. */
+ assert.equal(storedBoard.downSheetBadgeView,"off-road","a write must not scrub the dead field it no longer names");
  assert.equal(storedBoard.futureField,"keep","a field this release has not heard of survives too");
  assert.equal(storedBoard.statusVersion,3,"colours are stamped the way the map reads them back");
  assert.deepEqual(readBoardSettings(storage.getItem(BOARD_SETTINGS_KEY)).colors,board.colors,"the midnight colours read back as written");
