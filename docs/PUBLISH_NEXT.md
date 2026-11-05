@@ -42,8 +42,14 @@ longer loses what it says** — the scan prompt contradicted itself about IDOT
 rows, threw away the per-bus state written in brackets, and let a misread line
 number file a bus under another line's work — and **a completed repair stays
 completed** instead of re-opening under a new id on the next Down Sheet load.
-Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
-remains separately held and unmerged.
+**A REPAIR CAN CARRY MORE THAN ONE PART** — the record had exactly one pair of
+boxes and Curtis hit the wall on a real fix — with the old two fields kept as a
+read of the first part so nothing on disk is rewritten and an older phone still
+shows something. And **the FOCUS panel's share follows the window now**, with a
+**swipe left** (or a HIDE button, for the shop computer) to drop one defect from
+it and **PUT BACK** to return it; the share refuses to send an empty bus, which
+would have read as a clean one. Queued by Claude Code; not published, not
+tagged, not deployed. PR39 MCP remains separately held and unmerged.
 
 Application release 193 is live as Sites version 189 from
 `a009c08fad02aa6859ec6445784f744c6e269c8d`, deployed 2026-10-25 at
@@ -1963,7 +1969,7 @@ and swept as ink on that ground across the four Defect Log themes:
 text here at any tint; `--log-muted` needs the ground near the surface. So the
 tint is **4%**, the title is `--log-text` and the message `--log-muted`. 6%
 would floor at exactly 4.50 and a floor equal to the threshold is not a
-promise. Measured on the built page afterwards: title floor **8.69:1**, message
+promise. Measured on the built page afterward: title floor **8.69:1**, message
 **4.63:1**, the × **4.90:1**, the ring against the field's own surface
 **4.63:1**.
 
@@ -2429,26 +2435,38 @@ border box.
 Curtis, on a share he was about to send: *"when I hit like the last 24 hours of
 the shift, it gives me buses, but I think it's giving me more than the defects
 that I put down in the last 24 hours or the current shift."* He was right, and
-it was **two separate bugs** that compounded.
+**one** of the two things this section originally blamed was real.
 
-**ONE: the focus share ignored the window entirely.** It was built from the
-UNFILTERED records on purpose — he had asked for exactly that earlier, *"share
-all the defects with a bus"* — so with 24H selected, focusing a bus and pressing
-SHARE sent every defect it had ever carried. Asked which way he wanted it now
-that he had used the other, he chose: *"Follow the window, and add the swipe."*
-The share is **what is on screen** now, and the earlier reasoning stays in the
-page's comment because it is why this ever carried the whole bus.
+**THE REAL ONE: the focus share ignored the window entirely.** It was built from
+the UNFILTERED records on purpose — he had asked for exactly that earlier,
+*"share all the defects with a bus"* — so with 24H selected, focusing a bus and
+pressing SHARE sent every defect it had ever carried. Asked which way he wanted
+it now that he had used the other, he chose: *"Follow the window, and add the
+swipe."* The share is **what is on screen** now, and the earlier reasoning stays
+in the page's comment because it is why this ever carried the whole bus.
 
-**TWO: the WHEN LOGGED drop-down counted a scanned sheet as logged now.** A
-defect born from a Down Sheet row is stamped `source:"down-sheet"` with a
-`createdAt` of **when the scan ran**, so importing yesterday's paper at 20:00
-dropped that whole sheet into TODAY, LAST 24H and THIS SHIFT at once. The
-DEFECTS LOGGED quick filter was fixed for this earlier in 194; the drop-down was
-missed. A scanned row is now out of every **timed** window and stays in ALL —
-the same rule that module already applied to an undated record, and for the same
-reason. Curtis chose this over marking them: *"just things that were logged by
-hand."* `loggedByHand` moved down into `repair-catalog.ts`, where
-`DefectSource` lives, so both the filter and the window ask one function.
+**THE SECOND ONE WAS NOT A BUG ON THAT SCREEN, and this section said it was.**
+The claim was that the WHEN LOGGED drop-down counted a scanned sheet as logged
+now, since a defect born from a Down Sheet row is stamped `source:"down-sheet"`
+with a `createdAt` of when the scan ran. The stamp is real. The reachability is
+not: the Defect Log's feed is built by `defectLogRecords`, which filters
+`source==="defect-log"` **before the page sees a record**, so a scanned row was
+never in that drop-down's list — not in a timed window and not in ALL either.
+A cold read found it; the guard added to `defectWithinFeedWindow` is therefore
+dead code at its one caller today.
+
+The guard stays, as a property of the question rather than of today's caller:
+that function is what a route, an export or a whole-fleet read would ask, and
+the filter that makes it moot lives in another module. Its code comment said
+*"ALL still shows them"*, which was the opposite of true, and the wrong account
+was more dangerous than the dead line — it described a behaviour somebody could
+go looking for. Corrected, and now driven by a test that asserts both halves:
+the guard's own answer, and that `defectLogRecords` never hands it a scanned row.
+Where the rule **is** live is the DEFECTS LOGGED quick filter, which runs over
+the board's own defects; that was fixed earlier in 194 and is unaffected.
+`loggedByHand` moved down into `repair-catalog.ts`, where `DefectSource` lives,
+so both callers ask one function, and `quick-filters.ts` no longer carries a
+second copy of its rationale.
 
 **AND A SWIPE DROPS ONE DEFECT FROM THE SHARE.** *"I would like to swipe left to
 get rid of a defect and have a quick undo button to bring it back."* Swipe a
@@ -2469,30 +2487,122 @@ panel is open, cleared when the bus changes. That is not tidiness: the Shop
 Cloud ships every unknown defect field inside the row's `detail` blob and a
 merge replaces a defect wholesale by id, so one person's *"don't send this
 one"* would **hide that defect on every phone in the shop** — the reason a HOLD
-and a FULL SWEEP do not travel either. A test names the fields and keys it must
-not use.
+and a FULL SWEEP do not travel either. The test for this used to name three
+literal strings, so a different spelling walked past it; it now reads the hide
+handler's whole body and separately asserts that `focusShareScope` writes
+nothing onto a record.
+
+**AN EMPTY SHARE SAID A BUS WAS CLEAN, and the swipe is what made that
+reachable.** Hiding every row and pressing COPY put *"0 defects — shared …"* and
+then *"No defects on this bus."* on the clipboard — for a bus with three open
+defects. A recipient reads that as a clean vehicle, which is the most damaging
+thing this app can say about one. All three outputs now refuse: COPY, SHARE and
+SHARE PAGE each ask `focusShareIsEmpty` in their own body (SHARE falls back to
+COPY, so a guard on one path is a guard on the path somebody happened to take),
+the three buttons go dead, and the scope line says **NOTHING LEFT TO SHARE —
+3 YOU SWIPED AWAY** rather than counting to zero.
+
+**THE SWIPE NEVER FIRED ON A PHONE, and the paragraph that used to sit here said
+it could not need to.** It claimed *"nothing blocks scrolling — no
+`touch-action` … because a horizontal drag passes through a vertical scroller
+untouched"*, and a test enforced that by BANNING `touch-action` in the row's
+file. The browser does not work that way: with `touch-action:auto` it claims the
+gesture as soon as a finger moves and sends `pointercancel`, which the row
+correctly reads as "that was a scroll" — so the gesture was dead on every touch
+device. Reproduced with real CDP touch events at 390px as
+`pointerdown > pointermove > pointercancel`, three rows still there. It worked
+with a mouse, which is why it looked right on the shop computer, which is where
+it was checked.
+
+`touch-action:pan-y` on the row is the fix: vertical panning stays with the
+browser, horizontal movement comes to the component, and `none` — which would
+take the panel's own scroll away — is still banned. The gate is reversed and is
+now **resolved through the cascade** rather than matched as a string, so `none`
+arriving from a broader selector fails it too.
 
 **The gesture is a decision, not a distance**, and the panel it sits in scrolls
 vertically under the same thumb. The Facility Map paid for the naive version and
 wrote it down: a plain distance test *"carried garage-6 to wall-7 and scrolled
-the page zero pixels."* So three conditions, all of them: at least 56px, leftward,
-and sideways travel beating vertical by half again. **Nothing blocks scrolling** —
-no `touch-action`, no non-passive `touchmove`, no `preventDefault` — because a
-horizontal drag passes through a vertical scroller untouched, and a cancelled
-pointer (the browser saying "this was a scroll") never counts as a decision.
+the page zero pixels."* So three conditions, all of them: at least 56px,
+leftward, and sideways travel beating vertical by half again. A cancelled
+pointer never counts as a decision, a mouse never starts a gesture at all
+(a leftward drag to select a defect's text would otherwise satisfy all three),
+and a second finger landing mid-drag cannot restart the measurement.
+
+**A SELECTION ALREADY ON THE ROW ATE THE NEXT SWIPE.** Long-press a defect's
+text on a phone and the browser hands the following drag to the selection
+handles. `user-select:none`, scoped to `(hover:none) and (pointer:coarse)`:
+selecting a defect with a mouse to paste it somewhere is ordinary on the shop
+computer, and a mouse never starts a swipe, so there is nothing to protect
+there.
+
+**FOCUS AND THE ANNOUNCEMENT.** The pressed HIDE button unmounts with its row,
+which dropped focus to the document **body** — a keyboard then sat at the top of
+the page, outside a dialog it never left. The row now reports whether it was
+hidden by the **button** or by a **swipe**: a button press moves focus to PUT
+BACK, and the last PUT BACK moves it to COPY, because PUT BACK is about to stop
+being focusable. A swipe moves nothing, since a thumb holds no focus and
+scrolling the panel to a control nobody asked for is its own bug. A hide was
+also silent to a screen reader; it has its own live region, so a hide cannot
+wipe COPIED and a share cannot wipe the hide.
+
+**THE SCOPE LINE AND PUT BACK SIT IN ONE ALWAYS-MOUNTED SLOT.** They appear and
+disappear and they sit **above** the rows, so mounting them moved the whole list
+and put a different row under the thumb that was about to swipe next. The slot
+holds its height; only its contents change. Two bugs came out of that move and
+both are fixed: the note's own CSS rule was written as
+`.log-focus-share>.log-focus-share-scope`, so putting the note inside the slot
+took it out of that rule's reach **and** out of `.log-focus-share>small` beside
+it — it drew at the browser's default `small` size, measured 13px, inside a bar
+built for 7px. And `width:100%` on PUT BACK, left over from when it spanned the
+grid, squeezed the note to a word a line. A `>` is a claim about the markup, and
+moving an element is how the claim stops being true, silently.
 
 **All three outputs read one list.** A page that honoured a swipe while the text
 ignored it would be two answers to one question with no way to tell which had
-been sent.
+been sent. The test for this sliced 700 characters from each handler's name,
+which on the four-line `copyFocusBus` ran into `shareFocusBusText` below it and
+borrowed its call — so deleting the call from `copyFocusBus` left the gate
+green. It matches balanced braces now, and the extractor is itself asserted.
 
-**Measured in the built page at 390 and 1180**, driving the real panel: a
-mostly-vertical drag hides nothing; a left swipe removes the row it was on and
-the next one takes its place; a rightward drag does nothing; the HIDE button
-does what the swipe does; PUT BACK pressed twice returns both and the scope line
-goes silent; and the panel still scrolls to 120px afterwards. **Read out of the
-clipboard**, which is the check that matters: the share went from *"3 defects"*
-with three rows to *"2 defects"* with the swiped one gone and the rest
-renumbered, and back to three after PUT BACK. No page errors.
+**Measured in the built page with real CDP touch events**, at 390, 430 and 1180:
+
+| | measured |
+| --- | --- |
+| left drag on a row, 390px touch | `pointerdown > pointermove > pointerup`, **no cancel** — 3 rows to 2 |
+| vertical drag, 390px touch | panel scrolls **0 → 1105px**, 8 rows still 8 |
+| mostly-vertical diagonal flick | 8 rows still 8 — the axis lock holds |
+| clean left swipe mid-scroll | 8 rows to 7 — the gesture survives a scrolled panel |
+| leftward **mouse** drag, 1180px | 3 rows still 3, text selected instead |
+| keyboard HIDE (Enter) | 3 rows to 2, focus lands on **PUT BACK**, not `body` |
+| everything hidden | note **NOTHING LEFT TO SHARE — 3 YOU SWIPED AWAY**, all three buttons `disabled`, clipboard **empty** after pressing COPY |
+| one PUT BACK | row returns, focus stays on PUT BACK |
+| share bar height, a row hidden | **103px → 103px** — the slot's own contribution to the list's position is zero |
+| scope note | **9px** at 390/430, **7px** at 1180, accent blue at all three |
+| HIDE control | **44x44** at 390/430, 36x36 at 1180, `display:flex` throughout |
+| horizontal page scroll | none at 390, 430 or 1180 |
+
+One honest note on that table: an earlier run measured a **61px** shift in the
+list at 1180 when a row was hidden. That was the three-defect fixture, not the
+slot — a three-row dialog is short enough that losing a row lets the centred,
+auto-height panel shrink and re-centre. With the panel full (eight defects, or
+any viewport where it is already at its 92vh cap) the shift is **0px**, and the
+share bar's own height does not move either way.
+
+**28 of 28 mutations caught**, up from 21 of 25 before this round. The four that
+had been surviving were a `display:none` on HIDE, an exclusion written onto a
+defect through a cast, the scope note's rule reverted to a child selector, and
+the note put back behind a condition.
+
+**And the cascade resolver the layout gates lean on had a hole.**
+`effectiveStyle` in `tests/helpers/css-rules.mjs` split `A>B` and `A B` on one
+regex and then looked for every compound **anywhere** up the ancestor chain, so
+a child selector matched a grandchild — which is precisely the bug above, and a
+mutation putting the stale `>` back passed. It honours the child combinator now,
+declines sibling selectors rather than guessing (there are no siblings in its
+element model), and has its own test for the first time. It is what a dozen
+layout gates ask instead of reading CSS by eye, and it has now twice been the
+reason one passed something it was written to catch.
 
 ### A repair can carry more than one part
 
