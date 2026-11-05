@@ -3,7 +3,7 @@
 import StatusReportModal from "@/src/components/reports/status-report-modal";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
-import {downSheetShareFilename,downSheetShareHtml,downSheetShareScopeLabel,downSheetShareText,type DownSheetShareScope} from "@/src/lib/down-sheet/down-sheet-share";
+import {downSheetShareFilename,downSheetShareHtml,downSheetShareScope,downSheetShareScopeLabel,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -495,14 +495,25 @@ export default function DownSheet(){
     and already sent what was on screen; they were only reachable once a filter
     had been picked, so there was no way to send the sheet.
 
-    WHETHER ANYTHING IS NARROWING THE VIEW decides which of the two unfiltered
-    scopes this is, because the share sends what is drawn and the heading has to
-    match it. SHOW COMPLETED is deliberately NOT in this list: it ADDS finished
-    rows rather than hiding any, so a view carrying it is not "part of" the
-    sheet, and every row says its own workflow. The rest all hide rows. */
- const sheetNarrowed=Boolean(search.trim())||filter!=="All"||Boolean(roadFilter)||fixedToday;
- const shareScope:DownSheetShareScope=quickFilter||(sheetNarrowed?"partial-sheet":"whole-sheet");
+    WHAT THIS SHARE COVERS IS DECIDED IN THE LIB, not here. The page reports
+    its own view state and `downSheetShareScope` turns that into the claim the
+    heading makes, so a route can ask the same question without a second copy
+    of the rule - and so the rule is testable away from a page this suite
+    cannot render. A cold read found the first version, which decided it
+    inline, making that claim falsely in four different ways.
+
+    `drawn` against `onSheet` is the part that does not go stale: the bands
+    drop IDOT-only rows on their own, and a list of flags would have missed
+    that one and will miss the next. */
+ const shareScope=downSheetShareScope({quickFilter,search,shiftFiltered:filter!=="All",
+  roadFiltered:Boolean(roadFilter),fixedToday,showCompleted,drawn:visible.length,onSheet:shown.length});
  const shareLabel=downSheetShareScopeLabel(shareScope);
+ /* THE STATUS BELONGS TO A SCOPE, and the bar no longer unmounts to take it
+    away. Pressing COPY LIST then typing in SEARCH left "COPIED!" sitting
+    under a heading describing a different set of buses, with nothing in the
+    page that would ever clear it. */
+ const shareStatusKey=shareLabel+"|"+visible.length;
+ useEffect(()=>{setShareStatus("")},[shareStatusKey]);
  const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order
     the Defect Log settled on. A browser with no navigator.share must not leave
@@ -1039,7 +1050,7 @@ export default function DownSheet(){
       that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
       neither means anything when no filter is set. */}
   <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
-   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint:"Sends the buses on the screen right now, as text or as a page."}</small></p>
+   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint:"Sends the buses on the screen right now, as text or as a page."}</small></p>
    <div className="down-quick-filter-actions">
     <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
     <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
