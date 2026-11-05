@@ -263,7 +263,31 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    It used to be three across with SAVE spanning the full row on a phone,
    which made the biggest, easiest target the one you press least. */
 .save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
-.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:hidden}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
+/* ADVANCED DETAILS WAS A 2px LINE, AND `overflow:hidden` WAS DOING IT.
+
+   Measured in the project's own verification browser at 390 and 1180: the
+   `<details>` box computed to **2px** - its two borders and no content - while
+   the `<summary>` inside it was a correct 48px, clipped away to nothing. The
+   whole section (DIAGNOSIS / TEST / VERIFICATION, WHAT WAS FOUND, PARTS USED,
+   ESTIMATED TIME OF REPAIR, the hours) could not be opened by a tap or a click
+   at all. A KEYBOARD still opened it - focus the summary, press Enter - which
+   is why nothing ever errored and no test caught it: the element was there, it
+   was `open`-able, and only its box was gone.
+
+   Bisected live rather than reasoned about: with `overflow:hidden` the details
+   is 2px; with `overflow:clip` or `overflow:visible` it is 50px at 390 and 48px
+   at 1180. The summary's `display:flex` is NOT the cause - a bare
+   `<details>` with a flex `<summary>` on the same page measures 48px - and
+   neither is `height`, which nothing sets.
+
+   `overflow:clip` rather than removing it: the rule is here to keep the inner
+   grid inside the 8px rounded frame, and clip still does that. Measured with
+   the section open: the grid does not overflow the frame at either width.
+
+   This is older than the change it was found in - nothing on this branch ever
+   touched this rule - and it is a Chromium measurement; whether the same engine
+   behaviour reaches an iPhone is not established here. */
+.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:clip}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
 .advanced-defect-details:not([open]) .advanced-defect-grid{display:none}
 
 /* Three explicit actions in both editor rows and the fourth workflow tab. */
