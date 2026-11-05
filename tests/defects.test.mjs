@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectPartsText, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareIsEmpty, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, swipeOffsetPx, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectPartsText, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareIsEmpty, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, removeDefectPart, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, swipeOffsetPx, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
 import { effectiveStyle, stripCodeComments } from "./helpers/css-rules.mjs";
 
@@ -7353,6 +7353,37 @@ test("ESTIMATED TIME OF REPAIR is a claim about this bus, and the Defect Log own
   ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
   assert.deepEqual(normalizeDefectParts(legacy[0].parts,legacy[0]).map(part=>part.partNumber),["ZZ-9","YY-8"],
    "a one-part record saved before the array existed still brings its part");
+  /* AND EVERY MERGED PART NEEDS AN ID OF ITS OWN. `normalizeDefectParts` MINTS
+     a default id for a record that has none - `part-0` for a legacy one-part
+     record, `part-0, part-1…` for an array without ids - so two ordinary
+     one-part copies merged into a list where both parts were `part-0`.
+
+     That is the exact failure the ids exist to prevent: the editor keys rows by
+     id and `updateDefectPart`/`removeDefectPart` FIND a row by id, so typing in
+     row 2 rewrote row 1 and REMOVE on row 2 deleted both - silent loss on a
+     save, with the screen still showing the first part. Driven through the real
+     edit helpers, which is the only way to see it. */
+  const ids=normalizeDefectParts(legacy[0].parts,legacy[0]);
+  assert.equal(new Set(ids.map(part=>part.id)).size,ids.length,
+   "two merged parts must not share an id: "+JSON.stringify(ids.map(part=>part.id)));
+  assert.deepEqual(updateDefectPart(ids,ids[1].id,{partNumber:"YY-80"}).map(part=>part.partNumber),
+   ["ZZ-9","YY-80"],"typing in row 2 must not rewrite row 1");
+  assert.deepEqual(removeDefectPart(ids,ids[1].id).map(part=>part.partNumber),["ZZ-9"],
+   "and REMOVE on row 2 must not take row 1 with it");
+  /* An array whose own ids are the defaults collides the same way. */
+  const defaults=mergeDuplicateDefects([{id:"bd",n:"6308",l:"bay-8",s:"defect",defects:[
+   {...defect,id:"u1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z",
+    partsUsed:true,partNumber:"AA-1",parts:[{partNumber:"AA-1"},{partNumber:"BB-2"}]},
+   {...defect,id:"u2",details:"same parts",createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z",
+    partsUsed:true,partNumber:"CC-3",parts:[{partNumber:"CC-3"},{partNumber:"DD-4"}]},
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  const defaultIds=normalizeDefectParts(defaults[0].parts,defaults[0]);
+  assert.deepEqual(defaultIds.map(part=>part.partNumber),["AA-1","BB-2","CC-3","DD-4"]);
+  assert.equal(new Set(defaultIds.map(part=>part.id)).size,4,
+   "four parts, four ids: "+JSON.stringify(defaultIds.map(part=>part.id)));
+  /* A PART KEEPS ITS OWN ID WHEN NOTHING COLLIDES, so an ordinary merge does
+     not churn a record for nothing. */
+  assert.equal(defaultIds[0].id,"part-0","the first part is left alone");
   /* AND A COPY WITH A PART NUMBER AND NO `partsUsed` FLAG KEEPS ITS PART. The
      first version of this merge passed `anyTrue(...)===true` straight through,
      so when NO copy carried the flag it handed the assembler an explicit

@@ -32,7 +32,7 @@
       ever know which one. */
 
 import {defectLabel,isUnresolved,mergeReportAttempts,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
-import {normalizeDefectParts,withDefectParts,type DefectPart} from "./defect-parts.ts";
+import {blankDefectPart,normalizeDefectParts,withDefectParts,type DefectPart} from "./defect-parts.ts";
 
 const clean=(value:unknown)=>typeof value==="string"?value.trim():"";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "../down-sheet/down-sheet-sync.ts";
@@ -128,6 +128,27 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     keeps its MISSING PART # through the merge. */
  const mergedParts:DefectPart[]=[];
  const seenParts=new Map<string,number>();
+ /* AND EVERY MERGED PART NEEDS AN ID OF ITS OWN, which this union did not give
+    them. `normalizeDefectParts` MINTS a default id for a record that has none -
+    `part-0` for a legacy one-part record, `part-0, part-1…` for an array
+    without ids - so two ordinary one-part copies merged into a list where both
+    parts were `part-0`.
+
+    That is the exact failure `defect-parts.ts` keeps ids for in the first
+    place: the editor keys its rows by id and `updateDefectPart` /
+    `removeDefectPart` FIND a row by id, so with a collision, typing in row 2
+    rewrote row 1 and REMOVE on row 2 deleted both. Driven: merging ZZ-9/Belt
+    with YY-8 gave ids `[part-0, part-0]`; typing in row 2 gave
+    `[YY-80, YY-80]`; removing row 2 left `[""]` - silent loss on a save, with
+    the screen still showing ZZ-9.
+
+    An id that is already taken is REPLACED rather than suffixed, through the
+    module's own `blankDefectPart`, so there stays one place that mints an id.
+    A part keeps its own id when nothing collides, which is every merge that
+    does not hit this, so a record is not churned for nothing. The id means
+    nothing to anybody by design - the comment on it says so - which is exactly
+    why replacing one costs nothing. */
+ const usedIds=new Set<string>();
  for(const defect of ordered)
   for(const part of normalizeDefectParts(defect.parts,defect)){
    const key=(part.partNumber||"").trim().toLowerCase()||"name:"+(part.partName||"").trim().toLowerCase();
@@ -146,7 +167,9 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     continue;
    }
    seenParts.set(key,mergedParts.length);
-   mergedParts.push(part);
+   const kept=usedIds.has(part.id)?{...part,id:blankDefectPart().id}:part;
+   usedIds.add(kept.id);
+   mergedParts.push(kept);
   }
  return withDefectParts({
   ...survivor,
