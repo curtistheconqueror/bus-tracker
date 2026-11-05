@@ -5,7 +5,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetBadgeViewBusIds, downSheetBadgeViewCounts, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, isReadyRoadLocation, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
-import { cssRules, splitSelector } from "./helpers/css-rules.mjs";
+import { effectiveStyle } from "./helpers/css-rules.mjs";
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
   const fleet = [
@@ -1862,100 +1862,170 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
  assert.match(page,/rowAction&&<p className=\{"down-deleted-note"[\s\S]{0,600}?onClick=\{undoDeleteEntry\}/);
  assert.doesNotMatch(page,/<summary>MORE<\/summary>[\s\S]{0,600}?undoDeleteEntry/,"PUT BACK must not be the thing hidden behind a menu");
 
- /* 26px reads fine under a mouse and misses under a thumb. The sheet is used
-    on phones, so the phone block has to give it a real target. */
- assert.match(css,/\.delete-entry\{[^}]*width:26px/);
- /* MARK FIXED NO LONGER SHARES DELETE'S SHAPE, and that is the point of it.
-    It was a bare green tick that said nothing, which is why Curtis asked for
-    "its own Mark as fixed button, just like the defect sheet has" about a
-    button that already existed and had done the whole job since it was built.
-    It carries the word FIXED now, so it is wider than the square beside it —
-    but it keeps 26px as its FLOOR, so the pair still lines up. */
- assert.match(css,/\.fix-entry\{[^}]*min-width:26px/,"MARK FIXED is still at least DELETE's size");
- /* THE WORD CANNOT BE HIDDEN, and this is the third version of this gate. The
-    first asserted a CSS rule and said nothing about whether a `<b>` rendered.
-    The second anchored on the DESKTOP rule's opening declaration, so a cold
-    read walked nine mutations past it: appending `display:none`,
-    `visibility:hidden` or `color:transparent` to that rule, setting the phone
-    rule to `font-size:0`, or adding a later rule anywhere in the file.
+ /* BOTH CONTROLS ARE RESOLVED THROUGH THE CASCADE, NOT MATCHED IN THE TEXT,
+    and this is the third version of this gate. The first asserted
+    `/\.fix-entry b\{font-size:8px/` and said nothing about whether a `<b>`
+    rendered. The second computed "the last rule whose selector string is
+    exactly this one" and called that the effective style; a cold read walked
+    SIXTEEN ordinary-CSS mutations past it in one sitting — a descendant form
+    (`.row-actions .fix-entry b`), `!important`, a capital `None`, an
+    `@media(max-width:900px)` block (which this file already uses twice), a
+    `font:` shorthand, `font-size:40%`, `transform:scale(0)`, `width:0`,
+    `position:absolute;left:-9999px`, a colour equal to the button's own
+    background, and a plain later rule appended anywhere in the file. Two of
+    them put back the exact DELETE jitter this change was written to remove.
 
-    A regex over a stylesheet cannot see the cascade, so this stops using one.
-    `tests/helpers/css-rules.mjs` is a real CSS reader this project already
-    owns; it hands back each rule with the at-rules it sits inside, so the
-    effective declarations can be computed per context, last one winning. */
- const effective=(sheet,selectorText,inPhone)=>{
-  const out={};
-  for(const rule of cssRules(sheet)){
-   const media=(rule.at||[]).join(" ");
-   if(media&&!(inPhone&&/max-width:760px/.test(media)))continue;
-   if(!splitSelector(rule.selector).some(one=>one.trim()===selectorText))continue;
-   for(const part of (rule.body||"").split(";")){
-    const at=part.indexOf(":");
-    if(at>0)out[part.slice(0,at).trim()]=part.slice(at+1).trim();
+    `effectiveStyle` in tests/helpers/css-rules.mjs is the answer: it orders
+    every rule that targets the element by `!important`, then specificity, then
+    source position, and evaluates the at-rules against a real viewport width.
+    It is a tripwire and not a rendering engine — what it cannot see is listed
+    where it is defined. */
+ const SHEET=[{tag:"html",classes:[]},{tag:"body",classes:[]},
+  {tag:"div",classes:["sheet-scroll"]},{tag:"table",classes:["down-table"]},
+  {tag:"tbody",classes:[]}];
+ /* AN OPEN ROW AND A COMPLETED ROW ARE DIFFERENT ELEMENTS, which is the whole
+    subject of this change: `<tr className={entry.workflow==="Completed"?
+    "completed":""}>`, and a completed row draws no MARK FIXED at all. The
+    alignment claim is about those two rows side by side, so both are walked. */
+ for(const row of [{what:"an open row",classes:[]},{what:"a completed row",classes:["completed"]}]){
+  const inside=[...SHEET,{tag:"tr",classes:row.classes},
+   {tag:"td",classes:["row-actions"]},{tag:"span",classes:["row-actions-slots"]}];
+  const FIX={tag:"button",classes:["fix-entry"],ancestors:inside};
+  for(const width of [390,1180]){
+   const where=row.what+(width<=760?" on a phone":" on the shop computer");
+   const slots=effectiveStyle(css,{tag:"span",classes:["row-actions-slots"],
+    ancestors:inside.slice(0,-1)},width);
+   const fix=effectiveStyle(css,FIX,width);
+   const word=effectiveStyle(css,{tag:"b",classes:[],ancestors:[...inside,FIX],
+    inheritedFontSizePx:fix.fontSizePx},width);
+   const remove=effectiveStyle(css,{tag:"button",classes:["delete-entry"],ancestors:inside},width);
+
+   /* NOTHING IN THE ACTIONS CELL MAY BE HIDDEN, and the list below is the
+      floor rather than the ceiling: a stylesheet has more ways to make a box
+      disappear than can be enumerated, which is why this is a tripwire. */
+   const gone=style=>{
+    if(style.display==="none")return "display:none";
+    if(["hidden","collapse"].includes(style.visibility))return "visibility:"+style.visibility;
+    if(style.opacity!==undefined&&Number(style.opacity)===0)return "opacity:0";
+    /* `scale(0)` is the obvious spelling and the previous guard required a
+       decimal point, so it walked straight through. */
+    if(/\b(scale|scalex|scaley|scale3d)\(\s*(0(\.0*)?|\.0+)\s*[,)]/.test(style.transform||""))
+     return "transform:"+style.transform;
+    for(const property of ["width","height","max-width","max-height"])
+     if(style[property]&&/^0(px|%|em|rem)?$/.test(style[property]))return property+":"+style[property];
+    if(style.position==="absolute"&&["left","right","top","bottom"]
+     .some(side=>parseFloat(style[side])<=-1000))return "pushed off-screen";
+    if(parseFloat(style["text-indent"]||"0")<=-1000)return "text-indent off-screen";
+    return null;
+   };
+
+   assert.equal(gone(slots),null,"the ACTIONS cell's controls are "+gone(slots)+" on "+where);
+   assert.equal(slots.display,"inline-grid","the ACTIONS cell is a grid on "+where);
+   /* FIXED TRACKS, NOT `auto`. With `auto` the first track took MARK FIXED's
+      full width on an open row and collapsed to the button's `min-width` on a
+      completed one - 99.03px against 70px - so DELETE sat 48.5px apart
+      between neighbouring rows on the shop computer and 54px on a phone.
+      Adding the word moved every desktop DELETE as well: 9.52px on open rows
+      and 5.00px on completed rows, which never draw a MARK FIXED at all. A
+      destructive control that wanders between rows is worse than an
+      unlabelled one. Asserted per ROW, so a rule that only reaches one of
+      them fails here. */
+   assert.equal(slots["grid-template-columns"],width<=760?"44px 44px":"62px 36px",
+    "both tracks have to be fixed, or the grid changes width between rows - on "+where);
+   /* AND DELETE KEEPS ITS OWN TRACK. A lone grid child auto-places into
+      column 1, so on a completed row DELETE slid into the slot MARK FIXED
+      holds and left the reserved track empty beside it. That predates the
+      word and is why the two row types never lined up. */
+   assert.equal(remove["grid-column"],"2","DELETE must stay in its own track on "+where);
+   assert.equal(gone(remove),null,"DELETE is "+gone(remove)+" on "+where);
+   /* 26px reads fine under a mouse and misses under a thumb, and the sheet is
+      used on phones. */
+   const floor=width<=760?44:26;
+   for(const property of ["width","height"])
+    assert.ok(parseFloat(remove[property])>=floor,
+     "DELETE's "+property+" is "+remove[property]+" on "+where+", under "+floor+"px");
+
+   /* A COMPLETED ROW DRAWS NO MARK FIXED - the button is behind
+      `entry.workflow!=="Completed"` - so there is nothing to measure on it,
+      and the reserved track above is what keeps the two rows aligned. */
+   if(row.classes.includes("completed"))continue;
+
+   assert.equal(gone(fix),null,"MARK FIXED is "+gone(fix)+" on "+where);
+   assert.equal(gone(word),null,"the word FIXED is "+gone(word)+" on "+where);
+   /* THE WORD IS SMALL ON PURPOSE AND HAS A FLOOR. Read through
+      `declaredFontSizePx`, so the `font` shorthand and a `%` unit are seen:
+      `font:900 1px/1 Arial` and `font-size:40%` - 6.8px on this button - both
+      passed a `parseFloat` of the longhand. */
+   assert.ok(word.fontSizePx!==null,"the word has no size this can resolve on "+where);
+   assert.ok(word.fontSizePx>=8,"the word is "+word.fontSizePx+"px on "+where+", under 8px");
+   assert.ok(word.fontSizePx<fix.fontSizePx,
+    "the word is "+word.fontSizePx+"px against the tick's "+fix.fontSizePx+"px on "+where);
+   /* AND IT IS NOT THE BUTTON'S OWN BACKGROUND. `color:transparent` was the
+      only spelling the old gate knew; `color:#e4f4e8` is the button's fill and
+      is just as invisible. */
+   const ink=word.color||fix.color;
+   const fill=(fix.background||fix["background-color"]||"").match(/#[0-9a-f]{3,8}/)?.[0];
+   assert.notEqual(ink,"transparent","the word is transparent on "+where);
+   if(fill)assert.notEqual(ink,fill,"the word is the button's own fill colour on "+where);
+   /* THE THUMB TARGET SURVIVES THE WORD, which is why the word stacks. Beside
+      the tick it was measured clipped: the cell is 114px and two 44px targets
+      with a gap already fill it, so the button came back 45px wide with
+      `scrollWidth` 46 against `clientWidth` 43. Widening the cell would have
+      squeezed REASON, the bug the comment further up that stylesheet exists
+      for. Under the tick, the target stays 44px and the row's height does not
+      change: `.down-table td{height:55px}` floors an entry row and the
+      stacked button is 44px, so the height is REASON's rather than the
+      button's - measured identical with the word and with it hidden, 55px on
+      a one-line reason and 75.59px on one that wraps, at 360/390/430/760/1180.
+      An earlier note here said 38px and another said 34px; both are
+      `.down-group-row`, a colSpan divider holding no buttons at all, measured
+      by mistake. */
+   if(width<=760){
+    assert.equal(fix.width,"44px","MARK FIXED loses its thumb target on "+where);
+    assert.equal(fix["min-height"],"44px","and its height has to be a floor, since the word stacks");
+    assert.equal(fix["flex-direction"],"column","with the word under the tick on "+where);
+   }else{
+    assert.equal(fix.height,"26px","MARK FIXED matches DELETE's height on "+where);
+    assert.equal(fix["flex-direction"],undefined,"and sits beside the tick on "+where);
    }
   }
-  return out;
- };
- for(const phone of [false,true]){
-  const where=phone?"on a phone":"on the shop computer";
-  const word=effective(css,".fix-entry b",phone);
-  assert.ok(word["font-size"],"the word has a size "+where);
-  assert.ok(parseFloat(word["font-size"])>=8,"the word is at least 8px "+where+" - got "+word["font-size"]);
-  assert.notEqual(word.display,"none","the word is not hidden "+where);
-  assert.notEqual(word.visibility,"hidden","the word is not invisible "+where);
-  assert.notEqual(word.color,"transparent","the word is not transparent "+where);
-  assert.ok(!/scale\(0?\.\d/.test(word.transform||""),"the word is not scaled away "+where);
  }
- assert.ok(parseFloat(effective(css,".fix-entry b",true)["font-size"])
-  >=parseFloat(effective(css,".fix-entry b",false)["font-size"]),
-  "the word does not shrink on the device the sheet is used on");
+ /* THE WORD DOES NOT SHRINK ON THE DEVICE THE SHEET IS USED ON. The phone rule
+    said 7px - the smallest text on the sheet - five lines from a comment in
+    the same block saying the status label and the badge are both a point
+    LARGER here. */
+ const wordAt=width=>{
+  const inside=[...SHEET,{tag:"tr",classes:[]},{tag:"td",classes:["row-actions"]},
+   {tag:"span",classes:["row-actions-slots"]}];
+  const FIX={tag:"button",classes:["fix-entry"],ancestors:inside};
+  const fix=effectiveStyle(css,FIX,width);
+  return effectiveStyle(css,{tag:"b",classes:[],ancestors:[...inside,FIX],
+   inheritedFontSizePx:fix.fontSizePx},width).fontSizePx;
+ };
+ assert.ok(wordAt(390)>=wordAt(1180),
+  "the word is "+wordAt(390)+"px on a phone against "+wordAt(1180)+"px on the shop computer");
  /* THE MARKUP HAS TO CARRY IT. Styling `.fix-entry b` says nothing about
-    whether a `<b>` is rendered — removing the word from the button left this
+    whether a `<b>` is rendered - removing the word from the button left this
     test green until the mutation was run. */
  assert.match(page,/className="fix-entry"[\s\S]{0,400}?<b>FIXED<\/b><\/button>/,
   "the button renders the word, not just a rule for it");
- /* FIXED TRACKS, NOT `auto`, AND DELETE PINNED TO ITS OWN. With `auto` the
-    first track took the word's width on an open row and collapsed to the
-    button's min-width on a completed one, so the grid was 99.03px on one row
-    and 70px on the next: DELETE sat 48.5px apart between neighbours on the
-    shop computer, 54px on a phone. Adding the word also moved every desktop
-    DELETE - 9.52px on open rows and 5.00px on completed rows that never draw
-    a MARK FIXED at all - in a commit that claimed the column had not moved. */
- assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:62px 36px/,
-  "both tracks are fixed, so the grid is the same width on every row");
- assert.match(css,/\.delete-entry\{grid-column:2\}/,
-  "and DELETE keeps its own track rather than auto-placing into the first");
- /* AND THE THUMB TARGET SURVIVES THE WORD, which is the rule above. Measured:
-    beside the tick the word was clipped on a phone — the cell is 114px and two
-    44px targets with a gap already fill it, so the button came back 45px wide
-    with scrollWidth 46 against clientWidth 43. Widening the cell would have
-    squeezed REASON, the bug the comment further up this file exists for. The
-    word goes UNDER the tick on a phone instead: the target stays 44px, the
-    column does not move, and the row's height does not change - an entry row is
-    62.59px with the word and without it, floored by `.down-table td{height:55px}`.
-    An earlier note here said 38px, which is the GROUP DIVIDER row: a colSpan
-    cell with no buttons in it, measured by mistake. */
- /* AND THE THUMB TARGET, computed the same way rather than sliced out of the
-    file: `css.slice(indexOf("@media(max-width:760px)"))` took 88% of the
-    stylesheet, so an assertion over that slice was never phone-scoped. */
- const target=effective(css,".fix-entry",true);
- assert.equal(target.width,"44px","the phone keeps a full thumb target");
- assert.equal(target["min-height"],"44px","as a floor, since the word stacks under the tick");
- assert.equal(target["flex-direction"],"column","with the word stacked under the tick");
- assert.ok(!/scale\(0?\.\d/.test(target.transform||""),"and nothing scales it away");
- assert.ok(!(target["max-height"]&&parseFloat(target["max-height"])<44),"nor caps it short");
- /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
-    the map — matched on content rather than position, since the file has many. */
- const at=css.indexOf(".down-deleted-note button{width:100%");
- assert.ok(at>0,"the phone override for the PUT BACK button is gone");
- const phone=css.slice(at);
- /* BOTH ROW BUTTONS STILL REACH 44px UNDER A THUMB. They shared one selector
-    while they were the same square; MARK FIXED carries a word now and stacks
-    it under the tick on a phone, so they are two rules. The rule is the
-    target, not the selector. */
- assert.match(phone,/\.delete-entry\{width:44px;height:44px/,"DELETE keeps its thumb target");
- assert.match(phone,/\.fix-entry\{[^}]*[;{]width:44px/,"and so does MARK FIXED");
- assert.match(phone,/\.fix-entry\{[^}]*min-height:44px/,"stacked, so its height is a floor rather than fixed");
+ /* AND ITS COLUMN IS DECLARED WIDE ENOUGH FOR IT. The grid is 106px; the cell
+    adds 14px of padding and a 1px border, so ACTIONS has to be at least 121px
+    or the grid does not fit the column it is in. It was 110px and rendered
+    120.55px only because the table's `min-width` is deliberately larger than
+    the sum of its columns and Chrome spreads the surplus - 0.45px of DELETE
+    was landing in the cell's own right padding, and anyone who later made
+    `min-width` match the columns would have pushed it 3px past the table's
+    edge. Checked against the DECLARATION rather than the render for that
+    reason. */
+ const tracks=effectiveStyle(css,{tag:"span",classes:["row-actions-slots"],
+  ancestors:[...SHEET,{tag:"tr",classes:[]},{tag:"td",classes:["row-actions"]}]},1180);
+ const grid=(tracks["grid-template-columns"].match(/[\d.]+(?=px)/g)||[])
+  .reduce((total,one)=>total+Number(one),0)+parseFloat(tracks.gap||"0");
+ const cellPadding=14,cellBorder=1;
+ const actions=Number(css.match(/\.down-table th\.row-actions-head\{width:(\d+)px\}/)?.[1]);
+ assert.ok(actions>=grid+cellPadding+cellBorder,
+  "ACTIONS is "+actions+"px and its own contents need "+(grid+cellPadding+cellBorder)+"px");
 });
 
 test("the Down Sheet writes a removal down wherever one happens, and takes it back on an undo",async()=>{
@@ -2664,8 +2734,26 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
  assert.ok(busCol>=110&&busCol<=160,"the bus column is "+busCol+"px; it holds a number and a badge, stacked");
  /* Two 44px phone targets and the gap between them. */
  assert.ok(actionsCol>=98,"the actions column is "+actionsCol+"px, too narrow for two 44px targets");
- /* The other seven columns total 1052px and must not pay for either of these. */
- assert.equal(tableMin,1052+busCol+actionsCol,"every column's width has to be in the table's min-width, or one of them is being squeezed");
+ /* EVERY COLUMN'S WIDTH IS SUMMED FROM THE STYLESHEET, not held here as a
+    constant. This asserted `tableMin === 1052 + busCol + actionsCol`, and
+    1052 was described as "the other seven columns". They total 940px. The
+    missing 112px is a real surplus between `min-width` and the sum of the
+    declared columns, which Chrome distributes proportionally - it is what
+    REASON DOWN's width on a phone has always actually been - and writing it
+    into a constant labelled as a column total hid it, while making the test
+    read as if `min-width` equalled the sum. It does not, and a cold read
+    found a column 11px narrower than its own contents sheltering behind it. */
+ const columns=[...css.matchAll(/\.down-table th(?::nth-child\(\d+\)|\.row-actions-head)\{width:(\d+)px/g)]
+  .map(match=>Number(match[1]));
+ assert.equal(columns.length,10,"all ten columns have to declare a width, or one of them is whatever is left");
+ const declared=columns.reduce((total,one)=>total+one,0);
+ assert.ok(tableMin>=declared,
+  "the table's floor is "+tableMin+"px and its columns declare "+declared+"px, so one of them is being squeezed");
+ /* The surplus is deliberate and load-bearing, but it is not a licence: a
+    column still has to be declared wide enough for its own contents, which is
+    asserted where the ACTIONS grid is measured. */
+ assert.ok(tableMin-declared<=160,
+  "the floor is "+(tableMin-declared)+"px above the sum of the columns; that surplus inflates every one of them");
  /* And the net is NARROWER than before, which is the point: 288 became 124 and
     the actions took 104 back, so the sheet got 60px less wide, not more. */
  assert.ok(tableMin<1340,"moving the buttons out must not make the sheet wider than it was");
