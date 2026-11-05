@@ -1310,17 +1310,6 @@ export function deferredMinutesElapsed(defect:StructuredDefect,now=new Date()){
 export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
  return Boolean(defect.deferredReturnedAt)&&defect.state!=="deferred"&&isUnresolved(defect)&&!onDownSheet;
 }
-/* A part went on the bus and nobody has written down which one.
-
-   This is not a new field. PARTS USED ticked with the number left blank has
-   always meant exactly this — the PART NUMBER box says "Leave blank if the
-   number is unknown" — but nothing ever surfaced it, so the record just looked
-   finished. Naming the state lets the Fixed Repairs card say what is still
-   outstanding, and it reads correctly on records logged long before there was a
-   button for it.
-
-   Ticked with a number is complete. Not ticked means no part was used, which is
-   a different thing from an unknown one and must never be flagged. */
 /* DID A PERSON WRITE THIS DOWN, or did it come off a photographed sheet?
 
    A defect born from a scanned Down Sheet row is stamped `source:"down-sheet"`
@@ -1343,7 +1332,24 @@ export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
 export function loggedByHand(defect:{source?:string}){
  return String(defect?.source||"")!=="down-sheet";
 }
+/* A part went on the bus and nobody has written down which one.
 
+   This is not a new field. PARTS USED ticked with the number left blank has
+   always meant exactly this — the PART NUMBER box says "Leave blank if the
+   number is unknown" — but nothing ever surfaced it, so the record just looked
+   finished. Naming the state lets the Fixed Repairs card say what is still
+   outstanding, and it reads correctly on records logged long before there was a
+   button for it.
+
+   Ticked with a number is complete. Not ticked means no part was used, which is
+   a different thing from an unknown one and must never be flagged.
+
+   THE FIXED REPAIRS CARD NO LONGER CALLS THIS. A repair can carry more than one
+   part now, and this reads the mirrored FIRST one, so a name-only first part
+   beside a numbered second showed MISSING PART # over a number that had been
+   recorded. `defectPartsMissing` in defect-parts.ts asks the whole list and is
+   what the card reads. This stays as the single-part question, which is still
+   the right one to ask of a record that holds a single part. */
 export function partNumberMissing(defect:{partsUsed?:boolean;partNumber?:string}){
  return defect.partsUsed===true&&!String(defect.partNumber??"").trim();
 }

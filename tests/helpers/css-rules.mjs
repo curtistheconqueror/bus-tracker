@@ -322,11 +322,46 @@ function selectorScore(selector,element){
  /* A PSEUDO-CLASS OR PSEUDO-ELEMENT IS NOT THE RESTING ELEMENT, and reading
     one would answer a different question. See the note above. */
  if(text.includes(":"))return null;
- const compounds=text.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+ /* `>` MEANS PARENT AND A SPACE MEANS ANCESTOR, and this used to treat them as
+    the same thing: the selector was split on /[>+~]|\s+/ and every compound was
+    then looked for ANYWHERE up the chain. So `.bar>.note` matched a `.note`
+    nested three levels inside `.bar`, which is the precise bug this project has
+    now hit twice - a rule written as a child selector while the element was a
+    direct child, and then the element moved inside a wrapper and the rule
+    silently stopped applying. A resolver that cannot tell the two apart cannot
+    catch it, and a mutation putting the `>` back passed.
+
+    `+` and `~` ARE NOT EVALUATED AT ALL, and that is honest rather than lazy:
+    this model has no siblings in it, so there is nothing to answer with. They
+    return null - no match - which is also what they already did in practice,
+    since a sibling compound was being searched for among the ANCESTORS and a
+    button is not its own forebear. */
+ if(/[+~]/.test(text))return null;
+ const parts=[];
+ for(const token of text.split(/(\s*>\s*|\s+)/)){
+  if(!token.trim()){if(token&&parts.length)parts.push({combinator:" "});continue}
+  if(token.trim()===">"){if(parts.length&&parts[parts.length-1].combinator===" ")parts.pop();parts.push({combinator:">"});continue}
+  parts.push({compound:token.trim()});
+ }
+ const compounds=parts.filter(part=>part.compound).map(part=>part.compound);
+ const combinators=parts.filter(part=>part.combinator).map(part=>part.combinator);
  if(!compoundMatches(compounds[compounds.length-1],element))return null;
  const chain=element.ancestors||[];
- for(const compound of compounds.slice(0,-1))
-  if(!chain.some(ancestor=>compoundMatches(compound,ancestor)))return null;
+ /* Nearest ancestor LAST in the array, which is how every caller builds it, so
+    the walk runs backwards from the element. */
+ let at=chain.length;
+ for(let i=compounds.length-2;i>=0;i--){
+  const combinator=combinators[i]||" ";
+  if(combinator===">"){
+   if(at<=0||!compoundMatches(compounds[i],chain[at-1]))return null;
+   at-=1;
+   continue;
+  }
+  let found=-1;
+  for(let j=at-1;j>=0;j--)if(compoundMatches(compounds[i],chain[j])){found=j;break}
+  if(found<0)return null;
+  at=found;
+ }
  let ids=0,classes=0,tags=0;
  for(const token of text.matchAll(/#[\w-]+|\.[\w-]+|\[[^\]]*\]|[a-z][\w-]*/gi)){
   const one=token[0];
