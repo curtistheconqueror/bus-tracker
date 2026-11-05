@@ -2811,7 +2811,7 @@ rather than the opposite.
 
 **Two toothless gates went with them.** The suite drove
 `excludeFromFocusShare` and `putBackLastExclusion` as pure functions and then
-only *greped* the handlers for a name — so a mutation hiding **the first
+only *grepped* the handlers for a name — so a mutation hiding **the first
 on-screen row** instead of the one pressed, and another making PUT BACK restore
 **everything**, both passed. A render would be the right gate and this suite
 cannot render this surface: the helper runs the production worker server-side,
