@@ -111,10 +111,13 @@ rather than matches, and it searched `app` alone while the prose said `app src`.
 Measured at this commit, all three ways, so the next person can pick the one
 they mean:
 
+Spelled out in full, because a command with an `…` in it is a literal regex that
+matches four prefixes and returns a different number:
+
 ```
 grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
-grep -rE  … app src …  | wc -l   #  65 matching lines
-grep -rlE … app src …  | wc -l   #  17 files
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
 ```
 
 **So the rule for a new feature is narrow and checkable:** do not add a seventh

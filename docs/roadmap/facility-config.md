@@ -12,6 +12,15 @@ a figure nobody could reproduce survived two corrections. Anything that says
 carrying `64bd8ad` says so beside itself. A number without a command and a
 commit beside it is a number to re-run before quoting.
 
+**AND THE COMMAND HAS TO BE RUNNABLE, WHICH THE FIRST VERSION OF THIS RULE WAS
+NOT.** The blocks it added wrote the prefix list as `(garage|road|…|offsite)`,
+where the `…` is a literal character and not shorthand — so pasting that command
+matched four prefixes out of sixteen and returned **63** where **179** was
+printed beside it. A reviewer caught it. Writing an unrunnable command under a
+rule demanding runnable commands is the whole failure this file keeps
+documenting, so every block spells the alternation out in full now, however
+wide the line.
+
 ## What "the site is baked in" actually means
 
 The yard is not one table in one file. It is four independent descriptions of
@@ -55,9 +64,9 @@ it searches `app` alone while the prose says `app src`.
 they mean:**
 
 ```
-grep -rhoE '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
-grep -rE   '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
-grep -rlE  '"(garage|road|…|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
 ```
 
 For reference, the printed command as written - `-rcoE` over `app` alone -
@@ -237,9 +246,9 @@ that was written to catch them. Re-run at `5326143`:
 
 ```
 npm test | grep '^# tests'                             # 434
-grep -rE  '"(garage|road|…|offsite)-' tests/ | wc -l   # 476 matching lines
-grep -rhoE '"(garage|road|…|offsite)-' tests/ | wc -l  # 638 occurrences
-grep -rlE '"(garage|road|…|offsite)-' tests/ | wc -l   #  10 files
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   # 476 matching lines
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   # 638 occurrences
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   #  10 files
 ```
 
 **The test COUNT is the wrong thing to pin anyway**, which is why it is not
