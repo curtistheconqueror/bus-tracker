@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { operationalUpdateAt, stampOperationalChange } from "./helpers/modules.mjs";
+import { effectiveStyle } from "./helpers/css-rules.mjs";
 
 
 test("operational sitting time resets on either a real location or status change", () => {
@@ -1038,4 +1039,64 @@ test("a form redrawing around a text field does not drag the picker with it",asy
       + memo            median 31.0ms  p95 42.6ms  worst 47.5ms  0 over 50ms
     The median barely moves and the TAIL is where it lands, which is the half
     Curtis described: "It's not, you know, smooth and consistent." */
+});
+
+test("the cascade resolver the UI gates lean on answers like a browser", () => {
+ /* WHY THIS FILE HAS A TEST FOR A TEST HELPER.
+
+    `effectiveStyle` is what a dozen layout gates in this project ask instead of
+    reading CSS by eye, and it has twice been the reason a gate passed something
+    it was written to catch. First it was "last exact selector match wins",
+    which is not a cascade at all and let thirteen mutations through. Then,
+    after it became a real cascade, it still split `A>B` and `A B` on the same
+    regex and looked for every compound ANYWHERE up the chain - so a child
+    selector matched a grandchild, and a mutation putting a stale `>` back into
+    the Defect Log's stylesheet passed.
+
+    A gate nobody tests is a gate that passes everything. These are the cases
+    that have actually gone wrong. */
+ const css=[
+  ".bar>.note{color:red}",
+  ".bar>.note{color:blue}",
+  ".bar .note{font-size:9px}",
+  ".wrap .note{font-size:11px}",
+  ".note{font-size:30px;display:block}",
+  "@media(max-width:620px){.bar .note{font-size:7px}}",
+  ".bar .note{letter-spacing:1px}",
+  ".note{letter-spacing:9px!important}",
+  ".left+.note{display:none}",
+ ].join("\n");
+ const direct={tag:"small",classes:["note"],ancestors:[{tag:"div",classes:["bar"]}]};
+ const nested={tag:"small",classes:["note"],ancestors:[{tag:"div",classes:["bar"]},{tag:"div",classes:["wrap"]}]};
+
+ /* A CHILD SELECTOR REACHES A CHILD, and the later of two equal rules wins. */
+ assert.equal(effectiveStyle(css,direct,1180).color,"blue");
+ /* AND NOT A GRANDCHILD - the whole point. `.bar>.note` must not reach a
+    `.note` sitting inside `.wrap` inside `.bar`, which is exactly what moving
+    an element into a wrapper does to it, and exactly what nobody notices. */
+ assert.equal(effectiveStyle(css,nested,1180).color,undefined,
+  "a child rule must not apply through a wrapper");
+ /* A DESCENDANT SELECTOR STILL REACHES BOTH, and specificity then decides:
+    `.wrap .note` and `.bar .note` tie, so source order does. */
+ assert.equal(effectiveStyle(css,nested,1180).fontSizePx,11);
+ assert.equal(effectiveStyle(css,direct,1180).fontSizePx,9);
+ /* `!important` BEATS A HIGHER-SPECIFICITY NORMAL DECLARATION. That is the
+    cascade rather than the specificity order, and it is the half the first
+    version of this resolver did not have at all. */
+ assert.equal(effectiveStyle(css,direct,1180)["letter-spacing"],"9px");
+ /* AN AT-RULE IS EVALUATED AGAINST THE WIDTH ASKED FOR - at equal specificity,
+    because a media query does not add any. */
+ assert.equal(effectiveStyle(css,direct,390).fontSizePx,7);
+ assert.equal(effectiveStyle(css,direct,621).fontSizePx,9);
+ /* A SIBLING SELECTOR IS NOT ANSWERED AT ALL rather than guessed: there are no
+    siblings in this model, so `display:none` from `.left+.note` must not land
+    and the resolver must not pretend it knows. */
+ assert.equal(effectiveStyle(css,direct,1180).display,"block");
+ /* AND THE ANCESTOR CHAIN IS NEAREST LAST, which is how every caller builds
+    it. Reversed, a chain of child selectors would answer about the wrong
+    element, so the order is asserted rather than assumed. */
+ assert.equal(effectiveStyle(".a>.b>.c{color:red}",
+  {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["a"]},{tag:"div",classes:["b"]}]},1180).color,"red");
+ assert.equal(effectiveStyle(".a>.b>.c{color:red}",
+  {tag:"i",classes:["c"],ancestors:[{tag:"div",classes:["b"]},{tag:"div",classes:["a"]}]},1180).color,undefined);
 });

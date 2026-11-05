@@ -89,10 +89,30 @@ export function normalizeDefectParts(value: unknown, legacy: LegacyPartFields = 
 /* WHAT GETS WRITTEN BACK, so one save cannot leave the array and the mirrored
    pair disagreeing. Blank rows are dropped here rather than stored — somebody
    pressing ADD PART and changing their mind must not leave an empty part on a
-   repair's history. */
-export function defectPartFields(parts: DefectPart[]): LegacyPartFields & { parts?: DefectPart[] } {
+   repair's history.
+
+   `partsUsed` IS THE CHECKBOX'S ANSWER WHEN A FORM HANDS ONE OVER, and that
+   argument exists because this function was being overruled from outside in
+   three places - two forms appending `partsUsed:true` after the call and one
+   not - which is exactly the "two places decide one thing" this module's own
+   header says it exists to prevent. Re-deriving the flag from the rows is right
+   for a record read off disk and WRONG for a form being typed into: a ticked
+   box with nothing typed yet is somebody mid-sentence, and reporting
+   `partsUsed:false` for it silently drops MISSING PART # off the repair.
+
+   TICKED WITH NOTHING TYPED STORES THE LEGACY SHAPE - `partsUsed:true` with an
+   empty number and no array - because that is already exactly what an old
+   one-part record of the same state looks like, and `normalizeDefectParts`
+   reads it back as one blank row while `defectPartsMissing` flags it. Nothing
+   new to teach anything.
+
+   Omit the argument and the behaviour is unchanged: the rows decide. */
+export function defectPartFields(parts: DefectPart[], partsUsed?: boolean): LegacyPartFields & { parts?: DefectPart[] } {
   const kept = parts.filter(part => Boolean(clean(part.partNumber) || clean(part.partName)));
-  if (!kept.length) return { partsUsed: false, partNumber: "", partName: "" };
+  /* Unticked is the one gesture that means "no parts were used", and it wins
+     over any row still sitting in the list. */
+  if (partsUsed === false) return { partsUsed: false, partNumber: "", partName: "" };
+  if (!kept.length) return { partsUsed: partsUsed === true, partNumber: "", partName: "" };
   const first = kept[0];
   const fields: LegacyPartFields & { parts?: DefectPart[] } = {
     partsUsed: true,
@@ -105,6 +125,22 @@ export function defectPartFields(parts: DefectPart[]): LegacyPartFields & { part
      walks `Object.keys` — on a save that changed nothing a person could see. */
   if (kept.length > 1) fields.parts = kept;
   return fields;
+}
+
+/* THE RECORD, WITH THESE PARTS ON IT - the one place a defect's part fields are
+   assembled, so a form cannot write the array and the mirrored pair out of step.
+   A form passes its CHECKBOX through as the third argument rather than patching
+   `partsUsed` back on afterwards; two call sites were doing that and a third was
+   not, which is how ENTER LATER stopped flagging MISSING PART #.
+   `parts` is DELETED rather than set to undefined when a repair is back down to
+   one, the spelling `setBusHold` and the swap ledger's `gap` already use: it is
+   the only way `"parts" in defect` reads false, and `rowFingerprint` walks
+   `Object.keys`, so a key holding undefined would still move the row's
+   fingerprint on a push carrying nothing new. */
+export function withDefectParts<T extends LegacyPartFields & {parts?:unknown}>(defect:T,parts:DefectPart[],partsUsed?:boolean):T{
+ const next={...defect} as T & {parts?:DefectPart[]};
+ delete next.parts;
+ return Object.assign(next,defectPartFields(parts,partsUsed)) as T;
 }
 
 /* Does this repair claim parts and fail to name any of them?
@@ -166,9 +202,34 @@ export function removeDefectPart(parts: DefectPart[], id: string): DefectPart[] 
   return kept.length ? kept : [blankDefectPart()];
 }
 
-/* What the parts memory should learn from one save: every part that has a
-   number, since `learnPart` is keyed on the number and a name alone teaches it
-   nothing it can suggest later. */
+/* Which parts COULD be taught to the shop's memory: the ones carrying a
+   number, since the memory is keyed on the number and a name alone teaches it
+   nothing it could suggest later. Deduplicated, because two rows holding the
+   same number are one part typed twice and must not count as two uses. */
 export function partsToLearn(parts: DefectPart[]): DefectPart[] {
-  return parts.filter(part => Boolean(clean(part.partNumber)));
+  const seen = new Set<string>();
+  return parts.filter(part => {
+    const number = clean(part.partNumber);
+    if (!number || seen.has(number)) return false;
+    seen.add(number);
+    return true;
+  });
+}
+
+/* AND THE ONE THE MEMORY ACTUALLY TAKES, which is the FIRST of them.
+
+   This corrects a claim I made and a reviewer disproved. Both forms reduced
+   `learnPart` over every numbered part and the change described that as "the
+   shop learns every part now". `learnPart` keeps ONE entry per
+   scope+category+issue and REPLACES it, so reducing over [HX-99, ZZ-1] leaves
+   a single entry holding ZZ-1 with `uses:2` - the shop was taught the LAST
+   part and the count was inflated, which is worse than teaching it one.
+
+   So one part is learned, and it is the first row because that is the one the
+   suggestion offers back. Teaching the memory more than one part per repair
+   means giving it more than one slot per key, which changes what
+   `pace-parts-memory-v1` holds and what `recallPart` can return - a different
+   change, on the shop's own data, and not one to smuggle in here. */
+export function partToLearn(parts: DefectPart[]): DefectPart | null {
+  return partsToLearn(parts)[0] || null;
 }

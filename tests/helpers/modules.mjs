@@ -8,7 +8,9 @@ export {noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgains
 export {busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig} from "../../src/lib/cloud/cloud-sync.ts";
 export {hasBusNumberConflict, hasLocationConflict, validateBusUpdate} from "../../src/lib/fleet/fleet-validation.ts";
 export {applyDownEntryToFleet} from "../../src/lib/down-sheet/down-sheet-sync.ts";
-export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
+export {SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, excludeFromFocusShare, focusShareIsEmpty, focusShareScope, focusShareScopeNote, putBackLastExclusion, swipeHidesRow, swipeOffsetPx} from "../../src/lib/defects/focus-share-scope.ts";
+export {addDefectPart, blankDefectPart, defectPartFields, defectPartsMissing, defectPartsText, normalizeDefectParts, partToLearn, partsToLearn, partsWithoutNumbers, removeDefectPart, updateDefectPart, withDefectParts} from "../../src/lib/defects/defect-parts.ts";
+export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, mapDownSheetBadgeBusIds, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
 export {syncTrackerDownSheetSelection} from "../../src/lib/down-sheet/tracker-membership-sync.ts";
 export {clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState} from "../../src/lib/down-sheet/down-sheet-clear.ts";
 export {moveOrSwapBuses, roadServiceStatus, statusForLocation} from "../../src/lib/fleet/smart-status.ts";
