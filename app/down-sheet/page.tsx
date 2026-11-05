@@ -523,7 +523,8 @@ export default function DownSheet(){
  useEffect(()=>{setShareStatus("")},[shareStatusKey]);
  /* What the one line under the scope says. A press wins over the hint while
     it stands; COPIED! is not here because it is shown on the button itself. */
- const shareNote=shareStatus==="shared"?{said:true,text:"SENT"}
+ const shareNote=shareStatus==="copied"?{said:true,text:"COPIED!"}
+  :shareStatus==="shared"?{said:true,text:"SENT"}
   :shareStatus==="saved"?{said:true,text:"SAVED TO THIS DEVICE"}
   :shareStatus==="share-error"?{said:true,text:"COULD NOT SHARE — TRY COPY LIST"}
   :shareStatus==="copy-error"?{said:true,text:"COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT"}
