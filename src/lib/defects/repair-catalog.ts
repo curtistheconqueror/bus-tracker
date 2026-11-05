@@ -266,7 +266,7 @@ export const REPAIR_OPTIONS:Record<string,string[]>={
     loses that the moment it is saved. "Semi cold air" sits between No cooling
     and nothing at all: the unit runs, the air is not cold enough, and that is
     what a driver actually reports. */
- "A/C and HVAC":["Heating - No heat at front dash","Heating - Floor heat INOP","Heating - Heater boost pump","Heating - Heater / defroster","Heating - Other heating repair","Cooling - No cooling","Cooling - Semi cold air","Cooling - Compressor","Cooling - A/C belt","Cooling - A/C compressor pulley misaligned","Cooling - Evaporator core","Cooling - Condenser core","Cooling - Condenser fan INOP - 1 fan","Cooling - Condenser fans INOP - both fans","Cooling - Evaporator fan / motor INOP - 1","Cooling - Evaporator fans / motors INOP - both","Cooling - Refrigerant / Freon leak","Cooling - Other A/C repair","Controls and Blowers - Blower motor","Controls and Blowers - Operator A/C blower","Controls and Blowers - Bad connection / wiring","Controls and Blowers - Controls / electrical","Controls and Blowers - IntelligAIRE III control panel - screen blank / black"],
+ "A/C and HVAC":["Heating - No heat","Heating - No heat at front dash","Heating - Floor heat INOP","Heating - Heater boost pump","Heating - Heater / defroster","Heating - Other heating repair","Cooling - No cooling","Cooling - Semi cold air","Cooling - Compressor","Cooling - A/C belt","Cooling - A/C compressor pulley misaligned","Cooling - Evaporator core","Cooling - Condenser core","Cooling - Condenser fan INOP - 1 fan","Cooling - Condenser fans INOP - both fans","Cooling - Evaporator fan / motor INOP - 1","Cooling - Evaporator fans / motors INOP - both","Cooling - Refrigerant / Freon leak","Cooling - Other A/C repair","Controls and Blowers - Blower motor","Controls and Blowers - Operator A/C blower","Controls and Blowers - Bad connection / wiring","Controls and Blowers - Controls / electrical","Controls and Blowers - IntelligAIRE III control panel - screen blank / black"],
  "Engine":["Check engine light","Stop engine light","Check engine and stop engine light","Engine runs hot (207F+)","Overheating","Overheat shutdown (235-240F)","Coolant leak","Misfire","Loss of power","Oil leak","Rear main seal","Coolant level sensor","Water pump belt","Alternator belt","Water pump pulley","Tensioner pulley","Fan drive pulley","Spark plugs","Valve adjustment","Abnormal noise","Engine replacement","Internal engine repair","Other engine repair"],
  "Cooling System":["Overheating","Coolant leak","Coolant leak - heating side","Surge tank - engine side low","Surge tank - heating side low","Surge tank - both sides low","Radiator leak","Radiator","Radiator fan(s) out","Radiator fan diagnostic light","Radiator fans constantly running on high","Water pump","Cooling fan","Hoses / fittings","Other cooling repair"],
  "Transmission and Drivetrain":["Check transmission light","Will not shift","Slipping","Transmission leak","Control / communication fault","Transmission replacement","Driveshaft noise / banging","Driveshaft","U-joints","Carrier bearing","Differential","Axle / axle shaft","Other transmission or drivetrain repair"],
@@ -421,6 +421,20 @@ const DEFECT_NOTES:Record<string,Record<string,string>>={
      be worth a line: no hot air and a full tank is usually the pump, not the
      core, and the two repairs share no parts. */
   "Heating - Heater boost pump":"Check the heating side of the surge tank before you condemn the pump — an empty side gives you the same no-hot-air complaint and is the cheaper find. A pump that is getting power and not moving coolant is the pump; log it here. Say in the description whether the hoses were hot at the core.",
+  /* THE SYMPTOM, BEFORE ANYBODY KNOWS THE CAUSE. Curtis: "I cannot always
+     confirm why there is not heat on the spot, but I can confirm the heat
+     doesn't work immediately. This is for convenience."
+
+     Every other entry under Heating names a place or a part — the front dash,
+     the floor, the boost pump, the defroster — so a foreman who can only say
+     the heat is dead had nowhere honest to put it and either guessed at a
+     cause or reached for "Other heating repair", which says nothing. Cooling
+     has had "No cooling" in that slot since the catalog was written; this is
+     the heating side of the same idea, and it sits first for the same reason.
+
+     Narrowing it later is an edit to the same defect, and the rename maps
+     carry a record through a change of wording. */
+  "Heating - No heat":"Log this the moment the heat is dead, without guessing why. If you get a chance to narrow it, the two first checks are the heating side of the surge tank and the boost pump, and whether the FLOOR heat still works separates a dash problem from a whole-bus one.",
   "Heating - No heat at front dash":"Say whether the FLOOR heat still works, because that is what separates a dash duct or blower problem from a whole-bus heating fault. If neither works, the heating side of the surge tank and the boost pump are the first two checks.",
   "Heating - Floor heat INOP":"Try the floor heat switch before the heat itself — that switch is logged separately under Operator/Driver Controls → System Switches → Floor heat switch, and a dead switch is not a dead heater. Note in the description whether dash heat still works.",
  },
@@ -854,7 +868,7 @@ export const REPAIR_OPTION_GROUPS:Record<string,Record<string,string[]>>={
     the same conversion Bus Controls and Tech Services already went through -
     and nothing in storage is rewritten. */
  "A/C and HVAC":{
-  "Heating":["No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"],
+  "Heating":["No heat","No heat at front dash","Floor heat INOP","Heater boost pump","Heater / defroster","Other heating repair"],
   "Cooling":["No cooling","Semi cold air","Compressor","A/C belt","A/C compressor pulley misaligned","Evaporator core","Condenser core","Condenser fan INOP - 1 fan","Condenser fans INOP - both fans","Evaporator fan / motor INOP - 1","Evaporator fans / motors INOP - both","Refrigerant / Freon leak","Other A/C repair"],
   /* The parts that serve both sides. A blower motor moves whatever the unit
      has made, hot or cold, so filing it under either one would have it missing

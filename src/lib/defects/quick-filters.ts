@@ -175,6 +175,35 @@ function recentStamp(at:string|undefined,now:string){
  return !Number.isNaN(stamped)&&stamped>=new Date(now).getTime()-ROAD_CALL_WINDOW_DAYS*24*60*60*1000;
 }
 
+/* LOGGED MEANS SOMEBODY LOGGED IT, not that a record exists.
+
+   Curtis, looking at a DEFECTS LOGGED share that had picked up rows off a
+   scanned sheet: "I have no reason to share something off the down sheet
+   because the down sheet is already coming from the source — the down sheet is
+   located in an office, so I'm not gonna send them something that they already
+   have written down... for this particular function, no, just things that were
+   logged by hand."
+
+   A scanned Down Sheet row becomes a real defect on the bus, correctly stamped
+   `source:"down-sheet"`, and its `createdAt` is WHEN THE SCAN RAN rather than
+   when anybody logged anything — so importing yesterday's paper at 20:00 drops
+   the whole sheet into "the last 8 hours" at once. That is what put ninety
+   rows behind a SHOW ALL on a list whose entire claim is "this is what got
+   logged".
+
+   Only `down-sheet` is excluded. A defect typed into the Defect Log, into the
+   map's bus editor, or spoken to the AI operator is somebody logging it, and
+   none of those carry that source. The exclusion is the paper's, not the
+   app's.
+
+   AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. `applyDownEntryToFleet`
+   writes `linked?.source||"down-sheet"`, so a defect logged by hand that LATER
+   appears on a sheet stays `defect-log` and stays in this list. Somebody
+   logged it; the paper catching up does not take that away. */
+export function loggedByHand(defect:{source?:string}){
+ return String(defect?.source||"")!=="down-sheet";
+}
+
 /* Whether this defect was written down inside the window the drawer is set to.
    `null` means no window, which is ALL. An undated record is out of every
    narrowed window and in ALL, the same rule the time-window module applies to
@@ -250,7 +279,7 @@ export function quickFilterDefects(bus:QuickFilterBus,key:QuickFilterKey,now=new
      list headed 2ND SHIFT. The other filters ignore the window on purpose —
      they answer "what is true now", where the age of the record is not the
      question being asked. */
-  :key==="logged"?isUnresolved(defect)&&loggedWithin(defect,now,narrow.maxAgeMinutes??null)&&loggedBy(defect,narrow.initials||"")
+  :key==="logged"?isUnresolved(defect)&&loggedByHand(defect)&&loggedWithin(defect,now,narrow.maxAgeMinutes??null)&&loggedBy(defect,narrow.initials||"")
   :isUnresolved(defect)&&quickFilterTextMatch(key==="no-cabin-heat"?repairIdentityText(defect):defectText(defect),key)),legacy=(bus.pendingRepair||"").trim();
  if(key==="logged")matches.sort((a,b)=>loggedFirst(a,b,now));
  if(matches.length||normalized.length||!legacy||!quickFilterTextMatch(legacy,key))return matches;

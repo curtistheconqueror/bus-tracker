@@ -2264,6 +2264,55 @@ about whether a `<b>` is rendered. Shrinking the phone target 44px → 30px
 passed, because `[^}]*width:44px` also matches `min-width:44px`. Both anchored
 now.
 
+### NO HEAT, and DEFECTS LOGGED means logged by hand
+
+**A plain NO HEAT under Heating.** Curtis: *"I cannot always confirm why there
+is not heat on the spot, but I can confirm the heat doesn't work immediately.
+This is for convenience."* Every other entry in that group named a place or a
+part — the front dash, the floor, the boost pump, the defroster — so a foreman
+who could only say the heat was dead had to guess at a cause or reach for
+"Other heating repair", which says nothing. Cooling has had **No cooling** in
+that slot since the catalog was written; this is its heating twin and sits
+first for the same reason.
+
+It joins **No Heat Buses** without being told: that filter matches the group
+prefix rather than a list of wordings. Added to both `REPAIR_OPTIONS` and
+`REPAIR_OPTION_GROUPS`, which CLAUDE.md requires to stay in step — a mutation
+adding it to only one is caught.
+
+**DEFECTS LOGGED no longer lists rows off a scanned sheet.** Curtis, looking
+at a share that had: *"I have no reason to share something off the down sheet
+because the down sheet is already coming from the source — the down sheet is
+located in an office, so I'm not gonna send them something that they already
+have written down... for this particular function, no, just things that were
+logged by hand."*
+
+A scanned row becomes a real defect, correctly stamped `source:"down-sheet"`,
+and its `createdAt` is **when the scan ran** rather than when anybody logged
+anything — so importing yesterday's paper at 20:00 dropped the whole sheet
+into "the last 8 hours" at once. That is what put ninety rows behind a SHOW
+ALL on a list whose entire claim is "this is what got logged".
+
+Measured on the built page against his own screenshot's data: `17541` and
+`17560` stay, `18505 Inspection — C-24` and `20501 SPECIAL EVENT BUS / [HOLD
+FOR EVENT PREP]` drop out.
+
+**Only the paper is excluded.** Typing into the Defect Log, into the map's bus
+editor, or speaking to the AI operator is all somebody logging it. And a
+defect keeps the source it was born with — `applyDownEntryToFleet` writes
+`linked?.source||"down-sheet"` — so a defect logged by hand that LATER lands
+on a sheet stays in the list. Somebody logged it; the paper catching up does
+not take that away.
+
+The drawer says so above the share buttons, which is the last place anybody
+looks before sending the list on: **LOGGED BY HAND ONLY — BUSES READ OFF A
+SCANNED DOWN SHEET ARE NOT LISTED HERE. THE DOWN SHEET PAGE SHARES ITS OWN
+LIST.** 12.15:1, measured.
+
+**No new share function was built**, because the Down Sheet already has COPY
+LIST and SHARE PAGE of its own — which is what Curtis wanted for the case
+where a coworker does want a copy of the sheet.
+
 ### Open questions for Curtis
 
 **Should a bad reply fail the shell install the way a dropped connection
