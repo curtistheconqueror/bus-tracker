@@ -521,6 +521,13 @@ export default function DownSheet(){
     same device. */
  const shareStatusKey=shareLabel+"|"+visible.map(entry=>entry.id).join(",");
  useEffect(()=>{setShareStatus("")},[shareStatusKey]);
+ /* What the one line under the scope says. A press wins over the hint while
+    it stands; COPIED! is not here because it is shown on the button itself. */
+ const shareNote=shareStatus==="shared"?{said:true,text:"SENT"}
+  :shareStatus==="saved"?{said:true,text:"SAVED TO THIS DEVICE"}
+  :shareStatus==="share-error"?{said:true,text:"COULD NOT SHARE — TRY COPY LIST"}
+  :shareStatus==="copy-error"?{said:true,text:"COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT"}
+  :{said:false,text:quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint||"":"Sends the buses on the screen right now, as text or as a page."};
  const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order
     the Defect Log settled on. A browser with no navigator.share must not leave
@@ -1057,17 +1064,24 @@ export default function DownSheet(){
       that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
       neither means anything when no filter is set. */}
   <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
-   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint:"Sends the buses on the screen right now, as text or as a page."}</small></p>
+   {/* ONE LINE UNDER THE SCOPE, holding either the hint or what just
+       happened. The four status messages used to mount as SIBLINGS of this
+       <p>, where `.down-quick-filter-note>small` gives them flex-basis:100%
+       and so a row of their own: measured, SHARE TEXT succeeding grew the bar
+       101px -> 123px at 390 and 52px -> 74px at 1180 and pushed the sheet
+       down about 22px, every time, now that the bar is always on screen.
+       Reserving an empty slot instead would have cost those 22px on EVERY
+       visit to save them on a few; the hint is the thing worth yielding.
+       The live region is here and not on the scope line above it, which is
+       why that line is a plain <p>: this text changes on a deliberate press
+       or a filter change, never on a keystroke in SEARCH. */}
+   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small role="status" className={shareNote.said?"said":undefined}>{shareNote.text}</small></p>
    <div className="down-quick-filter-actions">
     <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
     <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
     <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
     {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
    </div>
-   {shareStatus==="shared"&&<small role="status">SENT</small>}
-   {shareStatus==="saved"&&<small role="status">SAVED TO THIS DEVICE</small>}
-   {shareStatus==="share-error"&&<small role="status">COULD NOT SHARE — TRY COPY LIST</small>}
-   {shareStatus==="copy-error"&&<small role="status">COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT</small>}
   </section>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
