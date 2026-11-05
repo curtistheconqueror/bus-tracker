@@ -5,6 +5,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetBadgeViewBusIds, downSheetBadgeViewCounts, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, isReadyRoadLocation, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
+import { cssRules, splitSelector } from "./helpers/css-rules.mjs";
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
   const fleet = [
@@ -1871,26 +1872,78 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
     It carries the word FIXED now, so it is wider than the square beside it —
     but it keeps 26px as its FLOOR, so the pair still lines up. */
  assert.match(css,/\.fix-entry\{[^}]*min-width:26px/,"MARK FIXED is still at least DELETE's size");
- assert.match(css,/\.fix-entry b\{font-size:8px/,"and the word is styled");
+ /* THE WORD CANNOT BE HIDDEN, and this is the third version of this gate. The
+    first asserted a CSS rule and said nothing about whether a `<b>` rendered.
+    The second anchored on the DESKTOP rule's opening declaration, so a cold
+    read walked nine mutations past it: appending `display:none`,
+    `visibility:hidden` or `color:transparent` to that rule, setting the phone
+    rule to `font-size:0`, or adding a later rule anywhere in the file.
+
+    A regex over a stylesheet cannot see the cascade, so this stops using one.
+    `tests/helpers/css-rules.mjs` is a real CSS reader this project already
+    owns; it hands back each rule with the at-rules it sits inside, so the
+    effective declarations can be computed per context, last one winning. */
+ const effective=(sheet,selectorText,inPhone)=>{
+  const out={};
+  for(const rule of cssRules(sheet)){
+   const media=(rule.at||[]).join(" ");
+   if(media&&!(inPhone&&/max-width:760px/.test(media)))continue;
+   if(!splitSelector(rule.selector).some(one=>one.trim()===selectorText))continue;
+   for(const part of (rule.body||"").split(";")){
+    const at=part.indexOf(":");
+    if(at>0)out[part.slice(0,at).trim()]=part.slice(at+1).trim();
+   }
+  }
+  return out;
+ };
+ for(const phone of [false,true]){
+  const where=phone?"on a phone":"on the shop computer";
+  const word=effective(css,".fix-entry b",phone);
+  assert.ok(word["font-size"],"the word has a size "+where);
+  assert.ok(parseFloat(word["font-size"])>=8,"the word is at least 8px "+where+" - got "+word["font-size"]);
+  assert.notEqual(word.display,"none","the word is not hidden "+where);
+  assert.notEqual(word.visibility,"hidden","the word is not invisible "+where);
+  assert.notEqual(word.color,"transparent","the word is not transparent "+where);
+  assert.ok(!/scale\(0?\.\d/.test(word.transform||""),"the word is not scaled away "+where);
+ }
+ assert.ok(parseFloat(effective(css,".fix-entry b",true)["font-size"])
+  >=parseFloat(effective(css,".fix-entry b",false)["font-size"]),
+  "the word does not shrink on the device the sheet is used on");
  /* THE MARKUP HAS TO CARRY IT. Styling `.fix-entry b` says nothing about
     whether a `<b>` is rendered — removing the word from the button left this
     test green until the mutation was run. */
  assert.match(page,/className="fix-entry"[\s\S]{0,400}?<b>FIXED<\/b><\/button>/,
   "the button renders the word, not just a rule for it");
- assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:auto 36px/,
-  "the first column grows for the word; the delete square does not");
+ /* FIXED TRACKS, NOT `auto`, AND DELETE PINNED TO ITS OWN. With `auto` the
+    first track took the word's width on an open row and collapsed to the
+    button's min-width on a completed one, so the grid was 99.03px on one row
+    and 70px on the next: DELETE sat 48.5px apart between neighbours on the
+    shop computer, 54px on a phone. Adding the word also moved every desktop
+    DELETE - 9.52px on open rows and 5.00px on completed rows that never draw
+    a MARK FIXED at all - in a commit that claimed the column had not moved. */
+ assert.match(css,/\.row-actions-slots\{display:inline-grid;grid-template-columns:62px 36px/,
+  "both tracks are fixed, so the grid is the same width on every row");
+ assert.match(css,/\.delete-entry\{grid-column:2\}/,
+  "and DELETE keeps its own track rather than auto-placing into the first");
  /* AND THE THUMB TARGET SURVIVES THE WORD, which is the rule above. Measured:
     beside the tick the word was clipped on a phone — the cell is 114px and two
     44px targets with a gap already fill it, so the button came back 45px wide
     with scrollWidth 46 against clientWidth 43. Widening the cell would have
     squeezed REASON, the bug the comment further up this file exists for. The
     word goes UNDER the tick on a phone instead: the target stays 44px, the
-    column does not move, and row height is unchanged at 38px either way. */
- const phoneFix=css.slice(css.indexOf("@media(max-width:760px)"));
- /* Anchored on the property boundary: `[^}]*width:44px` also matches
-    `min-width:44px`, so shrinking the real width to 30px left this green. */
- assert.match(phoneFix,/\.fix-entry\{[^}]*[;{]width:44px/,"the phone keeps a full thumb target");
- assert.match(phoneFix,/\.fix-entry\{[^}]*flex-direction:column/,"with the word stacked under the tick");
+    column does not move, and the row's height does not change - an entry row is
+    62.59px with the word and without it, floored by `.down-table td{height:55px}`.
+    An earlier note here said 38px, which is the GROUP DIVIDER row: a colSpan
+    cell with no buttons in it, measured by mistake. */
+ /* AND THE THUMB TARGET, computed the same way rather than sliced out of the
+    file: `css.slice(indexOf("@media(max-width:760px)"))` took 88% of the
+    stylesheet, so an assertion over that slice was never phone-scoped. */
+ const target=effective(css,".fix-entry",true);
+ assert.equal(target.width,"44px","the phone keeps a full thumb target");
+ assert.equal(target["min-height"],"44px","as a floor, since the word stacks under the tick");
+ assert.equal(target["flex-direction"],"column","with the word stacked under the tick");
+ assert.ok(!/scale\(0?\.\d/.test(target.transform||""),"and nothing scales it away");
+ assert.ok(!(target["max-height"]&&parseFloat(target["max-height"])<44),"nor caps it short");
  /* This sheet's phone breakpoint is 760px, not the 620px globals.css uses for
     the map — matched on content rather than position, since the file has many. */
  const at=css.indexOf(".down-deleted-note button{width:100%");

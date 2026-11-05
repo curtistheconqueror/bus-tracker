@@ -2253,16 +2253,58 @@ beside it.
 | | phone | desktop |
 | --- | --- | --- |
 | button | 44x44, ✓ over FIXED | 55x26, ✓ FIXED |
-| row height | 38px — **unchanged** | 34px — **unchanged** |
+| entry row height | 62.59px — **unchanged** | 62.59px — **unchanged** |
 
-Contrast 7.76:1, no horizontal overflow at 320 / 360 / 390 / 430 / 820 / 1180,
-and REASON's right edge does not move.
+Contrast 7.76:1, no horizontal overflow at 320 / 360 / 390 / 430 / 620 / 760 /
+820 / 1180, and REASON's right edge does not move.
 
-**Two of three mutations were not caught until the gates were fixed.** Taking
-the word out of the markup passed, because styling `.fix-entry b` says nothing
-about whether a `<b>` is rendered. Shrinking the phone target 44px → 30px
-passed, because `[^}]*width:44px` also matches `min-width:44px`. Both anchored
-now.
+**TWO FIGURES IN THIS SECTION WERE WRONG AND ARE CORRECTED HERE.** They were
+written before the cold read and should not be published as they stood.
+
+**ONE: the row-height numbers measured the wrong element.** This section said
+*"38px / 34px — unchanged"*. 34px is `.down-table .down-group-row td` — the
+group divider, a `colSpan` cell holding no buttons at all, which could not have
+changed either way. An **entry** row is **62.59px**, floored by
+`.down-table td{height:55px}`, and it is genuinely unchanged with the word and
+without it. The conclusion survives; the measurement did not.
+
+**TWO: “the column does not move” was false on the shop computer.**
+`.row-actions-slots` was `grid-template-columns:auto 36px`, so the first track
+took MARK FIXED's full width on an open row and collapsed to the button's
+`min-width` on a completed one — 99.03px against 70px, which left DELETE
+**48.5px apart between neighbouring rows** on the shop computer and 54px on a
+phone. Adding the word also moved **every desktop DELETE**: 9.52px on open
+rows and 5.00px on completed rows, which never draw a MARK FIXED at all. A
+destructive control that wanders between rows is worse than an unlabelled one.
+
+**Both tracks are fixed now** — `62px 36px` — and `.delete-entry{grid-column:2}`
+pins DELETE to its own. A lone grid child auto-places into column 1, so on a
+completed row DELETE had been sliding into the slot MARK FIXED holds and
+leaving the reserved track empty beside it — which predates the word and is why
+the two row types never lined up. Measured after: DELETE's left edge at
+**1190.5px on a phone and 1208.5px on the shop computer, on open and completed
+rows alike**, and the button's content spill into its own padding **0px**, down
+from 1.77px in this font and 3.34px in DejaVu Sans. That slack is why ACTIONS
+is 110px and the table's `min-width` 1286px rather than 1280 —
+`table-layout:fixed` inside `.sheet-scroll`, so the table gets longer and
+REASON is not squeezed. The phone's word also went **up** a point, 7px → 9px,
+matching the badge beside it: 7px was the smallest text on the sheet, on the
+device the sheet is actually used on.
+
+**Nine mutations now, all caught — and the first gates walked past six of
+them.** Taking the word out of the markup passed, because styling
+`.fix-entry b` says nothing about whether a `<b>` is rendered. Shrinking the
+phone target 44px → 30px passed, because `[^}]*width:44px` also matches
+`min-width:44px`. And the word's own gate anchored on the desktop rule's
+opening declaration, so appending `display:none`, `visibility:hidden` or
+`color:transparent` to that rule, setting the phone rule to `font-size:0`, or
+adding a later overriding rule anywhere in the file all passed — **a regex over
+a stylesheet cannot see the cascade.** The gates read the file through
+`tests/helpers/css-rules.mjs` now, the CSS reader this project already owns,
+and compute the effective declarations per breakpoint with the last rule
+winning. One more that had never been a gate at all:
+`css.slice(indexOf("@media(max-width:760px)"))` is 88% of the stylesheet, so
+every assertion scoped to “the phone” by that slice was not scoped to anything.
 
 ### NO HEAT, and DEFECTS LOGGED means logged by hand
 
