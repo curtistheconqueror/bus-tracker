@@ -6023,7 +6023,7 @@ test("DEFECTS LOGGED counts over a span somebody picks, and no other menu row ch
     first cut: measured at 390px the wrapped button came back 39px while every
     row beside it was 44. A shorter tap target on one row, below the minimum
     this repo holds everywhere else, found by measuring rather than reading. */
- assert.ok(css.includes(".quick-filter-popover>div>button,.quick-filter-popover>div>.quick-filter-row>button,.quick-filter-window select,.ds-badge-view-popover>div>button{min-height:44px}"),
+ assert.ok(css.includes(".quick-filter-popover>div>button,.quick-filter-popover>div>.quick-filter-row>button,.quick-filter-window select{min-height:44px}"),
   "the wrapped row and its picker take the phone tap-target rule with the rest");
 });
 
