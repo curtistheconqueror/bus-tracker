@@ -27,10 +27,19 @@ grep -rcoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|to
 `smart-status` 5, `repair-catalog` 5, `facility-layout` 4, `facility-areas` 4,
 `road-calls` 3, `mystery-buses` 3, `defect-log/page` 3, `operational-time` 2,
 `down-sheet-view` 2, `defect-log-sync` 2, `quick-filter-share` 1.
-**15 files, ~69 occurrences.** `down-sheet-badge-view` held the other two —
-`road-` and `garage-` in `isReadyRoadLocation` — and the whole file went when
-Curtis killed the DS badge view, so that is two literals and one file off this
-count rather than work still to do.
+
+**THE TABLE ABOVE IS STALE AND THE TOTAL WAS DERIVED RATHER THAN MEASURED.** It
+was pinned to a commit from before the `src/lib` move, and when
+`down-sheet-badge-view` was deleted its row was dropped and 2 subtracted from
+the total — but the table had credited that file with 1, so the stated figure
+contradicted the list printed above it. A reviewer caught that, and re-running
+the grep found the table wrong in both directions besides (`location-label` 3
+not 7, `facility-areas` 0 not 4, and three files missing from it entirely).
+
+**Re-run over `app src` at this commit: 16 files, 51 occurrences.** That is the
+number to work from; the itemisation above is kept only as a record of which
+files carried behaviour rather than labels, and it needs rebuilding before it
+is quoted again.
 
 Not all are equal. Most are labels. These carry BEHAVIOUR:
 

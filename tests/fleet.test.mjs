@@ -115,7 +115,15 @@ test("includes full theme, manual color, highlight, and locate controls", async 
      to `writeBoardSettings` now, which merges over the stored copy and stamps
      the version, so the stamp is asserted where it is written. */
   assert.match(page, /writeBoardSettings\(localStorage,\{/, "the map has to persist its board settings");
-  assert.doesNotMatch(page, /JSON\.stringify\(\{statusVersion:3/, "and must not write the key wholesale again");
+  /* ORDER-INDEPENDENT. This forbade the literal `JSON.stringify({statusVersion:3`
+     and a reviewer moved the stamp to the END of the object: the map replaced
+     the whole record again, a device lost its stale field, its `futureField`
+     and its legacy `dark` on the first render, and 433 tests stayed green. A
+     blacklist of one spelling is not a gate - which is what this change's own
+     notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
+     writer of this key outside map-settings.ts. */
+  assert.ok(!/writeSetting\((?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|"pace-board-settings-v1")/.test(page),
+   "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
   const boardWriter=await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
   assert.match(boardWriter, /statusVersion:3/);
   assert.match(page, /<Icon s=\{bus\.s\}/);

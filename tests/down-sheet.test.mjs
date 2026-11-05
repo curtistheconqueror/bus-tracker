@@ -5,7 +5,7 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, mapDownSheetBadgeBusIds, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
-import { effectiveStyle, stripComments } from "./helpers/css-rules.mjs";
+import { cssRules, effectiveStyle, splitSelector, stripCodeComments } from "./helpers/css-rules.mjs";
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
   const fleet = [
@@ -105,7 +105,7 @@ test("the DS badge is blind to where a bus is parked, and the view that was not 
      a switch that turns EVERY badge off, and neither puts a `:` or an `=`
      next to the name. `!==`, `===`, `==`, `)`, `&&`, `?.` and bracket access
      all cleared it. A blacklist of punctuation is not a gate. */
-  assert.ok(!stripComments(mapSettings).includes("downSheetBadgeView"),
+  assert.ok(!stripCodeComments(mapSettings).includes("downSheetBadgeView"),
     "the board settings still name downSheetBadgeView outside a comment");
   assert.match(mapSettings, /relocating/,
     "and the reason it went has to stay on the record beside the key it used to live in");
@@ -113,13 +113,93 @@ test("the DS badge is blind to where a bus is parked, and the view that was not 
   /* AND THE MAP COMPOSES NOTHING OF ITS OWN. Anchored on the closing `)),`
      so that a `.filter()` chained onto the call - the exact mutation that
      defeated the last version of this gate - cannot satisfy it. */
-  assert.match(map, /downSheetBadgeSet=new Set\(mapDownSheetBadgeBusIds\(buses,actualDownSet,showDownSheetBadges\)\),/,
+  /* WHITESPACE-TOLERANT. Written without it, adding one space after each comma
+     - or renaming the local `actualDownSet` - failed with a message about a
+     chained filter that was not there, sending the next reader hunting. */
+  assert.match(map, /downSheetBadgeSet\s*=\s*new Set\(\s*mapDownSheetBadgeBusIds\([^)]*\)\s*\)\s*,/,
     "the map has to take the badge set whole, with nothing chained onto it");
-  /* Belt and braces: the statement itself may not read a location or filter. */
-  const badgeStatement = map.slice(map.indexOf("downSheetBadgeSet="), map.indexOf("acIssueSet="));
-  for (const forbidden of ["filter", ".l", "road-", "garage-", "startsWith"])
-    assert.ok(!badgeStatement.includes(forbidden),
-      "the map's badge set names " + forbidden + ", so a location can decide a badge again");
+  /* THE WHOLE STATEMENT, AND THE PAINT PATH, not a 70-character window.
+
+     This sliced from `downSheetBadgeSet=` to `acIssueSet=` - the next thing in
+     the SAME `const` list - so anything written after that point was
+     unguarded, and declaring `acIssueSet` first made `end < start`, which
+     `String.prototype.slice` answers with `""`: the loop then passed over an
+     empty string and silently checked nothing at all. A reviewer walked two
+     mutations through it that way and measured the badge gone from a bus on
+     the road with 433 tests green.
+
+     IT IS STILL ONLY A TEXT GATE, and that limit is worth stating rather than
+     dressing up. The rule is enforced where the set is BUILT; a determined
+     edit can still hide a badge at the point it is CONSUMED, in the component
+     that paints it, or in one line of CSS. What would actually close it is a
+     render-level assertion - seed a fleet, relocate every bus, count the badge
+     boxes - and this suite cannot do that: `render` in tests/helpers/setup.mjs
+     runs the production worker server-side, where there is no LocalStorage to
+     seed a board into. So these gates cover the routes text can see, the
+     browser run covers the rest for this change, and the gap is recorded in
+     docs/PUBLISH_NEXT.md rather than claimed shut. */
+  const statement = (() => {
+    /* THE WHOLE `const` STATEMENT the badge set is declared in, from its own
+       `const` to the `;` at bracket depth zero.
+
+       Three window sizes have now been wrong here. To the next NAME in the
+       list left everything written after it unguarded, and reversed order made
+       the slice empty so the loop checked nothing. To the end of this one
+       DECLARATION still left a sibling declaration appended after it - a
+       reviewer's `_prune=buses.forEach(...delete(bus.id))` - and left
+       `actualDownSet` itself, which the badge set is built from, outside the
+       window entirely. */
+    const declared = map.indexOf("downSheetBadgeSet=");
+    assert.ok(declared >= 0, "the badge set has to be declared on the map page");
+    const from = map.lastIndexOf("const ", declared);
+    assert.ok(from >= 0, "and inside a declaration");
+    let depth = 0, to = -1;
+    for (let i = from; i < map.length; i++) {
+      const char = map[i];
+      if ("([{".includes(char)) depth++;
+      else if (")]}".includes(char)) depth--;
+      else if (depth === 0 && char === ";") { to = i; break; }
+    }
+    assert.ok(to > declared, "the statement has to end after the badge set");
+    return map.slice(from, to);
+  })();
+  /* NO LOCATION IS READABLE ANYWHERE IN IT. `filter` is NOT on this list:
+     `fixedRepairCount` beside it filters defects legitimately, and forbidding
+     the word would make the gate lie about why it failed. A location is what
+     matters, and `bus.l` is the only way to read one. */
+  for (const forbidden of ["road-", "garage-", "offsite-", "startsWith", "isReadyRoadLocation"])
+    assert.ok(!statement.includes(forbidden),
+      "the statement declaring the badge set names " + forbidden + ", so a location can decide a badge again");
+  /* `bus.l` AS A PROPERTY, with a boundary: a bare ".l" also matches `.length`,
+     which `fixedRepairCount` uses on the same line. */
+  assert.ok(!/\.l(?![a-zA-Z])/.test(statement),
+    "the statement declaring the badge set reads a bus's location");
+  /* AND THE SET IS NEVER EDITED AFTER IT IS BUILT, anywhere in the file - the
+     route that got past every window above. */
+  for (const mutate of ["downSheetBadgeSet.delete", "downSheetBadgeSet.add", "downSheetBadgeSet.clear"])
+    assert.ok(!map.includes(mutate),
+      "the badge set is edited after it is built: " + mutate);
+  /* THE ONE CONSUMER TAKES IT WHOLE. `downSheetReady:downSheetBadgeSet.has(bus.id)`
+     with a `&&!bus.l.startsWith("road-")` appended is one token, and it was the
+     cheapest of the six routes a reviewer found. */
+  assert.match(map, /downSheetReady:downSheetBadgeSet\.has\(bus\.id\),/,
+    "the badge flag has to be the set's answer and nothing else");
+  /* AND THE THING THAT PAINTS IT CARRIES NO CONDITION OF ITS OWN: no inline
+     style, no second test beside `bus.downSheetReady`. */
+  assert.match(map, /\{bus\.downSheetReady&&<span className="downsheet-ready-badge" aria-hidden="true">DS<\/span>\}/,
+    "the badge element has to draw on the flag alone");
+  /* AND NO STYLESHEET HIDES IT BY LOCATION. A slot carries `data-location`, so
+     `.spot[data-location^="road-"] .downsheet-ready-badge{display:none}` is a
+     one-line route to the same bug - measured at 0x0 by a reviewer. */
+  const badgeRules = cssRules(globals).filter(rule =>
+    splitSelector(rule.selector).some(one => one.includes("downsheet-ready-badge")));
+  for (const rule of badgeRules) {
+    for (const one of splitSelector(rule.selector))
+      assert.ok(!/data-location|\[data-location/.test(one),
+        "a stylesheet rule keys the DS badge on a location: " + one);
+    assert.ok(!/display\s*:\s*none|visibility\s*:\s*hidden/.test(rule.body || ""),
+      "a stylesheet rule hides the DS badge: " + rule.selector);
+  }
   /* AND THE PHONE COMMAND BAR DOES NOT HAVE A HOLE WHERE IT SAT. It was a
      four-column grid with the DS control pinned to column 3; removing it
      without widening its neighbour would have left an empty cell. */
@@ -2057,8 +2137,12 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
        rendered the label as one line 59px wide (66.02px in DejaVu Sans)
        inside a 44px button - the exact spill over DELETE that stacking the
        label exists to avoid. These are the values that wrap. */
-    assert.ok(["normal","pre-line","pre-wrap",undefined].includes(word["white-space"]),
-      "the label's white-space is "+word["white-space"]+" "+where+", which does not wrap");
+    /* THE VALUES THAT WRAP. `break-spaces` was missing and does wrap, so this
+       failed a legitimate change; anything else is treated as not wrapping and
+       fails on purpose, with a message saying what to do about it. */
+    assert.ok(["normal","pre-line","pre-wrap","break-spaces",undefined].includes(word["white-space"]),
+      "the label's white-space is "+word["white-space"]+" "+where+
+      " - if that value wraps, add it to this list; otherwise the label will spill over DELETE");
     assert.equal(fix.width,"44px","MARK FIXED loses its thumb target on "+where);
     assert.equal(fix["min-height"],"44px","and its height has to be a floor, since the word stacks");
     assert.equal(fix["flex-direction"],"column","with the word under the tick on "+where);

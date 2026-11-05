@@ -2360,6 +2360,70 @@ bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
 it stood. A unitless zero is a valid length; it reads as 0 now, and that was
 the last of the twenty-seven.
 
+### What two reviews found in the parts work, and what it cost
+
+The multi-part change above went out for review and **failed the gate — 5 Major,
+4 Minor.** Every finding was right. They are listed here because several were
+claims this release had already made in writing.
+
+**The PARTS USED section collapsed while somebody was typing in it.** The
+checkbox was derived from the record, and the assembler reports *no parts* the
+moment every row is blank — so pressing ADD ANOTHER PART on an empty row, or
+clearing the only number, unticked the box and unmounted the whole section.
+Measured by the reviewer at **-256px of content shift on a phone**, -234px on
+the shop computer, with keyboard focus dropped to the page body. The checkbox
+holds its own state now: only it means "no parts were used", while a blank row
+means somebody is typing. What gets **stored** still comes from the rows.
+
+**REMOVE and unticking did not stick on a saved repair.** Both save paths
+spread the assembled fields over the stored record, and the assembler **omits**
+the array for a one-part repair by design — so a repair that had held two parts
+kept both. `{...existing,...incoming}` cannot say "this field is gone", which
+is exactly why `workStates` and `downSheetRecommendation` are named explicitly
+in `defect-log-sync.ts`; **that file's own comment says anything deleting its
+key belongs on that line, and this change did not follow it.** Fixed on both
+sides, with the transitions driven in tests rather than matched as text.
+
+**An ENTER LATER repair lost its MISSING PART # flag** when re-saved — a
+regression against main, from the same re-derived flag.
+
+**"The shop learns every part now" was false.** The memory keeps **one entry
+per repair** and replaces it, so reducing over two parts taught it the *last*
+one with the use-count inflated to 2. One part is learned now — the first
+numbered row, which is the one the suggestion offers back — and duplicates
+count once. Teaching it more than one needs more slots per key, which changes
+what `pace-parts-memory-v1` holds; that is Curtis's call on the shop's own data,
+not something to slip in here.
+
+**And a second part was never shown anywhere.** The Defect Log's two card
+sites, the Fixed Repairs card and its search all read the first part only, so a
+part could be entered, stored, and then be invisible and unfindable — which
+made the feature close to pointless from a mechanic's side. `defectPartsText`
+had been written for this and nothing called it. All four read every part now,
+and the MISSING PART # flag reads the whole list, so a name-only first row
+beside a numbered second one no longer claims a number is missing.
+
+Also fixed: changing the CATEGORY or DEFECT now clears the parts (the old
+repair's rows came back on re-ticking), and the save-time part prompt goes
+through the assembler instead of patching the mirrored pair behind the array's
+back.
+
+**One test was locking a bug in.** It asserted the exact spread that kept the
+stale array. Ten mutations were then run across the fixes; the first pass caught
+five, so five more gates were added and all ten are caught now.
+
+**A separate review of the map work found six more routes to the DS badge bug** —
+see the note in *The DS badge no longer cares where a bus is parked* above,
+which now says plainly what the gates hold and what only a render-level test
+could.
+
+Three measurements this release had published were also wrong and are corrected
+where they appeared: the prefix-literal count (derived by arithmetic from a
+stale table; re-run, it is **16 files and 51 occurrences**), a claim that the
+command bar had no gap in any row (rows 3 and 4 still do, and they are older
+than this change), and a stylesheet comment comparing a padding box against a
+border box.
+
 ### DEFECTS LOGGED, the focus share, and swiping a defect out of it
 
 Curtis, on a share he was about to send: *"when I hit like the last 24 hours of
@@ -2558,13 +2622,30 @@ parked at a `road-` slot, and measured the badge gone from a bus on the sheet
 match on `app/page.tsx`. That is precisely the rule Curtis killed the setting
 for, reachable in one line.
 
-`mapDownSheetBadgeBusIds` is the whole of it now: membership and the SHOW
-switch, with **no access to `bus.l` at all**, so the function cannot see where
-a bus is parked. The gate drives it — over a fleet, over the same fleet with
-every bus relocated, and with the switch off — rather than reading the page for
-a word, and it anchors the map's call on its closing `)),` so nothing can be
-chained onto it. Six mutations run, including that one and the same rot done
-inside the lib instead; all six caught.
+`mapDownSheetBadgeBusIds` is the whole of the DECISION now: membership and the
+SHOW switch, with **no access to `bus.l` at all**. The gate drives it — over a
+fleet, over the same fleet with every bus relocated, and with the switch off —
+rather than reading the page for a word.
+
+**AND THE REST OF IT IS HELD BY TEXT GATES, WHICH IS A WEAKER THING.** An
+earlier draft of this paragraph said the rule was closed. A second reviewer
+then found **six more routes** to "a bus loses its badge because of where it is
+parked", all with 433 tests green and all measured in a browser: one token
+appended where the set is CONSUMED; a sibling declaration pruning the set after
+it is built; the same thing written before it, which made the window check
+compare an empty string and pass vacuously; an inline `style` on the badge
+element; and **one line of CSS** keyed on the slot's `data-location`.
+
+All six are caught now — the window is the whole `const` statement, the set may
+not be edited after it is built, the consumer and the badge element are
+anchored, and no stylesheet rule may key the badge on a location or hide it.
+**Ten mutations run, all ten caught.** But these are still gates over source
+text. What would actually close the rule is a render-level assertion — seed a
+fleet, relocate every bus, count the badge boxes — and this suite cannot do
+that: `render` in `tests/helpers/setup.mjs` runs the production worker
+server-side, where there is no LocalStorage to seed a board into. The browser
+run covers it for this change; the gap is written down here rather than
+described as shut.
 
 **A device that already holds `downSheetBadgeView:"off-road"` keeps it, inert
 — and making that true took a second fix.** The claim was written about
@@ -2604,10 +2685,15 @@ other half of the row empty beside it — 183.5px of nothing at 390, 298.5px at
 620.** It is one column now, which is what the FIND and MORE sheets beside it
 already were.
 
-Measured after both fixes: row 2 of the bar is full — HIGHLIGHTS and PAGES at
-293px each at 621, 382px each at 800 — and the FILTERS sheet's two controls each
-fill their row at 360 / 390 / 430 / 620. No gap wider than the gutter inside any
-row, and no page overflow at any width, before or after.
+Measured after both fixes: **row 2** of the bar is full — HIGHLIGHTS and PAGES
+at 293px each at 621, 382px each at 800 — and the FILTERS sheet's two controls
+each fill their row at 360 / 390 / 430 / 620. No page overflow at any width,
+before or after.
+
+**Scoped to row 2 on purpose.** An earlier draft of this sentence said "no gap
+wider than the gutter inside any row", which a reviewer measured as false:
+rows 3 and 4 still hold 150–195px and 300–389px of empty cell. Those are the
+older holes described below and are not this change's.
 
 **Two holes in that bar are older than this change and are NOT fixed here.**
 Row 3 holds REFRESH, ACTIONS and FULL SWEEP in three of four columns, and row 4

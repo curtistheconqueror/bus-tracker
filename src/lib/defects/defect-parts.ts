@@ -179,9 +179,34 @@ export function removeDefectPart(parts: DefectPart[], id: string): DefectPart[] 
   return kept.length ? kept : [blankDefectPart()];
 }
 
-/* What the parts memory should learn from one save: every part that has a
-   number, since `learnPart` is keyed on the number and a name alone teaches it
-   nothing it can suggest later. */
+/* Which parts COULD be taught to the shop's memory: the ones carrying a
+   number, since the memory is keyed on the number and a name alone teaches it
+   nothing it could suggest later. Deduplicated, because two rows holding the
+   same number are one part typed twice and must not count as two uses. */
 export function partsToLearn(parts: DefectPart[]): DefectPart[] {
-  return parts.filter(part => Boolean(clean(part.partNumber)));
+  const seen = new Set<string>();
+  return parts.filter(part => {
+    const number = clean(part.partNumber);
+    if (!number || seen.has(number)) return false;
+    seen.add(number);
+    return true;
+  });
+}
+
+/* AND THE ONE THE MEMORY ACTUALLY TAKES, which is the FIRST of them.
+
+   This corrects a claim I made and a reviewer disproved. Both forms reduced
+   `learnPart` over every numbered part and the change described that as "the
+   shop learns every part now". `learnPart` keeps ONE entry per
+   scope+category+issue and REPLACES it, so reducing over [HX-99, ZZ-1] leaves
+   a single entry holding ZZ-1 with `uses:2` - the shop was taught the LAST
+   part and the count was inflated, which is worse than teaching it one.
+
+   So one part is learned, and it is the first row because that is the one the
+   suggestion offers back. Teaching the memory more than one part per repair
+   means giving it more than one slot per key, which changes what
+   `pace-parts-memory-v1` holds and what `recallPart` can return - a different
+   change, on the shop's own data, and not one to smuggle in here. */
+export function partToLearn(parts: DefectPart[]): DefectPart | null {
+  return partsToLearn(parts)[0] || null;
 }

@@ -350,3 +350,42 @@ function compoundMatches(compound,node){
  const have=(node.classes||[]).map(one=>String(one).toLowerCase());
  return want.every(one=>have.includes(one));
 }
+
+/* THE SAME JOB FOR TYPESCRIPT, because `stripComments` above is a CSS
+   stripper and a caller reached for it on a `.ts` file.
+
+   CSS has no `//` comment and no template literal, so that one knows neither.
+   Applied to TypeScript it reported a plain `// note` line as live code - a
+   gate on a dead identifier then failed on an accurate comment about it, which
+   is a false accusation in the ordinary comment style of `src/lib`. A backtick
+   string holding `/*` would open a pseudo-comment too, the exact class of bug
+   the CSS reader was written to fix.
+
+   Strings and template literals are KEPT, comments are replaced with a space
+   so two tokens cannot fuse. `${...}` inside a template is kept as written,
+   which is right for an identifier scan. */
+export function stripCodeComments(code){
+ let out="",quote="",i=0;
+ while(i<code.length){
+  const char=code[i];
+  if(quote){
+   out+=char;
+   if(char==="\\"){out+=code[i+1]??"";i+=2;continue}
+   if(char===quote)quote="";
+   i++;continue;
+  }
+  if(char==='"'||char==="'"||char==="`"){quote=char;out+=char;i++;continue}
+  if(char==="/"&&code[i+1]==="*"){
+   const end=code.indexOf("*/",i+2);
+   i=end===-1?code.length:end+2;
+   out+=" ";continue;
+  }
+  if(char==="/"&&code[i+1]==="/"){
+   const end=code.indexOf("\n",i+2);
+   i=end===-1?code.length:end;
+   out+=" ";continue;
+  }
+  out+=char;i++;
+ }
+ return out;
+}

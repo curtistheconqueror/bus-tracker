@@ -92,7 +92,7 @@ branding.** Counted at this commit —
 
 | | what it is | where |
 | --- | --- | --- |
-| the yard's geometry | six independent descriptions of one building that must agree, plus ~69 slot-prefix literals across 15 files, some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
+| the yard's geometry | six independent descriptions of one building that must agree, plus 51 slot-prefix literals across 16 files, some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
 | 60 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
