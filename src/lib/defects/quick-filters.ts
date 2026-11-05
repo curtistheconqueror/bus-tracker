@@ -1,4 +1,4 @@
-import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
+import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedByHand,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
 import {hasRecentRoadCall,ROAD_CALL_WINDOW_DAYS,type RoadCallEvent} from "../fleet/road-calls.ts";
 import {isFarebox,isIbsVentra} from "../fleet/tech-services.ts";
 
@@ -199,10 +199,14 @@ function recentStamp(at:string|undefined,now:string){
    AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. `applyDownEntryToFleet`
    writes `linked?.source||"down-sheet"`, so a defect logged by hand that LATER
    appears on a sheet stays `defect-log` and stays in this list. Somebody
-   logged it; the paper catching up does not take that away. */
-export function loggedByHand(defect:{source?:string}){
- return String(defect?.source||"")!=="down-sheet";
-}
+   logged it; the paper catching up does not take that away.
+
+   MOVED TO repair-catalog.ts, where `DefectSource` itself is defined, because
+   the Defect Log's WHEN LOGGED window needs the same answer and feed-window.ts
+   cannot import this file without pulling road-calls and tech-services in
+   behind it. Re-exported here so nothing that names it from this module
+   breaks. */
+export {loggedByHand};
 
 /* Whether this defect was written down inside the window the drawer is set to.
    `null` means no window, which is ALL. An undated record is out of every

@@ -444,7 +444,29 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .close-log-focus{margin-left:auto;width:48px;height:48px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:10px;background:var(--log-surface);color:var(--log-text);font-family:inherit;font-size:24px;line-height:1;cursor:pointer}
 .add-log-focus-defect+.close-log-focus{margin-left:0}
 .log-focus-body{flex:1;display:grid;gap:12px;align-content:start;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.log-focus-record{border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 16px}
+/* SWIPE LEFT TO DROP A DEFECT FROM THE SHARE. Curtis: "I would like to swipe
+   left to get rid of a defect and have a quick undo button to bring it back."
+
+   `position:relative` is for the HIDE control in the corner; the row is padded
+   on the right so a long category name cannot run under it.
+
+   NO `touch-action` HERE ON PURPOSE. The panel above scrolls vertically under
+   the same thumb, and `touch-action:none` or `pan-y` would be the fastest way
+   to break that - the swipe is horizontal only and the browser already lets a
+   horizontal drag pass through a vertical scroller untouched. The transform
+   comes from the component as an inline style while a finger is down, so there
+   is no transition on it to fight the finger; it snaps back on release, which
+   is the one moment a transition would help and the one place React has
+   already removed the style. */
+.log-focus-record{position:relative;border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 52px 14px 16px}
+.log-focus-record .focus-hide-defect{position:absolute;top:8px;right:8px;min-width:36px;min-height:36px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);color:var(--log-muted);padding:3px 5px;font-family:inherit;line-height:1;cursor:pointer}
+.log-focus-record .focus-hide-defect span{font-size:14px}
+.log-focus-record .focus-hide-defect b{font-size:7px;font-weight:900;letter-spacing:.4px}
+.log-focus-record .focus-hide-defect:hover,.log-focus-record .focus-hide-defect:focus-visible{border-color:var(--log-accent);color:var(--log-accent);outline:none}
+/* THE WAY BACK, beside what the share is about to carry rather than behind a
+   menu - the rule the Down Sheet's own PUT BACK follows. */
+.log-focus-share .focus-put-back{min-height:36px;justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.log-focus-share .focus-put-back span{font-size:12px;line-height:1}
 .log-focus-record.in-progress{border-left-color:#c99400}.log-focus-record.deferred{border-left-color:#0e7490}.log-focus-record.completed{border-left-color:#0a7d47}
 .log-focus-record-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
 .log-focus-record-head b{font-size:14px;letter-spacing:.4px;color:var(--log-accent)}
@@ -489,6 +511,10 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-focus-share>small{font-size:9px}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+ /* Both controls reach a thumb target on the device the swipe exists for. */
+ .log-focus-record .focus-hide-defect{min-width:44px;min-height:44px}
+ .log-focus-record{padding-right:60px}
+ .log-focus-share .focus-put-back{min-height:44px;width:100%;justify-content:center}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}
  .log-focus-record-actions{gap:7px}
