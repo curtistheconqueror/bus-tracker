@@ -2604,12 +2604,37 @@ green. It matches balanced braces now, and the extractor is itself asserted.
 | HIDE control | **44x44** at 390/430, 36x36 at 1180, `display:flex` throughout |
 | horizontal page scroll | none at 390, 430 or 1180 |
 
-One honest note on that table: an earlier run measured a **61px** shift in the
-list at 1180 when a row was hidden. That was the three-defect fixture, not the
-slot — a three-row dialog is short enough that losing a row lets the centred,
-auto-height panel shrink and re-centre. With the panel full (eight defects, or
-any viewport where it is already at its 92vh cap) the shift is **0px**, and the
-share bar's own height does not move either way.
+**AND A NOTE THAT WAS HERE, WRONG, AND IS WORTH KEEPING AS A CORRECTION.** An
+earlier run measured a **61px** shift in the list at 1180 when a row was hidden,
+and this paragraph dismissed it as the three-defect fixture — a short dialog
+losing a row and re-centring — on the strength of an eight-defect run that
+showed 0px.
+
+That was backwards. With eight defects the panel is already at its 92vh cap and
+**cannot shrink**, which is exactly why that run looked clean; a bus carrying
+**two to seven** is the ordinary case, and there the dialog really does
+re-centre and carry the control under the cursor with it. A reviewer measured
+three defects again and was right. Dismissing a measurement because a different
+fixture disagreed is the mistake, and it is the second time in this release that
+a number was explained away rather than chased.
+
+The slot is the other half of this and it does hold — the share bar is 103px
+before and after, at every width. But a slot cannot hold a **centred** dialog
+still, because the thing moving is the dialog's own box: `.log-shade` centres
+and `.log-focus` is auto-height. The fix is
+`.log-focus-shade{align-items:flex-start}` above **761px**, the complement of
+the phone breakpoint; below it the panel is already full-screen and there is
+nothing to re-centre.
+
+Re-measured on the built page — body top before, after HIDE, after PUT BACK:
+
+| | |
+| --- | --- |
+| 1180px, 3 defects | 213 → 213 → 213 |
+| 1180px, 2 defects | 213 → 213 → 213 |
+| 1180px, 7 defects | 213 → 213 → 213 |
+| 820px, 3 defects | 213 → 213 → 213 |
+| 390px, 3 defects | 204 → 204 → 204 |
 
 **28 of 28 mutations caught**, up from 21 of 25 before this round. The four that
 had been surviving were a `display:none` on HIDE, an exclusion written onto a
