@@ -109,7 +109,15 @@ test("includes full theme, manual color, highlight, and locate controls", async 
   assert.match(css, /\.grow \.spot\.garage-special-slot\{background:var\(--garage-special\)/);
   assert.match(page, /scrollIntoView\(\{behavior:"smooth"/);
   assert.match(page, /original==="tow"\?"out"/);
-  assert.match(page, /statusVersion:3/);
+  /* THE VERSION STAMP MOVED, it did not go. The map wrote this key wholesale
+     with `JSON.stringify({statusVersion:3,...})`, which deleted every field it
+     did not name - including anything a later release adds. It hands the object
+     to `writeBoardSettings` now, which merges over the stored copy and stamps
+     the version, so the stamp is asserted where it is written. */
+  assert.match(page, /writeBoardSettings\(localStorage,\{/, "the map has to persist its board settings");
+  assert.doesNotMatch(page, /JSON\.stringify\(\{statusVersion:3/, "and must not write the key wholesale again");
+  const boardWriter=await readFile(new URL("../src/lib/settings/map-settings.ts", import.meta.url), "utf8");
+  assert.match(boardWriter, /statusVersion:3/);
   assert.match(page, /<Icon s=\{bus\.s\}/);
   assert.match(page, /setSmartStatusEnabled\(false\)/);
   assert.doesNotMatch(page, /tow:\["TOW \/ STAGING"/);
@@ -1642,7 +1650,10 @@ test("release safety keeps interval units and learned parts attached to the righ
  const boardModelSource=await readFile(new URL("../src/lib/settings/map-settings.ts",import.meta.url),"utf8");
  assert.match(boardModelSource,/serviceIntervals:readSavedServiceIntervals\(ui\.serviceIntervalsUnit,ui\.serviceIntervals\)/,
   "a restored backup still reaches the intervals, through the board-settings reader");
- assert.match(page,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals/);
+ /* Written by `writeBoardSettings` now rather than by the map's own
+    `JSON.stringify`, so the unit is asserted there. The map's job is to hand
+    over the intervals, which the set check in tests/settings.test.mjs holds. */
+ assert.match(boardModelSource,/serviceIntervalsUnit:SERVICE_INTERVALS_UNIT,serviceIntervals:next\.serviceIntervals/);
  // Campaigns were absent from the backup until version 4. Everything that
  // page holds — completed rows, initials, timestamps, billable hours — sat
  // outside the one control that promises to save the whole board, and the

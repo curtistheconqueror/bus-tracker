@@ -688,14 +688,15 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
    Out here they cost a deliberate scroll, which is the point, and both now ask
    before they act. */
-/* 121px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
+/* 155px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
    and "six more pixels buys the slack", which was wrong twice over. The six
    pixels of COLUMN width cannot affect the button's internal fit at all — the
-   first track is a fixed 62px however wide the cell is, and what gives the
-   word room is the track stretching the button to a 46px content box against
-   the 42.56px it needs. (The "3.34px over in DejaVu Sans" this comment used to
-   carry belongs to the old auto-width button; forced to DejaVu the stretched
-   one needs 45.13 of 46 and fits.)
+   first track is a fixed width however wide the cell is, and what gives the
+   label room is that track stretching the button. At the 96px MARK FIXED needs
+   that is a 94px content box against the 87.23px the tick, the gap and the
+   label occupy — 93.47px forced to DejaVu Sans, so it fits in both. (The
+   "3.34px over in DejaVu Sans" this comment used to carry belonged to the old
+   auto-width button, not to a stretched one.)
 
    What the column width decides is whether the GRID fits. It is 96 + 8 + 36 =
    140px; `*{box-sizing:border-box}` at the top of this file means a `th` width
@@ -725,8 +726,8 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    and 93.47px forced to DejaVu Sans, so 96px clears both.
 
    `justify-content:center` is INERT for the same reason: with both tracks
-   fixed the inline-grid is exactly 106px, so there is nothing inside it to
-   distribute. What centres the pair in the cell is `text-align:center` on the
+   fixed the inline-grid is exactly their sum — 140px on the shop computer and
+   98px on a phone — so there is nothing inside it to distribute. What centres the pair in the cell is `text-align:center` on the
    line above. Kept so that a future `auto` track does not also lose the
    centring, and recorded rather than left to be rediscovered. */
 .row-actions-slots{display:inline-grid;grid-template-columns:96px 36px;justify-content:center;gap:8px;align-items:center}

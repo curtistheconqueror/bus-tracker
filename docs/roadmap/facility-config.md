@@ -26,8 +26,11 @@ grep -rcoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|to
 `page.tsx` 16, `location-label` 7, `down-sheet-filters` 7, `quick-filters` 6,
 `smart-status` 5, `repair-catalog` 5, `facility-layout` 4, `facility-areas` 4,
 `road-calls` 3, `mystery-buses` 3, `defect-log/page` 3, `operational-time` 2,
-`down-sheet-view` 2, `defect-log-sync` 2, `down-sheet-badge-view` 1,
-`quick-filter-share` 1. **16 files, ~71 occurrences.**
+`down-sheet-view` 2, `defect-log-sync` 2, `quick-filter-share` 1.
+**15 files, ~69 occurrences.** `down-sheet-badge-view` held the other two —
+`road-` and `garage-` in `isReadyRoadLocation` — and the whole file went when
+Curtis killed the DS badge view, so that is two literals and one file off this
+count rather than work still to do.
 
 Not all are equal. Most are labels. These carry BEHAVIOUR:
 
