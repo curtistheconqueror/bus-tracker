@@ -2360,6 +2360,76 @@ bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
 it stood. A unitless zero is a valid length; it reads as 0 now, and that was
 the last of the twenty-seven.
 
+### DEFECTS LOGGED, the focus share, and swiping a defect out of it
+
+Curtis, on a share he was about to send: *"when I hit like the last 24 hours of
+the shift, it gives me buses, but I think it's giving me more than the defects
+that I put down in the last 24 hours or the current shift."* He was right, and
+it was **two separate bugs** that compounded.
+
+**ONE: the focus share ignored the window entirely.** It was built from the
+UNFILTERED records on purpose — he had asked for exactly that earlier, *"share
+all the defects with a bus"* — so with 24H selected, focusing a bus and pressing
+SHARE sent every defect it had ever carried. Asked which way he wanted it now
+that he had used the other, he chose: *"Follow the window, and add the swipe."*
+The share is **what is on screen** now, and the earlier reasoning stays in the
+page's comment because it is why this ever carried the whole bus.
+
+**TWO: the WHEN LOGGED drop-down counted a scanned sheet as logged now.** A
+defect born from a Down Sheet row is stamped `source:"down-sheet"` with a
+`createdAt` of **when the scan ran**, so importing yesterday's paper at 20:00
+dropped that whole sheet into TODAY, LAST 24H and THIS SHIFT at once. The
+DEFECTS LOGGED quick filter was fixed for this earlier in 194; the drop-down was
+missed. A scanned row is now out of every **timed** window and stays in ALL —
+the same rule that module already applied to an undated record, and for the same
+reason. Curtis chose this over marking them: *"just things that were logged by
+hand."* `loggedByHand` moved down into `repair-catalog.ts`, where
+`DefectSource` lives, so both the filter and the window ask one function.
+
+**AND A SWIPE DROPS ONE DEFECT FROM THE SHARE.** *"I would like to swipe left to
+get rid of a defect and have a quick undo button to bring it back."* Swipe a
+focus-view row left and it leaves the share; **PUT BACK** returns the last one,
+pressed repeatedly to walk them off in reverse.
+
+**It is not only a swipe.** Every row carries a **HIDE** control that does the
+same thing, because a gesture is unreachable with a mouse, unreachable from a
+keyboard, and invisible to anybody who was not told it exists — and the shop
+computer is a mouse.
+
+**The two reasons are counted apart**, which is why the scope line reads
+*"SHARING 4 OF 6 — 1 OUTSIDE THIS VIEW, 1 YOU SWIPED AWAY"*: a view narrowing
+something is not a person deciding it. Silent when the share is the whole bus.
+
+**Nothing is written to a defect.** An exclusion is a set of ids held while the
+panel is open, cleared when the bus changes. That is not tidiness: the Shop
+Cloud ships every unknown defect field inside the row's `detail` blob and a
+merge replaces a defect wholesale by id, so one person's *"don't send this
+one"* would **hide that defect on every phone in the shop** — the reason a HOLD
+and a FULL SWEEP do not travel either. A test names the fields and keys it must
+not use.
+
+**The gesture is a decision, not a distance**, and the panel it sits in scrolls
+vertically under the same thumb. The Facility Map paid for the naive version and
+wrote it down: a plain distance test *"carried garage-6 to wall-7 and scrolled
+the page zero pixels."* So three conditions, all of them: at least 56px, leftward,
+and sideways travel beating vertical by half again. **Nothing blocks scrolling** —
+no `touch-action`, no non-passive `touchmove`, no `preventDefault` — because a
+horizontal drag passes through a vertical scroller untouched, and a cancelled
+pointer (the browser saying "this was a scroll") never counts as a decision.
+
+**All three outputs read one list.** A page that honoured a swipe while the text
+ignored it would be two answers to one question with no way to tell which had
+been sent.
+
+**Measured in the built page at 390 and 1180**, driving the real panel: a
+mostly-vertical drag hides nothing; a left swipe removes the row it was on and
+the next one takes its place; a rightward drag does nothing; the HIDE button
+does what the swipe does; PUT BACK pressed twice returns both and the scope line
+goes silent; and the panel still scrolls to 120px afterwards. **Read out of the
+clipboard**, which is the check that matters: the share went from *"3 defects"*
+with three rows to *"2 defects"* with the swiped one gone and the rest
+renumbered, and back to three after PUT BACK. No page errors.
+
 ### A repair can carry more than one part
 
 Curtis, from the floor: *"we made a blooper, we assumed that each repair only

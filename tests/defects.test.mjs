@@ -3,8 +3,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, fluidsLabel, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partsToLearn, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
+import { stripComments } from "./helpers/css-rules.mjs";
 
 test("defect normalization preserves future odometer and parts fields",()=>{
  const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
@@ -6266,20 +6267,101 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(page,/useEffect\(\(\)=>\{setFocusShareStatus\(""\)\},\[focusedBusId\]\)/,
   "opening another bus never greets somebody with the last one's SHARED");
 
- /* THE SHARE CARRIES THE WHOLE BUS. `focusedGroup` comes out of `visibleGroups`,
-    which the state filter, the WHEN LOGGED window and the search have already
-    narrowed: with IN PROGRESS on, a bus carrying six showed two and the first
-    cut shared those two under a heading reading "2 defects". The reader of that
-    message has no filter and no way to know there was one. Curtis asked for the
-    opposite in as many words — "share all the defects with a bus". */
- assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/);
- assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusedAllRecords\.map/,
-  "the share is built from the unfiltered records");
- assert.doesNotMatch(page,/focusShareRows=\(\):BusShareDefect\[\]=>\(focusedGroup\?\.records/,
-  "never from the board's filtered view of the bus");
- /* And it says so, rather than quietly sending more than the screen shows. */
- assert.match(page,/SHARES ALL \{focusedAllRecords\.length\} — \{focusHiddenByBoard\} HIDDEN BY THE BOARD FILTER/);
- assert.match(page,/const focusHiddenByBoard=focusedGroup\?focusedAllRecords\.length-focusedGroup\.records\.length:0/);
+ /* THE SHARE FOLLOWS THE WINDOW NOW, AND THAT REVERSED A DECISION OF CURTIS'S.
+    It used to carry the WHOLE bus, because he asked for that in as many words
+    - "share all the defects with a bus" - after the first cut shared a
+    filtered two under a heading reading "2 defects", which tells its reader
+    nothing about there being a filter.
+
+    He then hit the other side of it: "when I hit like the last 24 hours of the
+    shift, it gives me buses, but I think it's giving me more than the defects
+    that I put down in the last 24 hours." Asked which way, he chose: "Follow
+    the window, and add the swipe." Both readings were defensible; this is the
+    one he picked after using the other. The old reasoning stays in the page's
+    own comment, because it is why this ever carried the whole bus.
+
+    So the share is WHAT IS ON SCREEN minus anything swiped away, and the two
+    reasons are counted apart - a view narrowing something is not a person
+    deciding it. */
+ assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/,
+  "the whole-bus list is still needed, to count what the view held back");
+ assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusScope\.rows\.map/,
+  "the share is built from the scope, not from the unfiltered records");
+ /* ALL THREE OUTPUTS READ ONE LIST. A page honouring a swipe while the text
+    ignored it would be two answers to one question, with no way to tell which
+    had been sent. */
+ for(const output of ["copyFocusBus","shareFocusBusText","shareFocusBusPage"]){
+  const body=page.slice(page.indexOf("const "+output+"="),page.indexOf("const "+output+"=")+700);
+  assert.ok(body.includes("focusShareRows()"),output+" has to share the same list as the others");
+ }
+ /* AND THE SCOPE IS COMPUTED IN THE LIB, not on the page: the MCP route asks
+    the same question about a bus, and a rule written in a page component would
+    have to be reimplemented there. */
+ assert.match(page,/focusShareScope\(focusedGroup\?focusedGroup\.records:\[\],focusedAllRecords,focusExcluded\)/);
+ assert.match(page,/focusShareScopeNote\(focusScope\)&&<small className="log-focus-share-scope">/,
+  "and the panel has to say what it is about to send");
+ /* THE SWIPED-AWAY LIST IS NEVER A FIELD ON A DEFECT. The cloud ships unknown
+    defect fields to every other phone and a merge replaces a defect wholesale,
+    so one person's "don't send this one" would hide it for the whole shop -
+    the reason a HOLD and a FULL SWEEP do not travel either. */
+ assert.match(page,/const \[focusExcluded,setFocusExcluded\]=useState<string\[\]>\(\[\]\)/);
+ for(const leak of ["defect.excludedFromShare","excludedFromShare:","pace-focus-share"])
+  assert.ok(!page.includes(leak),"a swipe must not be stored on a record or in a key: found "+leak);
+ /* AND IT GOES WITH THE BUS, like the SHARED status beside it: tabbing from
+    bus A's FOCUS to bus B's never passes through empty. */
+ assert.match(page,/useEffect\(\(\)=>\{setFocusExcluded\(\[\]\)\},\[focusedBusId\]\)/);
+ /* PUT BACK IS ON THE PAGE, not behind a menu - the rule the Down Sheet's own
+    PUT BACK follows, because an accidental swipe is exactly when nobody goes
+    looking for an undo. */
+ assert.match(page,/className="focus-put-back"[\s\S]{0,200}?onClick=\{focusPutBack\}/);
+
+ /* THE SCOPE'S BEHAVIOUR, driven rather than read. */
+ const row=id=>({defect:{id}});
+ const all=[row("1"),row("2"),row("3"),row("4")],onScreen=[row("1"),row("2")];
+ let scope=focusShareScope(onScreen,all,[]);
+ assert.deepEqual([scope.rows.length,scope.total,scope.hiddenByBoard,scope.hiddenByHand],[2,4,2,0]);
+ scope=focusShareScope(onScreen,all,["1"]);
+ assert.deepEqual([scope.rows.map(one=>one.defect.id),scope.hiddenByBoard,scope.hiddenByHand],[["2"],2,1]);
+ assert.match(focusShareScopeNote(scope),/SHARING 1 OF 4/);
+ assert.match(focusShareScopeNote(scope),/2 OUTSIDE THIS VIEW/);
+ assert.match(focusShareScopeNote(scope),/1 YOU SWIPED AWAY/);
+ /* SILENT WHEN THE SHARE IS THE WHOLE BUS: "sharing 4 of 4" is noise. */
+ assert.equal(focusShareScopeNote(focusShareScope(all,all,[])),"");
+ /* PUT BACK TAKES THE LAST ONE, so pressing it walks the swipes off in
+    reverse rather than restoring some arbitrary row. */
+ let excluded=excludeFromFocusShare(excludeFromFocusShare([],"a"),"b");
+ assert.deepEqual(excluded,["a","b"]);
+ assert.deepEqual(excludeFromFocusShare(excluded,"a"),["a","b"],"the same row twice is still one exclusion");
+ assert.deepEqual(putBackLastExclusion(excluded),{excluded:["a"],restored:"b"});
+ assert.deepEqual(putBackLastExclusion([]),{excluded:[],restored:null});
+
+ /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
+    vertically under the same thumb. The Facility Map paid for the naive
+    version: a plain distance test "carried garage-6 to wall-7 and scrolled the
+    page zero pixels". */
+ assert.equal(swipeHidesRow(-80,5),true,"a clean left swipe hides the row");
+ assert.equal(swipeHidesRow(-80,60),false,"a mostly-vertical drag is a scroll");
+ assert.equal(swipeHidesRow(-30,2),false,"a short drag is not a decision");
+ assert.equal(swipeHidesRow(80,2),false,"rightward does nothing - one direction destroys, not both");
+ assert.equal(swipeHidesRow(Number.NaN,0),false);
+ /* AND IT MUST NOT BLOCK SCROLLING: no touch-action, no non-passive listener,
+    no preventDefault anywhere in the row. */
+ const swipeRow=await readFile(new URL("../app/defect-log/_components/swipe-away-row.tsx",import.meta.url),"utf8");
+ /* COMMENTS STRIPPED FIRST, with the project's own string-aware stripper: the
+    file EXPLAINS that it uses none of these, and a gate that reads prose as
+    code fails on an accurate comment. The same trap the DS badge gate hit. */
+ const swipeCode=stripComments(swipeRow);
+ for(const blocker of ["touch-action","preventDefault","passive:false","touchmove"])
+  assert.ok(!swipeCode.includes(blocker),"the swipe row names "+blocker+", which is how a panel stops scrolling");
+ /* A GESTURE IS NOT REACHABLE WITH A MOUSE OR A KEYBOARD, and Curtis reads
+    this app on the shop computer too, so every row carries a real control
+    that does the same thing. */
+ assert.match(swipeRow,/className="focus-hide-defect"/);
+ assert.match(swipeRow,/onClick=\{\s*onHide\s*\}/,"the HIDE control has to work without a gesture");
+ assert.match(swipeRow,/aria-label=\{\s*hideLabel\s*\}/);
+ /* A CANCELLED POINTER IS THE BROWSER SAYING "this was a scroll", so it can
+    never count as a decision to hide something. */
+ assert.match(swipeRow,/onPointerCancel=\{\s*\(\s*\)\s*=>\s*end\(false\)\s*\}/);
 
  /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when it fell
     back to downloading; folding that into "copied" lit the COPY button with

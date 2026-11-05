@@ -1,5 +1,5 @@
 import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
-import {completedMinutesElapsed,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {completedMinutesElapsed,loggedByHand,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
 
@@ -166,6 +166,23 @@ export function withinFeedWindow(minutes:number|null,limit:number|null){
    logged on Monday, and a window keyed off the edit would quietly refill
    TODAY with last week's work every time somebody touched a record. */
 export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+ /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW and stays in
+    ALL - the same rule `withinFeedWindow` above already applies to an undated
+    record, and for the same reason: its `createdAt` is WHEN THE SCAN RAN, not
+    when anybody logged anything. Importing yesterday's paper at 20:00 dropped
+    that whole sheet into TODAY, LAST 24H and THIS SHIFT at once, which is what
+    put ninety rows behind a SHOW ALL on a list whose entire claim is "this is
+    what got logged".
+
+    Curtis, choosing this over marking them: "I have no reason to share
+    something off the down sheet because the down sheet is already coming from
+    the source... for this particular function, no, just things that were
+    logged by hand." The DEFECTS LOGGED quick filter already worked this way;
+    this drop-down was missed when that was fixed.
+
+    ALL still shows them, so nothing is hidden outright - only the timed
+    windows, which are the ones making a claim about when. */
+ if(limit!==null&&!loggedByHand(defect))return false;
  return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
 }
 

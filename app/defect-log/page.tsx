@@ -60,6 +60,8 @@ import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
 import {normalizeDefectParts,partsToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
 import PartsUsedList from "@/src/components/defects/parts-used-list";
+import {excludeFromFocusShare,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
+import SwipeAwayRow from "./_components/swipe-away-row";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
@@ -1101,18 +1103,34 @@ export default function DefectLog(){
     reading that message there is no filter and no way to know there was one:
     the sentence simply says this bus has two things wrong with it.
 
-    Curtis asked for the opposite in as many words — "share all the defects
-    with a bus" — so the share is built from the unfiltered records and the
-    row below says when that is more than the screen is showing. The VIEW stays
-    filtered, because that is the board doing what it was told. */
+    Curtis asked for exactly that at the time, in as many words — "share all
+    the defects with a bus" — so the share was built from the unfiltered
+    records and a row said when that was more than the screen showed.
+
+    HE THEN HIT THE OTHER SIDE OF IT and chose the window instead: "when I hit
+    like the last 24 hours of the shift, it gives me buses, but I think it's
+    giving me more than the defects that I put down in the last 24 hours", and
+    then, asked which way: "Follow the window, and add the swipe." So the share
+    is what is ON SCREEN minus anything swiped away, and the row below counts
+    the two reasons apart — a filter is not a decision. The earlier reasoning
+    is kept above because it is why this ever carried the whole bus. */
  const focusedAllRecords=focusedBusId?records.filter(record=>record.bus.id===focusedBusId):[];
- const focusHiddenByBoard=focusedGroup?focusedAllRecords.length-focusedGroup.records.length:0;
+ /* SWIPED AWAY, FOR THIS LOOK AT THIS BUS ONLY. Never a field on a defect: the
+    cloud ships unknown defect fields to every other phone, so a "don't send
+    this one" flag stored on the record would hide it for the whole shop. */
+ const [focusExcluded,setFocusExcluded]=useState<string[]>([]);
+ const focusScope=focusShareScope(focusedGroup?focusedGroup.records:[],focusedAllRecords,focusExcluded);
+ const focusPutBack=()=>setFocusExcluded(current=>putBackLastExclusion(current).excluded);
  /* EVERY CHANGE OF BUS, not only the close, and the first cut only cleared on
     close — while its own comment claimed what this line now actually does. The
     focus dialog does not trap the keyboard, so a tab can reach another card's
     FOCUS button and move straight from bus A to bus B without passing through
     empty, carrying A's SHARED onto B's screen. */
  useEffect(()=>{setFocusShareStatus("")},[focusedBusId]);
+ /* AND THE SWIPED-AWAY LIST GOES WITH THE BUS, for the same reason the status
+    does: tabbing from bus A's FOCUS to bus B's never passes through empty, and
+    carrying A's hidden rows onto B would silently narrow B's share. */
+ useEffect(()=>{setFocusExcluded([])},[focusedBusId]);
  /* "Deferred" is genuinely held-back only when the bus carries no active Down
     Sheet entry — quick-filters.ts has no way to know that, since it never
     sees Down Sheet entries, so the exclusion and the wait-time sort both
@@ -1623,7 +1641,11 @@ export default function DefectLog(){
   if(Number.isNaN(at.getTime()))return timeLabel(iso);
   return timeLabel(iso)+(at.getFullYear()!==new Date().getFullYear()?", "+at.getFullYear():"");
  };
- const focusShareRows=():BusShareDefect[]=>focusedAllRecords.map(record=>({
+ /* ALL THREE OUTPUTS READ THE SAME LIST. COPY, SHARE and SHARE PAGE are one
+    function away from each other on purpose - a page that honoured a swipe
+    while the text ignored it would be two different answers to one question,
+    and Curtis would have no way to tell which he had sent. */
+ const focusShareRows=():BusShareDefect[]=>focusScope.rows.map(record=>({
   defect:record.defect,
   state:STATE_LABELS[record.defect.state]||record.defect.state,
   logged:shareTimeLabel(record.createdAt),
@@ -2063,9 +2085,17 @@ export default function DefectLog(){
      {/* WHAT WILL ACTUALLY GO, when the board is hiding some of it. Pressing
          SHARE on a screen showing two and sending six is a surprise worth one
          line; with no filter on, the two numbers agree and this says nothing. */}
-     {focusHiddenByBoard>0&&<small className="log-focus-share-scope">SHARES ALL {focusedAllRecords.length} — {focusHiddenByBoard} HIDDEN BY THE BOARD FILTER</small>}
+     {/* TWO REASONS, COUNTED APART. A defect the view held back is still on
+         the bus; one swiped away is somebody saying "not this one". Silent
+         when the share is the whole bus. */}
+     {focusShareScopeNote(focusScope)&&<small className="log-focus-share-scope">{focusShareScopeNote(focusScope)}</small>}
+     {/* THE WAY BACK IS ON THE PAGE, not behind a menu - the same rule the
+         Down Sheet's PUT BACK follows, because an accidental swipe is exactly
+         when nobody goes looking for an undo. It takes the LAST one back, so
+         pressing it repeatedly walks the swipes off in reverse. */}
+     {focusScope.hiddenByHand>0&&<button type="button" className="focus-put-back" onClick={focusPutBack}><span aria-hidden="true">&#8629;</span><b>PUT BACK{focusScope.hiddenByHand>1?" ("+focusScope.hiddenByHand+")":""}</b></button>}
     </div>
-    <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
+    <div className="log-focus-body">{focusScope.rows.map((record,index)=><SwipeAwayRow className={"log-focus-record "+record.defect.state} key={record.defect.id} hideLabel={"Hide "+repairCategoryLabel(record.defect.category)+" from this share"} onHide={()=>setFocusExcluded(current=>excludeFromFocusShare(current,record.defect.id))}>
      <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
      {/* Spelled out here rather than abbreviated: the focus view is the one a
@@ -2091,7 +2121,7 @@ export default function DefectLog(){
       </div>
       <div className="log-focus-record-meta"><time>LOGGED {timeLabel(record.createdAt)}</time>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}</div>
      </div>
-    </article>)}
+    </SwipeAwayRow>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,
         like the bottom of however many defects listed. This way the list can
