@@ -2476,6 +2476,22 @@ test("both repair workflows offer a remembered part without imposing or blocking
     stale-part bug it replaced, and a reviewer reproduced both. */
  assert.match(log,/const clearPartsOnScreen=\(\)=>\{setPartsUsed\(false\);setPartRows\(\[\]\)\}/,
   "there is one way to clear the part on screen");
+ /* AND THE SECTION HOLDING ALL OF THIS HAS TO HAVE A BOX. `overflow:hidden` on
+    `.advanced-defect-details` collapsed the `<details>` to its two borders -
+    measured 2px, with a correct 48px `<summary>` clipped away inside it - so
+    ADVANCED DETAILS, and therefore PARTS USED, could not be opened by a tap or
+    a click at all. Only a keyboard could, which is why nothing errored and
+    nothing caught it. Bisected live: `hidden` gives 2px, `clip` and `visible`
+    give 50px at 390 and 48px at 1180. `clip` keeps the inner grid inside the
+    rounded frame, which is what the rule was for.
+
+    The gate bans `hidden` by name rather than asserting a height, because the
+    resolver cannot lay a page out - but the name IS the cause here, and a
+    reviewer reading this has the measurement above. */
+ assert.match(logCss,/\.advanced-defect-details\{[^}]*overflow:clip\}/,
+  "the disclosure clips without collapsing to its own border");
+ assert.doesNotMatch(logCss,/\.advanced-defect-details\{[^}]*overflow:hidden/,
+  "overflow:hidden flattens this <details> to 2px and takes PARTS USED with it");
  for(const handler of ["chooseCategory","chooseIssue"]){
   const body=bodyOfSource(log,handler);
   assert.ok(body.includes("clearPartsOnScreen()"),
