@@ -2233,6 +2233,37 @@ flag, because `mergeDownSheet` replaces a matched row wholesale. The tag
 reappears the next time that row is created in the app and is cleared by the
 paper either way, so it degrades to "no claim" rather than to a false one.
 
+### The Down Sheet's MARK FIXED button says what it is
+
+Curtis asked for *"its own Mark as fixed button, just like the defect sheet
+has"* — about a button that already existed and had done the whole job since
+it was built: confirm, complete the bus's defect, recompute status, teach the
+findings memory, write an undo copy first. He did not know it was there
+because it was **a bare green tick and nothing else**. A tick is not a word.
+
+**Beside the tick was measured and clipped on a phone.** The actions cell is
+114px and two 44px thumb targets with a gap already fill it, so the button came
+back 45px wide with `scrollWidth` 46 against `clientWidth` 43 and the word's
+right edge past the button's own. Widening the cell would have squeezed
+REASON — the bug the comment further up that stylesheet exists for.
+
+So on a phone the word goes **under** the tick; on the shop computer it sits
+beside it.
+
+| | phone | desktop |
+| --- | --- | --- |
+| button | 44x44, ✓ over FIXED | 55x26, ✓ FIXED |
+| row height | 38px — **unchanged** | 34px — **unchanged** |
+
+Contrast 7.76:1, no horizontal overflow at 320 / 360 / 390 / 430 / 820 / 1180,
+and REASON's right edge does not move.
+
+**Two of three mutations were not caught until the gates were fixed.** Taking
+the word out of the markup passed, because styling `.fix-entry b` says nothing
+about whether a `<b>` is rendered. Shrinking the phone target 44px → 30px
+passed, because `[^}]*width:44px` also matches `min-width:44px`. Both anchored
+now.
+
 ### Open questions for Curtis
 
 **Should a bad reply fail the shell install the way a dropped connection
