@@ -2,8 +2,8 @@
 
 import StatusReportModal from "@/src/components/reports/status-report-modal";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
-import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
-import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
+import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
+import {downSheetShareFilename,downSheetShareHtml,downSheetShareScopeLabel,downSheetShareText,type DownSheetShareScope} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -489,24 +489,35 @@ export default function DownSheet(){
     narrowings, in the order the sheet is drawn. Rebuilding the list from the
     filter alone would send something nobody had looked at. */
  const shareRows=visible as unknown as Parameters<typeof downSheetShareText>[1];
- const shareLabel=quickFilter?downSheetFilterLabel(quickFilter):"";
- const copyFilteredList=async()=>{if(!quickFilter)return;try{await copyText(downSheetShareText(quickFilter,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
+ /* SHARING THE SHEET ITSELF, which until now needed a quick filter first.
+    Curtis: "a separate function in the down sheet section where I can just
+    share the down sheet list with a person." The three actions already existed
+    and already sent what was on screen; they were only reachable once a filter
+    had been picked, so there was no way to send the sheet.
+
+    WHETHER ANYTHING IS NARROWING THE VIEW decides which of the two unfiltered
+    scopes this is, because the share sends what is drawn and the heading has to
+    match it. SHOW COMPLETED is deliberately NOT in this list: it ADDS finished
+    rows rather than hiding any, so a view carrying it is not "part of" the
+    sheet, and every row says its own workflow. The rest all hide rows. */
+ const sheetNarrowed=Boolean(search.trim())||filter!=="All"||Boolean(roadFilter)||fixedToday;
+ const shareScope:DownSheetShareScope=quickFilter||(sheetNarrowed?"partial-sheet":"whole-sheet");
+ const shareLabel=downSheetShareScopeLabel(shareScope);
+ const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order
     the Defect Log settled on. A browser with no navigator.share must not leave
     somebody pressing a button that does nothing. */
  const shareFilteredList=async()=>{
-  if(!quickFilter)return;
-  const text=downSheetShareText(quickFilter,shareRows,locations);
+  const text=downSheetShareText(shareScope,shareRows,locations);
   if(typeof navigator.share!=="function"){await copyFilteredList();return}
   try{await navigator.share({title:"Down Sheet — "+shareLabel,text});setShareStatus("shared")}
   catch(error){if((error as Error).name!=="AbortError")setShareStatus("share-error")}
  };
  const shareFilteredPage=async()=>{
-  if(!quickFilter)return;
   const stamp=new Date().toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-  const html=downSheetShareHtml(quickFilter,shareRows,locations,stamp);
+  const html=downSheetShareHtml(shareScope,shareRows,locations,stamp);
   try{
-   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(quickFilter),"Down Sheet — "+shareLabel);
+   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(shareScope),"Down Sheet — "+shareLabel);
    setShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"saved");
   }catch{setShareStatus("share-error")}
  };
@@ -1021,19 +1032,25 @@ export default function DownSheet(){
       every button inside it width:100% below 760px, which reads correctly for
       one SHOW THE WHOLE SHEET button and would stack these four down the
       screen. */}
-  {quickFilter&&<section className="down-quick-filter-note" aria-label={shareLabel+" — share the filtered sheet"}>
-   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint}</small></p>
+  {/* NO LONGER BEHIND A QUICK FILTER. The same three actions, always on the
+      page, because the thing most often wanted is the sheet itself and that
+      was the one thing they could not send. The row only CHANGES scope with a
+      filter on; with none it sends what is drawn, and says which of the two
+      that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
+      neither means anything when no filter is set. */}
+  <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
+   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint:"Sends the buses on the screen right now, as text or as a page."}</small></p>
    <div className="down-quick-filter-actions">
     <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
     <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
     <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
-    <button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>
+    {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
    </div>
    {shareStatus==="shared"&&<small role="status">SENT</small>}
    {shareStatus==="saved"&&<small role="status">SAVED TO THIS DEVICE</small>}
    {shareStatus==="share-error"&&<small role="status">COULD NOT SHARE — TRY COPY LIST</small>}
    {shareStatus==="copy-error"&&<small role="status">COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT</small>}
-  </section>}
+  </section>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet
