@@ -65,8 +65,16 @@ test("confirmation prompts are per-device settings that default to on", async ()
      changes nothing would break it too. What matters is that every board
      setting the page holds is in the object it writes: one left out is a
      preference that silently never persists. */
-  const written=page.match(/JSON\.stringify\(\{statusVersion:3,([^}]*(?:\{[^}]*\}[^}]*)*)\}\)\)/);
-  assert.ok(written,"the map still writes its settings as one object");
+  /* MATCHED ON THE OBJECT THE MAP HANDS OVER, not on a `JSON.stringify` of
+     its own. It used to stringify the whole record itself, which deleted every
+     field it did not name: measured, a device holding a stale
+     `pace-board-settings-v1` field lost it, and `futureField` with it, on the
+     first render of the map. `writeBoardSettings` merges over the stored copy,
+     which is what map-settings.ts has always claimed happens. */
+  const written=page.match(/writeBoardSettings\(localStorage,\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/);
+  assert.ok(written,"the map still persists its board settings");
+  assert.doesNotMatch(page,/JSON\.stringify\(\{statusVersion:3/,
+   "and it must not go back to replacing the whole record");
   /* DERIVED FROM BoardSettings, not hand-listed. A hand-written list cannot
      know it is complete: add a setting to the type and to readBoardSettings,
      forget the map's own write, and a hand-listed assertion passes while the

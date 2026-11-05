@@ -2221,12 +2221,14 @@ and the map page itself. It drives `moveOrSwapBuses`, `reassignBusPair`,
 `bulkRelocateBuses` and `moveBusToArea` now and asserts all three membership
 fields survive.
 
-**One honest exception, recorded rather than hidden:** the map's own
-`downSheetBadgeView` setting can HIDE the DS badge for a bus parked on the
-road. It is a per-device display filter that writes no record — the row and
-the flag are untouched — but it does mean "the badge disappeared after I moved
-it" is reachable on a device with that setting on, and Curtis should know the
-rule is about the data rather than about every pixel.
+**~~One honest exception, recorded rather than hidden~~ — SUPERSEDED LATER IN
+THIS RELEASE, see *The DS badge no longer cares where a bus is parked*.** It
+read: the map's own `downSheetBadgeView` setting can HIDE the DS badge for a
+bus parked on the road; it is a per-device display filter that writes no
+record, but "the badge disappeared after I moved it" is reachable on a device
+with that setting on. Curtis read that and killed the setting, so the exception
+no longer exists and nothing in this release depends on it. Left here rather
+than deleted because the reasoning is how the decision got made.
 
 **Known and not fixed:** a push from a device on an older release drops the
 flag, because `mergeDownSheet` replaces a matched row wholesale. The tag
@@ -2403,25 +2405,79 @@ design.** Turning every badge off is a decision about the display; losing one
 bus's badge by driving it to the road is the app lying about the sheet.
 
 Removed: `src/lib/down-sheet/down-sheet-badge-view.ts` (including
-`isReadyRoadLocation`, one more prefix matcher gone), the
+`isReadyRoadLocation`, one more prefix matcher gone — the count in
+`docs/roadmap/facility-config.md` is 15 files and ~69 occurrences now), the
 `app/_components/down-sheet-badge-menu.tsx` menu, its styles, and the field
-from `BoardSettings`. The map draws the badge from `downSheetBadgeBusIds` and
-the SHOW switch, nothing else.
+from `BoardSettings`.
 
-**A device that already holds `downSheetBadgeView:"off-road"` is not touched.**
-`writeBoardSettings` merges over whatever the key holds and no longer names the
-field, so a stored value sits there inert rather than being scrubbed by a
-settings write — the same treatment `futureField` gets in that test. Verified in
-the browser on exactly such a device: three buses on the sheet, one on the road,
-one in a garage space and one in CNG West, **all three keep their badge** where
-the old filter hid two of them.
+**AND THE WHOLE DECISION MOVED INTO THE LIB, because the first gate for this
+rule only read a name.** The map composed the badge set itself —
+`showDownSheetBadges ? downSheetBadgeBusIds(...) : []` written inline — and a
+cold read chained **one `.filter()`** onto that expression, dropped every bus
+parked at a `road-` slot, and measured the badge gone from a bus on the sheet
+**with all 433 tests green**, because the assertion was an unanchored substring
+match on `app/page.tsx`. That is precisely the rule Curtis killed the setting
+for, reachable in one line.
 
-**And the control's removal left no hole.** It was pinned to column 3 of the
-command bar's four-column phone grid, so AI OPERATOR now takes columns 3-5.
-Measured before and after, one render apart: the bar is **208px tall over 4
-rows at 621 / 700 / 760 / 800 and 53px over 1 row at 801 / 1180 — identical
-either way** — with no gap wider than the gutter inside any row and no page
-overflow. It is also gone from the phone's FILTERS sheet, which drew it too.
+`mapDownSheetBadgeBusIds` is the whole of it now: membership and the SHOW
+switch, with **no access to `bus.l` at all**, so the function cannot see where
+a bus is parked. The gate drives it — over a fleet, over the same fleet with
+every bus relocated, and with the switch off — rather than reading the page for
+a word, and it anchors the map's call on its closing `)),` so nothing can be
+chained onto it. Six mutations run, including that one and the same rot done
+inside the lib instead; all six caught.
+
+**A device that already holds `downSheetBadgeView:"off-road"` keeps it, inert
+— and making that true took a second fix.** The claim was written about
+`writeBoardSettings`, which does merge over the stored copy. But **the Facility
+Map did not use it**: it wrote `pace-board-settings-v1` wholesale with its own
+`JSON.stringify`, so opening the map once deleted every field the build does
+not name. Measured on a device holding `downSheetBadgeView` and a `futureField`
+— **both gone on the first render**, which also means the appeal to
+`futureField` proved the opposite of what it claimed. The map hands its object
+to `writeBoardSettings` now, so the merge is real, and a test asserts the map
+does not go back to replacing the whole record. The bug was wider than the dead
+field: any setting a LATER release adds was being deleted by an older build
+opening the map.
+
+Verified in the browser on exactly such a device: three buses on the sheet, one
+on the road, one in a garage space and one in CNG West, **all three keep their
+badge** where the old filter hid two of them.
+
+**The control's removal DID leave two holes, and both are closed.** The first
+draft of this paragraph said it left none; a cold read measured otherwise.
+
+The bar's height was right either way — **208px over 4 rows at 621 / 700 / 760
+/ 800, 53px over 1 row at 801 / 1180, identical before and after** — but the
+control was pinned to column 3 of a four-column grid, so with it gone PAGES
+auto-placed into column 3 and **column 4 was left empty: 143.3px at 621 rising
+to 195px at 800.** PAGES spans columns 3-5 now. (The `grid-column` this change
+first edited, on the bare `.ai-operator-command` rule, turned out to decide
+nothing at all — `.command-bar>.ai-operator-command` further down the same file
+is more specific and already said 3/5. That dead declaration is removed with a
+note pointing at the block that owns it.)
+
+**The second hole was on the phone, which is the device this app is used on,
+and it was the one place not measured.** The FILTERS sheet drew the DS menu
+too. It was a two-column grid with the first child spanning both, because it
+held three controls; with two, **MYSTERY BUSES sat alone in column 1 with the
+other half of the row empty beside it — 183.5px of nothing at 390, 298.5px at
+620.** It is one column now, which is what the FIND and MORE sheets beside it
+already were.
+
+Measured after both fixes: row 2 of the bar is full — HIGHLIGHTS and PAGES at
+293px each at 621, 382px each at 800 — and the FILTERS sheet's two controls each
+fill their row at 360 / 390 / 430 / 620. No gap wider than the gutter inside any
+row, and no page overflow at any width, before or after.
+
+**Two holes in that bar are older than this change and are NOT fixed here.**
+Row 3 holds REFRESH, ACTIONS and FULL SWEEP in three of four columns, and row 4
+holds AI OPERATOR across columns 3-4 with 1-2 empty. The comment above that
+block says *"All three share a row now"* about REFRESH, ACTIONS and the
+operator — the bar has not had that layout for some time; FULL SWEEP sits in the
+third slot and the operator is on its own row. Recorded rather than fixed:
+closing those means choosing a new row layout for the Facility Map's controls,
+which is Curtis's call and not what he asked for.
 
 **One unrelated thing found while measuring, not fixed:** `app/page.tsx:204`
 reads `ST[bus.s][0]` with no fallback, so a board holding a bus status outside

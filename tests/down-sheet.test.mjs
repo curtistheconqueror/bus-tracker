@@ -3,9 +3,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
+import { DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, DOWN_SHEET_GROUPS, MINIMUM_DIAGNOSTIC_HOURS, REPAIR_OPTIONS, aggregateRepairItemEstimates, applyDownEntryToFleet, blankRepairItem, clearDownSheetState, defectSummary, downSheetBadgeBusIds, downSheetCountLabel, mapDownSheetBadgeBusIds, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch, downSheetGroup, downSheetGroupLabel, downSheetGroupRank, downSheetMembershipMatches, downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText, downSheetWorkGroup, exportFleetMapPayload, formatRepairTime, groupDownSheetEntries, isQuarantineEntry, matchesDownSheetSearch, mergeFleetMap, mergeReviewedRows, normalizeDefects, normalizeDiagnosticHours, normalizeRepairItems, normalizeRepairTimeEstimate, orderDownSheetEntries, prepareFleetForScannedReplacement, readDownSheetClearSnapshot, recommendedRepairMinutes, reconcileDownSheetMembership, repairItemsProgress, repairItemsTotal, repairTimeTotal, restoreDownSheetState, reviewScannedRows, scannedSheetRemovals, selectedDownSheetBusIds, syncTrackerDownSheetSelection } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
-import { effectiveStyle } from "./helpers/css-rules.mjs";
+import { effectiveStyle, stripComments } from "./helpers/css-rules.mjs";
 
 test("DS badge marks every active Down Sheet bus regardless of location", async () => {
   const fleet = [
@@ -63,6 +63,28 @@ test("the DS badge is blind to where a bus is parked, and the view that was not 
   const moved = fleet.map(bus => ({ ...bus, l: bus.l.startsWith("road-") ? "bay-3" : "road-9" }));
   assert.deepEqual(downSheetBadgeBusIds(moved, active), active);
 
+  /* THE WHOLE DECISION IS DRIVEN, not read out of the map page, and this is
+     the second version of this gate. The first asserted four absent names and
+     one unanchored substring of `app/page.tsx` - and a cold read chained a
+     single `.filter()` onto the map's own inline expression, dropping every
+     bus parked at a `road-` slot, and measured the badge gone from a bus on
+     the sheet with all 433 tests green. A name is not a rule.
+
+     `mapDownSheetBadgeBusIds` is now the whole of it: membership and the SHOW
+     switch, with no access to `bus.l` at all. Walked over the fleet, over the
+     same fleet relocated, and with the switch off. */
+  for (const [what, buses] of [["parked where they were", fleet], ["after every bus moved", moved]]) {
+    assert.deepEqual(mapDownSheetBadgeBusIds(buses, active, true), active,
+      "the badge set changed " + what);
+    assert.deepEqual(mapDownSheetBadgeBusIds(buses, active, false), [],
+      "SHOW BADGE off has to take them all, " + what);
+  }
+  /* A bus NOT on the sheet never gets one, whichever switch is set - the badge
+     reads membership back rather than deciding it. */
+  assert.deepEqual(mapDownSheetBadgeBusIds(fleet, [], true), []);
+  assert.ok(!mapDownSheetBadgeBusIds(fleet, active, true).includes("clear"),
+    "a bus off the sheet must not carry a DS badge");
+
   /* THE MODULE, THE MENU AND THE STYLES ARE ALL GONE. Asserted as absence
      across the whole app rather than by one missing file, because a filter
      like this one comes back as a convenience. */
@@ -75,15 +97,29 @@ test("the DS badge is blind to where a bus is parked, and the view that was not 
   for (const [what, text] of [["the map", map], ["the stylesheet", globals], ["the test module list", modules]])
     for (const gone of ["downSheetBadgeView", "DownSheetBadgeMenu", "ds-badge-view", "isReadyRoadLocation"])
       assert.ok(!text.includes(gone), what + " still names " + gone);
-  /* map-settings.ts may only NAME the field in the note explaining why it is
-     gone - it must not read it, type it or write it. */
-  assert.ok(!/downSheetBadgeView\s*[:=]/.test(mapSettings),
-    "the board settings still read or write downSheetBadgeView");
+  /* map-settings.ts may name the field ONLY in the note explaining why it is
+     gone, so the gate strips the comments and then forbids it outright. It
+     used to be `/downSheetBadgeView\s*[:=]/`, which a cold read walked past
+     twice - `ui.downSheetBadgeView!=="off-road"` and
+     `ui["downSheetBadgeView"]!=="off-road"` both resurrect the dead record as
+     a switch that turns EVERY badge off, and neither puts a `:` or an `=`
+     next to the name. `!==`, `===`, `==`, `)`, `&&`, `?.` and bracket access
+     all cleared it. A blacklist of punctuation is not a gate. */
+  assert.ok(!stripComments(mapSettings).includes("downSheetBadgeView"),
+    "the board settings still name downSheetBadgeView outside a comment");
   assert.match(mapSettings, /relocating/,
     "and the reason it went has to stay on the record beside the key it used to live in");
   /* THE MAP DRAWS THE BADGE OFF MEMBERSHIP AND THE SHOW SWITCH, nothing else. */
-  assert.match(map, /showDownSheetBadges\?downSheetBadgeBusIds\(buses,actualDownSet\)/,
-    "the badge set is every active bus, filtered only by the SHOW switch");
+  /* AND THE MAP COMPOSES NOTHING OF ITS OWN. Anchored on the closing `)),`
+     so that a `.filter()` chained onto the call - the exact mutation that
+     defeated the last version of this gate - cannot satisfy it. */
+  assert.match(map, /downSheetBadgeSet=new Set\(mapDownSheetBadgeBusIds\(buses,actualDownSet,showDownSheetBadges\)\),/,
+    "the map has to take the badge set whole, with nothing chained onto it");
+  /* Belt and braces: the statement itself may not read a location or filter. */
+  const badgeStatement = map.slice(map.indexOf("downSheetBadgeSet="), map.indexOf("acIssueSet="));
+  for (const forbidden of ["filter", ".l", "road-", "garage-", "startsWith"])
+    assert.ok(!badgeStatement.includes(forbidden),
+      "the map's badge set names " + forbidden + ", so a location can decide a badge again");
   /* AND THE PHONE COMMAND BAR DOES NOT HAVE A HOLE WHERE IT SAT. It was a
      four-column grid with the DS control pinned to column 3; removing it
      without widening its neighbour would have left an empty cell. */
@@ -2016,7 +2052,13 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
     /* TWO LINES INSIDE THE 44px TARGET rather than a wider button: the widest
        line is FIXED at 31.56px in DejaVu Sans against a 42px content box. A
        `nowrap` here would push the label out of the target instead. */
-    assert.notEqual(word["white-space"],"nowrap","the label cannot wrap inside the target on "+where);
+    /* A WHITELIST, because a blacklist of one keyword is not a gate: this
+       asserted only `!== "nowrap"`, and `white-space:pre` walked past it and
+       rendered the label as one line 59px wide (66.02px in DejaVu Sans)
+       inside a 44px button - the exact spill over DELETE that stacking the
+       label exists to avoid. These are the values that wrap. */
+    assert.ok(["normal","pre-line","pre-wrap",undefined].includes(word["white-space"]),
+      "the label's white-space is "+word["white-space"]+" "+where+", which does not wrap");
     assert.equal(fix.width,"44px","MARK FIXED loses its thumb target on "+where);
     assert.equal(fix["min-height"],"44px","and its height has to be a floor, since the word stacks");
     assert.equal(fix["flex-direction"],"column","with the word under the tick on "+where);
@@ -2054,15 +2096,20 @@ test("every Down Sheet row carries its own DELETE and MARK FIXED, at the end of 
  const theirs=defectLog.match(/className="quick-fix"[\s\S]{0,400}?<b>([A-Z ]+)<\/b>/)?.[1];
  assert.equal(theirs,"MARK FIXED","the Defect Log's own button label moved; this one has to follow");
  assert.ok(page.includes("<b>"+theirs+"</b></button>"),"the Down Sheet's button has to read the same as the Defect Log's");
- /* AND ITS COLUMN IS DECLARED WIDE ENOUGH FOR IT. The grid is 106px; the cell
-    adds 14px of padding and a 1px border, so ACTIONS has to be at least 121px
-    or the grid does not fit the column it is in. It was 110px and rendered
-    120.55px only because the table's `min-width` is deliberately larger than
-    the sum of its columns and Chrome spreads the surplus - 0.45px of DELETE
-    was landing in the cell's own right padding, and anyone who later made
-    `min-width` match the columns would have pushed it 3px past the table's
-    edge. Checked against the DECLARATION rather than the render for that
-    reason. */
+ /* AND ITS COLUMN IS DECLARED WIDE ENOUGH FOR IT. The grid is the sum of its
+    tracks plus the gap - 140px with MARK FIXED's 96px track - and the cell
+    adds 14px of padding and a 1px border, so ACTIONS has to be at least 155px
+    or the grid does not fit the column it is in. Every figure here is computed
+    from the stylesheet below rather than written down, because the two it
+    replaced (106px and 121px) were true of the shorter label and went stale
+    the moment it grew.
+
+    Checked against the DECLARATION rather than the render, because the render
+    hides this: ACTIONS was once 110px against a 106px grid and looked right
+    only because the table's `min-width` is deliberately larger than the sum of
+    its columns and Chrome spreads the surplus. 0.45px of DELETE was landing in
+    the cell's own right padding, and anyone who later made `min-width` match
+    the columns would have pushed it 3px past the table's edge. */
  const tracks=effectiveStyle(css,{tag:"span",classes:["row-actions-slots"],
   ancestors:[...SHEET,{tag:"tr",classes:[]},{tag:"td",classes:["row-actions"]}]},1180);
  const grid=(tracks["grid-template-columns"].match(/[\d.]+(?=px)/g)||[])
@@ -2799,9 +2846,16 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
     asserted where the ACTIONS grid is measured. */
  assert.ok(tableMin-declared<=160,
   "the floor is "+(tableMin-declared)+"px above the sum of the columns; that surplus inflates every one of them");
- /* And the net is NARROWER than before, which is the point: 288 became 124 and
-    the actions took 104 back, so the sheet got 60px less wide, not more. */
- assert.ok(tableMin<1340,"moving the buttons out must not make the sheet wider than it was");
+ /* AND THE NET IS STILL NARROWER THAN BEFORE, which is the point of the
+    ceiling. 1340px is what the sheet was when the buttons lived in the bus
+    column at 288px wide. The margin has shrunk as the ACTIONS column grew for
+    the MARK FIXED label - the net is now 9px narrower (-288 +124 +155), not the
+    60px this comment claimed when ACTIONS was 104px - so the next label that
+    needs ten more pixels hits this gate. That is the gate doing its job, but
+    the message has to say the true reason, because a stale number in a failure
+    message sends the next person to the wrong place. */
+ assert.ok(tableMin<1340,
+  "the sheet is "+tableMin+"px against the 1340px it was before the buttons moved out of the bus column; it must not get wider than that again");
 });
 
 test("SHEET STATS folds into the tiles the foreman actually reads, without losing a number", async () => {
