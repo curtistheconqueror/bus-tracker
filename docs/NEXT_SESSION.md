@@ -106,15 +106,24 @@ ever will, and it is the only one of the three with no downside at all.
 | **#42** | `claude/multi-part-repairs-and-badge-rules` | `6c8ab33` | 19 | green | 41, none open | More than one part per repair; the focus-share swipe and PUT BACK; the DS badge stops caring where a bus is parked; MARK FIXED; **the 2px ADVANCED DETAILS fix** |
 | **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
 | **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
-| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 14 | green | 1 open **on purpose** | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
+| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | 1 open **on purpose** | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 **#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
 **#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
-way since. Of the eleven files it touches, the one that conflicts is
-`docs/PUBLISH_NEXT.md`, which every release rewrites; the other ten are new
+way since. Of the eleven files it touches, **two conflict**:
+`docs/PUBLISH_NEXT.md`, which every release rewrites, and
+`tests/helpers/modules.mjs`, where `main` and the branch each appended export
+lines at the same end of the file — keep both sets. The other nine are new
 files nothing else has touched. Resolving it means rebasing that branch onto
 `main` and rewriting its handoff section against the new base — and its two
 release gates are Curtis's anyway, so there is no hurry.
+
+Both figures in that row were re-measured on 2026-11-12 from a full clone,
+after the first write-up of this section — made from the shallow one described
+under the traps below — gave 14 commits ahead and one conflicting file. `git
+rev-list --count origin/main..<branch>` returns 9, GitHub's own `commits` for
+the PR is 9, and `git merge-tree --write-tree --name-only origin/main <branch>`
+names both files.
 
 **None of this is on `main`,** so none of it is in anything Codex can publish,
 and nothing in `docs/PUBLISH_NEXT.md` describes it.
