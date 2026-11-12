@@ -106,7 +106,7 @@ ever will, and it is the only one of the three with no downside at all.
 | **#42** | `claude/multi-part-repairs-and-badge-rules` | `6c8ab33` | 19 | green | 41, none open | More than one part per repair; the focus-share swipe and PUT BACK; the DS badge stops caring where a bus is parked; MARK FIXED; **the 2px ADVANCED DETAILS fix** |
 | **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
 | **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
-| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | 1 open **on purpose** | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
+| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 **#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
 **#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
@@ -173,7 +173,10 @@ get there.
 - **#39's `?token=` thread is left open deliberately.** It is a recorded,
   temporary accepted risk, written up in docs/MCP\_SECURITY\_FOLLOWUP.md — a
   file that arrives **with that PR** and is not on `main`, so do not go looking
-  for it here. Do not resolve that thread to tidy the PR.
+  for it here. Do not resolve that thread to tidy the PR. It is CodeRabbit's
+  Major on the PR's own `src/lib/mcp/agent-token.ts` (also not on `main`). The PR's **second** open thread is a
+  separate Minor on `docs/PUBLISH_NEXT.md` — one of the two files that
+  conflict, so a rebase will likely moot it. Two open, not one.
 
 ### A self-scheduled check-in is running
 
