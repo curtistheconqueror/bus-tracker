@@ -106,9 +106,16 @@ ever will, and it is the only one of the three with no downside at all.
 | **#42** | `claude/multi-part-repairs-and-badge-rules` | `6c8ab33` | 19 | green | 41, none open | More than one part per repair; the focus-share swipe and PUT BACK; the DS badge stops caring where a bus is parked; MARK FIXED; **the 2px ADVANCED DETAILS fix** |
 | **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
 | **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
-| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 14 | green | 1 open **on purpose** | `POST /api/mcp`, five read-only tools |
+| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 14 | green | 1 open **on purpose** | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
-All four are `mergeable_state: clean` against `92dfc0d` and merge in any order.
+**#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
+**#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
+way since. Of the eleven files it touches, the one that conflicts is
+`docs/PUBLISH_NEXT.md`, which every release rewrites; the other ten are new
+files nothing else has touched. Resolving it means rebasing that branch onto
+`main` and rewriting its handoff section against the new base — and its two
+release gates are Curtis's anyway, so there is no hurry.
+
 **None of this is on `main`,** so none of it is in anything Codex can publish,
 and nothing in `docs/PUBLISH_NEXT.md` describes it.
 
@@ -453,6 +460,18 @@ caught.
 - The MCP `get_status` method returns **legacy commit statuses only**. It reads
   `pending, total_count 0` on a PR whose CI is green, because CI here is
   Actions check runs. Read `.../actions/runs` instead.
+
+**This container's clone is SHALLOW, so git will lie to you about history.**
+`git rev-parse --is-shallow-repository` returns true and `.git/shallow` lists
+four grafted tips. `main` reads as 51 commits with a root dated two weeks ago.
+Consequences, all hit in one sitting: `git merge-base` finds none between
+`main` and a three-week-old branch, `git merge-tree` says **"refusing to merge
+unrelated histories"**, and `--is-ancestor` answers confidently and wrongly.
+None of that is true of the repository — only of this clone. **Never conclude
+that a branch is merged, unmerged, orphaned or conflicted from local ancestry
+here.** Ask GitHub (`gh api repos/<o>/<r>/pulls/<n>` gives `mergeable` and
+`mergeable_state`, computed against the full history), or deepen the clone
+first with `git fetch --unshallow`.
 
 **A stale remote-tracking ref will answer a question about the wrong commit.**
 `git rev-parse origin/<branch>` returned `main`'s SHA for a branch whose real
