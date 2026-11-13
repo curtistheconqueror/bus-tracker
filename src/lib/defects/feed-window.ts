@@ -1,5 +1,5 @@
 import {activeShift,type ShiftSettings,DEFAULT_SHIFT_SETTINGS,shiftLabel} from "../settings/shift-clock.ts";
-import {completedMinutesElapsed,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
+import {completedMinutesElapsed,loggedByHand,loggedMinutesElapsed,type StructuredDefect} from "./repair-catalog.ts";
 
 /* "JUST STAY FOCUSED ON TODAY."
 
@@ -166,6 +166,36 @@ export function withinFeedWindow(minutes:number|null,limit:number|null){
    logged on Monday, and a window keyed off the edit would quietly refill
    TODAY with last week's work every time somebody touched a record. */
 export function defectWithinFeedWindow(defect:StructuredDefect,limit:number|null,now:Date=new Date()){
+ /* A ROW READ OFF A SCANNED SHEET IS OUT OF EVERY NARROWED WINDOW, because its
+    `createdAt` is WHEN THE SCAN RAN rather than when anybody logged anything.
+    Importing yesterday's paper at 20:00 would drop that whole sheet into TODAY,
+    LAST 24H and THIS SHIFT at once, on a list whose entire claim is "this is
+    what got logged".
+
+    Curtis, choosing this over marking them: "I have no reason to share
+    something off the down sheet because the down sheet is already coming from
+    the source... for this particular function, no, just things that were
+    logged by hand."
+
+    AND AT THE ONE CALLER THIS FILE HAS TODAY, THE GUARD NEVER FIRES. A cold
+    read caught the claim this comment used to make. The Defect Log's feed is
+    built by `defectLogRecords`, which filters `defect.source==="defect-log"`
+    before anything here sees a record, and `loggedByHand` is `source !==
+    "down-sheet"` - so every record reaching this function already satisfies it.
+    The line that was removed from here said "ALL still shows them", which was
+    the opposite of true: on that screen a scanned row is not in ALL either,
+    because it never enters the list at all. The wrong account was more
+    dangerous than the dead line, since it described a behaviour somebody could
+    go looking for.
+
+    IT STAYS, as a property of the question rather than of today's caller. This
+    is the function that answers "is this defect inside this window", for the
+    feed and for anything that asks later off a list assembled some other way -
+    a whole-fleet read, an export, a route. The filter that currently makes it
+    moot lives in a different module and is not this function's to rely on. The
+    place the same rule is LIVE is the DEFECTS LOGGED quick filter, which runs
+    over the board's own defects. */
+ if(limit!==null&&!loggedByHand(defect))return false;
  return withinFeedWindow(loggedMinutesElapsed(defect,now),limit);
 }
 

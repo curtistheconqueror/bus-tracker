@@ -263,7 +263,31 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    It used to be three across with SAVE spanning the full row on a phone,
    which made the biggest, easiest target the one you press least. */
 .save-log-middle-actions{width:min(620px,100%);justify-self:center;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.save-log-middle,.close-log-middle{min-width:0;min-height:50px;border-radius:8px;padding:0 18px;font-size:11px;font-weight:900;letter-spacing:.45px;cursor:pointer;touch-action:manipulation}.save-log-middle{border:0;background:#08733f;color:#fff;box-shadow:0 3px 10px #064d2b38}.close-log-middle{border:1px solid var(--log-border);background:var(--log-surface);color:var(--log-text)}
-.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:hidden}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
+/* ADVANCED DETAILS WAS A 2px LINE, AND `overflow:hidden` WAS DOING IT.
+
+   Measured in the project's own verification browser at 390 and 1180: the
+   `<details>` box computed to **2px** - its two borders and no content - while
+   the `<summary>` inside it was a correct 48px, clipped away to nothing. The
+   whole section (DIAGNOSIS / TEST / VERIFICATION, WHAT WAS FOUND, PARTS USED,
+   ESTIMATED TIME OF REPAIR, the hours) could not be opened by a tap or a click
+   at all. A KEYBOARD still opened it - focus the summary, press Enter - which
+   is why nothing ever errored and no test caught it: the element was there, it
+   was `open`-able, and only its box was gone.
+
+   Bisected live rather than reasoned about: with `overflow:hidden` the details
+   is 2px; with `overflow:clip` or `overflow:visible` it is 50px at 390 and 48px
+   at 1180. The summary's `display:flex` is NOT the cause - a bare
+   `<details>` with a flex `<summary>` on the same page measures 48px - and
+   neither is `height`, which nothing sets.
+
+   `overflow:clip` rather than removing it: the rule is here to keep the inner
+   grid inside the 8px rounded frame, and clip still does that. Measured with
+   the section open: the grid does not overflow the frame at either width.
+
+   This is older than the change it was found in - nothing on this branch ever
+   touched this rule - and it is a Chromium measurement; whether the same engine
+   behaviour reaches an iPhone is not established here. */
+.advanced-defect-details{border:1px solid color-mix(in srgb,var(--log-accent) 55%,var(--log-border));border-radius:8px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));overflow:clip}.advanced-defect-details summary{min-height:46px;display:flex;align-items:center;gap:10px;color:var(--log-accent);padding:6px 12px;list-style:none;cursor:pointer;touch-action:manipulation}.advanced-defect-details summary::-webkit-details-marker{display:none}.advanced-defect-details summary>span{min-width:0;display:flex;flex:1;flex-direction:column;gap:2px}.advanced-defect-details summary b{font-size:10px;font-weight:900;letter-spacing:.65px}.advanced-defect-details summary small{color:var(--log-muted);font-size:7px;font-weight:800;letter-spacing:0;line-height:1.2}.advanced-defect-details summary em{flex:none;color:var(--log-accent);font-size:7px;font-style:normal;font-weight:900;letter-spacing:.45px}.advanced-defect-details summary:after{content:"+";flex:none;font-size:18px;font-weight:900;line-height:1}.advanced-defect-details[open] summary:after{content:"−"}.advanced-defect-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 13px;border-top:1px solid var(--log-border);padding:12px}
 .advanced-defect-details:not([open]) .advanced-defect-grid{display:none}
 
 /* Three explicit actions in both editor rows and the fourth workflow tab. */
@@ -403,7 +427,28 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-card-group>.log-group-header{padding-right:64px}
 
 /* Focus view itself: a windowed dialog on large screens, full screen on phones. */
+/* PINNED TO THE TOP ON A BIG SCREEN, and that is the rest of F11.
+
+   `.log-shade` centres its dialog and `.log-focus` is auto-height up to 92vh.
+   So on any bus whose list is shorter than that cap - 2 to 7 defects, which is
+   the ordinary case - hiding a row made the panel shorter and the whole dialog
+   re-centred: measured +61px on HIDE and -61px on PUT BACK at 1180 with three
+   defects, moving every remaining row and the control under the cursor.
+
+   The always-mounted slot was the other half of this and it works: the share
+   bar measures 103px before and after. But the slot cannot hold a CENTRED
+   dialog still, because the thing moving is the dialog's own box. I called the
+   61px a fixture artefact after measuring it with eight defects, where the
+   panel is already at its cap and cannot shrink. A reviewer measured it again
+   with three and was right: the common case is the one that moves.
+
+   Top-aligned above the phone breakpoint, where the dialog is windowed. Below
+   it the panel is already full-screen (`align-items:stretch`, height:100%) and
+   there is nothing to re-centre. */
 .log-focus-shade{padding:24px}
+@media(min-width:761px){
+ .log-focus-shade{align-items:flex-start}
+}
 .log-focus{display:flex;width:100%;max-width:760px;max-height:92vh;flex-direction:column;border:1px solid var(--log-border);border-radius:12px;background:var(--log-surface);overflow:hidden}
 .log-focus-head{display:flex;align-items:center;gap:14px;padding:16px 18px;border-bottom:2px solid var(--log-accent);background:var(--log-page)}
 /* SHARING ONE BUS. Three controls in a row under the head, drawn from the same
@@ -418,6 +463,12 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .log-focus-share{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px 18px;border-bottom:1px solid var(--log-border);background:color-mix(in srgb,var(--log-accent) 5%,var(--log-surface))}
 .log-focus-share button{min-height:36px;border:1px solid var(--log-accent);border-radius:6px;background:var(--log-accent);color:var(--log-accent-text,#fff);font-size:8px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .log-focus-share button+button{background:var(--log-surface);color:var(--log-accent)}
+/* NOTHING LEFT TO SEND. The three outputs refuse an empty share rather than
+   putting "No defects on this bus." on the clipboard for a bus with three, so
+   the buttons have to look refused - a live-looking button that does nothing is
+   worse than a dead one. `opacity` alone would not be enough on the outlined
+   two, so the border goes with it. */
+.log-focus-share button:disabled{opacity:.45;border-color:var(--log-border);cursor:not-allowed}
 .log-focus-share>small{grid-column:1/-1;color:var(--log-muted);font-size:7px;font-weight:900;text-align:center}
 /* The live region is always in the markup so a screen reader can hear it
    change; empty it must take no room, or every share row would carry a blank
@@ -431,8 +482,27 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    row and adds no gap while staying in the tree the entire time. */
 .log-focus-share>.log-focus-share-status:empty{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 /* What the share will send, when the board is hiding some of it. Coloured as a
-   notice rather than as a status: it is true before anything is pressed. */
-.log-focus-share>.log-focus-share-scope{color:var(--log-accent)}
+   notice rather than as a status: it is true before anything is pressed.
+
+   A DESCENDANT SELECTOR, NOT A CHILD ONE, and that is a fix rather than a
+   preference. This read `.log-focus-share>.log-focus-share-scope` from the
+   build where the note WAS a direct child of the bar. Putting it inside the
+   always-mounted slot took it out of reach of this rule AND of
+   `.log-focus-share>small` beside it, so the note drew at the browser's
+   default `small` size in inherited ink inside a bar built for 7px - measured
+   13px against the 7px of the line above it. The lesson this project keeps
+   paying for: a `>` is a claim about the markup, and moving an element is how
+   the claim stops being true, silently.
+
+   It takes the row's spare width so the note wraps instead of squeezing PUT
+   BACK below a thumb target. */
+.log-focus-share .log-focus-share-scope{flex:1;min-width:0;color:var(--log-accent);font-size:7px;font-weight:900;letter-spacing:.2px;text-align:left}
+/* THE HIDE ANNOUNCEMENT IS NEVER DRAWN. It exists for a screen reader: a row
+   leaving the list is silent, and the control that was pressed left with it.
+   Visually hidden always rather than when empty - the visible answer is the row
+   going, and a second line of 7px text here would compete with the one saying
+   what will be sent. Out of flow, so it adds no grid row and no gap. */
+.log-focus-share .log-focus-share-live{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .log-focus-bus{display:flex;flex-direction:column}
 .log-focus-bus small{font-size:10px;font-weight:900;letter-spacing:.9px;color:var(--log-muted)}
 .log-focus-bus strong{font-size:34px;line-height:1.05;color:var(--log-accent)}
@@ -444,7 +514,58 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .close-log-focus{margin-left:auto;width:48px;height:48px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:10px;background:var(--log-surface);color:var(--log-text);font-family:inherit;font-size:24px;line-height:1;cursor:pointer}
 .add-log-focus-defect+.close-log-focus{margin-left:0}
 .log-focus-body{flex:1;display:grid;gap:12px;align-content:start;padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.log-focus-record{border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 16px}
+/* SWIPE LEFT TO DROP A DEFECT FROM THE SHARE. Curtis: "I would like to swipe
+   left to get rid of a defect and have a quick undo button to bring it back."
+
+   `position:relative` is for the HIDE control in the corner; the row is padded
+   on the right so a long category name cannot run under it.
+
+   `touch-action:pan-y` IS LOAD-BEARING, and this comment said the opposite.
+   It claimed none was needed because "the browser already lets a horizontal
+   drag pass through a vertical scroller untouched". It does not: with
+   `touch-action:auto` the browser claims the gesture on the first move and
+   sends `pointercancel`, so on a phone the swipe never fired at all -
+   reproduced with a real touch drag at 390px as
+   `pointerdown > pointermove > pointercancel`, three rows still there. It
+   worked with a mouse, which is why it looked right on the shop computer.
+   `pan-y` keeps VERTICAL panning with the browser and hands horizontal
+   movement to the component; `none` would take the scroll away entirely, which
+   is what the test bans.
+
+   The transform comes from the component as an inline style while a finger is
+   down, so there is no transition on it to fight the finger; it snaps back on
+   release, which is the one moment a transition would help and the one place
+   React has already removed the style. */
+.log-focus-record{position:relative;touch-action:pan-y;border:1px solid var(--log-border);border-left:6px solid var(--log-accent);border-radius:10px;background:var(--log-surface);padding:14px 52px 14px 16px}
+/* AND A SELECTION ALREADY ON THE ROW EATS THE NEXT SWIPE. Long-press a defect's
+   text on a phone and the browser hands the following drag to the selection
+   handles, so the swipe does nothing until somebody taps the text away - the
+   same class of failure as the `touch-action` one above, and just as invisible
+   from a desktop.
+
+   SCOPED TO TOUCH, because the cost is not symmetric. Selecting the text of a
+   defect with a mouse to paste it somewhere is an ordinary thing to do on the
+   shop computer, and a mouse NEVER starts a swipe (`swipe-away-row.tsx` returns
+   on `pointerType==="mouse"`), so there is nothing to protect there. This is
+   the one query that matches where the gesture actually lives. */
+@media(hover:none) and (pointer:coarse){
+ .log-focus-record{-webkit-user-select:none;user-select:none}
+}
+.log-focus-record .focus-hide-defect{position:absolute;top:8px;right:8px;min-width:36px;min-height:36px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1px solid var(--log-border);border-radius:7px;background:var(--log-surface);color:var(--log-muted);padding:3px 5px;font-family:inherit;line-height:1;cursor:pointer}
+.log-focus-record .focus-hide-defect span{font-size:14px}
+.log-focus-record .focus-hide-defect b{font-size:7px;font-weight:900;letter-spacing:.4px}
+.log-focus-record .focus-hide-defect:hover,.log-focus-record .focus-hide-defect:focus-visible{border-color:var(--log-accent);color:var(--log-accent);outline:none}
+/* ONE SLOT, ALWAYS THERE, because both of these appear and disappear. They
+   mounted and unmounted inside the share bar ABOVE the rows, so every HIDE,
+   swipe and PUT BACK moved the whole list: measured at +70px on a phone and
+   +115px on the shop computer, with the bar growing 61px to 131px. The row you
+   were about to swipe next was no longer under your thumb. The slot keeps its
+   height whether it holds anything or not. */
+.log-focus-share .log-focus-share-slot{grid-column:1/-1;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* THE WAY BACK, beside what the share is about to carry rather than behind a
+   menu - the rule the Down Sheet's own PUT BACK follows. */
+.log-focus-share .focus-put-back{min-height:36px;flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.log-focus-share .focus-put-back span{font-size:12px;line-height:1}
 .log-focus-record.in-progress{border-left-color:#c99400}.log-focus-record.deferred{border-left-color:#0e7490}.log-focus-record.completed{border-left-color:#0a7d47}
 .log-focus-record-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
 .log-focus-record-head b{font-size:14px;letter-spacing:.4px;color:var(--log-accent)}
@@ -489,6 +610,16 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
  .log-focus-share>small{font-size:9px}
  .add-log-focus-defect{padding:0 11px;font-size:11px}
  .log-focus-body{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+ /* Both controls reach a thumb target on the device the swipe exists for. */
+ .log-focus-record .focus-hide-defect{min-width:44px;min-height:44px}
+ .log-focus-record{padding-right:60px}
+ /* 44px, not full width. `width:100%` was left over from the build where this
+     was a direct grid child spanning the bar; inside the slot it is a flex item
+     beside the note, so 100% made the two fight for the row and squeezed the
+     sentence saying what will be sent down to a word per line. It keeps the
+     thumb target and gives the note the rest. */
+ .log-focus-share .focus-put-back{min-height:44px;padding:0 14px;justify-content:center}
+ .log-focus-share .log-focus-share-scope{font-size:9px}
  .log-focus-bus strong{font-size:30px}
  .log-focus-defect{font-size:20px}
  .log-focus-record-actions{gap:7px}
@@ -507,6 +638,26 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-used-toggle b,.defect-log-app .parts-remember-scope b{font-size:9px;letter-spacing:.5px}
 .defect-log-app .parts-used-toggle small,.defect-log-app .parts-remember-scope small{font-size:8px;color:var(--log-muted)}
 .defect-log-app .parts-used-fields{display:grid;gap:8px}
+/* MORE THAN ONE PART PER REPAIR. The record held one `partNumber`/`partName`
+   pair; Curtis hit the wall from the floor - "I just saved a fix like a bus and
+   I was trying to find a way to add a second part" - so the pair became a list,
+   drawn by src/components/defects/parts-used-list.tsx for both this form and
+   the other one.
+
+   A SEPARATOR ONLY BETWEEN ROWS, so a one-part repair looks exactly as it did
+   and a two-part repair reads as two things. `+ .parts-row` cannot fire on a
+   lone row, which is the whole reason it is written that way rather than as a
+   border on every row.
+
+   REMOVE IS NOT DRAWN ON A LONE ROW at all - the component decides that, since
+   unticking PARTS USED is the gesture that means no parts were used. */
+.defect-log-app .parts-list{display:grid;gap:10px}
+.defect-log-app .parts-row{display:grid;gap:8px}
+.defect-log-app .parts-row+.parts-row{border-top:1px dashed var(--log-border);padding-top:10px}
+.defect-log-app .parts-row .remove-part{min-height:36px;justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
+.defect-log-app .parts-row .remove-part span{font-size:13px;line-height:1}
+.defect-log-app .parts-list .add-part{min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 7%,var(--log-surface));color:var(--log-accent);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.7px;cursor:pointer}
+.defect-log-app .parts-list .add-part span{font-size:14px;line-height:1}
 .defect-log-app .parts-remembered{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;border:1px dashed var(--log-accent);border-radius:6px;background:color-mix(in srgb,var(--log-accent) 8%,var(--log-surface));padding:8px 10px}
 .defect-log-app .parts-remembered span{display:grid;gap:2px;min-width:0;font-size:12px;font-weight:700;color:var(--log-text);overflow-wrap:anywhere}
 .defect-log-app .parts-remembered b{font-size:8px;font-weight:900;letter-spacing:.7px;color:var(--log-accent)}
@@ -514,6 +665,9 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
 .defect-log-app .parts-remembered button{min-height:36px;flex:0 0 auto;border:1px solid var(--log-border);border-radius:6px;background:var(--log-surface);color:var(--log-text);padding:0 12px;font-family:inherit;font-size:8px;font-weight:900;letter-spacing:.6px;cursor:pointer}
 @media(max-width:760px){
  .defect-log-app .parts-used-fields input{font-size:16px}
+ /* Both new controls reach a thumb target on the device this form is used on. */
+ .defect-log-app .parts-row .remove-part{min-height:44px;width:100%;justify-content:center}
+ .defect-log-app .parts-list .add-part{min-height:44px;width:100%}
  .defect-log-app .parts-remembered{flex-wrap:wrap}
  .defect-log-app .parts-remembered button{min-height:44px;width:100%}
 }

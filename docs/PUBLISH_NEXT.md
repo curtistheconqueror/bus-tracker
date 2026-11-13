@@ -42,8 +42,25 @@ longer loses what it says** — the scan prompt contradicted itself about IDOT
 rows, threw away the per-bus state written in brackets, and let a misread line
 number file a bus under another line's work — and **a completed repair stays
 completed** instead of re-opening under a new id on the next Down Sheet load.
-Queued by Claude Code; not published, not tagged, not deployed. PR39 MCP
-remains separately held and unmerged.
+**A REPAIR CAN CARRY MORE THAN ONE PART** — the record had exactly one pair of
+boxes and Curtis hit the wall on a real fix — with the old two fields kept as a
+read of the first part so nothing on disk is rewritten and an older phone still
+shows something. And **the FOCUS panel's share follows the window now**, with a
+**swipe left** (or a HIDE button, for the shop computer) to drop one defect from
+it and **PUT BACK** to return it; the share refuses to send an empty bus, which
+would have read as a clean one. Two fixes found while checking those in a
+browser: **ADVANCED DETAILS on the LOG DEFECT form was a 2px line** and could
+not be opened by a tap at all — taking PARTS USED, the estimate and the hours
+with it — and **ENTER LATER had stopped marking a repair MISSING PART #**,
+which is the one thing that button promises. **THE DOWN SHEET ITSELF CAN BE
+SHARED** — COPY LIST, SHARE TEXT and SHARE PAGE used to appear only once a
+quick filter was picked, so the one thing that could not be sent was the sheet;
+the bar is permanent now and its heading says whether what it sends is the
+whole sheet or part of it. And the box of checks on the LOG DEFECT form reads
+**PRELIMS** where it read WORK DONE SO FAR. Queued by Claude Code; not
+published, not tagged, not deployed. PR39 MCP remains separately held and
+unmerged, and so are PR45 (a test that could not run on Windows) and PR46 (the
+heat check log) — **neither is in this release.**
 
 Application release 193 is live as Sites version 189 from
 `a009c08fad02aa6859ec6445784f744c6e269c8d`, deployed 2026-10-25 at
@@ -106,6 +123,55 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+14c47ae BT44-F8: the three-across rule was the 101px and nothing was holding it
+a302396 PR44-F7: the comment said COPIED! was not there, directly above the line putting it there
+f891dd9 PR44-F5/F6 and CR: the F1 gates had the same fault F1 did
+8389f6b PR44-F1 to F4: a result no longer moves the sheet, and three gates get teeth
+83c42c5 PR44-F1: the status reset counted rows instead of naming them
+7418a69 Cold read: the scope could lie four ways, and the decision moves to the lib
+78c9074 Share the Down Sheet itself, not only a filtered slice of it
+f9d09fd PR43-F1 and F2: pin the legend, and fix the one doc line that kept the old name
+0a82708 Rename WORK DONE SO FAR to PRELIMS on the Defect Log form
+dbbdea8 F31: the gate counted a spelling, so three respellings got a write past it
+16ce5db F30: the gate's own comment claimed more than the gate did, twice
+dafc81d F29: count the writes instead of banning the spellings
+04413ff The commands added to enforce "quote a runnable command" were not runnable
+2894e9a F27 and F28: a gate that watched the call instead of the store, and two stale numbers the new rule was written to catch
+21d6563 F25: merged parts could share an id, so editing row 2 rewrote row 1 and REMOVE wiped both
+fba7333 A merge kept the part number and threw its name away, in the union I added yesterday
+828a93c Replace the handoff note that explained the 61px away
+ecbaf61 F11 was real and I called it a fixture: the focus dialog re-centred on every hide at desktop width
+7220c49 Answer the cold read: a merge was dropping parts, the prompt's own fix did not take, and PUT BACK was eating off-screen exclusions
+4baf3e5 Put the disclosure fix and the ENTER LATER regression in the handoff
+0feee45 ADVANCED DETAILS was a 2px line on every screen, so PARTS USED could not be opened by a tap at all
+4697aa5 Answer F18, F19 and F20: ENTER LATER lost its own promise, a typed part was shown and then dropped, and the notes still said "every part"
+3ff623a Correct the handoff: the "two separate bugs" was one, and the swipe's scrolling paragraph said the opposite of the truth
+1a9b523 Answer SD-QG round 2 and cold read #4: the swipe's blocker, the empty share, and three gates that had no teeth
+c302dda Answer both reviews: the parts gate's 9 findings and 6 more routes to the badge bug
+fa896c9 The focus share follows the window, and a swipe drops one defect from it
+742c042 A repair can carry more than one part: the two forms
+c22f00c Answer the cold read: the badge rule was guarded by a name, and the map was scrubbing settings
+a490743 The entry point names #45 and #46, so a fresh session does not rebuild either
+b8c1ef9 #39 has two open threads, not one — the second is a Minor on PUBLISH_NEXT.md
+cc3c8f7 #39 conflicts in two files and is nine commits ahead, not one and fourteen
+142807f #39 is conflicted, and this container's shallow clone will lie about why
+fb98346 The entry point said nothing about four open PRs, so a fresh session would miss them
+92dfc0d A repair can carry more than one part: the domain half
+5544dd6 MARK FIXED says what the Defect Log's does, and the DS badge stops watching locations
+59df5a5 A real cascade behind the MARK FIXED gate, and a column 11px too narrow
+2f5ad11 Answer the cold read: DELETE wandered, and the gates could not see the cascade
+8be5b62 A plain NO HEAT, and DEFECTS LOGGED means logged by hand
+3b062aa Describe the MARK FIXED label in the Codex handoff
+a559704 The Down Sheet's MARK FIXED button says what it is
+b375fc3 Answer the cold read: the label never cleared, and half the app never set it
+e8ff3ef The tag reads ADDED VIA APP, which is true of both rows that carry it
+150e6ab Label a Down Sheet row the app added, and pin that moving a bus never drops one
+872942f Answer the cold read: the fix left the destroying half of that line in place
+13432c2 Describe both sheet fixes in the Codex handoff
+012bcd1 A completed repair stays completed instead of re-opening under a new id
+873c78b Every finding from the cold read, and the two that mattered were one bug
+6f50012 Read a line that names several buses without losing what it says
+bedc58e Re-run the handoff's command blocks, five commits after they were quoted
 0e27216 A step-by-step helper on the defect form, off until somebody turns it on
 1269097 Size the bus generation chips for their label instead of for the box
 2df4f73 Fix the Defect Log form, which has not opened since the PATH TO REPAIR extraction
@@ -160,9 +226,13 @@ b387c33 Queue application release 193 from the reviewed PR41 merge
 
 ```
 $ git diff --name-only a009c08..HEAD -- app src
+app/_components/down-sheet-badge-menu.tsx
+app/api/down-sheet-scan/route.ts
 app/defect-log/_components/form-coach-bar.tsx
+app/defect-log/_components/swipe-away-row.tsx
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
+app/down-sheet/_components/down-sheet-scanner.tsx
 app/down-sheet/down-sheet.css
 app/down-sheet/page.tsx
 app/fixed-repairs/fixed-repairs.css
@@ -177,6 +247,7 @@ app/settings/_components/map-settings-panel.tsx
 app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
+src/components/defects/parts-used-list.tsx
 src/components/defects/path-to-repair-panel.css
 src/components/defects/path-to-repair-panel.tsx
 src/components/settings/fixed-repairs-settings.tsx
@@ -189,17 +260,29 @@ src/lib/defects/bus-share.ts
 src/lib/defects/defect-estimates.ts
 src/lib/defects/defect-log-display-settings.ts
 src/lib/defects/defect-log-sync.ts
+src/lib/defects/defect-parts.ts
 src/lib/defects/duplicate-defects.ts
 src/lib/defects/feed-window.ts
 src/lib/defects/fixed-share.ts
+src/lib/defects/focus-share-scope.ts
 src/lib/defects/form-coach.ts
 src/lib/defects/quick-filter-share.ts
+src/lib/defects/quick-filters.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
+src/lib/defects/save-refusal.ts
+src/lib/down-sheet/down-sheet-badge-view.ts
+src/lib/down-sheet/down-sheet-counter.ts
+src/lib/down-sheet/down-sheet-scan-import.ts
 src/lib/down-sheet/down-sheet-share.ts
 src/lib/down-sheet/down-sheet-sync.ts
+src/lib/down-sheet/entry-origin.ts
 src/lib/down-sheet/repair-time-estimates.ts
+src/lib/down-sheet/scan-multi-bus.ts
+src/lib/down-sheet/sheet-mint.ts
+src/lib/down-sheet/tracker-membership-sync.ts
 src/lib/fleet/quick-view-position.ts
+src/lib/fleet/service-intervals.ts
 src/lib/operator/operator-engine.ts
 src/lib/reports/fleet-status-report-print.ts
 src/lib/reports/fleet-status-report.ts
@@ -213,7 +296,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 68 files changed, 10084 insertions(+), 458 deletions(-)
+ 87 files changed, 16142 insertions(+), 723 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -861,7 +944,8 @@ this.** `applyDownEntryToFleet` writes
 bus whose sheet card still carries the old wording lets the next sheet save put
 it back. Not introduced here, not changed here, and worth knowing.
 
-**The field is OUTSIDE the WORK DONE SO FAR fieldset** the finding sat inside,
+**The field is OUTSIDE the PRELIMS fieldset** (named WORK DONE SO FAR when this
+was written) the finding sat inside,
 though in the same place on the screen. An estimate is not work done, and that
 legend would be wrong about the one field under it that looks forward. Still
 above WORK STATUS and outside ADVANCED DETAILS, because this is typed by somebody
@@ -1963,7 +2047,7 @@ and swept as ink on that ground across the four Defect Log themes:
 text here at any tint; `--log-muted` needs the ground near the surface. So the
 tint is **4%**, the title is `--log-text` and the message `--log-muted`. 6%
 would floor at exactly 4.50 and a floor equal to the threshold is not a
-promise. Measured on the built page afterwards: title floor **8.69:1**, message
+promise. Measured on the built page afterward: title floor **8.69:1**, message
 **4.63:1**, the × **4.90:1**, the ring against the field's own surface
 **4.63:1**.
 
@@ -2221,12 +2305,14 @@ and the map page itself. It drives `moveOrSwapBuses`, `reassignBusPair`,
 `bulkRelocateBuses` and `moveBusToArea` now and asserts all three membership
 fields survive.
 
-**One honest exception, recorded rather than hidden:** the map's own
-`downSheetBadgeView` setting can HIDE the DS badge for a bus parked on the
-road. It is a per-device display filter that writes no record — the row and
-the flag are untouched — but it does mean "the badge disappeared after I moved
-it" is reachable on a device with that setting on, and Curtis should know the
-rule is about the data rather than about every pixel.
+**~~One honest exception, recorded rather than hidden~~ — SUPERSEDED LATER IN
+THIS RELEASE, see *The DS badge no longer cares where a bus is parked*.** It
+read: the map's own `downSheetBadgeView` setting can HIDE the DS badge for a
+bus parked on the road; it is a per-device display filter that writes no
+record, but "the badge disappeared after I moved it" is reachable on a device
+with that setting on. Curtis read that and killed the setting, so the exception
+no longer exists and nothing in this release depends on it. Left here rather
+than deleted because the reasoning is how the decision got made.
 
 **Known and not fixed:** a push from a device on an older release drops the
 flag, because `mergeDownSheet` replaces a matched row wholesale. The tag
@@ -2358,6 +2444,455 @@ bare `0`, so `font-size:0` came back as *"no size declared"* and the 8px above
 it stood. A unitless zero is a valid length; it reads as 0 now, and that was
 the last of the twenty-seven.
 
+### What two reviews found in the parts work, and what it cost
+
+The multi-part change above went out for review and **failed the gate — 5 Major,
+4 Minor.** Every finding was right. They are listed here because several were
+claims this release had already made in writing.
+
+**The PARTS USED section collapsed while somebody was typing in it.** The
+checkbox was derived from the record, and the assembler reports *no parts* the
+moment every row is blank — so pressing ADD ANOTHER PART on an empty row, or
+clearing the only number, unticked the box and unmounted the whole section.
+Measured by the reviewer at **-256px of content shift on a phone**, -234px on
+the shop computer, with keyboard focus dropped to the page body. The checkbox
+holds its own state now: only it means "no parts were used", while a blank row
+means somebody is typing. What gets **stored** still comes from the rows.
+
+**REMOVE and unticking did not stick on a saved repair.** Both save paths
+spread the assembled fields over the stored record, and the assembler **omits**
+the array for a one-part repair by design — so a repair that had held two parts
+kept both. `{...existing,...incoming}` cannot say "this field is gone", which
+is exactly why `workStates` and `downSheetRecommendation` are named explicitly
+in `defect-log-sync.ts`; **that file's own comment says anything deleting its
+key belongs on that line, and this change did not follow it.** Fixed on both
+sides, with the transitions driven in tests rather than matched as text.
+
+**An ENTER LATER repair lost its MISSING PART # flag** when re-saved — a
+regression against main, from the same re-derived flag.
+
+**"The shop learns every part now" was false.** The memory keeps **one entry
+per repair** and replaces it, so reducing over two parts taught it the *last*
+one with the use-count inflated to 2. One part is learned now — the first
+numbered row, which is the one the suggestion offers back — and duplicates
+count once. Teaching it more than one needs more slots per key, which changes
+what `pace-parts-memory-v1` holds; that is Curtis's call on the shop's own data,
+not something to slip in here.
+
+**And a second part was never shown anywhere.** The Defect Log's two card
+sites, the Fixed Repairs card and its search all read the first part only, so a
+part could be entered, stored, and then be invisible and unfindable — which
+made the feature close to pointless from a mechanic's side. `defectPartsText`
+had been written for this and nothing called it. All four read every part now,
+and the MISSING PART # flag reads the whole list, so a name-only first row
+beside a numbered second one no longer claims a number is missing.
+
+Also fixed: changing the CATEGORY or DEFECT now clears the parts (the old
+repair's rows came back on re-ticking), and the save-time part prompt goes
+through the assembler instead of patching the mirrored pair behind the array's
+back.
+
+**One test was locking a bug in.** It asserted the exact spread that kept the
+stale array. Ten mutations were then run across the fixes; the first pass caught
+five, so five more gates were added and all ten are caught now.
+
+**A separate review of the map work found six more routes to the DS badge bug** —
+see the note in *The DS badge no longer cares where a bus is parked* above,
+which now says plainly what the gates hold and what only a render-level test
+could.
+
+Three measurements this release had published were also wrong and are corrected
+where they appeared: the prefix-literal count, a claim that the command bar had
+no gap in any row (rows 3 and 4 still do, and they are older than this change),
+and a stylesheet comment comparing a padding box against a border box.
+
+**The prefix-literal count took TWO corrections, which is worth saying out
+loud.** It was first derived by arithmetic from a stale table; the re-run that
+replaced it said "16 files and 51 occurrences", and a second reviewer could not
+reproduce that either. Nor can I. Two causes, both in the command the roadmap
+prints: `grep -rcoE` has `-c` silently overriding `-o`, so it counts matching
+LINES rather than matches, and it searches `app` alone while the prose says
+`app src`. Measured at this commit, all three ways:
+
+| | over `app src` |
+| --- | --- |
+| occurrences (`grep -rhoE … \| wc -l`) | **179** |
+| matching lines (`grep -rE`) | 65 |
+| files (`grep -rlE`) | 17 |
+
+The printed command as written — `-rcoE` over `app` alone — gives **2 files, 19
+lines**, which is how a figure this far out survived two passes. **179 across 17
+files** is the number, it is in `CLAUDE.md` and the roadmap with the command
+beside it, and the lesson is the one this project keeps paying: a count quoted
+without the command that produced it is a number nobody can check.
+
+### DEFECTS LOGGED, the focus share, and swiping a defect out of it
+
+Curtis, on a share he was about to send: *"when I hit like the last 24 hours of
+the shift, it gives me buses, but I think it's giving me more than the defects
+that I put down in the last 24 hours or the current shift."* He was right, and
+**one** of the two things this section originally blamed was real.
+
+**THE REAL ONE: the focus share ignored the window entirely.** It was built from
+the UNFILTERED records on purpose — he had asked for exactly that earlier,
+*"share all the defects with a bus"* — so with 24H selected, focusing a bus and
+pressing SHARE sent every defect it had ever carried. Asked which way he wanted
+it now that he had used the other, he chose: *"Follow the window, and add the
+swipe."* The share is **what is on screen** now, and the earlier reasoning stays
+in the page's comment because it is why this ever carried the whole bus.
+
+**THE SECOND ONE WAS NOT A BUG ON THAT SCREEN, and this section said it was.**
+The claim was that the WHEN LOGGED drop-down counted a scanned sheet as logged
+now, since a defect born from a Down Sheet row is stamped `source:"down-sheet"`
+with a `createdAt` of when the scan ran. The stamp is real. The reachability is
+not: the Defect Log's feed is built by `defectLogRecords`, which filters
+`source==="defect-log"` **before the page sees a record**, so a scanned row was
+never in that drop-down's list — not in a timed window and not in ALL either.
+A cold read found it; the guard added to `defectWithinFeedWindow` is therefore
+dead code at its one caller today.
+
+The guard stays, as a property of the question rather than of today's caller:
+that function is what a route, an export or a whole-fleet read would ask, and
+the filter that makes it moot lives in another module. Its code comment said
+*"ALL still shows them"*, which was the opposite of true, and the wrong account
+was more dangerous than the dead line — it described a behaviour somebody could
+go looking for. Corrected, and now driven by a test that asserts both halves:
+the guard's own answer, and that `defectLogRecords` never hands it a scanned row.
+Where the rule **is** live is the DEFECTS LOGGED quick filter, which runs over
+the board's own defects; that was fixed earlier in 194 and is unaffected.
+`loggedByHand` moved down into `repair-catalog.ts`, where `DefectSource` lives,
+so both callers ask one function, and `quick-filters.ts` no longer carries a
+second copy of its rationale.
+
+**AND A SWIPE DROPS ONE DEFECT FROM THE SHARE.** *"I would like to swipe left to
+get rid of a defect and have a quick undo button to bring it back."* Swipe a
+focus-view row left and it leaves the share; **PUT BACK** returns the last one,
+pressed repeatedly to walk them off in reverse.
+
+**It is not only a swipe.** Every row carries a **HIDE** control that does the
+same thing, because a gesture is unreachable with a mouse, unreachable from a
+keyboard, and invisible to anybody who was not told it exists — and the shop
+computer is a mouse.
+
+**The two reasons are counted apart**, which is why the scope line reads
+*"SHARING 4 OF 6 — 1 OUTSIDE THIS VIEW, 1 YOU SWIPED AWAY"*: a view narrowing
+something is not a person deciding it. Silent when the share is the whole bus.
+
+**Nothing is written to a defect.** An exclusion is a set of ids held while the
+panel is open, cleared when the bus changes. That is not tidiness: the Shop
+Cloud ships every unknown defect field inside the row's `detail` blob and a
+merge replaces a defect wholesale by id, so one person's *"don't send this
+one"* would **hide that defect on every phone in the shop** — the reason a HOLD
+and a FULL SWEEP do not travel either. The test for this used to name three
+literal strings, so a different spelling walked past it; it now reads the hide
+handler's whole body and separately asserts that `focusShareScope` writes
+nothing onto a record.
+
+**AN EMPTY SHARE SAID A BUS WAS CLEAN, and the swipe is what made that
+reachable.** Hiding every row and pressing COPY put *"0 defects — shared …"* and
+then *"No defects on this bus."* on the clipboard — for a bus with three open
+defects. A recipient reads that as a clean vehicle, which is the most damaging
+thing this app can say about one. All three outputs now refuse: COPY, SHARE and
+SHARE PAGE each ask `focusShareIsEmpty` in their own body (SHARE falls back to
+COPY, so a guard on one path is a guard on the path somebody happened to take),
+the three buttons go dead, and the scope line says **NOTHING LEFT TO SHARE —
+3 YOU SWIPED AWAY** rather than counting to zero.
+
+**THE SWIPE NEVER FIRED ON A PHONE, and the paragraph that used to sit here said
+it could not need to.** It claimed *"nothing blocks scrolling — no
+`touch-action` … because a horizontal drag passes through a vertical scroller
+untouched"*, and a test enforced that by BANNING `touch-action` in the row's
+file. The browser does not work that way: with `touch-action:auto` it claims the
+gesture as soon as a finger moves and sends `pointercancel`, which the row
+correctly reads as "that was a scroll" — so the gesture was dead on every touch
+device. Reproduced with real CDP touch events at 390px as
+`pointerdown > pointermove > pointercancel`, three rows still there. It worked
+with a mouse, which is why it looked right on the shop computer, which is where
+it was checked.
+
+`touch-action:pan-y` on the row is the fix: vertical panning stays with the
+browser, horizontal movement comes to the component, and `none` — which would
+take the panel's own scroll away — is still banned. The gate is reversed and is
+now **resolved through the cascade** rather than matched as a string, so `none`
+arriving from a broader selector fails it too.
+
+**The gesture is a decision, not a distance**, and the panel it sits in scrolls
+vertically under the same thumb. The Facility Map paid for the naive version and
+wrote it down: a plain distance test *"carried garage-6 to wall-7 and scrolled
+the page zero pixels."* So three conditions, all of them: at least 56px,
+leftward, and sideways travel beating vertical by half again. A cancelled
+pointer never counts as a decision, a mouse never starts a gesture at all
+(a leftward drag to select a defect's text would otherwise satisfy all three),
+and a second finger landing mid-drag cannot restart the measurement.
+
+**A SELECTION ALREADY ON THE ROW ATE THE NEXT SWIPE.** Long-press a defect's
+text on a phone and the browser hands the following drag to the selection
+handles. `user-select:none`, scoped to `(hover:none) and (pointer:coarse)`:
+selecting a defect with a mouse to paste it somewhere is ordinary on the shop
+computer, and a mouse never starts a swipe, so there is nothing to protect
+there.
+
+**FOCUS AND THE ANNOUNCEMENT.** The pressed HIDE button unmounts with its row,
+which dropped focus to the document **body** — a keyboard then sat at the top of
+the page, outside a dialog it never left. The row now reports whether it was
+hidden by the **button** or by a **swipe**: a button press moves focus to PUT
+BACK, and the last PUT BACK moves it to COPY, because PUT BACK is about to stop
+being focusable. A swipe moves nothing, since a thumb holds no focus and
+scrolling the panel to a control nobody asked for is its own bug. A hide was
+also silent to a screen reader; it has its own live region, so a hide cannot
+wipe COPIED and a share cannot wipe the hide.
+
+**THE SCOPE LINE AND PUT BACK SIT IN ONE ALWAYS-MOUNTED SLOT.** They appear and
+disappear and they sit **above** the rows, so mounting them moved the whole list
+and put a different row under the thumb that was about to swipe next. The slot
+holds its height; only its contents change. Two bugs came out of that move and
+both are fixed: the note's own CSS rule was written as
+`.log-focus-share>.log-focus-share-scope`, so putting the note inside the slot
+took it out of that rule's reach **and** out of `.log-focus-share>small` beside
+it — it drew at the browser's default `small` size, measured 13px, inside a bar
+built for 7px. And `width:100%` on PUT BACK, left over from when it spanned the
+grid, squeezed the note to a word a line. A `>` is a claim about the markup, and
+moving an element is how the claim stops being true, silently.
+
+**All three outputs read one list.** A page that honoured a swipe while the text
+ignored it would be two answers to one question with no way to tell which had
+been sent. The test for this sliced 700 characters from each handler's name,
+which on the four-line `copyFocusBus` ran into `shareFocusBusText` below it and
+borrowed its call — so deleting the call from `copyFocusBus` left the gate
+green. It matches balanced braces now, and the extractor is itself asserted.
+
+**Measured in the built page with real CDP touch events**, at 390, 430 and 1180:
+
+| | measured |
+| --- | --- |
+| left drag on a row, 390px touch | `pointerdown > pointermove > pointerup`, **no cancel** — 3 rows to 2 |
+| vertical drag, 390px touch | panel scrolls **0 → 1105px**, 8 rows still 8 |
+| mostly-vertical diagonal flick | 8 rows still 8 — the axis lock holds |
+| clean left swipe mid-scroll | 8 rows to 7 — the gesture survives a scrolled panel |
+| leftward **mouse** drag, 1180px | 3 rows still 3, text selected instead |
+| keyboard HIDE (Enter) | 3 rows to 2, focus lands on **PUT BACK**, not `body` |
+| everything hidden | note **NOTHING LEFT TO SHARE — 3 YOU SWIPED AWAY**, all three buttons `disabled`, clipboard **empty** after pressing COPY |
+| one PUT BACK | row returns, focus stays on PUT BACK |
+| share bar height, a row hidden | **103px → 103px** — the slot's own contribution to the list's position is zero |
+| scope note | **9px** at 390/430, **7px** at 1180, accent blue at all three |
+| HIDE control | **44x44** at 390/430, 36x36 at 1180, `display:flex` throughout |
+| horizontal page scroll | none at 390, 430 or 1180 |
+
+**AND A NOTE THAT WAS HERE, WRONG, AND IS WORTH KEEPING AS A CORRECTION.** An
+earlier run measured a **61px** shift in the list at 1180 when a row was hidden,
+and this paragraph dismissed it as the three-defect fixture — a short dialog
+losing a row and re-centring — on the strength of an eight-defect run that
+showed 0px.
+
+That was backwards. With eight defects the panel is already at its 92vh cap and
+**cannot shrink**, which is exactly why that run looked clean; a bus carrying
+**two to seven** is the ordinary case, and there the dialog really does
+re-centre and carry the control under the cursor with it. A reviewer measured
+three defects again and was right. Dismissing a measurement because a different
+fixture disagreed is the mistake, and it is the second time in this release that
+a number was explained away rather than chased.
+
+The slot is the other half of this and it does hold — the share bar is 103px
+before and after, at every width. But a slot cannot hold a **centred** dialog
+still, because the thing moving is the dialog's own box: `.log-shade` centres
+and `.log-focus` is auto-height. The fix is
+`.log-focus-shade{align-items:flex-start}` above **761px**, the complement of
+the phone breakpoint; below it the panel is already full-screen and there is
+nothing to re-centre.
+
+Re-measured on the built page — body top before, after HIDE, after PUT BACK:
+
+| | |
+| --- | --- |
+| 1180px, 3 defects | 213 → 213 → 213 |
+| 1180px, 2 defects | 213 → 213 → 213 |
+| 1180px, 7 defects | 213 → 213 → 213 |
+| 820px, 3 defects | 213 → 213 → 213 |
+| 390px, 3 defects | 204 → 204 → 204 |
+
+**28 of 28 mutations caught**, up from 21 of 25 before this round. The four that
+had been surviving were a `display:none` on HIDE, an exclusion written onto a
+defect through a cast, the scope note's rule reverted to a child selector, and
+the note put back behind a condition.
+
+**And the cascade resolver the layout gates lean on had a hole.**
+`effectiveStyle` in `tests/helpers/css-rules.mjs` split `A>B` and `A B` on one
+regex and then looked for every compound **anywhere** up the ancestor chain, so
+a child selector matched a grandchild — which is precisely the bug above, and a
+mutation putting the stale `>` back passed. It honours the child combinator now,
+declines sibling selectors rather than guessing (there are no siblings in its
+element model), and has its own test for the first time. It is what a dozen
+layout gates ask instead of reading CSS by eye, and it has now twice been the
+reason one passed something it was written to catch.
+
+### A repair can carry more than one part
+
+Curtis, from the floor: *"we made a blooper, we assumed that each repair only
+takes one part. I just saved a fix like a bus and I was trying to find a way to
+add a second part."*
+
+He was right and there was nowhere to put it. A defect record held `partsUsed`,
+`partNumber` and `partName` — **exactly one part** — so a repair that takes a
+gasket and the sensor behind it forced a choice between them. The pair is a
+**list** now, with **ADD ANOTHER PART** under it and a REMOVE on each row.
+
+**Nothing on disk is rewritten.** A repair saved with one part reads back as a
+one-part list, computed at read time, the way catalog renames and a Down Sheet
+entry's `repairItems` already work. The fix Curtis had just saved keeps its part
+and can take a second.
+
+**The first part stays mirrored into `partNumber`/`partName`, and a one-part
+repair stores no array at all.** Two reasons, both rules this app already
+follows: the Shop Cloud ships every field it has no column for inside the row's
+`detail` blob, so a device on an older release receives `parts` and cannot read
+it — mirrored, it shows the first part instead of none; and `rowFingerprint`
+walks `Object.keys`, so growing a `parts:[…]` on every one-part repair would
+move that row's fingerprint on a save that changed nothing a person could see.
+Going back down to one part **deletes** the key rather than setting it to
+`undefined`, the spelling `setBusHold` uses.
+
+**One component, two routes.** The Defect Log's LOG DEFECT form and Fixed
+Repairs' completion editor had the same block of JSX copied into both files; a
+list is more to get wrong than a pair of inputs, so it is
+`src/components/defects/parts-used-list.tsx`. It holds **no rules** — every
+decision about what a part is and what gets stored is in
+`src/lib/defects/defect-parts.ts`, so the MCP route can ask the same question
+instead of reimplementing it. A test asserts the component names no rule.
+
+**The shop's parts memory learns the FIRST NUMBERED part of a repair, and this
+paragraph used to claim it learns every one.** It does not, and it cannot as
+built: `learnPart` keeps **one entry per scope+category+issue and replaces it**,
+so reducing over `[HX-99, ZZ-1]` leaves a single entry holding **ZZ-1** with
+`uses:2` — the shop taught the LAST part with an inflated count, which is worse
+than teaching it one. A reviewer disproved the claim; it is corrected at :2396
+as well, and both say the same thing now. Teaching it more than one part per
+repair means giving it more than one slot per key, which changes what
+`pace-parts-memory-v1` holds and what `recallPart` can return — somebody's own
+data, and a separate change.
+
+The first row is the one learned because it is the one the suggestion offers
+back. A part with only a **name** is kept on the record — *"the long bolt behind
+the alternator"* is how a part gets recorded when nobody can find its number —
+but teaches the memory nothing it could suggest, so it is skipped when choosing
+what to learn and is **not** counted as a missing number either.
+
+Decisions worth having on the record: **each part carries an id**, because
+keying rows by array index makes the row under somebody's finger change identity
+when a row above it is removed, which is how a list deletes the wrong entry;
+**removing the last row leaves one blank row** rather than an empty section,
+since unticking PARTS USED is the one gesture that means no parts were used; and
+**a blank row is never stored**, so pressing ADD ANOTHER PART and changing your
+mind leaves nothing on the repair's history.
+
+**Measured in the built page** at 390 and 1180, driving the real form: two parts
+typed and both held; removing the FIRST row leaves the second's values, which is
+the id-keying doing its job and what index-keying would have got wrong; REMOVE
+absent on a lone row and present on two; ADD 318x44 on a phone and 700x36 on the
+shop computer; REMOVE 318x44 and 78.5x36; the row separator **0px on the first
+row and 1px dashed on the second**, so a one-part repair looks exactly as it did;
+nothing clipped, no page overflow, no page errors.
+
+**AND THE THING THAT WAS "NOT ESTABLISHED" TURNED OUT TO BE A REAL BUG, OLDER
+THAN THIS CHANGE.** This paragraph used to say that every control in ADVANCED
+DETAILS was unreachable by a synthetic pointer event, guess that the form's own
+sticky action bar was the topmost element over that region, and conclude it was
+"either a harness artifact or a pre-existing reachability problem". It was
+neither of those things, and the guess was wrong.
+
+**ADVANCED DETAILS was a 2px line.** The `<details>` box measured **2px** — its
+two borders and no content at all — with a correct **48px** `<summary>` clipped
+away inside it. So the entire section (DIAGNOSIS / TEST / VERIFICATION, WHAT WAS
+FOUND, PARTS USED, ESTIMATED TIME OF REPAIR, REPAIR HOURS, DIAGNOSTIC HOURS)
+could not be opened by a tap or a click on any screen. A **keyboard** still
+opened it — focus the summary, press Enter — which is exactly why nothing
+errored and no test ever caught it: the element was present, it was `open`-able,
+and only its box was gone.
+
+`overflow:hidden` on `.advanced-defect-details` is the cause, bisected live
+rather than reasoned about: `hidden` gives 2px; `clip` and `visible` give 50px
+at 390 and 48px at 1180. The summary's `display:flex` is **not** it — a bare
+`<details>` with a flex `<summary>` on the same page measures 48px — and nothing
+anywhere sets a height. The fix is **`overflow:clip`**, which still keeps the
+inner grid inside the 8px rounded frame, which is what the rule was there for;
+measured with the section open, the grid does not overflow the frame at either
+width.
+
+Measured after the fix, in the built page: a real tap opens the section at 390
+and 1180, a real tap ticks PARTS USED, and the parts rows appear. **UI change,
+and a visible one**: ADVANCED DETAILS goes from a 2px line to the 48px bar it
+was always meant to be.
+
+Two caveats, both on the record rather than buried. It is **older than this
+release's work** — `git log -S` over `advanced-defect-details` against `main` is
+empty, so nothing here ever touched that rule — and it is a **Chromium**
+measurement. Whether the same engine behaviour reaches an iPhone or the shop
+computer's browser is not established here, and is worth one look on a real
+device.
+
+### Three more, all found by a cold read of the finished branch
+
+None of these was visible from the tests, and two of them lose data.
+
+**MERGE DUPLICATES was dropping every part past the first.** `mergedRecord`
+returned `{...survivor, …, partNumber:firstText(…), partName:firstText(…)}`, so
+only the SURVIVOR's `parts` array came through and a merged-away copy
+contributed nothing but its mirrored first part. Driven: a duplicate holding
+`[BB-2, CC-3]` merged into a survivor holding `[AA-1]` left **AA-1 alone**. The
+module already unions `symptoms`, `fluids` and `reportAttempts` on the stated
+reasoning that *"a merge that quietly halved it would make the number evidence
+of nothing"* — `parts` was simply never added to that list when it was created.
+It is unioned now, read through `normalizeDefectParts` so a copy saved under the
+old single-part shape still contributes, deduplicated on the number (or the name
+where there is none) so the same part typed on both copies is one part, and
+assembled through `withDefectParts` so the mirrored pair cannot describe a
+different part from the array's first row.
+
+One trap inside the fix, caught by the Down Sheet's own merge test: passing the
+assembler an explicit `partsUsed:false` means *somebody unticked the box*, and
+that beats every row in the list. A copy carrying `partNumber:"HX-99"` with no
+flag at all — the shape a pre-flag record has — had its part wiped. It passes
+`true` or nothing now, never `false`.
+
+**The part prompt's own fix did not take.** `validateAndSave` does
+`{...value.defect,...patch}`, and the prompt was handing it the fully assembled
+record as that patch. A spread **cannot carry a deletion**, and deleting `parts`
+is the whole job of the assembler — so on a repair already holding
+`parts:[AA-1,BB-2]`, ENTER LATER left the array untouched while the mirrored
+pair said BB-2. The exact disagreement the prompt's comment claimed to have
+fixed, and the same `{...existing,...incoming}` trap `saveDefectLogRecord` keeps
+an explicit field list for. The parts go in as **parts** now, and the assembler
+runs after the spread where nothing can spread over it.
+
+**PUT BACK was throwing away exclusions that had left the screen.** The first
+fix for "PUT BACK restores nothing" filtered the list to what is on screen and
+then stored the **filtered** result, so one press silently dropped every
+off-screen exclusion: swipe A and B away, let A leave the view, press PUT BACK
+for B, and A came back into the share on its own the next time the window
+widened — with the count reading 0. The ordering and the keeping are one rule in
+the lib now: the off-screen ids stay, and only the last visible one is removed.
+
+**And two smaller ones.** The HIDE control is drawn in the row's top-right
+corner but was the LAST child, so a keyboard reached it after EDIT DEFECT, MARK
+FIXED and PTR — four stops below where it visibly sits (WCAG 2.4.3). It is
+`position:absolute`, so moving it first in the markup costs nothing on screen.
+And the comment over its `aria-label` claimed the swipe was named in the
+accessible label *"so speech input can say it"*: a `title` beside an
+`aria-label` becomes the accessible DESCRIPTION, and speech input matches the
+NAME. Measured through CDP — name `"Hide Brakes from this share"`, description
+`"… — or swipe the row left"`. A screen reader does reach the hint, so the
+gesture is still discoverable; it is not sayable, and the comment says so now
+rather than the opposite.
+
+**Two toothless gates went with them.** The suite drove
+`excludeFromFocusShare` and `putBackLastExclusion` as pure functions and then
+only *grepped* the handlers for a name — so a mutation hiding **the first
+on-screen row** instead of the one pressed, and another making PUT BACK restore
+**everything**, both passed. A render would be the right gate and this suite
+cannot render this surface: the helper runs the production worker server-side,
+where there is no LocalStorage and therefore no board. So they are source gates
+aimed at those two shapes, the browser run is the witness for the wiring, and
+the test says that in as many words rather than looking like a behavioural one.
+
 ### The button reads MARK FIXED, the same as the Defect Log's
 
 Curtis asked for *"its own Mark as fixed button, just like the defect sheet
@@ -2403,25 +2938,102 @@ design.** Turning every badge off is a decision about the display; losing one
 bus's badge by driving it to the road is the app lying about the sheet.
 
 Removed: `src/lib/down-sheet/down-sheet-badge-view.ts` (including
-`isReadyRoadLocation`, one more prefix matcher gone), the
+`isReadyRoadLocation`, one more prefix matcher gone — see the corrected count
+above; the "15 files and ~69 occurrences" this line used to quote was a third
+figure that matched neither of the other two and nothing measurable), the
 `app/_components/down-sheet-badge-menu.tsx` menu, its styles, and the field
-from `BoardSettings`. The map draws the badge from `downSheetBadgeBusIds` and
-the SHOW switch, nothing else.
+from `BoardSettings`.
 
-**A device that already holds `downSheetBadgeView:"off-road"` is not touched.**
-`writeBoardSettings` merges over whatever the key holds and no longer names the
-field, so a stored value sits there inert rather than being scrubbed by a
-settings write — the same treatment `futureField` gets in that test. Verified in
-the browser on exactly such a device: three buses on the sheet, one on the road,
-one in a garage space and one in CNG West, **all three keep their badge** where
-the old filter hid two of them.
+**AND THE WHOLE DECISION MOVED INTO THE LIB, because the first gate for this
+rule only read a name.** The map composed the badge set itself —
+`showDownSheetBadges ? downSheetBadgeBusIds(...) : []` written inline — and a
+cold read chained **one `.filter()`** onto that expression, dropped every bus
+parked at a `road-` slot, and measured the badge gone from a bus on the sheet
+**with all 433 tests green**, because the assertion was an unanchored substring
+match on `app/page.tsx`. That is precisely the rule Curtis killed the setting
+for, reachable in one line.
 
-**And the control's removal left no hole.** It was pinned to column 3 of the
-command bar's four-column phone grid, so AI OPERATOR now takes columns 3-5.
-Measured before and after, one render apart: the bar is **208px tall over 4
-rows at 621 / 700 / 760 / 800 and 53px over 1 row at 801 / 1180 — identical
-either way** — with no gap wider than the gutter inside any row and no page
-overflow. It is also gone from the phone's FILTERS sheet, which drew it too.
+`mapDownSheetBadgeBusIds` is the whole of the DECISION now: membership and the
+SHOW switch, with **no access to `bus.l` at all**. The gate drives it — over a
+fleet, over the same fleet with every bus relocated, and with the switch off —
+rather than reading the page for a word.
+
+**AND THE REST OF IT IS HELD BY TEXT GATES, WHICH IS A WEAKER THING.** An
+earlier draft of this paragraph said the rule was closed. A second reviewer
+then found **six more routes** to "a bus loses its badge because of where it is
+parked", all with 433 tests green and all measured in a browser: one token
+appended where the set is CONSUMED; a sibling declaration pruning the set after
+it is built; the same thing written before it, which made the window check
+compare an empty string and pass vacuously; an inline `style` on the badge
+element; and **one line of CSS** keyed on the slot's `data-location`.
+
+All six are caught now — the window is the whole `const` statement, the set may
+not be edited after it is built, the consumer and the badge element are
+anchored, and no stylesheet rule may key the badge on a location or hide it.
+**Ten mutations run, all ten caught.** But these are still gates over source
+text. What would actually close the rule is a render-level assertion — seed a
+fleet, relocate every bus, count the badge boxes — and this suite cannot do
+that: `render` in `tests/helpers/setup.mjs` runs the production worker
+server-side, where there is no LocalStorage to seed a board into. The browser
+run covers it for this change; the gap is written down here rather than
+described as shut.
+
+**A device that already holds `downSheetBadgeView:"off-road"` keeps it, inert
+— and making that true took a second fix.** The claim was written about
+`writeBoardSettings`, which does merge over the stored copy. But **the Facility
+Map did not use it**: it wrote `pace-board-settings-v1` wholesale with its own
+`JSON.stringify`, so opening the map once deleted every field the build does
+not name. Measured on a device holding `downSheetBadgeView` and a `futureField`
+— **both gone on the first render**, which also means the appeal to
+`futureField` proved the opposite of what it claimed. The map hands its object
+to `writeBoardSettings` now, so the merge is real, and a test asserts the map
+does not go back to replacing the whole record. The bug was wider than the dead
+field: any setting a LATER release adds was being deleted by an older build
+opening the map.
+
+Verified in the browser on exactly such a device: three buses on the sheet, one
+on the road, one in a garage space and one in CNG West, **all three keep their
+badge** where the old filter hid two of them.
+
+**The control's removal DID leave two holes, and both are closed.** The first
+draft of this paragraph said it left none; a cold read measured otherwise.
+
+The bar's height was right either way — **208px over 4 rows at 621 / 700 / 760
+/ 800, 53px over 1 row at 801 / 1180, identical before and after** — but the
+control was pinned to column 3 of a four-column grid, so with it gone PAGES
+auto-placed into column 3 and **column 4 was left empty: 143.3px at 621 rising
+to 195px at 800.** PAGES spans columns 3-5 now. (The `grid-column` this change
+first edited, on the bare `.ai-operator-command` rule, turned out to decide
+nothing at all — `.command-bar>.ai-operator-command` further down the same file
+is more specific and already said 3/5. That dead declaration is removed with a
+note pointing at the block that owns it.)
+
+**The second hole was on the phone, which is the device this app is used on,
+and it was the one place not measured.** The FILTERS sheet drew the DS menu
+too. It was a two-column grid with the first child spanning both, because it
+held three controls; with two, **MYSTERY BUSES sat alone in column 1 with the
+other half of the row empty beside it — 183.5px of nothing at 390, 298.5px at
+620.** It is one column now, which is what the FIND and MORE sheets beside it
+already were.
+
+Measured after both fixes: **row 2** of the bar is full — HIGHLIGHTS and PAGES
+at 293px each at 621, 382px each at 800 — and the FILTERS sheet's two controls
+each fill their row at 360 / 390 / 430 / 620. No page overflow at any width,
+before or after.
+
+**Scoped to row 2 on purpose.** An earlier draft of this sentence said "no gap
+wider than the gutter inside any row", which a reviewer measured as false:
+rows 3 and 4 still hold 150–195px and 300–389px of empty cell. Those are the
+older holes described below and are not this change's.
+
+**Two holes in that bar are older than this change and are NOT fixed here.**
+Row 3 holds REFRESH, ACTIONS and FULL SWEEP in three of four columns, and row 4
+holds AI OPERATOR across columns 3-4 with 1-2 empty. The comment above that
+block says *"All three share a row now"* about REFRESH, ACTIONS and the
+operator — the bar has not had that layout for some time; FULL SWEEP sits in the
+third slot and the operator is on its own row. Recorded rather than fixed:
+closing those means choosing a new row layout for the Facility Map's controls,
+which is Curtis's call and not what he asked for.
 
 **One unrelated thing found while measuring, not fixed:** `app/page.tsx:204`
 reads `ST[bus.s][0]` with no fallback, so a board holding a bus status outside
@@ -2480,6 +3092,111 @@ LIST.** 12.15:1, measured.
 **No new share function was built**, because the Down Sheet already has COPY
 LIST and SHARE PAGE of its own — which is what Curtis wanted for the case
 where a coworker does want a copy of the sheet.
+
+### The Down Sheet itself can be shared, not only a filtered slice of it
+
+Curtis: *"a separate function in the down sheet section where I can just share
+the down sheet list with a person."*
+
+**The three actions already existed.** COPY LIST, SHARE TEXT and SHARE PAGE
+sent exactly what was drawn and named locations through `location-label.ts`.
+They were reachable only once a quick filter had been picked — the section was
+wrapped in `{quickFilter&&…}` and all three handlers opened
+`if(!quickFilter)return` — so the one thing that could not be sent was the
+sheet. The gate is removed rather than a second way to share built.
+
+**The heading is a claim about the fleet to somebody who cannot see the
+screen, so it has to be true.** `downSheetShareScope` in
+`src/lib/down-sheet/down-sheet-share.ts` decides it, by comparing what was
+DRAWN against what the sheet holds rather than from a list of filters:
+
+| the view | heading | empty note |
+| --- | --- | --- |
+| nothing changing it | `WHOLE SHEET` | The sheet is empty. |
+| anything hiding rows | `PART OF THE SHEET` | No buses in this view of the sheet. |
+| SHOW COMPLETED on | `WHOLE SHEET PLUS COMPLETED` | The sheet is empty. |
+| a filter | that filter's name | …match this filter. |
+| a filter, cut further | `Part of <filter>` | No buses in this view of the sheet. |
+
+The comparison is the point. The bands drop IDOT-only rows unconditionally, and
+a first version that listed the filters it knew about headed a sheet of three
+IDOT rows `WHOLE SHEET — 0 of 3` and put "The sheet is empty." on the
+clipboard. A list of inputs goes stale the moment the next row filter lands; a
+count cannot.
+
+**THIS IS A UI CHANGE CURTIS HAS APPROVED BUILDING AND HAS NOT SEEN PLACED.**
+The share bar is now permanent: **101px on a phone where it used to be 0px
+unless a filter was picked.** Reusing the quick-filter bar rather than adding a
+second control is the piece worth his eye.
+
+It landed on `main` as `78c9074..a302396`. PR44 could not be merged from its
+branch after PR42 went in — both had edited the one long import line at the top
+of `tests/down-sheet.test.mjs` — so its six commits were replayed with that
+line resolved as the union of both sides' names. Nothing else conflicted. No
+storage key added, renamed or read differently. No migration.
+
+**Measured** (Chromium against the production build, 360 / 390 / 430 / 1180, on
+the PR's own branch before it landed): all rows IDOT-only reads `PART OF THE
+SHEET — 0 of 3`; one IDOT among two faults `PART OF THE SHEET — 2 of 3`; no
+IDOT rows `WHOLE SHEET — 2 of 2`; SHOW COMPLETED with one down and two done
+`WHOLE SHEET PLUS COMPLETED — 3 of 3`; COPY LIST then a search returns the
+button from `COPIED!` to `COPY LIST`. Bar height with no filter 101px, with a
+filter 201px unchanged, at 1180 52px unchanged. No horizontal overflow at any
+width. **Not re-measured in a browser after the replay onto `main`** — the
+replay changed one import line in a test file and nothing the browser loads.
+
+**To check once it is live:**
+
+1. Open the Down Sheet with no quick filter picked. COPY LIST, SHARE TEXT and
+   SHARE PAGE are there, under a line reading WHOLE SHEET with a count.
+2. Press COPY LIST and paste it somewhere. It starts `DOWN SHEET — WHOLE SHEET`
+   and names real locations.
+3. Type a bus number in SEARCH. The line changes to PART OF THE SHEET, and a
+   COPIED! left on the button goes back to COPY LIST.
+4. Pick a quick filter. The line names that filter, and the bar is the taller
+   four-button one it always was.
+5. On a phone, look at how much of the screen the bar takes with no filter
+   picked, and say if it should live somewhere else.
+
+### WORK DONE SO FAR reads PRELIMS
+
+Curtis: *"the part where it says work done so far ... make it a prelims or
+preliminary checks or preliminaries. Whichever is better."*
+
+One label. The box on the LOG DEFECT form holding INSPECTED, DIAGNOSED, ROAD
+CALL, TEST DRIVEN, BRAKE TEST and OPERATOR REPORTED reads **PRELIMS —
+OPTIONAL**. PRELIMS rather than PRELIMINARY CHECKS because two of the six are
+not checks — ROAD CALL says what the bus did and OPERATOR REPORTED says where
+the report came from, both in `repair-catalog.ts`'s own words — and because at
+the legend's 8px it is one line of 108px at 360, 390, 430 and 1180 where the
+longer wording is three times the length.
+
+The legend text, and the two comments that named the box by its old label. The
+six work states, the values they write and everything that reads them are
+untouched. `docs/RELEASES.md` keeps the old name where it records what shipped
+under it. No storage key. No migration. Landed as PR43.
+
+**To check once it is live:** open + LOG DEFECT on a phone. The box of six
+checks is headed PRELIMS — OPTIONAL, on one line.
+
+### How PR42, PR43 and PR44 reached `main`, and what was run on the result
+
+PR42 and PR43 were rebase-merged on GitHub, in that order; PR44 was replayed as
+described above. Before any of the three was merged, all 27 commits were
+stacked on `main` at `a490743` in a scratch branch and the gates run on that
+stack; the tree `main` ended on is byte-identical to it (`git diff` empty).
+
+One commit has landed since from another session: `14c47ae`, a test that holds
+the share bar's three-across rule, which PR44's reviewer asked for after the
+replay had been built. It is in the range above and was not part of that stack.
+
+On that tree, on a Windows machine: **`npm test` 433 of 434.** The one failure
+is *nothing in app/ or src/ names an identifier that does not exist*, which
+cannot run on Windows — `tsc produced no output at all` — and is what PR45
+fixes; it passes in CI. ESLint reports no error in the repository. The build
+inside `npm test` succeeds. **No cold read was run on the combination**: each
+PR had its own, and the only line that differs from the three reviewed heads is
+the merged import in `tests/down-sheet.test.mjs`.
 
 ### Open questions for Curtis
 

@@ -281,6 +281,13 @@ export function saveDefectLogRecord(
    came straight back on the next read and the untick looked like it had not
    worked.
 
+   `parts` is the third, found by a reviewer rather than by me: `withDefectParts`
+   deletes it when a repair comes back down to one part, so a record that had
+   held two kept both after a REMOVE, and after unticking PARTS USED entirely -
+   `normalizeDefectParts` read them straight back off the stored array. Exactly
+   the shape of the two below, in a change whose own comment pointed at this
+   line and did not follow it.
+
    workStates was fixed when it was found; downSheetRecommendation had the same
    bug and was found the same way, by driving the button in a browser and
    reading the record back. Turning RECOMMEND FOR DOWN SHEET off did nothing
@@ -292,7 +299,7 @@ export function saveDefectLogRecord(
    never a partial patch, so reading these straight off the incoming copy is
    what the callers already mean. A future caller that passes a patch would
    have to carry both fields with it. */
-const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
+const defect:StructuredDefect={...existing,...incoming,workStates:incoming.workStates,downSheetRecommendation:incoming.downSheetRecommendation,parts:incoming.parts,...attemptsPatch(existing,incoming),createdAt:existing?.createdAt||incoming.createdAt||now,updatedAt:now,completedAt:state==="completed"?(incoming.completedAt||now):"",reportedLocation:existing?.reportedLocation||incoming.reportedLocation||bus.l,source:incoming.source||existing?.source||"defect-log",...(leaving?{movedFromBusNumber:leaving.n,movedAt:now}:{})},supportingDetails=defectSupportingDetails(defect);
  const defects=existing?current.map(item=>item.id===defect.id?defect:item):[...current,defect];
  const existingDown=downEntries.find(entry=>entry.defectId===defect.id);
  let nextDown=downEntries;

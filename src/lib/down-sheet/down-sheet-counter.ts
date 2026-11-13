@@ -22,3 +22,30 @@ export function downSheetBadgeBusIds<T extends {id:string}>(buses:T[],activeDown
  const active=new Set(activeDownSheetBusIds);
  return buses.filter(bus=>active.has(bus.id)).map(bus=>bus.id);
 }
+
+/* WHICH BUSES THE FACILITY MAP DRAWS A DS BADGE ON - the WHOLE decision, so
+   that the map composes nothing of its own.
+
+   It was two halves: this list, and `showDownSheetBadges?...:[]` written inline
+   on the map page. A cold read then chained one `.filter()` onto that inline
+   expression - dropping every bus parked at a `road-` slot - and measured the
+   badge gone from a bus on the sheet with all 433 tests green, because the gate
+   read the file for a NAME instead of driving the RULE. That is exactly what
+   Curtis killed `downSheetBadgeView` for: "there should be no way that a bus
+   can have its badge removed from the map by simply relocating it."
+
+   So the rule lives here, where a test can hand it a fleet, move every bus and
+   insist the answer does not change - and where the MCP route can ask the same
+   question the map asks rather than reimplementing it. MEMBERSHIP AND THE SHOW
+   SWITCH ARE THE ONLY TWO INPUTS, and `bus.l` is deliberately not one of them.
+
+   THE TYPE DOES NOT STOP IT, THE TEST DOES, and the first version of this note
+   claimed otherwise - "this function cannot see where a bus is parked".
+   `<T extends {id:string}>` is a lower bound: whole bus objects arrive here, and
+   a reviewer's `(bus as {l?:string}).l` inside this body compiled, linted and
+   built clean. Only the behavioural assertion - the same fleet relocated, the
+   same answer - caught it. Worth knowing which of the two is actually holding
+   the line. */
+export function mapDownSheetBadgeBusIds<T extends {id:string}>(buses:T[],activeDownSheetBusIds:Iterable<string>,showBadges:boolean){
+ return showBadges?downSheetBadgeBusIds(buses,activeDownSheetBusIds):[];
+}

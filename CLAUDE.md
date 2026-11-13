@@ -92,7 +92,7 @@ branding.** Counted at this commit —
 
 | | what it is | where |
 | --- | --- | --- |
-| the yard's geometry | six independent descriptions of one building that must agree, plus ~71 slot-prefix literals across 16 files, some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
+| the yard's geometry | six independent descriptions of one building that must agree, plus **179 slot-prefix literals across 17 files** (`grep -rhoE` over `app src`, see below), some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
 | 50 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
@@ -103,6 +103,22 @@ software; the **site's own sections** come from `site-config.ts`; **`APP_NAME`**
 is one line; and the organisation's name is now **`src/lib/settings/site-identity.ts`**
 — it had been typed into four share modules and a fifth was added the day that
 file was written, which is how a string becomes unfindable.
+
+**That figure replaces "51 across 16 files", which was not reproducible by any
+reading and had been copied into three files.** The command the roadmap printed
+used `grep -rcoE`, where `-c` silently overrides `-o` and counts matching LINES
+rather than matches, and it searched `app` alone while the prose said `app src`.
+Measured at this commit, all three ways, so the next person can pick the one
+they mean:
+
+Spelled out in full, because a command with an `…` in it is a literal regex that
+matches four prefixes and returns a different number:
+
+```
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
+```
 
 **So the rule for a new feature is narrow and checkable:** do not add a seventh
 description of the building, do not hard-code the organisation's name or the

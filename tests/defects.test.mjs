@@ -3,8 +3,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, fluidsLabel, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
+import { BRAKE_TEST_KEY, CATALOG_OPTIONS, CHECK_ENGINE_ISSUES, CHECK_ENGINE_SYMPTOMS, DEFAULT_DEFECT_LOG_DISPLAY, DEFAULT_DOWN_SHEET_DISPLAY, EMPTY_FINDINGS_MEMORY, EMPTY_PARTS_MEMORY, FLUID_TOP_UPS, PARTS_MEMORY_LIMIT, PARTS_MEMORY_STORAGE_KEY, QUICK_FILTERS, QUICK_FILTER_EVENT, QUICK_FILTER_PARAM, RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, REPAIR_CATEGORY_EMOJI, REPAIR_OPTIONS, REPAIR_OPTION_GROUPS, RETIRED_ISSUES, WORK_STATES, activeDefectLogCount, addDefectPart, applyDefectToBuses, applyDownEntryToFleet, applyOperatorBatch, brakeTestFailed, brakeTestResult, defaultDefectOperability, defectCountField, defectFromDraft, defectLabel, defectLogRecords, defectNote, defectPartsMissing, defectPartsText, defectSummary, defectSupportingDetails, defectWorkStates, deferredBadgeCounts, deferredMinutesElapsed, diagLightLabel, excludeFromFocusShare, fluidsLabel, focusShareIsEmpty, focusShareScope, focusShareScopeNote, forgetFinding, forgetPart, groupDefectLogRecords, hasDeferredHistory, hasDiagLightField, hasWorkState, heldDeferredBuses, hideDefectLogRecords, isCheckEngineIssue, isDefectLogCleanupCandidate, isDownSheetRecommended, isFluidTopUp, isHeldDeferred, isUnresolved, learnFinding, learnPart, migrateRepairIdentity, moveOrSwapBuses, normalizeAlarmCode, normalizeDefectLogDisplay, normalizeDefectParts, normalizeDefects, normalizeDiagLight, normalizeDownSheetDisplay, normalizeFinding, normalizeFindingsMemory, normalizeFluids, normalizePartsMemory, normalizeRepairCount, normalizeRepairItems, normalizeSweepRow, normalizeWorkStateStamp, normalizeWorkStates, noteIssues, partMemoryKey, partMemoryLabel, partNumberMissing, partToLearn, partsToLearn, putBackLastExclusion, quickFilterBusIds, quickFilterDefects, quickFilterFallbackLabel, quickFilterFromValue, quickFilterHref, quickFilterMatch, quickFilterShareText, readPartsMemory, readSettings, recallFindings, recallPart, recentDefectDuplicate, recommendedMinutesElapsed, removeDefectPart, repairCategoryEmoji, repairCategoryLabel, repairGroupDisplayLabel, repairGroupPlaceholder, repairGroupStepLabel, repairIssueDisplayLabel, repairIssuePlaceholder, repairIssueStepLabel, returnDefectLogBusToService, saveDefectLogRecord, searchCatalog, searchCatalogForCategory, searchCategories, searchTerms, setDefectWorkState, setDownSheetRecommendation, SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, statusForLocation, sweepDefect, sweepFindings, sweepOkAgainstBoard, swipeHidesRow, swipeOffsetPx, updateDefectPart, withDefectParts, workStateStampLabel, writePartsMemory } from "./helpers/modules.mjs";
 import { render } from "./helpers/setup.mjs";
+import { effectiveStyle, stripCodeComments } from "./helpers/css-rules.mjs";
+
+/* ONE FUNCTION'S BODY, BY BALANCED BRACES.
+
+   Every gate in this file that wants to assert something about a single handler
+   used to slice a fixed number of characters from its name, and a reviewer
+   defeated that: 700 characters from `const copyFocusBus=` runs clean through
+   the four-line handler into `shareFocusBusText` below it, so an assertion
+   about the first was satisfied by the second. One name, one body. */
+const bodyOfSource=(source,name)=>{
+ const at=source.indexOf("const "+name+"=");
+ assert.notEqual(at,-1,name+" is gone from the source");
+ const open=source.indexOf("{",at);
+ let depth=0;
+ for(let i=open;i<source.length;i++){
+  if(source[i]==="{")depth++;
+  else if(source[i]==="}"&&!--depth)return source.slice(open,i+1);
+ }
+ throw new Error(name+" has no balanced body");
+};
 
 test("defect normalization preserves future odometer and parts fields",()=>{
  const [defect]=normalizeDefects([{id:"future-defect",category:"Bus Controls",issue:"Horn",details:"No horn",state:"open",operability:"service",odometerMiles:123456,partsUsed:true,parts:[{id:"part-1",partNumber:"HORN-1"}],futureMetadata:{revision:4}}]);
@@ -1229,6 +1249,24 @@ test("a repair records how far it got, and what was found travels with it",async
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("advanced-defect-details"),"above ADVANCED DETAILS");
  assert.ok(page.indexOf("work-state-picker")<page.indexOf("WORK STATUS<select"),"and above WORK STATUS");
 
+ /* THE LEGEND'S OWN WORDS, which nothing above pins. Everything else in this
+    suite checks the picker's STRUCTURE - its class, its checkboxes, where it
+    sits - so the visible text could be reverted or mistyped and the whole file
+    would stay green. Curtis renamed it from WORK DONE SO FAR to PRELIMS, and a
+    rename nobody can see break is a rename that comes back.
+
+    Two assertions because they fail differently: the first catches a changed or
+    mistyped legend, the second catches the old name surviving ANYWHERE in this
+    file - a half-done rename that left the legend right and a comment wrong.
+
+    It reads the SOURCE, not a render, so it cannot say the legend is visible or
+    unwrapped; that was measured in a browser (one line, 108px, at 360/390/430/
+    1180) and this only says the text is still the text that was measured. */
+ assert.match(page,/<fieldset className="wide work-state-picker"><legend>PRELIMS — OPTIONAL<\/legend>/,
+  "the picker's legend still reads PRELIMS — OPTIONAL");
+ assert.equal(page.includes("WORK DONE SO FAR"),false,
+  "the old legend name is gone from the Defect Log page, comments included");
+
  // Three across at phone width. Stacked, the block was tall enough to push
  // itself off the bottom of the open editor.
  const styles=await readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8");
@@ -2179,7 +2217,11 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
  // phone rules stay in the established phone breakpoint
  const conditions=[];
  for(let index=css.indexOf("@media(");index>=0;index=css.indexOf("@media(",index+1)){
-  const conditionEnd=css.indexOf(")",index),open=css.indexOf("{",conditionEnd);
+  /* THE WHOLE PRELUDE, not up to the first ")". `@media(hover:none) and
+     (pointer:coarse)` was being reported as "hover:none", which is a condition
+     this stylesheet does not contain - and a gate that compares a truncated
+     string is comparing something nobody wrote. */
+  const open=css.indexOf("{",index);
   let depth=0,end=open;
   for(;end<css.length;end++){
    if(css[end]==="{")depth++;
@@ -2201,7 +2243,7 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
     that this would then never check. A future .log-focus-button rule dropped
     into the wrong breakpoint would have passed silently. */
  const body=css.slice(open+1,end).split("}").filter(rule=>!rule.includes("[data-bus-")).join("}");
- if(body.includes(".log-focus"))conditions.push(css.slice(index+7,conditionEnd));
+ if(body.includes(".log-focus"))conditions.push(css.slice(index+6,open).trim());
  }
  /* EVERY block carrying a .log-focus rule uses the phone breakpoint — which is
     what the line above says, and what matters. Comparing the list itself also
@@ -2209,7 +2251,24 @@ test("every Defect Log bus card carries a focus view with safe repair actions",a
     correct breakpoint failed this. Deduplicated, it tests the rule; the length
     check below keeps it from passing vacuously if the rules ever move out. */
  assert.ok(conditions.length>0,"the focus view must still have phone rules");
- assert.deepEqual([...new Set(conditions)],["max-width:760px"]);
+ /* WIDTH CONDITIONS AND CAPABILITY CONDITIONS ARE DIFFERENT QUESTIONS, and
+    lumping them together is what this split fixes. The rule being enforced is
+    that the focus view has ONE breakpoint - a second invented width is how a
+    panel comes right at 390 and wrong at 430. A `(hover:none) and
+    (pointer:coarse)` block is not a breakpoint: it asks whether the device has
+    a thumb instead of a pointer, which is exactly the question the swipe's
+    `user-select` guard has to ask and cannot ask with a width. So widths are
+    still pinned to the one breakpoint, and the capability queries are listed
+    rather than waved through - an invented one still fails here. */
+ /* ONE BREAKPOINT, AND ITS COMPLEMENT. `(min-width:761px)` is not a second
+    invented width - it is exactly "not the phone", which is how a rule that
+    must apply to the WINDOWED dialog and not the full-screen one is written.
+    Any other width still fails. */
+ const byWidth=[...new Set(conditions.filter(one=>one.includes("width")))].sort();
+ const byCapability=[...new Set(conditions.filter(one=>!one.includes("width")))];
+ assert.deepEqual(byWidth,["(max-width:760px)","(min-width:761px)"]);
+ assert.deepEqual(byCapability,["(hover:none) and (pointer:coarse)"],
+  "the only non-width query the focus view may use is the touch one the swipe needs");
 });
 
 test("parts memory learns per defect issue and lets a category default be chosen deliberately",()=>{
@@ -2276,39 +2335,284 @@ test("parts memory survives storage that is blocked or corrupt",()=>{
 });
 
 test("both repair workflows offer a remembered part without imposing or blocking one",async()=>{
- const [log,fixed,catalog,logCss,fixedCss]=await Promise.all([
+ const [log,fixed,catalog,logCss,fixedCss,list]=await Promise.all([
   readFile(new URL("../app/defect-log/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/page.tsx",import.meta.url),"utf8"),
   readFile(new URL("../src/lib/defects/repair-catalog.ts",import.meta.url),"utf8"),
   readFile(new URL("../app/defect-log/defect-log.css",import.meta.url),"utf8"),
   readFile(new URL("../app/fixed-repairs/fixed-repairs.css",import.meta.url),"utf8"),
+  readFile(new URL("../src/components/defects/parts-used-list.tsx",import.meta.url),"utf8"),
  ]);
 
  for(const [name,page] of [["defect log",log],["fixed repairs",fixed]]){
   assert.match(page,/PARTS USED/,name);
-  assert.match(page,/PART NAME \(OPTIONAL\)/,name);
   assert.match(page,/REMEMBER FOR EVERY /,name);
-  assert.match(page,/Leave blank if the number is unknown/,name);
   assert.match(page,/REMEMBERED/,name);
   assert.match(page,/>FORGET<\/button>/,name);
+  /* THE BOXES THEMSELVES MOVED into the shared list component - two routes draw
+     it, so a copy in each page would drift. Each page has to DRAW it; importing
+     it and never rendering it is the failure this pair catches. */
+  assert.match(page,/import PartsUsedList from "@\/src\/components\/defects\/parts-used-list"/,name);
+  assert.match(page,/<PartsUsedList parts=\{/,name);
   // learning happens on save and is never a precondition of saving
   assert.match(page,/learnPart\(current,\{category:/,name);
+  /* ONE PART IS LEARNED, AND IT IS THE FIRST, which corrects a claim this
+     change first made. Both forms reduced `learnPart` over every numbered part
+     and called it "learns every part"; a reviewer disproved it. `learnPart`
+     keeps ONE entry per scope+category+issue and REPLACES it, so reducing over
+     [HX-99, ZZ-1] left a single entry holding ZZ-1 with `uses:2` - the shop
+     taught the LAST part, with an inflated count. Driven below rather than
+     asserted. */
+  assert.match(page,/partToLearn\(/,name);
   // a legacy record with a part number still shows it
   assert.match(page,/partsUsed\?\?Boolean\(String\(/,name);
+  /* AND A SUGGESTION STILL NEVER OVERWRITES TYPING. It seeds the FIRST row and
+     only an empty one, which is what it did when there was one pair of boxes. */
+  assert.match(page,/suggestion&&!?[\s\S]{0,60}?String\((?:first|current\[0\])[\s\S]{0,40}?partNumber/,name);
  }
+
+ /* THE LIST'S OWN LABELS live in the component now. Asserted there rather than
+    in the pages, because that is where they are - and the component is where a
+    rename would happen. */
+ assert.match(list,/PART NUMBER/);
+ assert.match(list,/PART NAME \(OPTIONAL\)/);
+ assert.match(list,/Leave blank if the number is unknown/);
+ assert.match(list,/ADD_PART_LABEL\s*=\s*"ADD ANOTHER PART"/,"the way to add a second part has to say so");
+ assert.match(list,/<b>REMOVE<\/b>/);
+ /* REMOVE IS NOT OFFERED ON A LONE ROW, because removing it cannot empty the
+    list - unticking PARTS USED is the one gesture that means no parts. */
+ assert.match(list,/\{\s*many\s*&&\s*\([\s\S]{0,400}?className="remove-part"/,"a lone row must not offer REMOVE");
+ /* AND THE LIST HOLDS NO RULES: every decision about what a part is and what
+    gets stored is in the lib, so the MCP route can ask the same question
+    rather than reimplementing it. */
+ for(const rule of ["partsUsed:","localStorage","learnPart","partNumber.trim()"])
+  assert.ok(!list.includes(rule),"the parts list is deciding "+rule+" instead of drawing rows");
 
  // the record keeps its own snapshot, separate from the learned mapping
  assert.match(catalog,/partsUsed\?:boolean;/);
  assert.match(catalog,/partName\?:string;/);
- assert.match(fixed,/partsUsed:draft\.partsUsed,partName:draft\.partName\.trim\(\)/);
- // suggestions never overwrite something already typed
- assert.match(log,/hasNumber\|\|!suggestion\?current\.defect\.partNumber\|\|"":suggestion\.partNumber/);
- assert.match(fixed,/hasNumber\|\|!suggestion\?current\.partNumber:suggestion\.partNumber/);
+ assert.match(catalog,/parts\?:DefectPart\[\];/,"the record has to be able to hold more than one part");
+ /* WRITTEN THROUGH THE ONE ASSEMBLER, AND THE ASSEMBLER DELETES THE KEY.
+
+    This asserted the exact `...defectPartFields(draft.partsUsed?draft.parts:[])`
+    spread - and a reviewer showed that spread was itself the bug, so the test
+    was locking it in. `defectPartFields` OMITS `parts` for a 0- or 1-part list
+    by design, and a missing key does not override the one the stored record
+    still carries: a repair that had held two parts kept both after a REMOVE,
+    and after unticking PARTS USED entirely. Only `withDefectParts`, which
+    `delete`s the key first, can say "this field is gone".
+
+    DRIVEN, not matched, for the same reason. */
+ assert.match(fixed,/withDefectParts\(\{\.\.\.defect,category:draft\.category/,
+  "Fixed Repairs has to build the saved record through the assembler");
+ /* AND THE CHECKBOX GOES THROUGH THE ASSEMBLER AS ITS THIRD ARGUMENT, not
+    patched on after it. Fixed Repairs appended `partsUsed:draft.partsUsed`,
+    which fixed this page and left the Defect Log broken in exactly the same
+    way - two places deciding one thing, which is what that function exists to
+    stop. Every call site that has a checkbox passes it. */
+ assert.match(fixed,/draft\.partsUsed\?draft\.parts:\[\],draft\.partsUsed\)/,
+  "Fixed Repairs hands the checkbox to the assembler");
+ /* THE ASSIGNMENT, not one closing layout. This required `})` after it, so an
+    override followed by another field - `partsUsed:draft.partsUsed,completedBy:…`
+    - walked past. Matched to a comma or a brace instead. */
+ assert.doesNotMatch(fixed,/partsUsed\s*:\s*draft\.partsUsed\s*[,}]/,
+  "and does not then overrule it from outside");
+ assert.match(log,/withDefectParts\(current\.defect,next,partsUsed\)/,
+  "the Defect Log's rows carry the checkbox too");
+ assert.match(log,/withDefectParts\(current\.defect,\[\],false\)/,
+  "unticking says so explicitly rather than relying on the rows being empty");
+ assert.match(log,/withDefectParts\(cur\.defect,rows,true\)/);
+ /* ENTER LATER IS SOMEBODY SAYING A PART WAS USED, so it passes `true`. The
+    prompt promises in as many words that the repair "is marked MISSING PART #
+    on the Fixed Repairs page until the number is added" - and it arrives here
+    with an EMPTY number, which the assembler read as "no parts were used", so
+    the repair saved completed with no flag and the promise on screen was
+    false. A reviewer reproduced it in a browser against this branch. */
+ assert.match(log,/validateAndSave\(true,\{\},\{rows:next,used:true\}\)/,
+  "ENTER LATER has to store partsUsed:true or its own promise is a lie");
+ /* AND IT MUST NOT ERASE A NUMBER ALREADY TYPED. ENTER LATER arrives with an
+    EMPTY number, and writing that over the first row wiped a part the mechanic
+    had entered on the form a moment earlier - the prompt even opens prefilled
+    with it. Only a number given here replaces the row. */
+ assert.match(log,/const next=number\?\[\{id:first\?first\.id:"part-0",partNumber:number/,
+  "a number given at the prompt replaces the first row");
+ assert.match(log,/\.\.\.rows\.slice\(1\)\]:rows;/,
+  "and an empty one keeps what the form already holds");
+ {
+  /* DRIVEN over the real assembler, the three cases that matter. */
+  const held={id:"d1",partsUsed:true,partNumber:"HX-99"};
+  const rows=normalizeDefectParts(held.parts,held),first=rows[0];
+  const enterLater=number=>withDefectParts(held,
+   number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows,true);
+  assert.equal(enterLater("").partNumber,"HX-99","ENTER LATER keeps a number already on the record");
+  assert.equal(defectPartsMissing(enterLater("")),false,"so it is not flagged as missing");
+  assert.equal(enterLater("ZZ-1").partNumber,"ZZ-1","a number typed at the prompt replaces it");
+  const empty={id:"d2",partsUsed:true,partNumber:""};
+  const emptyRows=normalizeDefectParts(empty.parts,empty);
+  const nothingYet=withDefectParts(empty,emptyRows,true);
+  assert.equal(nothingYet.partsUsed,true);
+  assert.equal(defectPartsMissing(nothingYet),true,"and with no number anywhere it still flags");
+ }
+ {
+  /* DRIVEN END TO END: the state ENTER LATER writes must be the state the
+     Fixed Repairs card flags. */
+  const later=withDefectParts({id:"d1",partsUsed:false,partNumber:"",partName:""},
+   [{id:"part-0",partNumber:""}],true);
+  assert.equal(later.partsUsed,true,"a ticked box with nothing typed is still a part used");
+  assert.equal(later.partNumber,"");
+  assert.ok(!("parts" in later),"and it stores the legacy shape, not an array of blanks");
+  assert.equal(defectPartsMissing(later),true,"so the card says MISSING PART #");
+  assert.deepEqual(normalizeDefectParts(later.parts,later),[{id:"part-0",partNumber:""}],
+   "and it reads back as one blank row to type into");
+  /* UNTICKING STILL WINS OVER A ROW LEFT IN THE LIST. */
+  const off=withDefectParts({id:"d1",parts:[{id:"a",partNumber:"HX-99"}]},
+   [{id:"a",partNumber:"HX-99"}],false);
+  assert.equal(off.partsUsed,false);
+  assert.ok(!("parts" in off),"unticking clears the array whatever the rows hold");
+  assert.equal(defectPartsMissing(off),false,"no parts used is not a missing part");
+  /* AND OMITTING THE ARGUMENT CHANGES NOTHING for a caller without a checkbox,
+     which is every read-side caller. */
+  assert.equal(withDefectParts({},[{id:"part-0",partNumber:""}]).partsUsed,false);
+  assert.equal(withDefectParts({},[{id:"a",partNumber:"HX-99"}]).partsUsed,true);
+ }
+ /* AND THE DEFECT LOG'S MERGE HAS TO NAME IT. `{...existing,...incoming}`
+    cannot express "this field is gone", which is why `workStates` and
+    `downSheetRecommendation` are already listed explicitly there; that file's
+    own comment says anything deleting its key belongs on the line, and this
+    change had to be told twice. */
+ const sync=await readFile(new URL("../src/lib/defects/defect-log-sync.ts",import.meta.url),"utf8");
+ assert.match(sync,/\.\.\.existing,\.\.\.incoming,[^}]*parts:incoming\.parts/,
+  "a cleared parts array has to survive the save merge");
+
+ /* THE TRANSITIONS, driven over the real assembler: two parts down to one,
+    and two parts down to none. Both used to read back as two. */
+ const held={partsUsed:true,partNumber:"HX-99",partName:"Gasket",
+  parts:[{id:"a",partNumber:"HX-99",partName:"Gasket"},{id:"b",partNumber:"ZZ-1"}]};
+ const downToOne=withDefectParts(held,[{id:"a",partNumber:"HX-99",partName:"Gasket"}]);
+ assert.deepEqual(normalizeDefectParts(downToOne.parts,downToOne).map(part=>part.partNumber),["HX-99"],
+  "removing a part has to stick");
+ const downToNone=withDefectParts(held,[]);
+ assert.deepEqual(normalizeDefectParts(downToNone.parts,downToNone),[],
+  "unticking PARTS USED has to stick");
+ assert.equal(downToNone.partsUsed,false);
+ /* AND AN ENTER LATER RECORD - ticked, no number yet - keeps its flag through a
+    save that touches nothing, or MISSING PART # silently disappears off its
+    card. The regression a reviewer found against main. */
+ assert.equal(defectPartsMissing({partsUsed:true,partNumber:"",partName:""}),true);
+
+ /* PARTS USED IS THE CHECKBOX'S OWN STATE, NOT A READING OF THE RECORD. It was
+    derived, and `defectPartFields` reports `partsUsed:false` the moment every
+    row is blank - so pressing ADD ANOTHER PART on an empty row unticked the box
+    and unmounted the whole section mid-edit: a reviewer measured -256px of
+    content shift on a phone with focus dropped to the body. Only the checkbox
+    means "no parts were used"; a blank row means somebody is typing. */
+ assert.match(log,/const \[partsUsed,setPartsUsed\]=useState\(\(\)=>value\.defect\.partsUsed\?\?/,
+  "the checkbox has to hold its own state, seeded from the record");
+ assert.doesNotMatch(log,/const partsUsed=value\.defect\.partsUsed\?\?/,
+  "deriving it from the record collapses the section while somebody is typing");
+ assert.match(log,/setPartsUsed\(checked\)/,"and the toggle has to drive it");
+
+ /* A DIFFERENT REPAIR TAKES DIFFERENT PARTS. Both pickers cleared the mirrored
+    pair and left the array, so re-ticking PARTS USED after a category change
+    brought the PREVIOUS repair's rows back and blocked the new suggestion. */
+ for(const picker of [/category,issue:"",symptoms:\[\][\s\S]{0,160}?parts:undefined/,/category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined/])
+  assert.match(log,picker,"a Defect Log picker has to clear the parts array");
+ /* AND THE SCREEN HAS TO AGREE WITH THE RECORD. Once the box and the rows
+    became local state, clearing only the record left the tick on screen with
+    HX-99 still in the input over a record holding no part: SAVE dropped it
+    with nothing saying so. Shown and silently discarded is worse than the
+    stale-part bug it replaced, and a reviewer reproduced both. */
+ assert.match(log,/const clearPartsOnScreen=\(\)=>\{setPartsUsed\(false\);setPartRows\(\[\]\)\}/,
+  "there is one way to clear the part on screen");
+ /* AND THE SECTION HOLDING ALL OF THIS HAS TO HAVE A BOX. `overflow:hidden` on
+    `.advanced-defect-details` collapsed the `<details>` to its two borders -
+    measured 2px, with a correct 48px `<summary>` clipped away inside it - so
+    ADVANCED DETAILS, and therefore PARTS USED, could not be opened by a tap or
+    a click at all. Only a keyboard could, which is why nothing errored and
+    nothing caught it. Bisected live: `hidden` gives 2px, `clip` and `visible`
+    give 50px at 390 and 48px at 1180. `clip` keeps the inner grid inside the
+    rounded frame, which is what the rule was for.
+
+    The gate bans `hidden` by name rather than asserting a height, because the
+    resolver cannot lay a page out - but the name IS the cause here, and a
+    reviewer reading this has the measurement above. */
+ assert.match(logCss,/\.advanced-defect-details\{[^}]*overflow:clip\}/,
+  "the disclosure clips without collapsing to its own border");
+ assert.doesNotMatch(logCss,/\.advanced-defect-details\{[^}]*overflow:hidden/,
+  "overflow:hidden flattens this <details> to 2px and takes PARTS USED with it");
+ /* THE FIRST STATEMENT, not merely present somewhere. `body.includes(...)` is
+    satisfied by a call that never runs: `if(0)clearPartsOnScreen();` passed the
+    whole suite. A reviewer found it. It has to be the thing the handler does
+    before anything else, which is also the only ordering that cannot race the
+    `setValue` beside it. */
+ for(const handler of ["chooseCategory","chooseIssue"]){
+  const body=bodyOfSource(log,handler);
+  assert.match(body,/^\{\s*clearPartsOnScreen\(\);/,
+   handler+" has to clear the part on screen first, not somewhere: "+body.slice(0,90));
+ }
+ for(const picker of [/category:event\.target\.value,issue:"",quantity:"",parts:\[\]/,/issue:event\.target\.value,quantity:"",parts:\[\]/])
+  assert.match(fixed,picker,"a Fixed Repairs picker has to clear the parts array");
+
+ /* THE PART THE MEMORY TAKES IS THE FIRST NUMBERED ONE, not simply the first
+    row: a name-only row carries nothing the memory could suggest. */
+ assert.equal(partToLearn([{id:"a",partName:"long bolt"},{id:"b",partNumber:"ZZ-1"}])?.partNumber,"ZZ-1",
+  "a name-only first row must not be what gets learned");
+ assert.equal(partToLearn([{id:"a",partNumber:"HX-99"},{id:"b",partNumber:"ZZ-1"}])?.partNumber,"HX-99");
+ assert.equal(partToLearn([{id:"a",partName:"bolt"}]),null);
+
+ /* EVERY PART IS SHOWN AND SEARCHABLE. A second part was stored and rendered
+    nowhere in the app, which made the list pointless from a mechanic's side -
+    `defectPartsText` existed and nothing called it. */
+ for(const [name,page] of [["defect log",log],["fixed repairs",fixed]]){
+  assert.match(page,/defectPartsText\(normalizeDefectParts\(record\.defect\.parts,record\.defect\)\)/,
+   name+" has to render every part, not just the first");
+  assert.ok(!/\{record\.defect\.partNumber&&</.test(page),
+   name+" still renders the first part alone");
+ }
+ assert.match(fixed,/shopNotes,defectPartsText\(normalizeDefectParts\(record\.defect\.parts,record\.defect\)\),/,
+  "and a second part has to be findable by the search");
+
+ /* THE BEHAVIOUR, driven rather than read. A record saved with one part reads
+    back as a one-part list and nothing on disk is rewritten; a second part is
+    stored as an array; going back to one removes the array again. */
+ const legacy={partsUsed:true,partNumber:"HX-99",partName:"Gasket"};
+ assert.deepEqual(normalizeDefectParts(legacy.parts,legacy).map(part=>[part.partNumber,part.partName]),
+  [["HX-99","Gasket"]],"a one-part record read as a list");
+ const two=addDefectPart(normalizeDefectParts(legacy.parts,legacy));
+ const typed=updateDefectPart(two,two[1].id,{partNumber:"ZZ-1",partName:"Sensor"});
+ const saved=withDefectParts(legacy,typed);
+ assert.equal(saved.partNumber,"HX-99","the first part stays mirrored for a device on an older release");
+ assert.equal(saved.parts.length,2,"and the second part is stored");
+ assert.deepEqual(normalizeDefectParts(saved.parts,saved).map(part=>part.partNumber),["HX-99","ZZ-1"]);
+ /* BACK DOWN TO ONE DELETES THE ARRAY rather than leaving it as `undefined`:
+    `rowFingerprint` walks `Object.keys`, so a key holding undefined moves a
+    row's cloud fingerprint on a push carrying nothing new. */
+ assert.ok(!("parts" in withDefectParts(saved,[typed[0]])),"one part must store no array at all");
+ /* A BLANK ROW IS NEVER STORED - somebody pressing ADD ANOTHER PART and
+    changing their mind must not leave an empty part on a repair's history. */
+ assert.ok(!("parts" in withDefectParts(legacy,addDefectPart(normalizeDefectParts(legacy.parts,legacy)))));
+ /* A ROW WITH ONLY A NAME IS KEPT - "the long bolt behind the alternator" is
+    how a part gets recorded when nobody can find its number - and it is not
+    counted as missing, but it teaches the memory nothing it could suggest. */
+ const named=withDefectParts({},[{id:"a",partName:"long bolt"}]);
+ assert.equal(named.partsUsed,true);
+ assert.equal(defectPartsMissing(named),false,"a named part is not a missing one");
+ assert.equal(partsToLearn(normalizeDefectParts(named.parts,named)).length,0);
+ /* AND THE OLD FLAG KEEPS ITS MEANING: PARTS USED ticked with nothing typed is
+    still what the Fixed Repairs card flags. */
+ assert.equal(defectPartsMissing({partsUsed:true}),true);
+ assert.equal(defectPartsMissing({partsUsed:false}),false);
 
  for(const [name,css] of [["defect log",logCss],["fixed repairs",fixedCss]]){
   assert.match(css,/\.parts-used-block\{/,name);
   assert.match(css,/\.parts-remembered button\{min-height:36px/,name);
   assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-remembered button\{min-height:44px;width:100%\}/,name);
+  /* THE TWO NEW CONTROLS REACH A THUMB TARGET on the device these forms are
+     used on, and the separator fires only BETWEEN rows so a one-part repair
+     looks exactly as it did. */
+  assert.match(css,/\.parts-row\+\.parts-row\{border-top/,name+" needs a separator between rows, not on every row");
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-row \.remove-part\{min-height:44px/,name);
+  assert.match(css,/@media\(max-width:760px\)\{[\s\S]*?\.parts-list \.add-part\{min-height:44px/,name);
  }
 });
 
@@ -2882,12 +3186,47 @@ test("saving fixed with a part asks for the number and flags it when left for la
  // ENTER LATER records that a part went on with no number, which is a different
  // fact from no part at all.
  assert.match(logPage,/confirm\(""\)/);
- assert.match(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/);
+ /* THROUGH THE ASSEMBLER, AND THE ASSEMBLER RUNS LAST.
+
+    The prompt first patched `{partsUsed:true,partNumber}` straight onto the
+    record, so on a repair already holding a `parts` array the mirrored pair and
+    the array disagreed. Passing the ASSEMBLED record in as the patch was the
+    next attempt, and a cold read showed it does not work either:
+    `{...value.defect,...patch}` CANNOT CARRY A DELETION, and the assembler's
+    whole job is to `delete parts`. The key is absent from the patch, so the
+    stored array came back through the first spread - measured on a repair
+    holding [AA-1,BB-2] as `partNumber:"BB-2"` beside `parts:[AA-1,BB-2]`, the
+    exact disagreement the first fix was for. Same `{...existing,...incoming}`
+    trap `saveDefectLogRecord` keeps an explicit field list for.
+
+    So the parts go in as PARTS and the assembler runs after the spread, where
+    nothing can spread over it. */
+ assert.match(logPage,/const next=number\?\[\{id:first\?first\.id:"part-0",partNumber:number/);
+ assert.match(logPage,/validateAndSave\(true,\{\},\{rows:next,used:true\}\)/);
+ assert.doesNotMatch(logPage,/validateAndSave\(true,\{partsUsed:true,partNumber:number\}\)/,
+  "the prompt must not write the mirrored pair without the array");
+ assert.doesNotMatch(logPage,/validateAndSave\(true,withDefectParts\(/,
+  "and must not hand the assembled record in as a patch, which undoes the delete");
 
  // The patch is passed INTO the save rather than set on state first. Setting it
  // and then saving would write the defect as it was a render earlier, dropping
  // the number on the very save that asked for it.
- assert.match(logPage,/const validateAndSave=\(complete:boolean,patch:Partial<StructuredDefect>=\{\}\)=>\{const defect=\{\.\.\.value\.defect,\.\.\.patch\}/);
+ assert.match(logPage,/const validateAndSave=\(complete:boolean,patch:Partial<StructuredDefect>=\{\},parts\?:\{rows:DefectPart\[\];used:boolean\}\)=>\{const patched=\{\.\.\.value\.defect,\.\.\.patch\};const defect=parts\?withDefectParts\(patched,parts\.rows,parts\.used\):patched/,
+  "the spread happens first and the assembler last, so a deleted key stays deleted");
+ /* DRIVEN, because the gate above is a shape and this is the behaviour: the
+    assembled record spread over the stored one brings the array back. */
+ {
+  const held={id:"d1",partsUsed:true,partNumber:"AA-1",partName:"Chamber",
+   parts:[{id:"a",partNumber:"AA-1",partName:"Chamber"},{id:"b",partNumber:"BB-2"}]};
+  const rows=normalizeDefectParts(held.parts,held);
+  const assembled=withDefectParts(held,[{id:rows[0].id,partNumber:""},...rows.slice(1)],true);
+  assert.ok(!("parts" in assembled),"the assembler deletes the key");
+  const asAPatch={...held,...assembled};
+  assert.deepEqual(normalizeDefectParts(asAPatch.parts,asAPatch).map(part=>part.partNumber),["AA-1","BB-2"],
+   "spreading the assembled record over the stored one brings the array back - which is why it is not a patch");
+  assert.deepEqual(normalizeDefectParts(assembled.parts,assembled).map(part=>part.partNumber),["BB-2"],
+   "and running the assembler last is what the record should hold");
+ }
 
  // It renders OUTSIDE the form. Inside it, Enter in the part field would submit
  // the defect behind the prompt.
@@ -2906,7 +3245,14 @@ test("saving fixed with a part asks for the number and flags it when left for la
 
  // THE FLAG on Fixed Repairs, in its own colour, beside the amber one it can
  // appear next to.
- assert.ok(fixedPage.includes("partNumberMissing(record.defect)&&"));
+ /* OFF THE WHOLE LIST. `partNumberMissing` reads the FIRST part only, so a
+    name-only first row beside a numbered second one showed MISSING PART # with
+    a number recorded - reproduced by a reviewer. */
+ assert.ok(fixedPage.includes("defectPartsMissing(record.defect)&&"));
+ assert.ok(!fixedPage.includes("partNumberMissing("),"the card must not flag off the first part alone");
+ assert.equal(defectPartsMissing({partsUsed:true,parts:[{id:"a",partName:"long bolt"},{id:"b",partNumber:"ZZ-1"}],partNumber:"",partName:"long bolt"}),false,
+  "a numbered second part means the number is not missing");
+ assert.equal(defectPartsMissing({partsUsed:true}),true,"and ENTER LATER still flags");
  assert.ok(fixedPage.includes("MISSING PART #"));
  // Filled orange, not another pale pill: NEEDS FIX DETAILS sits beside it on
  // #fff1e0 already, and the first attempt used that same background, which made
@@ -7526,20 +7872,369 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(page,/useEffect\(\(\)=>\{setFocusShareStatus\(""\)\},\[focusedBusId\]\)/,
   "opening another bus never greets somebody with the last one's SHARED");
 
- /* THE SHARE CARRIES THE WHOLE BUS. `focusedGroup` comes out of `visibleGroups`,
-    which the state filter, the WHEN LOGGED window and the search have already
-    narrowed: with IN PROGRESS on, a bus carrying six showed two and the first
-    cut shared those two under a heading reading "2 defects". The reader of that
-    message has no filter and no way to know there was one. Curtis asked for the
-    opposite in as many words — "share all the defects with a bus". */
- assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/);
- assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusedAllRecords\.map/,
-  "the share is built from the unfiltered records");
- assert.doesNotMatch(page,/focusShareRows=\(\):BusShareDefect\[\]=>\(focusedGroup\?\.records/,
-  "never from the board's filtered view of the bus");
- /* And it says so, rather than quietly sending more than the screen shows. */
- assert.match(page,/SHARES ALL \{focusedAllRecords\.length\} — \{focusHiddenByBoard\} HIDDEN BY THE BOARD FILTER/);
- assert.match(page,/const focusHiddenByBoard=focusedGroup\?focusedAllRecords\.length-focusedGroup\.records\.length:0/);
+ /* THE SHARE FOLLOWS THE WINDOW NOW, AND THAT REVERSED A DECISION OF CURTIS'S.
+    It used to carry the WHOLE bus, because he asked for that in as many words
+    - "share all the defects with a bus" - after the first cut shared a
+    filtered two under a heading reading "2 defects", which tells its reader
+    nothing about there being a filter.
+
+    He then hit the other side of it: "when I hit like the last 24 hours of the
+    shift, it gives me buses, but I think it's giving me more than the defects
+    that I put down in the last 24 hours." Asked which way, he chose: "Follow
+    the window, and add the swipe." Both readings were defensible; this is the
+    one he picked after using the other. The old reasoning stays in the page's
+    own comment, because it is why this ever carried the whole bus.
+
+    So the share is WHAT IS ON SCREEN minus anything swiped away, and the two
+    reasons are counted apart - a view narrowing something is not a person
+    deciding it. */
+ assert.match(page,/const focusedAllRecords=focusedBusId\?records\.filter\(record=>record\.bus\.id===focusedBusId\):\[\]/,
+  "the whole-bus list is still needed, to count what the view held back");
+ assert.match(page,/const focusShareRows=\(\):BusShareDefect\[\]=>focusScope\.rows\.map/,
+  "the share is built from the scope, not from the unfiltered records");
+ /* ALL THREE OUTPUTS READ ONE LIST, AND ALL THREE REFUSE AN EMPTY ONE.
+
+    BALANCED BRACES, NOT A 700-CHARACTER WINDOW, and that is a fix. The first
+    version of this loop sliced 700 characters from each handler's name, which
+    on `copyFocusBus` - four lines long - ran straight into `shareFocusBusText`
+    below it. Its `focusShareRows()` satisfied the assertion for BOTH, so
+    deleting the call from `copyFocusBus` left this green. A cold read found it
+    by mutation. One handler, one body. */
+ const row=id=>({defect:{id}});
+ const bodyOf=(source,name)=>bodyOfSource(source,name);
+ /* And the slicer itself is checked, because a broken extractor is a gate that
+    passes everything: a body that ran on would carry the NEXT handler's name. */
+ assert.ok(!bodyOf(page,"copyFocusBus").includes("shareFocusBusText"),
+  "the extractor has to stop at the end of the handler it was asked for");
+ for(const output of ["copyFocusBus","shareFocusBusText","shareFocusBusPage"]){
+  const body=bodyOf(page,output);
+  assert.ok(body.includes("focusShareRows()"),output+" has to share the same list as the others");
+  /* NOTHING LEFT TO SEND IS A REFUSAL. Hiding all three defects on a bus and
+     pressing COPY put "0 defects - shared ..." and "No defects on this bus." on
+     the clipboard for a bus with three open defects, which reads as a CLEAN
+     vehicle - the most damaging thing this app could say about one. Asked in
+     each body rather than once in a wrapper, because SHARE falls back to COPY
+     and a guard on one path is a guard on the path somebody happened to take. */
+  assert.ok(body.includes("focusShareIsEmpty(focusScope)"),
+   output+" has to refuse an empty share rather than send a clean bus");
+ }
+ /* AND THE BUTTONS GO DEAD, so nobody presses a live-looking one and wonders.
+    Three of them, each carrying the flag. */
+ assert.equal((page.match(/disabled=\{focusShareEmpty\}/g)||[]).length,3,
+  "COPY, SHARE and SHARE PAGE all have to go dead on an empty share");
+ assert.match(page,/const focusShareEmpty=focusShareIsEmpty\(focusScope\)/);
+ /* THE REFUSAL ITSELF, DRIVEN. */
+ assert.equal(focusShareIsEmpty(focusShareScope([row("x")],[row("x")],[])),false);
+ assert.equal(focusShareIsEmpty(focusShareScope([row("x")],[row("x")],["x"])),true);
+ /* AND IT SAYS SO IN WORDS RATHER THAN IN A NUMBER: "SHARING 0 OF 3" is a count
+    where somebody needs an instruction. */
+ assert.match(focusShareScopeNote(focusShareScope([row("x")],[row("x")],["x"])),
+  /^NOTHING LEFT TO SHARE — 1 YOU SWIPED AWAY$/);
+ /* THE HANDLERS HAVE TO BE WIRED TO THE ROW THEY WERE GIVEN, and these two
+    gates exist because a cold read got two mutations past the suite: hiding
+    THE FIRST ON-SCREEN ROW instead of the one swiped or pressed, and PUT BACK
+    calling `setFocusExcluded([])` so it restored everything. Both were
+    invisible, because everything around them drives `excludeFromFocusShare`
+    and `putBackLastExclusion` as pure functions and then only greps the
+    handlers for a name.
+
+    A RENDER WOULD BE THE RIGHT GATE AND THIS SUITE CANNOT RENDER THIS: the
+    helper runs the production worker SERVER-SIDE, where there is no
+    LocalStorage and therefore no board. So these are source gates, deliberately
+    about the two specific shapes, and the browser run is the witness for the
+    wiring. Said plainly rather than left looking like a behavioural test. */
+ {
+  const hide=bodyOfSource(page,"focusHideRecord");
+  assert.ok(/excludeFromFocusShare\(current,record\.defect\.id\)/.test(hide),
+   "the hide excludes the row it was handed, by id");
+  assert.ok(!/\[0\]|\.find\(|rows\[/.test(hide),
+   "and never reaches for a row of its own choosing: "+hide.slice(0,160));
+  const back=bodyOfSource(page,"focusPutBack");
+  assert.ok(/putBackLastExclusion\(/.test(back),"PUT BACK asks the lib which one comes back");
+  assert.ok(!/setFocusExcluded\(\[\]\)/.test(back),
+   "and never clears the whole list - that is what changing bus does");
+  assert.ok(/if\(!restored\)return/.test(back),
+   "a press that restores nothing returns rather than re-rendering");
+ }
+ /* AND THE SCOPE IS COMPUTED IN THE LIB, not on the page. The reason is the
+    general one and it is enough: a decision inside a `page.tsx` is reachable by
+    that page and nothing else. An earlier version of this comment said the MCP
+    route asks the same question about a bus - it does not, PR39's five tools
+    are read-only and none of them has a share or a window, and naming a caller
+    that does not exist is how a reader stops believing the rest. */
+ assert.match(page,/focusShareScope\(focusedGroup\?focusedGroup\.records:\[\],focusedAllRecords,focusExcluded\)/);
+ /* AND THE PANEL SAYS WHAT IT IS ABOUT TO SEND - from an ALWAYS-MOUNTED slot.
+    This used to assert the conditional `note && <small>`, which was the shape
+    that moved the whole list by 70px on a phone and 115px on the shop computer
+    on every hide and every undo: the note and PUT BACK sit ABOVE the rows, so
+    mounting them put a different row under the thumb that was about to swipe
+    next. The slot holds its height; only its contents change. */
+ assert.match(page,/<div className="log-focus-share-slot"/);
+ assert.match(page,/<small className="log-focus-share-scope">\{focusShareScopeNote\(focusScope\)\}<\/small>/,
+  "and the panel has to say what it is about to send");
+ /* AND UNCONDITIONALLY. Matching the `<small>` alone was not enough: wrapping
+    the same markup back up in `note && …` left that substring intact and this
+    gate green, which is the mutation that put the 70px jump back. The absence
+    of the conditional is the thing to assert. */
+ assert.doesNotMatch(page,/focusShareScopeNote\(focusScope\)&&/,
+  "the note is mounted whatever it says, or the list jumps on every hide");
+ assert.match(css,/\.log-focus-share \.log-focus-share-slot\{grid-column:1\/-1;min-height:44px/,
+  "the slot keeps its height whether it holds anything or not");
+ /* THE SWIPED-AWAY LIST IS NEVER A FIELD ON A DEFECT. The cloud ships unknown
+    defect fields to every other phone and a merge replaces a defect wholesale,
+    so one person's "don't send this one" would hide it for the whole shop -
+    the reason a HOLD and a FULL SWEEP do not travel either. */
+ assert.match(page,/const \[focusExcluded,setFocusExcluded\]=useState<string\[\]>\(\[\]\)/);
+ /* THREE LITERAL STRINGS WAS NOT A GATE, and a cold read said so: the first
+    version of this listed "defect.excludedFromShare", "excludedFromShare:" and
+    "pace-focus-share", so storing the same thing as `defect.hiddenFromShare`
+    or under `pace-focus-hidden-v1` walked straight past it. The shape of the
+    mistake is what has to be caught, not one spelling of it. */
+ assert.doesNotMatch(page,/"pace-[a-z0-9-]*(focus|swipe|hid|exclud|share)[a-z0-9-]*"/,
+  "the swiped-away list is React state for this one look at this one bus - never a storage key");
+ /* AND NEVER A FIELD WRITTEN ONTO A DEFECT. Anchoring this on `defect.` was
+    not enough either: `(record.defect as {hiddenFromShare?:boolean})
+    .hiddenFromShare=true` has `).` in front of the dot and walked past it. The
+    HANDLER's whole body is the thing to read - it may set React state and
+    nothing else. */
+ {
+  const hide=bodyOf(page,"focusHideRecord");
+  assert.ok(/setFocusExcluded\(/.test(hide)&&/setFocusHideNote\(/.test(hide),
+   "the hide handler sets the two pieces of state it owns");
+  assert.ok(!/[)\]a-zA-Z]\.[A-Za-z]+\s*=[^=>]/.test(hide),
+   "and assigns to nothing at all: a hide is a property of this look at this bus");
+  assert.ok(!/localStorage|writeJSON|saveDefectLogRecord|applyDefectToBuses|setFleet|setDownEntries/.test(hide),
+   "a hide must not reach storage, a record or the board");
+ }
+ assert.doesNotMatch(page,/\.[A-Za-z]*(xclud|idden)[A-Za-z]*\s*=[^=>]/,
+  "nothing anywhere on this page writes an exclusion onto an object");
+ /* AND THE SCOPE ITSELF WRITES NOTHING ONTO A RECORD, which is the property
+    those two gates are circling. The cloud ships every defect field it has no
+    column for inside `detail` and a merge replaces a defect wholesale by id, so
+    a flag on the record would hide the defect on every other phone in the shop
+    - the same reason a HOLD and a FULL SWEEP never travel. */
+ {
+  const records=[row("1"),row("2"),row("3")];
+  const before=JSON.stringify(records);
+  focusShareScope(records.slice(0,2),records,["1"]);
+  assert.equal(JSON.stringify(records),before,"focusShareScope must not touch a record");
+ }
+ /* AND IT GOES WITH THE BUS, like the SHARED status beside it: tabbing from
+    bus A's FOCUS to bus B's never passes through empty. */
+ assert.match(page,/useEffect\(\(\)=>\{setFocusExcluded\(\[\]\)\},\[focusedBusId\]\)/);
+ /* PUT BACK IS ON THE PAGE, not behind a menu - the rule the Down Sheet's own
+    PUT BACK follows, because an accidental swipe is exactly when nobody goes
+    looking for an undo. */
+ assert.match(page,/className="focus-put-back"[\s\S]{0,200}?onClick=\{focusPutBack\}/);
+
+ /* THE SCOPE'S BEHAVIOUR, driven rather than read. */
+ const all=[row("1"),row("2"),row("3"),row("4")],onScreen=[row("1"),row("2")];
+ let scope=focusShareScope(onScreen,all,[]);
+ assert.deepEqual([scope.rows.length,scope.total,scope.hiddenByBoard,scope.hiddenByHand],[2,4,2,0]);
+ scope=focusShareScope(onScreen,all,["1"]);
+ assert.deepEqual([scope.rows.map(one=>one.defect.id),scope.hiddenByBoard,scope.hiddenByHand],[["2"],2,1]);
+ assert.match(focusShareScopeNote(scope),/SHARING 1 OF 4/);
+ assert.match(focusShareScopeNote(scope),/2 OUTSIDE THIS VIEW/);
+ assert.match(focusShareScopeNote(scope),/1 YOU SWIPED AWAY/);
+ /* SILENT WHEN THE SHARE IS THE WHOLE BUS: "sharing 4 of 4" is noise. */
+ assert.equal(focusShareScopeNote(focusShareScope(all,all,[])),"");
+ /* PUT BACK TAKES THE LAST ONE, so pressing it walks the swipes off in
+    reverse rather than restoring some arbitrary row. */
+ let excluded=excludeFromFocusShare(excludeFromFocusShare([],"a"),"b");
+ assert.deepEqual(excluded,["a","b"]);
+ assert.deepEqual(excludeFromFocusShare(excluded,"a"),["a","b"],"the same row twice is still one exclusion");
+ assert.deepEqual(putBackLastExclusion(excluded),{excluded:["a"],restored:"b"});
+ assert.deepEqual(putBackLastExclusion([]),{excluded:[],restored:null});
+ /* AND AN EXCLUSION THAT HAS LEFT THE SCREEN IS NEITHER RESTORED NOR THROWN
+    AWAY. Two different bugs, one after the other.
+
+    First, `focusExcluded` is only cleared when the BUS changes, so a defect
+    swiped away and then taken off screen by the window, the filter or a sync
+    left an id the counts no longer see - and PUT BACK popped THAT one,
+    restoring nothing while the button still read PUT BACK.
+
+    The fix for that filtered the list and then STORED the filtered result, so
+    one press silently dropped every off-screen exclusion: swipe A and B away,
+    let A leave the view, press PUT BACK for B, and A came back into the share
+    on its own the next time the window widened, with `hiddenByHand` reading 0.
+    A cold read found the second one. */
+ assert.deepEqual(putBackLastExclusion(["a","b"],["b"]),{excluded:["a"],restored:"b"},
+  "the off-screen exclusion is kept, not swept up with the press");
+ assert.deepEqual(putBackLastExclusion(["a","b"],["a"]),{excluded:["b"],restored:"a"},
+  "and the LAST VISIBLE one is what comes back, not simply the last one");
+ assert.deepEqual(putBackLastExclusion(["a","b"],["z"]),{excluded:["a","b"],restored:null},
+  "nothing on screen is hidden, so nothing is put back and nothing is lost");
+ {
+  const held=["a","b"];
+  assert.equal(putBackLastExclusion(held,["z"]).excluded,held,
+   "and that press returns the same array, so it is not a re-render that does nothing");
+ }
+ assert.deepEqual(putBackLastExclusion([],["a"]),{excluded:[],restored:null});
+ /* The page passes what is on screen; without it the rule is the plain one. */
+ assert.match(page,/putBackLastExclusion\(focusExcluded,live\)/,
+  "the page hands PUT BACK the on-screen ids rather than filtering the list itself");
+ /* AND IT STORES EXACTLY WHAT THE LIB RETURNED. Checking only HOW THE CALL IS
+    SPELLED left the F22 bug a way back in AFTER it:
+    `setFocusExcluded(excluded.filter(id=>live.includes(id)))` is the same
+    permanent loss of off-screen exclusions, one line lower, and it passed the
+    whole suite. A reviewer ran that mutant. The lib tests above are the real
+    coverage of the RULE; this is the coverage of the WIRING, and the wiring is
+    the half a render would check if this suite could render it. */
+ {
+  /* THIS GATE PINS AN EXACT SHAPE. IT DOES NOT UNDERSTAND THE CODE, and saying
+     so is the point of this comment, because the two versions before it each
+     claimed more than they did.
+
+     The first banned `.filter(` after the call. A reviewer got three
+     respellings past it. The second counted the `setFocusExcluded` calls and
+     claimed "every prune after the lib needs a second write"; that was FALSE,
+     and five one-write mutants proved it - rebinding the lib's answer before
+     storing it (a `for` loop, `filter?.()`, `Array.prototype.filter.call`,
+     `toSpliced`) or mutating the stored array afterwards with `.pop()`.
+
+     Each round of that is an arms race a text gate loses, because the thing
+     being checked is WIRING and this suite cannot render this surface: the
+     helper runs the production worker server-side, where there is no
+     LocalStorage and so no board. So the gate stops pretending to reason and
+     pins the three statements as one string instead.
+
+     THAT MEANS A LEGITIMATE REFACTOR WILL FAIL THIS, and that is correct rather
+     than unfortunate. Renaming `excluded`, inserting a line, reordering the
+     two - any of them breaks a pin that only ever meant "this exact code, which
+     was verified in a browser, is still the code". Failing sends the next
+     person to re-verify it there, which is where the wiring was always checked.
+     The browser run is the witness; this is the tripwire that says the witness
+     is stale. */
+  const back=bodyOfSource(page,"focusPutBack");
+  const flat=back.replace(/\s+/g,"");
+  assert.ok(flat.includes("const{excluded,restored}=putBackLastExclusion(focusExcluded,live);if(!restored)return;setFocusExcluded(excluded);"),
+   "PUT BACK stores exactly what the lib handed back, with nothing in between: "+back.slice(0,160));
+  /* AND THE LIB'S LIST IS NAMED TWICE AND NO MORE - once where it is received
+     and once where it is stored. A third mention is a rebind, a rebuild or a
+     mutation, which is every one of the five one-write ways round the old
+     count. */
+  assert.equal((flat.match(/\bexcluded\b/g)||[]).length,2,
+   "the lib's list is named once and stored once, never rebuilt or mutated: "+back.slice(0,160));
+  /* AND THE SETTER IS NAMED ONCE IN THIS BODY, which the pin alone does NOT
+     give. Dropping this for the pin let two mutants back in: a second
+     `setFocusExcluded` call APPENDED after the pinned three statements leaves
+     that substring intact and names `excluded` only twice, so both of the other
+     assertions pass while the off-screen ids are pruned on the second write.
+     Measured, not reasoned - the two came back the moment this line went.
+
+     IT COUNTS THE IDENTIFIER, NOT CALLS, and that wording is the THIRD
+     correction to this one comment. It read "exactly one write" while the regex
+     matched the spelling `setFocusExcluded(` - so `.call(null,...)`,
+     `.apply(null,[...])` and `const write=setFocusExcluded;write(...)` each
+     appended a second write and passed all three assertions. Reproduced, all
+     three, and all three die on counting the bare identifier instead.
+
+     WHAT IT STILL CANNOT SEE is a write through a helper defined OUTSIDE this
+     function, and no text check on this body can - which is the same ceiling
+     the pin above admits to. Three assertions, three different ways round, none
+     of them enough alone, and the browser run is still the witness. */
+  assert.equal((flat.match(/\bsetFocusExcluded\b/g)||[]).length,1,
+   "PUT BACK names the setter once in this body: "+back.slice(0,160));
+ }
+
+ /* THE GESTURE IS A DECISION, NOT A DISTANCE, and the panel it sits in scrolls
+    vertically under the same thumb. The Facility Map paid for the naive
+    version: a plain distance test "carried garage-6 to wall-7 and scrolled the
+    page zero pixels". */
+ assert.equal(swipeHidesRow(-80,5),true,"a clean left swipe hides the row");
+ assert.equal(swipeHidesRow(-80,60),false,"a mostly-vertical drag is a scroll");
+ assert.equal(swipeHidesRow(-30,2),false,"a short drag is not a decision");
+ assert.equal(swipeHidesRow(80,2),false,"rightward does nothing - one direction destroys, not both");
+ assert.equal(swipeHidesRow(Number.NaN,0),false);
+ assert.equal(swipeHidesRow(0,Number.NaN),false);
+ /* THE THRESHOLDS ARE THE EXPORTED ONES, so a gate cannot pass while the
+    constant moves out from under it. 56px commits; a pixel short does not. */
+ assert.equal(swipeHidesRow(-SWIPE_COMMIT_PX,0),true,"exactly the commit distance is a swipe");
+ assert.equal(swipeHidesRow(-(SWIPE_COMMIT_PX-1),0),false,"a pixel short is not");
+ /* AND THE AXIS LOCK IS THE RATIO, not a feeling about it: at the boundary the
+    sideways travel has to BEAT the vertical by the margin, not tie it. */
+ assert.equal(swipeHidesRow(-90,90/SWIPE_AXIS_RATIO),false,"a tie on the axis ratio is a scroll");
+ assert.equal(swipeHidesRow(-90,90/SWIPE_AXIS_RATIO-1),true);
+ /* HOW FAR THE ROW FOLLOWS THE FINGER, capped so a long drag cannot pull a row
+    off its own panel, and zero to the right because there is nothing there. */
+ assert.equal(swipeOffsetPx(-10),-10);
+ assert.equal(swipeOffsetPx(-500),-(SWIPE_COMMIT_PX+24),"a long drag is capped");
+ assert.equal(swipeOffsetPx(40),0,"rightward reads as zero, not as a positive offset");
+ assert.equal(swipeOffsetPx(0),0);
+ assert.equal(swipeOffsetPx(Number.NaN),0);
+
+ const swipeRow=await readFile(new URL("../app/defect-log/_components/swipe-away-row.tsx",import.meta.url),"utf8");
+ /* COMMENTS STRIPPED FIRST, with the project's own string-aware stripper: the
+    file EXPLAINS the rules it follows, and a gate that reads prose as code
+    fails on an accurate comment. The same trap the DS badge gate hit. */
+ const swipeCode=stripCodeComments(swipeRow);
+ /* IT MUST NOT BLOCK SCROLLING: no non-passive listener and no preventDefault
+    anywhere in the row. `touch-action` IS NO LONGER ON THIS LIST, and taking it
+    off is a fix rather than a relaxation - see the CSS gate below. */
+ for(const blocker of ["preventDefault","passive:false","touchmove"])
+  assert.ok(!swipeCode.includes(blocker),"the swipe row names "+blocker+", which is how a panel stops scrolling");
+ /* A GESTURE IS NOT REACHABLE WITH A MOUSE OR A KEYBOARD, and Curtis reads
+    this app on the shop computer too, so every row carries a real control
+    that does the same thing - and the control has to SAY which defect it
+    drops. `hideLabel` reaching the aria-label is not enough on its own: the
+    page can hand it "", and four buttons reading "Hide" is what a screen
+    reader then gets. */
+ assert.match(swipeRow,/className="focus-hide-defect"/);
+ /* AND IT COMES BEFORE THE CONTENT, because it is DRAWN above it. The button
+    is `position:absolute` in the row's top-right corner and was the LAST child,
+    so a keyboard reached it after EDIT DEFECT, MARK FIXED and PTR - four stops
+    below where it visibly sits (WCAG 2.4.3, found by a cold read). Absolute
+    positioning means the markup order costs nothing on screen. */
+ assert.ok(swipeRow.indexOf('className="focus-hide-defect"')<swipeRow.indexOf("{children}"),
+  "tab order has to follow the eye: HIDE is drawn first, so it comes first");
+ assert.match(swipeRow,/onClick=\{\s*\(\)\s*=>\s*onHide\("button"\)\s*\}/,
+  "the HIDE control has to work without a gesture");
+ assert.match(swipeRow,/aria-label=\{\s*hideLabel\s*\}/);
+ {
+  const label=page.match(/hideLabel=\{([^}]*)\}/);
+  assert.ok(label,"the page has to pass a hide label");
+  assert.ok(label[1].includes("repairCategoryLabel(record.defect.category)"),
+   "and the label has to name the defect it drops: got "+label[1]);
+ }
+ /* AND THE CONTROL STAYS VISIBLE AND REACHABLE. Resolved through the cascade
+    rather than read off one rule, because that is how this project has been
+    bitten: a broader selector elsewhere setting display:none would leave the
+    swipe as the only way to hide a row, on the one device that cannot swipe. */
+ for(const width of [390,1180]){
+  const hide=effectiveStyle(css,{tag:"button",classes:["focus-hide-defect"],
+   ancestors:[{tag:"div",classes:["log-focus-body"]},{tag:"article",classes:["log-focus-record","open"]}]},width);
+  assert.notEqual(hide.display,"none","HIDE is the desktop route and cannot be display:none at "+width);
+  assert.notEqual(hide.visibility,"hidden");
+  assert.equal(hide["min-height"],width<=760?"44px":"36px","HIDE has to stay a target at "+width);
+ }
+ assert.doesNotMatch(swipeRow,/<button[^>]*\shidden\b/,"a hidden HIDE button is no control at all");
+ assert.doesNotMatch(swipeRow,/aria-hidden="true"[\s\S]{0,80}focus-hide-defect/);
+ /* A CANCELLED POINTER IS THE BROWSER SAYING "this was a scroll", so it can
+    never count as a decision to hide something. */
+ assert.match(swipeRow,/onPointerCancel=\{\s*\(\s*\)\s*=>\s*end\(false\)\s*\}/);
+ /* AND THE RELEASE ASKS `swipeHidesRow` RATHER THAN COMMITTING. `end(true)` on
+    pointerup passed every assertion above it, because every one of them was
+    about the decision function and none about whether the component called it.
+    Found by mutation in a cold read. */
+ assert.match(swipeCode,/end\(\s*swipeHidesRow\(\s*event\.clientX\s*-\s*from\.x\s*,\s*event\.clientY\s*-\s*from\.y\s*\)\s*\)/,
+  "the release has to ask the decision function, not assume the answer");
+ assert.ok(!/end\(\s*true\s*\)/.test(swipeCode),"nothing may commit a hide without asking");
+ /* THE ROW STOPS FOLLOWING A FINGER THAT IS CLEARLY SCROLLING, or it creeps
+    sideways through a diagonal scroll and snaps back, which looks like a bug
+    even though nothing was hidden. Deleting this line changed no assertion. */
+ assert.match(swipeCode,/onPointerMove[\s\S]{0,400}?Math\.abs\(dy\)\s*>\s*Math\.abs\(dx\)/,
+  "the drag has to stop following a vertical finger");
+ /* AND A SECOND FINGER OR A MOUSE NEVER STARTS ONE. A second finger landing
+    mid-drag restarts the measurement from its own position, which reads as a
+    jump back; a leftward mouse drag is text selection and would otherwise
+    satisfy all three conditions and silently drop that defect. */
+ assert.match(swipeCode,/if\s*\(\s*!event\.isPrimary\s*\|\|\s*event\.pointerType\s*===\s*"mouse"\s*\)\s*return/,
+  "a non-primary pointer and a mouse must not arm the gesture");
+ /* A DRAG THAT ENDS OFF THE ROW STILL ENDS. Without the capture a gesture
+    finishing outside the element never reached `onPointerUp` and left the row
+    stuck mid-swipe with its start point still armed. */
+ assert.match(swipeCode,/setPointerCapture\(event\.pointerId\)/);
+ assert.match(swipeCode,/onLostPointerCapture=\{/);
 
  /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when it fell
     back to downloading; folding that into "copied" lit the COPY button with
@@ -7584,6 +8279,123 @@ test("FOCUS shares one bus, as text or as a page",async()=>{
  assert.match(css,/\.log-focus-share button\{min-height:36px/);
  assert.match(css,/\.log-focus-share button\{min-height:44px;font-size:10px\}/);
  assert.match(css,/\.log-focus-share\{position:relative;display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+
+ /* `touch-action:pan-y` IS REQUIRED, AND THIS GATE USED TO BAN IT.
+
+    That inversion is the worst thing in this file's history, because it did not
+    merely miss a bug - it locked one in. The row's own comment claimed no
+    `touch-action` was needed, "a horizontal drag inside a vertical scroller
+    does not scroll it anyway, so there is nothing to suppress", and this test
+    enforced the claim. The browser does not work that way: with
+    `touch-action:auto` it claims the gesture as soon as a finger moves and
+    sends `pointercancel`, which the row correctly treats as "not a swipe" - so
+    on a phone the swipe NEVER FIRED. Reproduced with a real CDP touch drag at
+    390px: pointerdown > pointermove > pointercancel, three rows still there. It
+    worked with a mouse, which is why it looked fine on the shop computer.
+
+    So the gate is the other way round now, and it is resolved THROUGH THE
+    CASCADE rather than matched as a string, because `none` arriving from a
+    broader selector would read identically to this rule being right. `pan-y`
+    keeps vertical panning with the browser and hands horizontal movement to the
+    component; `none` would take the panel's own scroll away. */
+ for(const width of [390,620,1180]){
+  const record=effectiveStyle(css,{tag:"article",classes:["log-focus-record","open"],
+   ancestors:[{tag:"div",classes:["log-focus-body"]}]},width);
+  assert.equal(record["touch-action"],"pan-y",
+   "the swipe row needs pan-y at "+width+"px: auto cancels the gesture, none kills the scroll");
+ }
+ /* AND THE DIALOG DOES NOT RE-CENTRE WHEN THE LIST GETS SHORTER. `.log-shade`
+    centres its dialog and `.log-focus` is auto-height up to 92vh, so on any bus
+    whose list is under that cap - 2 to 7 defects, the ordinary case - hiding a
+    row made the panel shorter and the whole dialog moved: measured +61px on
+    HIDE and -61px on PUT BACK at 1180 with three defects, carrying every
+    remaining row and the control under the cursor with it.
+
+    The always-mounted slot is the other half of this and it works (the share
+    bar measures 103px before and after), but a slot cannot hold a CENTRED
+    dialog still - the thing moving is the dialog's own box. This was first
+    dismissed as a fixture artefact, measured with eight defects where the panel
+    is already at its cap and cannot shrink; a reviewer measured three and was
+    right.
+
+    Only above the phone breakpoint: below it the panel is already full-screen
+    and there is nothing to re-centre. */
+ assert.match(css,/@media\(min-width:761px\)\{\s*\.log-focus-shade\{align-items:flex-start\}/,
+  "a windowed focus dialog has to be pinned to the top, or it re-centres on every hide");
+ {
+  const shade=effectiveStyle(css,{tag:"div",classes:["log-shade","log-focus-shade"]},1180);
+  assert.equal(shade["align-items"],"flex-start","at 1180 the dialog hangs from the top");
+  const phone=effectiveStyle(css,{tag:"div",classes:["log-shade","log-focus-shade"]},390);
+  assert.equal(phone["align-items"],"stretch","and on a phone it is full-screen, as it was");
+ }
+ /* AND A SELECTION ALREADY SITTING ON THE ROW EATS THE NEXT SWIPE. Long-press a
+    defect's text and the browser hands the following drag to the selection
+    handles. Scoped to touch on purpose: selecting a defect with a mouse to
+    paste it is ordinary on the shop computer, and a mouse never starts a swipe,
+    so there is nothing to protect there. Matched as text rather than resolved,
+    because the resolver answers width questions and this one is not about
+    width. */
+ assert.match(css,/@media\(hover:none\) and \(pointer:coarse\)\{\s*\.log-focus-record\{-webkit-user-select:none;user-select:none\}/,
+  "a touch-only user-select guard, so the desktop keeps its text");
+ assert.doesNotMatch(css,/^\.log-focus-record\{[^}]*user-select:none/m,
+  "and it is not applied unconditionally - that would take text selection off the shop computer");
+
+ /* THE SCOPE NOTE MOVED INSIDE THE SLOT AND ITS RULE DID NOT FOLLOW IT. The
+    selector was `.log-focus-share>.log-focus-share-scope`, written when the
+    note was a direct child of the bar; inside the always-mounted slot it
+    matched nothing, and neither did `.log-focus-share>small` beside it, so the
+    note drew at the browser's default `small` size in inherited ink inside a
+    bar built for 7px. A `>` is a claim about the markup, and moving an element
+    is how the claim stops being true - silently. Resolved, so the next move
+    fails here. */
+ for(const [width,size] of [[390,9],[1180,7]]){
+  const note=effectiveStyle(css,{tag:"small",classes:["log-focus-share-scope"],
+   ancestors:[{tag:"div",classes:["log-focus-share"]},{tag:"div",classes:["log-focus-share-slot"]}]},width);
+  assert.equal(note.fontSizePx,size,"the scope note has to be bar-sized at "+width+"px");
+  assert.ok(note.color&&note.color.includes("--log-accent"),"and coloured as a notice");
+ }
+ /* AND THE HIDE ANNOUNCEMENT IS NEVER DRAWN, in or out of the slot: the visible
+    answer to a hide is the row going. */
+ assert.match(css,/\.log-focus-share \.log-focus-share-live\{position:absolute;width:1px;height:1px;[^}]*clip-path:inset\(50%\)/);
+ /* A REFUSED BUTTON LOOKS REFUSED. */
+ assert.match(css,/\.log-focus-share button:disabled\{[^}]*cursor:not-allowed/);
+
+ /* THE SLOT'S TWO CHILDREN SHARE ONE ROW. `width:100%` on PUT BACK was left
+    over from the build where it spanned the grid; inside the slot it is a flex
+    item beside the note, and 100% squeezed the sentence saying what will be
+    sent down to a word a line. */
+ assert.doesNotMatch(css,/\.focus-put-back\{[^}]*width:100%/,
+  "PUT BACK shares the slot with the note rather than taking the whole row");
+ for(const width of [390,1180]){
+  const back=effectiveStyle(css,{tag:"button",classes:["focus-put-back"],
+   ancestors:[{tag:"div",classes:["log-focus-share"]},{tag:"div",classes:["log-focus-share-slot"]}]},width);
+  assert.equal(back["min-height"],width<=760?"44px":"36px");
+  assert.equal(back.flex,"0 0 auto","and it does not shrink out from under a thumb");
+ }
+
+ /* WHAT HAPPENS TO FOCUS WHEN THE PRESSED CONTROL UNMOUNTS. A HIDE button goes
+    with its row, which drops focus to the document BODY - a keyboard then sits
+    at the top of the page, outside a dialog it never left. Only on a BUTTON
+    press: a swipe holds no focus, and scrolling the panel up to a control a
+    thumb never asked for is its own bug, which is why the row reports WHICH
+    WAY it was hidden rather than the page guessing. */
+ assert.match(page,/onHide=\{via=>focusHideRecord\(record,via\)\}/);
+ assert.match(swipeRow,/onHide: \(via: "button" \| "swipe"\) => void;/);
+ assert.match(page,/if\(via==="button"\)focusAfterCommit\(focusPutBackRef\)/);
+ assert.match(page,/if\(focusScope\.hiddenByHand<=1\)focusAfterCommit\(focusCopyRef\)/,
+  "the last PUT BACK takes the button away with it, so focus has to move on");
+ assert.match(page,/<button ref=\{focusCopyRef\}/);
+ assert.match(page,/<button ref=\{focusPutBackRef\}/);
+ /* AND A HIDE SAYS SO OUT LOUD, in its own region. A row leaving the list and a
+    button arriving are both silent, and the control that was pressed is gone
+    with its row - so without this a hide is a press with no outcome at all. Its
+    own region rather than the share status beside it, so a hide cannot wipe
+    COPIED and a share cannot wipe the hide. */
+ assert.match(page,/<small className="log-focus-share-live" role="status" aria-live="polite">\{focusHideNote\}<\/small>/);
+ assert.match(page,/setFocusHideNote\("HIDDEN FROM THIS SHARE — "\+repairCategoryLabel\(record\.defect\.category\)\)/);
+ assert.match(page,/setFocusHideNote\("PUT BACK — "/);
+ assert.match(page,/useEffect\(\(\)=>\{setFocusHideNote\(""\)\},\[focusedBusId\]\)/,
+  "and it goes with the bus, like the share status and the swiped-away list");
 });
 
 test("a re-report is visible where it happens, and the count it claims is one it made", async () => {
@@ -7888,6 +8700,114 @@ test("ESTIMATED TIME OF REPAIR is a claim about this bus, and the Defect Log own
  assert.equal(merged.length,1,"the two copies merged");
  assert.equal(merged[0].estimateHours,4,"and the merge keeps the one estimate either of them held");
 
+ /* AND EVERY PART ANYONE RECORDED SURVIVES THE MERGE, which it did not. Only
+    the survivor's `parts` came through `...survivor`; a merged-away copy
+    contributed nothing but its mirrored FIRST part, so a two-part duplicate
+    lost its second one outright. A cold read drove it. Losing a part number off
+    a repair's history is losing the history this app exists to keep - the same
+    reasoning the module already applies to the return tally, which it unions
+    for exactly this reason. */
+ {
+  const parted=(id,day,parts,mirror)=>({...defect,id,details:"same parts",
+   createdAt:"2026-09-0"+day+"T00:00:00.000Z",updatedAt:"2026-09-0"+day+"T00:00:00.000Z",
+   partsUsed:true,partNumber:mirror,parts});
+  const out=mergeDuplicateDefects([{id:"bus-8",n:"6302",l:"bay-2",s:"defect",defects:[
+   parted("p1",1,[{id:"a",partNumber:"AA-1",partName:"Chamber"}],"AA-1"),
+   parted("p2",2,[{id:"b",partNumber:"BB-2"},{id:"c",partNumber:"CC-3",partName:"Sensor"}],"BB-2"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.equal(out.length,1,"the two copies merged");
+  assert.deepEqual(normalizeDefectParts(out[0].parts,out[0]).map(part=>part.partNumber),
+   ["AA-1","BB-2","CC-3"],"every part on either copy has to survive the merge");
+  /* AND THE MIRRORED PAIR DESCRIBES THE ARRAY'S FIRST ROW, because the merge
+     runs through the one assembler rather than spreading fields. */
+  assert.equal(out[0].partNumber,"AA-1");
+  assert.equal(out[0].partsUsed,true);
+  /* THE SAME PART TYPED ON BOTH COPIES IS ONE PART, not two: two records of one
+     repair name the same part, and a doubled row would read as two fitted. */
+  const same=mergeDuplicateDefects([{id:"bus-7",n:"6303",l:"bay-3",s:"defect",defects:[
+   parted("q1",1,[{id:"a",partNumber:"AA-1"}],"AA-1"),
+   parted("q2",2,[{id:"b",partNumber:"aa-1"}],"aa-1"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.deepEqual(normalizeDefectParts(same[0].parts,same[0]).map(part=>part.partNumber),["AA-1"],
+   "the same number on both copies is one part, whatever its case");
+  /* AND A NAME ON THE LATER COPY FILLS A GAP IN THE EARLIER ONE. Skipping a
+     repeat outright kept the number and threw the NAME away: a survivor holding
+     `AA-1` with no name and a duplicate holding `AA-1 (Chamber)` merged to
+     `AA-1`. The same loss the union exists to prevent, one field smaller. The
+     first entry keeps its place; a later copy only ever fills a gap. */
+  const named=(id,day,part)=>({...defect,id,details:"same parts",
+   createdAt:"2026-09-0"+day+"T00:00:00.000Z",updatedAt:"2026-09-0"+day+"T00:00:00.000Z",
+   partsUsed:true,partNumber:part.partNumber,partName:part.partName||"",parts:[part]});
+  const fill=(a,b)=>{
+   const out=mergeDuplicateDefects([{id:"bx",n:"6309",l:"bay-9",s:"defect",
+    defects:[named("x1",1,a),named("x2",2,b)]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+   return defectPartsText(normalizeDefectParts(out[0].parts,out[0]));
+  };
+  assert.equal(fill({id:"a",partNumber:"AA-1"},{id:"b",partNumber:"AA-1",partName:"Chamber"}),
+   "AA-1 (Chamber)","a name on the later copy fills the gap");
+  assert.equal(fill({id:"a",partNumber:"AA-1",partName:"Chamber"},{id:"b",partNumber:"AA-1"}),
+   "AA-1 (Chamber)","and a bare repeat does not erase a name already held");
+  assert.equal(fill({id:"a",partNumber:"AA-1",partName:"Chamber"},{id:"b",partNumber:"AA-1",partName:"Pot"}),
+   "AA-1 (Chamber)","a later copy FILLS a gap and never overwrites what is there");
+  /* A COPY SAVED UNDER THE OLD SINGLE-PART SHAPE still contributes its part:
+     the merge reads through `normalizeDefectParts`, not off `parts` alone. */
+  const legacy=mergeDuplicateDefects([{id:"bus-6",n:"6304",l:"bay-4",s:"defect",defects:[
+   /* The SAME `details` as the copy below, or these are not duplicates at all
+      and nothing merges - which is how this fixture first "failed". */
+   {...defect,id:"r1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z",
+    partsUsed:true,partNumber:"ZZ-9",partName:"Belt"},
+   parted("r2",2,[{id:"b",partNumber:"YY-8"}],"YY-8"),
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.deepEqual(normalizeDefectParts(legacy[0].parts,legacy[0]).map(part=>part.partNumber),["ZZ-9","YY-8"],
+   "a one-part record saved before the array existed still brings its part");
+  /* AND EVERY MERGED PART NEEDS AN ID OF ITS OWN. `normalizeDefectParts` MINTS
+     a default id for a record that has none - `part-0` for a legacy one-part
+     record, `part-0, part-1…` for an array without ids - so two ordinary
+     one-part copies merged into a list where both parts were `part-0`.
+
+     That is the exact failure the ids exist to prevent: the editor keys rows by
+     id and `updateDefectPart`/`removeDefectPart` FIND a row by id, so typing in
+     row 2 rewrote row 1 and REMOVE on row 2 deleted both - silent loss on a
+     save, with the screen still showing the first part. Driven through the real
+     edit helpers, which is the only way to see it. */
+  const ids=normalizeDefectParts(legacy[0].parts,legacy[0]);
+  assert.equal(new Set(ids.map(part=>part.id)).size,ids.length,
+   "two merged parts must not share an id: "+JSON.stringify(ids.map(part=>part.id)));
+  assert.deepEqual(updateDefectPart(ids,ids[1].id,{partNumber:"YY-80"}).map(part=>part.partNumber),
+   ["ZZ-9","YY-80"],"typing in row 2 must not rewrite row 1");
+  assert.deepEqual(removeDefectPart(ids,ids[1].id).map(part=>part.partNumber),["ZZ-9"],
+   "and REMOVE on row 2 must not take row 1 with it");
+  /* An array whose own ids are the defaults collides the same way. */
+  const defaults=mergeDuplicateDefects([{id:"bd",n:"6308",l:"bay-8",s:"defect",defects:[
+   {...defect,id:"u1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z",
+    partsUsed:true,partNumber:"AA-1",parts:[{partNumber:"AA-1"},{partNumber:"BB-2"}]},
+   {...defect,id:"u2",details:"same parts",createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z",
+    partsUsed:true,partNumber:"CC-3",parts:[{partNumber:"CC-3"},{partNumber:"DD-4"}]},
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  const defaultIds=normalizeDefectParts(defaults[0].parts,defaults[0]);
+  assert.deepEqual(defaultIds.map(part=>part.partNumber),["AA-1","BB-2","CC-3","DD-4"]);
+  assert.equal(new Set(defaultIds.map(part=>part.id)).size,4,
+   "four parts, four ids: "+JSON.stringify(defaultIds.map(part=>part.id)));
+  /* A PART KEEPS ITS OWN ID WHEN NOTHING COLLIDES, so an ordinary merge does
+     not churn a record for nothing. */
+  assert.equal(defaultIds[0].id,"part-0","the first part is left alone");
+  /* AND A COPY WITH A PART NUMBER AND NO `partsUsed` FLAG KEEPS ITS PART. The
+     first version of this merge passed `anyTrue(...)===true` straight through,
+     so when NO copy carried the flag it handed the assembler an explicit
+     `false` - which means "somebody unticked the box" and beats every row in
+     the list. A pre-flag record carrying `partNumber:"HX-99"` alone had its
+     part wiped. The Down Sheet's merge test caught it, having asserted that
+     exact number survives since long before parts were a list. */
+  const unflagged=mergeDuplicateDefects([{id:"bus-5",n:"6305",l:"bay-5",s:"defect",defects:[
+   {...defect,id:"s1",details:"same parts",createdAt:"2026-09-01T00:00:00.000Z",updatedAt:"2026-09-01T00:00:00.000Z"},
+   {...defect,id:"s2",details:"same parts",createdAt:"2026-09-02T00:00:00.000Z",updatedAt:"2026-09-02T00:00:00.000Z",
+    partNumber:"HX-99"},
+  ]}],[],"2026-09-10T00:00:00.000Z").buses[0].defects;
+  assert.equal(unflagged[0].partNumber,"HX-99",
+   "a part number with no partsUsed flag is still a part somebody recorded");
+  assert.equal(unflagged[0].partsUsed,true,"and the flag follows the part, not the other way round");
+ }
+
  /* Both seeding sites ask the defect rather than the catalog: the entry the
     Defect Log opens when it puts a bus on the sheet, and the cards the Down
     Sheet builds for a bus that is already down. */
@@ -7921,7 +8841,7 @@ test("the Defect Log editor asks how long the repair takes where it used to ask 
  /* IN THE SAME PLACE ON THE SCREEN, directly above WORK STATUS and OUTSIDE
     ADVANCED DETAILS: this is typed by somebody standing at the bus, and a
     control behind a disclosure here goes unused, the way the campaign paste box
-    did. But outside the WORK DONE SO FAR fieldset the finding sat inside —
+    did. But outside the PRELIMS fieldset the finding sat inside —
     an estimate is not work done, and that legend would be wrong about the one
     field under it that looks forward. */
  const estimateAt=page.indexOf('className="wide repair-estimate-field"');
@@ -8747,4 +9667,34 @@ test("DEFECTS LOGGED lists what somebody logged, not what a scanned sheet brough
  const note=page.indexOf("LOGGED BY HAND ONLY");
  assert.ok(note>0,"the drawer states its scope");
  assert.ok(note<page.indexOf('className="quick-filter-share-actions"'),"before the share buttons");
+
+ /* AND `defectWithinFeedWindow` ASKS THE SAME QUESTION - with one honest
+    correction about where the answer matters.
+
+    The WHEN LOGGED drop-down over the feed carries the same guard, and at its
+    one caller today the guard never fires: `defectLogRecords` filters
+    `source==="defect-log"` before the page sees a record, and `loggedByHand`
+    is `source!=="down-sheet"`, so everything reaching it already passes. The
+    code comment that shipped with it claimed "ALL still shows them", which was
+    the opposite of true on that screen - a scanned row is not in ALL either,
+    because it never enters the list at all. A cold read caught the claim.
+
+    The guard stays as a property of the question rather than of today's
+    caller, so this drives it directly: the function is what a route, an export
+    or a whole-fleet read would ask, and the filter that currently makes it moot
+    lives in another module. */
+ const {defectWithinFeedWindow:inWindow}=await import("../src/lib/defects/feed-window.ts");
+ const at=new Date("2026-01-02T12:00:00.000Z");
+ const scanned={...defect("s1","down-sheet","C-24"),createdAt:"2026-01-02T11:30:00.000Z"};
+ const typed={...defect("t1","defect-log","Crank no start"),createdAt:"2026-01-02T11:30:00.000Z"};
+ assert.equal(inWindow(typed,1440,at),true,"something logged half an hour ago is in the window");
+ assert.equal(inWindow(scanned,1440,at),false,
+  "a scanned row is out of every narrowed window: its createdAt is when the scan ran");
+ assert.equal(inWindow(scanned,null,at),true,
+  "and ALL is the absence of a window, so it keeps everything handed to it");
+ /* AND THE FILTER THAT MAKES IT MOOT AT THE FEED IS STILL THERE, named here so
+    the dead-code account above cannot quietly stop being true. */
+ const sheetBus={id:"b2",n:"18506",pendingRepair:"",defects:[typed,scanned]};
+ assert.deepEqual(defectLogRecords([sheetBus],[]).map(record=>record.defect.id),["t1"],
+  "the Defect Log's own list never carries a scanned row in the first place");
 });
