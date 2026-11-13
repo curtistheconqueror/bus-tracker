@@ -4,7 +4,7 @@ import {isFarebox,isIbsVentra} from "../fleet/tech-services.ts";
 
 export type QuickFilterKey="ac"|"check-engine"|"bad-ramp"|"no-horn"|"farebox"|"ibs-ventra"|"leak"|"add-oil"|"no-cabin-heat"|"not-duplicated"|"down-sheet-recommended"|"deferred"|"road-call"|"logged";
 export type QuickFilterBus={
- id:string;n?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];roadCalls?:RoadCallEvent[];
+ id:string;n?:string;s?:string;pendingRepair?:string;checkEngine?:boolean;badRampKneeler?:boolean;noHorn?:boolean;farebox?:boolean;ibsVentra?:boolean;defects?:StructuredDefect[];roadCalls?:RoadCallEvent[];
 };
 
 export const QUICK_FILTERS:{key:QuickFilterKey;label:string;shortLabel:string}[]=[
@@ -167,6 +167,21 @@ function repairIdentityText(defect:StructuredDefect){
  const issue=String(defect.issue||"").trim();
  const placeholder=IDENTITY_IN_DETAILS.has(issue.toLowerCase());
  return [defect.category,issue,placeholder?defect.details:""].filter(Boolean).join(" ");
+}
+
+/* WHETHER ONE REPAIR IS A NO-HEAT REPAIR, open or finished.
+
+   The list above only ever asks this of work still outstanding, so the question
+   had no name of its own. The heat sheet scan needs it of FINISHED work too — a
+   heat repair closed after the day a bus was checked is the reason not to file
+   that check as a new fault — and the alternative was a second copy of what a
+   heating repair is, kept in step with this one by hope.
+
+   It is the same two functions `quickFilterDefects` composes for this key, in
+   the same order, and deliberately says nothing about `isUnresolved`: the
+   caller knows which it is asking about. */
+export function isNoHeatRepair(defect:StructuredDefect){
+ return quickFilterTextMatch(repairIdentityText(defect),"no-cabin-heat");
 }
 
 /* Whether a work-state stamp falls inside the road-call window. */

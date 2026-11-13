@@ -24,6 +24,7 @@ import {FINDINGS_MEMORY_STORAGE_KEY,normalizeFindingsMemory} from "../defects/fi
 import {PATH_TO_REPAIR_KEY,normalizePathToRepairs} from "../defects/path-to-repair.ts";
 import {REPAIR_HOURS_KEY,normalizeRepairHoursLedger} from "../defects/repair-hours-ledger.ts";
 import {SHEET_LEDGER_KEY,mergeSheetLedgers,readSheetLedger} from "../down-sheet/sheet-ledger.ts";
+import {mergeHeatChecks,readHeatChecks,writeHeatChecks} from "../defects/heat-check-log.ts";
 
 export type FleetBackupBus={id:string;n:string;l:string;[key:string]:unknown};
 export type FleetBackup={
@@ -43,6 +44,7 @@ export type FleetBackup={
  pathToRepairs?:unknown;
  repairHours?:unknown;
  sheetLedger?:unknown;
+ heatChecks?:unknown;
 };
 
 export type FleetBackupRead={ok:true;backup:FleetBackup}|{ok:false;error:FleetBackupError};
@@ -72,7 +74,7 @@ export function readFleetBackup(text:string):FleetBackupRead{
   settings:rest.settings,downSheet:rest.downSheet,downSheetSettings:rest.downSheetSettings,
   defectLogSettings:rest.defectLogSettings,partsMemory:rest.partsMemory,
   busLists:rest.busLists,busListTemplates:rest.busListTemplates,findingsMemory:rest.findingsMemory,
-  pathToRepairs:rest.pathToRepairs,repairHours:rest.repairHours,sheetLedger:rest.sheetLedger}};
+  pathToRepairs:rest.pathToRepairs,repairHours:rest.repairHours,sheetLedger:rest.sheetLedger,heatChecks:rest.heatChecks}};
 }
 
 export const FLEET_BACKUP_ERRORS:Record<FleetBackupError,string>={
@@ -148,6 +150,23 @@ export function restoreFleetBackup(storage:Storage,backup:FleetBackup):FleetRest
  if(backup.sheetLedger!==undefined&&backup.sheetLedger!==null){
   writeSetting(storage,SHEET_LEDGER_KEY,JSON.stringify(mergeSheetLedgers(readSheetLedger(storage),backup.sheetLedger)));
   restored.push("swap history");
+ }
+ /* THE HEAT CHECK LOG IS THE SECOND THING HERE THAT MERGES, and for the reason
+    the swap ledger is the first: it is events, not state. A check is one person
+    looking at one bus on one day; two devices never make the same one, and a
+    line both of them read off the same paper carries the same id on both. So
+    restoring the phone's file onto the iPad adds the phone's checks to the
+    iPad's and loses nobody's — where replacing would throw away every check the
+    iPad's own mechanic had tapped in.
+
+    It was written into this file with the first screen that could fill it,
+    rather than two releases later: PATH TO REPAIR and the repair-hours ledger
+    each shipped without their line here. */
+ if(backup.heatChecks!==undefined&&backup.heatChecks!==null){
+  /* Named in the result only when it was actually written. The board is
+     already restored by this point, so a full disk here is reported by the
+     label being absent rather than by failing a restore that succeeded. */
+  if(writeHeatChecks(storage,mergeHeatChecks(readHeatChecks(storage),backup.heatChecks)).ok)restored.push("heat checks");
  }
  return {ok:true,restored};
 }

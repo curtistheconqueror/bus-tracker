@@ -87,6 +87,9 @@ export type StructuredDefect={
  state:DefectState;
  createdAt?:string;
  updatedAt?:string;
+ /* Set by PUT BACK on a scan record, to the stamp PUT BACK gave `updatedAt`.
+    scan-batches.ts owns what it means. */
+ scanRestoredAt?:string;
  completedAt?:string;
  completedBy?:string;
  conditionNotDuplicated?:boolean;

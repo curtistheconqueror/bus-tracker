@@ -2,7 +2,7 @@ import {candidateBusNumbers,resolveBusNumber} from "../fleet/bus-number-resolver
 import {REPAIR_OPTIONS,REPAIR_OPTION_GROUPS,migrateRepairIdentity,type DefectOperability,type StructuredDefect} from "../defects/repair-catalog.ts";
 import {analyzeFleetQuestion,findOperatorArea,findOperatorAreaMentions,type FleetInsightBus} from "../fleet/fleet-intelligence.ts";
 import type {FleetStatus} from "../fleet/smart-status.ts";
-import {describeScanBatch,scanBatches,type ScanBatch} from "../defects/scan-batches.ts";
+import {describeScanBatch,scanBatches,scanBatchWords,type ScanBatch,type ScanBatchKind} from "../defects/scan-batches.ts";
 
 export type OperatorBus=FleetInsightBus;
 
@@ -281,7 +281,7 @@ function areaLabel(bus:OperatorBus,areas:OperatorArea[]){return areas.find(area=
    the last sweep filed 24 is that sweep; when it filed 19, the operator says so
    rather than removing 19 and calling it 24. A command naming a bus is not a
    batch command at all and falls through to the per-bus paths. */
-type ScanBatchIntent={action:"remove"|"restore";count:number|null;namesScan:boolean};
+type ScanBatchIntent={action:"remove"|"restore";count:number|null;namesScan:boolean;kind:ScanBatchKind|null};
 
 function scanBatchCommand(text:string):ScanBatchIntent|null{
  if(/\bbus(?:es)?\s*(?:number|no|#)?\s*\d/.test(text)||/\b\d{5}\b/.test(text))return null;
@@ -295,27 +295,38 @@ function scanBatchCommand(text:string):ScanBatchIntent|null{
  const count=counted?parseInt(counted[1],10):null;
  /* Without a count and without a scan word, "undo the last change to the log"
     is not a batch — the log's own UNDO LAST is that, and the operator says so. */
- if(!restore&&!namesScan&&count===null)return {action:"remove",count:null,namesScan:false};
- return {action:restore?"restore":"remove",count,namesScan};
+ /* "Heat" names the heat sheet's scanner; "sweep", "farebox" and "Ventra" name
+    the other one. Naming both, or neither, names no kind. */
+ const heat=/\bheat\b/.test(text),sweep=/\b(?:sweep|swept|farebox|fareboxes|ventra)\b/.test(text);
+ const kind:ScanBatchKind|null=heat===sweep?null:heat?"heat":"sweep";
+ if(!restore&&!namesScan&&count===null)return {action:"remove",count:null,namesScan:false,kind};
+ return {action:restore?"restore":"remove",count,namesScan,kind};
 }
 
 function batchLine(batch:ScanBatch){return describeScanBatch(batch)}
 
 function planScanBatch(intent:ScanBatchIntent,fleet:OperatorBus[]):OperatorPlanningResult{
- if(intent.action==="restore")return {kind:"plan",plan:{kind:"restoreScanBatch",requiresConfirmation:true,summary:"Put back the last scan sweep removed on this device — every record goes back on its bus, stamped as new work so the shop cloud accepts it over the deletion"}};
- const batches=scanBatches(fleet);
+ /* WHICH SCAN WAS ASKED FOR. Two scanners file batches now, and this used to
+    take the newest of either: "remove the last heat sheet scan" with a farebox
+    sweep filed after it planned the removal of the SWEEP, and said so in the
+    sweep's words. A command that names a kind gets that kind; one that names
+    neither — "the last 24 entries" — still means the newest of any. */
+ const asked=intent.kind?scanBatchWords({kind:intent.kind}).noun:"photo scan";
+ if(intent.action==="restore")return {kind:"plan",plan:{kind:"restoreScanBatch",requiresConfirmation:true,summary:"Put back the last scan removed on this device — every record goes back on its bus, stamped as new work so the shop cloud accepts it over the deletion"}};
+ const all=scanBatches(fleet),batches=intent.kind?all.filter(batch=>batch.kind===intent.kind):all;
  const newest=batches[0];
- if(!newest)return {kind:"message",message:"There is no scan sweep on this device's Defect Log to take out. Every record filed by SCAN SWEEP in one press shares one time stamp, and none of the records here carry one."};
- if(!intent.namesScan&&intent.count===null)return {kind:"message",message:"The Defect Log's own UNDO LAST button reverses its most recent save. From here I can take out a whole scan sweep: the most recent one filed "+batchLine(newest)+". Say “remove the last scan sweep from the defect log” and I will preview exactly that."};
+ if(!newest)return {kind:"message",message:"There is no "+asked+" on this device's Defect Log to take out. Every record a scan files in one press shares one time stamp, and none of the records here carry one."+(intent.kind&&all.length?" There is a "+scanBatchWords(all[0]).noun+": "+batchLine(all[0])+".":"")};
+ const noun=scanBatchWords(newest).noun,short=scanBatchWords(newest).short;
+ if(!intent.namesScan&&intent.count===null)return {kind:"message",message:"The Defect Log's own UNDO LAST button reverses its most recent save. From here I can take out a whole "+noun+": the most recent one filed "+batchLine(newest)+". Say “remove the last "+noun+" from the defect log” and I will preview exactly that."};
  if(intent.count!==null&&intent.count!==newest.ids.length){
   const match=batches.find(batch=>batch.ids.length===intent.count);
-  if(match)return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+". A sweep of "+intent.count+" was filed earlier: "+batchLine(match)+". Say “remove the scan sweep from "+describeWhen(match.filedAt)+"”, or “remove the last scan sweep” for the most recent one."};
-  return {kind:"message",message:"The most recent scan sweep filed "+newest.ids.length+" records, not "+intent.count+" — "+batchLine(newest)+". Say “remove the last scan sweep” to take out those "+newest.ids.length+", or open SCAN BATCHES on the Defect Log to see every sweep."};
+  if(match)return {kind:"message",message:"The most recent "+noun+" filed "+newest.ids.length+" records, not "+intent.count+". A "+scanBatchWords(match).noun+" of "+intent.count+" was filed earlier: "+batchLine(match)+". Open SCAN BATCHES on the Defect Log to take that one out, or say “remove the last "+noun+"” for the most recent one."};
+  return {kind:"message",message:"The most recent "+noun+" filed "+newest.ids.length+" records, not "+intent.count+" — "+batchLine(newest)+". Say “remove the last "+noun+"” to take out those "+newest.ids.length+", or open SCAN BATCHES on the Defect Log to see every scan."};
  }
- if(!newest.removableIds.length)return {kind:"message",message:"Every record in the most recent scan sweep ("+batchLine(newest)+") has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to take out. Nothing was changed."};
+ if(!newest.removableIds.length)return {kind:"message",message:"Every record in the most recent "+noun+" ("+batchLine(newest)+") has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to take out. Nothing was changed."};
  const kept=newest.keptIds.length;
  return {kind:"plan",plan:{kind:"removeScanBatch",requiresConfirmation:true,batchKey:newest.key,count:newest.ids.length,busCount:newest.busNumbers.length,
-  summary:"Remove the "+newest.removableIds.length+" Tech Services record"+(newest.removableIds.length===1?"":"s")+" SCAN SWEEP filed at "+describeWhen(newest.filedAt)+" from "+newest.busNumbers.length+" bus"+(newest.busNumbers.length===1?"":"es")+" ("+newest.busNumbers.slice(0,6).join(", ")+(newest.busNumbers.length>6?", …":"")+")."+(kept?" "+kept+" record"+(kept===1?"":"s")+" from that sweep "+(kept===1?"has":"have")+" been worked on since and will be kept.":"")+" The shop cloud is told, so the other devices drop them too. The way back is SCAN BATCHES on the Defect Log, or tell me to put the sweep back."}};
+  summary:"Remove the "+newest.removableIds.length+" "+scanBatchWords(newest).records+" record"+(newest.removableIds.length===1?"":"s")+" "+scanBatchWords(newest).filedBy+" filed at "+describeWhen(newest.filedAt)+" from "+newest.busNumbers.length+" bus"+(newest.busNumbers.length===1?"":"es")+" ("+newest.busNumbers.slice(0,6).join(", ")+(newest.busNumbers.length>6?", …":"")+")."+(kept?" "+kept+" record"+(kept===1?"":"s")+" from that "+short+" "+(kept===1?"has":"have")+" been worked on since and will be kept.":"")+(newest.kind==="heat"?" The heat checks that scan logged come off the check log with it.":"")+" The shop cloud is told, so the other devices drop them too. The way back is SCAN BATCHES on the Defect Log, or tell me to put the "+short+" back."}};
 }
 
 function describeWhen(iso:string){

@@ -93,7 +93,7 @@ branding.** Counted at this commit —
 | | what it is | where |
 | --- | --- | --- |
 | the yard's geometry | six independent descriptions of one building that must agree, plus ~71 slot-prefix literals across 16 files, some carrying BEHAVIOUR (`smart-status`, `mystery-buses`, `road-calls`) | `docs/roadmap/facility-config.md`, scoped and not built |
-| 60 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
+| 50 storage keys | all prefixed `pace-`, and renaming one is forbidden above | the key list below |
 | the Shop Cloud | one project, one shop login, and RLS grants any authenticated user full insert and update | `supabase/migrations/0002_shared_records.sql` |
 | the MCP | one `MCP_TOKEN` with no issuer and no per-organisation identity | `docs/AGENT_MCP.md` |
 
@@ -215,6 +215,7 @@ the records
   pace-bus-list-templates-v1       campaign column formats
   pace-incidents-v1                INCIDENTS: what happened to a person, where
   pace-shop-talk-v1                SHOP TALK: hazards, heads ups, suggestions
+  pace-heat-checks-v1              HEAT CHECKS: who checked which bus for heat, when, and what they found
 
 what the shop has taught it
   pace-parts-memory-v1             learned part numbers
@@ -674,6 +675,109 @@ repair marked done by the mechanic who did it becomes the finer signal and the
 sheet updates from it — at which point this ledger becomes the coarse check on
 that, not the only input.
 
+**`pace-heat-checks-v1` is a LOG OF CHECKS, not a sheet.** Curtis, on why the
+heat sheet is not a Down Sheet: *"the heat sheet needs to be shared and verify
+with multiple mechanics because a mechanic could be put on heat sheet duty"*,
+where the Down Sheet *"is just a snapshot of what currently happening during a
+shift"*. So a scan never REPLACES anything here. Each record is one person
+looking at one bus on one day — fleet number, `ok` or `no-heat`, the day, the
+initials — and a later check is added beside an earlier one, never over it.
+
+**Which buses are cold is NOT decided by this key.** A no-heat bus is a DEFECT
+(`A/C and HVAC` / `Heating - No heat`) on a bus that still runs — Curtis:
+*"they're letting them roll every day despite being cold because they're trying
+to make pull out"* — so it lives in the Defect Log, never on the Down Sheet,
+and No Heat Buses is the one list that says who is cold right now.
+`heatRoster` in `src/lib/defects/heat-check-log.ts` sets that list beside the
+last check; an open heat repair is not cleared by somebody saying the bus felt
+warm.
+
+**A line off the paper has an id made of what the line says**, so the same
+sheet photographed again, or on a second phone, logs no DATED line twice. A
+line with no date is named by the day it was read — with nothing in its place
+last winter's undated OK and this winter's were one check — so re-read on a
+later day it logs again: the same result twice, which moves no bus's standing.
+A tap in the app is the opposite and carries a random tail.
+
+**TWO DOORS FILL IT, AND THE BOARD IS WRITTEN ONE WAY FROM BOTH.** A photographed
+heat sheet is read on the **Defect Log** (SCAN HEAT SHEET, beside SCAN SWEEP),
+because that is where its results land and where the board is saved, undone and
+taken back out. The heat campaign is RUN from **Fleet Campaigns**, whose card
+links to that scanner and whose list takes a HEAT OK / NO HEAT tap at the bus.
+Both put a no-heat result on a bus through `src/lib/defects/heat-check-apply.ts`
+and nowhere else; Fleet Campaigns never writes the board itself — `fileHeatTap`
+takes STORAGE and reads the board fresh at the tap.
+
+**What a mark means is decided in `heat-check-import.ts`, not by the model.** The
+route returns the result cell AS WRITTEN. "N/R" reads as "needs repair" and as
+"no repair needed" equally well, so it was asked: Curtis — *"Yes N/R needs
+repair"*. A STRUCK-THROUGH row files nothing, closes nothing and is not logged:
+*"struck means fixed but I'll double check"*, and until he has, a pen line is
+nobody's finding.
+
+**A scanned heat defect is an ORDINARY defect.** Curtis: *"the defect itself has
+to be editable of course and be no different than logging one manually."* Its id
+carries the scan prefix only so SCAN BATCHES can take a wrong scan back out —
+and taking one out takes the checks that scan logged with it, from EVERY door:
+the panel, UNDO LAST and the AI Operator all end in `dropScanChecks`. The
+operator did not at first, and each bus the removed scan had called N/R dropped
+into VERIFY. A record somebody has since narrowed or written on is kept.
+
+**Taking a scan out puts each bus's STATUS back by the rule a save uses**, and
+only while the status is still the one that rule gives — `statusAfterDefectChange`
+in `defect-log-sync.ts`. Filing moved a bus in service to DEFECT; the removal
+used to rebuild the defects and leave it there, sixty buses reading DEFECT with
+nothing on them. A status somebody set since is left alone. It cannot return a
+status the filing itself flattened: a bus marked OUT with nothing downing it
+became DEFECT when the scan filed on it, as it would for a defect logged by
+hand. **PUT BACK stamps `scanRestoredAt`** beside the `updatedAt` it has to
+move, so a returned record still reads as untouched and the scan can be taken
+out again; and it leaves off a repair the bus already has open, which is what a
+re-scan between the removal and the PUT BACK would otherwise double.
+
+**A heat log that cannot be READ is not written over.** It draws as empty, and
+every write to it is refused and says why — the board's rule, for the case of a
+newer app's log on a phone still running an older page from its cache.
+
+**The review can only say no to a row it can see.** An N/R the reviewer unticks
+is neither filed nor logged; a row the RULES held back is unticked by rule and
+is still logged, because VERIFY is where it belongs. The OK buses are drawn as
+their own group — each one logged comes off the walking list — and an OK read
+below `HEAT_LOW_CONFIDENCE` is not logged at all. Two rows with one bus number
+collapse only when they are the same line on two photos: same mark, same date,
+same initials. Anything else is a misread number and goes to a person.
+
+**MASTER EXPORT carries it and a restore MERGES it**, the way the swap ledger is
+merged and for the same reason: it is events. **It does not SYNC**, which for a
+log whose whole reason is changing hands is the open gap. The no-heat DEFECTS
+already travel through the Shop Cloud like any defect; the checks — who looked,
+the OK results, who is still unchecked — stay on the device that recorded them.
+Carrying them needs a new table, which is a write to the live database and
+Curtis's call.
+
+**FOUR LIMITS, KNOWN AND LEFT.** (1) Two devices that each scan the same sheet
+before either has synced will each file their own defect for a bus: the checks
+dedupe by id and the defects cannot, because a deterministic defect id would
+collide with the tombstone a removed scan leaves. Scan on one device, or sync
+first. (2) A scan that files NO defect leaves no batch, so its checks cannot be
+taken back as a set; a wrong check is corrected by the next check on that bus.
+(3) An undated line off the paper never outranks a dated check — all that is
+known is that it was written before the photo. (4) UNDO THIS TAP takes back the
+check and never the defect a NO HEAT tap opened; that is the Defect Log's to
+correct, which is why the tap asks first.
+
+**THE PHOTO READ ITSELF HAS NEVER BEEN RUN.** Everything after the route was
+driven in a browser with the route's answer stubbed; `/api/heat-sheet-scan`
+needs the OpenRouter key and has not seen a real photograph. Its first real
+sheet is the test of its prompt.
+
+**THE A/C CARD CLAIMS NO NUMBER, ON PURPOSE.** The only definition of an A/C bus
+is the Defect Log's A/C Buses filter, and it matches the CATEGORY "A/C and HVAC"
+— so it counts every heating repair too. Measured: one cooling fault and two
+no-heat buses read as three. Narrowing that filter changes an existing list and
+is Curtis's call; until it is settled, a heat campaign's results would have
+appeared on the A/C card.
+
 **`pace-incidents-v1` and `pace-shop-talk-v1` are about PEOPLE AND PLACES, not
 buses.** Added the night Curtis slipped on oil in the shop. A defect is attached
 to a fleet number; the oil was on the floor and belonged to no bus, so filing it
@@ -1039,6 +1143,9 @@ app/<route>/_components/             React drawn by exactly one route
 src/lib/fleet/bus-hold.ts            HOLD THIS BUS: the field, what lifts it, the held list
 src/lib/fleet/location-label.ts      slot id -> the words a person says, trouble bays included
 src/lib/defects/repair-catalog.ts    the defect catalog, rename maps, count fields
+src/lib/defects/heat-check-import.ts the heat sheet's rules: what a mark means, what may be filed
+src/lib/defects/heat-check-log.ts    the heat check log, the roster, the list to hand out
+src/lib/defects/heat-check-apply.ts  putting a no-heat result on a bus, for the scan and the tap
 src/lib/storage/section-transfer.ts  per-section device transfers and their merge rules
 src/lib/storage/storage.ts           storage keys, envelopes, recovery snapshots
 app/globals.css                      the whole facility map, all breakpoints

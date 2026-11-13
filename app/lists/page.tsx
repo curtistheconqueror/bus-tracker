@@ -5,7 +5,12 @@ import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./lists.css";
 import "./_components/work-time.css";
+import "./_components/campaign-board.css";
 import WorkTimePanel from "./_components/work-time-panel";
+import CampaignBoard from "./_components/campaign-board";
+import type {HeatFleetBus} from "@/src/lib/defects/heat-check-import";
+import {HEAT_CHECKS_KEY,heatLogProblemWords,readHeatChecks,undoHeatCheck,type HeatCheck,type HeatResult,type HeatRosterRow} from "@/src/lib/defects/heat-check-log";
+import {recordHeatTap,type HeatTapOutcome} from "@/src/lib/defects/heat-check-apply";
 import type {WorkTimeBus} from "@/src/lib/reports/work-time";
 import {REPORT_EXPORT_HINT} from "@/src/lib/storage/fleet-backup";
 import {DeferredNavBadge,DeferredReviewPrompt} from "@/src/components/shared/deferred-watch";
@@ -23,6 +28,20 @@ function readLists(raw:string|null):BusList[]{
 function writeLists(lists:BusList[]){
  try{localStorage.setItem(BUS_LISTS_STORAGE_KEY,JSON.stringify(lists));return true}catch{return false}
 }
+/* The fleet as this page borrows it: enough for the timesheet, and enough for
+   the campaigns board to ask the Defect Log's own filters about a bus. */
+type CampaignBus=WorkTimeBus&HeatFleetBus;
+/* What to say when a tap changed nothing, and each says so. The one failure
+   that CAN leave something behind — the check refused after NO HEAT had already
+   opened its defect — is not in this table: `checkHeat` words it from what the
+   tap reports, because "nothing was changed" would be false there. */
+const HEAT_TAP_PROBLEM:Record<Exclude<Extract<HeatTapOutcome,{ok:false}>["why"],"check-not-saved">,string>={
+ "no-initials":"Enter your initials first, so the check says who made it.",
+ "no-bus":"Bus {bus} is not on this device's board any more. Nothing was changed.",
+ "two-buses":"Two buses on the board share the number {bus}, so the tap could land on either. Nothing was changed — fix the duplicate on the Facility Map first.",
+ unreadable:"This device's board could not be read. Nothing was changed.",
+ "not-saved":"The defect could not be saved to this device. Nothing was changed.",
+};
 function seedId(){return Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7)}
 function dayLabel(value:string){
  const date=new Date(value);
@@ -45,24 +64,39 @@ export default function Lists(){
  const [exportMode,setExportMode]=useState<BusListExportMode>("full");
  const [copyStatus,setCopyStatus]=useState("");
  const addBoxRef=useRef<HTMLTextAreaElement|null>(null);
- /* Read only, and never written back from this page. Campaigns own their own
-    storage; the fleet is borrowed purely so the work time panel can add up
-    Defect Log repairs alongside campaign rows. */
- const [fleet,setFleet]=useState<WorkTimeBus[]>([]);
+ /* A BORROWED COPY, and never written back from this page. It is here so the
+    work time panel can add up Defect Log repairs and the campaigns board can
+    count the fleet. The one thing this page does to the board — a NO HEAT tap
+    opening a defect — goes through `recordHeatTap`, which takes STORAGE and
+    reads the board fresh at the moment of the tap; this state is re-read
+    afterwards and is never the thing that gets saved. */
+ const [fleet,setFleet]=useState<CampaignBus[]>([]);
+ const [heatChecks,setHeatChecks]=useState<HeatCheck[]>([]);
+ /* The one tap that can still be taken back. Held in memory only: it is "the
+    thing I just did", and a reload is the end of just. */
+ const [lastTap,setLastTap]=useState<{checkId:string;busNumber:string;result:HeatResult;filed:boolean}|null>(null);
 
  useEffect(()=>{
+  setHeatChecks(readHeatChecks(localStorage));
   setLists(readLists(localStorage.getItem(BUS_LISTS_STORAGE_KEY)));
   try{setSavedTemplates(normalizeBusListTemplates(JSON.parse(localStorage.getItem(BUS_LIST_TEMPLATES_STORAGE_KEY)||"[]")))}catch{/* optional */}
   try{setInitials(String(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").defaultInitials||""))}catch{/* optional */}
-  try{const saved=readFleetPayload<WorkTimeBus>(localStorage.getItem(FLEET_STORAGE_KEY));if(saved.valid)setFleet(saved.buses)}catch{/* the timesheet still works without it */}
+  try{const saved=readFleetPayload<CampaignBus>(localStorage.getItem(FLEET_STORAGE_KEY));if(saved.valid)setFleet(saved.buses)}catch{/* the timesheet still works without it */}
   setHydrated(true);
+ },[]);
+ /* The heat sheet is scanned on the Defect Log, often in the tab next to this
+    one, so its checks arrive here the way a saved repair does. */
+ useEffect(()=>{
+  const refresh=(event:StorageEvent)=>{if(event.key===HEAT_CHECKS_KEY)setHeatChecks(readHeatChecks(localStorage))};
+  window.addEventListener("storage",refresh);
+  return()=>window.removeEventListener("storage",refresh);
  },[]);
  /* A repair saved as fixed in another tab should show up here without a
     reload: the Defect Log and this page are commonly open side by side. */
  useEffect(()=>{
   const refresh=(event:StorageEvent)=>{
    if(event.key!==FLEET_STORAGE_KEY||!event.newValue)return;
-   const saved=readFleetPayload<WorkTimeBus>(event.newValue);
+   const saved=readFleetPayload<CampaignBus>(event.newValue);
    if(saved.valid)setFleet(saved.buses);
   };
   window.addEventListener("storage",refresh);
@@ -124,6 +158,42 @@ export default function Lists(){
   try{await copyText(exportText);setCopyStatus("COPIED")}catch{setCopyStatus("COULD NOT COPY")}
   setTimeout(()=>setCopyStatus(""),2200);
  };
+ /* ONE TAP ON THE HEAT LIST. Everything it does — who, the defect if there is
+    one to open, the check, and in what order — is `recordHeatTap`'s; this asks
+    the one question only a person can answer, hands the tap over, and shows
+    what came back. The clock is taken AFTER the question, so a confirm left
+    open for ten minutes does not date the check ten minutes early. */
+ const checkHeat=(row:HeatRosterRow,result:HeatResult)=>{
+  if(!initials.trim()){alert(HEAT_TAP_PROBLEM["no-initials"]);return}
+  if(result==="no-heat"&&!row.openHeat.length&&!confirm("Log bus "+row.busNumber+" as NO HEAT?\n\nThis opens a No Heat defect on the Defect Log. It is an ordinary defect — add details, or mark it fixed, there."))return;
+  const tap=recordHeatTap(localStorage,row.busNumber,result,initials);
+  if(!tap.ok&&tap.why==="check-not-saved"){
+   /* The board may hold a defect this tap opened, so the page re-reads it
+      before saying anything, and the words come from what the tap reports. */
+   refreshFromStorage();
+   alert("The check could not be saved — "+heatLogProblemWords(tap.log)+"."+(tap.filed?" The No Heat defect WAS opened on the Defect Log for bus "+row.busNumber+", and it is still there.":" Nothing was changed."));
+   return;
+  }
+  if(!tap.ok){alert(HEAT_TAP_PROBLEM[tap.why].replace("{bus}",row.busNumber));return}
+  refreshFromStorage();
+  setLastTap({checkId:tap.checkId,busNumber:row.busNumber,result,filed:tap.filed});
+ };
+ /* Taking the last tap back. The CHECK goes; a defect that tap opened does not,
+    and the button says so before it is pressed — a defect is the Defect Log's
+    to correct, and one that somebody has since added to must not vanish from a
+    list on another page. */
+ const undoHeatTap=()=>{
+  if(!lastTap)return;
+  const undone=undoHeatCheck(localStorage,lastTap.checkId);
+  if(!undone.ok){alert("The check could not be taken back — "+heatLogProblemWords(undone.why)+".");return}
+  setLastTap(null);refreshFromStorage();
+ };
+ /* The board and the log as they are on disk now. This page never trusts its
+    own copy of either after something has written to them. */
+ const refreshFromStorage=()=>{
+  setHeatChecks(readHeatChecks(localStorage));
+  try{const saved=readFleetPayload<CampaignBus>(localStorage.getItem(FLEET_STORAGE_KEY));if(saved.valid)setFleet(saved.buses)}catch{/* the counts catch up on the next read */}
+ };
  const downloadList=()=>{
   if(!open)return;
   const blob=new Blob([exportText],{type:"text/plain;charset=utf-8"});
@@ -134,6 +204,8 @@ export default function Lists(){
   <header className="lists-header"><div><AppName/><span>FLEET MAINTENANCE</span><h1>Fleet Campaigns</h1><p>Working lists you can hand to someone without the app</p></div>
    <TrackerNav active="/lists"/><RefreshButton/>
   </header>
+
+  <CampaignBoard fleet={fleet} checks={heatChecks} initials={initials} onInitials={setInitials} onCheck={checkHeat} lastTap={lastTap} onUndo={undoHeatTap}/>
 
   <WorkTimePanel lists={lists} buses={fleet} defaultPerson={initials.trim().toUpperCase()}/>
 
