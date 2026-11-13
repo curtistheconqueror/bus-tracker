@@ -221,7 +221,11 @@ export function normalizeHeatRow(raw:unknown,pageNumber=1):ScannedHeatRow{
   busNumber:scannedBus(row.busNumber),
   written:cell(row.written,24),
   struck:row.struck===true,
-  date:clean(row.date).slice(0,16),
+  /* A lone dash, or "n/a", in the DATE cell is an empty date cell — the same
+     filler `heatMark` already reads as a blank result, written by a model that
+     will not return an empty string. Kept as text it was "a date that could
+     not be placed", which costs an OK its check. */
+  date:/^(?:[-–—_]+|n\/?a)$/i.test(clean(row.date))?"":clean(row.date).slice(0,16),
   initial:clean(row.initial).slice(0,6),
   note:clean(row.note).slice(0,240),
   confidence:confidence(row.confidence),

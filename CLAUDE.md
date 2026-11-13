@@ -783,7 +783,8 @@ dedupe by id and the defects cannot, because a deterministic defect id would
 collide with the tombstone a removed scan leaves. Scan on one device, or sync
 first. (2) A scan that files NO defect leaves no batch for SCAN BATCHES. UNDO
 LAST takes its checks back out, but only while it is still the last thing done
-on the Defect Log; after that a wrong check is corrected by the next check on
+on the Defect Log AND the page has not been left — the undo is held in the
+page, not on disk. After that a wrong check is corrected by the next check on
 that bus.
 (3) An undated line off the paper never outranks a dated check — all that is
 known is that it was written before the photo. (4) UNDO THIS TAP takes back the

@@ -5188,6 +5188,16 @@ test("what two reviewers found in the heat log once it was pushed",async()=>{
  assert.deepEqual(kept.map(check=>check.busNumber+":"+check.result+":"+(check.on||"undated")).sort(),["17512:ok:2026-11-10","17515:ok:undated","17516:no-heat:undated"],
   "the OK nobody can date is left out; the undated OK and the N/R are kept");
  assert.equal(dated[2].action,"file","and an N/R with a date like that is still filed — that errs toward somebody going to the bus");
+ /* A FILLER IN THE DATE CELL IS AN EMPTY DATE CELL. A model that will not return
+    an empty string writes a dash; kept as text it was "a date nobody can
+    place" and cost the OK its check. */
+ for(const filler of ["-","—","--","_","n/a","N/A","na"]){
+  const filled=heatFindings([row("17515","OK",filler)],fleet,NOW)[0];
+  assert.equal(filled.dateWritten,"",JSON.stringify(filler));
+  assert.equal(heatOkHeldWhy(filled),"",JSON.stringify(filler));
+  assert.equal(heatChecksFromFindings([filled],NOW).length,1,JSON.stringify(filler));
+ }
+ assert.equal(heatDateUnplaced(heatFindings([row("17515","OK","1o/22")],fleet,NOW)[0]),true,"a date that is written and wrong is still not an empty one");
 
  /* FILING ASKS AGAIN. The review can sit open while a heat repair lands on the
     bus some other way, and the save's own guard matches the same repair only. */
@@ -5285,7 +5295,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(scanner,/const loggable=useMemo\(\(\)=>heatLoggable\(findings,held\)/,"what may be logged is asked again after the reviewer's ticks");
  assert.match(scanner,/if\(!photos.length\|\|busy\)return;/,"READ SHEET cannot be pressed twice");
  /* The way back is promised only where there is one. */
- assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, until the next change on the Defect Log; after that a wrong check is corrected by the next check on that bus\.";/);
+ assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus\.";/);
  /* The photos and the notes cannot change under a read that is running. */
  assert.match(scanner,/if\(!files\|\|busy\)return;/,"no photo is added mid-read");
  assert.match(scanner,/const removePhoto=\(key:string\)=>busy\?undefined:setPhotos\(/,"none is removed mid-read");
@@ -5322,7 +5332,13 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  /* A scan that filed NO defect is still the last thing done, and UNDO LAST
     takes its checks — it used to leave the previous undo armed instead. */
  assert.match(fileHeat,/if\(!filed&&log\.ok&&log\.added\)setUndoSnapshot\(\{fleet,downEntries,label:[^}]*heatChecks:now\}\);/);
- assert.match(undo,/if\(undoSnapshot\.heatChecks\)\{\s*const cut=dropScanChecks\(localStorage,\{kind:"heat",key:undoSnapshot\.heatChecks\}\);\s*setUndoSnapshot\(null\);/);
+ assert.match(undo,/if\(undoSnapshot\.heatChecks\)\{\s*const cut=dropScanChecks\(localStorage,\{kind:"heat",key:undoSnapshot\.heatChecks\}\);/);
+ /* A refused undo keeps its way back, and says why it was refused. */
+ const checksOnly=undo.slice(undo.indexOf("if(undoSnapshot.heatChecks){"),undo.indexOf("if(undoSnapshot.heatScan){"));
+ assert.ok(checksOnly.length>100,"the checks-only branch was found");
+ assert.match(checksOnly,/if\(cut\.ok\)setUndoSnapshot\(null\);/);
+ assert.equal((checksOnly.match(/setUndoSnapshot\(null\)/g)||[]).length,1,"cleared only when the log let the checks go");
+ assert.match(checksOnly,/:"THE HEAT CHECKS COULD NOT BE TAKEN OUT — "\+heatLogProblemWords\(cut\.why\)\+"\."\);/);
  inOrder(undo,"if(undoSnapshot.heatChecks){","persist(undoSnapshot.fleet,undoSnapshot.downEntries)","a checks-only undo never reaches the board write");
  /* Checks that could not be taken out are SAID, even when none came out. */
  assert.match(removeBatch,/\+\(cut\.removed\|\|!cut\.ok\?\(cut\.ok\?/);
@@ -5347,7 +5363,7 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  /* A double-tap must not land on the row that slid up: both buttons go dead. */
  assert.match(board,/className="tap-ok" disabled=\{guarded\} onClick=\{\(\)=>tap\(row,"ok"\)\}/);
  assert.match(board,/className="tap-cold" disabled=\{guarded\} onClick=\{\(\)=>tap\(row,"no-heat"\)\}/);
- assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>\{\s*if\(guarded\)return;\s*setGuarded\(true\);/);
+ assert.match(board,/const guardedPress=\(press:\(\)=>void\)=>\{\s*if\(guarded\)return;\s*setGuarded\(true\);/);
  assert.match(board,/\{lastTap&&<div className="heat-undo" role="status">/);
  /* THE UNDO BAR IS AFTER THE LIST, so mounting it moves no row. Above the lane
     buttons it pushed every row down by its own height on the first tap. The
@@ -5357,9 +5373,20 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  inOrder(board,'className="heat-lanes"','className="heat-undo"',"and after the lane buttons");
  assert.match(boardCss,/\.heat-undo\{position:sticky;bottom:8px;/);
  /* The cooldown starts when the tap is over, question and all. */
- const tapBody=board.slice(board.indexOf(" const tap=("),board.indexOf(" const roster="));
- inOrder(tapBody,"onCheck(row,result)","setTimeout(","the guard's clock starts after the tap has been handled");
- assert.match(board,/<button type="button" onClick=\{onUndo\}>UNDO THIS TAP</);
+ const pressBody=board.slice(board.indexOf(" const guardedPress="),board.indexOf(" const tap=("));
+ inOrder(pressBody,"try{press()}","setTimeout(","the guard's clock starts after the press has been handled");
+ /* MASTER IMPORT says when the file's heat checks did not go in, and claims
+    nothing about the rest: the other keys' writes are not checked, so "everything
+    listed above was restored" would be the app vouching for writes it never saw. */
+ const settingsPage=await readFile(new URL("../app/settings/page.tsx",import.meta.url),"utf8");
+ assert.match(settingsPage,/\(result\.heatCheckProblem\?"\\n\\nTHE HEAT CHECKS IN THIS FILE WERE NOT RESTORED — "\+heatLogProblemWords\(result\.heatCheckProblem\)\+"\.":""\)/);
+ assert.doesNotMatch(settingsPage,/Everything listed above was/);
+ /* UNDO is under the same guard as the taps, both ways: the bar floats over
+    live tap buttons, so a double-tap must neither undo the tap it followed
+    nor fall through an unmounted bar onto the row beneath. */
+ assert.match(board,/<button type="button" disabled=\{guarded\} onClick=\{undo\}>UNDO THIS TAP</);
+ assert.match(board,/const undo=\(\)=>guardedPress\(onUndo\);/);
+ assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>guardedPress\(\(\)=>onCheck\(row,result\)\);/);
  assert.doesNotMatch(boardCode,/role="tablist"|role="tab"/,"buttons that filter a list are not tabs without panels");
  const listsCode=code(lists);
  assert.doesNotMatch(listsCode,/writeFleetStorage|serializeFleetPayload|setItem\(\s*FLEET_STORAGE_KEY|pace-board-v1/,"Fleet Campaigns never writes the board itself — by the constant, or by the key spelled out");

@@ -1516,7 +1516,7 @@ export default function DefectLog(){
    +(skipped?". "+skipped+" could not be filed and "+(skipped===1?"was":"were")+" left off":"")
    +(!log.ok?". THE HEAT CHECKS COULD NOT BE SAVED — "+heatLogProblemWords(log.why)+(log.why==="unreadable"?"":". Scan the sheet again once there is room")
      :log.added?". "+log.added+" new heat check"+(log.added===1?"":"s")+" logged":". No new heat checks — every line on these pages was already in the log")
-   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, until the next change on this page.":"."));
+   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, for as long as you stay on this page and change nothing else.":"."));
  };
  /* Takes a whole scan sweep back out. The batch is the set of sweep records
     sharing one creation stamp — the fingerprint fileSweep leaves by taking the
@@ -1581,7 +1581,9 @@ export default function DefectLog(){
   if(undoSnapshot.scanBatch){restoreBatch();return}
   if(undoSnapshot.heatChecks){
    const cut=dropScanChecks(localStorage,{kind:"heat",key:undoSnapshot.heatChecks});
-   setUndoSnapshot(null);
+   /* Kept when the log refused: a failed undo that threw its own way back
+      away could not be tried again once there was room. */
+   if(cut.ok)setUndoSnapshot(null);
    alert(cut.ok?(cut.removed?cut.removed+" heat check"+(cut.removed===1?"":"s")+" from that scan "+(cut.removed===1?"was":"were")+" taken back out. No defect was filed by it, so nothing else changed.":"Those heat checks are no longer on this device's log, so there was nothing to take out."):"THE HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+".");
    return;
   }

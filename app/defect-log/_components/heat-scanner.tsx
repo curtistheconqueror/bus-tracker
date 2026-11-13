@@ -106,7 +106,7 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
      defects leaves no batch for SCAN BATCHES to find, and the first version
      promised it anyway; what it does have is UNDO LAST, for as long as it is
      the last thing done. */
-  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. UNDO LAST takes these checks back out, until the next change on the Defect Log; after that a wrong check is corrected by the next check on that bus.";
+  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. UNDO LAST takes these checks back out, for as long as you stay on the Defect Log and change nothing else; after that a wrong check is corrected by the next check on that bus.";
   if(!confirm(what+"\n\n"+back))return;
   onFile(findings,loggable);
  };

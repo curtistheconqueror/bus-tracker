@@ -376,7 +376,7 @@ export default function SettingsPage(){
      would otherwise still be showing the settings the file just replaced. */
   reloadBoard();reloadDown();reloadLog();
   setMergeUndo(null);
-  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+"."+(result.heatCheckProblem?"\n\nTHE HEAT CHECKS IN THIS FILE WERE NOT RESTORED — "+heatLogProblemWords(result.heatCheckProblem)+". Everything listed above was.":""));
+  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+"."+(result.heatCheckProblem?"\n\nTHE HEAT CHECKS IN THIS FILE WERE NOT RESTORED — "+heatLogProblemWords(result.heatCheckProblem)+".":""));
  };
 
  /* One theme across every page. It writes into each page's own settings rather

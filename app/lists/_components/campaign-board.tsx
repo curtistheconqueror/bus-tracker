@@ -55,19 +55,28 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
  const [guarded,setGuarded]=useState(false);
  const guard=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>()=>{if(guard.current)clearTimeout(guard.current)},[]);
- const tap=(row:HeatRosterRow,result:HeatResult)=>{
+ /* Every press that can change what is under the thumb goes through here: a
+    tap, and UNDO. The clock starts when the press is OVER. NO HEAT asks a
+    question first, and with the timer started before it a confirm left open
+    for a second had used the whole cooldown up — the buttons came back live
+    the instant the list changed, which is the moment the guard exists for. */
+ const guardedPress=(press:()=>void)=>{
   if(guarded)return;
   setGuarded(true);
-  /* The clock starts when the tap is OVER. NO HEAT asks a question first, and
-     with the timer started before it a confirm left open for a second had
-     used the whole cooldown up — the buttons came back live the instant the
-     list changed, which is the moment the guard exists for. */
-  try{onCheck(row,result)}
+  try{press()}
   finally{
    if(guard.current)clearTimeout(guard.current);
    guard.current=setTimeout(()=>setGuarded(false),HEAT_TAP_GUARD_MS);
   }
  };
+ const tap=(row:HeatRosterRow,result:HeatResult)=>guardedPress(()=>onCheck(row,result));
+ /* UNDO IS GUARDED BOTH WAYS, because the bar now floats over live tap
+    buttons. Dead while a tap's guard runs: the bar mounts under the thumb
+    that just tapped a row near the bottom of the screen, and the second touch
+    of a double-tap took the check straight back. And it starts the guard
+    itself: pressing it unmounts the bar, and a second touch landed on the
+    HEAT OK that had been underneath it. */
+ const undo=()=>guardedPress(onUndo);
  const roster=useMemo(()=>heatRoster(fleet,checks),[fleet,checks]);
  const counts=useMemo(()=>heatRosterCounts(roster),[roster]);
  const shown=useMemo(()=>heatRosterLane(roster,lane),[roster,lane]);
@@ -130,15 +139,19 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
      <button type="button" className="tap-cold" disabled={guarded} onClick={()=>tap(row,"no-heat")} aria-label={"Bus "+row.busNumber+" has no heat"}>NO HEAT</button>
     </span>
    </li>)}</ul>:<p className="heat-list-empty">{roster.length?"No buses in this group.":"There are no buses on this device's board yet."}</p>}
-   {/* BELOW THE LIST, AND STUCK TO THE BOTTOM OF THE SCREEN. It was above the
+   {/* BELOW THE ROWS, AND STUCK TO THE BOTTOM OF THE SCREEN. It was above the
        lane buttons, in flow: the first tap mounted it and pushed every row
        down by its own height under the thumb — +101px at 390, measured by the
        SDET gate — and UNDO pulled them back up. After the last row, mounting
-       it adds height where nothing is beneath it, and `position:sticky` keeps
-       it in reach while the list is longer than the screen. */}
+       it moves no ROW. What it does move is whatever the page draws under
+       the heat list — the timesheet and the working lists — by its own
+       height, which nobody's thumb is on. `position:sticky` keeps it in reach
+       while the list is longer than the screen, and the cost of that is
+       written at `undo` above: it floats over a row's buttons. It is also
+       last in the tab order now, after every row. */}
    {lastTap&&<div className="heat-undo" role="status">
     <span>Bus <b>{lastTap.busNumber}</b> recorded as <b>{lastTap.result==="ok"?"HEAT OK":"NO HEAT"}</b>.{lastTap.filed?" The No Heat defect it opened stays on the Defect Log; undo takes back the check only.":""}</span>
-    <button type="button" onClick={onUndo}>UNDO THIS TAP</button>
+    <button type="button" disabled={guarded} onClick={undo}>UNDO THIS TAP</button>
    </div>}
   </div>}
  </div>;
