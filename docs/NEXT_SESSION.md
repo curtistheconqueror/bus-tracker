@@ -115,8 +115,8 @@ check a fix on his phone that has not been published.
 
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
-| **#45** | `claude/typecheck-gate-windows` | `256c744` | 1 | green | **1 open**, a Nit | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
-| **#46** | `claude/heat-check-domain` | `79c4e58` | 1 | green | **14 open** | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
+| **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
+| **#46** | `claude/heat-check-domain` | `cd21990` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
@@ -124,18 +124,30 @@ before the merges. **"Ahead" is against the `main` each was cut from**; all
 three now sit behind `main` by the 27 merged commits and will need rebasing
 before they can land.
 
-**#46 failed its SDET gate, and that is the next thing to do on it.** One
-Major from the SD-QG reviewer: the UNDO THIS TAP bar mounts above the heat
-list, so the first tap pushes every row down under the thumb — +101px at 390,
-+71px at 1180, measured. One Nit on a test guard. Twelve more from CodeRabbit,
-six of them Major. Every one gets an answer on its own thread. **What #46 has
-never done is read a real photograph**: `/api/heat-sheet-scan` needs the
-OpenRouter key, which the development machine does not have. Curtis has
-photographed the real sheet twice — the second, from an iPad, shows all 108
-printed bus numbers. Three things are still his to settle: whether a
-struck-through row means fixed, whether to narrow the A/C Buses filter (it
-counts heating repairs, so the A/C card claims no number), and whether the
-check log gets a Shop Cloud table so it syncs.
+**#46 failed its SDET gate at `79c4e58`, and all 14 findings were answered on
+2026-11-13** in `f0a98f8` and `cd21990`, each on its own thread, with a ledger
+in a PR comment. The Major — UNDO THIS TAP mounting above the heat list and
+pushing every row down — is fixed and re-measured: no row moves at 390 or 1180.
+**Nobody has re-reviewed it since, and CI on the new head was not read.** Do
+that before calling it ready. The branch now CONTAINS `main` (`43e9594` merges
+it in, because the branch is published and is not rebased), so "ahead" is no
+longer one commit.
+
+**Three things on #46 are with Curtis and not built:** whether each OK row in
+the scan review needs its own way to be turned down (a UI change); whether the
+heat list should hold its order still — a NO HEAT tap sends the bus to the top
+of TO DO and every row it passes slides down one; and the two from before,
+whether a struck-through row means fixed and whether to narrow the A/C Buses
+filter. **What it has never done is read a real photograph**:
+`/api/heat-sheet-scan` needs the OpenRouter key, which the development machine
+does not have. Curtis has photographed the real sheet twice — the second, from
+an iPad, shows all 108 printed bus numbers.
+
+**Found while answering #46 and NOT fixed, because it is older than that
+branch:** `put()` in `src/lib/storage/fleet-restore.ts` ignores
+`writeSetting`'s result and pushes its label regardless. On a disk that fills
+after the board write, MASTER IMPORT reports map settings, the Down Sheet and
+campaigns as restored when only the board landed. Probed, not reasoned.
 
 **#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
 way since. Of the eleven files it touches, two conflicted when this was
