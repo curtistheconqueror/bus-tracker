@@ -58,6 +58,10 @@ import {MysteryMoveModal} from "@/src/components/down-sheet/mystery-board";
 import {candidateBusNumbers,resolveBusNumberList} from "@/src/lib/fleet/bus-number-resolver";
 import {quickFilterShareFilename,quickFilterShareHtml,quickFilterShareText} from "@/src/lib/defects/quick-filter-share";
 import {EMPTY_PARTS_MEMORY,forgetPart,learnPart,readPartsMemory,recallPart,writePartsMemory,type PartMemoryEntry,type PartMemoryScope,type PartsMemory} from "@/src/lib/defects/parts-memory";
+import {defectPartsText,normalizeDefectParts,partToLearn,withDefectParts,type DefectPart} from "@/src/lib/defects/defect-parts";
+import PartsUsedList from "@/src/components/defects/parts-used-list";
+import {excludeFromFocusShare,focusShareIsEmpty,focusShareScope,focusShareScopeNote,putBackLastExclusion} from "@/src/lib/defects/focus-share-scope";
+import SwipeAwayRow from "./_components/swipe-away-row";
 import {EMPTY_FINDINGS_MEMORY,findingMatchKey,forgetFinding,learnFinding,readFindingsMemory,recallFindings,writeFindingsMemory,type FindingMemoryEntry,type FindingsMemory} from "@/src/lib/defects/findings-memory";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {busShareFilename,busShareHtml,busShareText,type BusShareDefect} from "@/src/lib/defects/bus-share";
@@ -195,15 +199,27 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     old onChange bodies, moved rather than rewritten — everything they reset
     (symptoms, quantity, unit, operability, the part fields) is reset for the
     same reasons it always was. */
- const chooseCategory=(category:string)=>setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
-  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:""}}));
+ /* AND THEY CLEAR THE PART ON SCREEN AS WELL AS ON THE RECORD. They always
+    cleared the record's part fields - a part number belongs to a REPAIR, and
+    the parts memory is keyed on category+issue, so HX-99 typed for a coolant
+    leak and saved under a door fault would teach the shop the wrong thing. But
+    the form now draws the box and the rows from local state, so clearing only
+    the record left the tick on screen and HX-99 still in the input over a
+    record holding nothing: press SAVE and the part was dropped with nothing
+    saying so. Shown and silently discarded is worse than the stale-part bug
+    this replaced. Both now say the same thing, which is also what the form did
+    before the rows became local state. */
+ const clearPartsOnScreen=()=>{setPartsUsed(false);setPartRows([])};
+ const chooseCategory=(category:string)=>{clearPartsOnScreen();setValue(current=>({...current,quickIssue:"",rememberScope:undefined,
+  defect:{...current.defect,category,issue:"",symptoms:[],fluids:undefined,quantity:undefined,unit:undefined,operability:"service",partsUsed:false,partNumber:"",partName:"",parts:undefined}}))};
 
  const chooseIssue=(issue:string,switchTo:string)=>{
+  clearPartsOnScreen();
   const category=switchTo||value.defect.category;
   const picked=defectCountField(category,issue);
   const oilIssue=isFluidTopUp(category,issue);
   setValue(current=>({...current,quickIssue:issue,rememberScope:undefined,
-   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",
+   defect:{...current.defect,category,issue,partsUsed:false,partNumber:"",partName:"",parts:undefined,
     symptoms:isCheckEngineIssue(category,issue)?current.defect.symptoms||[]:[],
     /* Switching between the three top-ups keeps what is still true: pick oil
        with glycol ticked, change your mind and pick glycol, and the tick that
@@ -222,20 +238,62 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
   CATALOG_OPTIONS.find(row=>row.value===issue&&(!category||row.category===category))?.label
   ||CATALOG_OPTIONS.find(row=>row.value===issue)?.label
   ||issue;
- /* A record saved before Stage 6 has a part number but no flag, so treat an
-    existing number as parts used rather than hiding it behind an empty box. */
- const partsUsed=value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim());
+ /* PARTS USED IS THE CHECKBOX'S OWN STATE, not a reading of the record, and
+    that is a fix. It was `value.defect.partsUsed??Boolean(partNumber)` - which
+    is right for a record arriving from storage and wrong for a form being
+    typed into, because `defectPartFields` reports `partsUsed:false` the moment
+    every row is blank. So pressing ADD ANOTHER PART on an empty row, or
+    clearing the only number, unticked the box and unmounted the whole section
+    mid-edit: measured by a reviewer at -256px of content shift on a phone and
+    -234px on the shop computer, with focus dropped to the body.
+
+    ONLY THE CHECKBOX MEANS "no parts were used". A blank row means somebody is
+    typing. What gets STORED still comes from the rows, so a blank list saves
+    as `partsUsed:false` - the record stays honest while the form stays still.
+
+    Seeded from the record, including the pre-Stage-6 shape that has a part
+    number and no flag. */
+ const [partsUsed,setPartsUsed]=useState(()=>value.defect.partsUsed??Boolean(String(value.defect.partNumber||"").trim()));
+ /* THE ROWS BEING TYPED INTO, held here rather than derived from the record on
+    every render. `defectPartFields` drops a row with nothing in it - which is
+    right for what gets STORED - so a derived list would make ADD ANOTHER PART
+    appear to do nothing at all. The editor is keyed per defect, so opening
+    another bus starts from that record's own parts. */
+ const [partRows,setPartRows]=useState<DefectPart[]>(()=>normalizeDefectParts(value.defect.parts,value.defect));
+ /* THE CHECKBOX GOES THROUGH THE ASSEMBLER, as its third argument, rather than
+    being patched on after. Without it a ticked box with the number not typed
+    yet stored `partsUsed:false` - so a repair saved in that state lost MISSING
+    PART # off its Fixed Repairs card, which is the one thing that state exists
+    to say. A blank row means somebody is mid-sentence; only the checkbox means
+    no parts were used. */
+ const setParts=(next:DefectPart[])=>{
+  setPartRows(next);
+  setValue(current=>({...current,defect:withDefectParts(current.defect,next,partsUsed)}));
+ };
  const remembered=recallPart(partsMemory,value.defect.category,value.defect.issue);
  /* Checking the box offers the remembered part; it never fills anything in
     while a defect is merely being logged, and never overwrites typing. */
- const togglePartsUsed=(checked:boolean)=>setValue(current=>{
-  if(!checked)return {...current,defect:{...current.defect,partsUsed:false,partNumber:"",partName:""}};
-  const suggestion=recallPart(partsMemory,current.defect.category,current.defect.issue);
-  const hasNumber=Boolean(String(current.defect.partNumber||"").trim());
-  return {...current,rememberScope:current.rememberScope||"issue",defect:{...current.defect,partsUsed:true,
-   partNumber:hasNumber||!suggestion?current.defect.partNumber||"":suggestion.partNumber,
-   partName:hasNumber||!suggestion?current.defect.partName||"":suggestion.partName||""}};
- });
+ const togglePartsUsed=(checked:boolean)=>{
+  setPartsUsed(checked);
+  if(!checked){
+   /* Unticking is the one gesture that means "no parts were used", so it
+      clears the whole list rather than leaving a row behind. */
+   setPartRows([]);
+   setValue(current=>({...current,defect:withDefectParts(current.defect,[],false)}));
+   return;
+  }
+  const suggestion=recallPart(partsMemory,value.defect.category,value.defect.issue);
+  /* THE SUGGESTION SEEDS THE FIRST ROW AND ONLY AN EMPTY ONE, which is the
+     behaviour this had with one pair of boxes: it never overwrites typing. */
+  const current=normalizeDefectParts(value.defect.parts,value.defect);
+  const first=current[0];
+  const seeded=suggestion&&(!first||!String(first.partNumber||"").trim())
+   ?[{id:first?first.id:"part-0",partNumber:suggestion.partNumber,...(suggestion.partName?{partName:suggestion.partName}:{})},...current.slice(1)]
+   :current;
+  const rows=seeded.length?seeded:[{id:"part-0",partNumber:""}];
+  setPartRows(rows);
+  setValue(cur=>({...cur,rememberScope:cur.rememberScope||"issue",defect:withDefectParts(cur.defect,rows,true)}));
+ };
  const diagnosticDefect=isDiagnosticDefect(value.defect.category,value.quickIssue||value.defect.issue);
  const learnedFindings=recallFindings(findingsMemory,value.defect.category,value.quickIssue||value.defect.issue);
  /* WHAT THE ESTIMATE BOX IS ABOUT TO OVERRIDE, quoted inside the box.
@@ -420,7 +478,17 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     save the defect as it was one render ago — React has not applied the update
     yet — so the part number would be dropped on the very save that asked for
     it. Passing it through means what is validated is what is written. */
- const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={})=>{const defect={...value.defect,...patch};const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;/* ONE RULE, AND THE STEP-BY-STEP HELPER ASKS IT THE SAME QUESTION. This was five inline clauses here and a hand-written copy of the same list in form-coach.ts, and the two had already disagreed about two of them - see src/lib/defects/save-refusal.ts. The messages and their order are unchanged. */const refusal=saveRefusal({busId:value.busId,category:defect.category,issue,count,state:defect.state},{savingAsFixed:completed,requireInitials,completedBy,duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL});if(refusal){alert(refusal.message);return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
+ /* THE PARTS GO IN AS PARTS, NOT AS A PATCH, and that is a fix a cold read
+    found. The part prompt used to hand the whole assembled record in as
+    `patch`, and `{...value.defect,...patch}` CANNOT CARRY A DELETION: the
+    assembler `delete`s `parts`, so the key is absent from the patch and the
+    stored array comes straight back through the first spread. On a repair
+    already holding `parts:[AA-1,BB-2]`, ENTER LATER left the array untouched
+    while the mirrored pair said BB-2 - the exact disagreement the prompt's own
+    comment claims to have fixed. The same `{...existing,...incoming}` trap
+    `saveDefectLogRecord` keeps an explicit field list for.
+    So the assembler runs LAST, here, where nothing can spread over it. */
+ const validateAndSave=(complete:boolean,patch:Partial<StructuredDefect>={},parts?:{rows:DefectPart[];used:boolean})=>{const patched={...value.defect,...patch};const defect=parts?withDefectParts(patched,parts.rows,parts.used):patched;const completed=complete||defect.state==="completed";const initials=(defect.reportedBy||defaultInitials).trim().toUpperCase(),completedBy=(defect.completedBy||defaultInitials).trim().toUpperCase(),details=defect.details.trim(),issue=value.quickIssue||defect.issue,count=defect.quantity;/* ONE RULE, AND THE STEP-BY-STEP HELPER ASKS IT THE SAME QUESTION. This was five inline clauses here and a hand-written copy of the same list in form-coach.ts, and the two had already disagreed about two of them - see src/lib/defects/save-refusal.ts. The messages and their order are unchanged. */const refusal=saveRefusal({busId:value.busId,category:defect.category,issue,count,state:defect.state},{savingAsFixed:completed,requireInitials,completedBy,duplicateAt:recentDuplicate?(recentDuplicate.createdAt||recentDuplicate.updatedAt||"logged"):"",duplicateWhen:recentDuplicate?timeLabel(recentDuplicate.createdAt||recentDuplicate.updatedAt||""):"",duplicateWindow:RECENT_DUPLICATE_WINDOW_LABEL});if(refusal){alert(refusal.message);return}const now=new Date().toISOString(),finalIssue=issue&&issue!=="Manual entry"?issue:details?"Manual entry":"Unspecified issue",finalDraft:LogDraft={...value,onDownSheet:completed?false:value.onDownSheet,defect:{...defect,issue:finalIssue,details,reportedBy:initials,completedBy:completed?completedBy:defect.completedBy,state:completed?"completed":defect.state,completedAt:completed?(defect.completedAt||now):"",deferredAt:completed?undefined:defect.deferredAt,deferredUntil:completed?undefined:defect.deferredUntil,deferredReturnedAt:completed?undefined:defect.deferredReturnedAt}};(completed?saveFixed:save)(finalDraft)};
  const submit=(event:React.FormEvent)=>{event.preventDefault();validateAndSave(false)};
  return <div className="log-shade" onMouseDown={event=>{if(event.target===event.currentTarget)close()}}>
   {partPrompt&&<PartNumberPrompt
@@ -428,7 +496,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
    suggestion={remembered?.partNumber||""}
    initial={value.defect.partNumber||""}
    close={()=>setPartPrompt(false)}
-   confirm={number=>{setPartPrompt(false);validateAndSave(true,{partsUsed:true,partNumber:number});}}/>}
+   confirm={number=>{setPartPrompt(false);/* ALWAYS `partsUsed:true`, WHICH IS WHAT ENTER LATER PROMISES. The prompt says in as many words that the repair "is marked MISSING PART # on the Fixed Repairs page until the number is added", and ENTER LATER arrives here with an empty number - which the assembler read as "no parts were used", so the repair saved completed with no flag at all and the promise on screen was false. The third argument is the checkbox's answer and ENTER LATER is somebody saying a part WAS used. THROUGH THE ASSEMBLER. This patched `{partsUsed:true,partNumber}` straight onto the record, so on a repair that already held a `parts` array the mirrored pair said one thing and the array another - and the number typed here was never learned, because the save reads the array. It becomes the FIRST row now, which is the one the memory takes. */const rows=normalizeDefectParts(value.defect.parts,value.defect);const first=rows[0];/* ENTER LATER MUST NOT ERASE A NUMBER ALREADY TYPED. It arrives here with an EMPTY number, and writing that over the first row wiped a part the mechanic had entered on the form a moment earlier - the prompt even opens prefilled with it. "I will enter it later" is a statement about a number that is NOT there; with one on the record it is a press of the wrong button, and losing the number is the expensive reading. Only a number given here replaces the row. */const next=number?[{id:first?first.id:"part-0",partNumber:number,...(first?.partName?{partName:first.partName}:{})},...rows.slice(1)]:rows;validateAndSave(true,{},{rows:next,used:true});}}/>}
   <form className="log-editor" onSubmit={submit}>
    <header className="log-editor-head"><span><small>REAL-TIME DEFECT</small><h2>{selectedBus?"Bus "+selectedBus.n:"Log Repair"}</h2></span><div className="log-editor-header-actions"><button className="close-log-editor" type="button" onClick={close} aria-label="Close">×</button></div></header>
    {coach&&<FormCoachBar step={coach} hide={()=>setCoachHidden(true)}/>}
@@ -589,7 +657,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         the bus, and burying them behind a disclosure is how they would go
         unused. Placed further down the form it opened below the fold on a
         phone, which is the same way the campaign paste box got missed. */}
-    <fieldset className="wide work-state-picker"><legend>WORK DONE SO FAR — OPTIONAL</legend>
+    <fieldset className="wide work-state-picker"><legend>PRELIMS — OPTIONAL</legend>
      <div>{WORK_STATES.map(state=>{
       const stamp=value.defect.workStates?.[state.key],on=Boolean(stamp),who=workStateStampLabel(stamp);
       return <label className={on?"selected":""} key={state.key}>
@@ -623,7 +691,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
         the same screen, while how long the job runs was nowhere on this form at
         all — and that figure is the one every other surface was guessing at.
 
-        OUTSIDE the WORK DONE SO FAR fieldset rather than inside it, which is
+        OUTSIDE the PRELIMS fieldset rather than inside it, which is
         where the finding sat. An estimate is not work done, and a legend saying
         it is would be wrong about the one field under it that looks forward. It
         is the same place on the screen: directly above WORK STATUS and outside
@@ -695,8 +763,7 @@ function DefectEditor({draft,fleet,defaultInitials,requireInitials,coachOn,parts
     <div className="parts-used-block">
      <label className="parts-used-toggle"><input type="checkbox" checked={partsUsed} onChange={event=>togglePartsUsed(event.target.checked)}/><span><b>PARTS USED</b><small>Record the part that fixed this defect. Leave it off if none were used.</small></span></label>
      {partsUsed&&<div className="parts-used-fields">
-      <label>PART NUMBER<input value={value.defect.partNumber||""} onChange={event=>updateDefect("partNumber",event.target.value)} placeholder="Leave blank if the number is unknown"/></label>
-      <label>PART NAME (OPTIONAL)<input value={value.defect.partName||""} onChange={event=>updateDefect("partName",event.target.value)} placeholder="Exact catalog name"/></label>
+      <PartsUsedList parts={partRows} onChange={setParts}/>
       <label className="parts-remember-scope"><input type="checkbox" checked={value.rememberScope==="category"} onChange={event=>setValue(current=>({...current,rememberScope:event.target.checked?"category":"issue"}))}/><span><b>REMEMBER FOR EVERY {repairCategoryLabel(value.defect.category||"this category").toUpperCase()} DEFECT</b><small>Off remembers the part for this exact defect only.</small></span></label>
       {remembered&&<p className="parts-remembered"><span><b>REMEMBERED</b>{remembered.partNumber}{remembered.partName?" — "+remembered.partName:""}<small>{remembered.scope==="category"?"Saved for the whole category":"Saved for this exact defect"} · used {remembered.uses}×</small></span><button type="button" onClick={()=>forgetLearned(remembered)}>FORGET</button></p>}
      </div>}
@@ -1078,18 +1145,89 @@ export default function DefectLog(){
     reading that message there is no filter and no way to know there was one:
     the sentence simply says this bus has two things wrong with it.
 
-    Curtis asked for the opposite in as many words — "share all the defects
-    with a bus" — so the share is built from the unfiltered records and the
-    row below says when that is more than the screen is showing. The VIEW stays
-    filtered, because that is the board doing what it was told. */
+    Curtis asked for exactly that at the time, in as many words — "share all
+    the defects with a bus" — so the share was built from the unfiltered
+    records and a row said when that was more than the screen showed.
+
+    HE THEN HIT THE OTHER SIDE OF IT and chose the window instead: "when I hit
+    like the last 24 hours of the shift, it gives me buses, but I think it's
+    giving me more than the defects that I put down in the last 24 hours", and
+    then, asked which way: "Follow the window, and add the swipe." So the share
+    is what is ON SCREEN minus anything swiped away, and the row below counts
+    the two reasons apart — a filter is not a decision. The earlier reasoning
+    is kept above because it is why this ever carried the whole bus. */
  const focusedAllRecords=focusedBusId?records.filter(record=>record.bus.id===focusedBusId):[];
- const focusHiddenByBoard=focusedGroup?focusedAllRecords.length-focusedGroup.records.length:0;
+ /* SWIPED AWAY, FOR THIS LOOK AT THIS BUS ONLY. Never a field on a defect: the
+    cloud ships unknown defect fields to every other phone, so a "don't send
+    this one" flag stored on the record would hide it for the whole shop. */
+ const [focusExcluded,setFocusExcluded]=useState<string[]>([]);
+ const focusScope=focusShareScope(focusedGroup?focusedGroup.records:[],focusedAllRecords,focusExcluded);
+ /* NOTHING LEFT TO SEND IS A REFUSAL, NOT A SHARE, and it was reachable the
+    moment the swipe existed. Hiding all three defects on a bus and pressing
+    COPY put "0 defects - shared ..." and then "No defects on this bus." on the
+    clipboard, which a recipient reads as the bus being CLEAN - the most
+    damaging sentence this app could say about a vehicle. The three outputs
+    refuse, and the buttons go dead so nobody presses one and wonders. */
+ const focusShareEmpty=focusShareIsEmpty(focusScope);
+ /* WHAT JUST HAPPENED, FOR SOMEBODY WHO CANNOT SEE THE ROW GO. A row vanishing
+    and a button appearing are both silent to a screen reader, and the HIDE
+    control that was just pressed is gone with its row - so without this a hide
+    is a press with no outcome at all. Its own region rather than the share
+    status beside it: a hide must not wipe COPIED, and a share outcome must not
+    wipe the hide. */
+ const [focusHideNote,setFocusHideNote]=useState("");
+ useEffect(()=>{setFocusHideNote("")},[focusedBusId]);
+ /* AND FOCUS HAS TO LAND SOMEWHERE. The pressed HIDE button unmounts with its
+    row, which drops focus to the document BODY: a keyboard is then at the top
+    of the page, outside a dialog it never left. PUT BACK is where the press
+    leads next, so that is where focus goes - and when PUT BACK itself empties,
+    COPY takes it, because PUT BACK is about to become unfocusable.
+    Only on a BUTTON press: a swipe holds no focus, and scrolling the panel up
+    to a control a thumb never asked for is its own bug. */
+ const focusCopyRef=useRef<HTMLButtonElement|null>(null);
+ const focusPutBackRef=useRef<HTMLButtonElement|null>(null);
+ const focusAfterCommit=(target:React.RefObject<HTMLButtonElement|null>)=>{
+  /* After the commit, not during it: the element being focused is one this
+     render is about to make focusable. */
+  if(typeof requestAnimationFrame==="function")requestAnimationFrame(()=>target.current?.focus());
+ };
+ const focusHideRecord=(record:DefectLogRecord,via:"button"|"swipe")=>{
+  setFocusExcluded(current=>excludeFromFocusShare(current,record.defect.id));
+  setFocusHideNote("HIDDEN FROM THIS SHARE — "+repairCategoryLabel(record.defect.category));
+  if(via==="button")focusAfterCommit(focusPutBackRef);
+ };
+ /* PRUNED TO WHAT IS ON SCREEN BEFORE POPPING, and it names what came back.
+    `focusExcluded` is only cleared when the BUS changes, so a defect swiped
+    away and then taken off screen by the window, the filter or a sync left an
+    id in the list that `hiddenByHand` no longer counts - and PUT BACK popped
+    that one, restoring nothing while the button still read PUT BACK. The press
+    looked broken. */
+ const focusPutBack=()=>{
+  const onScreen=focusedGroup?focusedGroup.records:[];
+  const live=onScreen.map(record=>String(record.defect.id));
+  /* THE OFF-SCREEN IDS ARE KEPT. This filtered the list and stored the FILTERED
+     result, so one press threw away every exclusion the window had taken off
+     screen: swipe A and B away, let A leave the view, press PUT BACK for B, and
+     A came back into the share on its own the next time the window widened. The
+     rule is in the lib so the ordering and the keeping are one decision. */
+  const {excluded,restored}=putBackLastExclusion(focusExcluded,live);
+  if(!restored)return;
+  setFocusExcluded(excluded);
+  const back=onScreen.find(record=>String(record.defect.id)===restored);
+  setFocusHideNote("PUT BACK — "+(back?repairCategoryLabel(back.defect.category):"1 DEFECT"));
+  /* The last one back takes PUT BACK off the row with it. */
+  if(focusScope.hiddenByHand<=1)focusAfterCommit(focusCopyRef);
+ };
  /* EVERY CHANGE OF BUS, not only the close, and the first cut only cleared on
     close — while its own comment claimed what this line now actually does. The
     focus dialog does not trap the keyboard, so a tab can reach another card's
     FOCUS button and move straight from bus A to bus B without passing through
     empty, carrying A's SHARED onto B's screen. */
  useEffect(()=>{setFocusShareStatus("")},[focusedBusId]);
+ /* AND THE SWIPED-AWAY LIST GOES WITH THE BUS, for the same reason the status
+    does: tabbing from bus A's FOCUS to bus B's never passes through empty, and
+    carrying A's hidden rows onto B would silently narrow B's share. */
+ useEffect(()=>{setFocusExcluded([])},[focusedBusId]);
  /* "Deferred" is genuinely held-back only when the bus carries no active Down
     Sheet entry — quick-filters.ts has no way to know that, since it never
     sees Down Sheet entries, so the exclusion and the wait-time sort both
@@ -1301,7 +1439,7 @@ export default function DefectLog(){
   if(!matchesSearch({bus,defect,createdAt:"",updatedAt:"",onDownSheet:false}))setSearch("");
  };
  const closeEditor=()=>{const left=window.scrollX,top=window.scrollY;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setEditing(null);const restore=()=>window.scrollTo(left,top);window.requestAnimationFrame(()=>{restore();window.requestAnimationFrame(restore)})};
- const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";if(draft.defect.partsUsed&&String(draft.defect.partNumber||"").trim())setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:draft.defect.partNumber||"",partName:draft.defect.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
+ const persistDraft=(draft:LogDraft,hideCompleted=false)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,draft.busId,draft.defect,draft.onDownSheet,now);if(result.error){alert(result.error==="recent-duplicate"?"This same unresolved defect was logged within the last "+RECENT_DUPLICATE_WINDOW_LABEL+". Use the existing defect instead.":"That bus is no longer available. Refresh and try again.");return}const busNumber=fleet.find(bus=>bus.id===draft.busId)?.n||"selected";/* THE FIRST NUMBERED PART IS LEARNED, and only one. This reduced `learnPart` over every numbered part and the change called that "learns every part" - which a reviewer disproved: the memory keeps ONE entry per scope+category+issue and replaces it, so reducing over two parts taught the shop the LAST one with `uses:2`. Teaching it more than one needs more than one slot per key, which is a change to `pace-parts-memory-v1` itself. A part with only a name teaches nothing the memory could suggest, so `partToLearn` skips it. */const learnable=draft.defect.partsUsed?partToLearn(normalizeDefectParts(draft.defect.parts,draft.defect)):null;if(learnable)setPartsMemory(current=>{const next=learnPart(current,{category:draft.defect.category,issue:draft.defect.issue,partNumber:learnable.partNumber,partName:learnable.partName,scope:draft.rememberScope},now);writePartsMemory(localStorage,next);return next});/* Learned on any save that carries a finding, not only on one marked Diagnosed. Typing a cause is the diagnosis; making the checkbox the trigger would mean a mechanic writes the finding, sees nothing remembered, and never learns why. */if(normalizeFinding(draft.defect.finding))setFindingsMemory(current=>{const next=learnFinding(current,{category:draft.defect.category,issue:draft.defect.issue,finding:draft.defect.finding},now);writeFindingsMemory(localStorage,next);return next});setUndoSnapshot({fleet,downEntries,label:(hideCompleted?"Logged a fix":"Saved a defect")+" for Bus "+busNumber});persist(hideCompleted?hideDefectLogRecords(result.fleet,[{busId:draft.busId,defectId:draft.defect.id}],now):result.fleet,result.downEntries);clearSearchIfItHides(draft.busId,draft.defect);closeEditor()};
  const saveDraft=(draft:LogDraft)=>persistDraft(draft,false);
  const saveFixedDraft=(draft:LogDraft)=>persistDraft(draft,true);
  const markFixed=(record:DefectLogRecord)=>{const now=new Date().toISOString(),result=saveDefectLogRecord(fleet,downEntries,record.bus.id,{...record.defect,state:"completed",deferredAt:undefined,deferredUntil:undefined,deferredReturnedAt:undefined,reportedBy:record.defect.reportedBy||settings.defaultInitials,completedBy:record.defect.completedBy||settings.defaultInitials},false,now);if(result.error){alert("That bus is no longer available. Refresh and try again.");return}setUndoSnapshot({fleet,downEntries,label:"Marked Bus "+record.bus.n+" fixed"});persist(hideDefectLogRecords(result.fleet,[{busId:record.bus.id,defectId:record.defect.id}],now),result.downEntries)};
@@ -1600,7 +1738,18 @@ export default function DefectLog(){
   if(Number.isNaN(at.getTime()))return timeLabel(iso);
   return timeLabel(iso)+(at.getFullYear()!==new Date().getFullYear()?", "+at.getFullYear():"");
  };
- const focusShareRows=():BusShareDefect[]=>focusedAllRecords.map(record=>({
+ /* ALL THREE OUTPUTS READ THE SAME LIST. COPY, SHARE and SHARE PAGE are one
+    function away from each other on purpose - a page that honoured a swipe
+    while the text ignored it would be two different answers to one question,
+    and Curtis would have no way to tell which he had sent.
+
+    AND ALL THREE ASK `focusShareIsEmpty` FIRST, each in its own body rather
+    than through one wrapper, because each is also reachable from somewhere
+    else: SHARE falls back to COPY, and a guard on the wrapper only would be a
+    guard on the path somebody happened to take. An empty share sends
+    "0 defects" and "No defects on this bus." about a bus with three open
+    defects, which reads as a clean vehicle. */
+ const focusShareRows=():BusShareDefect[]=>focusScope.rows.map(record=>({
   defect:record.defect,
   state:STATE_LABELS[record.defect.state]||record.defect.state,
   logged:shareTimeLabel(record.createdAt),
@@ -1609,7 +1758,7 @@ export default function DefectLog(){
  }));
  const focusShareBus=()=>({n:focusedGroup?.bus.n||"",l:focusedGroup?.bus.l,status:focusedGroup?(STATUS_LABELS[focusedGroup.bus.s]||focusedGroup.bus.s):""});
  const copyFocusBus=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   try{await copyText(busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString()));setFocusShareStatus("copied")}
   catch{setFocusShareStatus("error")}
  };
@@ -1617,14 +1766,14 @@ export default function DefectLog(){
     the same order the drawer settled on, so a browser without one never leaves
     somebody pressing a button that does nothing. */
  const shareFocusBusText=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const text=busShareText(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   if(typeof navigator.share!=="function"){await copyFocusBus();return}
   try{await navigator.share({title:"Bus "+focusedGroup.bus.n+" defects",text});setFocusShareStatus("shared")}
   catch(error){if(!(error instanceof DOMException&&error.name==="AbortError"))setFocusShareStatus("error")}
  };
  const shareFocusBusPage=async()=>{
-  if(!focusedGroup)return;
+  if(!focusedGroup||focusShareIsEmpty(focusScope))return;
   const html=busShareHtml(focusShareBus(),focusShareRows(),new Date().toLocaleString());
   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),busShareFilename(focusedGroup.bus.n),"Bus "+focusedGroup.bus.n+" defects");
   /* A DOWNLOAD IS NOT A COPY. `shareOrDownloadFile` returns "saved" when there
@@ -1928,9 +2077,9 @@ export default function DefectLog(){
          of these is the one. */}
      {unexplainedDownSheetEntries(group.records,group.bus.id,downEntries).map(entry=><p className="down-sheet-banner elsewhere" key={entry.id}><b>ON THE DOWN SHEET</b><span>{[entry.category,entry.repair,entry.customReason].map(part=>String(part||"").trim()).filter(Boolean).join(" — ")||"Repair required"} — not one of the defects below</span></p>)}{group.records.map((record,index)=><section className={"grouped-defect-row"+(record.onDownSheet?" on-down-sheet":"")} key={record.defect.id}>
      {record.downSheetEntry&&<p className="down-sheet-banner"><b>ON THE DOWN SHEET</b><span>{downSheetEntryLabel(record.downSheetEntry)}</span></p>}
-     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{record.defect.partNumber&&<small><b>PART:</b> {record.defect.partNumber}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"Reported "+reportTotal(record.defect)+" times: the original report plus "+reportAttemptCount(record.defect)+" return"+(reportAttemptCount(record.defect)===1?"":"s")}>REPORTED &times;{reportTotal(record.defect)}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
+     <button className="grouped-defect-main" onClick={()=>setEditing(recordDraft(record))}><span className="grouped-defect-number">{index+1}</span><span className="log-repair"><b>{repairCategoryLabel(record.defect.category)}</b><strong>{defectLabel(record.defect)}</strong>{record.defect.conditionNotDuplicated&&<small><b>RESULT:</b> Defect / condition not duplicated</small>}{record.defect.diagnosticNote&&<small><b>DIAG:</b> {record.defect.diagnosticNote}</small>}{record.defect.actionTaken&&<small><b>ACTION:</b> {record.defect.actionTaken}</small>}{/* EVERY PART. The second of two sites in this file that read `partNumber` alone; a reviewer named both, and the first pass fixed one. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<small><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}:</b> {defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</small>}</span><span className="log-meta"><b className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</b>{isDownSheetRecommended(record.defect)&&<b className="work-state-badge down-sheet-recommended" title={"Recommended for the Down Sheet"+(workStateStampLabel(record.defect.downSheetRecommendation)?" — "+workStateStampLabel(record.defect.downSheetRecommendation):"")}>DS REC</b>}{hasDeferredHistory(record.defect,activeDownBusIdSet.has(group.bus.id))&&<b className="work-state-badge deferred-history" title={"Was deferred, returned to service "+timeLabel(record.defect.deferredReturnedAt||"")+", still open"}>WAS DEFERRED</b>}{defectWorkStates(record.defect).map(state=>{const who=workStateStampLabel(record.defect.workStates?.[state.key]);return <b className={"work-state-badge "+state.key} key={state.key} title={who?state.label+" — "+who:state.label}>{state.short}</b>})}{reportAttemptCount(record.defect)>0&&<b className="work-state-badge report-return" title={"Reported "+reportTotal(record.defect)+" times: the original report plus "+reportAttemptCount(record.defect)+" return"+(reportAttemptCount(record.defect)===1?"":"s")}>REPORTED &times;{reportTotal(record.defect)}</b>}<time>LOGGED {timeLabel(record.createdAt)}</time>{record.updatedAt!==record.createdAt&&<time>UPDATED {timeLabel(record.updatedAt)}</time>}{lastReportAttemptAt(record.defect)&&<time className="last-reported">LAST REPORTED {timeLabel(lastReportAttemptAt(record.defect)||"")}</time>}</span></button>
      <ShopNotesEditor record={record} label={settings.display.labels.shopNotes+(group.records.length>1?" "+(index+1):"")} save={saveShopNotes}/>
-     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark bus "+record.bus.n+" defect "+(index+1)+" fixed"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
+     <div className="log-actions">{record.defect.state!=="completed"&&<button className="quick-fix" onClick={()=>markFixed(record)} aria-label={"Mark fixed: bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)} aria-label={"Undo Deferred status for bus "+record.bus.n+" defect "+(index+1)}><span aria-hidden="true">↩</span><b>UNDO DEFERRED</b></button>}{isHeldDeferred(record.defect,record.onDownSheet)&&(extending===record.defect.id
       ?<span className="extend-deferral-field"><input type="time" value={extendUntil} autoFocus
          onChange={event=>setExtendUntil(event.target.value)}
          aria-label={"Hold bus "+record.bus.n+" until"}/>
@@ -2013,9 +2162,13 @@ export default function DefectLog(){
         at the bottom is a scroll away from the thing somebody opened this to
         send. */}
     <div className="log-focus-share" role="group" aria-label={"Share bus "+focusedGroup.bus.n+" defects"}>
-     <button type="button" onClick={copyFocusBus} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
-     <button type="button" onClick={shareFocusBusText} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
-     <button type="button" onClick={shareFocusBusPage} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
+     {/* DEAD WHEN THERE IS NOTHING LEFT TO SEND, rather than sending an empty
+         bus. `disabled` as well as the refusal inside each handler: the handler
+         is what makes it true, and this is what stops a mechanic pressing a
+         live-looking button and getting nothing. The slot below says why. */}
+     <button ref={focusCopyRef} type="button" onClick={copyFocusBus} disabled={focusShareEmpty} aria-label={"Copy bus "+focusedGroup.bus.n+" defects"}>{focusShareStatus==="copied"?"COPIED!":"COPY"}</button>
+     <button type="button" onClick={shareFocusBusText} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as text"}>SHARE</button>
+     <button type="button" onClick={shareFocusBusPage} disabled={focusShareEmpty} aria-label={"Share bus "+focusedGroup.bus.n+" defects as a page"}>SHARE PAGE</button>
      {/* MOUNTED WHETHER OR NOT IT HAS ANYTHING TO SAY. A live region only
          announces what changes INSIDE it; one that appears at the same moment
          as its text is a new element to a screen reader, not an update, and is
@@ -2037,13 +2190,47 @@ export default function DefectLog(){
        focusShareStatus==="saved"?"SAVED TO THIS DEVICE":
        focusShareStatus==="error"?"COULD NOT SHARE — TRY COPY":""}
      </small>
+     {/* AND WHAT A HIDE DID, announced and never drawn. A row leaving the list
+         and a button arriving are both silent, and the HIDE control that was
+         pressed is gone with its row, so without this a hide is a press with no
+         outcome. Always visually hidden rather than hidden-when-empty: the
+         visible answer is the row going, and a second line of 7px text in this
+         bar would be competing with the one that says what will be sent. */}
+     <small className="log-focus-share-live" role="status" aria-live="polite">{focusHideNote}</small>
      {/* WHAT WILL ACTUALLY GO, when the board is hiding some of it. Pressing
          SHARE on a screen showing two and sending six is a surprise worth one
          line; with no filter on, the two numbers agree and this says nothing. */}
-     {focusHiddenByBoard>0&&<small className="log-focus-share-scope">SHARES ALL {focusedAllRecords.length} — {focusHiddenByBoard} HIDDEN BY THE BOARD FILTER</small>}
+     {/* ONE SLOT, ALWAYS MOUNTED. Both of these appear and disappear, and they
+         sit ABOVE the rows - so mounting them moved the whole list by 70px on
+         a phone and 115px on the shop computer on every hide and every undo,
+         putting a different row under the thumb that was about to swipe. The
+         slot holds its height; only its contents change.
+
+         IT CARRIED AN `aria-hidden` WHEN EMPTY AND THAT CLAIM WAS EMPTY TOO.
+         The comment said it kept an announced blank out of the tree - but this
+         slot is not a live region, so nothing announces it either way, and the
+         two things inside it are already silent when there is nothing to say:
+         an empty `<small>` reads as nothing, and PUT BACK is
+         `visibility:hidden`, which takes it out of the tree on its own. One
+         fewer condition on the markup, and one fewer sentence that is not true.
+
+         TWO REASONS, COUNTED APART. A defect the view held back is still on
+         the bus; one swiped away is somebody saying "not this one". Silent
+         when the share is the whole bus.
+
+         AND THE WAY BACK IS ON THE PAGE, not behind a menu - the rule the Down
+         Sheet's own PUT BACK follows, because an accidental swipe is exactly
+         when nobody goes looking for an undo. It takes the LAST one back, so
+         pressing it repeatedly walks the swipes off in reverse. */}
+     <div className="log-focus-share-slot">
+      <small className="log-focus-share-scope">{focusShareScopeNote(focusScope)}</small>
+      <button ref={focusPutBackRef} type="button" className="focus-put-back" onClick={focusPutBack}
+       style={focusScope.hiddenByHand>0?undefined:{visibility:"hidden"}}
+       tabIndex={focusScope.hiddenByHand>0?0:-1}><span aria-hidden="true">&#8629;</span><b>PUT BACK{focusScope.hiddenByHand>1?" ("+focusScope.hiddenByHand+")":""}</b></button>
+     </div>
     </div>
-    <div className="log-focus-body">{focusedGroup.records.map((record,index)=><article className={"log-focus-record "+record.defect.state} key={record.defect.id}>
-     <div className="log-focus-record-head"><b>{focusedGroup.records.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
+    <div className="log-focus-body">{focusScope.rows.map((record,index)=><SwipeAwayRow className={"log-focus-record "+record.defect.state} key={record.defect.id} hideLabel={"Hide "+repairCategoryLabel(record.defect.category)+" from this share"} onHide={via=>focusHideRecord(record,via)}>
+     <div className="log-focus-record-head"><b>{focusScope.rows.length>1?index+1+". ":""}{repairCategoryLabel(record.defect.category)}</b><i className={"state "+record.defect.state}>{STATE_LABELS[record.defect.state]}</i></div>
      <p className="log-focus-defect">{defectLabel(record.defect)}</p>
      {/* Spelled out here rather than abbreviated: the focus view is the one a
          foreman reads standing next to somebody, and "DIAGNOSED — CJ, Aug 27"
@@ -2055,7 +2242,7 @@ export default function DefectLog(){
      {record.defect.conditionNotDuplicated&&<p><b>RESULT</b>Defect / condition not duplicated</p>}
      {record.defect.diagnosticNote&&<p><b>DIAG</b>{record.defect.diagnosticNote}</p>}
      {record.defect.actionTaken&&<p><b>ACTION</b>{record.defect.actionTaken}</p>}
-     {record.defect.partNumber&&<p><b>PART</b>{record.defect.partNumber}</p>}
+     {/* EVERY PART. This read `partNumber`, so a second part was invisible here too. */}{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))&&<p><b>PART{normalizeDefectParts(record.defect.parts,record.defect).length>1?"S":""}</b>{defectPartsText(normalizeDefectParts(record.defect.parts,record.defect))}</p>}
      {record.defect.shopNotes&&<p><b>{settings.display.labels.shopNotes.toUpperCase()}</b>{record.defect.shopNotes}</p>}
      {reportAttemptCount(record.defect)>0&&<p className="log-focus-work-states"><b>CAME BACK</b><span><i className="work-state-badge report-return">{reportAttemptCount(record.defect)}× SINCE IT WAS LOGGED — see ADVANCED STATS below</i></span></p>}
      <div className="log-focus-record-foot">
@@ -2068,7 +2255,7 @@ export default function DefectLog(){
       </div>
       <div className="log-focus-record-meta"><time>LOGGED {timeLabel(record.createdAt)}</time>{isHeldDeferred(record.defect,record.onDownSheet)&&<button className="undo-deferred" type="button" onClick={()=>undoDeferred(record)}>UNDO DEFERRED</button>}</div>
      </div>
-    </article>)}
+    </SwipeAwayRow>)}
     {/* ADVANCED STATS — the last thing in the focus body, after however many
         defects the bus is carrying. Curtis: "make it viewable only in focus,
         like the bottom of however many defects listed. This way the list can

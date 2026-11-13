@@ -65,8 +65,33 @@ test("confirmation prompts are per-device settings that default to on", async ()
      changes nothing would break it too. What matters is that every board
      setting the page holds is in the object it writes: one left out is a
      preference that silently never persists. */
-  const written=page.match(/JSON\.stringify\(\{statusVersion:3,([^}]*(?:\{[^}]*\}[^}]*)*)\}\)\)/);
-  assert.ok(written,"the map still writes its settings as one object");
+  /* MATCHED ON THE OBJECT THE MAP HANDS OVER, not on a `JSON.stringify` of
+     its own. It used to stringify the whole record itself, which deleted every
+     field it did not name: measured, a device holding a stale
+     `pace-board-settings-v1` field lost it, and `futureField` with it, on the
+     first render of the map. `writeBoardSettings` merges over the stored copy,
+     which is what map-settings.ts has always claimed happens. */
+  const written=page.match(/writeBoardSettings\(localStorage,\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\)/);
+  assert.ok(written,"the map still persists its board settings");
+  /* ORDER-INDEPENDENT. This forbade the literal `JSON.stringify({statusVersion:3`
+     and a reviewer moved the stamp to the END of the object: the map replaced
+     the whole record again, a device lost its stale field, its `futureField`
+     and its legacy `dark` on the first render, and 433 tests stayed green. A
+     blacklist of one spelling is not a gate - which is what this change's own
+     notes say about the one it replaced. So: `writeBoardSettings` is the ONLY
+     writer of this key outside map-settings.ts. */
+  /* THREE SHAPES, NOT ONE. This checked a double-quoted `writeSetting` call
+     only, so a single-quoted key, a backtick, or a plain
+     `localStorage.setItem("pace-board-settings-v1", …)` could sit beside
+     `writeBoardSettings` and replace the merged record without failing here.
+     The rule is "the map never writes this key itself"; the spelling is not
+     the rule. */
+  const raw=[
+   /writeSetting\(\s*(?:window\.)?(?:localStorage|storage)\s*,\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+   /(?:window\.)?(?:localStorage|storage)\.setItem\(\s*(?:BOARD_SETTINGS_KEY|["'`]pace-board-settings-v1["'`])/,
+  ];
+  assert.ok(!raw.some(shape=>shape.test(page)),
+   "the map must not write pace-board-settings-v1 itself; writeBoardSettings merges, a raw write replaces");
   /* DERIVED FROM BoardSettings, not hand-listed. A hand-written list cannot
      know it is complete: add a setting to the type and to readBoardSettings,
      forget the map's own write, and a hand-listed assertion passes while the

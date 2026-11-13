@@ -1,4 +1,4 @@
-import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
+import {hasWorkState,isDownSheetRecommended,isUnresolved,loggedByHand,loggedMinutesElapsed,normalizeDefects,ROAD_CALL_KEY,type StructuredDefect} from "./repair-catalog.ts";
 import {hasRecentRoadCall,ROAD_CALL_WINDOW_DAYS,type RoadCallEvent} from "../fleet/road-calls.ts";
 import {isFarebox,isIbsVentra} from "../fleet/tech-services.ts";
 
@@ -175,34 +175,27 @@ function recentStamp(at:string|undefined,now:string){
  return !Number.isNaN(stamped)&&stamped>=new Date(now).getTime()-ROAD_CALL_WINDOW_DAYS*24*60*60*1000;
 }
 
-/* LOGGED MEANS SOMEBODY LOGGED IT, not that a record exists.
+/* LOGGED MEANS SOMEBODY LOGGED IT, not that a record exists - and DEFECTS
+   LOGGED is where that rule is live, because this filter runs over the board's
+   own defects, scanned rows included.
 
    Curtis, looking at a DEFECTS LOGGED share that had picked up rows off a
    scanned sheet: "I have no reason to share something off the down sheet
-   because the down sheet is already coming from the source — the down sheet is
+   because the down sheet is already coming from the source - the down sheet is
    located in an office, so I'm not gonna send them something that they already
    have written down... for this particular function, no, just things that were
-   logged by hand."
+   logged by hand." That is what put ninety rows behind a SHOW ALL on a list
+   whose entire claim is "this is what got logged".
 
-   A scanned Down Sheet row becomes a real defect on the bus, correctly stamped
-   `source:"down-sheet"`, and its `createdAt` is WHEN THE SCAN RAN rather than
-   when anybody logged anything — so importing yesterday's paper at 20:00 drops
-   the whole sheet into "the last 8 hours" at once. That is what put ninety
-   rows behind a SHOW ALL on a list whose entire claim is "this is what got
-   logged".
-
-   Only `down-sheet` is excluded. A defect typed into the Defect Log, into the
-   map's bus editor, or spoken to the AI operator is somebody logging it, and
-   none of those carry that source. The exclusion is the paper's, not the
-   app's.
-
-   AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. `applyDownEntryToFleet`
-   writes `linked?.source||"down-sheet"`, so a defect logged by hand that LATER
-   appears on a sheet stays `defect-log` and stays in this list. Somebody
-   logged it; the paper catching up does not take that away. */
-export function loggedByHand(defect:{source?:string}){
- return String(defect?.source||"")!=="down-sheet";
-}
+   THE RULE ITSELF - what the source means, why only the paper is excluded, and
+   why a defect keeps the source it was born with - is written once, over
+   `loggedByHand` in repair-catalog.ts, where `DefectSource` is defined. It
+   lives there rather than here because feed-window.ts needs the same answer
+   and cannot import this file without pulling road-calls and tech-services in
+   behind it. This comment used to carry its own copy of all three paragraphs;
+   two copies of a rule is how the two stop agreeing. Re-exported so nothing
+   that names it from this module breaks. */
+export {loggedByHand};
 
 /* Whether this defect was written down inside the window the drawer is set to.
    `null` means no window, which is ALL. An undated record is out of every

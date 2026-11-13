@@ -96,14 +96,128 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
+## Six pull requests are open and not one of them is merged
+
+**Read this before you plan anything.** The four in the table were measured
+2026-11-12, when `main` was at `92dfc0d` and had not moved since 2026-11-05.
+**#45 and #46 were opened later that day and are in their own table below it.**
+
+| PR | Branch | Head | Ahead | CI | Threads | What it is |
+| --- | --- | --- | --- | --- | --- | --- |
+| **#42** | `claude/multi-part-repairs-and-badge-rules` | `6c8ab33` | 19 | green | 41, none open | More than one part per repair; the focus-share swipe and PUT BACK; the DS badge stops caring where a bus is parked; MARK FIXED; **the 2px ADVANCED DETAILS fix** |
+| **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
+| **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
+| **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
+
+**Opened 2026-11-12, after that table was measured.** Head and commits ahead are
+from `git rev-parse` and `git rev-list --count origin/main..<branch>` at
+`b8c1ef9`. **Their CI and review threads were NOT measured when this was
+written — read them off the PR before quoting either.**
+
+| PR | Branch | Head | Ahead | What it is |
+| --- | --- | --- | --- | --- |
+| **#45** | `claude/typecheck-gate-windows` | `256c744` | 1 | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
+| **#46** | `claude/heat-check-domain` | `79c4e58` | 1 | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules, limits and what was never verified are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`**, so do not look for it here |
+
+**What #46 has never done is read a real photograph.** `/api/heat-sheet-scan`
+needs the OpenRouter key, which the development machine does not have;
+everything after the route was driven with its answer stubbed. Curtis has
+photographed the real sheet twice — the second, from an iPad, shows all 108
+printed bus numbers — and its first real scan after a publish is the test of
+the prompt. Three things are still his to settle: whether a struck-through row
+means fixed, whether to narrow the A/C Buses filter (it counts heating repairs,
+so the A/C card claims no number), and whether the check log gets a Shop Cloud
+table so it syncs.
+
+**#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
+**#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
+way since. Of the eleven files it touches, **two conflict**:
+`docs/PUBLISH_NEXT.md`, which every release rewrites, and
+`tests/helpers/modules.mjs`, where `main` and the branch each appended export
+lines at the same end of the file — keep both sets. The other nine are new
+files nothing else has touched. Resolving it means rebasing that branch onto
+`main` and rewriting its handoff section against the new base — and its two
+release gates are Curtis's anyway, so there is no hurry.
+
+Both figures in that row were re-measured on 2026-11-12 from a full clone,
+after the first write-up of this section — made from the shallow one described
+under the traps below — gave 14 commits ahead and one conflicting file. `git
+rev-list --count origin/main..<branch>` returns 9, GitHub's own `commits` for
+the PR is 9, and `git merge-tree --write-tree --name-only origin/main <branch>`
+names both files.
+
+**None of this is on `main`,** so none of it is in anything Codex can publish,
+and nothing in `docs/PUBLISH_NEXT.md` describes it.
+
+**The one with floor impact is #42.** Curtis reported from his phone that there
+was no way to record a second part — *"we made a blooper, we assumed that each
+repair only takes one part."* Chasing it found a worse thing underneath:
+`overflow:hidden` on `.advanced-defect-details` collapses that `<details>` box
+to **2px** — two borders and no content — with a correct 48px `<summary>`
+clipped away inside it, so PARTS USED, the estimate and the hours cannot be
+opened by a tap at all. A keyboard still opens it, which is why nothing ever
+errored. It is **older than that branch** (`git log -S` over the rule against
+`main` is empty). The fix is `overflow:clip`, and it is sitting unmerged, so
+**the bug is still live on the shop's phones.** Say that plainly rather than
+letting him test a fix that was never deployed — this session told him to check
+it on his phone before realising that.
+
+**Why these are branches and not `main`.** Curtis: *"When u r done with
+everything push it so SD-QG engineer can review it / Don't make live just
+push."* That is the only reason; the workflow elsewhere in this file is commits
+straight to `main`. Once he says merge, they go to `main` and each gets its
+version section in `docs/PUBLISH_NEXT.md`.
+
+**Do not push to those branches to tidy something up.** Each head is the exact
+commit SD-QG passed and CodeRabbit cleared, and a new commit resets both — a
+whole review round spent on nothing. #44 took 13 findings across 6 rounds to
+get there.
+
+### Still Curtis's call, not yours
+
+- **Merging #42, #43 and #44.** He has been told what is waiting, twice, and
+  has not answered. **Do not ask again unprompted and never merge on your own.**
+- **An actual iPhone.** `overflow:clip` and the row swipe were measured in
+  Chromium with real CDP touch events. Real iOS Safari was never touched,
+  because this container cannot. Older WebKit drops `overflow:clip` and falls
+  back to `visible`, which degrades safely — but that is reasoning, not a
+  measurement.
+- **The Down Sheet share bar is now permanent** — 101px on a phone where it
+  used to be 0px unless a quick filter was picked. He approved building the
+  feature; he has not seen where it landed. Reusing the quick-filter bar rather
+  than inventing a second control is the piece worth his eye.
+- **#39's two release gates**, both writes to his live Supabase project: a
+  dedicated reader identity (a new account is *not* enough — every policy in
+  `0002_shared_records.sql` grants insert and update to `authenticated`, so it
+  needs restrictive policies), and verified runtime configuration with real
+  authorized reads.
+- **#39's `?token=` thread is left open deliberately.** It is a recorded,
+  temporary accepted risk, written up in docs/MCP\_SECURITY\_FOLLOWUP.md — a
+  file that arrives **with that PR** and is not on `main`, so do not go looking
+  for it here. Do not resolve that thread to tidy the PR. It is CodeRabbit's
+  Major on the PR's own `src/lib/mcp/agent-token.ts` (also not on `main`). The PR's **second** open thread is a
+  separate Minor on `docs/PUBLISH_NEXT.md` — one of the two files that
+  conflict, so a rebase will likely moot it. Two open, not one.
+
+### A self-scheduled check-in is running
+
+Every 8 hours a `send_later` reminder re-reads #42/#43/#44 — CI on the current
+head, mergeability, open review threads — and fixes anything that goes red or
+conflicted. It had fired 33 times by 2026-11-12 and found nothing changed since
+2026-11-05, which is why it was stretched from 4 hours to 8. It is the backstop
+for a dropped webhook, not the primary signal. **Stop it once the PRs are
+merged or closed, or when Curtis says to stop.**
+
+---
+
 ## Where things stand
 
 | | |
 | --- | --- |
-| Branch | `main`, linear history, no force-pushes ever |
+| Branch | `main`, linear history, no force-pushes ever. **Six PRs are open off it and unmerged — see the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
-| Working tree at handoff | Clean. Nothing stashed, nothing uncommitted. |
+| Working tree at handoff | Clean, on `main` at `92dfc0d`. Nothing stashed, nothing uncommitted. The three feature branches are pushed and need nothing from you. |
 | Gate at handoff | All four green: the full suite passing, ESLint clean, production build succeeds, and a cold read of the diff answered. Run them; the count moves with every change that adds a test. |
 
 **Neither is the test count, for the same reason.** It was written down as 229
@@ -281,6 +395,38 @@ strike the item the day it lands.
   rust on Incidents, green on Shop Talk, bright blue on the Down Sheet. 194
   shared the header BAR only. Whether the whole block should match is open.
 
+### 4. Built in this session and sitting in PRs — do not rebuild
+
+Every one of these is written, reviewed, green and **unmerged**. Check the PR
+table at the top of this file before offering any of them to Curtis as work;
+this project has twice re-offered finished work from a queue title alone.
+
+- **A repair can carry more than one part** (#42) — PART NUMBER / PART NAME is
+  a list with ADD ANOTHER PART, in both the Defect Log form and the Fixed
+  Repairs completion editor. Parts memory still learns only the first numbered
+  part; the notes say why.
+- **The focus share follows the window, and a swipe drops one defect from it**
+  (#42) — swipe a row left, or press HIDE because the shop computer is a
+  mouse; PUT BACK returns the last one. The share refuses to send an empty bus,
+  which would read as a clean one.
+- **The DS badge no longer cares where a bus is parked** (#42) — the map's
+  three-way badge filter is gone; SHOW BADGE in Settings is the one switch.
+- **MARK FIXED** on the Down Sheet's green tick (#42).
+- **ADVANCED DETAILS is a 48px bar again instead of a 2px line** (#42) — see
+  the top of this file. This is the one with floor impact.
+- **PRELIMS** replaces WORK DONE SO FAR on the Defect Log form (#43). PRELIMS
+  rather than PRELIMINARY CHECKS because two of the six boxes are not checks —
+  ROAD CALL says what the bus did, OPERATOR REPORTED says where the report came
+  from — and the repo already says so in its own words.
+- **Share the Down Sheet itself** (#44) — the three actions already existed and
+  were gated behind picking a quick filter, so the one thing that could not be
+  sent was the sheet. The gate is removed rather than a second sharing system
+  built, and `downSheetShareScope` in `src/lib/down-sheet/down-sheet-share.ts`
+  decides what the heading may claim. **`bandEntries` drops IDOT-only rows
+  unconditionally**, which is why WHOLE SHEET had to be computed from what was
+  drawn against what the sheet holds rather than from a list of filters — a
+  list goes stale the moment the next row filter lands.
+
 ---
 
 ## How to check your work
@@ -330,6 +476,60 @@ are worth reading before the situations they describe: `browser-verification`,
 
 Every one of these cost real debugging time. They are here so it is not spent
 twice.
+
+**Four GitHub reads that each returned a confidently wrong answer, in one
+session.** Every one of them produced a false statement to Curtis before it was
+caught.
+
+- A review thread's resolved flag is **`is_resolved`** on the MCP
+  `pull_request_read` route and **`resolved`** on the CCR REST route
+  (`gh api repos/<owner>/<repo>/pulls/<n>/ccr/review_threads`). Reading the
+  wrong key reported "every thread closed" when 30 of 41 were open, and later
+  the exact reverse. **Dump the keys before trusting a count.**
+- `gh api .../reviews` returns 30 of 91 without `--paginate`, and is not
+  newest-last.
+- `gh pr view --json` goes through GraphQL and 403s here. `gh` itself works —
+  use the REST endpoints.
+- The MCP `get_status` method returns **legacy commit statuses only**. It reads
+  `pending, total_count 0` on a PR whose CI is green, because CI here is
+  Actions check runs. Read `.../actions/runs` instead.
+
+**This container's clone is SHALLOW, so git will lie to you about history.**
+`git rev-parse --is-shallow-repository` returns true and `.git/shallow` lists
+four grafted tips. `main` reads as 51 commits with a root dated two weeks ago.
+Consequences, all hit in one sitting: `git merge-base` finds none between
+`main` and a three-week-old branch, `git merge-tree` says **"refusing to merge
+unrelated histories"**, and `--is-ancestor` answers confidently and wrongly.
+None of that is true of the repository — only of this clone. **Never conclude
+that a branch is merged, unmerged, orphaned or conflicted from local ancestry
+here.** Ask GitHub (`gh api repos/<o>/<r>/pulls/<n>` gives `mergeable` and
+`mergeable_state`, computed against the full history), or deepen the clone
+first with `git fetch --unshallow`.
+
+**A stale remote-tracking ref will answer a question about the wrong commit.**
+`git rev-parse origin/<branch>` returned `main`'s SHA for a branch whose real
+head was 14 commits away, and an `--is-ancestor` check built on it concluded a
+PR was already merged and its files deleted from `main`. `git ls-remote --heads
+origin` disagreed. Before concluding anything about what is merged, fetch with
+`--prune --force 'refs/heads/*:refs/remotes/origin/*'` and compare the local
+refs against `ls-remote`.
+
+**A mutation-test tally that counted skips as kills.** The script computed
+`len(MUTANTS) - len(survived)` and printed `12/12` while printing
+`SKIP (anchor missing)` three times above it — three mutants never ran, because
+later commits had rewritten the exact lines they anchored on. The figure was
+published in a PR and had to be retracted. **A skipped mutant is not a caught
+one; make the arithmetic unable to say otherwise.**
+
+**A text gate that bans one spelling bans one spelling.** Five gates written in
+this session each matched a single way of writing the thing they forbade, and a
+reviewer walked a mutant past every one: `setFocusExcluded.call(...)` past a
+check for `setFocusExcluded(`, `if (!quickFilter) return;` with a space past a
+check without one, `role={"status"}` past a check for `role="status"`. Collapse
+whitespace before asking, count identifiers rather than call spellings, and
+**drive every mutant rather than reasoning about coverage.** One of them could
+also pass *vacuously* — its `indexOf` anchor returned -1 and it cheerfully
+checked the tail of the file.
 
 **`git push | tail -1` hides a failed push.** A pipeline returns the exit code
 of the *last* command, so `tail` reports success over a rejected push. Test the

@@ -32,6 +32,9 @@
       ever know which one. */
 
 import {defectLabel,isUnresolved,mergeReportAttempts,normalizeDefects,normalizeFluids,defectSummary,type StructuredDefect} from "./repair-catalog.ts";
+import {blankDefectPart,normalizeDefectParts,withDefectParts,type DefectPart} from "./defect-parts.ts";
+
+const clean=(value:unknown)=>typeof value==="string"?value.trim():"";
 import {downSheetDefectIdCandidates,type SyncDownEntry} from "../down-sheet/down-sheet-sync.ts";
 /* The identity rule lives on its own so the Down Sheet can ask the same
    question before it writes without these two files importing each other. */
@@ -103,7 +106,72 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
     nothing. Deduplicated by timestamp, so two copies of the same return that
     both travelled through the cloud count once. */
  const reportAttempts=mergeReportAttempts(ordered.flatMap(defect=>defect.reportAttempts||[]),[]);
- return {
+ /* EVERY PART ANYONE RECORDED, KEPT, for the reason the return tally is kept:
+    a merge that quietly halves it makes the number evidence of nothing. This
+    was missed when a repair grew a `parts` array - only the survivor's array
+    came through `...survivor`, and a merged-away copy contributed nothing but
+    its mirrored FIRST part, so a two-part duplicate lost its second one. A cold
+    read drove it: `parts:[BB-2,CC-3]` merged away left `AA-1` alone on the
+    record. Losing a part number off a repair's history is losing the history
+    this app exists to keep.
+
+    READ THROUGH `normalizeDefectParts`, so a copy saved under the old
+    single-part shape contributes the part it describes rather than nothing.
+    Deduplicated on the NUMBER where there is one and on the NAME where there is
+    not, because two copies of the same repair name the same part and it must
+    not be counted twice; a name-only row - "the long bolt behind the
+    alternator" - is still a part somebody recorded.
+
+    ASSEMBLED, not spread, so the mirrored pair cannot end up describing a
+    different part from the array's first row. `withDefectParts` runs last for
+    that reason, and it takes `partsUsed` so a ticked-with-nothing-typed copy
+    keeps its MISSING PART # through the merge. */
+ const mergedParts:DefectPart[]=[];
+ const seenParts=new Map<string,number>();
+ /* AND EVERY MERGED PART NEEDS AN ID OF ITS OWN, which this union did not give
+    them. `normalizeDefectParts` MINTS a default id for a record that has none -
+    `part-0` for a legacy one-part record, `part-0, part-1…` for an array
+    without ids - so two ordinary one-part copies merged into a list where both
+    parts were `part-0`.
+
+    That is the exact failure `defect-parts.ts` keeps ids for in the first
+    place: the editor keys its rows by id and `updateDefectPart` /
+    `removeDefectPart` FIND a row by id, so with a collision, typing in row 2
+    rewrote row 1 and REMOVE on row 2 deleted both. Driven: merging ZZ-9/Belt
+    with YY-8 gave ids `[part-0, part-0]`; typing in row 2 gave
+    `[YY-80, YY-80]`; removing row 2 left `[""]` - silent loss on a save, with
+    the screen still showing ZZ-9.
+
+    An id that is already taken is REPLACED rather than suffixed, through the
+    module's own `blankDefectPart`, so there stays one place that mints an id.
+    A part keeps its own id when nothing collides, which is every merge that
+    does not hit this, so a record is not churned for nothing. The id means
+    nothing to anybody by design - the comment on it says so - which is exactly
+    why replacing one costs nothing. */
+ const usedIds=new Set<string>();
+ for(const defect of ordered)
+  for(const part of normalizeDefectParts(defect.parts,defect)){
+   const key=(part.partNumber||"").trim().toLowerCase()||"name:"+(part.partName||"").trim().toLowerCase();
+   if(key==="name:")continue;
+   const already=seenParts.get(key);
+   if(already!==undefined){
+    /* THE SAME NUMBER TWICE IS ONE PART, BUT A NAME IS STILL SOMETHING SOMEBODY
+       RECORDED. The first version skipped a repeat outright, so a survivor
+       holding `AA-1` with no name and a duplicate holding `AA-1 (Chamber)` kept
+       the number and threw the name away - the same kind of loss this whole
+       union exists to prevent, one field smaller. The first entry keeps its
+       place; a later copy only ever FILLS a gap in it, never overwrites. */
+    const held=mergedParts[already];
+    if(!clean(held.partName)&&clean(part.partName))
+     mergedParts[already]={...held,partName:clean(part.partName)};
+    continue;
+   }
+   seenParts.set(key,mergedParts.length);
+   const kept=usedIds.has(part.id)?{...part,id:blankDefectPart().id}:part;
+   usedIds.add(kept.id);
+   mergedParts.push(kept);
+  }
+ return withDefectParts({
   ...survivor,
   createdAt,
   updatedAt:now,
@@ -128,7 +196,16 @@ function mergedRecord(group:StructuredDefect[],survivor:StructuredDefect,now:str
   estimateHours:firstNumber(defect=>defect.estimateHours),
   conditionNotDuplicated:anyTrue(defect=>defect.conditionNotDuplicated),
   partsUsed:anyTrue(defect=>defect.partsUsed),
- };
+ /* `true` OR NOTHING AT ALL, never an explicit `false`. An explicit false is a
+     person UNTICKING the box and it beats any row still in the list - which is
+     right on a form and wrong here, because a merge is nobody unticking
+     anything. Passed as false, a copy carrying `partNumber:"HX-99"` with no
+     `partsUsed` flag at all (the shape a pre-flag record has) had its part
+     wiped by the merge. Caught by the Down Sheet's own merge test, which has
+     asserted that number survives since long before parts were a list.
+     Undefined lets the rows decide, which is the same answer
+     `normalizeDefectParts` gives when it reads that record. */
+ },mergedParts,anyTrue(defect=>defect.partsUsed)===true?true:undefined);
 }
 
 /* Which copy survives.
