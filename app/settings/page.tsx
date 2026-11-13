@@ -43,6 +43,7 @@ import {DEFAULT_HEADER_COLOR,DEFAULT_HEADER_THEME,HEADER_SURFACES,HEADER_THEME_K
 import {pageHeaderThemes} from "@/src/lib/settings/page-header-themes";
 import {BOARD_SETTINGS_KEY,readBoardSettings,writeBoardSettings,THEMES} from "@/src/lib/settings/map-settings";
 import {FLEET_BACKUP_ERRORS,readFleetBackup,restoreFleetBackup} from "@/src/lib/storage/fleet-restore";
+import {heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import DownSheetSettings from "./_components/down-sheet-settings";
 import {DOWN_SHEET_SETTINGS_KEY,readDownSheetSettings,writeDownSheetSettings} from "@/src/lib/down-sheet/down-sheet-settings-store";
 import LogSettingsModal from "./_components/defect-log-settings-modal";
@@ -375,7 +376,7 @@ export default function SettingsPage(){
      would otherwise still be showing the settings the file just replaced. */
   reloadBoard();reloadDown();reloadLog();
   setMergeUndo(null);
-  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+".");
+  alert("MASTER IMPORT complete. Restored: "+result.restored.join(", ")+"."+(result.heatCheckProblem?"\n\nTHE HEAT CHECKS IN THIS FILE WERE NOT RESTORED — "+heatLogProblemWords(result.heatCheckProblem)+". Everything listed above was.":""));
  };
 
  /* One theme across every page. It writes into each page's own settings rather

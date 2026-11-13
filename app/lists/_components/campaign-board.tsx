@@ -58,9 +58,15 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
  const tap=(row:HeatRosterRow,result:HeatResult)=>{
   if(guarded)return;
   setGuarded(true);
-  if(guard.current)clearTimeout(guard.current);
-  guard.current=setTimeout(()=>setGuarded(false),HEAT_TAP_GUARD_MS);
-  onCheck(row,result);
+  /* The clock starts when the tap is OVER. NO HEAT asks a question first, and
+     with the timer started before it a confirm left open for a second had
+     used the whole cooldown up — the buttons came back live the instant the
+     list changed, which is the moment the guard exists for. */
+  try{onCheck(row,result)}
+  finally{
+   if(guard.current)clearTimeout(guard.current);
+   guard.current=setTimeout(()=>setGuarded(false),HEAT_TAP_GUARD_MS);
+  }
  };
  const roster=useMemo(()=>heatRoster(fleet,checks),[fleet,checks]);
  const counts=useMemo(()=>heatRosterCounts(roster),[roster]);
@@ -114,10 +120,6 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
     </div>
    </div>
    <p className="heat-list-note">Tap what you found at the bus. <b>NO HEAT</b> opens a No Heat defect on the Defect Log unless the bus already has one. <b>HEAT OK</b> only records that you checked — it never closes a repair. Every tap is kept with your initials and today&apos;s date.</p>
-   {lastTap&&<div className="heat-undo" role="status">
-    <span>Bus <b>{lastTap.busNumber}</b> recorded as <b>{lastTap.result==="ok"?"HEAT OK":"NO HEAT"}</b>.{lastTap.filed?" The No Heat defect it opened stays on the Defect Log; undo takes back the check only.":""}</span>
-    <button type="button" onClick={onUndo}>UNDO THIS TAP</button>
-   </div>}
    <div className="heat-lanes" aria-label="Which buses to show">{LANES.map(key=>
     <button type="button" aria-pressed={lane===key} className={lane===key?"active":""} key={key} onClick={()=>setLane(key)}>{key==="todo"?"TO DO":HEAT_STANDING_LABEL[key]} <strong>{laneCount[key]}</strong></button>)}</div>
    {shown.length?<ul className="heat-roster">{shown.map(row=><li className={"standing-"+row.status} key={row.busNumber}>
@@ -128,6 +130,16 @@ export default function CampaignBoard({fleet,checks,initials,onInitials,onCheck,
      <button type="button" className="tap-cold" disabled={guarded} onClick={()=>tap(row,"no-heat")} aria-label={"Bus "+row.busNumber+" has no heat"}>NO HEAT</button>
     </span>
    </li>)}</ul>:<p className="heat-list-empty">{roster.length?"No buses in this group.":"There are no buses on this device's board yet."}</p>}
+   {/* BELOW THE LIST, AND STUCK TO THE BOTTOM OF THE SCREEN. It was above the
+       lane buttons, in flow: the first tap mounted it and pushed every row
+       down by its own height under the thumb — +101px at 390, measured by the
+       SDET gate — and UNDO pulled them back up. After the last row, mounting
+       it adds height where nothing is beneath it, and `position:sticky` keeps
+       it in reach while the list is longer than the screen. */}
+   {lastTap&&<div className="heat-undo" role="status">
+    <span>Bus <b>{lastTap.busNumber}</b> recorded as <b>{lastTap.result==="ok"?"HEAT OK":"NO HEAT"}</b>.{lastTap.filed?" The No Heat defect it opened stays on the Defect Log; undo takes back the check only.":""}</span>
+    <button type="button" onClick={onUndo}>UNDO THIS TAP</button>
+   </div>}
   </div>}
  </div>;
 }

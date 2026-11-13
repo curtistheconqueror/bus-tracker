@@ -75,7 +75,9 @@
 /* Dead for a moment after any tap. Dimmed, not hidden: a button that vanished
    would move the next one under the thumb, which is the thing being stopped. */
 .heat-taps button:disabled{opacity:.45;cursor:default}
-.heat-undo{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #c9b46a;border-radius:7px;background:#fffbea;color:#4d3d00;font-size:10px;line-height:1.4}
+/* Sticky, not fixed: it keeps its place after the last row, so at the end of
+   the list it covers nothing, and it cannot sit over another page's content. */
+.heat-undo{position:sticky;bottom:8px;z-index:2;box-shadow:0 4px 14px rgb(0 0 0 / .18);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #c9b46a;border-radius:7px;background:#fffbea;color:#4d3d00;font-size:10px;line-height:1.4}
 .heat-undo span{flex:1 1 220px;min-width:0}
 .heat-undo button{flex:none;min-height:44px;border:1px solid #5d4a00;border-radius:6px;background:#fff;color:#4d3d00;padding:0 14px;font-size:9px;font-weight:900;cursor:pointer}
 .tap-ok{background:#08733f}

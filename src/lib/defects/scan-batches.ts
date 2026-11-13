@@ -88,6 +88,17 @@ export function scanBatchWords(batch:Pick<ScanBatch,"kind">){
 
 function text(value:unknown){return String(value??"").trim()}
 
+/* A stamp in the one spelling this module keys a batch by. The shop cloud hands
+   the same moment back as `+00:00` where this device wrote `Z`, and a pull
+   replaces only the records it carries — so one press could hold both
+   spellings, and keyed by text it became two batches: UNDO LAST found one,
+   removed half the scan, and `dropScanChecks`, which has always matched by
+   instant, took every check. A stamp that is not a date keys as its own text. */
+function stampKey(value:unknown){
+ const at=Date.parse(text(value));
+ return Number.isNaN(at)?text(value):new Date(at).toISOString();
+}
+
 /* Two stamps for one moment. Compared as instants, because the shop cloud hands
    a stamp back spelled its own way — `+00:00` where this device wrote `Z` — and
    a pull replaces the local record with that spelling. Two stamps neither of
@@ -127,6 +138,15 @@ export function touchedScanRecord(defect:StructuredDefect){
  if(text(defect.createdAt)&&text(defect.updatedAt)&&!sameInstant(defect.updatedAt,defect.createdAt)
   &&!(text(defect.scanRestoredAt)&&sameInstant(defect.updatedAt,defect.scanRestoredAt)))return true;
  if(defect.partsUsed===true||defect.conditionNotDuplicated===true)return true;
+ /* MARKED AS TAKING THE BUS OUT OF SERVICE. Both scanners file every record as
+    able to run. The OPERATIONAL EFFECT select on the Facility Map's bus card
+    changes `operability` and nothing else — no state, no stamp — so a scan
+    record somebody had set to "must be removed from service" read as untouched
+    and left with its batch, taking the bus's OUT status with it. Read off the
+    record rather than fixed by stamping in that card's save: the stamp is what
+    the shop cloud orders writes by, and this needs no change to how the map
+    saves. */
+ if(defect.operability==="down")return true;
  return false;
 }
 
@@ -136,8 +156,8 @@ export function scanBatches(fleet:ScanBatchBus[]):ScanBatch[]{
  for(const bus of fleet){
   for(const defect of normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id)){
    if(!defect.id.startsWith(SCAN_BATCH_ID_PREFIX))continue;
-   const stamp=text(defect.createdAt);
-   if(!stamp)continue;
+   if(!text(defect.createdAt))continue;
+   const stamp=stampKey(defect.createdAt);
    const batch=byStamp.get(stamp)||{kind:"heat" as ScanBatchKind,key:stamp,filedAt:stamp,ids:[],removableIds:[],keptIds:[],busNumbers:[],checkedBy:[]};
    /* Heat only while EVERY record under the stamp is a heat record. Two
       scanners sharing one millisecond is not a thing that happens, and if it
@@ -162,7 +182,7 @@ export function scanBatches(fleet:ScanBatchBus[]):ScanBatch[]{
    the undo answered that the scan was "no longer on this device" while it sat
    on the board in front of whoever pressed it. */
 export function findScanBatch(batches:ScanBatch[],stamp:string){
- return batches.find(batch=>sameInstant(batch.key,stamp));
+ return batches.find(batch=>batch.key===stampKey(stamp));
 }
 
 export function describeScanBatch(batch:ScanBatch,when:(iso:string)=>string=defaultWhen){
@@ -198,7 +218,7 @@ export function removeScanBatch<T extends ScanBatchBus>(fleet:T[],key:string,now
  let kept=0;
  const next=fleet.map(bus=>{
   const current=normalizeDefects(bus.defects,bus.pendingRepair||"",bus.id);
-  const going=current.filter(defect=>defect.id.startsWith(SCAN_BATCH_ID_PREFIX)&&text(defect.createdAt)===key);
+  const going=current.filter(defect=>defect.id.startsWith(SCAN_BATCH_ID_PREFIX)&&text(defect.createdAt)&&stampKey(defect.createdAt)===stampKey(key));
   if(!going.length)return bus;
   const goingIds=new Set<string>();
   for(const defect of going){

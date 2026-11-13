@@ -88,6 +88,9 @@ export type HeatFinding={
  confidence:number;
  reviewNote:string;
  fleetMatch:"matched"|"unknown"|"duplicate";
+ /* The reviewer unticked this row themselves. Set and cleared only by
+    `tickHeatFinding`; `heatChecksFromFindings` reads it. */
+ declined?:boolean;
  /* The open heat repairs the board already holds on this bus, by name. */
  openHeat:string[];
  action:HeatAction;
@@ -380,7 +383,14 @@ function sameLine(group:ScannedHeatRow[]){
  return group.every(row=>outcome(row)===outcome(first)&&fold(row.date)===fold(first.date)&&fold(row.initial)===fold(first.initial));
 }
 
-function onePerBus(rows:ScannedHeatRow[]):Array<{row:ScannedHeatRow;conflict:boolean;repeated:number}>{
+/* WHICH COPY OF A LINE READ TWICE IS KEPT: one from a page the scan trusts,
+   when there is one. It was always the first, so the order two photos were
+   added in decided whether a bus could be filed and logged — an unsure page
+   first, and the same line read cleanly off the retake was unticked and left
+   out of the log; the other way round, it went through. Only among copies
+   `sameLine` has already called the same line, so the conflict checks see
+   every copy exactly as before. */
+function onePerBus(rows:ScannedHeatRow[],unsurePages:ReadonlySet<number>=new Set()):Array<{row:ScannedHeatRow;conflict:boolean;repeated:number}>{
  const slots:Array<{number:string;rows:ScannedHeatRow[]}>=[],byNumber=new Map<string,ScannedHeatRow[]>();
  for(const row of rows){
   if(!row.busNumber){if(touched(row))slots.push({number:"",rows:[row]});continue}
@@ -394,7 +404,7 @@ function onePerBus(rows:ScannedHeatRow[]):Array<{row:ScannedHeatRow;conflict:boo
   if(!group.length)return {row:all[0],conflict:false,repeated:all.length};
   if(group.length===1)return {row:group[0],conflict:false,repeated:all.length};
   if(!sameLine(group))return {row:group[0],conflict:true,repeated:all.length};
-  return {row:group[0],conflict:false,repeated:all.length};
+  return {row:group.find(row=>!unsurePages.has(row.pageNumber))||group[0],conflict:false,repeated:all.length};
  });
 }
 
@@ -403,10 +413,10 @@ function onePerBus(rows:ScannedHeatRow[]):Array<{row:ScannedHeatRow;conflict:boo
    Blank lines come back too rather than being dropped: "nobody has checked this
    one" is the third thing this sheet says, and a log that only knows the buses
    somebody wrote on cannot answer how far the walk has got. */
-export function heatFindings(rows:ScannedHeatRow[],fleet:HeatFleetBus[],now=new Date().toISOString()):HeatFinding[]{
+export function heatFindings(rows:ScannedHeatRow[],fleet:HeatFleetBus[],now=new Date().toISOString(),unsurePages:ReadonlySet<number>=new Set()):HeatFinding[]{
  const byNumber=new Map<string,HeatFleetBus[]>();
  for(const bus of fleet){const number=busDigits(bus.n);if(!number)continue;byNumber.set(number,[...(byNumber.get(number)||[]),bus])}
- return onePerBus(rows).map(({row,conflict,repeated},index)=>{
+ return onePerBus(rows,unsurePages).map(({row,conflict,repeated},index)=>{
   const matches=byNumber.get(row.busNumber)||[];
   const fleetMatch:HeatFinding["fleetMatch"]=matches.length===1?"matched":matches.length>1?"duplicate":"unknown";
   const bus=fleetMatch==="matched"?matches[0]:null;
@@ -453,6 +463,13 @@ export function heatFindings(rows:ScannedHeatRow[],fleet:HeatFleetBus[],now=new 
  });
 }
 
+/* A date was written on the line and could not be placed: in the future, more
+   than a season old, or not a date. NOT the same as an empty date cell, and
+   `heatChecksFromFindings` is where the difference matters. */
+export function heatDateUnplaced(finding:Pick<HeatFinding,"dateWritten"|"checkedOn">){
+ return Boolean(clean(finding.dateWritten))&&!finding.checkedOn;
+}
+
 /* How sure the reading has to be before a row is taken at its word. The route
    is told to answer below this for any row it had to interpret rather than
    read cleanly, so the number is the same one on both sides of the wire. */
@@ -495,7 +512,7 @@ export function heatScanReview(pages:HeatScanPage[],fleet:HeatFleetBus[],now=new
   if(verdict!=="not-a-heat-sheet")scanned.push(...rows);
  });
  const unsure=new Set(held.filter(item=>item.verdict==="unsure").map(item=>item.page));
- const findings=heatFindings(scanned,fleet,now).map(finding=>unsure.has(finding.pageNumber)?{...finding,selected:false}:finding);
+ const findings=heatFindings(scanned,fleet,now,unsure).map(finding=>unsure.has(finding.pageNumber)?{...finding,selected:false}:finding);
  return {findings,held,loggable:heatLoggable(findings,held)};
 }
 
@@ -524,9 +541,16 @@ export function heatReviewGroups(findings:HeatFinding[]){
 }
 
 /* A tick is the reviewer's, and only ever lands on a row the rules say may be
-   filed. Everything else keeps the tick it has. */
+   filed. Everything else keeps the tick it has.
+
+   AN UNTICK BY HAND IS RECORDED AS ONE, in `declined`. A held-back row arrives
+   unticked BY RULE and its check is still logged, which is right — but nothing
+   told that apart from a reviewer ticking it, thinking again, and unticking
+   it, so a row somebody had looked at and turned down was logged anyway, under
+   a heading promising that an unticked wrong row is neither filed nor logged.
+   Ticking it again clears the flag. */
 export function tickHeatFinding(findings:HeatFinding[],key:string,selected:boolean):HeatFinding[]{
- return findings.map(finding=>finding.key===key&&canFileHeatFinding(finding)?{...finding,selected}:finding);
+ return findings.map(finding=>finding.key===key&&canFileHeatFinding(finding)?{...finding,selected,declined:!selected}:finding);
 }
 
 /* WHETHER A FINDING MAY BECOME A DEFECT AT ALL — here, and not in the page.

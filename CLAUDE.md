@@ -759,7 +759,13 @@ newer app's log on a phone still running an older page from its cache.
 is neither filed nor logged; a row the RULES held back is unticked by rule and
 is still logged, because VERIFY is where it belongs. The OK buses are drawn as
 their own group — each one logged comes off the walking list — and an OK read
-below `HEAT_LOW_CONFIDENCE` is not logged at all. Two rows with one bus number
+below `HEAT_LOW_CONFIDENCE` is not logged at all, nor one whose date was
+written and cannot be placed: that went on as undated, and an undated line
+counts from the day it was READ, so last winter's OK took a bus off this
+winter's walk. A held-back row the reviewer ticks and then unticks is a "no"
+like any other (`declined`), and is not logged either. **The OK chips still
+cannot be turned down one at a time** — a control on each is a UI change and
+Curtis's call. Two rows with one bus number
 collapse only when they are the same line on two photos: same mark, same date,
 same initials. Anything else is a misread number and goes to a person.
 
@@ -775,8 +781,10 @@ Curtis's call.
 before either has synced will each file their own defect for a bus: the checks
 dedupe by id and the defects cannot, because a deterministic defect id would
 collide with the tombstone a removed scan leaves. Scan on one device, or sync
-first. (2) A scan that files NO defect leaves no batch, so its checks cannot be
-taken back as a set; a wrong check is corrected by the next check on that bus.
+first. (2) A scan that files NO defect leaves no batch for SCAN BATCHES. UNDO
+LAST takes its checks back out, but only while it is still the last thing done
+on the Defect Log; after that a wrong check is corrected by the next check on
+that bus.
 (3) An undated line off the paper never outranks a dated check — all that is
 known is that it was written before the photo. (4) UNDO THIS TAP takes back the
 check and never the defect a NO HEAT tap opened; that is the Defect Log's to

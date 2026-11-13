@@ -24,7 +24,7 @@ import {FINDINGS_MEMORY_STORAGE_KEY,normalizeFindingsMemory} from "../defects/fi
 import {PATH_TO_REPAIR_KEY,normalizePathToRepairs} from "../defects/path-to-repair.ts";
 import {REPAIR_HOURS_KEY,normalizeRepairHoursLedger} from "../defects/repair-hours-ledger.ts";
 import {SHEET_LEDGER_KEY,mergeSheetLedgers,readSheetLedger} from "../down-sheet/sheet-ledger.ts";
-import {mergeHeatChecks,readHeatChecks,writeHeatChecks} from "../defects/heat-check-log.ts";
+import {mergeHeatChecks,readHeatChecks,writeHeatChecks,type HeatLogProblem} from "../defects/heat-check-log.ts";
 
 export type FleetBackupBus={id:string;n:string;l:string;[key:string]:unknown};
 export type FleetBackup={
@@ -84,7 +84,11 @@ export const FLEET_BACKUP_ERRORS:Record<FleetBackupError,string>={
  "duplicate-id":"This backup lists two buses with the same id, which would merge them. No changes were made.",
 };
 
-export type FleetRestoreResult={ok:boolean;restored:string[];reason?:string};
+export type FleetRestoreResult={ok:boolean;restored:string[];reason?:string;
+ /* The board restored and the file's heat checks did not: why. Carried
+    because "heat checks" merely missing from a list of what WAS restored is
+    not something anybody notices. */
+ heatCheckProblem?:HeatLogProblem};
 
 /* Write everything the file carries, and nothing it does not.
 
@@ -162,13 +166,17 @@ export function restoreFleetBackup(storage:Storage,backup:FleetBackup):FleetRest
     It was written into this file with the first screen that could fill it,
     rather than two releases later: PATH TO REPAIR and the repair-hours ledger
     each shipped without their line here. */
+ let heatCheckProblem:HeatLogProblem|undefined;
  if(backup.heatChecks!==undefined&&backup.heatChecks!==null){
   /* Named in the result only when it was actually written. The board is
-     already restored by this point, so a full disk here is reported by the
-     label being absent rather than by failing a restore that succeeded. */
-  if(writeHeatChecks(storage,mergeHeatChecks(readHeatChecks(storage),backup.heatChecks)).ok)restored.push("heat checks");
+     already restored by this point, so a refused write here does not fail a
+     restore that succeeded — but it is SAID, with the reason: the label
+     merely being absent from the list was the whole report, and nobody reads
+     a list for what is missing from it. */
+  const heat=writeHeatChecks(storage,mergeHeatChecks(readHeatChecks(storage),backup.heatChecks));
+  if(heat.ok)restored.push("heat checks");else heatCheckProblem=heat.why;
  }
- return {ok:true,restored};
+ return heatCheckProblem?{ok:true,restored,heatCheckProblem}:{ok:true,restored};
 }
 
 export {FLEET_STORAGE_KEY};

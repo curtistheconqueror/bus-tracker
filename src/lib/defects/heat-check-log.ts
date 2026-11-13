@@ -1,6 +1,6 @@
 import {defectShortLabel} from "./repair-catalog.ts";
 import {quickFilterDefects} from "./quick-filters.ts";
-import {dayStamp,HEAT_CHECK_MAX_AGE_DAYS,heatLowConfidence,localDay,type HeatFinding,type HeatFleetBus} from "./heat-check-import.ts";
+import {dayStamp,HEAT_CHECK_MAX_AGE_DAYS,heatDateUnplaced,heatLowConfidence,localDay,type HeatFinding,type HeatFleetBus} from "./heat-check-import.ts";
 
 /* WHO CHECKED WHICH BUS FOR HEAT, WHEN, AND WHAT THEY FOUND.
 
@@ -191,16 +191,43 @@ export function heatChecksFromFindings(findings:HeatFinding[],now=new Date().toI
      VERIFY, and the reviewer had no way to stop that short of cancelling the
      whole scan. A HELD-BACK row is different: it arrives unticked by rule, the
      paper's statement about it stands, and VERIFY is exactly where a bus whose
-     repair was closed after its check belongs. */
-  if(finding.action==="file"&&!finding.selected&&!finding.heldBack)continue;
+     repair was closed after its check belongs — UNLESS the reviewer has ticked
+     it and unticked it again, which `tickHeatFinding` records as `declined`
+     and which is the same "no" as on any other row. */
+  if(finding.action==="file"&&!finding.selected&&(finding.declined||!finding.heldBack))continue;
   /* An OK takes a bus off the walk, so it has to be a clean read. A shaky N/R
      errs toward somebody going to look; a shaky OK errs toward nobody going,
      and it is the one line on the sheet the review does not ask about. */
-  if(finding.mark==="ok"&&heatLowConfidence(finding))continue;
+  if(finding.mark==="ok"&&heatOkHeldWhy(finding))continue;
   const result:HeatResult=finding.mark==="ok"?"ok":"no-heat",by=finding.initial.toUpperCase();
   checks.push({id:paperCheckId(finding.busNumber,result,finding.checkedOn,by,localDay(at)),busNumber:finding.busNumber,result,on:finding.checkedOn,by,at,source:"paper"});
  }
  return normalizeHeatChecks(checks,Infinity);
+}
+
+/* WHY AN OK ON THE SHEET IS NOT LOGGED, in the words the review shows — or ""
+   when nothing about the line itself stands in the way.
+
+   An OK takes a bus off the walk, so it is the one result that has to be
+   believed before it is written down, and there are two ways it is not:
+
+   - THE READ WAS NOT CLEAN. A shaky N/R errs toward somebody going to look; a
+     shaky OK errs toward nobody going.
+   - ITS DATE WAS WRITTEN AND COULD NOT BE PLACED. Such a line went on as
+     UNDATED, and an undated line counts from the day it was read — so an OK
+     dated 10/22/2025, scanned this November, logged as this season's check and
+     the bus came off the list on the strength of last winter. An empty date
+     cell is still an honest undated line. An N/R with a date like that is
+     still filed and logged: that errs toward somebody going to the bus, which
+     is the direction an unreadable date should err in.
+
+   The review screen draws this sentence, so it and the log cannot give two
+   different reasons. A page the scan does not trust is a third reason and is
+   not this function's: that is about the page, and `heatLoggable` owns it. */
+export function heatOkHeldWhy(finding:Pick<HeatFinding,"confidence"|"dateWritten"|"checkedOn">):string{
+ if(heatLowConfidence(finding))return "the read was not clean, check the paper";
+ if(heatDateUnplaced(finding))return "its date could not be placed in this season, check the paper";
+ return "";
 }
 
 /* TAKING A SCAN BACK OUT TAKES ITS CHECKS WITH IT.
@@ -413,6 +440,10 @@ export function addHeatChecks(storage:LogStorage,checks:unknown):{ok:boolean;why
    check behind. A sweep logs no checks, so for one this does nothing. */
 export function dropScanChecks(storage:LogStorage,batch:{kind:string;key:string}):{ok:boolean;why?:HeatLogProblem;removed:number}{
  if(batch.kind!=="heat")return {ok:true,removed:0};
+ /* A log that cannot be read is not "no checks to remove". It read as empty,
+    so this answered success with nothing removed, and the screen said the scan
+    was out while its checks sat in a log nobody could see into. */
+ if(!storedHeatChecks(storage).readable)return {ok:false,why:"unreadable",removed:0};
  const cut=withoutScanChecks(readHeatChecks(storage),batch.key);
  if(!cut.removed)return {ok:true,removed:0};
  return {...writeHeatChecks(storage,cut.checks),removed:cut.removed};

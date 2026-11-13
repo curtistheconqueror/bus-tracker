@@ -34,8 +34,9 @@ export type HeatFilingResult={
  fleet:DefectLogFleetBus[];
  downEntries:DefectLogDownEntry[];
  filed:HeatFilingItem[];
- /* Refused by the Defect Log's own rules: the bus is gone, or the same repair
-    was logged on it too recently to be a second fault. Reported, not retried. */
+ /* Not filed: the bus is gone, it has gained an open heat repair since the
+    sheet was read, or the Defect Log's own rules turned the save down.
+    Reported, not retried. */
  skipped:HeatFilingItem[];
 };
 
@@ -47,6 +48,15 @@ export function applyHeatFiling(fleet:DefectLogFleetBus[],downEntries:DefectLogD
  let nextFleet=fleet,nextDown=downEntries;
  const filed:HeatFilingItem[]=[],skipped:HeatFilingItem[]=[];
  for(const item of filing){
+  /* ASKED AGAIN AT THE MOMENT OF FILING. A finding is judged when the sheet is
+     read and filed when the reviewer presses the button, and the review can
+     sit open while a tap, another tab or a pull puts a heat repair on the
+     bus. The save's own duplicate guard would not stop it: that matches the
+     same category and issue, and "Heater boost pump" is not "No heat". Asked
+     of No Heat Buses, the one rule, against the board as the last item left
+     it. */
+  const bus=nextFleet.find(candidate=>candidate.id===item.busId);
+  if(bus&&quickFilterDefects(bus,"no-cabin-heat",now).length){skipped.push(item);continue}
   const result=saveDefectLogRecord(nextFleet,nextDown,item.busId,item.defect,false,now);
   if(result.error){skipped.push(item);continue}
   nextFleet=result.fleet;nextDown=result.downEntries;filed.push(item);
@@ -98,8 +108,13 @@ export type HeatTapResult=
    alone would get its duplicate from the list instead. */
 type TapStorage=Pick<Storage,"getItem"|"setItem">;
 export function fileHeatTap(storage:TapStorage,busNumber:string,by:string,now=new Date().toISOString(),note=""):HeatTapResult{
- const fleetPayload=readFleetPayload<DefectLogFleetBus>(storage.getItem(FLEET_STORAGE_KEY));
- const downPayload=readDownSheetPayload<DefectLogDownEntry>(storage.getItem(DOWN_SHEET_STORAGE_KEY));
+ /* A browser that has blocked storage THROWS from getItem. Nothing caught it,
+    so the tap died without the message every other failure gets. */
+ let fleetRaw:string|null,downRaw:string|null;
+ try{fleetRaw=storage.getItem(FLEET_STORAGE_KEY);downRaw=storage.getItem(DOWN_SHEET_STORAGE_KEY)}
+ catch{return {ok:false,why:"unreadable"}}
+ const fleetPayload=readFleetPayload<DefectLogFleetBus>(fleetRaw);
+ const downPayload=readDownSheetPayload<DefectLogDownEntry>(downRaw);
  if(!fleetPayload.valid)return {ok:false,why:"unreadable"};
  /* A SHEET THAT CANNOT BE READ REFUSES THE TAP, the same as a board that
     cannot. It fell back to an empty sheet, and the save works out a bus's

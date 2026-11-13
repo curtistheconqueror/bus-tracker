@@ -4794,6 +4794,25 @@ test("a page that is not a heat check sheet files nothing, and one that only loo
  assert.equal(HEAT_LOW_CONFIDENCE,.7);
  assert.deepEqual(groups.warm.map(heatLowConfidence),[false,true,false]);
  assert.deepEqual(heatScanReview([],board,HEAT_NOW),{findings:[],held:[],loggable:[]});
+
+ /* A LINE READ TWICE KEEPS THE COPY FROM A TRUSTED PAGE, whichever photo was
+    added first. It was always the first: an unsure page ahead of a clean
+    retake left the bus unticked and out of the log, and the same two photos
+    the other way round filed and logged it. */
+ for(const order of [["whatever","heat"],["heat","whatever"]]){
+  const twice=heatScanReview(order.map(document=>({document,rows:[R("17514","N/R")]})),board,HEAT_NOW);
+  assert.equal(twice.findings.length,1,order.join(" then "));
+  assert.equal(twice.findings[0].pageNumber,order.indexOf("heat")+1,"the trusted page's copy, "+order.join(" then "));
+  assert.equal(twice.findings[0].selected,true);
+  assert.deepEqual(twice.loggable.map(finding=>finding.busNumber),["17514"]);
+ }
+ /* Two unsure copies are still unsure, and a trusted copy does not settle a
+    DISAGREEMENT — that is a row for a person, as before. */
+ const bothUnsure=heatScanReview([{document:"whatever",rows:[R("17514","N/R")]},{document:"nope",rows:[R("17514","N/R")]}],board,HEAT_NOW);
+ assert.equal(bothUnsure.findings[0].selected,false);
+ assert.deepEqual(bothUnsure.loggable,[]);
+ const clash=heatScanReview([{document:"whatever",rows:[R("17514","OK")]},{document:"heat",rows:[R("17514","N/R")]}],board,HEAT_NOW);
+ assert.equal(clash.findings[0].action,"look");
 });
 
 test("a NO HEAT tap opens one ordinary defect on the board on disk, and never a second",async()=>{
@@ -5124,6 +5143,110 @@ test("a heat scan taken out, put back and taken out again leaves each bus the wa
  assert.equal(statusAfterDefectChange({...on(filed.fleet,"17510"),s:"out"},[...heat,...downing],downing,OUT).s,"out","a downing defect still on the bus keeps it OUT");
 });
 
+test("what two reviewers found in the heat log once it was pushed",async()=>{
+ const {heatFindings,heatFiling,normalizeHeatRow,tickHeatFinding,heatDateUnplaced}=await import("../src/lib/defects/heat-check-import.ts");
+ const {heatChecksFromFindings,heatOkHeldWhy,dropScanChecks,HEAT_CHECKS_KEY,readHeatChecks}=await import("../src/lib/defects/heat-check-log.ts");
+ const {applyHeatFiling,fileHeatTap,recordHeatTap}=await import("../src/lib/defects/heat-check-apply.ts");
+ const {scanBatches,removeScanBatch,findScanBatch,touchedScanRecord}=await import("../src/lib/defects/scan-batches.ts");
+ const {restoreFleetBackup,readFleetBackup}=await import("../src/lib/storage/fleet-restore.ts");
+ const {memoryStorage}=await import("./helpers/setup.mjs");
+ const NOW=HEAT_NOW;
+ const row=(busNumber,written,date="11/10",extra={})=>normalizeHeatRow({busNumber,written,struck:false,date,initial:"MJ",note:"",confidence:.95,reviewNote:"",...extra},1);
+ const bus=(n,defects=[])=>({id:"b-"+n,n,l:"road-1",s:"service",defects,pendingRepair:""});
+ const noted={id:"hand-1",category:"Miscellaneous",issue:"Driver-reported defect",details:"driver says no heat in the rear",operability:"service",state:"open",source:"defect-log"};
+ const fleet=[bus("17511",[noted]),bus("17512"),bus("17514"),bus("17515"),bus("17516")];
+
+ /* THE REVIEWER'S "NO" IS A FACT OF ITS OWN. A held-back row arrives unticked by
+    rule and is still logged; one a person ticked and then unticked is a row
+    they turned down, and it was logged anyway. */
+ const findings=heatFindings([row("17511","N/R"),row("17512","N/R")],fleet,NOW);
+ const held=findings[0],plain=findings[1];
+ assert.equal(held.heldBack,true);
+ assert.equal(held.selected,false);
+ const logged=list=>heatChecksFromFindings(list,NOW).map(check=>check.busNumber);
+ assert.deepEqual(logged(findings),["17511","17512"],"held back by rule: logged, VERIFY is where it belongs");
+ const ticked=tickHeatFinding(findings,held.key,true);
+ assert.equal(ticked[0].declined,false);
+ assert.deepEqual(logged(ticked),["17511","17512"]);
+ const turnedDown=tickHeatFinding(ticked,held.key,false);
+ assert.equal(turnedDown[0].heldBack,true,"it is still a held-back row");
+ assert.equal(turnedDown[0].declined,true);
+ assert.deepEqual(logged(turnedDown),["17512"],"ticked, then unticked: the reviewer said no, and it is not logged");
+ assert.deepEqual(logged(tickHeatFinding(turnedDown,held.key,true)),["17511","17512"],"ticking it again takes the no back");
+ assert.deepEqual(logged(tickHeatFinding(findings,plain.key,false)),["17511"],"and an ordinary row unticked is not logged, as before");
+
+ /* A DATE THAT WAS WRITTEN AND CANNOT BE PLACED DOES NOT MAKE AN OK CURRENT.
+    12/22 read on Nov 12 is last December — most of a year old. It went on as
+    an undated line, and an undated line counts from the day it was read. */
+ const dated=heatFindings([row("17514","OK","12/22"),row("17515","OK",""),row("17516","N/R","12/22"),row("17512","OK","11/10")],fleet,NOW);
+ assert.deepEqual(dated.map(heatDateUnplaced),[true,false,true,false]);
+ assert.match(heatOkHeldWhy(dated[0]),/date could not be placed/);
+ assert.equal(heatOkHeldWhy(dated[1]),"","an EMPTY date cell is an honest undated line");
+ assert.equal(heatOkHeldWhy(dated[3]),"");
+ assert.match(heatOkHeldWhy({...dated[3],confidence:.4}),/read was not clean/);
+ const kept=heatChecksFromFindings(dated,NOW);
+ assert.deepEqual(kept.map(check=>check.busNumber+":"+check.result+":"+(check.on||"undated")).sort(),["17512:ok:2026-11-10","17515:ok:undated","17516:no-heat:undated"],
+  "the OK nobody can date is left out; the undated OK and the N/R are kept");
+ assert.equal(dated[2].action,"file","and an N/R with a date like that is still filed — that errs toward somebody going to the bus");
+
+ /* FILING ASKS AGAIN. The review can sit open while a heat repair lands on the
+    bus some other way, and the save's own guard matches the same repair only. */
+ const filing=heatFiling(heatFindings([row("17512","N/R"),row("17514","N/R")],fleet,NOW),NOW);
+ assert.equal(filing.length,2);
+ const pump={id:"hand-2",category:"A/C and HVAC",issue:"Heating - Heater boost pump",details:"",operability:"service",state:"open",source:"defect-log",createdAt:NOW,updatedAt:NOW};
+ const moved=fleet.map(item=>item.n==="17512"?{...item,defects:[pump]}:item);
+ const late=applyHeatFiling(moved,[],filing,NOW);
+ assert.deepEqual(late.filed.map(item=>item.busNumber),["17514"]);
+ assert.deepEqual(late.skipped.map(item=>item.busNumber),["17512"],"the bus that gained a heat repair while the review was open is not filed on twice");
+ assert.deepEqual(late.fleet.find(item=>item.n==="17512").defects.map(defect=>defect.id),["hand-2"]);
+ for(const item of filing)assert.equal(item.defect.operability,"service","a scan files every record as able to run");
+
+ /* STORAGE THAT THROWS IS "UNREADABLE", not an exception nobody catches. */
+ const blocked={getItem(){throw new Error("blocked")},setItem(){throw new Error("blocked")}};
+ assert.deepEqual(fileHeatTap(blocked,"17512","MJ",NOW),{ok:false,why:"unreadable"});
+ assert.deepEqual(recordHeatTap(blocked,"17512","no-heat","MJ",NOW),{ok:false,why:"unreadable"});
+
+ /* A SCAN RECORD MARKED AS DOWNING THE BUS HAS BEEN THROUGH SOMEBODY'S HANDS.
+    The map's OPERATIONAL EFFECT select changes that and nothing else. */
+ const scanRecord=filing[0].defect;
+ assert.equal(touchedScanRecord(scanRecord),false);
+ assert.equal(touchedScanRecord({...scanRecord,operability:"down"}),true);
+
+ /* ONE PRESS IS ONE BATCH, HOWEVER ITS STAMPS ARE SPELLED. After a pull that
+    carried only some of a scan's records, one press held `Z` and `+00:00`. */
+ const PRESS="2026-11-12T18:00:00.000Z",PULLED="2026-11-12T18:00:00+00:00";
+ const mixed=[bus("17512",[{...filing[0].defect,createdAt:PRESS,updatedAt:PRESS}]),bus("17514",[{...filing[1].defect,createdAt:PULLED,updatedAt:PULLED}])];
+ const batches=scanBatches(mixed);
+ assert.equal(batches.length,1,"two spellings of one moment are one batch");
+ assert.equal(batches[0].key,PRESS,"keyed by the one canonical spelling");
+ assert.equal(batches[0].ids.length,2);
+ for(const spelling of [PRESS,PULLED])assert.equal(findScanBatch(batches,spelling)?.ids.length,2,spelling);
+ for(const spelling of [PRESS,PULLED])assert.equal(removeScanBatch(mixed,spelling,NOW).removed.length,2,"removal takes the whole press, asked for as "+spelling);
+ assert.equal(removeScanBatch(mixed,"2026-11-12T18:00:01.000Z",NOW).removed.length,0);
+
+ /* A LOG THAT CANNOT BE READ: taking a scan's checks out FAILS and says so. It
+    answered "ok, none removed", and the screen said nothing at all. */
+ const garbled=memoryStorage({[HEAT_CHECKS_KEY]:"{not json"});
+ assert.deepEqual(dropScanChecks(garbled,{kind:"heat",key:PRESS}),{ok:false,why:"unreadable",removed:0});
+ assert.deepEqual(dropScanChecks(garbled,{kind:"sweep",key:PRESS}),{ok:true,removed:0},"a sweep logged no checks, so there is nothing to fail at");
+ assert.equal(garbled.getItem(HEAT_CHECKS_KEY),"{not json");
+
+ /* A RESTORE THAT COULD NOT WRITE THE HEAT CHECKS SAYS WHY. The board is
+    restored and the result is still ok; the checks' label was merely absent. */
+ const file=readFleetBackup(JSON.stringify({kind:"pace-south-fleet-board-backup",version:6,buses:[{id:"a",n:"17511",l:"road-1",s:"service"}],
+  heatChecks:[{busNumber:"17511",result:"ok",on:"2026-11-10",by:"MJ",at:"2026-11-10T12:00:00.000Z",source:"app",id:"app-x"}]}));
+ assert.equal(file.ok,true);
+ const refused=restoreFleetBackup(memoryStorage({[HEAT_CHECKS_KEY]:"{not json"}),file.backup);
+ assert.equal(refused.ok,true);
+ assert.ok(!refused.restored.includes("heat checks"));
+ assert.equal(refused.heatCheckProblem,"unreadable");
+ const fine=memoryStorage({});
+ const taken=restoreFleetBackup(fine,file.backup);
+ assert.ok(taken.restored.includes("heat checks"));
+ assert.ok(!("heatCheckProblem" in taken),"and a restore that wrote them carries no problem at all");
+ assert.equal(readHeatChecks(fine).length,1);
+});
+
 test("the heat screens decide nothing: the rules are asked, and the board is written one way",async()=>{
  const [scanner,board,lists,logPage,mapPage,route,panel,logCss,boardCss,globals]=await Promise.all([
   "../app/defect-log/_components/heat-scanner.tsx","../app/lists/_components/campaign-board.tsx","../app/lists/page.tsx","../app/defect-log/page.tsx","../app/page.tsx",
@@ -5162,7 +5285,13 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(scanner,/const loggable=useMemo\(\(\)=>heatLoggable\(findings,held\)/,"what may be logged is asked again after the reviewer's ticks");
  assert.match(scanner,/if\(!photos.length\|\|busy\)return;/,"READ SHEET cannot be pressed twice");
  /* The way back is promised only where there is one. */
- assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*corrected by the next check on that bus\.";/);
+ assert.match(scanner,/const back=files\?"[^"]*SCAN BATCHES takes the defects and the checks back out together\.":"[^"]*UNDO LAST takes these checks back out, until the next change on the Defect Log; after that a wrong check is corrected by the next check on that bus\.";/);
+ /* The photos and the notes cannot change under a read that is running. */
+ assert.match(scanner,/if\(!files\|\|busy\)return;/,"no photo is added mid-read");
+ assert.match(scanner,/const removePhoto=\(key:string\)=>busy\?undefined:setPhotos\(/,"none is removed mid-read");
+ assert.equal((scanner.match(/disabled=\{busy\}/g)||[]).length,4,"TAKE PHOTO, UPLOAD FILE, REMOVE and the notes box");
+ /* Why an OK is not logged is the log's sentence, drawn here. */
+ assert.match(scanner,/heatOkHeldWhy\(finding\)\|\|"its page is not trusted"/);
  /* The OK buses are drawn, because each one logged comes off the walk. */
  assert.match(scanner,/\{warm.length>0&&<section className="heat-group quiet" aria-label="Buses with heat">/);
  /* The group headings are divs: globals.css paints a bare <header> navy. */
@@ -5188,12 +5317,21 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  const removeBatch=logPage.slice(logPage.indexOf(" const removeBatch="),logPage.indexOf(" const restoreBatch="));
  assert.match(removeBatch,/const cut=dropScanChecks\(localStorage,batch\);/);
  inOrder(removeBatch,"persist(result.fleet,downEntries,{allowBulkDefectLoss:true})","dropScanChecks(","the checks go only once the board has let the defects go");
- const undo=logPage.slice(logPage.indexOf(" const undoLastChange="),logPage.indexOf(" const undoLastChange=")+700);
+ const undo=logPage.slice(logPage.indexOf(" const undoLastChange="),logPage.indexOf(" const backInService="));
+ assert.ok(undo.length>300&&undo.length<3000,"the undo handler was found, whole");
+ /* A scan that filed NO defect is still the last thing done, and UNDO LAST
+    takes its checks — it used to leave the previous undo armed instead. */
+ assert.match(fileHeat,/if\(!filed&&log\.ok&&log\.added\)setUndoSnapshot\(\{fleet,downEntries,label:[^}]*heatChecks:now\}\);/);
+ assert.match(undo,/if\(undoSnapshot\.heatChecks\)\{\s*const cut=dropScanChecks\(localStorage,\{kind:"heat",key:undoSnapshot\.heatChecks\}\);\s*setUndoSnapshot\(null\);/);
+ inOrder(undo,"if(undoSnapshot.heatChecks){","persist(undoSnapshot.fleet,undoSnapshot.downEntries)","a checks-only undo never reaches the board write");
+ /* Checks that could not be taken out are SAID, even when none came out. */
+ assert.match(removeBatch,/\+\(cut\.removed\|\|!cut\.ok\?\(cut\.ok\?/);
  assert.match(undo,/if\(undoSnapshot.heatScan\)\{\s*const batch=findScanBatch\(batches,undoSnapshot.heatScan\);\s*if\(batch\)\{removeBatch\(batch\);return\}/,"UNDO LAST on a heat filing is the scan removal, tombstones and checks and all — and the scan is found by instant, not by how its stamp is spelled");
  const executor=mapPage.slice(mapPage.indexOf('if(plan.kind==="removeScanBatch")'),mapPage.indexOf('if(plan.kind==="restoreScanBatch")'));
  assert.match(executor,/const cut=dropScanChecks\(localStorage,batch\);/,"the AI Operator removes a heat scan's checks with it");
  inOrder(executor,"writeFleetStorageResult(","dropScanChecks(","the operator takes the checks only once the board has let the defects go");
  assert.match(executor,/scanBatchWords\(batch\)/);
+ assert.match(executor,/\+\(cut\.removed\|\|!cut\.ok\?\(cut\.ok\?/,"the operator says so too");
  assert.doesNotMatch(executor,/scan sweep record|from that sweep|"[^"]*That scan sweep/,"the executor names the scan it removed, not always a sweep");
  assert.match(panel,/scanBatchWords\(batch\)/);
  assert.doesNotMatch(code(panel),/SCAN SWEEP FILED|this sweep/,"the panel lists two kinds of scan now and must not call both a sweep");
@@ -5211,10 +5349,20 @@ test("the heat screens decide nothing: the rules are asked, and the board is wri
  assert.match(board,/className="tap-cold" disabled=\{guarded\} onClick=\{\(\)=>tap\(row,"no-heat"\)\}/);
  assert.match(board,/const tap=\(row:HeatRosterRow,result:HeatResult\)=>\{\s*if\(guarded\)return;\s*setGuarded\(true\);/);
  assert.match(board,/\{lastTap&&<div className="heat-undo" role="status">/);
+ /* THE UNDO BAR IS AFTER THE LIST, so mounting it moves no row. Above the lane
+    buttons it pushed every row down by its own height on the first tap. The
+    suite cannot render, so this holds the ORDER and the rule; the pixels were
+    measured in a browser. */
+ inOrder(board,'className="heat-roster"','className="heat-undo"',"the undo bar comes after the rows");
+ inOrder(board,'className="heat-lanes"','className="heat-undo"',"and after the lane buttons");
+ assert.match(boardCss,/\.heat-undo\{position:sticky;bottom:8px;/);
+ /* The cooldown starts when the tap is over, question and all. */
+ const tapBody=board.slice(board.indexOf(" const tap=("),board.indexOf(" const roster="));
+ inOrder(tapBody,"onCheck(row,result)","setTimeout(","the guard's clock starts after the tap has been handled");
  assert.match(board,/<button type="button" onClick=\{onUndo\}>UNDO THIS TAP</);
  assert.doesNotMatch(boardCode,/role="tablist"|role="tab"/,"buttons that filter a list are not tabs without panels");
  const listsCode=code(lists);
- assert.doesNotMatch(listsCode,/writeFleetStorage|serializeFleetPayload|setItem\(FLEET_STORAGE_KEY/,"Fleet Campaigns never writes the board itself");
+ assert.doesNotMatch(listsCode,/writeFleetStorage|serializeFleetPayload|setItem\(\s*FLEET_STORAGE_KEY|pace-board-v1/,"Fleet Campaigns never writes the board itself — by the constant, or by the key spelled out");
  assert.doesNotMatch(listsCode,/fileHeatTap|recordHeatCheck|writeHeatChecks/,"nor does it sequence a tap: recordHeatTap does");
  const checkHeat=lists.slice(lists.indexOf(" const checkHeat="),lists.indexOf(" const undoHeatTap="));
  assert.match(checkHeat,/const tap=recordHeatTap\(localStorage,row.busNumber,result,initials\);/);

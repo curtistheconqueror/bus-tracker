@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
-import {heatChecksFromFindings} from "@/src/lib/defects/heat-check-log";
+import {heatChecksFromFindings,heatOkHeldWhy} from "@/src/lib/defects/heat-check-log";
 import {heatLoggable,heatLowConfidence,heatReviewGroups,heatScanReview,heatSummary,tickHeatFinding,type HeatFinding,type HeatFleetBus,type HeatScanPage,type HeatScanReview} from "@/src/lib/defects/heat-check-import";
 
 /* The heat check sheet scanner.
@@ -58,8 +58,12 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
  const loggedBuses=useMemo(()=>new Set(logged.map(check=>check.busNumber)),[logged]);
  const {toFile,tagged,warm,disagree,look,struck}=useMemo(()=>heatReviewGroups(findings),[findings]);
 
+ /* THE PHOTOS AND THE NOTES ARE FROZEN WHILE A READ IS RUNNING. `readSheets`
+    works through the photos it was started with; swapping one out mid-read
+    left the review showing a removed photo's lines under the new photo's
+    picture, ready to approve. */
  const addPhotos=(files:FileList|null)=>{
-  if(!files)return;
+  if(!files||busy)return;
   const incoming=Array.from(files).filter(file=>["image/jpeg","image/png","image/webp"].includes(file.type));
   setPhotos(current=>{
    const available=Math.max(0,MAX_FILES-current.length),next=incoming.slice(0,available).map((file,index)=>({file,url:URL.createObjectURL(file),key:`${file.name}-${file.lastModified}-${index}-${Math.random()}`}));
@@ -69,7 +73,7 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)});
+ const removePhoto=(key:string)=>busy?undefined:setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)});
 
  const readSheets=async()=>{
   if(!photos.length||busy)return;
@@ -100,8 +104,9 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
   const what=(files?`File ${files} No Heat defect${files===1?"":"s"} on the Defect Log`:"File no defects")+` and log ${checks} heat check${checks===1?"":"s"}?`;
   /* The way back is named only where there is one. A scan that files no
      defects leaves no batch for SCAN BATCHES to find, and the first version
-     promised it anyway. */
-  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. A check that turns out to be wrong is corrected by the next check on that bus.";
+     promised it anyway; what it does have is UNDO LAST, for as long as it is
+     the last thing done. */
+  const back=files?"Each defect is an ordinary open record on its bus — editable like one logged by hand. Nothing is closed and the Down Sheet is not touched. SCAN BATCHES takes the defects and the checks back out together.":"Nothing is filed on any bus and the Down Sheet is not touched. UNDO LAST takes these checks back out, until the next change on the Defect Log; after that a wrong check is corrected by the next check on that bus.";
   if(!confirm(what+"\n\n"+back))return;
   onFile(findings,loggable);
  };
@@ -116,13 +121,13 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
     {!read&&<>
      <div className="sweep-intro"><b>ADD UP TO 6 PHOTOS OF THE HEAT CHECK SHEET</b><span>N/R is a bus that needs its heat repaired, OK is a bus with heat, and a blank line is a bus nobody has checked yet. Keep the whole sheet in frame, left edge included, so every bus number can be read. Photos are sent for processing only after you press Read Sheet, and nothing is filed until you approve it.</span></div>
      <div className="sweep-pickers">
-      <button type="button" onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
-      <button type="button" onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
+      <button type="button" disabled={busy} onClick={()=>cameraRef.current?.click()}>📷 TAKE PHOTO</button>
+      <button type="button" disabled={busy} onClick={()=>uploadRef.current?.click()}>⇧ UPLOAD FILE</button>
       <input ref={cameraRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event=>addPhotos(event.target.files)}/>
       <input ref={uploadRef} className="sweep-file-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={event=>addPhotos(event.target.files)}/>
      </div>
-     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
-     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. The second set of initials is MJ. The left column starts at 15500. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
+     <div className="sweep-previews">{photos.map((photo,index)=><figure key={photo.key}><img src={photo.url} alt={`Selected page ${index+1}`}/><figcaption>PAGE {index+1}<button type="button" disabled={busy} onClick={()=>removePhoto(photo.key)}>REMOVE</button></figcaption></figure>)}</div>
+     <label className="sweep-notes"><span><b>NOTES FOR THIS SCAN</b><small>{notes.length}/{SCAN_NOTES_LIMIT}</small></span><textarea value={notes} disabled={busy} maxLength={SCAN_NOTES_LIMIT} rows={3} onChange={event=>setNotes(event.target.value.slice(0,SCAN_NOTES_LIMIT))} placeholder="Anything the camera might get wrong. The second set of initials is MJ. The left column starts at 15500. A note can correct how a row is read, never add a bus that is not on the sheet."/></label>
      <button className="sweep-read" type="button" onClick={readSheets} disabled={!photos.length||busy}>{busy?progress||"READING…":"READ SHEET"}</button>
     </>}
     {read&&<>
@@ -146,7 +151,7 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
 
      {warm.length>0&&<section className="heat-group quiet" aria-label="Buses with heat">
       <div className="heat-group-head"><b>HEAT OK · {warm.length}</b><small>OK on the sheet, and nothing open for heat on the board. Nothing is filed. Each one that is logged comes off the walking list, so a bus here that should not be is worth catching.</small></div>
-      <div className="heat-chips">{warm.map(finding=><span className={loggedBuses.has(finding.busNumber)?"":"unlogged"} key={finding.key}><b>{finding.busNumber}</b><small>{meta(finding)}{loggedBuses.has(finding.busNumber)?"":" — NOT LOGGED: "+(heatLowConfidence(finding)?"the read was not clean, check the paper":"its page is not trusted")}</small></span>)}</div>
+      <div className="heat-chips">{warm.map(finding=><span className={loggedBuses.has(finding.busNumber)?"":"unlogged"} key={finding.key}><b>{finding.busNumber}</b><small>{meta(finding)}{loggedBuses.has(finding.busNumber)?"":" — NOT LOGGED: "+(heatOkHeldWhy(finding)||"its page is not trusted")}</small></span>)}</div>
      </section>}
 
      {disagree.length>0&&<section className="heat-group warn" aria-label="Sheet and board disagree">

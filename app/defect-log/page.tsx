@@ -88,7 +88,7 @@ type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownShee
    restore of the old fleet: the records have to come back stamped as new work,
    and the cloud ledger has to forget them, or the shop cloud keeps them deleted.
    That path lives in restoreBatch and UNDO LAST hands over to it. */
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string};
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string;heatChecks?:string};
 
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
@@ -1504,12 +1504,19 @@ export default function DefectLog(){
   /* `added` is what is NEW to this device, and that is the number said out
      loud: a sheet scanned a second time reads sixty lines and adds none. */
   const log=addHeatChecks(localStorage,heatChecksFromFindings(loggable,now));
+  /* A SCAN THAT FILED NOTHING STILL HAS A WAY BACK. An all-OK page leaves no
+     defect, so no batch for SCAN BATCHES to find — and it left the PREVIOUS
+     undo armed, so UNDO LAST after it reversed whatever had been done before
+     the scan. `heatChecks` is this press's stamp; UNDO LAST takes exactly the
+     checks carrying it. The board in this snapshot is the board as it is,
+     because this press did not change it. */
+  if(!filed&&log.ok&&log.added)setUndoSnapshot({fleet,downEntries,label:"Logged "+log.added+" heat check"+(log.added===1?"":"s"),heatChecks:now});
   setHeatOpen(false);
   alert((filed?filed+" No Heat defect"+(filed===1?"":"s")+" filed on the Defect Log":"No defects were filed")
    +(skipped?". "+skipped+" could not be filed and "+(skipped===1?"was":"were")+" left off":"")
    +(!log.ok?". THE HEAT CHECKS COULD NOT BE SAVED — "+heatLogProblemWords(log.why)+(log.why==="unreadable"?"":". Scan the sheet again once there is room")
      :log.added?". "+log.added+" new heat check"+(log.added===1?"":"s")+" logged":". No new heat checks — every line on these pages was already in the log")
-   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":"."));
+   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, until the next change on this page.":"."));
  };
  /* Takes a whole scan sweep back out. The batch is the set of sweep records
     sharing one creation stamp — the fingerprint fileSweep leaves by taking the
@@ -1544,7 +1551,7 @@ export default function DefectLog(){
      learned to leave off a repair the bus already has open. */
   const cut=dropScanChecks(localStorage,batch);
   alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")
-   +(cut.removed?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."):"")
+   +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."):"")
    +" PUT BACK under SCAN BATCHES returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
  };
  /* The records go back stamped as new work — newer than the tombstones the
@@ -1572,6 +1579,12 @@ export default function DefectLog(){
  const undoLastChange=()=>{
   if(!undoSnapshot)return;
   if(undoSnapshot.scanBatch){restoreBatch();return}
+  if(undoSnapshot.heatChecks){
+   const cut=dropScanChecks(localStorage,{kind:"heat",key:undoSnapshot.heatChecks});
+   setUndoSnapshot(null);
+   alert(cut.ok?(cut.removed?cut.removed+" heat check"+(cut.removed===1?"":"s")+" from that scan "+(cut.removed===1?"was":"were")+" taken back out. No defect was filed by it, so nothing else changed.":"Those heat checks are no longer on this device's log, so there was nothing to take out."):"THE HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+".");
+   return;
+  }
   if(undoSnapshot.heatScan){
    const batch=findScanBatch(batches,undoSnapshot.heatScan);
    if(batch){removeBatch(batch);return}
