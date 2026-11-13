@@ -8,7 +8,9 @@ export {noteIssues, normalizeSweepRow, sweepDefect, sweepFindings, sweepOkAgains
 export {busRow, busUpdatedAt, changedRows, cloudConfigProblem, cloudFailurePhase, cloudStatusLabel, defectLogPayload, defectRow, downSheetPayload, downSheetRow, fleetMapPayload, normalizeCloudConfig, readCloudConfig, readSentFingerprints, rowFingerprint, writeCloudConfig} from "../../src/lib/cloud/cloud-sync.ts";
 export {hasBusNumberConflict, hasLocationConflict, validateBusUpdate} from "../../src/lib/fleet/fleet-validation.ts";
 export {applyDownEntryToFleet} from "../../src/lib/down-sheet/down-sheet-sync.ts";
-export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
+export {SWIPE_AXIS_RATIO, SWIPE_COMMIT_PX, excludeFromFocusShare, focusShareIsEmpty, focusShareScope, focusShareScopeNote, putBackLastExclusion, swipeHidesRow, swipeOffsetPx} from "../../src/lib/defects/focus-share-scope.ts";
+export {addDefectPart, blankDefectPart, defectPartFields, defectPartsMissing, defectPartsText, normalizeDefectParts, partToLearn, partsToLearn, partsWithoutNumbers, removeDefectPart, updateDefectPart, withDefectParts} from "../../src/lib/defects/defect-parts.ts";
+export {downSheetBadgeBusIds, downSheetCountLabel, downSheetMembershipMatches, mapDownSheetBadgeBusIds, reconcileDownSheetMembership, selectedDownSheetBusIds} from "../../src/lib/down-sheet/down-sheet-counter.ts";
 export {syncTrackerDownSheetSelection} from "../../src/lib/down-sheet/tracker-membership-sync.ts";
 export {clearDownSheetState, readDownSheetClearSnapshot, restoreDownSheetState} from "../../src/lib/down-sheet/down-sheet-clear.ts";
 export {moveOrSwapBuses, roadServiceStatus, statusForLocation} from "../../src/lib/fleet/smart-status.ts";
@@ -39,8 +41,8 @@ export {busNumbersInText, perBusReason, printedLineConflicts, unreadBusNumbers} 
 export {addMintedEntries, mintSkippedMessage} from "../../src/lib/down-sheet/sheet-mint.ts";
 export {ADDED_IN_APP_LABEL, clearAddedInApp, entryOriginLabel, markAddedInApp, wasAddedInApp} from "../../src/lib/down-sheet/entry-origin.ts";
 export {prepareFleetForScannedReplacement, scannedSheetRemovals} from "../../src/lib/down-sheet/down-sheet-replace.ts";
-export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
-export {downSheetShareContext, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
+export {DOWN_SHEET_AGING_DAYS, DOWN_SHEET_FILTERS, downSheetEntryAgeDays, downSheetFilterCounts, downSheetFilterEntries, downSheetFilterFromValue, downSheetFilterLabel, downSheetFilterMatch} from "../../src/lib/down-sheet/down-sheet-filters.ts";
+export {downSheetShareContext, downSheetShareEmptyNote, downSheetShareFilename, downSheetShareHtml, downSheetShareLines, downSheetShareScope, downSheetShareScopeLabel, downSheetShareText} from "../../src/lib/down-sheet/down-sheet-share.ts";
 export {RECENT_DUPLICATE_WINDOW_HOURS, RECENT_DUPLICATE_WINDOW_LABEL, activeDefectLogCount, defectLogRecords, groupDefectLogRecords, hideDefectLogRecords, isDefectLogCleanupCandidate, recentDefectDuplicate, returnDefectLogBusToService, saveDefectLogRecord} from "../../src/lib/defects/defect-log-sync.ts";
 export {bay12AwarenessBusIds, isBay12AwarenessArea, isMysteryArea, mysteryBusIds} from "../../src/lib/fleet/mystery-buses.ts";
 export {reconcileDownSheetMembership as reconcileDS} from "../../src/lib/down-sheet/down-sheet-counter.ts";

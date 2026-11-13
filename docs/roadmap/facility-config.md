@@ -1,7 +1,25 @@
 # Pull the site out of the code
 
-Issue #21. **Scoped, not built.** Every number here was measured at `64bd8ad`,
-not estimated; the commands are in each section so they can be re-run.
+Issue #21. **Scoped, not built.** The commands are in each section so every
+number can be re-run.
+
+**WHICH COMMIT EACH NUMBER COMES FROM IS NOW SAID WHERE IT IS QUOTED, rather
+than once up here.** This line used to claim every number was measured at
+`64bd8ad`, while the prefix-literal section below it said "re-run at this
+commit" about a different one — two provenances for one document, which is how
+a figure nobody could reproduce survived two corrections. Anything that says
+"at this commit" was measured at the commit that changed it; anything still
+carrying `64bd8ad` says so beside itself. A number without a command and a
+commit beside it is a number to re-run before quoting.
+
+**AND THE COMMAND HAS TO BE RUNNABLE, WHICH THE FIRST VERSION OF THIS RULE WAS
+NOT.** The blocks it added wrote the prefix list as `(garage|road|…|offsite)`,
+where the `…` is a literal character and not shorthand — so pasting that command
+matched four prefixes out of sixteen and returned **63** where **179** was
+printed beside it. A reviewer caught it. Writing an unrunnable command under a
+rule demanding runnable commands is the whole failure this file keeps
+documenting, so every block spells the alternation out in full now, however
+wide the line.
 
 ## What "the site is baked in" actually means
 
@@ -26,8 +44,36 @@ grep -rcoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|to
 `page.tsx` 16, `location-label` 7, `down-sheet-filters` 7, `quick-filters` 6,
 `smart-status` 5, `repair-catalog` 5, `facility-layout` 4, `facility-areas` 4,
 `road-calls` 3, `mystery-buses` 3, `defect-log/page` 3, `operational-time` 2,
-`down-sheet-view` 2, `defect-log-sync` 2, `down-sheet-badge-view` 1,
-`quick-filter-share` 1. **16 files, ~71 occurrences.**
+`down-sheet-view` 2, `defect-log-sync` 2, `quick-filter-share` 1.
+
+**THE TABLE ABOVE IS STALE AND THE TOTAL WAS DERIVED RATHER THAN MEASURED.** It
+was pinned to a commit from before the `src/lib` move, and when
+`down-sheet-badge-view` was deleted its row was dropped and 2 subtracted from
+the total — but the table had credited that file with 1, so the stated figure
+contradicted the list printed above it. A reviewer caught that, and re-running
+the grep found the table wrong in both directions besides (`location-label` 3
+not 7, `facility-areas` 0 not 4, and three files missing from it entirely).
+
+**AND THE RE-RUN THAT REPLACED IT WAS ALSO WRONG.** It said "16 files, 51
+occurrences", which a second reviewer could not reproduce by any reading - and
+nor can I. Two causes, both in the command printed above: `grep -rcoE` has `-c`
+silently overriding `-o`, so it counts matching LINES rather than matches, and
+it searches `app` alone while the prose says `app src`.
+
+**Measured at this commit, all three ways, so the next person can pick the one
+they mean:**
+
+```
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   # 179 occurrences
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  65 matching lines
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' app src --include=*.ts --include=*.tsx | wc -l   #  17 files
+```
+
+For reference, the printed command as written - `-rcoE` over `app` alone -
+gives **2 files, 19 lines**, which is how a figure this far out survived.
+**179 across 17 files** is the number to work from. The itemisation above is
+kept only as a record of which files carried behaviour rather than labels, and
+it needs rebuilding before it is quoted again.
 
 Not all are equal. Most are labels. These carry BEHAVIOUR:
 
@@ -187,15 +233,30 @@ still splitting "bays 11 and 12" into two mentions.
 **Phase 1 is complete.** The decision gate is now: Phase 2 is the CSS, and it
 only pays if a second garage is real.
 
-The gate, and it is not negotiable: **`npm test` reports 325 with zero edits to
-any test file.** The suite carries 431 slot-name literals and 71 section-name
-mentions — it is already the regression net for exactly this, so any change that
-needs a test edited is a change that moved behaviour.
+The gate, and it is not negotiable: **`npm test` reports its current count with
+zero edits to any test file.** The suite is already the regression net for
+exactly this, so any change that needs a test edited is a change that moved
+behaviour.
+
+**THE NUMBERS THAT USED TO BE PINNED HERE WERE STALE** — "must read 325" and
+"431 slot-name literals" — and the new header rule at the top of this file
+condemns exactly that: a number without a command and a commit beside it has to
+be re-run before it is quoted. A reviewer caught these two surviving the rule
+that was written to catch them. Re-run at `5326143`:
 
 ```
-grep -rcoE '"(garage|road|west|east|bay|...)-' tests/   # 431
-npm test | grep '^# tests'                                                    # must read 325
+npm test | grep '^# tests'                             # 434
+grep -rE   '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   # 476 matching lines
+grep -rhoE '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   # 638 occurrences
+grep -rlE  '"(garage|road|west|east|bay|service|wall|waiting|office|pit|brake|tow|body|paint|wash|offsite)-' tests/ | wc -l   #  10 files
 ```
+
+**The test COUNT is the wrong thing to pin anyway**, which is why it is not
+pinned now: it moves with every test added for any reason, so a stale figure
+here fails a refactor that changed nothing. What the gate actually means is
+*zero edits to any test file* — `git diff --stat tests/` is empty — and that is
+checkable without a number going out of date. The literal counts stay as a
+sense of scale, with the commit and the command beside them.
 
 Plus: seed a real exported board into LocalStorage, render the map before and
 after, and diff the HTML. Byte-identical or it is not a pure refactor.

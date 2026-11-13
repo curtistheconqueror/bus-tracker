@@ -1,3 +1,4 @@
+import type {DefectPart} from "./defect-parts.ts";
 export type DefectState="open"|"in-progress"|"deferred"|"completed";
 export type DefectOperability="service"|"down";
 export type DefectSource="tracker"|"down-sheet"|"defect-log"|"operator"|"scan";
@@ -100,6 +101,13 @@ export type StructuredDefect={
     PartUsage in domain.ts for Stage 7. */
  partsUsed?:boolean;
  partName?:string;
+ /* MORE THAN ONE PART. `partNumber` and `partName` above are the FIRST part,
+    kept and still written so a device on an older release shows one instead of
+    none - the Shop Cloud carries every field it has no column for through the
+    row's `detail` blob, and an older build cannot read this array. A one-part
+    repair stores no `parts` at all. The read, the write and the rules are in
+    src/lib/defects/defect-parts.ts; nothing here decides anything about them. */
+ parts?:DefectPart[];
  /* Billable time on this repair, in decimal hours: .5 is half an hour.
     Diagnostic time is kept apart from repair time because they are different
     work and often different visits. A bus can be diagnosed on one shift and
@@ -1302,6 +1310,28 @@ export function deferredMinutesElapsed(defect:StructuredDefect,now=new Date()){
 export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
  return Boolean(defect.deferredReturnedAt)&&defect.state!=="deferred"&&isUnresolved(defect)&&!onDownSheet;
 }
+/* DID A PERSON WRITE THIS DOWN, or did it come off a photographed sheet?
+
+   A defect born from a scanned Down Sheet row is stamped `source:"down-sheet"`
+   and carries a `createdAt` of WHEN THE SCAN RAN, which is not when anybody
+   logged anything - importing yesterday's paper at 20:00 drops that whole sheet
+   into "the last 24 hours" at once. Curtis, looking at a share that had: "I
+   have no reason to share something off the down sheet because the down sheet
+   is already coming from the source... for this particular function, no, just
+   things that were logged by hand."
+
+   ONLY THE PAPER IS EXCLUDED. Typing into the Defect Log, the map's bus editor,
+   the AI operator and a defect swept off a photographed defect sheet are all
+   somebody putting a defect down, and none of those carries that source. The
+   exclusion is the paper's, not the app's.
+
+   AND A DEFECT KEEPS THE SOURCE IT WAS BORN WITH. `applyDownEntryToFleet`
+   writes `linked?.source||"down-sheet"`, so a defect logged by hand that LATER
+   appears on a sheet stays `defect-log`. Somebody logged it; the paper catching
+   up does not take that away. */
+export function loggedByHand(defect:{source?:string}){
+ return String(defect?.source||"")!=="down-sheet";
+}
 /* A part went on the bus and nobody has written down which one.
 
    This is not a new field. PARTS USED ticked with the number left blank has
@@ -1312,7 +1342,14 @@ export function hasDeferredHistory(defect:StructuredDefect,onDownSheet:boolean){
    button for it.
 
    Ticked with a number is complete. Not ticked means no part was used, which is
-   a different thing from an unknown one and must never be flagged. */
+   a different thing from an unknown one and must never be flagged.
+
+   THE FIXED REPAIRS CARD NO LONGER CALLS THIS. A repair can carry more than one
+   part now, and this reads the mirrored FIRST one, so a name-only first part
+   beside a numbered second showed MISSING PART # over a number that had been
+   recorded. `defectPartsMissing` in defect-parts.ts asks the whole list and is
+   what the card reads. This stays as the single-part question, which is still
+   the right one to ask of a record that holds a single part. */
 export function partNumberMissing(defect:{partsUsed?:boolean;partNumber?:string}){
  return defect.partsUsed===true&&!String(defect.partNumber??"").trim();
 }

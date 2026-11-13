@@ -2,8 +2,8 @@
 
 import StatusReportModal from "@/src/components/reports/status-report-modal";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
-import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,downSheetFilterLabel,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
-import {downSheetShareFilename,downSheetShareHtml,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
+import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
+import {downSheetShareFilename,downSheetShareHtml,downSheetShareScope,downSheetShareScopeLabel,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
 import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
@@ -489,24 +489,67 @@ export default function DownSheet(){
     narrowings, in the order the sheet is drawn. Rebuilding the list from the
     filter alone would send something nobody had looked at. */
  const shareRows=visible as unknown as Parameters<typeof downSheetShareText>[1];
- const shareLabel=quickFilter?downSheetFilterLabel(quickFilter):"";
- const copyFilteredList=async()=>{if(!quickFilter)return;try{await copyText(downSheetShareText(quickFilter,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
+ /* SHARING THE SHEET ITSELF, which until now needed a quick filter first.
+    Curtis: "a separate function in the down sheet section where I can just
+    share the down sheet list with a person." The three actions already existed
+    and already sent what was on screen; they were only reachable once a filter
+    had been picked, so there was no way to send the sheet.
+
+    WHAT THIS SHARE COVERS IS DECIDED IN THE LIB, not here. The page reports
+    its own view state and `downSheetShareScope` turns that into the claim the
+    heading makes, so a route can ask the same question without a second copy
+    of the rule - and so the rule is testable away from a page this suite
+    cannot render. A cold read found the first version, which decided it
+    inline, making that claim falsely in four different ways.
+
+    `drawn` against `onSheet` is the part that does not go stale: the bands
+    drop IDOT-only rows on their own, and a list of flags would have missed
+    that one and will miss the next. */
+ const shareScope=downSheetShareScope({quickFilter,search,shiftFiltered:filter!=="All",
+  roadFiltered:Boolean(roadFilter),fixedToday,showCompleted,drawn:visible.length,onSheet:shown.length});
+ const shareLabel=downSheetShareScopeLabel(shareScope);
+ /* THE STATUS BELONGS TO THE ROWS IT WAS EARNED ON, and the bar no longer
+    unmounts to take it away. Pressing COPY LIST then typing in SEARCH left
+    "COPIED!" sitting under a heading describing a different set of buses,
+    with nothing in the page that would ever clear it.
+
+    KEYED ON WHICH BUSES, not how many: a review caught that the first
+    version used `visible.length`, so swapping one matching bus for another
+    in SEARCH - same count, same label - left the old status standing over
+    rows it was never about. The ids are device-local, which does not matter
+    here because this only ever compares one render against the next on the
+    same device. */
+ const shareStatusKey=shareLabel+"|"+visible.map(entry=>entry.id).join(",");
+ useEffect(()=>{setShareStatus("")},[shareStatusKey]);
+ /* What the one line under the scope says: a press wins over the hint while
+    it stands, and EVERY outcome gets a word here, COPY LIST included.
+
+    The button changing to COPIED! is the only thing a sighted person needs,
+    which is why `copied` was the one state with no branch - and it is also
+    why a screen reader heard nothing when a copy succeeded. The line is the
+    announcement; the duplication with the button is the price, measured at
+    360 and 390 and worth it. */
+ const shareNote=shareStatus==="copied"?{said:true,text:"COPIED!"}
+  :shareStatus==="shared"?{said:true,text:"SENT"}
+  :shareStatus==="saved"?{said:true,text:"SAVED TO THIS DEVICE"}
+  :shareStatus==="share-error"?{said:true,text:"COULD NOT SHARE — TRY COPY LIST"}
+  :shareStatus==="copy-error"?{said:true,text:"COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT"}
+  :{said:false,text:quickFilter?DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint||"":"Sends the buses on the screen right now, as text or as a page."};
+ const copyFilteredList=async()=>{try{await copyText(downSheetShareText(shareScope,shareRows,locations));setShareStatus("copied")}catch{setShareStatus("copy-error")}};
  /* Text first, and the clipboard when there is no share sheet — the same order
     the Defect Log settled on. A browser with no navigator.share must not leave
     somebody pressing a button that does nothing. */
  const shareFilteredList=async()=>{
-  if(!quickFilter)return;
-  const text=downSheetShareText(quickFilter,shareRows,locations);
+  const text=downSheetShareText(shareScope,shareRows,locations);
   if(typeof navigator.share!=="function"){await copyFilteredList();return}
   try{await navigator.share({title:"Down Sheet — "+shareLabel,text});setShareStatus("shared")}
   catch(error){if((error as Error).name!=="AbortError")setShareStatus("share-error")}
  };
  const shareFilteredPage=async()=>{
-  if(!quickFilter)return;
   const stamp=new Date().toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
-  const html=downSheetShareHtml(quickFilter,shareRows,locations,stamp);
+  const html=downSheetShareHtml(shareScope,shareRows,locations,stamp);
   try{
-   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(quickFilter),"Down Sheet — "+shareLabel);
+   const outcome=await shareOrDownloadFile(new Blob([html],{type:"text/html"}),downSheetShareFilename(shareScope),"Down Sheet — "+shareLabel);
    setShareStatus(outcome==="cancelled"?"":outcome==="shared"?"shared":"saved");
   }catch{setShareStatus("share-error")}
  };
@@ -1021,19 +1064,32 @@ export default function DownSheet(){
       every button inside it width:100% below 760px, which reads correctly for
       one SHOW THE WHOLE SHEET button and would stack these four down the
       screen. */}
-  {quickFilter&&<section className="down-quick-filter-note" aria-label={shareLabel+" — share the filtered sheet"}>
-   <p role="status"><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small>{DOWN_SHEET_FILTERS.find(item=>item.key===quickFilter)?.hint}</small></p>
+  {/* NO LONGER BEHIND A QUICK FILTER. The same three actions, always on the
+      page, because the thing most often wanted is the sheet itself and that
+      was the one thing they could not send. The row only CHANGES scope with a
+      filter on; with none it sends what is drawn, and says which of the two
+      that is. SHOW THE WHOLE SHEET and the filter's hint stay filter-only:
+      neither means anything when no filter is set. */}
+  <section className={"down-quick-filter-note"+(quickFilter?"":" sheet-share")} aria-label={shareLabel+" — share the sheet"}>
+   {/* ONE LINE UNDER THE SCOPE, holding either the hint or what just
+       happened. The four status messages used to mount as SIBLINGS of this
+       <p>, where `.down-quick-filter-note>small` gives them flex-basis:100%
+       and so a row of their own: measured, SHARE TEXT succeeding grew the bar
+       101px -> 123px at 390 and 52px -> 74px at 1180 and pushed the sheet
+       down about 22px, every time, now that the bar is always on screen.
+       Reserving an empty slot instead would have cost those 22px on EVERY
+       visit to save them on a few; the hint is the thing worth yielding.
+       The live region is here and not on the scope line above it, which is
+       why that line is a plain <p>: this text changes on a deliberate press
+       or a filter change, never on a keystroke in SEARCH. */}
+   <p><b>{shareLabel.toUpperCase()}</b> — {visible.length} of {shown.length} on the sheet<br/><small role="status" className={shareNote.said?"said":undefined}>{shareNote.text}</small></p>
    <div className="down-quick-filter-actions">
     <button type="button" onClick={copyFilteredList}>{shareStatus==="copied"?"COPIED!":"COPY LIST"}</button>
     <button type="button" onClick={shareFilteredList}>SHARE TEXT</button>
     <button type="button" onClick={shareFilteredPage}>SHARE PAGE</button>
-    <button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>
+    {quickFilter&&<button type="button" className="down-quick-filter-clear" onClick={()=>{setQuickFilter(null);setShareStatus("")}}>SHOW THE WHOLE SHEET</button>}
    </div>
-   {shareStatus==="shared"&&<small role="status">SENT</small>}
-   {shareStatus==="saved"&&<small role="status">SAVED TO THIS DEVICE</small>}
-   {shareStatus==="share-error"&&<small role="status">COULD NOT SHARE — TRY COPY LIST</small>}
-   {shareStatus==="copy-error"&&<small role="status">COULD NOT COPY ON THIS DEVICE — TRY SHARE TEXT</small>}
-  </section>}
+  </section>
   {roadFilter&&<p className="down-road-filter-note" role="status">Showing only <b>{roadFilter==="inspection"?"INSPECTIONS ON ROAD":"DOWNED BUSES ON ROAD"}</b> — {visible.length} of {shown.length} on the sheet. <button type="button" onClick={()=>setRoadFilter(null)}>SHOW THE WHOLE SHEET</button></p>}
 
   {/* Off by default now. It sat permanently between the counts and the sheet
@@ -1100,7 +1156,7 @@ export default function DownSheet(){
           the sheet. Curtis closed out a bus he did not mean to. Out here they
           take a deliberate scroll AND a confirm, and the first column shrinks
           by 164px, which is what makes the reason readable. */}
-      <td className="row-actions"><span className="row-actions-slots">{entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark bus "+(entry.busNumber||"entry")+" fixed"} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}<button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
+      <td className="row-actions"><span className="row-actions-slots">{entry.workflow!=="Completed"&&<button className="fix-entry" type="button" onClick={()=>markEntryFixed(entry)} aria-label={"Mark fixed: bus "+(entry.busNumber||"entry")} title={"Mark bus "+(entry.busNumber||"this entry")+" fixed and close it out"}><span aria-hidden="true">&#10003;</span><b>MARK FIXED</b></button>}<button className="delete-entry" type="button" onClick={()=>deleteEntry(entry)} aria-label={"Delete bus "+(entry.busNumber||"entry")+" from the Down Sheet"} title={"Delete bus "+(entry.busNumber||"this entry")+" from the Down Sheet"}><span aria-hidden="true">×</span></button></span></td>
      </tr></Fragment>})}
       </Fragment>;
      }):<tr><td className="empty-sheet" colSpan={10}><b>No buses match this view.</b><span>{search?"Clear the search or choose another filter.":"All shifts are shown by default. Use Add Down Bus to create the first repair entry."}</span></td></tr>}</tbody>

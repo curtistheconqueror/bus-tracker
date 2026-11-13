@@ -688,14 +688,20 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 
    Out here they cost a deliberate scroll, which is the point, and both now ask
    before they act. */
-/* 121px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
+/* 155px, AND THE ARITHMETIC IS THE GRID'S, NOT THE WORD'S. This said 110px
    and "six more pixels buys the slack", which was wrong twice over. The six
    pixels of COLUMN width cannot affect the button's internal fit at all — the
-   first track is a fixed 62px however wide the cell is, and what gives the
-   word room is the track stretching the button to a 46px content box against
-   the 42.56px it needs. (The "3.34px over in DejaVu Sans" this comment used to
-   carry belongs to the old auto-width button; forced to DejaVu the stretched
-   one needs 45.13 of 46 and fits.)
+   first track is a fixed width however wide the cell is, and what gives the
+   label room is that track stretching the button. Measured at the 96px MARK
+   FIXED needs: the button's BORDER box is 96.00px and its contents — tick
+   11.50 + gap 5 + label 54.78 — are 71.28px, so 87.28px with the padding and
+   border, leaving 8.7px clear. (An earlier version of this line read "a 94px
+   content box against 87.23px": 94 is the PADDING box and 87.23 a border-box
+   figure, two frames 2px apart, which a reviewer caught. The conclusion was
+   right and the comparison was not.) Forced to DejaVu Sans the label is
+   61.02px, so 93.52px in the border box and it still fits. (The
+   "3.34px over in DejaVu Sans" this comment used to carry belonged to the old
+   auto-width button, not to a stretched one.)
 
    What the column width decides is whether the GRID fits. It is 96 + 8 + 36 =
    140px; `*{box-sizing:border-box}` at the top of this file means a `th` width
@@ -725,8 +731,8 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    and 93.47px forced to DejaVu Sans, so 96px clears both.
 
    `justify-content:center` is INERT for the same reason: with both tracks
-   fixed the inline-grid is exactly 106px, so there is nothing inside it to
-   distribute. What centres the pair in the cell is `text-align:center` on the
+   fixed the inline-grid is exactly their sum — 140px on the shop computer and
+   98px on a phone — so there is nothing inside it to distribute. What centres the pair in the cell is `text-align:center` on the
    line above. Kept so that a future `auto` track does not also lose the
    centring, and recorded rather than left to be rediscovered. */
 .row-actions-slots{display:inline-grid;grid-template-columns:96px 36px;justify-content:center;gap:8px;align-items:center}
@@ -846,7 +852,9 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
 .down-quick-filter-actions{display:flex;flex-wrap:wrap;gap:6px}
 .down-quick-filter-actions button{min-height:32px;border:1px solid #6b3fc4;border-radius:5px;background:#6b3fc4;color:#fff;padding:0 11px;font-size:9px;font-weight:900;cursor:pointer;touch-action:manipulation}
 .down-quick-filter-actions button+button{background:#fff;color:#4a2a8c}
-.down-quick-filter-note>small{flex-basis:100%;color:#4a2a8c;font-size:9px;font-weight:900}
+/* The share's own word sits in the hint's line rather than claiming a row of
+   its own, so a result never moves the sheet underneath it. */
+.down-quick-filter-note>p>small.said{color:#4a2a8c;font-weight:900}
 /* The trigger takes this page's own control styling. Bare, it inherits nothing
    but display:inline-flex from globals.css and renders as unstyled text. */
 .down-view-controls .quick-filter-trigger{height:32px;border:1px solid #aebbd0;border-radius:5px;background:#f2f5f9;color:#294264;padding:0 10px;font-size:8px;font-weight:900;cursor:pointer}
@@ -857,6 +865,15 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
  .down-quick-filter-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .down-quick-filter-actions button{min-height:44px;font-size:10px}
  .down-quick-filter-actions .down-quick-filter-clear{grid-column:1/-1}
+ /* THREE ACROSS WHEN THERE IS NO FILTER. The two-column grid above is right
+    for the filtered bar, which carries a fourth button; with only the three
+    share actions it strands SHARE PAGE alone on a second row and the block
+    costs 151px of a phone screen it now occupies on EVERY visit, where it
+    used to appear only once a filter had been picked. Measured at 390: 151px
+    stranded, 101px three across. The 44px targets above are untouched - at
+    360 each button still gets about 100px of width, and the shortest label
+    here is nine characters. */
+ .down-quick-filter-note.sheet-share .down-quick-filter-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
  .down-view-controls>.quick-filter-control{flex:1}
  .down-view-controls .quick-filter-trigger{width:100%;height:44px;min-height:44px;font-size:9px}
 }
