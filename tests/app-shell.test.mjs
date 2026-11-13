@@ -1615,12 +1615,17 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
  /* A NAME PLANTED IN MEMORY, SO A PASS CANNOT BE AN EMPTY ONE. The check below
     is "no line survives the filter", and every way of breaking it — the checker
     not running, the code list emptied, the prefix filter matching nothing —
-    also leaves no line. So one file that exists only in this process names an
-    identifier defined nowhere, and the test demands exactly that one report
+    also leaves no line. So one file that exists only in this process names
+    identifiers defined nowhere, and the test demands exactly those reports
     back. It is under `src/` on purpose: it has to travel the same filter the
     real ones do. Nothing is written to disk. */
  const canary = slashed(path.join(root, "src", "__undefined-name-canary__.ts"));
- const canaryText = "export const canary = thisNameIsDefinedNowhere;\n";
+ /* TWO LINES, because the first proved only its own code. With TS2304 alone
+    planted, deleting 18004 from the list below left this test green — and
+    18004 is the code the comment under it calls the one that matters most:
+    the shorthand `{name}` left behind by a narrowed import. Each line is the
+    smallest thing that produces its code, and both must come back. */
+ const canaryText = "export const canary = thisNameIsDefinedNowhere;\nexport const shorthand = { thisShorthandIsDefinedNowhere };\n";
  const host = ts.createCompilerHost(parsed.options);
  const isCanary = name => slashed(path.resolve(name)) === canary;
  const fromDisk = host.getSourceFile.bind(host);
@@ -1665,8 +1670,9 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
     line under `@ts-ignore`, `@ts-expect-error` or `@ts-nocheck` reports
     nothing — there are none in app/ or src/ today. A `.js` file is not in this
     program at all. `worker/` and `db/` are not asked. And the name planted
-    above proves the checker ran and that TS2304 comes back through the filter;
-    it does not prove the other twelve codes, which were driven by hand. */
+    above proves the checker ran and that TS2304 and TS18004 come back through
+    the filter; it does not prove the other eleven codes, which were driven by
+    hand. */
  const undefined_names = program.getSemanticDiagnostics()
   .filter(diagnostic => diagnostic.file && NAME_NOT_THERE.has(diagnostic.code))
   .map(diagnostic => {
@@ -1675,8 +1681,10 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
   })
   .filter(line => line.startsWith("app/") || line.startsWith("src/"));
  const planted = undefined_names.filter(line => line.startsWith("src/__undefined-name-canary__.ts("));
- assert.deepEqual(planted, ["src/__undefined-name-canary__.ts(1,23): error TS2304: Cannot find name 'thisNameIsDefinedNowhere'."],
-  "the name planted in memory did not come back as one TS2304, so the checker did not run or the filter is broken, and this test proves nothing");
+ assert.deepEqual(planted, [
+  "src/__undefined-name-canary__.ts(1,23): error TS2304: Cannot find name 'thisNameIsDefinedNowhere'.",
+  "src/__undefined-name-canary__.ts(2,28): error TS18004: No value exists in scope for the shorthand property 'thisShorthandIsDefinedNowhere'. Either declare one or provide an initializer.",
+ ], "the two names planted in memory did not come back as one TS2304 and one TS18004, so the checker did not run, the filter is broken or a code fell out of the list, and this test proves nothing");
  const real = undefined_names.filter(line => !planted.includes(line));
  assert.deepEqual(real, [],
   "a name that is not there — if it is used as a value, that line throws the moment it runs:\n  " + real.join("\n  "));
