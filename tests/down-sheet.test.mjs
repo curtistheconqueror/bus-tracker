@@ -2888,6 +2888,22 @@ test("the Down Sheet says which of its buses are out on the road, the inverse of
    state+" puts its own word on the status line");
  assert.doesNotMatch(css.replace(/\s+/g,""),/\.down-quick-filter-note>small\{[^}]*flex-basis:100%/,
   "the full-width status row is gone from the stylesheet, not just from the markup");
+ /* THE THREE-ACROSS RULE IS THE 101px, AND NOTHING WAS HOLDING IT. Deleting
+    it left this file green at 62 of 62, so an edit could strand SHARE PAGE on
+    a second row again - about 50px on every phone visit, on a bar that is now
+    permanent - with nothing going red. Found by the reviewer as BT44-F8; the
+    gap predates the merge that surfaced it.
+    Driven through the CASCADE rather than matched as text, because what is
+    being claimed is what a phone computes: the share bar gets three columns
+    at 390, and the FILTERED bar must not, or its four buttons lose the 44px
+    targets the comment above the rule promises. A text check on the selector
+    would pass on a rule that no longer reaches the element. */
+ const shareActions=extra=>effectiveStyle(css,{tag:"div",classes:["down-quick-filter-actions"],
+  ancestors:[{tag:"section",classes:["down-quick-filter-note",...extra]}]},390);
+ assert.equal(shareActions(["sheet-share"])["grid-template-columns"],"repeat(3,minmax(0,1fr))",
+  "the share bar is three across at 390: this is the measured 151px -> 101px");
+ assert.notEqual(shareActions([])["grid-template-columns"],"repeat(3,minmax(0,1fr))",
+  "the filtered bar keeps its own columns - four buttons three across is not the same bar");
  /* A failed COPY LIST used to be reported as "COULD NOT SHARE — TRY COPY LIST",
     which sends somebody to press the button that had just failed. */
  assert.match(pageCode,/shareStatus==="copy-error"/);
