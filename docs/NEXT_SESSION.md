@@ -96,92 +96,75 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
-## Six pull requests are open and not one of them is merged
+## Three pull requests are open; #42, #43 and #44 are on `main`
 
-**Read this before you plan anything.** The four in the table were measured
-2026-11-12, when `main` was at `92dfc0d` and had not moved since 2026-11-05.
-**#45 and #46 were opened later that day and are in their own table below it.**
+**Read this before you plan anything.** Measured 2026-11-13.
+
+**#42, #43 and #44 landed on `main` on 2026-11-13**, after Curtis said to go
+ahead. #42 and #43 were rebase-merged on GitHub. #44 could not be — it and #42
+had both edited the one long import line at the top of
+`tests/down-sheet.test.mjs` — so its six commits were replayed onto `main` as
+`78c9074..a302396` with that line resolved as the union of both sides, and the
+PR was closed with a comment saying so. All 27 commits were stacked and tested
+before any was merged, and `main` ended byte-identical to that stack.
+
+**They are on `main` and NOT live.** Codex publishes, from
+`docs/PUBLISH_NEXT.md`, when Curtis points it there. Until then the 2px
+ADVANCED DETAILS bar is still what the shop's phones draw — do not tell him to
+check a fix on his phone that has not been published.
 
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
-| **#42** | `claude/multi-part-repairs-and-badge-rules` | `6c8ab33` | 19 | green | 41, none open | More than one part per repair; the focus-share swipe and PUT BACK; the DS badge stops caring where a bus is parked; MARK FIXED; **the 2px ADVANCED DETAILS fix** |
-| **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
-| **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
+| **#45** | `claude/typecheck-gate-windows` | `256c744` | 1 | green | **1 open**, a Nit | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
+| **#46** | `claude/heat-check-domain` | `79c4e58` | 1 | green | **14 open** | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
-**Opened 2026-11-12, after that table was measured.** Head and commits ahead are
-from `git rev-parse` and `git rev-list --count origin/main..<branch>` at
-`b8c1ef9`. **Their CI and review threads were NOT measured when this was
-written — read them off the PR before quoting either.**
+Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
+before the merges. **"Ahead" is against the `main` each was cut from**; all
+three now sit behind `main` by the 27 merged commits and will need rebasing
+before they can land.
 
-| PR | Branch | Head | Ahead | What it is |
-| --- | --- | --- | --- | --- |
-| **#45** | `claude/typecheck-gate-windows` | `256c744` | 1 | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
-| **#46** | `claude/heat-check-domain` | `79c4e58` | 1 | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules, limits and what was never verified are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`**, so do not look for it here |
-
-**What #46 has never done is read a real photograph.** `/api/heat-sheet-scan`
-needs the OpenRouter key, which the development machine does not have;
-everything after the route was driven with its answer stubbed. Curtis has
+**#46 failed its SDET gate, and that is the next thing to do on it.** One
+Major from the SD-QG reviewer: the UNDO THIS TAP bar mounts above the heat
+list, so the first tap pushes every row down under the thumb — +101px at 390,
++71px at 1180, measured. One Nit on a test guard. Twelve more from CodeRabbit,
+six of them Major. Every one gets an answer on its own thread. **What #46 has
+never done is read a real photograph**: `/api/heat-sheet-scan` needs the
+OpenRouter key, which the development machine does not have. Curtis has
 photographed the real sheet twice — the second, from an iPad, shows all 108
-printed bus numbers — and its first real scan after a publish is the test of
-the prompt. Three things are still his to settle: whether a struck-through row
-means fixed, whether to narrow the A/C Buses filter (it counts heating repairs,
-so the A/C card claims no number), and whether the check log gets a Shop Cloud
-table so it syncs.
+printed bus numbers. Three things are still his to settle: whether a
+struck-through row means fixed, whether to narrow the A/C Buses filter (it
+counts heating repairs, so the A/C card claims no number), and whether the
+check log gets a Shop Cloud table so it syncs.
 
-**#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
 **#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
-way since. Of the eleven files it touches, **two conflict**:
-`docs/PUBLISH_NEXT.md`, which every release rewrites, and
-`tests/helpers/modules.mjs`, where `main` and the branch each appended export
-lines at the same end of the file — keep both sets. The other nine are new
-files nothing else has touched. Resolving it means rebasing that branch onto
-`main` and rewriting its handoff section against the new base — and its two
-release gates are Curtis's anyway, so there is no hurry.
-
-Both figures in that row were re-measured on 2026-11-12 from a full clone,
-after the first write-up of this section — made from the shallow one described
-under the traps below — gave 14 commits ahead and one conflicting file. `git
-rev-list --count origin/main..<branch>` returns 9, GitHub's own `commits` for
-the PR is 9, and `git merge-tree --write-tree --name-only origin/main <branch>`
-names both files.
-
-**None of this is on `main`,** so none of it is in anything Codex can publish,
-and nothing in `docs/PUBLISH_NEXT.md` describes it.
-
-**The one with floor impact is #42.** Curtis reported from his phone that there
-was no way to record a second part — *"we made a blooper, we assumed that each
-repair only takes one part."* Chasing it found a worse thing underneath:
-`overflow:hidden` on `.advanced-defect-details` collapses that `<details>` box
-to **2px** — two borders and no content — with a correct 48px `<summary>`
-clipped away inside it, so PARTS USED, the estimate and the hours cannot be
-opened by a tap at all. A keyboard still opens it, which is why nothing ever
-errored. It is **older than that branch** (`git log -S` over the rule against
-`main` is empty). The fix is `overflow:clip`, and it is sitting unmerged, so
-**the bug is still live on the shop's phones.** Say that plainly rather than
-letting him test a fix that was never deployed — this session told him to check
-it on his phone before realising that.
+way since. Of the eleven files it touches, two conflicted when this was
+measured on 2026-11-12: `docs/PUBLISH_NEXT.md`, which every release rewrites,
+and `tests/helpers/modules.mjs`, where `main` and the branch each appended
+export lines at the same end of the file — keep both sets. **That was measured
+before the 27 commits landed; measure again before relying on it.** Resolving
+it means rebasing that branch onto `main` and rewriting its handoff section
+against the new base — and its two release gates are Curtis's anyway, so there
+is no hurry.
 
 **Why these are branches and not `main`.** Curtis: *"When u r done with
 everything push it so SD-QG engineer can review it / Don't make live just
-push."* That is the only reason; the workflow elsewhere in this file is commits
-straight to `main`. Once he says merge, they go to `main` and each gets its
-version section in `docs/PUBLISH_NEXT.md`.
+push."* Once he says merge, they go to `main` and each gets its section in
+`docs/PUBLISH_NEXT.md`.
 
-**Do not push to those branches to tidy something up.** Each head is the exact
-commit SD-QG passed and CodeRabbit cleared, and a new commit resets both — a
-whole review round spent on nothing. #44 took 13 findings across 6 rounds to
-get there.
+**The `Supabase Preview` check fails on every commit on `main`** and has since
+at least `92dfc0d` on 2026-11-05; on pull requests it is skipped. `Lint, build
+and test` is the gate and is green. Nobody here has looked at why, and it is
+Curtis's integration to look at.
 
 ### Still Curtis's call, not yours
 
-- **Merging #42, #43 and #44.** He has been told what is waiting, twice, and
-  has not answered. **Do not ask again unprompted and never merge on your own.**
+- **Merging #45, #46 and #39.** Never merge on your own.
+- **Pointing Codex at `docs/PUBLISH_NEXT.md`.** That is how 194 goes live.
 - **An actual iPhone.** `overflow:clip` and the row swipe were measured in
-  Chromium with real CDP touch events. Real iOS Safari was never touched,
-  because this container cannot. Older WebKit drops `overflow:clip` and falls
-  back to `visible`, which degrades safely — but that is reasoning, not a
-  measurement.
+  Chromium with real CDP touch events. Real iOS Safari was never touched.
+  Older WebKit drops `overflow:clip` and falls back to `visible`, which
+  degrades safely — but that is reasoning, not a measurement.
 - **The Down Sheet share bar is now permanent** — 101px on a phone where it
   used to be 0px unless a quick filter was picked. He approved building the
   feature; he has not seen where it landed. Reusing the quick-filter bar rather
@@ -195,18 +178,16 @@ get there.
   temporary accepted risk, written up in docs/MCP\_SECURITY\_FOLLOWUP.md — a
   file that arrives **with that PR** and is not on `main`, so do not go looking
   for it here. Do not resolve that thread to tidy the PR. It is CodeRabbit's
-  Major on the PR's own `src/lib/mcp/agent-token.ts` (also not on `main`). The PR's **second** open thread is a
-  separate Minor on `docs/PUBLISH_NEXT.md` — one of the two files that
-  conflict, so a rebase will likely moot it. Two open, not one.
+  Major on the PR's own `src/lib/mcp/agent-token.ts` (also not on `main`). The
+  PR's **second** open thread is a separate Minor on `docs/PUBLISH_NEXT.md` —
+  one of the two files that conflict, so a rebase will likely moot it.
 
-### A self-scheduled check-in is running
+### A self-scheduled check-in may still be running
 
-Every 8 hours a `send_later` reminder re-reads #42/#43/#44 — CI on the current
-head, mergeability, open review threads — and fixes anything that goes red or
-conflicted. It had fired 33 times by 2026-11-12 and found nothing changed since
-2026-11-05, which is why it was stretched from 4 hours to 8. It is the backstop
-for a dropped webhook, not the primary signal. **Stop it once the PRs are
-merged or closed, or when Curtis says to stop.**
+An earlier cloud session scheduled a `send_later` reminder every 8 hours to
+re-read #42/#43/#44. **Those three are merged or closed, so it has nothing left
+to watch and should be stopped.** It could not be stopped from the desktop
+session that did the merging — if you are the session that owns it, stop it.
 
 ---
 
@@ -214,10 +195,10 @@ merged or closed, or when Curtis says to stop.**
 
 | | |
 | --- | --- |
-| Branch | `main`, linear history, no force-pushes ever. **Six PRs are open off it and unmerged — see the section above before planning anything.** |
+| Branch | `main`, linear history, no force-pushes ever. **Three PRs are open off it — see the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
-| Working tree at handoff | Clean, on `main` at `92dfc0d`. Nothing stashed, nothing uncommitted. The three feature branches are pushed and need nothing from you. |
+| Working tree at handoff | Read it with `git status` and `git log -1`; a commit named here is stale by the next push. |
 | Gate at handoff | All four green: the full suite passing, ESLint clean, production build succeeds, and a cold read of the diff answered. Run them; the count moves with every change that adds a test. |
 
 **Neither is the test count, for the same reason.** It was written down as 229
@@ -395,11 +376,11 @@ strike the item the day it lands.
   rust on Incidents, green on Shop Talk, bright blue on the Down Sheet. 194
   shared the header BAR only. Whether the whole block should match is open.
 
-### 4. Built in this session and sitting in PRs — do not rebuild
+### 4. Built, and on `main` since 2026-11-13 — do not rebuild
 
-Every one of these is written, reviewed, green and **unmerged**. Check the PR
-table at the top of this file before offering any of them to Curtis as work;
-this project has twice re-offered finished work from a queue title alone.
+Every one of these is written, reviewed and **on `main`, waiting on Codex to
+publish** — not live. Check before offering any of them to Curtis as work; this
+project has twice re-offered finished work from a queue title alone.
 
 - **A repair can carry more than one part** (#42) — PART NUMBER / PART NAME is
   a list with ADD ANOTHER PART, in both the Defect Log form and the Fixed

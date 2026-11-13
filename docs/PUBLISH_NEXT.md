@@ -52,8 +52,15 @@ would have read as a clean one. Two fixes found while checking those in a
 browser: **ADVANCED DETAILS on the LOG DEFECT form was a 2px line** and could
 not be opened by a tap at all — taking PARTS USED, the estimate and the hours
 with it — and **ENTER LATER had stopped marking a repair MISSING PART #**,
-which is the one thing that button promises. Queued by Claude Code; not published, not
-tagged, not deployed. PR39 MCP remains separately held and unmerged.
+which is the one thing that button promises. **THE DOWN SHEET ITSELF CAN BE
+SHARED** — COPY LIST, SHARE TEXT and SHARE PAGE used to appear only once a
+quick filter was picked, so the one thing that could not be sent was the sheet;
+the bar is permanent now and its heading says whether what it sends is the
+whole sheet or part of it. And the box of checks on the LOG DEFECT form reads
+**PRELIMS** where it read WORK DONE SO FAR. Queued by Claude Code; not
+published, not tagged, not deployed. PR39 MCP remains separately held and
+unmerged, and so are PR45 (a test that could not run on Windows) and PR46 (the
+heat check log) — **neither is in this release.**
 
 Application release 193 is live as Sites version 189 from
 `a009c08fad02aa6859ec6445784f744c6e269c8d`, deployed 2026-10-25 at
@@ -116,6 +123,55 @@ command output is a measurement and goes stale like one.
 
 ```
 $ git log --oneline a009c08..HEAD
+14c47ae BT44-F8: the three-across rule was the 101px and nothing was holding it
+a302396 PR44-F7: the comment said COPIED! was not there, directly above the line putting it there
+f891dd9 PR44-F5/F6 and CR: the F1 gates had the same fault F1 did
+8389f6b PR44-F1 to F4: a result no longer moves the sheet, and three gates get teeth
+83c42c5 PR44-F1: the status reset counted rows instead of naming them
+7418a69 Cold read: the scope could lie four ways, and the decision moves to the lib
+78c9074 Share the Down Sheet itself, not only a filtered slice of it
+f9d09fd PR43-F1 and F2: pin the legend, and fix the one doc line that kept the old name
+0a82708 Rename WORK DONE SO FAR to PRELIMS on the Defect Log form
+dbbdea8 F31: the gate counted a spelling, so three respellings got a write past it
+16ce5db F30: the gate's own comment claimed more than the gate did, twice
+dafc81d F29: count the writes instead of banning the spellings
+04413ff The commands added to enforce "quote a runnable command" were not runnable
+2894e9a F27 and F28: a gate that watched the call instead of the store, and two stale numbers the new rule was written to catch
+21d6563 F25: merged parts could share an id, so editing row 2 rewrote row 1 and REMOVE wiped both
+fba7333 A merge kept the part number and threw its name away, in the union I added yesterday
+828a93c Replace the handoff note that explained the 61px away
+ecbaf61 F11 was real and I called it a fixture: the focus dialog re-centred on every hide at desktop width
+7220c49 Answer the cold read: a merge was dropping parts, the prompt's own fix did not take, and PUT BACK was eating off-screen exclusions
+4baf3e5 Put the disclosure fix and the ENTER LATER regression in the handoff
+0feee45 ADVANCED DETAILS was a 2px line on every screen, so PARTS USED could not be opened by a tap at all
+4697aa5 Answer F18, F19 and F20: ENTER LATER lost its own promise, a typed part was shown and then dropped, and the notes still said "every part"
+3ff623a Correct the handoff: the "two separate bugs" was one, and the swipe's scrolling paragraph said the opposite of the truth
+1a9b523 Answer SD-QG round 2 and cold read #4: the swipe's blocker, the empty share, and three gates that had no teeth
+c302dda Answer both reviews: the parts gate's 9 findings and 6 more routes to the badge bug
+fa896c9 The focus share follows the window, and a swipe drops one defect from it
+742c042 A repair can carry more than one part: the two forms
+c22f00c Answer the cold read: the badge rule was guarded by a name, and the map was scrubbing settings
+a490743 The entry point names #45 and #46, so a fresh session does not rebuild either
+b8c1ef9 #39 has two open threads, not one — the second is a Minor on PUBLISH_NEXT.md
+cc3c8f7 #39 conflicts in two files and is nine commits ahead, not one and fourteen
+142807f #39 is conflicted, and this container's shallow clone will lie about why
+fb98346 The entry point said nothing about four open PRs, so a fresh session would miss them
+92dfc0d A repair can carry more than one part: the domain half
+5544dd6 MARK FIXED says what the Defect Log's does, and the DS badge stops watching locations
+59df5a5 A real cascade behind the MARK FIXED gate, and a column 11px too narrow
+2f5ad11 Answer the cold read: DELETE wandered, and the gates could not see the cascade
+8be5b62 A plain NO HEAT, and DEFECTS LOGGED means logged by hand
+3b062aa Describe the MARK FIXED label in the Codex handoff
+a559704 The Down Sheet's MARK FIXED button says what it is
+b375fc3 Answer the cold read: the label never cleared, and half the app never set it
+e8ff3ef The tag reads ADDED VIA APP, which is true of both rows that carry it
+150e6ab Label a Down Sheet row the app added, and pin that moving a bus never drops one
+872942f Answer the cold read: the fix left the destroying half of that line in place
+13432c2 Describe both sheet fixes in the Codex handoff
+012bcd1 A completed repair stays completed instead of re-opening under a new id
+873c78b Every finding from the cold read, and the two that mattered were one bug
+6f50012 Read a line that names several buses without losing what it says
+bedc58e Re-run the handoff's command blocks, five commits after they were quoted
 0e27216 A step-by-step helper on the defect form, off until somebody turns it on
 1269097 Size the bus generation chips for their label instead of for the box
 2df4f73 Fix the Defect Log form, which has not opened since the PATH TO REPAIR extraction
@@ -170,9 +226,13 @@ b387c33 Queue application release 193 from the reviewed PR41 merge
 
 ```
 $ git diff --name-only a009c08..HEAD -- app src
+app/_components/down-sheet-badge-menu.tsx
+app/api/down-sheet-scan/route.ts
 app/defect-log/_components/form-coach-bar.tsx
+app/defect-log/_components/swipe-away-row.tsx
 app/defect-log/defect-log.css
 app/defect-log/page.tsx
+app/down-sheet/_components/down-sheet-scanner.tsx
 app/down-sheet/down-sheet.css
 app/down-sheet/page.tsx
 app/fixed-repairs/fixed-repairs.css
@@ -187,6 +247,7 @@ app/settings/_components/map-settings-panel.tsx
 app/settings/page.tsx
 app/settings/settings.css
 app/shop-talk/shop-talk.css
+src/components/defects/parts-used-list.tsx
 src/components/defects/path-to-repair-panel.css
 src/components/defects/path-to-repair-panel.tsx
 src/components/settings/fixed-repairs-settings.tsx
@@ -199,17 +260,29 @@ src/lib/defects/bus-share.ts
 src/lib/defects/defect-estimates.ts
 src/lib/defects/defect-log-display-settings.ts
 src/lib/defects/defect-log-sync.ts
+src/lib/defects/defect-parts.ts
 src/lib/defects/duplicate-defects.ts
 src/lib/defects/feed-window.ts
 src/lib/defects/fixed-share.ts
+src/lib/defects/focus-share-scope.ts
 src/lib/defects/form-coach.ts
 src/lib/defects/quick-filter-share.ts
+src/lib/defects/quick-filters.ts
 src/lib/defects/repair-catalog.ts
 src/lib/defects/report-returns.ts
+src/lib/defects/save-refusal.ts
+src/lib/down-sheet/down-sheet-badge-view.ts
+src/lib/down-sheet/down-sheet-counter.ts
+src/lib/down-sheet/down-sheet-scan-import.ts
 src/lib/down-sheet/down-sheet-share.ts
 src/lib/down-sheet/down-sheet-sync.ts
+src/lib/down-sheet/entry-origin.ts
 src/lib/down-sheet/repair-time-estimates.ts
+src/lib/down-sheet/scan-multi-bus.ts
+src/lib/down-sheet/sheet-mint.ts
+src/lib/down-sheet/tracker-membership-sync.ts
 src/lib/fleet/quick-view-position.ts
+src/lib/fleet/service-intervals.ts
 src/lib/operator/operator-engine.ts
 src/lib/reports/fleet-status-report-print.ts
 src/lib/reports/fleet-status-report.ts
@@ -223,7 +296,7 @@ src/lib/settings/site-identity.ts
 
 ```
 $ git diff --shortstat a009c08..HEAD
- 68 files changed, 10084 insertions(+), 458 deletions(-)
+ 87 files changed, 16142 insertions(+), 723 deletions(-)
 ```
 
 ### What this release touches outside `app/` and `src/`
@@ -3019,6 +3092,111 @@ LIST.** 12.15:1, measured.
 **No new share function was built**, because the Down Sheet already has COPY
 LIST and SHARE PAGE of its own — which is what Curtis wanted for the case
 where a coworker does want a copy of the sheet.
+
+### The Down Sheet itself can be shared, not only a filtered slice of it
+
+Curtis: *"a separate function in the down sheet section where I can just share
+the down sheet list with a person."*
+
+**The three actions already existed.** COPY LIST, SHARE TEXT and SHARE PAGE
+sent exactly what was drawn and named locations through `location-label.ts`.
+They were reachable only once a quick filter had been picked — the section was
+wrapped in `{quickFilter&&…}` and all three handlers opened
+`if(!quickFilter)return` — so the one thing that could not be sent was the
+sheet. The gate is removed rather than a second way to share built.
+
+**The heading is a claim about the fleet to somebody who cannot see the
+screen, so it has to be true.** `downSheetShareScope` in
+`src/lib/down-sheet/down-sheet-share.ts` decides it, by comparing what was
+DRAWN against what the sheet holds rather than from a list of filters:
+
+| the view | heading | empty note |
+| --- | --- | --- |
+| nothing changing it | `WHOLE SHEET` | The sheet is empty. |
+| anything hiding rows | `PART OF THE SHEET` | No buses in this view of the sheet. |
+| SHOW COMPLETED on | `WHOLE SHEET PLUS COMPLETED` | The sheet is empty. |
+| a filter | that filter's name | …match this filter. |
+| a filter, cut further | `Part of <filter>` | No buses in this view of the sheet. |
+
+The comparison is the point. The bands drop IDOT-only rows unconditionally, and
+a first version that listed the filters it knew about headed a sheet of three
+IDOT rows `WHOLE SHEET — 0 of 3` and put "The sheet is empty." on the
+clipboard. A list of inputs goes stale the moment the next row filter lands; a
+count cannot.
+
+**THIS IS A UI CHANGE CURTIS HAS APPROVED BUILDING AND HAS NOT SEEN PLACED.**
+The share bar is now permanent: **101px on a phone where it used to be 0px
+unless a filter was picked.** Reusing the quick-filter bar rather than adding a
+second control is the piece worth his eye.
+
+It landed on `main` as `78c9074..a302396`. PR44 could not be merged from its
+branch after PR42 went in — both had edited the one long import line at the top
+of `tests/down-sheet.test.mjs` — so its six commits were replayed with that
+line resolved as the union of both sides' names. Nothing else conflicted. No
+storage key added, renamed or read differently. No migration.
+
+**Measured** (Chromium against the production build, 360 / 390 / 430 / 1180, on
+the PR's own branch before it landed): all rows IDOT-only reads `PART OF THE
+SHEET — 0 of 3`; one IDOT among two faults `PART OF THE SHEET — 2 of 3`; no
+IDOT rows `WHOLE SHEET — 2 of 2`; SHOW COMPLETED with one down and two done
+`WHOLE SHEET PLUS COMPLETED — 3 of 3`; COPY LIST then a search returns the
+button from `COPIED!` to `COPY LIST`. Bar height with no filter 101px, with a
+filter 201px unchanged, at 1180 52px unchanged. No horizontal overflow at any
+width. **Not re-measured in a browser after the replay onto `main`** — the
+replay changed one import line in a test file and nothing the browser loads.
+
+**To check once it is live:**
+
+1. Open the Down Sheet with no quick filter picked. COPY LIST, SHARE TEXT and
+   SHARE PAGE are there, under a line reading WHOLE SHEET with a count.
+2. Press COPY LIST and paste it somewhere. It starts `DOWN SHEET — WHOLE SHEET`
+   and names real locations.
+3. Type a bus number in SEARCH. The line changes to PART OF THE SHEET, and a
+   COPIED! left on the button goes back to COPY LIST.
+4. Pick a quick filter. The line names that filter, and the bar is the taller
+   four-button one it always was.
+5. On a phone, look at how much of the screen the bar takes with no filter
+   picked, and say if it should live somewhere else.
+
+### WORK DONE SO FAR reads PRELIMS
+
+Curtis: *"the part where it says work done so far ... make it a prelims or
+preliminary checks or preliminaries. Whichever is better."*
+
+One label. The box on the LOG DEFECT form holding INSPECTED, DIAGNOSED, ROAD
+CALL, TEST DRIVEN, BRAKE TEST and OPERATOR REPORTED reads **PRELIMS —
+OPTIONAL**. PRELIMS rather than PRELIMINARY CHECKS because two of the six are
+not checks — ROAD CALL says what the bus did and OPERATOR REPORTED says where
+the report came from, both in `repair-catalog.ts`'s own words — and because at
+the legend's 8px it is one line of 108px at 360, 390, 430 and 1180 where the
+longer wording is three times the length.
+
+The legend text, and the two comments that named the box by its old label. The
+six work states, the values they write and everything that reads them are
+untouched. `docs/RELEASES.md` keeps the old name where it records what shipped
+under it. No storage key. No migration. Landed as PR43.
+
+**To check once it is live:** open + LOG DEFECT on a phone. The box of six
+checks is headed PRELIMS — OPTIONAL, on one line.
+
+### How PR42, PR43 and PR44 reached `main`, and what was run on the result
+
+PR42 and PR43 were rebase-merged on GitHub, in that order; PR44 was replayed as
+described above. Before any of the three was merged, all 27 commits were
+stacked on `main` at `a490743` in a scratch branch and the gates run on that
+stack; the tree `main` ended on is byte-identical to it (`git diff` empty).
+
+One commit has landed since from another session: `14c47ae`, a test that holds
+the share bar's three-across rule, which PR44's reviewer asked for after the
+replay had been built. It is in the range above and was not part of that stack.
+
+On that tree, on a Windows machine: **`npm test` 433 of 434.** The one failure
+is *nothing in app/ or src/ names an identifier that does not exist*, which
+cannot run on Windows — `tsc produced no output at all` — and is what PR45
+fixes; it passes in CI. ESLint reports no error in the repository. The build
+inside `npm test` succeeds. **No cold read was run on the combination**: each
+PR had its own, and the only line that differs from the three reviewed heads is
+the merged import in `tests/down-sheet.test.mjs`.
 
 ### Open questions for Curtis
 
