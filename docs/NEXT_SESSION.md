@@ -96,10 +96,11 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
-## Four pull requests are open and not one of them is merged
+## Six pull requests are open and not one of them is merged
 
-**Read this before you plan anything.** Measured 2026-11-12; `main` is at
-`92dfc0d` and has not moved since 2026-11-05.
+**Read this before you plan anything.** The four in the table were measured
+2026-11-12, when `main` was at `92dfc0d` and had not moved since 2026-11-05.
+**#45 and #46 were opened later that day and are in their own table below it.**
 
 | PR | Branch | Head | Ahead | CI | Threads | What it is |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -107,6 +108,26 @@ ever will, and it is the only one of the three with no downside at all.
 | **#43** | `claude/prelims-label` | `82f52ae` | 2 | green | none | WORK DONE SO FAR reads **PRELIMS** on the Defect Log form |
 | **#44** | `claude/share-down-sheet` | `7241191` | 6 | green | 8, none open | Share the Down Sheet itself, not only a filtered slice of it |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
+
+**Opened 2026-11-12, after that table was measured.** Head and commits ahead are
+from `git rev-parse` and `git rev-list --count origin/main..<branch>` at
+`b8c1ef9`. **Their CI and review threads were NOT measured when this was
+written — read them off the PR before quoting either.**
+
+| PR | Branch | Head | Ahead | What it is |
+| --- | --- | --- | --- | --- |
+| **#45** | `claude/typecheck-gate-windows` | `256c744` | 1 | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
+| **#46** | `claude/heat-check-domain` | `79c4e58` | 1 | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules, limits and what was never verified are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`**, so do not look for it here |
+
+**What #46 has never done is read a real photograph.** `/api/heat-sheet-scan`
+needs the OpenRouter key, which the development machine does not have;
+everything after the route was driven with its answer stubbed. Curtis has
+photographed the real sheet twice — the second, from an iPad, shows all 108
+printed bus numbers — and its first real scan after a publish is the test of
+the prompt. Three things are still his to settle: whether a struck-through row
+means fixed, whether to narrow the A/C Buses filter (it counts heating repairs,
+so the A/C card claims no number), and whether the check log gets a Shop Cloud
+table so it syncs.
 
 **#42, #43 and #44 are `mergeable_state: clean`** and merge in any order.
 **#39 is `dirty`** — it was opened on 2026-10-20 and `main` has moved a long
@@ -193,7 +214,7 @@ merged or closed, or when Curtis says to stop.**
 
 | | |
 | --- | --- |
-| Branch | `main`, linear history, no force-pushes ever. **Four PRs are open off it and unmerged — see the section above before planning anything.** |
+| Branch | `main`, linear history, no force-pushes ever. **Six PRs are open off it and unmerged — see the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Clean, on `main` at `92dfc0d`. Nothing stashed, nothing uncommitted. The three feature branches are pushed and need nothing from you. |
