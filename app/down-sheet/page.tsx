@@ -5,12 +5,15 @@ import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import {DOWN_SHEET_FILTERS,downSheetFilterCounts,downSheetFilterEntries,type DownSheetFilterKey} from "@/src/lib/down-sheet/down-sheet-filters";
 import {downSheetShareFilename,downSheetShareHtml,downSheetShareScope,downSheetShareScopeLabel,downSheetShareText} from "@/src/lib/down-sheet/down-sheet-share";
 import {copyText,shareOrDownloadFile} from "@/src/lib/shared/share-file";
-import {Fragment,useEffect,useMemo,useState,type CSSProperties} from "react";
+import {Fragment,useEffect,useMemo,useRef,useState,type CSSProperties} from "react";
 import TrackerNav from "@/src/components/shared/tracker-nav";
 import RefreshButton from "@/src/components/shared/refresh-button";
 import "./down-sheet.css";
 import DownSheetEditor from "./_components/down-sheet-editor";
 import DownSheetScanner from "./_components/down-sheet-scanner";
+import ScanPaper from "@/src/components/scan/scan-paper";
+import {PAPER_PHOTOS_PARAM,PAPER_SCAN_PARAM} from "@/src/lib/scan/paper-kinds";
+import {paperHandIn,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {readSweep,startSweep} from "@/src/lib/fleet/facility-sweep";
 import {applyDownEntryToFleet} from "@/src/lib/down-sheet/down-sheet-sync";
 import {matchingUnresolvedDefectId} from "@/src/lib/defects/duplicate-defects";
@@ -40,6 +43,8 @@ import MysteryBoard,{MYSTERY_COLLAPSED_KEY} from "@/src/components/down-sheet/my
 import DeferredBoard,{DEFERRED_BOARD_COLLAPSED_KEY} from "./_components/deferred-board";
 import RecommendedBoard,{RECOMMENDED_BOARD_COLLAPSED_KEY} from "./_components/recommended-board";
 import SheetSectionBoard from "./_components/sheet-section-board";
+/* The route this page is, as SCAN PAPER and the hand-off name it. */
+const PAPER_HERE="/down-sheet";
 /* Per device and collapsed by default, the same as the three boards above
    them. Both are NEW names, so nothing already stored is renamed. */
 const SOFT_BOARD_COLLAPSED_KEY="pace-down-sheet-soft-collapsed-v1";
@@ -243,6 +248,17 @@ export default function DownSheet(){
  useEffect(()=>{setAdvancedOpen(localStorage.getItem(ADVANCED_OPEN_KEY)==="1")},[]);
  useEffect(()=>{if(hydrated)writeSetting(localStorage,ADVANCED_OPEN_KEY,advancedOpen?"1":"0")},[advancedOpen,hydrated]);
  const [scannerOpen,setScannerOpen]=useState(false);
+ /* SCAN PAPER, and the photos it hands to the scanner. A hand-off is for ONE
+    opening: left in place, the next press of SCAN SHEET would open on
+    yesterday's photos and start reading them. Dropped when the scanner SHUTS,
+    however it came to be shut — on the change from open to shut, not whenever
+    it is shut, which is also true the moment the page opens and would race
+    the effect below that takes a hand-off off the address. */
+ const [paperOpen,setPaperOpen]=useState(false);
+ const [handed,setHanded]=useState<HandedPhotos|null>(null);
+ const scannerWasOpen=useRef(false);
+ useEffect(()=>{if(scannerWasOpen.current&&!scannerOpen)setHanded(null);scannerWasOpen.current=scannerOpen},[scannerOpen]);
+ const openPaperHere=(next:HandedPhotos)=>{setPaperOpen(false);setHanded(next);setScannerOpen(true)};
  const [defaultInitials,setDefaultInitials]=useState("");
  const [defaultShift,setDefaultShift]=useState<Shift>("1st");
  const [extraTiles,setExtraTiles]=useState<OptionalDownTile[]>([]);
@@ -363,6 +379,21 @@ export default function DownSheet(){
     two places is the hazard. The rule is in `src/lib/down-sheet/sheet-mint.ts`
     now and both paths here call it. */
  useEffect(()=>{try{const fleetPayload=readFleetPayload<FleetBus>(localStorage.getItem(FLEET_KEY)),nextFleet=fleetPayload.valid?fleetPayload.buses:[];setFleet(nextFleet);const downPayload=readDownSheetPayload<DownEntry>(localStorage.getItem(DOWN_KEY)),nextEntries=downPayload.valid?downPayload.entries:[],restored=nextEntries.map(normalizeEntry),minted=addMintedEntries(restored,entriesFromFleet(nextFleet),MINT_RULES);setEntries(minted.entries);setMintSkipped(mintSkippedMessage(minted.skipped,MAX_ENTRIES));setUndoClearAvailable(Boolean(readDownSheetClearSnapshot<DownEntry>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY))));setUndoScanAvailable(Boolean(localStorage.getItem(SCAN_UNDO_KEY)));setRowAction(readRowAction(localStorage.getItem(ENTRY_UNDO_KEY)));setMysteryCollapsed(localStorage.getItem(MYSTERY_COLLAPSED_KEY)==="1");try{setMysteryDisplay(normalizeDefectLogDisplay(JSON.parse(localStorage.getItem("pace-defect-log-settings-v1")||"{}").display))}catch{}const settings=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"{}"),note=typeof settings.quickNotes==="string"?settings.quickNotes:"";setShowCompleted(Boolean(settings.showCompleted));setDefaultInitials(typeof settings.defaultInitials==="string"?settings.defaultInitials:"");setDefaultShift((["1st","2nd","3rd"] as string[]).includes(settings.defaultShift)?settings.defaultShift:"1st");setQuickNotes(note);setSavedQuickNotes(note);setSectionOrder(normalizeDownSheetSectionOrder(settings.sectionOrder));setExtraTiles((Array.isArray(settings.extraTiles)?settings.extraTiles:[]).filter((key:unknown)=>OPTIONAL_DOWN_TILES.some(tile=>tile.key===key)));setShowQuickNotes(settings.showQuickNotes===true);setDisplaySettings(normalizeDownSheetDisplay(settings.display))}catch{setFleet([]);setEntries([])}setHydrated(true)},[]);
+ /* SCAN PAPER on the Defect Log sends a Vehicle Down Sheet here to be read.
+    This and the load above both run as the page opens, and what they set
+    lands in one render, so the scanner mounts with the fleet and the current
+    sheet already in hand. That matters because it starts reading by itself,
+    and a read matched against an empty fleet would call every bus unknown.
+    The parameters come off the address once acted on, so a reload does not
+    throw the scanner up again, and the history entry keeps the state the
+    router left in it. */
+ useEffect(()=>{
+  const url=new URL(window.location.href),arrived=paperHandIn(url.search,PAPER_HERE);
+  if(!arrived)return;
+  setHanded(arrived);setScannerOpen(true);
+  url.searchParams.delete(PAPER_SCAN_PARAM);url.searchParams.delete(PAPER_PHOTOS_PARAM);
+  window.history.replaceState(window.history.state,"",url.pathname+url.search+url.hash);
+ },[]);
 
  // Active Down Sheet rows are the single source of truth for every tracker checkbox and DS badge.
  /* Road calls are reconciled here beside DS membership, and for the same
@@ -910,6 +941,7 @@ export default function DownSheet(){
          two amber buttons — sitting above the button that adds a bus. The undos
          still appear only when there is something to undo. */}
      <button className="scan-sheet-button" type="button" onClick={()=>setScannerOpen(true)}>▣ SCAN SHEET</button>
+     <button className="paper-scan-button" type="button" onClick={()=>setPaperOpen(true)} title="Photograph any shop sheet: the app works out which one it is and opens its scanner">📷 SCAN PAPER</button>
      {undoScanAvailable&&<button className="undo-scan" type="button" onClick={undoScan}>UNDO IMPORT</button>}
      {undoClearAvailable&&<button className="undo-clear" type="button" onClick={undoClear}>UNDO CLEAR</button>}
      <button className="clear-downsheet" type="button" onClick={clearEntireDownSheet} disabled={!entries.length&&!fleet.some(bus=>bus.down)}>CLEAR DOWNSHEET</button>
@@ -1172,7 +1204,8 @@ export default function DownSheet(){
       that is already there rather than refused. */}
   {editing&&<DownSheetEditor onOpenExisting={entryId=>{const found=entries.find(item=>item.id===entryId);if(found)setEditing({...found,repairItems:[...normalizeRepairItems(found.repairItems,{category:found.category,repair:found.repair,details:found.customReason,timeEstimate:found.timeEstimate}),blankRepairItem()]})}} entry={editing} fleet={fleet} entries={entries} defaultInitials={defaultInitials} onClose={()=>setEditing(null)} onSave={saveEntry}/>}
   
-  {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {scannerOpen&&<DownSheetScanner fleet={fleet} currentEntries={active} defaultShift={defaultShift} handed={handed} onClose={()=>setScannerOpen(false)} onImport={importScan}/>}
+  {paperOpen&&<ScanPaper here={PAPER_HERE} onClose={()=>setPaperOpen(false)} onHere={openPaperHere}/>}
   {sweepAsk&&<div className="down-shade" role="dialog" aria-modal="true" aria-labelledby="sweep-ask-title">
    <section className="sweep-ask-modal">
     <header className="repair-editor-head"><div><span>AFTER THE SCAN</span><h2 id="sweep-ask-title">{sweepAsk==="ask"?"FULL SWEEP?":"CHECK THE MAP"}</h2></div></header>

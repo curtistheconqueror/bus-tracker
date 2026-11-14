@@ -951,3 +951,17 @@ html.down-editor-open,body.down-editor-open{overflow:hidden;overscroll-behavior:
    sheet has not confirmed the bus yet. It clears itself on the next scan. */
 .added-in-app-badge{align-self:flex-start;display:inline-flex;align-items:center;flex:none;padding:3px 7px;border:1px dashed #b07d12;border-radius:9px;background:#fff6e3;color:#7a4d05;font-style:normal;font-size:8px;font-weight:900;letter-spacing:.4px;vertical-align:middle;white-space:nowrap}
 @media(max-width:760px){.added-in-app-badge{font-size:9px;padding:4px 8px}}
+/* ── SCAN PAPER: the one door in front of the scanners ──
+   Darker than SCAN SHEET beside it, so the two purple buttons are told apart
+   before either label is read. The same button, the same colour, on the Defect
+   Log. Sized here rather than added to the shared lists above, which are long
+   enough that a seventh name in each is how one gets missed. */
+.down-advanced-group>.paper-scan-button{height:34px;border:0;border-radius:5px;padding:0 13px;background:#3d1c6e;color:#fff;font-size:9px;font-weight:900;cursor:pointer}
+@media(max-width:760px){.down-advanced-group>.paper-scan-button{height:44px;min-height:44px;flex:1;min-width:132px}}
+/* Named through this page's own tools group, never bare: the Defect Log draws
+   the same button in a different shape, and after SCAN PAPER has changed page
+   without a reload both stylesheets are loaded at once. */
+/* The line the scanner shows when SCAN PAPER opened it, and the warning when
+   SCAN PAPER held pages of the batch back. */
+.scan-handed{margin:0;padding:8px 11px;border-left:4px solid #08733f;background:#e6f6ec;color:#0c3b22;font-size:9px;font-weight:900;letter-spacing:.3px;line-height:1.4}
+.scan-handed.held-back{border-left-color:#c98a00;background:#fff3d6;color:#6b4a00}

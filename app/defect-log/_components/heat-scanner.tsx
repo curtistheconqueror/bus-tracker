@@ -4,6 +4,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {scanReadyPhoto} from "@/src/lib/defects/scan-photo";
 import {SCAN_NOTES_LIMIT} from "@/src/lib/defects/scan-notes";
 import {heatChecksFromFindings,heatOkHeldWhy} from "@/src/lib/defects/heat-check-log";
+import {handedStart,type HandedPhotos} from "@/src/lib/scan/paper-handoff";
 import {heatLoggable,heatLowConfidence,heatReviewGroups,heatScanReview,heatSummary,tickHeatFinding,type HeatFinding,type HeatFleetBus,type HeatScanPage,type HeatScanReview} from "@/src/lib/defects/heat-check-import";
 
 /* The heat check sheet scanner.
@@ -33,18 +34,27 @@ type Props={
  /* Every finding, with the reviewer's ticks, and the subset whose page was
     trusted. The page files and logs; this only asks. */
  onFile:(findings:HeatFinding[],loggable:HeatFinding[])=>void;
+ /* Set when SCAN PAPER was the way in: the photos it took, already identified
+    as this scanner's sheet. Absent for the scanner's own button. */
+ handed?:HandedPhotos|null;
 };
 
 const MAX_FILES=6;
 
-export default function HeatScanner({fleet,onClose,onFile}:Props){
- const [photos,setPhotos]=useState<SelectedPhoto[]>([]);
+export default function HeatScanner({fleet,onClose,onFile,handed}:Props){
+ /* Asked once, when the scanner opens. A hand-off is for this opening only. */
+ const [start]=useState(()=>handedStart(handed,"heat"));
+ const [photos,setPhotos]=useState<SelectedPhoto[]>(()=>start.files.slice(0,MAX_FILES).map((file,index)=>({file,url:URL.createObjectURL(file),key:`handed-${index}-${file.name}-${file.lastModified}`})));
+ /* The lines that say SCAN PAPER opened this stay up only while the photos
+    are the ones it handed over. Once a photo is added or taken away they
+    describe a batch that is no longer the one on screen. */
+ const [fromPaper,setFromPaper]=useState(true);
  const [findings,setFindings]=useState<HeatFinding[]>([]);
  const [held,setHeld]=useState<HeatScanReview["held"]>([]);
  const [read,setRead]=useState(false);
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState("");
- const [error,setError]=useState("");
+ const [error,setError]=useState(start.lost);
  const [notes,setNotes]=useState("");
  const cameraRef=useRef<HTMLInputElement>(null),uploadRef=useRef<HTMLInputElement>(null),photosRef=useRef<SelectedPhoto[]>([]);
 
@@ -70,10 +80,11 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
    if(incoming.length>available)setError(`Use no more than ${MAX_FILES} photos.`);else setError("");
    return [...current,...next];
   });
+  setFromPaper(false);
   if(cameraRef.current)cameraRef.current.value="";
   if(uploadRef.current)uploadRef.current.value="";
  };
- const removePhoto=(key:string)=>busy?undefined:setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)});
+ const removePhoto=(key:string)=>{if(busy)return;setFromPaper(false);setPhotos(current=>{const removed=current.find(photo=>photo.key===key);if(removed)URL.revokeObjectURL(removed.url);return current.filter(photo=>photo.key!==key)})};
 
  const readSheets=async()=>{
   if(!photos.length||busy)return;
@@ -98,6 +109,14 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
    else if(!review.findings.length)setError("No bus lines were found. Try a clearer photo, with the whole sheet in frame.");
   }catch(reason){setError(reason instanceof Error?reason.message:"The photos could not be processed.")}finally{setBusy(false);setProgress("")}
  };
+ /* PHOTOS THAT SCAN PAPER HANDED IN ARE READ WITHOUT A SECOND PRESS. The
+    person has already pressed READ once, on SCAN PAPER; asking again here
+    would be asking them to confirm a decision they were never shown as a
+    question. It happens once. The cost is that NOTES FOR THIS SCAN cannot be
+    typed before that first read: CHANGE PHOTOS afterwards comes back to the
+    ordinary first screen, notes box included, and reads again. */
+ const wantsRead=useRef(start.read);
+ useEffect(()=>{if(!wantsRead.current)return;wantsRead.current=false;void readSheets()},[]);// eslint-disable-line react-hooks/exhaustive-deps
  const approve=()=>{
   const files=summary.toFile,checks=logged.length;
   if(!files&&!checks){setError("There is nothing on these pages to file or to log.");return}
@@ -118,6 +137,8 @@ export default function HeatScanner({fleet,onClose,onFile}:Props){
   <section className="sweep-modal heat-modal">
    <header className="log-editor-head"><div><span>PHOTO IMPORT</span><h2 id="heat-scan-title">SCAN HEAT SHEET</h2></div><div className="log-editor-header-actions"><button type="button" onClick={onClose} aria-label="Close">×</button></div></header>
    <div className="sweep-body">
+    {fromPaper&&start.note&&<p className="sweep-handed" role="status">{start.note}</p>}
+    {fromPaper&&start.warning&&<p className="sweep-handed held-back" role="alert">{start.warning}</p>}
     {!read&&<>
      <div className="sweep-intro"><b>ADD UP TO 6 PHOTOS OF THE HEAT CHECK SHEET</b><span>N/R is a bus that needs its heat repaired, OK is a bus with heat, and a blank line is a bus nobody has checked yet. Keep the whole sheet in frame, left edge included, so every bus number can be read. Photos are sent for processing only after you press Read Sheet, and nothing is filed until you approve it.</span></div>
      <div className="sweep-pickers">

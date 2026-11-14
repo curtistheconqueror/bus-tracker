@@ -876,6 +876,23 @@ html.defect-editor-open,body.defect-editor-open{overflow:hidden;overscroll-behav
    with its label broken over two lines — measured at 390: 159px wide and 50px
    tall beside neighbours at 44. Given the whole row, the name fits on one. */
 @media(max-width:760px){.log-advanced-group>.feed-actions>.heat-scan-button,.feed-actions>.heat-scan-button{grid-column:1/-1}}
+/* ── SCAN PAPER: the one door in front of the scanners ──
+   The darkest of the scan colours, solid where SCAN SWEEP and SCAN HEAT SHEET
+   are tinted, so it reads as the way in rather than as a third sheet. Last in
+   the row, so none of the buttons before it moved when it was added, and given
+   the whole row on a phone for the reason SCAN HEAT SHEET is. */
+.feed-actions>.paper-scan-button{border:1px solid #3d1c6e!important;background:#3d1c6e!important;color:#fff!important}
+.feed-actions>.paper-scan-button:disabled{opacity:.55}
+@media(max-width:760px){.feed-actions>.paper-scan-button{grid-column:1/-1}}
+/* Every rule above names this page's own row. The Down Sheet draws the same
+   button with a different shape, and SCAN PAPER is the one thing in the app
+   that changes page without reloading it, which leaves both stylesheets
+   loaded: a bare .paper-scan-button in each would have had the Down Sheet's
+   height and font landing on this one after a hop. */
+/* The line a scanner shows when SCAN PAPER opened it, and the warning when
+   SCAN PAPER held pages of the batch back. */
+.sweep-handed{margin:0;padding:8px 11px;border-left:4px solid #08733f;background:#e6f6ec;color:#0c3b22;font-size:9px;font-weight:900;letter-spacing:.3px;line-height:1.4}
+.sweep-handed.held-back{border-left-color:#c98a00;background:#fff3d6;color:#6b4a00}
 /* The review is groups, not one long list: what will be filed, what the board
    already knew, where paper and board disagree, and what to check by eye. The
    group heading is a div on purpose — globals.css paints every bare <header>

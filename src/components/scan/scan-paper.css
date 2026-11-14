@@ -1,0 +1,57 @@
+/* SCAN PAPER. Every rule is prefixed .paper- and nothing here styles a bare
+   element: globals.css gives a bare <header> a fixed 38px height and a bare
+   <footer> position:fixed, which is why the head and the actions are divs. */
+.paper-shade{position:fixed;z-index:2147483000;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;background:#03132dcc}
+.paper-modal{width:min(720px,98vw);max-height:96vh;max-height:96dvh;display:flex;flex-direction:column;border-radius:11px;background:#f8fafc;color:#172b4d;box-shadow:0 25px 85px #000b;overflow:hidden}
+.paper-head{display:flex;flex:none;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;background:linear-gradient(90deg,#041d47,#1d3459);color:#fff}
+.paper-head span{display:block;font-size:8px;font-weight:900;letter-spacing:1.4px}
+.paper-head h2{margin:2px 0 0;font-size:22px;line-height:1.1}
+.paper-head button{flex:none;width:44px;height:44px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:25px;line-height:1;cursor:pointer}
+.paper-head button:disabled,.paper-actions button:disabled{opacity:.4;cursor:not-allowed}
+.paper-body{display:flex;flex-direction:column;gap:12px;min-height:220px;padding:16px 18px;overflow:auto}
+.paper-intro,.paper-found,.paper-ask{display:grid;gap:4px;padding:11px 13px;border-left:4px solid #6b31b6;background:#f2eaff;color:#2b2350}
+.paper-found{border-left-color:#08733f;background:#e6f6ec;color:#0c3b22}
+.paper-ask{border-left-color:#c98a00;background:#fff3d6;color:#4d3600}
+.paper-intro b,.paper-found b,.paper-ask b{font-size:11px;line-height:1.3}
+.paper-intro span,.paper-found span,.paper-ask span{font-size:10px;line-height:1.45}
+.paper-pickers{display:flex;justify-content:center;gap:12px;padding:8px}
+.paper-pickers button,.paper-read{min-height:44px;border:0;border-radius:7px;padding:0 22px;background:#173d74;color:#fff;font-family:inherit;font-size:10px;font-weight:900;cursor:pointer;touch-action:manipulation}
+.paper-pickers button:disabled{opacity:.45;cursor:not-allowed}
+.paper-file-input{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0}
+.paper-previews{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.paper-previews:empty{display:none}
+.paper-previews figure{margin:0;border:1px solid #b8c4d6;border-radius:7px;background:#fff;overflow:hidden}
+.paper-previews img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover}
+.paper-previews figcaption{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px 6px;font-size:8px;font-weight:900}
+.paper-previews figcaption button{min-height:32px;border:1px solid #b8c4d6;border-radius:4px;background:#fff;color:#7a1820;padding:0 7px;font-family:inherit;font-size:8px;font-weight:900;cursor:pointer}
+.paper-previews figcaption button:disabled{opacity:.45;cursor:not-allowed}
+.paper-read{align-self:center;min-width:220px;background:#6b31b6}
+.paper-read:disabled{opacity:.45;cursor:not-allowed}
+.paper-choices{display:grid;gap:9px}
+.paper-choices button{display:grid;gap:3px;min-height:56px;border:2px solid #6b31b6;border-radius:8px;background:#fff;color:#2b2350;padding:10px 13px;font-family:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+.paper-choices button:disabled{opacity:.45;cursor:not-allowed}
+.paper-choices button b{font-size:12px;font-weight:900;line-height:1.2}
+.paper-choices button small{font-size:9px;font-weight:800;letter-spacing:.3px;color:#4b3f72}
+.paper-choices button em{font-size:9px;font-style:normal;font-weight:800;line-height:1.4;color:#7a3505}
+.paper-back{align-self:center;min-height:38px;border:1px solid #aebbd0;border-radius:6px;background:#fff;color:#294264;padding:0 16px;font-family:inherit;font-size:9px;font-weight:900;cursor:pointer}
+.paper-leaving{margin:0;text-align:center;font-size:10px;font-weight:900;color:#3d1c6e}
+.paper-error{margin:0;padding:10px;border-left:4px solid #b62b35;background:#ffe8e9;color:#7a1820;font-size:9px;font-weight:800;line-height:1.4}
+.paper-actions{display:flex;flex:none;justify-content:flex-end;gap:8px;padding:11px 18px;border-top:1px solid #cbd4e3;background:#f2f5fa}
+.paper-actions button{min-height:42px;min-width:120px;border:1px solid #aebbd0;border-radius:6px;background:#fff;color:#294264;padding:0 16px;font-family:inherit;font-size:10px;font-weight:900;cursor:pointer}
+/* Touch sizes at the width both pages treat as touch, which is wider than the
+   width at which this goes full screen. */
+@media(max-width:760px){
+ .paper-actions button,.paper-back,.paper-pickers button,.paper-read{min-height:44px}
+ .paper-previews figcaption{flex-direction:column;align-items:stretch;text-align:center}
+ .paper-previews figcaption button{min-height:44px}
+}
+@media(max-width:620px){
+ .paper-shade{padding:4px;height:100dvh}
+ .paper-modal{width:100%;max-height:100dvh;border-radius:0}
+ .paper-body{padding:10px}
+ .paper-pickers{display:grid;grid-template-columns:1fr 1fr}
+ .paper-pickers button{padding:0 8px}
+ .paper-previews{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .paper-read{align-self:stretch;min-width:0;white-space:normal;line-height:1.3;padding:8px 12px}
+ .paper-actions button{flex:1}
+}

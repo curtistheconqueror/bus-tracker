@@ -1122,6 +1122,127 @@ Grouped catalog categories are held in **two** structures that must stay in
 step: `REPAIR_OPTIONS` (the stored identity, prefixed `"Group - Item"`) and
 `REPAIR_OPTION_GROUPS` (the bare names the picker draws).
 
+## SCAN PAPER: one door in front of the three scanners
+
+Three sheets get photographed — the Vehicle Down Sheet, the farebox / Ventra
+sweep, the heat check sheet — through three buttons on two pages, and the
+person holding the paper had to know which button reads which. SCAN PAPER takes
+the photo, asks one cheap question of a small copy of it (`/api/scan-identify`:
+which sheet is this), and opens THAT sheet's own scanner with the photos in it.
+It reads no rows and files nothing. **It adds no storage key.**
+
+**THE THREE OLD BUTTONS STAY.** Curtis was told nothing he uses today moves, and
+they are also the way round a wrong guess: each scanner still opens from its own
+button, empty, exactly as before.
+
+**A NEW SHEET IS ONE ROW IN `src/lib/scan/paper-kinds.ts`, ITS SCANNER, AND THE
+LINE ON ITS PAGE THAT OPENS THAT SCANNER.** The table is what the first look's
+prompt is built from, what the screen names and lists the sheets from, and
+where the address a page is sent to comes from. The page's NAME is not in it —
+that is looked up in `tracker-pages.ts`. Do not type a sheet's description into
+the route, or a sheet's name into `scan-paper.tsx` in any spelling; tests hold
+both. The Defect Log names each of its sheets when it opens a scanner
+(`openScanner`) and has no `else`: an `else` opens the sweep scanner, empty,
+for whatever is added next.
+
+**THE APP ONLY DECIDES BY ITSELF WHEN EVERY PAGE AGREES**, and it trusts nothing
+the first look sends back (`paper-identify.ts`). An unknown kind, a page that
+was never sent, or a confidence under `PAPER_SURE` is not placed, never
+guessed. One unplaced page, or two pages placed as different sheets, and the
+person is asked — and told WHY each page was not placed, because "does not look
+like any of these sheets", "might be a heat check sheet, but the reader was not
+sure" and "could not be made out" are three different things to someone about
+to send that page somewhere.
+
+**A PAGE PLACED AS A DIFFERENT SHEET IS NOT SENT TO THE SCANNER THAT WAS PICKED.
+IT IS HELD BACK, AND THE SCANNER SAYS SO.** "Placed" is the `PAPER_SURE` line
+and nothing softer: an unplaced page goes with whatever the person picks. The
+count held back travels with the photos, and the scanner opens with an amber
+line telling the person to add the page back if it belongs. That line is there
+because the look can be confidently wrong: page three of a Down Sheet read as a
+heat sheet would otherwise be left out without a trace, and its buses would
+show as COMING OFF.
+
+**FOR THE DOWN SHEET, THE FIRST LOOK IS THE ONLY CHECK BEFORE A PERSON'S EYES.**
+The sweep and heat scanners each ask their own route what the page is and
+refuse one that is not theirs. The Down Sheet scanner does not —
+`down-sheet-scan` was never asked that — and its import REPLACES the live sheet.
+So a heat sheet the look calls a Down Sheet opens the replacing scanner, reads,
+and shows every row as FLEET MATCH, because all three sheets list real buses.
+That is no worse than pressing SCAN SHEET on the same photo, which has always
+done exactly that, and the review and the import's own confirm still stand in
+the way. It is still the weakest point here, and the fix is a document verdict
+on the Down Sheet route — which changes a production prompt and needs a key to
+prove, so it is not in this change.
+
+**THE PHOTOS CROSS PAGES IN MEMORY AND NOWHERE ELSE** (`paper-handoff.ts`). Not
+LocalStorage, not the address, not an upload to be fetched back: a photographed
+sheet carries names and initials, and the only copy this app has ever kept of
+one is the one in the camera roll. Memory only survives a change of page that
+does not reload the app, so **this is the one place the app moves with the
+router (`router.push`) instead of a full page load.** Every other link here is
+a full load on purpose — it rehydrates LocalStorage across surfaces — so do not
+copy this elsewhere without that reason. The address still carries `?scan=` and
+`photos=N`, so a page that is reached by a reload instead can tell "nobody sent
+any" from "they were sent and did not make it", and says so. **All of them or
+none:** a hand-off that does not match the count in the address is treated as
+lost outright.
+
+**WHEN THE ROUTER CANNOT MAKE THE MOVE, IT FALLS BACK TO A PAGE LOAD BY ITSELF**
+and the scanner that opens says the photos were lost. That happened for real
+during the browser checks — the dev server answered one page fetch with a 500 —
+and the destination did exactly that. The fallback is vinext's, not ours:
+`push` returns before the move happens, so the `catch` around it in
+`scan-paper.tsx` only ever sees an address the router refuses outright.
+
+**MOVING WITHOUT A RELOAD LEAVES BOTH PAGES' STYLESHEETS LOADED.** No reload ever
+produces that state, so a browser check that reloads will never see it. Any
+class this feature styles in a page stylesheet is therefore named through that
+page's own container (`.feed-actions>.paper-scan-button`,
+`.down-advanced-group>.paper-scan-button`), never bare, and a test reads both
+sheets for it.
+
+**What the other page's stylesheet does to a page it was never written for,
+measured on the built worker** by comparing every element against a fresh load
+of the same page: the Defect Log reached from the Down Sheet had 78 of 80
+elements identical, the other two being `<html>` and `<body>`, whose colour and
+background take the Down Sheet's — not visible, because the page's own root
+covers both. The Down Sheet reached from the Defect Log had 138 of 148
+identical; the five board collapse toggles and their wrappers drew 44px where a
+fresh load draws 38px, because `defect-log.css` still styles `.mystery-toggle`
+from when that board lived there. It lasts until the next full page load, which
+is the next tap on any nav link. That was one board state on one width, not
+every state: two page stylesheets sharing class names is a risk this feature
+introduced and did not remove. If it ever shows as more than six pixels, the
+fix is to stop moving softly and carry the photos another way.
+
+**A SCANNER HANDED PHOTOS READS THEM WITHOUT A SECOND PRESS — ONCE.** Reading is
+all that happens unasked: the review, the ticks, the approve button and its
+confirm are untouched. On the two scanners that keep notes, the read waits
+until the kept notes are in the box — started a render earlier it sends none
+and then writes "none kept" over them. **The cost:** notes for this one scan
+cannot be typed before that first read. Kept notes go with it; for a one-off
+note, CHANGE PHOTOS comes back to the ordinary first screen and reads again.
+
+**CANCEL MEANS CANCEL.** A look outlives the press that started it. Closing
+SCAN PAPER aborts the request and ignores anything already on its way back; it
+used to let the answer open a scanner and send the full-size photos after the
+person had backed out. Once the page is being left, both ways of closing go
+dead instead, because closing would not stop the move.
+
+**A HAND-OFF IS FOR ONE OPENING.** Both pages drop it when the scanner shuts —
+on the change from open to shut, not "whenever shut", which is also true the
+moment the page opens and raced the effect that takes a hand-off off the
+address. Left in place, the next press of SCAN SWEEP opens on yesterday's
+photos and starts reading them.
+
+**What has never been run:** `/api/scan-identify` against a real photograph. The
+development machine has no OpenRouter key, so every browser check drove the
+screens with the route's answer stubbed. The design assumes the look is wrong
+sometimes; how often is not known. "Cheap" is also relative: the look uses
+`SCAN_IDENTIFY_MODEL` if one is set and otherwise the Down Sheet scan's model,
+so its cost follows whatever that is.
+
 ## Checking your work
 
 ```
@@ -1171,6 +1292,9 @@ src/lib/defects/repair-catalog.ts    the defect catalog, rename maps, count fiel
 src/lib/defects/heat-check-import.ts the heat sheet's rules: what a mark means, what may be filed
 src/lib/defects/heat-check-log.ts    the heat check log, the roster, the list to hand out
 src/lib/defects/heat-check-apply.ts  putting a no-heat result on a bus, for the scan and the tap
+src/lib/scan/paper-kinds.ts          the sheets this shop photographs, and which page reads each
+src/lib/scan/paper-identify.ts       which sheet a photo is, and what to ask when it is not one answer
+src/lib/scan/paper-handoff.ts        getting the photos to the scanner that reads them, in memory
 src/lib/storage/section-transfer.ts  per-section device transfers and their merge rules
 src/lib/storage/storage.ts           storage keys, envelopes, recovery snapshots
 app/globals.css                      the whole facility map, all breakpoints
