@@ -96,7 +96,7 @@ ever will, and it is the only one of the three with no downside at all.
 
 ---
 
-## Three pull requests are open; #42, #43 and #44 are on `main`
+## Four pull requests are open; #42, #43 and #44 are on `main`
 
 **Read this before you plan anything.** Measured 2026-11-13.
 
@@ -117,12 +117,34 @@ check a fix on his phone that has not been published.
 | --- | --- | --- | --- | --- | --- | --- |
 | **#45** | `claude/typecheck-gate-windows` | `a7b7152` | 2 | not re-read | **1, answered** — the reviewer's to close | The type-check gate in `tests/app-shell.test.mjs` runs on Windows. On `main` it fails there with *"tsc produced no output at all"*, so on Curtis's own machine the TS2304 gate proves nothing and `npm test` is one short. Test-only |
 | **#46** | `claude/heat-check-domain` | `cd21990` | see below | not re-read | **14, all answered** — the reviewers' to close | **A heat check log.** A CAMPAIGNS board on Fleet Campaigns with a NO HEAT walking list; SCAN HEAT SHEET on the Defect Log; a new key `pace-heat-checks-v1`. Its rules and limits are in the heat section of that branch's `CLAUDE.md` — **which is not on `main`** |
+| **#47** | `claude/scan-paper` | `3b5eb67` | 1, **on #46** | not read | none yet | **SCAN PAPER.** One button on the Defect Log and the Down Sheet in front of the three scanners: take the photo, the app works out which sheet it is and opens that sheet's own scanner with the photos loaded. **Stacked on #46 — its base is `claude/heat-check-domain`, not `main`** |
 | **#39** | `claude/codex-workflow-docs-fn9any` | `17b7b2a` | 9 | green | **2 open**, 1 on purpose | `POST /api/mcp`, five read-only tools. **Conflicted — see below** |
 
 Heads, commits ahead, CI and thread counts were read from GitHub on 2026-11-13
-before the merges. **"Ahead" is against the `main` each was cut from**; all
+before the merges, except #47's, which is as pushed. **"Ahead" is against the `main` each was cut from**; all
 three now sit behind `main` by the 27 merged commits and will need rebasing
 before they can land.
+
+**#47 is SCAN PAPER, built on 2026-11-13 after Curtis approved the design, and
+it is STACKED ON #46** because the heat scanner only exists there. It merges
+after #46 and not before. One cold read by a subagent found 14 things, one
+Major (CANCEL did not cancel a look in flight); all 14 are answered in its one
+commit and listed in the PR body. **No review bot has read it and its CI was
+not read.** Three things about it worth knowing before touching it:
+
+- **It is the one place the app changes page with the router instead of a full
+  load**, because the photos cross pages in memory only. That leaves both
+  pages' stylesheets loaded afterwards. Measured on the built worker: the
+  Defect Log reached that way is 78 of 80 elements identical to a fresh load,
+  the Down Sheet 138 of 148 (five board toggles 44px for 38px). One board
+  state, one width. `CLAUDE.md` on that branch records it as a risk introduced
+  and not removed.
+- **`/api/scan-identify` has never seen a real photograph.** Every browser
+  check stubbed the route's answer.
+- **How to drive the BUILT app locally**, which nothing here had written down:
+  `npm run build`, then `npx wrangler dev -c dist/server/wrangler.json --port
+  8788 --local`. `vinext start` serves the pages and 404s every asset, so
+  nothing hydrates and every measurement is of dead HTML.
 
 **#46 failed its SDET gate at `79c4e58`, and all 14 findings were answered on
 2026-11-13** in `f0a98f8` and `cd21990`, each on its own thread, with a ledger
@@ -207,7 +229,7 @@ session that did the merging — if you are the session that owns it, stop it.
 
 | | |
 | --- | --- |
-| Branch | `main`, linear history, no force-pushes ever. **Three PRs are open off it — see the section above before planning anything.** |
+| Branch | `main`, linear history, no force-pushes ever. **Four PRs are open — three off it and one stacked on #46. See the section above before planning anything.** |
 | Live | See the STATUS line of `docs/PUBLISH_NEXT.md`, and `docs/RELEASES.md` for the version table |
 | Pending publication | The same STATUS line — it names what is queued and what it publishes from |
 | Working tree at handoff | Read it with `git status` and `git log -1`; a commit named here is stale by the next push. |
