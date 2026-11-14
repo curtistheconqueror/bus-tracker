@@ -1575,28 +1575,119 @@ test("nothing in app/ or src/ names an identifier that does not exist", async ()
     baseline hides exactly the error you just added.
 
     So this asserts the one error class that means "this will throw the moment
-    somebody opens it": TS2304, a name with no definition. Not the whole of
+    somebody opens it": TS2304 and its relatives, a name that is not there. Not the whole of
     `tsc` — this repo carries 213 other errors and fixing them is its own job —
     just the class that is a crash rather than a type quibble. */
- const { execFile } = await import("node:child_process");
- const { promisify } = await import("node:util");
- const run = promisify(execFile);
- const root = new URL("../", import.meta.url).pathname;
- /* tsc exits non-zero whenever it reports anything, and this repo expects it
-    to, so the output is what matters rather than the exit code. */
- const out = await run("npx", ["tsc", "--noEmit"], { cwd: root, maxBuffer: 32 * 1024 * 1024 })
-  .then(result => result.stdout + result.stderr)
-  .catch(error => (error.stdout || "") + (error.stderr || ""));
- assert.ok(out.length, "tsc produced no output at all, so this test proves nothing");
+ /* IT ASKS THE COMPILER, IN THIS PROCESS, RATHER THAN READING WHAT `tsc` PRINTS.
+    It used to run `npx tsc --noEmit` and filter the output, and three things
+    were wrong with that, each of them measured.
 
- const undefined_names = out.split("\n")
-  .filter(line => line.includes("error TS2304"))
-  /* `worker/index.ts` names Cloudflare's `Fetcher`, which is a type from an
-     ambient package this tsconfig does not pull in. It is not app code and it
-     cannot throw in a browser. */
+    It did not run on Windows at all. `execFile("npx")` is `spawn npx ENOENT`
+    there, and a URL's `.pathname` for a drive path is `/C:/Users/…`, which as a
+    `cwd` is ENOENT too. The test reported "tsc produced no output at all" and
+    the one gate written for the crash above was simply off on that machine.
+
+    ONE UNRELATED SYNTAX ERROR SWITCHED IT OFF EVERYWHERE. `tsc` runs its checker
+    only when there is no syntactic, option or global diagnostic to report
+    first, so a stray `export const x = ;` in any file, or one conflicting line
+    in tsconfig, makes it print that and nothing about names. Re-create the
+    incident above, add that file, and the old test passed. Asking the program
+    for its semantic diagnostics directly has no such precondition.
+
+    And it needed the repo to stay broken: a clean `tsc` prints nothing, which
+    the old test read as "proves nothing" and failed on. */
+ const ts = (await import("typescript")).default;
+ const path = await import("node:path");
+ const { fileURLToPath } = await import("node:url");
+ const slashed = name => name.split(path.sep).join("/");
+ const root = fileURLToPath(new URL("../", import.meta.url));
+ const parsed = ts.getParsedCommandLineOfConfigFile(path.join(root, "tsconfig.json"), { noEmit: true }, {
+  ...ts.sys,
+  onUnRecoverableConfigFileDiagnostic: diagnostic => {
+   throw new Error("tsconfig.json could not be read: " + ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+  },
+ });
+ assert.ok(parsed, "tsconfig.json was not found beside the tests, so nothing was checked");
+ const covered = prefix => parsed.fileNames.filter(name => slashed(path.relative(root, name)).startsWith(prefix)).length;
+ assert.ok(covered("app/") && covered("src/"),
+  "tsconfig.json no longer includes app/ and src/ (" + covered("app/") + " and " + covered("src/") + " files), so this test would pass over code it never read");
+
+ /* A NAME PLANTED IN MEMORY, SO A PASS CANNOT BE AN EMPTY ONE. The check below
+    is "no line survives the filter", and every way of breaking it — the checker
+    not running, the code list emptied, the prefix filter matching nothing —
+    also leaves no line. So one file that exists only in this process names
+    identifiers defined nowhere, and the test demands exactly those reports
+    back. It is under `src/` on purpose: it has to travel the same filter the
+    real ones do. Nothing is written to disk. */
+ const canary = slashed(path.join(root, "src", "__undefined-name-canary__.ts"));
+ /* TWO LINES, because the first proved only its own code. With TS2304 alone
+    planted, deleting 18004 from the list below left this test green — and
+    18004 is the code the comment under it calls the one that matters most:
+    the shorthand `{name}` left behind by a narrowed import. Each line is the
+    smallest thing that produces its code, and both must come back. */
+ const canaryText = "export const canary = thisNameIsDefinedNowhere;\nexport const shorthand = { thisShorthandIsDefinedNowhere };\n";
+ const host = ts.createCompilerHost(parsed.options);
+ const isCanary = name => slashed(path.resolve(name)) === canary;
+ const fromDisk = host.getSourceFile.bind(host);
+ host.getSourceFile = (name, options, ...rest) => isCanary(name) ? ts.createSourceFile(name, canaryText, options) : fromDisk(name, options, ...rest);
+ const program = ts.createProgram({ rootNames: [...parsed.fileNames, canary], options: parsed.options, host });
+
+ /* THE COMPILER HAS MORE THAN ONE CODE FOR "THAT NAME IS NOT THERE", and the
+    old test knew one. Each line below was planted under src/ and reported
+    back before it was listed here; a code that could not be driven on this
+    tsconfig is not in the list.
+
+    The one that matters most is TS18004. The incident above was a narrowed
+    import with a CALL left behind, which is TS2304. Leave `{findRepairMinutes}`
+    behind instead — a shorthand property — and the same mistake is TS18004,
+    which the TS2304 test passed. TS2552 is the other near miss: a leftover name
+    that resembles one still imported gets "Did you mean …?" and its own code.
+
+    NOT EVERY ONE OF THESE IS A CRASH, and the failure message does not say so.
+    TS2304 and TS2552 also fire for a name in a TYPE position, which is erased
+    before the code runs — `worker/index.ts` trips both that way, on
+    Cloudflare's `Fetcher` and `D1Database`, types from an ambient package this
+    tsconfig does not pull in. That file is not app code, which is why only
+    app/ and src/ are asked. Telling a value from a type here would take the
+    compiler's internals, so a missing type under app/ or src/ fails this too:
+    the file names something it cannot see, and the fix is the same import. */
+ const NAME_NOT_THERE = new Set([
+  2304,  // Cannot find name 'x'.
+  2552,  // Cannot find name 'x'. Did you mean 'y'?
+  2662,  // Cannot find name 'x'. Did you mean the static member 'C.x'?
+  2663,  // Cannot find name 'x'. Did you mean the instance member 'this.x'?
+  18004, // No value exists in scope for the shorthand property 'x'.
+  2581,  // Cannot find name '$'. Do you need to install type definitions for jQuery?
+  2582,  // Cannot find name 'test'. Do you need to install type definitions for a test runner?
+  2693,  // 'X' only refers to a type, but is being used as a value here.
+  2708,  // Cannot use namespace 'N' as a value.
+  1361,  // 'x' cannot be used as a value because it was imported using 'import type'.
+  1362,  // 'x' cannot be used as a value because it was exported using 'export type'.
+  2448,  // Block-scoped variable 'x' used before its declaration.
+  2449,  // Class 'X' used before its declaration.
+ ]);
+ /* WHAT THIS STILL CANNOT SEE, so nobody reads a pass as more than it is. A
+    line under `@ts-ignore`, `@ts-expect-error` or `@ts-nocheck` reports
+    nothing — there are none in app/ or src/ today. A `.js` file is not in this
+    program at all. `worker/` and `db/` are not asked. And the name planted
+    above proves the checker ran and that TS2304 and TS18004 come back through
+    the filter; it does not prove the other eleven codes, which were driven by
+    hand. */
+ const undefined_names = program.getSemanticDiagnostics()
+  .filter(diagnostic => diagnostic.file && NAME_NOT_THERE.has(diagnostic.code))
+  .map(diagnostic => {
+   const at = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+   return slashed(path.relative(root, diagnostic.file.fileName)) + "(" + (at.line + 1) + "," + (at.character + 1) + "): error TS" + diagnostic.code + ": " + ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
+  })
   .filter(line => line.startsWith("app/") || line.startsWith("src/"));
- assert.deepEqual(undefined_names, [],
-  "a name with no definition will throw the moment that code runs:\n  " + undefined_names.join("\n  "));
+ const planted = undefined_names.filter(line => line.startsWith("src/__undefined-name-canary__.ts("));
+ assert.deepEqual(planted, [
+  "src/__undefined-name-canary__.ts(1,23): error TS2304: Cannot find name 'thisNameIsDefinedNowhere'.",
+  "src/__undefined-name-canary__.ts(2,28): error TS18004: No value exists in scope for the shorthand property 'thisShorthandIsDefinedNowhere'. Either declare one or provide an initializer.",
+ ], "the two names planted in memory did not come back as one TS2304 and one TS18004, so the checker did not run, the filter is broken or a code fell out of the list, and this test proves nothing");
+ const real = undefined_names.filter(line => !planted.includes(line));
+ assert.deepEqual(real, [],
+  "a name that is not there — if it is used as a value, that line throws the moment it runs:\n  " + real.join("\n  "));
 });
 
 test("the bus generation chips are sized for their label, not for the box", async () => {
