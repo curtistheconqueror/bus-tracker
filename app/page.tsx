@@ -48,7 +48,8 @@ import {DOWN_SHEET_STORAGE_KEY as DOWN_KEY,FLEET_STORAGE_KEY as FLEET_KEY,readDo
 import SaveAlert from "@/src/components/shared/save-alert";
 import ShopCloudLive from "@/src/components/shared/shop-cloud-live";
 import RefreshButton,{refreshTrackerApp} from "@/src/components/shared/refresh-button";
-import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot} from "@/src/lib/defects/scan-batches";
+import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff} from "@/src/lib/defects/scan-batches";
+import {dropScanChecks,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {forgetRemovedEntries,readMergedAway,rememberRemovedEntries,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import AppName from "@/src/components/shared/app-name";
 import WelcomeGate from "@/src/components/shared/welcome-gate";
@@ -481,30 +482,36 @@ const executeOperator=(plan:OperatorPlan):{ok:boolean;message:string}=>{
     sends their tombstones on the way out, and the other devices drop them. */
  if(plan.kind==="removeScanBatch"){
   const batch=scanBatches(buses).find(item=>item.key===plan.batchKey);
-  if(!batch||batch.ids.length!==plan.count)return {ok:false,message:"That scan sweep changed after the preview. Nothing was removed — ask again to see it as it is now."};
+  if(!batch||batch.ids.length!==plan.count)return {ok:false,message:"That scan changed after the preview. Nothing was removed — ask again to see it as it is now."};
   const now=new Date().toISOString(),result=removeScanBatch(buses,batch.key,now);
-  if(!result.removed.length)return {ok:false,message:"Every record in that sweep has been worked on since, so nothing was removed."};
+  const words=scanBatchWords(batch);
+  if(!result.removed.length)return {ok:false,message:"Every record in that "+words.short+" has been worked on since, so nothing was removed."};
   const written=writeFleetStorageResult(localStorage,result.fleet,{allowBulkDefectLoss:true});
   setSaveProblem(written.reason||"");
   if(!written.ok)return {ok:false,message:"The board could not be saved on this device, so nothing was removed."};
-  const label="Removed "+result.removed.length+" scan sweep record"+(result.removed.length===1?"":"s");
+  const label="Removed "+result.removed.length+" "+words.noun+" record"+(result.removed.length===1?"":"s");
+  /* A heat sheet scan also logged a check for every line it read, and they go
+     with it — through the one function the Defect Log's own SCAN BATCHES uses.
+     This door took the defects and left every check behind until a cold read
+     ran it: each bus the removed scan had called N/R dropped into VERIFY. */
+  const cut=dropScanChecks(localStorage,batch);
   writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(scanBatchUndoSnapshot(result.removed,label,now)));
   writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
   setBuses(result.fleet as B[]);
-  return {ok:true,message:result.removed.length+" record"+(result.removed.length===1?"":"s")+" from that sweep "+(result.removed.length===1?"was":"were")+" taken off "+new Set(result.removed.map(record=>record.busId)).size+" bus"+(new Set(result.removed.map(record=>record.busId)).size===1?"":"es")+"."+(result.kept?" "+result.kept+" worked on since "+(result.kept===1?"was":"were")+" kept.":"")+" The shop cloud will drop them on the other devices. To put them back, tell me to put the sweep back, or use SCAN BATCHES on the Defect Log."};
+  return {ok:true,message:result.removed.length+" record"+(result.removed.length===1?"":"s")+" from that "+words.short+" "+(result.removed.length===1?"was":"were")+" taken off "+new Set(result.removed.map(record=>record.busId)).size+" bus"+(new Set(result.removed.map(record=>record.busId)).size===1?"":"es")+"."+(result.kept?" "+result.kept+" worked on since "+(result.kept===1?"was":"were")+" kept.":"")+(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken off the check log too.":" Its heat checks could not be taken off the check log — "+heatLogProblemWords(cut.why)+"."):"")+" The shop cloud will drop them on the other devices. To put them back, tell me to put the "+words.short+" back, or use SCAN BATCHES on the Defect Log."};
  }
  if(plan.kind==="restoreScanBatch"){
   const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
-  if(!snapshot)return {ok:false,message:"There is no removed scan sweep to put back on this device."};
+  if(!snapshot)return {ok:false,message:"There is no removed scan to put back on this device."};
   const now=new Date().toISOString(),result=restoreScanBatch(buses,snapshot,now);
-  if(!result.restored){localStorage.removeItem(SCAN_BATCH_UNDO_KEY);return {ok:false,message:result.missing?"Those records' buses are no longer on this device, so nothing could be put back.":"Every record from that sweep is already back on its bus."}}
+  if(!result.restored){localStorage.removeItem(SCAN_BATCH_UNDO_KEY);return {ok:false,message:result.missing?"Those records' buses are no longer on this device, so nothing could be put back.":result.duplicate?"Nothing was put back: every record from that scan is already on its bus, or the bus already has that repair open.":"Every record from that scan is already back on its bus."}}
   const written=writeFleetStorageResult(localStorage,result.fleet);
   setSaveProblem(written.reason||"");
   if(!written.ok)return {ok:false,message:"The board could not be saved on this device, so nothing was put back."};
   const ledger=readMergedAway(localStorage);for(const id of result.restoredIds)delete ledger[id];writeMergedAway(localStorage,ledger);
   localStorage.removeItem(SCAN_BATCH_UNDO_KEY);
   setBuses(result.fleet as B[]);
-  return {ok:true,message:result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+". Stamped as new work, so the shop cloud takes them back over the deletion."};
+  return {ok:true,message:result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+scanRestoreLeftOff(result)+". Stamped as new work, so the shop cloud takes them back over the deletion."};
  }
  if(plan.kind==="undoDownSheetClear"){
   try{const snapshot=readDownSheetClearSnapshot<{id:string;busId:string;workflow:string}>(localStorage.getItem(DOWN_SHEET_CLEAR_UNDO_KEY));if(!snapshot)return {ok:false,message:"There is no cleared down sheet to restore on this device."};const raw=localStorage.getItem("pace-down-sheet-v1"),payload=raw?JSON.parse(raw):null,entries=(Array.isArray(payload)?payload:payload?.entries)||[];if(!Array.isArray(entries))return {ok:false,message:"The current down sheet could not be read. Nothing was changed."};const restoredAt=new Date().toISOString(),held=new Set((entries as {id:string}[]).map(entry=>entry.id)),plain=restoreDownSheetState(entries,buses,snapshot);/* Off the ledger, and restamped, or the entries put back here lose to the tombstone the clear sent and are deleted again on the next pull. */forgetRemovedEntries(localStorage,snapshot.entries.map(entry=>entry.id));const result={...plain,entries:plain.entries.map(entry=>held.has(entry.id)?entry:{...entry,updatedAt:restoredAt})},downText=JSON.stringify({version:1,entries:result.entries}),flags=downSheetHighlightIds(downText);localStorage.setItem("pace-down-sheet-v1",downText);writeFleetStorage(localStorage,result.fleet);localStorage.removeItem(DOWN_SHEET_CLEAR_UNDO_KEY);setBuses(result.fleet as B[]);setActiveDownIds(flags.down);setAcIssueIds(flags.ac);return {ok:true,message:result.restoredEntries+" down-sheet row"+(result.restoredEntries===1?" was":"s were")+" restored with the matching tracker checkboxes."}}catch{return {ok:false,message:"The last cleared down sheet could not be restored. Nothing was changed."}}

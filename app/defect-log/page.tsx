@@ -24,9 +24,13 @@ import {useHeaderColor} from "@/src/components/shared/header-theme-live";
 import {headerTextFor} from "@/src/lib/settings/header-theme";
 import {pageThemeHeaderPair} from "@/src/lib/settings/page-header-themes";
 import SweepScanner from "./_components/sweep-scanner";
+import HeatScanner from "./_components/heat-scanner";
+import {heatFiling,type HeatFinding} from "@/src/lib/defects/heat-check-import";
+import {applyHeatFiling} from "@/src/lib/defects/heat-check-apply";
+import {HEAT_SCAN_PARAM,HEAT_SCAN_VALUE,addHeatChecks,dropScanChecks,heatChecksFromFindings,heatLogProblemWords} from "@/src/lib/defects/heat-check-log";
 import {sweepDefect,type SweepFinding} from "@/src/lib/defects/sweep-scan-import";
 import ScanBatchesPanel from "./_components/scan-batches-panel";
-import {readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
+import {findScanBatch,readScanBatchUndo,removeScanBatch,restoreScanBatch,SCAN_BATCH_UNDO_KEY,scanBatches,scanBatchUndoSnapshot,scanBatchWords,scanRestoreLeftOff,type ScanBatch,type ScanBatchUndo} from "@/src/lib/defects/scan-batches";
 import {readMergedAway,writeMergedAway} from "@/src/lib/cloud/cloud-sync";
 import QuickFilterMenu from "@/src/components/defects/quick-filter-menu";
 import OfflineBackupReminder from "./_components/offline-backup-reminder";
@@ -84,7 +88,7 @@ type LogDraft={busId:string;defect:StructuredDefect;quickIssue:string;onDownShee
    restore of the old fleet: the records have to come back stamped as new work,
    and the cloud ledger has to forget them, or the shop cloud keeps them deleted.
    That path lives in restoreBatch and UNDO LAST hands over to it. */
-type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true};
+type LogUndoSnapshot={fleet:DefectLogFleetBus[];downEntries:DefectLogDownEntry[];label:string;scanBatch?:true;heatScan?:string;heatChecks?:string};
 
 const BOARD_SETTINGS_KEY="pace-board-settings-v1";
 /* Absent means closed. A new key rather than a settings field, so a device
@@ -988,6 +992,17 @@ export default function DefectLog(){
  useEffect(()=>{if(!reportNote)return;const timer=window.setTimeout(()=>setReportNote(null),OUTCOME_WINDOW_MS);return()=>window.clearTimeout(timer)},[reportNote]);
  const [extendUntil,setExtendUntil]=useState("");
  const [sweepOpen,setSweepOpen]=useState(false);
+ const [heatOpen,setHeatOpen]=useState(false);
+ /* Fleet Campaigns sends people here to scan the heat sheet. The parameter is
+    taken off the address once it has been acted on, the way a quick filter's
+    is, so a reload does not throw the scanner up a second time. */
+ useEffect(()=>{
+  const url=new URL(window.location.href);
+  if(url.searchParams.get(HEAT_SCAN_PARAM)!==HEAT_SCAN_VALUE)return;
+  setHeatOpen(true);
+  url.searchParams.delete(HEAT_SCAN_PARAM);
+  window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+ },[]);
  const [batchesOpen,setBatchesOpen]=useState(false);
  /* The last removed scan sweep, read from the device rather than held only in
     memory, so PUT BACK works after a reload and after a removal the operator
@@ -1465,6 +1480,44 @@ export default function DefectLog(){
   setSweepOpen(false);
   alert(filed+" finding"+(filed===1?"":"s")+" filed as open Tech Services defect"+(filed===1?"":"s")+(skipped?". "+skipped+" skipped — already logged on that bus in the last 48 hours":"")+". UNDO LAST reverses it.");
  };
+ /* A reviewed heat check sheet. Two writes, in this order, and the order is the
+    point: the DEFECTS go on first, because they are the part that can be
+    refused, and the checks are logged only once the board has taken them — a
+    log saying forty buses were checked beside a board that never got the
+    forty defects would be the worse of the two half-states. The log write is
+    best effort after that: losing it costs a re-scan, since a line off the
+    paper has an id made of what the line says and reading it again adds
+    nothing twice.
+
+    One `now` for the whole press, which is what SCAN BATCHES finds it by. */
+ const fileHeat=(findings:HeatFinding[],loggable:HeatFinding[])=>{
+  const now=new Date().toISOString(),filing=heatFiling(findings,now);
+  const result=applyHeatFiling(fleet,downEntries,filing,now);
+  const filed=result.filed.length,skipped=result.skipped.length;
+  if(filed){
+   const written=persist(result.fleet,result.downEntries);
+   if(!written.ok)return;
+   /* `heatScan` is the press's stamp. UNDO LAST puts the board back, and a
+      heat filing it undoes has checks on the log that go back with it. */
+   setUndoSnapshot({fleet,downEntries,label:"Filed "+filed+" heat sheet finding"+(filed===1?"":"s"),heatScan:now});
+  }
+  /* `added` is what is NEW to this device, and that is the number said out
+     loud: a sheet scanned a second time reads sixty lines and adds none. */
+  const log=addHeatChecks(localStorage,heatChecksFromFindings(loggable,now));
+  /* A SCAN THAT FILED NOTHING STILL HAS A WAY BACK. An all-OK page leaves no
+     defect, so no batch for SCAN BATCHES to find — and it left the PREVIOUS
+     undo armed, so UNDO LAST after it reversed whatever had been done before
+     the scan. `heatChecks` is this press's stamp; UNDO LAST takes exactly the
+     checks carrying it. The board in this snapshot is the board as it is,
+     because this press did not change it. */
+  if(!filed&&log.ok&&log.added)setUndoSnapshot({fleet,downEntries,label:"Logged "+log.added+" heat check"+(log.added===1?"":"s"),heatChecks:now});
+  setHeatOpen(false);
+  alert((filed?filed+" No Heat defect"+(filed===1?"":"s")+" filed on the Defect Log":"No defects were filed")
+   +(skipped?". "+skipped+" could not be filed and "+(skipped===1?"was":"were")+" left off":"")
+   +(!log.ok?". THE HEAT CHECKS COULD NOT BE SAVED — "+heatLogProblemWords(log.why)+(log.why==="unreadable"?"":". Scan the sheet again once there is room")
+     :log.added?". "+log.added+" new heat check"+(log.added===1?"":"s")+" logged":". No new heat checks — every line on these pages was already in the log")
+   +(filed?". SCAN BATCHES takes the defects and the checks back out together.":log.ok&&log.added?". UNDO LAST takes these checks back out, for as long as you stay on this page and change nothing else.":"."));
+ };
  /* Takes a whole scan sweep back out. The batch is the set of sweep records
     sharing one creation stamp — the fingerprint fileSweep leaves by taking the
     clock once — and only the records nobody has touched since are removed.
@@ -1478,33 +1531,69 @@ export default function DefectLog(){
     MERGE DUPES writes it. With it, the removal reaches the other devices. */
  const removeBatch=(batch:ScanBatch)=>{
   const now=new Date().toISOString(),result=removeScanBatch(fleet,batch.key,now);
-  if(!result.removed.length){alert("Every record in that sweep has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to remove.");return}
+  if(!result.removed.length){alert("Every record in that "+scanBatchWords(batch).short+" has been worked on since — marked fixed, deferred, ticked or written on — so there is nothing untouched to remove.");return}
   const buses=new Set(result.removed.map(record=>record.busId)).size;
-  if(!confirm("Remove "+result.removed.length+" record"+(result.removed.length===1?"":"s")+" filed by that scan sweep from "+buses+" bus"+(buses===1?"":"es")+"?"+(result.kept?" "+result.kept+" worked on since will be kept.":"")+"\n\nThe shop cloud is told, so the other devices drop them too. UNDO LAST or PUT BACK reverses it."))return;
+  if(!confirm("Remove "+result.removed.length+" record"+(result.removed.length===1?"":"s")+" filed by that "+scanBatchWords(batch).noun+" from "+buses+" bus"+(buses===1?"":"es")+"?"+(result.kept?" "+result.kept+" worked on since will be kept.":"")+"\n\nThe shop cloud is told, so the other devices drop them too. UNDO LAST or PUT BACK reverses it."))return;
   const written=persist(result.fleet,downEntries,{allowBulkDefectLoss:true});
   if(!written.ok)return;
-  const label="Removed "+result.removed.length+" scan sweep record"+(result.removed.length===1?"":"s");
+  const label="Removed "+result.removed.length+" "+scanBatchWords(batch).noun+" record"+(result.removed.length===1?"":"s");
   const snapshot=scanBatchUndoSnapshot(result.removed,label,now);
   writeSetting(localStorage,SCAN_BATCH_UNDO_KEY,JSON.stringify(snapshot));setBatchUndo(snapshot);
   writeMergedAway(localStorage,{...readMergedAway(localStorage),...Object.fromEntries(result.removed.map(record=>[record.defect.id,now]))});
   setUndoSnapshot({fleet,downEntries,label,scanBatch:true});
   setBatchesOpen(false);
-  alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")+" PUT BACK under SCAN BATCHES reverses it.");
+  /* A heat sheet scan also logged a check for every line it read. Those go
+     with it, or the buses it called N/R would sit under VERIFY on the strength
+     of a scan somebody has just taken back. PUT BACK returns the defects and
+     not the checks; reading the sheet again returns those. The alert offers
+     the two as the ALTERNATIVES they are — it used to offer both in one
+     breath, and doing both gave every bus its defect twice until PUT BACK
+     learned to leave off a repair the bus already has open. */
+  const cut=dropScanChecks(localStorage,batch);
+  alert(result.removed.length+" record"+(result.removed.length===1?"":"s")+" removed from "+buses+" bus"+(buses===1?"":"es")+"."+(result.kept?" "+result.kept+" kept.":"")
+   +(cut.removed||!cut.ok?(cut.ok?" The "+cut.removed+" heat check"+(cut.removed===1?"":"s")+" that scan logged "+(cut.removed===1?"was":"were")+" taken out too.":" ITS HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+"."):"")
+   +" PUT BACK under SCAN BATCHES returns the records"+(cut.removed&&cut.ok?"; the checks come back by scanning the sheet again":"")+".");
  };
  /* The records go back stamped as new work — newer than the tombstones the
     removal sent — and the ledger forgets them, so the shop cloud accepts them
     back over the deletion instead of dropping the restore as an older write. */
  const restoreBatch=()=>{
   const snapshot=readScanBatchUndo(localStorage.getItem(SCAN_BATCH_UNDO_KEY));
-  if(!snapshot){setBatchUndo(null);alert("There is no removed scan sweep to put back on this device.");return}
+  if(!snapshot){setBatchUndo(null);alert("There is no removed scan to put back on this device.");return}
   const now=new Date().toISOString(),result=restoreScanBatch(fleet,snapshot,now);
   if(result.restored&&!persist(result.fleet,downEntries).ok)return;
   const ledger=readMergedAway(localStorage);for(const id of result.restoredIds)delete ledger[id];writeMergedAway(localStorage,ledger);
   localStorage.removeItem(SCAN_BATCH_UNDO_KEY);setBatchUndo(null);
   if(undoSnapshot?.scanBatch)setUndoSnapshot(null);
-  alert(result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+".");
+  alert(result.restored+" record"+(result.restored===1?"":"s")+" went back on "+(result.restored===1?"its bus":"their buses")+(result.missing?"; "+result.missing+" could not because "+(result.missing===1?"its bus is":"their buses are")+" no longer on this device":"")+scanRestoreLeftOff(result)+".");
  };
- const undoLastChange=()=>{if(!undoSnapshot)return;if(undoSnapshot.scanBatch){restoreBatch();return}persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null)};
+ /* UNDO LAST ON A HEAT SHEET FILING IS "TAKE THAT SCAN BACK OUT", so it goes
+    through the door that does that properly. Putting the board's old copy back
+    — what UNDO LAST does for a hand-saved change — would have left three things
+    wrong for a scan: the checks it logged stayed on the log, so every bus it
+    had called N/R went to VERIFY; the shop cloud was never told, so the next
+    pull brought the defects straight back; and a filing of five or more was
+    refused as a bulk loss with the undo thrown away anyway. `removeBatch`
+    writes the tombstones, takes the checks, asks first, and leaves PUT BACK.
+    A cold read found the first of those; the other two came with it. */
+ const undoLastChange=()=>{
+  if(!undoSnapshot)return;
+  if(undoSnapshot.scanBatch){restoreBatch();return}
+  if(undoSnapshot.heatChecks){
+   const cut=dropScanChecks(localStorage,{kind:"heat",key:undoSnapshot.heatChecks});
+   /* Kept when the log refused: a failed undo that threw its own way back
+      away could not be tried again once there was room. */
+   if(cut.ok)setUndoSnapshot(null);
+   alert(cut.ok?(cut.removed?cut.removed+" heat check"+(cut.removed===1?"":"s")+" from that scan "+(cut.removed===1?"was":"were")+" taken back out. No defect was filed by it, so nothing else changed.":"Those heat checks are no longer on this device's log, so there was nothing to take out."):"THE HEAT CHECKS COULD NOT BE TAKEN OUT — "+heatLogProblemWords(cut.why)+".");
+   return;
+  }
+  if(undoSnapshot.heatScan){
+   const batch=findScanBatch(batches,undoSnapshot.heatScan);
+   if(batch){removeBatch(batch);return}
+   setUndoSnapshot(null);alert("That heat sheet scan is no longer on this device's Defect Log, so there is nothing to undo.");return;
+  }
+  persist(undoSnapshot.fleet,undoSnapshot.downEntries);setUndoSnapshot(null);
+ };
  const backInService=(record:DefectLogRecord)=>{const result=returnDefectLogBusToService(fleet,downEntries,record.bus.id,record.defect.id);if(result.error){alert(result.error==="decommissioned"?"A decommissioned bus cannot be returned to service.":"That repair is no longer available. Refresh and try again.");return}persist(result.fleet,result.downEntries);if(result.status==="out")alert("This bus remains Out of Service because another active downing defect is still present.")};
 /* EXTEND, from the held row itself.
 
@@ -1894,7 +1983,7 @@ export default function DefectLog(){
      </div>
      <div className="log-advanced-group">
       <b className="log-advanced-label">TOOLS</b>
-      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every scan sweep filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a></div>
+      <div className="feed-actions"><button className="cleanup-log" onClick={cleanUpLog}>CLEAN UP</button><button className="sweep-scan-button" type="button" onClick={()=>setSweepOpen(true)} disabled={!fleet.length} title="Photograph the farebox and Ventra check-off sheets and file what they found">📷 SCAN SWEEP</button><button className="scan-batches-button" type="button" onClick={()=>setBatchesOpen(true)} disabled={!batches.length&&!batchUndo} title="Every photo scan filed on this device, and the way to take one back out">↶ SCAN BATCHES</button><a className="feed-operator" href="/?operator=1" title="Opens the AI Operator on the Facility Map — this leaves the Defect Log" onClick={event=>{if(!leaveForOperator())event.preventDefault()}}><span aria-hidden="true">&#10022;</span> AI OPERATOR</a><button className="heat-scan-button" type="button" onClick={()=>setHeatOpen(true)} disabled={!fleet.length} title="Photograph the heat check sheet: N/R becomes a No Heat defect, and every line is logged as a check">📷 SCAN HEAT SHEET</button></div>
      </div>
     </div>
   </section>}
@@ -2297,7 +2386,7 @@ export default function DefectLog(){
   {editing&&<DefectEditor key={editing.busId+":"+editing.defect.id} draft={editing} fleet={fleet} defaultInitials={settings.defaultInitials} requireInitials={settings.requireInitials} coachOn={coachOn} partsMemory={partsMemory} forgetPart={forgetLearnedPart} findingsMemory={findingsMemory} forgetFinding={forgetLearnedFinding} shopHours={repairHours} save={saveDraft} saveFixed={saveFixedDraft} showExisting={showExistingDefect} countReturn={countReturn} close={closeEditor} onBusPicked={clearSearchIfBusIsOutside}/>}
   {/* Rendered here rather than inside ADVANCED ACTIONS: closing that section
       must not tear down a scanner somebody is part-way through. */}
-  {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
+  {sweepOpen&&<SweepScanner fleet={fleet} onClose={()=>setSweepOpen(false)} onFile={fileSweep}/>}{heatOpen&&<HeatScanner fleet={fleet} onClose={()=>setHeatOpen(false)} onFile={fileHeat}/>}{batchesOpen&&<ScanBatchesPanel batches={batches} undo={batchUndo} onRemove={removeBatch} onRestore={restoreBatch} onClose={()=>setBatchesOpen(false)}/>}
   {holdBoardOpen&&<HoldBoard fleet={fleet} close={()=>setHoldBoardOpen(false)} onRelease={busId=>setHold(busId,false)}/>}
   {movingMysteryBus&&<MysteryMoveModal bus={movingMysteryBus} fleet={fleet} move={moveMysteryBus} close={()=>setMovingMysteryBusId("")}/>}
   

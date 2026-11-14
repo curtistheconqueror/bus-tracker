@@ -1150,6 +1150,14 @@ test("MASTER EXPORT and MASTER IMPORT carry the same set of keys",async()=>{
  const ledger=restoreSource.match(/writeSetting\(storage,(\w+),JSON\.stringify\(mergeSheetLedgers\(readSheetLedger\(storage\),backup\.(\w+)\)/);
  assert.ok(ledger,"the sheet ledger no longer merges through the branch this test knows about");
  restored.set(ledger[2],ledger[1]);
+ /* And the heat check log, the second thing that merges rather than replaces.
+    It writes through its own helper, which names its key inside
+    heat-check-log.ts, so the key is taken from the export side's import and
+    the pairing asserted is field-to-field. */
+ const heat=restoreSource.match(/writeHeatChecks\(storage,mergeHeatChecks\(readHeatChecks\(storage\),backup\.(\w+)\)\)/);
+ assert.ok(heat,"the heat check log no longer merges through the branch this test knows about");
+ assert.match(backupSource,/import \{HEAT_CHECKS_KEY\} from "\.\.\/defects\/heat-check-log\.ts"/);
+ restored.set(heat[1],"HEAT_CHECKS_KEY");
 
  assert.ok(exported.size>=10,"expected the export to read at least ten keys, found "+exported.size);
  assert.deepEqual([...restored.keys()].sort(),[...exported.keys()].sort(),
