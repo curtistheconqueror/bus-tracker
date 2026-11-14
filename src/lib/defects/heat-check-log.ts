@@ -1,5 +1,6 @@
 import {defectShortLabel} from "./repair-catalog.ts";
 import {quickFilterDefects} from "./quick-filters.ts";
+import {PAPER_SCAN_PARAM,paperScanHref,type PaperKind} from "../scan/paper-kinds.ts";
 import {dayStamp,HEAT_CHECK_MAX_AGE_DAYS,heatDateUnplaced,heatLowConfidence,localDay,type HeatFinding,type HeatFleetBus} from "./heat-check-import.ts";
 
 /* WHO CHECKED WHICH BUS FOR HEAT, WHEN, AND WHAT THEY FOUND.
@@ -405,10 +406,14 @@ export function heatShareText(rows:HeatRosterRow[],mode:HeatShareMode="remaining
    and where the board is saved, undone and taken back out; Fleet Campaigns is
    where the heat campaign is run from. So the campaign's SCAN button is a link,
    and this is its address — one definition, so the link and the page that
-   reads it cannot drift. */
-export const HEAT_SCAN_PARAM="scan";
-export const HEAT_SCAN_VALUE="heat";
-export function heatScanHref(){return "/defect-log?"+HEAT_SCAN_PARAM+"="+HEAT_SCAN_VALUE}
+   reads it cannot drift.
+
+   SCAN PAPER uses the same address for all three sheets, so the spelling now
+   lives with the table of sheets in scan/paper-kinds.ts and these are that
+   table's answers for the heat sheet rather than a second copy of them. */
+export const HEAT_SCAN_PARAM=PAPER_SCAN_PARAM;
+export const HEAT_SCAN_VALUE:PaperKind="heat";
+export function heatScanHref(){return paperScanHref(HEAT_SCAN_VALUE)}
 
 /* ADDING CHECKS TO THE LOG ON DISK: read, merge, write, in one place.
 
